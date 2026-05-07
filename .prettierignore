@@ -1,0 +1,7 @@
+node_modules
+out
+dist
+apps/*/node_modules
+apps/*/out
+apps/*/dist
+pnpm-lock.yaml

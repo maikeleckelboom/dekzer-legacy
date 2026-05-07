@@ -1,0 +1,29 @@
+appId: com.dekzer.desktop
+productName: Dekzer
+directories:
+  buildResources: resources
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+win:
+  executableName: Dekzer
+nsis:
+  artifactName: dekzer-desktop-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+dmg:
+  artifactName: dekzer-desktop-${version}.${ext}
+linux:
+  target:
+    - AppImage
+    - deb
+  maintainer: Dekzer
+  category: Utility
+appImage:
+  artifactName: dekzer-desktop-${version}.${ext}
+npmRebuild: false

@@ -1,0 +1,98 @@
+# ====================================================================
+# 1. Default Fallback
+# ====================================================================
+# Auto-detect text files and normalize to LF in the repo.
+# Removing 'eol=lf' from the wildcard prevents Git from throwing
+# warnings on unmapped/unknown files created on Windows.
+* text=auto
+
+# ====================================================================
+# 2. Strict Executable Endings (Mandatory)
+# ====================================================================
+# Shell scripts MUST use Unix line endings, even on Windows,
+# otherwise they will fail in WSL, Docker, or Linux subsystems.
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Windows scripts MUST use Windows line endings.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ====================================================================
+# 3. Source Code & Configuration (Forced LF)
+# ====================================================================
+# Forcing LF prevents cross-platform CI failures with strict linters
+# like Prettier, ESLint, or Rustfmt.
+
+# Core repo metadata
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.editorconfig text eol=lf
+
+# Docs & Configs
+*.md text eol=lf
+*.txt text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.xml text eol=lf
+*.sql text eol=lf
+Cargo.lock text eol=lf
+
+# Rust & Native
+*.rs text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+
+# Web / UI
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.html text eol=lf
+*.vue text eol=lf
+*.svg text eol=lf
+
+# ====================================================================
+# 4. Binary Assets (Do Not Modify)
+# ====================================================================
+# The 'binary' macro is equivalent to '-text -diff'.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.wasm binary
+*.db binary
+*.db-shm binary
+*.db-wal binary
+*.sqlite binary
+*.sqlite3 binary
+*.wav binary
+*.mp3 binary
+*.flac binary
+*.aiff binary
+*.aif binary
+*.m4a binary
+*.mp4 binary
+*.aac binary
+*.ogg binary
