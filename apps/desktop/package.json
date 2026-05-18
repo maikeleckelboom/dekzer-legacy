@@ -21,7 +21,8 @@
     "build:linux": "pnpm run build && electron-builder --linux"
   },
   "dependencies": {
-    "@electron-toolkit/utils": "^4.0.0"
+    "@electron-toolkit/utils": "^4.0.0",
+    "reka-ui": "^2.9.7"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",

@@ -4,7 +4,8 @@
 
 Accepted working foundation.
 
-This document captures the current final implementation direction for the Dekzer workspace engine foundation as established through architecture review.
+This document captures the current final implementation direction for the Dekzer workspace engine foundation as
+established through architecture review.
 
 It exists to prevent loss of design decisions across chat, repo resets, or prototype churn.
 
@@ -90,7 +91,8 @@ Current tree shape is effectively:
 - `packages/*` is empty and reserved
 - `docs/workspace/*` contains the current law docs
 
-This means the next work is greenfield implementation inside the scaffold, not migration patching of an already-built workspace engine.
+This means the next work is greenfield implementation inside the scaffold, not migration patching of an already-built
+workspace engine.
 
 ---
 
@@ -543,11 +545,13 @@ The intended final model is topology-native same-axis continuation.
 
 ### Immediate reality
 
-An early same-parent-split-only implementation is acceptable only as a temporary slice, provided it is treated as debt and not mistaken for the final law.
+An early same-parent-split-only implementation is acceptable only as a temporary slice, provided it is treated as debt
+and not mistaken for the final law.
 
 ### Final target
 
-Negotiated participation must eventually resolve over same-axis continuation topology, not only same-parent-split siblings.
+Negotiated participation must eventually resolve over same-axis continuation topology, not only same-parent-split
+siblings.
 
 ### Dominance
 
@@ -612,7 +616,8 @@ Rounding remainders must be explicitly assigned.
 
 ### Structural sharing goal
 
-Projection should eventually support structural sharing or pooling so unchanged presentation objects are reused across frames.
+Projection should eventually support structural sharing or pooling so unchanged presentation objects are reused across
+frames.
 
 This is a performance goal after correctness.
 
@@ -828,7 +833,8 @@ Rust is not the first move.
 
 TS-first remains correct because the current problem is ownership and law proofing, not raw throughput.
 
-Later, if the architecture hardens, the inside of `packages/workspace` can migrate to Rust or WASM behind the same public contract.
+Later, if the architecture hardens, the inside of `packages/workspace` can migrate to Rust or WASM behind the same
+public contract.
 
 That future migration target would be:
 

@@ -1,24 +1,32 @@
 # Workspace Topology Negotiation — Solver Sketch
 
-> This document describes one viable implementation family for the negotiation law defined in `workspace-topology-negotiation-law.md`. Nothing here is architectural canon. The law doc states what must be true. This doc shows one way to make it true. Specific formulas, type shapes, and pseudocode may change without violating the law.
+> This document describes one viable implementation family for the negotiation law defined in
+`workspace-topology-negotiation-law.md`. Nothing here is architectural canon. The law doc states what must be true. This
+> doc shows one way to make it true. Specific formulas, type shapes, and pseudocode may change without violating the law.
 >
-> Read the law doc first. Do not treat anything in this doc as a constraint on future implementations unless it has been explicitly promoted to the law doc.
+> Read the law doc first. Do not treat anything in this doc as a constraint on future implementations unless it has been
+> explicitly promoted to the law doc.
 
 ---
 
 ## Participant set construction
 
-The solver operates on a resolved participant set. The participant set is constructed at session creation and frozen for the duration of the gesture.
+The solver operates on a resolved participant set. The participant set is constructed at session creation and frozen for
+the duration of the gesture.
 
-The set is derived by walking the same-axis continuation topology rooted at the touched boundary. Starting from the touched boundary's parent split, collect all siblings sharing the same axis. Assign each a band index based on topological distance from the touched boundary. Do not cross orthogonal splits.
+The set is derived by walking the same-axis continuation topology rooted at the touched boundary. Starting from the
+touched boundary's parent split, collect all siblings sharing the same axis. Assign each a band index based on
+topological distance from the touched boundary. Do not cross orthogonal splits.
 
 For each participant, record:
+
 - Band index
 - Authored participation preference (the non-CSS, non-flex-grow coefficient)
 - Authored min and max fraction constraints
 - Which side of the touched boundary it sits on (left or right)
 
-Directional capacity (`canGive`, `canTake`) is **not** stored in the frozen snapshot. It is derived from current preview sizes at each iteration.
+Directional capacity (`canGive`, `canTake`) is **not** stored in the frozen snapshot. It is derived from current preview
+sizes at each iteration.
 
 ---
 
@@ -26,8 +34,8 @@ Directional capacity (`canGive`, `canTake`) is **not** stored in the frozen snap
 
 Participants are grouped into bands by distance from the touched boundary.
 
-**Band 0** — immediate neighbors of the touched boundary (left neighbor and right neighbor).  
-**Band 1** — next same-axis participants outward from Band 0.  
+**Band 0** — immediate neighbors of the touched boundary (left neighbor and right neighbor).
+**Band 1** — next same-axis participants outward from Band 0.
 **Band N** — same-axis participants at distance N.
 
 In **direct mode**, only Band 0 participates. No other bands are included in the solve.
@@ -45,9 +53,12 @@ touchedShare     = α × delta
 negotiationShare = (1 − α) × delta
 ```
 
-Where `α` is the dominance coefficient — an engine-level parameter or authored per split. A value near 1.0 makes Band 0 nearly exclusive. A value near 0.5 produces more balanced co-participation.
+Where `α` is the dominance coefficient — an engine-level parameter or authored per split. A value near 1.0 makes Band 0
+nearly exclusive. A value near 0.5 produces more balanced co-participation.
 
-**Band 0 absorbs `touchedShare` first**, before `negotiationShare` is distributed. Both allocations run in the same solver step — this is not sequential exhaustion. But Band 0 gets a privileged, non-negotiable portion that is not subject to redistribution by the negotiation pool.
+**Band 0 absorbs `touchedShare` first**, before `negotiationShare` is distributed. Both allocations run in the same
+solver step — this is not sequential exhaustion. But Band 0 gets a privileged, non-negotiable portion that is not
+subject to redistribution by the negotiation pool.
 
 `negotiationShare` then distributes across all eligible bands, including Band 0, by weighted economics.
 
@@ -59,9 +70,11 @@ Where `α` is the dominance coefficient — an engine-level parameter or authore
 effectiveWeight(p) = localityAttenuation(p.band) × p.participationPreference
 ```
 
-`localityAttenuation` is a monotonically decreasing function over band index. Band 0 has attenuation 1.0. The specific decay shape (linear, exponential, stepped) is a tuning decision. The constraint is strict monotonic decrease.
+`localityAttenuation` is a monotonically decreasing function over band index. Band 0 has attenuation 1.0. The specific
+decay shape (linear, exponential, stepped) is a tuning decision. The constraint is strict monotonic decrease.
 
-Eligibility is binary and gates participation entirely — an ineligible participant is not included in the pool and receives no share.
+Eligibility is binary and gates participation entirely — an ineligible participant is not included in the pool and
+receives no share.
 
 ---
 
@@ -74,7 +87,7 @@ canGive(p) = currentPreviewSize(p) - p.minFrac
 canTake(p) = p.maxFrac - currentPreviewSize(p)
 ```
 
-A participant can absorb a positive delta share only if `canTake(p) > ε`.  
+A participant can absorb a positive delta share only if `canTake(p) > ε`.
 A participant can absorb a negative delta share only if `canGive(p) > ε`.
 
 These values change as the preview state evolves. They are not cached.
@@ -83,7 +96,10 @@ These values change as the preview state evolves. They are not cached.
 
 ## Solver pseudocode
 
-> **This pseudocode is a candidate shape, not a proof that the desired feel has been achieved.** Matching this code does not mean the law is satisfied. The law is satisfied when the visible interaction is correct: touched boundary dominant, additional motion constraint-justified, no ambient drift. Treat this as a starting point for implementation, not a specification to satisfy by compliance.
+> **This pseudocode is a candidate shape, not a proof that the desired feel has been achieved.** Matching this code does
+> not mean the law is satisfied. The law is satisfied when the visible interaction is correct: touched boundary dominant,
+> additional motion constraint-justified, no ambient drift. Treat this as a starting point for implementation, not a
+> specification to satisfy by compliance.
 
 ```ts
 function solve(
@@ -95,18 +111,18 @@ function solve(
   const deltaFrac = deltaPx / totalPx
   const sizes = clone(preview.negotiatedSizes)
 
-  const touchedShare    = session.dominanceCoeff * deltaFrac
+  const touchedShare = session.dominanceCoeff * deltaFrac
   const negotiatedShare = (1 - session.dominanceCoeff) * deltaFrac
 
   // Band 0 absorbs touched share
-  distribute(sizes, session.band0Left,  +touchedShare,    sizes)
-  distribute(sizes, session.band0Right, -touchedShare,    sizes)
+  distribute(sizes, session.band0Left, +touchedShare, sizes)
+  distribute(sizes, session.band0Right, -touchedShare, sizes)
 
   // All bands share the negotiated remainder
-  distribute(sizes, session.allLeft,    +negotiatedShare, sizes)
-  distribute(sizes, session.allRight,   -negotiatedShare, sizes)
+  distribute(sizes, session.allLeft, +negotiatedShare, sizes)
+  distribute(sizes, session.allRight, -negotiatedShare, sizes)
 
-  return { negotiatedSizes: sizes }
+  return {negotiatedSizes: sizes}
 }
 
 function distribute(
@@ -129,9 +145,9 @@ function distribute(
     let absorbed = 0
 
     for (const p of eligible) {
-      const share  = remaining * (p.effectiveWeight / totalWeight)
+      const share = remaining * (p.effectiveWeight / totalWeight)
       const before = currentSize(sizes, p)
-      const next   = clamp(before + share, p.minFrac, p.maxFrac)
+      const next = clamp(before + share, p.minFrac, p.maxFrac)
       setSize(sizes, p, next)
       absorbed += next - before
     }
@@ -142,7 +158,8 @@ function distribute(
 }
 ```
 
-The solver does not read `RuntimeTopologyState` or `RuntimeLayoutState` directly. It receives a frozen participant snapshot and a current preview state. It returns a new preview state. That is its entire contract.
+The solver does not read `RuntimeTopologyState` or `RuntimeLayoutState` directly. It receives a frozen participant
+snapshot and a current preview state. It returns a new preview state. That is its entire contract.
 
 ---
 
@@ -160,40 +177,40 @@ type BoundaryRef = {
 // Geometric projection — recomputed each projection pass
 type ProjectedBoundary = {
   ref: BoundaryRef
-  hitRegion:     PixelRect
-  visualRegion:  PixelRect
-  gutterRegion:  PixelRect
-  junctions:     JunctionId[]
-  isActive:      boolean
+  hitRegion: PixelRect
+  visualRegion: PixelRect
+  gutterRegion: PixelRect
+  junctions: JunctionId[]
+  isActive: boolean
   participating: boolean
 }
 
 // Renderer frame — complete projected surface
 type RendererFrame = {
-  slots:      Map<SlotId, SlotPresentation>
+  slots: Map<SlotId, SlotPresentation>
   boundaries: Map<BoundaryId, BoundaryPresentation>
-  junctions:  Map<JunctionId, JunctionPresentation>
+  junctions: Map<JunctionId, JunctionPresentation>
 }
 
 // Frozen at session creation
 type FrozenDragSession = {
-  boundary:        BoundaryRef
-  mode:            'direct' | 'negotiated'
-  dominanceCoeff:  number
-  band0Left:       ResolvedParticipant[]
-  band0Right:      ResolvedParticipant[]
-  allLeft:         ResolvedParticipant[]   // all bands, ordered outward
-  allRight:        ResolvedParticipant[]
+  boundary: BoundaryRef
+  mode: 'direct' | 'negotiated'
+  dominanceCoeff: number
+  band0Left: ResolvedParticipant[]
+  band0Right: ResolvedParticipant[]
+  allLeft: ResolvedParticipant[]   // all bands, ordered outward
+  allRight: ResolvedParticipant[]
 }
 
 // One participant in the solve pool
 type ResolvedParticipant = {
-  splitId:              SplitId
-  index:                number           // position in parent's sizes array
-  band:                 number
-  effectiveWeight:      number           // attenuation × participationPreference
-  minFrac:              number           // authored constraint, stable
-  maxFrac:              number           // authored constraint, stable
+  splitId: SplitId
+  index: number           // position in parent's sizes array
+  band: number
+  effectiveWeight: number           // attenuation × participationPreference
+  minFrac: number           // authored constraint, stable
+  maxFrac: number           // authored constraint, stable
   // canGive / canTake are NOT stored here — derived from current preview each iteration
 }
 ```
