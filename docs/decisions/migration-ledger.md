@@ -2,7 +2,7 @@
 
 ## Status
 
-Active migration ledger. Controlled `music-library-core` slices moved so far: `crates/library-domain`, `crates/library-store-sqlite`, `crates/library-boundary-protocol`, and `crates/library-boundary-service`.
+Active migration ledger. Controlled `music-library-core` slices moved so far: `crates/library-domain`, `crates/library-store-sqlite`, `crates/library-boundary-protocol`, `crates/library-boundary-service`, and the generated-only `packages/library-boundary-contract` artifact projection.
 
 ## Workspace-Host Source Surfaces
 
@@ -45,7 +45,7 @@ Active migration ledger. Controlled `music-library-core` slices moved so far: `c
 | `crates/library-surface-protocol` | `crates/library-boundary-protocol` | Moved and renamed in boundary protocol slice | Dekzer boundary protocol | None; source was protocol DTO ownership with historical `surface` naming debt only | Protocol tests, workspace Rust gates, JS gates | Rust boundary protocol is present with no active `surface` identity |
 | `crates/library-surface-service` | `crates/library-boundary-service` | Recreated and renamed in boundary service MVP | Dekzer boundary service | None after removing the old `library-read-kernel` hop and mapping store-owned rows/windows directly to protocol DTOs | Register root, run scan, literal hierarchy, service reopen tests, workspace gates | Service maps requests to substrate owners without recreating read-kernel |
 | Missing explicit authority layer | `crates/library-authority` | Add only when behavior demands it | Dekzer library authority | Must avoid broad abstraction | Operation-level tests for product commands | Authority removes hidden ownership, not just indirection |
-| `packages/library-surface-contract` | `packages/library-boundary-contract` | Regenerate, do not copy generated output | Dekzer generated TS boundary | Need boundary contract generation tooling/package slice | Export/check contract, TS build/typecheck | Generated-only package uses `@dekzer` scope |
+| `packages/library-surface-contract` | `packages/library-boundary-contract` | Regenerated from Rust protocol; old generator pattern migrated, old generated output not copied | Dekzer generated TS boundary contract | None for contract generation | Export/check contract, TS build/typecheck | Generated-only package uses `@dekzer` scope |
 | `packages/library-surface-client` | `packages/library-boundary-client` | Move and rename | Dekzer boundary client | Depends on generated contract rename | Client/session tests, runtime smoke | No DTO forks, no old package scope |
 | `packages/library-surface-client/fixtures/session-validation.ts` | Boundary client tests | Rewrite or move with rename | Dekzer boundary client tests | Fixture names and package scope must change | Session lifecycle, pump, listener, monotonic revision tests | Tests prove real client behavior without fake product rows |
 | `xtask` contract tooling | `crates/library-tooling` or root `xtask` after decision | Defer | Dekzer tooling | Need repo-wide tooling convention | Export/check generated contract tests | One generation command, no stale artifacts |
@@ -148,6 +148,25 @@ Active migration ledger. Controlled `music-library-core` slices moved so far: `c
 | Blockers discovered | None |
 | Next migration slice | Regenerate/migrate the boundary TypeScript contract package from the Rust protocol after the service is stable. Do not wire desktop, stdio transport, or handwritten TypeScript client in this slice |
 | Exit criterion satisfied | Yes: protocol command handling reaches the real SQLite store for root registration, root scan materialization, literal hierarchy reads, and reopen persistence without transport, desktop wiring, generated TypeScript migration, read-kernel recreation, fake rows, or service-owned read-model DTO authority |
+
+### `library-boundary-contract`
+
+| Field | Value |
+| --- | --- |
+| Source generator inspected | `C:\dev\music-stack\music-library-core\xtask\src\commands\surface_contract.rs`; supporting files inspected: `xtask\src\main.rs`, `packages\library-surface-contract\package.json`, and `crates\library-surface-protocol\src\contract.rs` |
+| Target tooling owner | `C:\dev\dekzer\crates\xtask` |
+| Target generated package | `C:\dev\dekzer\packages\library-boundary-contract` |
+| Chosen action | Migrated the useful generator pattern to boundary vocabulary: artifact generation, stale check, deterministic artifact hashing, package JSON generation, TypeScript config generation, schema generation, and compact error rendering. Stopped old command names, package scope, schema filename, and all active generated output naming from the old surface identity |
+| Rust protocol authority | `crates/library-boundary-protocol/src/contract.rs` remains the DTO source of truth through `generated_contract_index_ts()`, `generated_contract_schema_json()`, `protocol_crate_name()`, and `protocol_version()` |
+| Generated artifacts | `index.ts`, `boundary-contract.schema.json`, `manifest.json`, `package.json`, `tsconfig.json`, and `tsconfig.build.json` |
+| Package identity | `@dekzer/library-boundary-contract`; private, ESM, generated-only, side-effect-free, buildable with declarations through `tsc` |
+| Manifest fields | `generatedOnly`, `generator`, `protocolCrateName`, `protocolVersion`, `packageName`, deterministic per-artifact SHA-256 entries, `artifactHash`, package-root source layout, and optional `gitCommitHash` when available |
+| Scripts added | `library:contract:export`, `library:contract:check`, and `library:contract:build`; root `typecheck`, `build`, and `check` now include the generated package or stale check without wiring desktop to the contract |
+| Tests added | `cargo test -p xtask` covers artifact presence, required protocol type/command names, package name, no active generated `surface` vocabulary, fresh stale-check pass, and stale-check failure after mutating a generated artifact |
+| Validation run | Passed: `cargo metadata --format-version 1 --no-deps`; `cargo fmt --all --check`; `cargo test -p xtask`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `cargo run -p xtask -- export-boundary-contract`; `cargo run -p xtask -- check-boundary-contract`; `pnpm store prune`; `pnpm install --config.manage-package-manager-versions=false --frozen-lockfile --reporter append-only`; `pnpm run typecheck`; `pnpm run check`; `pnpm run library:contract:build`; `pnpm run build:desktop`; `pnpm run build`; `pnpm run test` |
+| Blockers discovered | None for contract generation. A normal `pnpm install` needed pnpm's package-manager self-management disabled after cache pruning because the registry fetch for pnpm metadata failed; the project install then completed with the existing pnpm binary |
+| Next migration slice | Migrate the handwritten TypeScript boundary client against `@dekzer/library-boundary-contract` only after this generated contract package remains green. Do not combine that with stdio transport, host bridge, Electron preload, or desktop wiring |
+| Exit criterion satisfied | Yes: `packages/library-boundary-contract` is generated from the Rust protocol crate, stale-checked by `crates/xtask`, included in JS workspace typecheck/build gates, and contains no active old surface package identity or copied generated output |
 
 ## Exit Gate For This Ledger
 

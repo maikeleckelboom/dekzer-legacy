@@ -1,0 +1,31 @@
+{
+  "artifactHash": "e8aa6c786097eb9ebd440430f3dbb482c74446a7bb44dfdcead269ac39c124a7",
+  "artifacts": [
+    {
+      "path": "index.ts",
+      "sha256": "ea2c5c0a4269fcbd48f204e1eca416dccc57aa183cfa85a94998ba8754e66481"
+    },
+    {
+      "path": "boundary-contract.schema.json",
+      "sha256": "743ad85b5f20ef22640a5a48d94db432a055d8780ea46f4a619b804e439345fd"
+    },
+    {
+      "path": "package.json",
+      "sha256": "a3c6e2068d1eafa15ea74e5fa62b848888f7ec3d7c4e2e527c71cc6a6ad66132"
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "fc3f334075bb395f08b5ac85ecb7c00e012ef5e3bdd99cfac4457b60a012eeb7"
+    },
+    {
+      "path": "tsconfig.build.json",
+      "sha256": "d387ce85ee6c72cc824fd327bcd8c1dfbbc641b9bc48844b61e81150ea81479d"
+    }
+  ],
+  "generatedOnly": true,
+  "generator": "xtask export-boundary-contract",
+  "packageName": "@dekzer/library-boundary-contract",
+  "protocolCrateName": "library-boundary-protocol",
+  "protocolVersion": "0.0.0",
+  "sourceLayout": "index.ts is generated at the package root"
+}

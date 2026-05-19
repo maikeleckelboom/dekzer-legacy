@@ -4,6 +4,7 @@ members = [
     "crates/library-store-sqlite",
     "crates/library-boundary-protocol",
     "crates/library-boundary-service",
+    "crates/xtask",
 ]
 resolver = "3"
 

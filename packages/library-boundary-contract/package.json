@@ -1,0 +1,31 @@
+{
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "exports": {
+    ".": {
+      "default": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "boundary-contract.schema.json",
+    "manifest.json",
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.build.json"
+  ],
+  "generatedOnly": true,
+  "main": "./dist/index.js",
+  "name": "@dekzer/library-boundary-contract",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "sideEffects": false,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "version": "0.0.0"
+}
