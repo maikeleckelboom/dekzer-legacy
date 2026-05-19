@@ -134,7 +134,7 @@ Controlled migration candidates:
 | Dekzer | `packages/library-boundary-client` | Controlled port and rename | Replaces `@music-library-core/library-surface-client`; no DTO copies. |
 | Dekzer | `crates/library-domain` | Controlled move | Product vocabulary and typed ids. |
 | Dekzer | `crates/library-store-sqlite` | Controlled move and rename | Durable SQLite substrate. |
-| Dekzer | `crates/library-read-model` | Controlled move and rename | Read model/query windows over durable substrate. |
+| Dekzer | None for `library-read-kernel` | Rejected after audit | Store-owned rows/windows stay in `crates/library-store-sqlite`; future boundary service maps them directly to protocol DTOs. |
 | Dekzer | `crates/library-authority` | Future explicit layer | Product operations such as register root and scan. |
 | Dekzer | `crates/library-boundary-protocol` | Controlled move and rename | Rust source for generated boundary contract. |
 | Dekzer | `crates/library-boundary-service` | Controlled move and rename | Maps boundary requests to product owners. |
@@ -168,7 +168,7 @@ No slice is accepted if validation passes only through fake data, mock product w
 
 1. Establish Dekzer root docs, root workspace metadata, and honest boot status.
 2. Decide target names and delete old naming from future docs.
-3. Move library substrate slices from `music-library-core` into Dekzer in dependency order: domain, store, read model, protocol, service, generated contract, client.
+3. Move library substrate slices from `music-library-core` into Dekzer in dependency order: domain, store, protocol, service, generated contract, client.
 4. Introduce explicit `library-authority` only where it removes hidden ownership.
 5. Recreate required tests in Dekzer and keep behavior unchanged before broad renames.
 6. Connect the desktop app to real library boundary imports.

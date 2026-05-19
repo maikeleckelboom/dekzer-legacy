@@ -1,0 +1,168 @@
+use rusqlite::OptionalExtension;
+
+use crate::authority::write_lane::AdmittedWrite;
+use crate::{LibrarySqliteError, LibrarySqliteResult};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ArtifactRow {
+    pub(crate) artifact_id: i64,
+    pub(crate) subject_kind: String,
+    pub(crate) subject_id: String,
+    pub(crate) capability_kind: Option<String>,
+    pub(crate) profile_key: Option<String>,
+    pub(crate) artifact_kind: String,
+    pub(crate) artifact_role: String,
+    pub(crate) basis_fingerprint: String,
+}
+
+pub(crate) fn load_artifact_row(
+    tx: &AdmittedWrite<'_>,
+    artifact_id: i64,
+) -> LibrarySqliteResult<ArtifactRow> {
+    tx.query_row(
+        "SELECT artifact_id,
+                subject_kind,
+                subject_id,
+                capability_kind,
+                profile_key,
+                artifact_kind,
+                artifact_role,
+                basis_fingerprint
+         FROM Artifacts
+         WHERE artifact_id = ?1",
+        [artifact_id],
+        |row| {
+            Ok(ArtifactRow {
+                artifact_id: row.get(0)?,
+                subject_kind: row.get(1)?,
+                subject_id: row.get(2)?,
+                capability_kind: row.get(3)?,
+                profile_key: row.get(4)?,
+                artifact_kind: row.get(5)?,
+                artifact_role: row.get(6)?,
+                basis_fingerprint: row.get(7)?,
+            })
+        },
+    )
+    .optional()?
+    .ok_or_else(|| {
+        LibrarySqliteError::WriteInvariant(format!("artifact {artifact_id} does not exist"))
+    })
+}
+
+pub(crate) fn require_source_artifact(
+    tx: &AdmittedWrite<'_>,
+    artifact_id: i64,
+    source_file_id: i64,
+    expected_artifact_kind: &str,
+    expected_basis_fingerprint: &str,
+) -> LibrarySqliteResult<ArtifactRow> {
+    let artifact = load_artifact_row(tx, artifact_id)?;
+    let expected_subject_id = source_file_id.to_string();
+    require(
+        artifact.subject_kind == "source_file",
+        format!(
+            "artifact {artifact_id} must target subject_kind=source_file, found {}",
+            artifact.subject_kind
+        ),
+    )?;
+    require(
+        artifact.subject_id == expected_subject_id,
+        format!(
+            "artifact {artifact_id} must target source_file {} but points at {}",
+            source_file_id, artifact.subject_id
+        ),
+    )?;
+    require(
+        artifact.artifact_kind == expected_artifact_kind,
+        format!(
+            "artifact {artifact_id} must have artifact_kind={expected_artifact_kind}, found {}",
+            artifact.artifact_kind
+        ),
+    )?;
+    require(
+        artifact.artifact_role == "primary_result",
+        format!(
+            "artifact {artifact_id} must have artifact_role=primary_result, found {}",
+            artifact.artifact_role
+        ),
+    )?;
+    require(
+        artifact.basis_fingerprint == expected_basis_fingerprint,
+        format!(
+            "artifact {artifact_id} basis_fingerprint mismatch: expected {expected_basis_fingerprint}, found {}",
+            artifact.basis_fingerprint
+        ),
+    )?;
+    Ok(artifact)
+}
+
+pub(crate) fn require_library_asset_capability_artifact(
+    tx: &AdmittedWrite<'_>,
+    artifact_id: i64,
+    library_asset_id: i64,
+    capability_kind: &str,
+    profile_key: &str,
+    expected_basis_fingerprint: &str,
+) -> LibrarySqliteResult<ArtifactRow> {
+    let artifact = load_artifact_row(tx, artifact_id)?;
+    let expected_subject_id = library_asset_id.to_string();
+    require(
+        artifact.subject_kind == "library_asset",
+        format!(
+            "artifact {artifact_id} must target subject_kind=library_asset, found {}",
+            artifact.subject_kind
+        ),
+    )?;
+    require(
+        artifact.subject_id == expected_subject_id,
+        format!(
+            "artifact {artifact_id} must target library_asset {} but points at {}",
+            library_asset_id, artifact.subject_id
+        ),
+    )?;
+    require(
+        artifact.artifact_kind == "capability_result",
+        format!(
+            "artifact {artifact_id} must have artifact_kind=capability_result, found {}",
+            artifact.artifact_kind
+        ),
+    )?;
+    require(
+        artifact.artifact_role == "primary_result",
+        format!(
+            "artifact {artifact_id} must have artifact_role=primary_result, found {}",
+            artifact.artifact_role
+        ),
+    )?;
+    require(
+        artifact.capability_kind.as_deref() == Some(capability_kind),
+        format!(
+            "artifact {artifact_id} capability_kind mismatch: expected {capability_kind}, found {:?}",
+            artifact.capability_kind
+        ),
+    )?;
+    require(
+        artifact.profile_key.as_deref() == Some(profile_key),
+        format!(
+            "artifact {artifact_id} profile_key mismatch: expected {profile_key}, found {:?}",
+            artifact.profile_key
+        ),
+    )?;
+    require(
+        artifact.basis_fingerprint == expected_basis_fingerprint,
+        format!(
+            "artifact {artifact_id} basis_fingerprint mismatch: expected {expected_basis_fingerprint}, found {}",
+            artifact.basis_fingerprint
+        ),
+    )?;
+    Ok(artifact)
+}
+
+fn require(condition: bool, message: String) -> LibrarySqliteResult<()> {
+    if condition {
+        Ok(())
+    } else {
+        Err(LibrarySqliteError::WriteInvariant(message))
+    }
+}
