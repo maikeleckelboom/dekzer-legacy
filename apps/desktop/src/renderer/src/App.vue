@@ -13,15 +13,19 @@
       </div>
       <div>
         <span>Desktop app</span>
-        <strong>apps/desktop</strong>
+        <strong>Ready</strong>
       </div>
       <div>
-        <span>Workspace host</span>
+        <span>Workspace shell</span>
         <strong>Not imported</strong>
       </div>
       <div>
-        <span>Music library core</span>
+        <span>Music library substrate</span>
         <strong>Not imported</strong>
+      </div>
+      <div>
+        <span>Exclave</span>
+        <strong>External dependency, not vendored</strong>
       </div>
     </section>
   </main>

@@ -11,6 +11,7 @@
     "install:workspace": "pnpm install",
     "dev:desktop": "pnpm --filter @dekzer/desktop run dev",
     "typecheck": "pnpm --filter @dekzer/desktop run typecheck",
+    "check": "pnpm run typecheck",
     "build": "pnpm run build:desktop",
     "build:desktop": "pnpm --filter @dekzer/desktop run build",
     "start:desktop": "pnpm --filter @dekzer/desktop run start:built"
