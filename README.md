@@ -7,8 +7,9 @@ Current state:
 - `apps/desktop` is the booting Electron/Vue desktop app.
 - `crates/library-domain` is the first migrated Rust library substrate crate.
 - `crates/library-store-sqlite` is the migrated durable SQLite store crate.
+- `crates/library-boundary-protocol` is the migrated Rust boundary DTO/protocol crate.
 - `workspace-host` is not imported.
-- Remaining `music-library-core` slices beyond the domain and SQLite store are not imported.
+- Remaining `music-library-core` slices beyond the domain, SQLite store, and boundary protocol are not imported.
 - Exclave is an external dependency candidate, not vendored into this repo.
 
 Run workspace commands from this directory:
@@ -43,4 +44,4 @@ Workspace ownership:
 - `crates/*` is for Rust workspace ownership, starting with `crates/library-domain`.
 - `docs/*` is for product canon, decisions, and architecture documents.
 
-Only `apps/desktop` and the first two Rust library substrate crates are present as product code after this slice. See `docs/decisions/repo-consolidation-plan.md` and `docs/decisions/migration-ledger.md` for the migration plan.
+Only `apps/desktop` and the migrated Rust library domain, store, and boundary protocol crates are present as product code after this slice. See `docs/decisions/repo-consolidation-plan.md` and `docs/decisions/migration-ledger.md` for the migration plan.

@@ -13,7 +13,7 @@ pub struct ScopedLibraryAssetBrowserRow {
     pub relative_path: Option<String>,
     pub file_name: Option<String>,
     // Finite projection vocabulary enforced by the baseline schema and mapped
-    // to a typed protocol enum by `library-read-kernel`.
+    // to protocol DTOs by the future boundary service.
     pub availability_state: String,
     pub title: Option<String>,
     pub artist: Option<String>,
@@ -25,9 +25,8 @@ pub struct ScopedLibraryAssetBrowserRow {
     // capability/artifact state; they are not canonical authority.
     pub waveform_quality_current: Option<i64>,
     pub waveform_quality_target: Option<i64>,
-    // Finite browse vocabulary mapped to a typed protocol enum by
-    // `library-read-kernel`: missing, queued, leased, ready, stale, blocked,
-    // failed.
+    // Finite browse vocabulary mapped to a typed protocol enum by the future
+    // boundary service: missing, queued, leased, ready, stale, blocked, failed.
     pub stems_state_summary: Option<String>,
     // Finite browse projection over effective resolved prep intent plus
     // matching capability state.

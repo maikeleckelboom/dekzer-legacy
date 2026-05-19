@@ -2,7 +2,7 @@
 
 ## Status
 
-Active migration ledger. The first controlled `music-library-core` slice has moved: `crates/library-domain`.
+Active migration ledger. Controlled `music-library-core` slices moved so far: `crates/library-domain`, `crates/library-store-sqlite`, and `crates/library-boundary-protocol`.
 
 ## Workspace-Host Source Surfaces
 
@@ -42,10 +42,10 @@ Active migration ledger. The first controlled `music-library-core` slice has mov
 | `crates/library-sqlite` | `crates/library-store-sqlite` | Moved in second substrate slice | Dekzer Rust/SQLite substrate | None; depends locally only on `library-domain`; contains store-level read DTO/query mechanics and narrow root-scan materialization already owned by the old store crate | Store tests, schema bootstrap, root scan, reopen tests | Durable store passes without renderer access |
 | `migrations/20260502000000_substrate_baseline.sql` | `crates/library-store-sqlite/migrations/20260502000000_substrate_baseline.sql` | Moved in second substrate slice | Dekzer Rust/SQLite substrate | None | Bootstrap and schema comparison tests | Baseline schema has one owner under the store crate |
 | `crates/library-read-kernel` | None; absorbed by `crates/library-store-sqlite` | Do not move | Dekzer store owns the durable read models and read queries | Audit found only a thin facade/type-promotion layer over store-owned reads; moving it would duplicate read-model ownership | Store read tests and future boundary-service mapping from store rows to protocol DTOs | No active `library-read-model` crate exists for duplicated store-owned read logic |
-| `crates/library-surface-protocol` | `crates/library-boundary-protocol` | Move and rename | Dekzer boundary protocol | Need replace `surface` vocabulary | Contract generation and protocol tests | Rust protocol is source of generated TS contract |
-| `crates/library-surface-service` | `crates/library-boundary-service` | Move and rename | Dekzer boundary service | Needs domain, store, read model, protocol in place | Register root, run scan, literal hierarchy, service reopen tests | Service maps requests to substrate owners |
+| `crates/library-surface-protocol` | `crates/library-boundary-protocol` | Moved and renamed in boundary protocol slice | Dekzer boundary protocol | None; source was protocol DTO ownership with historical `surface` naming debt only | Protocol tests, workspace Rust gates, JS gates | Rust boundary protocol is present with no active `surface` identity |
+| `crates/library-surface-service` | `crates/library-boundary-service` | Move and rename after split | Dekzer boundary service | Must remove old `library-read-kernel` hop and map store-owned rows/windows directly to protocol DTOs | Register root, run scan, literal hierarchy, service reopen tests | Service maps requests to substrate owners without recreating read-kernel |
 | Missing explicit authority layer | `crates/library-authority` | Add only when behavior demands it | Dekzer library authority | Must avoid broad abstraction | Operation-level tests for product commands | Authority removes hidden ownership, not just indirection |
-| `packages/library-surface-contract` | `packages/library-boundary-contract` | Regenerate, do not copy generated output | Dekzer generated TS boundary | Need protocol crate moved first | Export/check contract, TS build/typecheck | Generated-only package uses `@dekzer` scope |
+| `packages/library-surface-contract` | `packages/library-boundary-contract` | Regenerate, do not copy generated output | Dekzer generated TS boundary | Need boundary contract generation tooling/package slice | Export/check contract, TS build/typecheck | Generated-only package uses `@dekzer` scope |
 | `packages/library-surface-client` | `packages/library-boundary-client` | Move and rename | Dekzer boundary client | Depends on generated contract rename | Client/session tests, runtime smoke | No DTO forks, no old package scope |
 | `packages/library-surface-client/fixtures/session-validation.ts` | Boundary client tests | Rewrite or move with rename | Dekzer boundary client tests | Fixture names and package scope must change | Session lifecycle, pump, listener, monotonic revision tests | Tests prove real client behavior without fake product rows |
 | `xtask` contract tooling | `crates/library-tooling` or root `xtask` after decision | Defer | Dekzer tooling | Need repo-wide tooling convention | Export/check generated contract tests | One generation command, no stale artifacts |
@@ -105,6 +105,29 @@ Active migration ledger. The first controlled `music-library-core` slice has mov
 | Decision rationale | Migrating it would keep old and new active names for the same read-model concepts and duplicate read-model DTO ownership already exposed by `library-store-sqlite`. The remaining useful behavior is protocol-adjacent type promotion that belongs in the future boundary-service/protocol slice, not in a separate read-model crate |
 | Naming review | `library-store-sqlite` is broad but honest for the current slice: it owns SQLite schema/bootstrap/opening, write admission, authority transaction inputs, source/root materialization, maintained read-model queries, and public store read rows/windows. `LibrarySqliteError` and `LibrarySqliteResult` remain SQLite-store error names and were not renamed in this docs-only action |
 | Old identity | No `library-read-kernel` crate was added to Dekzer. The migration ledger no longer names it as a future active crate |
+
+### `library-boundary-protocol`
+
+| Field | Value |
+| --- | --- |
+| Source path | `C:\dev\music-stack\music-library-core\crates\library-surface-protocol` |
+| Target path | `C:\dev\dekzer\crates\library-boundary-protocol` |
+| Owner after migration | Dekzer boundary protocol; owns request, reply, event, error, and generated-contract source DTO shape only |
+| Classification | B: clean protocol/DTO crate with minor naming debt. It had no local crate dependencies and did not import read-kernel, SQLite, service, stdio, generated TypeScript output, TypeScript client code, desktop, renderer, or `workspace-host` |
+| Local dependencies | None. A `library-domain` dependency was not introduced because the protocol DTOs need serde/schemars/ts-rs wire traits and the current domain crate remains pure product vocabulary without contract derives |
+| External dependencies | `schemars`; `serde` with `derive`; `serde_json`; `thiserror`; `ts-rs` |
+| Tests copied | Source had no separate `crates/library-surface-protocol/tests/**` directory. Protocol-owned in-crate tests under `src/**` were copied and renamed with the crate |
+| Crate rename | Cargo package renamed from `library-surface-protocol` to `library-boundary-protocol`; Rust crate target is `library_boundary_protocol`; no alias crate, wrapper, or dual path was created |
+| DTO rename | Active public `LibrarySurface*` names were renamed to `LibraryBoundary*`. The event command family tag now serializes as `libraryBoundaryEvents`; request/reply/event/error product semantics and command families were preserved |
+| Generated output | No generated TypeScript contract output, TypeScript client package, stdio adapter, or service code was copied. The Rust crate still exposes source functions for future boundary contract generation and names the future command as `export-boundary-contract` |
+| `surface` vocabulary | None remains in `crates/library-boundary-protocol`. Remaining `surface` strings in Dekzer are historical docs only, such as this ledger and the consolidation plan |
+| Stale identity sweep | Active code search for `library-surface`, `library_surface`, `LibrarySurface`, `surface protocol`, `surface service`, `music-library-core`, `library-read-kernel`, `library_read_kernel`, `library-sqlite`, `library_sqlite`, and `workspace-host` found no active protocol/store/service identity except the pre-existing store-owned `LibrarySqliteError` helper names, which were intentionally not renamed in this slice |
+| Store comment cleanup | Two stale `library-read-kernel` comments in `crates/library-store-sqlite/src/read_models/library_browser.rs` were updated to point future mapping at the boundary service |
+| Validation run | Passed: `cargo metadata --format-version 1 --no-deps`; `cargo fmt --all --check`; `cargo test -p library-boundary-protocol`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `pnpm run typecheck`; `pnpm run check`; `pnpm run build:desktop`; `pnpm run test`; `git diff --check` |
+| Blockers discovered | None for protocol migration. Cargo dependency resolution on Windows required `CARGO_HTTP_CHECK_REVOKE=false` for the first package test because Schannel could not check certificate revocation |
+| Service readiness audit summary | `crates/library-surface-service` depends on `library-surface-protocol`, `library-domain`, `library-read-kernel`, and `library-sqlite`; external dependency `thiserror`; dev dependencies `rusqlite` and `tempfile`. It contains no stdio transport and no generated TypeScript/client imports. It owns service orchestration, command validation, session event coalescing/draining, maintained snapshot invalidation publication, root registration, root scan, playlist writes, and snapshot-read mapping. It currently maps read-kernel DTOs to protocol DTOs in `snapshot_read_protocol.rs`, so it must not be copied as-is. It can map directly from `library-store-sqlite` because the store exposes the needed public rows/windows/revisions and command inputs; an explicit `library-authority` crate is not a prerequisite for the next service slice |
+| Next migration slice | Migrate `crates/library-surface-service` to `crates/library-boundary-service` only after replacing the read-kernel hop with direct `library-store-sqlite` store-owned rows/windows mapped to `library-boundary-protocol` DTOs. Do not create `library-read-kernel`; do not move stdio or generated/client packages in the same slice |
+| Exit criterion satisfied | Yes: the boundary protocol crate builds as `library-boundary-protocol` / `library_boundary_protocol`, preserves protocol-owned DTO behavior under the new boundary identity, and passes the required workspace gates without importing service, stdio, generated TypeScript output, client, renderer, desktop, store internals, read-kernel, or `workspace-host` |
 
 ## Exit Gate For This Ledger
 
