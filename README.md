@@ -45,4 +45,4 @@ Workspace ownership:
 - `crates/*` is for Rust workspace ownership, starting with `crates/library-domain`.
 - `docs/*` is for product canon, decisions, and architecture documents.
 
-Only `apps/desktop` and the migrated Rust library domain, store, and boundary protocol crates are present as product code after this slice. See `docs/decisions/repo-consolidation-plan.md` and `docs/decisions/migration-ledger.md` for the migration plan.
+Only `apps/desktop` and the migrated Rust library domain, store, boundary protocol, and boundary service crates are present as product code after this slice. See `docs/decisions/repo-consolidation-plan.md` and `docs/decisions/migration-ledger.md` for the migration plan.

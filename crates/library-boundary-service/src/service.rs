@@ -504,16 +504,22 @@ fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol:
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
-        CommandOutcome, CommandReply, CommandRequest, LibraryRootCommand, LibraryRootReply,
-        LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind, LiteralHierarchyPresenceState,
-        ProtocolError, ReadLiteralHierarchyChildrenRequest, RegisterLocalRootReply,
-        RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
+        CommandOutcome, CommandReply, CommandRequest, CreatePlaylistReply, CreatePlaylistRequest,
+        DeletePlaylistReply, DeletePlaylistRequest, LibraryBoundaryEvent,
+        LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
+        LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
+        LiteralHierarchyPresenceState, LoadNavigationRowByStableKeyReply,
+        LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
+        PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsReply,
+        ReadLibraryBoundaryEventsRequest, ReadLiteralHierarchyChildrenRequest,
+        RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
+        RenamePlaylistRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
         SnapshotReadReply,
     };
     use serde_json::json;
     use tempfile::TempDir;
 
-    use library_store_sqlite::{LibraryStoreContext, StoreEnvironment};
+    use library_store_sqlite::{LibraryStoreContext, StoreEnvironment, durable_store_path};
 
     use super::LibraryBoundaryService;
 
@@ -558,6 +564,47 @@ mod tests {
         }
     }
 
+    fn expect_event_stream_read_pending_reply(
+        reply: CommandReply,
+    ) -> ReadLibraryBoundaryEventsReply {
+        match reply {
+            CommandReply::LibraryBoundaryEvents(LibraryBoundaryEventStreamReply::ReadPending(
+                reply,
+            )) => reply,
+            other => panic!("expected event stream readPending reply, got {other:?}"),
+        }
+    }
+
+    fn expect_create_playlist_reply(reply: CommandReply) -> CreatePlaylistReply {
+        match reply {
+            CommandReply::PlaylistWrite(PlaylistWriteReply::CreatePlaylist(reply)) => reply,
+            other => panic!("expected create playlist reply, got {other:?}"),
+        }
+    }
+
+    fn expect_rename_playlist_reply(reply: CommandReply) -> RenamePlaylistReply {
+        match reply {
+            CommandReply::PlaylistWrite(PlaylistWriteReply::RenamePlaylist(reply)) => reply,
+            other => panic!("expected rename playlist reply, got {other:?}"),
+        }
+    }
+
+    fn expect_delete_playlist_reply(reply: CommandReply) -> DeletePlaylistReply {
+        match reply {
+            CommandReply::PlaylistWrite(PlaylistWriteReply::DeletePlaylist(reply)) => reply,
+            other => panic!("expected delete playlist reply, got {other:?}"),
+        }
+    }
+
+    fn expect_navigation_row_by_stable_key_reply(
+        reply: CommandReply,
+    ) -> LoadNavigationRowByStableKeyReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::NavigationRowByStableKey(reply)) => reply,
+            other => panic!("expected load navigation row by stable key reply, got {other:?}"),
+        }
+    }
+
     fn register_local_root(
         service: &LibraryBoundaryService,
         absolute_path: String,
@@ -570,11 +617,59 @@ mod tests {
         (json, reply)
     }
 
+    fn create_playlist(
+        service: &LibraryBoundaryService,
+        display_name: &str,
+    ) -> (serde_json::Value, CreatePlaylistReply) {
+        let outcome = service.handle_command(CommandRequest::PlaylistWrite(
+            PlaylistWriteCommand::CreatePlaylist(CreatePlaylistRequest {
+                display_name: display_name.to_string(),
+            }),
+        ));
+        let json = serde_json::to_value(&outcome).expect("serialize create playlist outcome");
+        let reply = expect_create_playlist_reply(expect_success(outcome));
+        (json, reply)
+    }
+
+    fn rename_playlist(
+        service: &LibraryBoundaryService,
+        playlist_id: i64,
+        display_name: &str,
+    ) -> RenamePlaylistReply {
+        expect_rename_playlist_reply(expect_success(service.handle_command(
+            CommandRequest::PlaylistWrite(PlaylistWriteCommand::RenamePlaylist(
+                RenamePlaylistRequest {
+                    playlist_id,
+                    display_name: display_name.to_string(),
+                },
+            )),
+        )))
+    }
+
+    fn delete_playlist(service: &LibraryBoundaryService, playlist_id: i64) -> DeletePlaylistReply {
+        expect_delete_playlist_reply(expect_success(service.handle_command(
+            CommandRequest::PlaylistWrite(PlaylistWriteCommand::DeletePlaylist(
+                DeletePlaylistRequest { playlist_id },
+            )),
+        )))
+    }
+
     fn run_root_scan(service: &LibraryBoundaryService, root_id: i64) -> RunRootScanReply {
         expect_run_root_scan_reply(expect_success(service.handle_command(
             CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(RunRootScanRequest {
                 root_id,
             })),
+        )))
+    }
+
+    fn read_pending_events(
+        service: &LibraryBoundaryService,
+        max_events: usize,
+    ) -> ReadLibraryBoundaryEventsReply {
+        expect_event_stream_read_pending_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand::ReadPending(
+                ReadLibraryBoundaryEventsRequest { max_events },
+            )),
         )))
     }
 
@@ -593,6 +688,33 @@ mod tests {
                 },
             )),
         )))
+    }
+
+    fn load_navigation_row_by_stable_key(
+        service: &LibraryBoundaryService,
+        stable_key: String,
+    ) -> LoadNavigationRowByStableKeyReply {
+        expect_navigation_row_by_stable_key_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::LoadNavigationRowByStableKey(
+                LoadNavigationRowByStableKeyRequest { stable_key },
+            )),
+        )))
+    }
+
+    fn assert_maintained_invalidation_for_scope(
+        event: &LibraryBoundaryEvent,
+        expected_scope: MaintainedSnapshotScope,
+    ) {
+        let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(invalidation) = event;
+        assert_eq!(invalidation.scope, expected_scope);
+        assert!(
+            invalidation
+                .revision
+                .map(|revision| revision.value() > 0)
+                .unwrap_or(false),
+            "expected positive maintained snapshot revision, got {:?}",
+            invalidation.revision
+        );
     }
 
     #[test]
@@ -676,6 +798,117 @@ mod tests {
             .window
             .expect("persisted hierarchy survives service reopen");
         assert_eq!(reopened_crate_window.rows, crate_window.rows);
+    }
+
+    #[test]
+    fn protocol_commands_read_and_drain_real_snapshot_invalidation_events() {
+        let (_tempdir, _context, service) = open_service_with_context();
+        let initially_empty = read_pending_events(&service, 1);
+        assert!(initially_empty.events.is_empty());
+
+        let (_create_json, created) = create_playlist(&service, "Event Test");
+        let deleted = delete_playlist(&service, created.playlist_id);
+        assert!(deleted.deleted);
+
+        let first_drain = read_pending_events(&service, 1);
+        assert_eq!(first_drain.events.len(), 1);
+        assert_maintained_invalidation_for_scope(
+            &first_drain.events[0],
+            MaintainedSnapshotScope::NavigationRows,
+        );
+
+        let second_drain = read_pending_events(&service, 1);
+        assert_eq!(second_drain.events.len(), 1);
+        assert_maintained_invalidation_for_scope(
+            &second_drain.events[0],
+            MaintainedSnapshotScope::LibraryBrowser,
+        );
+
+        let drained_again = read_pending_events(&service, 1);
+        assert!(
+            drained_again.events.is_empty(),
+            "drained events must not replay forever"
+        );
+
+        let error = service
+            .try_handle_command(CommandRequest::LibraryBoundaryEvents(
+                LibraryBoundaryEventStreamCommand::ReadPending(ReadLibraryBoundaryEventsRequest {
+                    max_events: 0,
+                }),
+            ))
+            .expect_err("zero maxEvents is invalid");
+        assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
+        assert_eq!(error.code(), "INVALID_REQUEST");
+    }
+
+    #[test]
+    fn protocol_playlist_write_commands_create_rename_and_delete_real_playlists() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let (create_json, created) = create_playlist(&service, "Warmups");
+        assert!(created.playlist_id > 0);
+        assert_eq!(
+            create_json.pointer("/payload/reply/payload/payload/playlistId"),
+            Some(&json!(created.playlist_id.to_string()))
+        );
+
+        let stable_key = format!("playlist:{}", created.playlist_id);
+        let created_row = load_navigation_row_by_stable_key(&service, stable_key.clone())
+            .row
+            .expect("created playlist has navigation row");
+        assert_eq!(created_row.display_name, "Warmups");
+
+        let renamed = rename_playlist(&service, created.playlist_id, "Peak Hour");
+        assert!(renamed.renamed);
+        let renamed_row = load_navigation_row_by_stable_key(&service, stable_key.clone())
+            .row
+            .expect("renamed playlist still has navigation row");
+        assert_eq!(renamed_row.display_name, "Peak Hour");
+
+        let deleted = delete_playlist(&service, created.playlist_id);
+        assert!(deleted.deleted);
+        assert!(
+            load_navigation_row_by_stable_key(&service, stable_key)
+                .row
+                .is_none()
+        );
+
+        let error = service
+            .try_handle_command(CommandRequest::PlaylistWrite(
+                PlaylistWriteCommand::RenamePlaylist(RenamePlaylistRequest {
+                    playlist_id: 0,
+                    display_name: "Invalid".to_string(),
+                }),
+            ))
+            .expect_err("zero playlist id is invalid");
+        match error {
+            ProtocolError::InvalidRequest { detail } => {
+                assert!(detail.contains("playlistId"));
+            }
+            other => panic!("expected InvalidRequest, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn real_store_read_failure_maps_to_durable_store_failure() {
+        let (tempdir, context, service) = open_service_with_context();
+        let database_path = durable_store_path(&context.user_data_path, context.environment);
+        drop(tempdir);
+        if database_path.exists() {
+            std::fs::remove_file(&database_path).expect("remove durable store file");
+        }
+
+        let error = service
+            .try_handle_command(CommandRequest::SnapshotRead(
+                SnapshotReadCommand::ReadNavigationRows(
+                    library_boundary_protocol::ReadNavigationRowsRequest {
+                        parent_navigation_row_id: None,
+                    },
+                ),
+            ))
+            .expect_err("missing schema should fail as a durable store error");
+        assert!(matches!(error, ProtocolError::DurableStoreFailure { .. }));
+        assert_eq!(error.code(), "DURABLE_STORE_FAILURE");
     }
 
     #[test]
