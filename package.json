@@ -11,10 +11,14 @@
     "install:workspace": "pnpm install",
     "dev:desktop": "pnpm --filter @dekzer/desktop run dev",
     "typecheck": "pnpm --filter @dekzer/desktop run typecheck",
-    "check": "pnpm run typecheck",
+    "check": "pnpm run typecheck && pnpm run fmt:rust && pnpm run lint:rust && pnpm run test:rust",
     "build": "pnpm run build:desktop",
     "build:desktop": "pnpm --filter @dekzer/desktop run build",
-    "start:desktop": "pnpm --filter @dekzer/desktop run start:built"
+    "start:desktop": "pnpm --filter @dekzer/desktop run start:built",
+    "test": "pnpm run test:rust",
+    "test:rust": "cargo test --workspace",
+    "fmt:rust": "cargo fmt --all --check",
+    "lint:rust": "cargo clippy --workspace --all-targets -- -D warnings"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

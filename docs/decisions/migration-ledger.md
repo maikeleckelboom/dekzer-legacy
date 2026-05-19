@@ -2,7 +2,7 @@
 
 ## Status
 
-Active control-plane ledger. No code has moved in this slice.
+Active migration ledger. The first controlled `music-library-core` slice has moved: `crates/library-domain`.
 
 ## Workspace-Host Source Surfaces
 
@@ -38,7 +38,7 @@ Active control-plane ledger. No code has moved in this slice.
 
 | Source surface | Target Dekzer path | Decision | Owner after migration | Blockers | Validation required | Exit criterion |
 | --- | --- | --- | --- | --- | --- | --- |
-| `crates/library-domain` | `crates/library-domain` | Move in controlled slice | Dekzer library substrate | Need workspace crate setup | Domain unit tests for typed ids, finite enums, selectors | Crate builds in Dekzer with no old repo identity |
+| `crates/library-domain` | `crates/library-domain` | Moved in first substrate slice | Dekzer library substrate | None; leaf crate with no local or external dependencies | `cargo metadata --format-version 1 --no-deps`; `cargo fmt --all --check`; `cargo test -p library-domain`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `pnpm run check` | Crate builds in Dekzer with no old repo identity and root Rust gates are active |
 | `crates/library-sqlite` | `crates/library-store-sqlite` | Move and rename | Dekzer Rust/SQLite substrate | Need migration path and crate rename | Store tests, schema bootstrap, root scan, reopen tests | Durable store passes without renderer access |
 | `migrations/20260502000000_substrate_baseline.sql` | `crates/library-store-sqlite/migrations` or embedded schema module | Move under store owner | Dekzer Rust/SQLite substrate | Need decide migration embedding convention | Bootstrap and schema comparison tests | Baseline schema has one owner |
 | `crates/library-read-kernel` | `crates/library-read-model` | Move and rename | Dekzer read model owner | Depends on store and domain move | Literal hierarchy, navigation, browser, waveform, prep detail read tests | Read models query durable state only |
@@ -53,12 +53,27 @@ Active control-plane ledger. No code has moved in this slice.
 | `docs/archive/**`, repo bundles, generated source archives | None | Delete or leave behind | None | Too much historical noise for active canon | None | Not imported into Dekzer |
 | `package-lock.json`, npm workspace root | None | Delete instead of moving | None | Dekzer uses pnpm | `pnpm install` in Dekzer when package deps change | No npm lock in Dekzer |
 
+## Current Migrated Slice
+
+### `library-domain`
+
+| Field | Value |
+| --- | --- |
+| Source path | `C:\dev\music-stack\music-library-core\crates\library-domain` |
+| Target path | `C:\dev\dekzer\crates\library-domain` |
+| Owner after migration | Dekzer library substrate |
+| Classification | Leaf crate; pure product vocabulary and invariants; no local crate dependencies; no SQLite; no filesystem scanning; no async runtime; no boundary protocol; no generated TypeScript; no app wiring |
+| Validation run | Passed: `cargo metadata --format-version 1 --no-deps`; `cargo fmt --all --check`; `cargo test -p library-domain`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `pnpm run typecheck`; `pnpm run check`; `pnpm run build:desktop`; `git diff --check` |
+| Blockers discovered | None |
+| Next migration slice | `crates/library-sqlite` to `crates/library-store-sqlite`, including only its owned SQLite substrate and required migrations |
+| Exit criterion satisfied | Yes: crate builds in Dekzer with no old repo identity and active root Rust quality gates |
+
 ## Exit Gate For This Ledger
 
-This ledger is complete for the control-plane slice when:
+The control-plane portion of this ledger is complete. Ongoing migration slices remain accepted only when:
 
 - `workspace-host` demo code is explicitly classified as non-authoritative
 - `music-library-core` surfaces have target owners and validation gates
-- no source code from either related repo is copied
+- copied source code belongs to the named target owner and passes its validation gate
 - Dekzer root docs define the final two-repo direction
 - Dekzer boot status remains honest about unimported subsystems
