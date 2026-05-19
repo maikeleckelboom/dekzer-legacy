@@ -1,0 +1,16 @@
+[package]
+name = "library-store-sqlite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+library-domain = { path = "../library-domain" }
+rusqlite = { version = "0.39.0", features = ["bundled", "hooks", "trace"] }
+serde_json = "1.0.149"
+sha2 = "0.10.9"
+thiserror = "2.0.18"
+walkdir = "2.5.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"

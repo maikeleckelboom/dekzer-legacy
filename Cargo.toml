@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/library-domain"]
+members = ["crates/library-domain", "crates/library-store-sqlite"]
 resolver = "3"
 
 [workspace.package]

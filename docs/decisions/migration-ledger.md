@@ -39,8 +39,8 @@ Active migration ledger. The first controlled `music-library-core` slice has mov
 | Source surface | Target Dekzer path | Decision | Owner after migration | Blockers | Validation required | Exit criterion |
 | --- | --- | --- | --- | --- | --- | --- |
 | `crates/library-domain` | `crates/library-domain` | Moved in first substrate slice | Dekzer library substrate | None; leaf crate with no local or external dependencies | `cargo metadata --format-version 1 --no-deps`; `cargo fmt --all --check`; `cargo test -p library-domain`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `pnpm run check` | Crate builds in Dekzer with no old repo identity and root Rust gates are active |
-| `crates/library-sqlite` | `crates/library-store-sqlite` | Move and rename | Dekzer Rust/SQLite substrate | Need migration path and crate rename | Store tests, schema bootstrap, root scan, reopen tests | Durable store passes without renderer access |
-| `migrations/20260502000000_substrate_baseline.sql` | `crates/library-store-sqlite/migrations` or embedded schema module | Move under store owner | Dekzer Rust/SQLite substrate | Need decide migration embedding convention | Bootstrap and schema comparison tests | Baseline schema has one owner |
+| `crates/library-sqlite` | `crates/library-store-sqlite` | Moved in second substrate slice | Dekzer Rust/SQLite substrate | None; depends locally only on `library-domain`; contains store-level read DTO/query mechanics and narrow root-scan materialization already owned by the old store crate | Store tests, schema bootstrap, root scan, reopen tests | Durable store passes without renderer access |
+| `migrations/20260502000000_substrate_baseline.sql` | `crates/library-store-sqlite/migrations/20260502000000_substrate_baseline.sql` | Moved in second substrate slice | Dekzer Rust/SQLite substrate | None | Bootstrap and schema comparison tests | Baseline schema has one owner under the store crate |
 | `crates/library-read-kernel` | `crates/library-read-model` | Move and rename | Dekzer read model owner | Depends on store and domain move | Literal hierarchy, navigation, browser, waveform, prep detail read tests | Read models query durable state only |
 | `crates/library-surface-protocol` | `crates/library-boundary-protocol` | Move and rename | Dekzer boundary protocol | Need replace `surface` vocabulary | Contract generation and protocol tests | Rust protocol is source of generated TS contract |
 | `crates/library-surface-service` | `crates/library-boundary-service` | Move and rename | Dekzer boundary service | Needs domain, store, read model, protocol in place | Register root, run scan, literal hierarchy, service reopen tests | Service maps requests to substrate owners |
@@ -65,8 +65,27 @@ Active migration ledger. The first controlled `music-library-core` slice has mov
 | Classification | Leaf crate; pure product vocabulary and invariants; no local crate dependencies; no SQLite; no filesystem scanning; no async runtime; no boundary protocol; no generated TypeScript; no app wiring |
 | Validation run | Passed: `cargo metadata --format-version 1 --no-deps`; `cargo fmt --all --check`; `cargo test -p library-domain`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `pnpm run typecheck`; `pnpm run check`; `pnpm run build:desktop`; `git diff --check` |
 | Blockers discovered | None |
-| Next migration slice | `crates/library-sqlite` to `crates/library-store-sqlite`, including only its owned SQLite substrate and required migrations |
+| Next migration slice | Completed by the second substrate slice: `crates/library-sqlite` moved to `crates/library-store-sqlite` with its owned SQLite substrate and required migration |
 | Exit criterion satisfied | Yes: crate builds in Dekzer with no old repo identity and active root Rust quality gates |
+
+### `library-store-sqlite`
+
+| Field | Value |
+| --- | --- |
+| Source path | `C:\dev\music-stack\music-library-core\crates\library-sqlite` |
+| Target path | `C:\dev\dekzer\crates\library-store-sqlite` |
+| Owner after migration | Dekzer Rust/SQLite durable library substrate |
+| Classification | Safe as the second migration slice: one local dependency (`library-domain`), no dependency on read-kernel/read-model crate, boundary protocol, boundary service, generated TypeScript, desktop, renderer, or `workspace-host`; owns schema/bootstrap, canonical schema validation, SQLite connection policy, write admission, durable source/source-location/source-directory/source-file persistence, work/artifact/playlist persistence, store-level projection tables, and a root-scan materialization operation already present in the old store crate |
+| Local dependencies | `library-domain = { path = "../library-domain" }` |
+| External dependencies | `rusqlite` with `bundled`, `hooks`, and `trace`; `serde_json`; `sha2`; `thiserror`; `walkdir`; dev dependency `tempfile` |
+| Migrations copied | `migrations/20260502000000_substrate_baseline.sql` copied to `crates/library-store-sqlite/migrations/20260502000000_substrate_baseline.sql`; schema include path now resolves inside the store crate |
+| Tests copied | Store-owned in-crate tests under `crates/library-store-sqlite/src/**`; source crate had no separate `crates/library-sqlite/tests/**` directory |
+| Crate rename | Cargo package renamed from `library-sqlite` to `library-store-sqlite`; crate target is `library_store_sqlite`; no alias crate, wrapper, or dual path was created |
+| Old identity removal | The active Dekzer crate no longer uses the `library-sqlite` package identity. Old `surface` wording copied in store comments/tests was replaced with boundary/API wording where it meant the historical boundary naming, and app-owned file-store root kind was renamed from `library_sqlite_state` to `library_store_sqlite_state` for the new store owner |
+| Validation run | Passed: `cargo metadata --format-version 1 --no-deps`; `cargo fmt --all --check`; `cargo test -p library-store-sqlite`; `cargo test --workspace`; `cargo clippy --workspace --all-targets -- -D warnings`; `pnpm run typecheck`; `pnpm run check`; `pnpm run build:desktop`; `pnpm run test`; `git diff --check` |
+| Blockers discovered | Cargo dependency resolution on Windows required `CARGO_HTTP_CHECK_REVOKE=false` once to fetch the crates.io index because Schannel could not check certificate revocation; after dependencies were fetched, the required Cargo commands ran normally |
+| Next migration slice | `crates/library-read-kernel` to `crates/library-read-model`, updating it to depend on `library-store-sqlite` and preserving only read-model/query composition ownership |
+| Exit criterion satisfied | Yes: durable SQLite substrate, schema bootstrap, migrations, store tests, root scan materialization, literal hierarchy persistence, and reopen behavior are owned by the Dekzer store crate and validated without renderer or desktop SQLite access |
 
 ## Exit Gate For This Ledger
 
