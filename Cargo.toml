@@ -3,6 +3,7 @@ members = [
     "crates/library-domain",
     "crates/library-store-sqlite",
     "crates/library-boundary-protocol",
+    "crates/library-boundary-service",
 ]
 resolver = "3"
 

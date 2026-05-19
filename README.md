@@ -8,8 +8,9 @@ Current state:
 - `crates/library-domain` is the first migrated Rust library substrate crate.
 - `crates/library-store-sqlite` is the migrated durable SQLite store crate.
 - `crates/library-boundary-protocol` is the migrated Rust boundary DTO/protocol crate.
+- `crates/library-boundary-service` maps boundary protocol commands to the real SQLite store.
 - `workspace-host` is not imported.
-- Remaining `music-library-core` slices beyond the domain, SQLite store, and boundary protocol are not imported.
+- Remaining `music-library-core` slices beyond the domain, SQLite store, boundary protocol, and boundary service are not imported.
 - Exclave is an external dependency candidate, not vendored into this repo.
 
 Run workspace commands from this directory:
