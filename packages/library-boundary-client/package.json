@@ -1,0 +1,33 @@
+{
+  "name": "@dekzer/library-boundary-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "package.json",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "tsconfig.test.json"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "pnpm --filter @dekzer/library-boundary-contract run build && pnpm run build && tsc -p tsconfig.test.json && node .tmp-tests/tests/clientSessionValidation.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@dekzer/library-boundary-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
