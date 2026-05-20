@@ -1,11 +1,10 @@
 import type { App } from 'electron'
 import type {
-  LibraryBoundaryClient as PackageLibraryBoundaryClient,
+  LibraryBoundaryClient,
   LibraryBoundaryTransport
 } from '@dekzer/library-boundary-client'
 import type {
-  LibraryBoundaryStdioDiagnostic as PackageLibraryBoundaryStdioDiagnostic,
-  LibraryBoundaryStdioTransport,
+  LibraryBoundaryStdioDiagnostic,
   LibraryBoundaryStdioTransportOptions
 } from '@dekzer/library-boundary-stdio-transport'
 
@@ -24,15 +23,14 @@ export type LibraryBoundaryHostLogger = {
   error?(message?: unknown, ...optionalParams: unknown[]): void
 }
 
-export type LibraryBoundaryHostClient = Pick<
-  PackageLibraryBoundaryClient,
-  keyof PackageLibraryBoundaryClient
->
+export type LibraryBoundaryHostClient = LibraryBoundaryClient
 
-export type LibraryBoundaryHostTransport = Omit<LibraryBoundaryTransport, 'close'> &
-  Pick<LibraryBoundaryStdioTransport, 'ready' | 'close'>
+export type LibraryBoundaryHostTransport = Omit<LibraryBoundaryTransport, 'close'> & {
+  readonly ready: Promise<void>
+  close(): Promise<void>
+}
 
-export type LibraryBoundaryStdioDiagnostic = PackageLibraryBoundaryStdioDiagnostic
+export type { LibraryBoundaryStdioDiagnostic }
 
 export type LibraryBoundaryHostTransportOptions = LibraryBoundaryStdioTransportOptions
 

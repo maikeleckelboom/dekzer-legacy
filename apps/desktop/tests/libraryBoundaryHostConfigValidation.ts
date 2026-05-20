@@ -253,7 +253,7 @@ function createFakeClient(): LibraryBoundaryHostClient {
     renamePlaylist: rejectUnexpectedClientCall,
     deletePlaylist: rejectUnexpectedClientCall,
     readPendingBoundaryEvents: rejectUnexpectedClientCall
-  } satisfies LibraryBoundaryHostClient
+  } as LibraryBoundaryHostClient
 }
 
 function rejectUnexpectedClientCall(): Promise<never> {
