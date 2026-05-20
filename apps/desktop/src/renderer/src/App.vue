@@ -56,7 +56,7 @@
         <div :class="stateRowClass">
           <span :class="stateLabelClass">Library UI</span>
           <strong :class="[stateValueClass, 'text-(--color-warning)']">
-            Fixture foundation only
+            Read-only path guarded
           </strong>
         </div>
       </section>

@@ -9,6 +9,10 @@ import {
   type LibraryBoundaryHostTransport
 } from '../src/main/libraryBoundaryHost'
 import {
+  readLiteralHierarchyChildrenThroughHost,
+  registerLibraryHierarchyReadIpc
+} from '../src/main/libraryHierarchyRead'
+import {
   createLibraryBoundaryHostStatus,
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
@@ -29,6 +33,12 @@ import {
   libraryBoundaryHostStatusIpcChannels,
   type LibraryBoundaryHostStatus
 } from '../src/shared/libraryBoundaryStatus'
+import {
+  libraryHierarchyReadIpcChannels,
+  type LibraryHierarchyReadErrorCode,
+  type LibraryHierarchyReadRequest,
+  type LibraryHierarchyReadResult
+} from '../src/shared/libraryHierarchyRead'
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-host-'))
 
@@ -117,6 +127,8 @@ async function main(): Promise<void> {
   await validatesStatusControllerPublishesAndUnsubscribes(devConfig)
   await validatesMissingDevelopmentBinaryPublishesFailure(devConfig)
   validatesStatusIpcRegistration(devConfig)
+  await validatesHierarchyReadHandler(devConfig)
+  validatesHierarchyReadIpcRegistration(devConfig)
   await validatesPreloadApiSurface()
 }
 
@@ -328,16 +340,177 @@ function validatesStatusIpcRegistration(config: LibraryBoundaryHostConfig): void
   assert.equal(registeredHandler?.().state, 'idle')
 }
 
+async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig): Promise<void> {
+  const idleHost = new LibraryBoundaryHost(config, silentLogger())
+  const hostUnavailable = await readLiteralHierarchyChildrenThroughHost(
+    idleHost,
+    firstAvailableSourceReadRequest()
+  )
+
+  assert.equal(hostUnavailable.state, 'hostUnavailable')
+  assertReadError(hostUnavailable, 'hostNotStarted')
+
+  const noTargetHost = await startedHostWithClient(
+    config,
+    createFakeClient({
+      readNavigationRows: async () => ({
+        rows: []
+      })
+    })
+  )
+  const noTarget = await readLiteralHierarchyChildrenThroughHost(
+    noTargetHost,
+    firstAvailableSourceReadRequest()
+  )
+
+  assert.equal(noTarget.state, 'noTarget')
+  assertReadError(noTarget, 'noTarget')
+
+  const successHost = await startedHostWithClient(
+    config,
+    createFakeClient({
+      readNavigationRows: async () => ({
+        rows: [
+          {
+            navigationRowId: '7',
+            stableKey: 'source:7',
+            parentNavigationRowId: null,
+            family: 'sources',
+            rowKind: 'source',
+            displayName: 'Source Fixture',
+            siblingPosition: 0,
+            selectable: true,
+            selectorKind: 'source',
+            selectorPayload: '7',
+            updatedAtMs: 100,
+            rowVersion: '1'
+          }
+        ]
+      }),
+      readLiteralHierarchyChildren: async (request) => {
+        assert.deepEqual(request.entryPoint, {
+          type: 'source',
+          payload: {
+            sourceId: '7'
+          }
+        })
+        assert.equal(request.parentSourceDirectoryId, null)
+        assert.equal(request.offset, 0)
+        assert.equal(request.limit, 50)
+
+        return {
+          window: {
+            entryPoint: request.entryPoint,
+            parentSourceDirectoryId: null,
+            offset: request.offset,
+            limit: request.limit,
+            totalRows: 1,
+            rows: [
+              {
+                nodeKind: 'file',
+                sourceId: '7',
+                sourceDirectoryId: null,
+                sourceFileId: '11',
+                parentSourceDirectoryId: null,
+                relativePath: 'track.wav',
+                displayName: 'track.wav',
+                presenceState: 'present',
+                sizeBytes: null,
+                modifiedAtNs: null,
+                updatedAtMs: 101
+              }
+            ]
+          }
+        }
+      }
+    })
+  )
+  const success = await readLiteralHierarchyChildrenThroughHost(
+    successHost,
+    firstAvailableSourceReadRequest()
+  )
+
+  assert.equal(success.state, 'ready')
+  if (success.state !== 'ready') {
+    assert.fail('expected ready hierarchy read result')
+  }
+  assert.equal(success.window.root.id, 'source:7')
+  assert.equal(success.window.root.label, 'Source Fixture')
+  assert.deepEqual(success.window.nodes, [
+    {
+      id: 'source-file:11',
+      kind: 'file',
+      label: 'track.wav',
+      parentSourceDirectoryId: null,
+      sourceDirectoryId: null,
+      sourceFileId: '11',
+      presenceState: 'present',
+      updatedAtMs: 101
+    }
+  ])
+
+  const invalidTarget = await readLiteralHierarchyChildrenThroughHost(successHost, {
+    target: {
+      kind: 'entryPoint',
+      entryPoint: {
+        kind: 'source',
+        sourceId: '0'
+      }
+    }
+  })
+
+  assert.equal(invalidTarget.state, 'invalidRequest')
+  assertReadError(invalidTarget, 'invalidRequest')
+}
+
+function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig): void {
+  const host = new LibraryBoundaryHost(config, silentLogger())
+  let registeredChannel: string | null = null
+  let registeredHandler: ((request: unknown) => Promise<LibraryHierarchyReadResult>) | null = null
+
+  registerLibraryHierarchyReadIpc(
+    {
+      handle(channel, listener): void {
+        registeredChannel = channel
+        registeredHandler = (request) => listener({}, request)
+      }
+    },
+    host
+  )
+
+  assert.equal(registeredChannel, libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren)
+  assert.equal(typeof registeredHandler, 'function')
+}
+
 async function validatesPreloadApiSurface(): Promise<void> {
   const status = testStatus()
+  const hierarchyRequest = firstAvailableSourceReadRequest()
+  const hierarchyResult: LibraryHierarchyReadResult = {
+    state: 'noTarget',
+    error: {
+      code: 'noTarget',
+      message: 'No library source is available for a literal hierarchy read.'
+    }
+  }
+  let receivedHierarchyRequest: unknown = null
   const listeners = new Map<
     string,
     Set<(event: unknown, changedStatus: LibraryBoundaryHostStatus) => void>
   >()
   const ipcRenderer = {
-    invoke: async (channel) => {
-      assert.equal(channel, libraryBoundaryHostStatusIpcChannels.getStatus)
-      return status
+    invoke: async (channel, ...args) => {
+      if (channel === libraryBoundaryHostStatusIpcChannels.getStatus) {
+        assert.deepEqual(args, [])
+        return status
+      }
+
+      if (channel === libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren) {
+        assert.equal(args.length, 1)
+        receivedHierarchyRequest = args[0]
+        return hierarchyResult
+      }
+
+      throw new Error(`unexpected preload invoke channel ${channel}`)
     },
     on: (channel, listener) => {
       const channelListeners = listeners.get(channel) ?? new Set()
@@ -365,14 +538,25 @@ async function validatesPreloadApiSurface(): Promise<void> {
   const api = createDekzerRendererApi(ipcRenderer)
 
   assert.deepEqual(Object.keys(api), ['libraryBoundary'])
-  assert.deepEqual(Object.keys(api.libraryBoundary).sort(), ['getStatus', 'onStatusChanged'])
+  assert.deepEqual(Object.keys(api.libraryBoundary).sort(), [
+    'getStatus',
+    'onStatusChanged',
+    'readLiteralHierarchyChildren'
+  ])
   assert.equal('ipcRenderer' in api, false)
   assert.equal('client' in api, false)
   assert.equal('transport' in api, false)
   assert.equal('client' in api.libraryBoundary, false)
   assert.equal('transport' in api.libraryBoundary, false)
   assert.equal('ipcRenderer' in api.libraryBoundary, false)
+  assert.equal('registerLocalRoot' in api.libraryBoundary, false)
+  assert.equal('runRootScan' in api.libraryBoundary, false)
   assert.equal(await api.libraryBoundary.getStatus(), status)
+  assert.equal(
+    await api.libraryBoundary.readLiteralHierarchyChildren(hierarchyRequest),
+    hierarchyResult
+  )
+  assert.equal(receivedHierarchyRequest, hierarchyRequest)
 
   let receivedStatus: LibraryBoundaryHostStatus | null = null
   const unsubscribe = api.libraryBoundary.onStatusChanged((changedStatus) => {
@@ -470,7 +654,53 @@ function emitStatus(
   }
 }
 
-function createFakeClient(): LibraryBoundaryHostClient {
+async function startedHostWithClient(
+  config: LibraryBoundaryHostConfig,
+  client: LibraryBoundaryHostClient
+): Promise<LibraryBoundaryHost> {
+  const ready = deferred<void>()
+  ready.resolve()
+
+  const host = new LibraryBoundaryHost(config, silentLogger(), {
+    createTransport: () => ({
+      ready: ready.promise,
+      close: async () => undefined,
+      execute: async () => {
+        throw new Error('execute should not be called by host validation')
+      }
+    }),
+    createClient: () => client
+  })
+
+  await host.start()
+  return host
+}
+
+function firstAvailableSourceReadRequest(): LibraryHierarchyReadRequest {
+  return {
+    target: {
+      kind: 'firstAvailableSource'
+    },
+    parentSourceDirectoryId: null,
+    offset: 0,
+    limit: 50
+  }
+}
+
+function assertReadError(
+  result: LibraryHierarchyReadResult,
+  code: LibraryHierarchyReadErrorCode
+): void {
+  if (result.state === 'ready') {
+    assert.fail(`expected hierarchy read error ${String(code)}`)
+  }
+
+  assert.equal(result.error.code, code)
+}
+
+function createFakeClient(
+  overrides: Partial<LibraryBoundaryHostClient> = {}
+): LibraryBoundaryHostClient {
   return {
     registerLocalRoot: rejectUnexpectedClientCall,
     runRootScan: rejectUnexpectedClientCall,
@@ -483,7 +713,8 @@ function createFakeClient(): LibraryBoundaryHostClient {
     createPlaylist: rejectUnexpectedClientCall,
     renamePlaylist: rejectUnexpectedClientCall,
     deletePlaylist: rejectUnexpectedClientCall,
-    readPendingBoundaryEvents: rejectUnexpectedClientCall
+    readPendingBoundaryEvents: rejectUnexpectedClientCall,
+    ...overrides
   } as LibraryBoundaryHostClient
 }
 

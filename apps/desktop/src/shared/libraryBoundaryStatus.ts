@@ -1,3 +1,8 @@
+import type {
+  LibraryHierarchyReadRequest,
+  LibraryHierarchyReadResult
+} from './libraryHierarchyRead'
+
 export const libraryBoundaryHostStatusIpcChannels = {
   getStatus: 'desktop:library-boundary:get-status',
   statusChanged: 'desktop:library-boundary:status-changed'
@@ -49,5 +54,8 @@ export type DekzerRendererApi = {
   readonly libraryBoundary: {
     getStatus(): Promise<LibraryBoundaryHostStatus>
     onStatusChanged(callback: LibraryBoundaryHostStatusChangedCallback): () => void
+    readLiteralHierarchyChildren(
+      request: LibraryHierarchyReadRequest
+    ): Promise<LibraryHierarchyReadResult>
   }
 }

@@ -3,11 +3,16 @@ import {
   type DekzerRendererApi,
   type LibraryBoundaryHostStatus
 } from '../shared/libraryBoundaryStatus'
+import {
+  libraryHierarchyReadIpcChannels,
+  type LibraryHierarchyReadRequest,
+  type LibraryHierarchyReadResult
+} from '../shared/libraryHierarchyRead'
 
 type IpcRendererEventLike = unknown
 
 export type LibraryBoundaryPreloadIpcRenderer = {
-  invoke(channel: string): Promise<unknown>
+  invoke(channel: string, ...args: readonly unknown[]): Promise<unknown>
   on(
     channel: string,
     listener: (event: IpcRendererEventLike, status: LibraryBoundaryHostStatus) => void
@@ -38,6 +43,14 @@ export function createDekzerRendererApi(
         return (await ipcRenderer.invoke(
           libraryBoundaryHostStatusIpcChannels.getStatus
         )) as LibraryBoundaryHostStatus
+      },
+      async readLiteralHierarchyChildren(
+        request: LibraryHierarchyReadRequest
+      ): Promise<LibraryHierarchyReadResult> {
+        return (await ipcRenderer.invoke(
+          libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren,
+          request
+        )) as LibraryHierarchyReadResult
       },
       onStatusChanged(callback) {
         const listener = (

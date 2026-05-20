@@ -2,7 +2,8 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { createLibraryBoundaryHost, type LibraryBoundaryHost } from './libraryBoundaryHost'
+import { createLibraryBoundaryHost } from './libraryBoundaryHost'
+import { registerLibraryHierarchyReadIpc } from './libraryHierarchyRead'
 import {
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
@@ -11,7 +12,6 @@ import { libraryBoundaryHostStatusIpcChannels } from '../shared/libraryBoundaryS
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
-let libraryBoundaryHost: LibraryBoundaryHost | null = null
 let libraryBoundaryHostStatusController: LibraryBoundaryHostStatusController | null = null
 let isQuittingAfterLibraryBoundaryHostStop = false
 
@@ -51,12 +51,13 @@ function createWindow(): void {
 app.setName(windowTitle)
 
 app.whenReady().then(() => {
-  libraryBoundaryHost = createLibraryBoundaryHost({
+  const host = createLibraryBoundaryHost({
     app,
     isDev: is.dev
   })
-  libraryBoundaryHostStatusController = new LibraryBoundaryHostStatusController(libraryBoundaryHost)
+  libraryBoundaryHostStatusController = new LibraryBoundaryHostStatusController(host)
   registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
+  registerLibraryHierarchyReadIpc(ipcMain, host)
   libraryBoundaryHostStatusController.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(libraryBoundaryHostStatusIpcChannels.statusChanged, status)

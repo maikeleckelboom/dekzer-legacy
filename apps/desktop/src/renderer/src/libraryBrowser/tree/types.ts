@@ -2,7 +2,9 @@ export type BrowserTreeNodeId = string
 
 export type BrowserTreeNodeKind =
   | 'fixtureRoot'
+  | 'source'
   | 'folder'
+  | 'file'
   | 'playlistGroup'
   | 'preparation'
   | 'history'

@@ -2,6 +2,7 @@ import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 
 import { libraryHierarchyFixtureTree } from '../src/renderer/src/libraryBrowser/libraryHierarchyFixture'
+import { projectLibraryHierarchyReadToBrowserTree } from '../src/renderer/src/libraryBrowser/libraryHierarchyProjection'
 import {
   getTreeItemAriaExpanded,
   getTreeItemAriaSelected
@@ -24,6 +25,7 @@ import type {
   BrowserTreeNodeId,
   BrowserTreeVisibleItem
 } from '../src/renderer/src/libraryBrowser/tree/types'
+import type { LibraryHierarchyReadResult } from '../src/shared/libraryHierarchyRead'
 
 const expandedFixtureIds = new Set<BrowserTreeNodeId>([
   'fixture-root',
@@ -43,6 +45,8 @@ function main(): void {
   validatesKeyboardSelection()
   validatesFocusAndSelectionSeparation()
   validatesAriaAttributes()
+  validatesLibraryHierarchyReadProjection()
+  validatesFixtureFallbackRemainsExplicit()
   validatesRootQualityGateIncludesTreeValidation()
 }
 
@@ -216,6 +220,56 @@ function validatesAriaAttributes(): void {
   assert.equal(getTreeItemAriaExpanded(getItem(rootOnlyItems, 'fixture-tracks')), 'false')
 }
 
+function validatesLibraryHierarchyReadProjection(): void {
+  const projected = projectLibraryHierarchyReadToBrowserTree(fileOnlyHierarchyReadResult())
+
+  assert.equal(projected.kind, 'tree')
+  if (projected.kind !== 'tree') {
+    assert.fail('expected file-only hierarchy read result to project to browser tree')
+  }
+
+  assert.deepEqual(projected.nodes, [
+    {
+      id: 'source:7',
+      label: 'Source Fixture',
+      kind: 'source',
+      detail: '1 literal hierarchy row loaded read-only.',
+      children: [
+        {
+          id: 'source-file:11',
+          label: 'track.wav',
+          kind: 'file',
+          detail: 'Present file.'
+        }
+      ]
+    }
+  ])
+
+  const directoryProjection = projectLibraryHierarchyReadToBrowserTree(
+    directoryHierarchyReadResult()
+  )
+  assert.equal(directoryProjection.kind, 'unsupported')
+  if (directoryProjection.kind !== 'unsupported') {
+    assert.fail('expected directory rows to stay out of the current browser tree model')
+  }
+  assert.match(directoryProjection.message, /unloaded child state/)
+
+  const partialProjection = projectLibraryHierarchyReadToBrowserTree({
+    ...fileOnlyHierarchyReadResult(),
+    window: {
+      ...fileOnlyHierarchyReadResult().window,
+      totalRows: 2
+    }
+  })
+  assert.equal(partialProjection.kind, 'unsupported')
+}
+
+function validatesFixtureFallbackRemainsExplicit(): void {
+  assert.equal(libraryHierarchyFixtureTree.name, 'Library hierarchy fixture')
+  assert.match(libraryHierarchyFixtureTree.detail, /Renderer-only demo input/)
+  assert.equal(libraryHierarchyFixtureTree.nodes[0]?.kind, 'fixtureRoot')
+}
+
 function validatesRootQualityGateIncludesTreeValidation(): void {
   const rootPackage = JSON.parse(
     readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')
@@ -303,5 +357,69 @@ function leafRootNode(): BrowserTreeNode {
     id: 'leaf-root',
     label: 'Leaf root',
     kind: 'folder'
+  }
+}
+
+function fileOnlyHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { state: 'ready' }> {
+  return {
+    state: 'ready',
+    window: {
+      root: {
+        id: 'source:7',
+        label: 'Source Fixture',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        }
+      },
+      parentSourceDirectoryId: null,
+      offset: 0,
+      limit: 50,
+      totalRows: 1,
+      nodes: [
+        {
+          id: 'source-file:11',
+          kind: 'file',
+          label: 'track.wav',
+          parentSourceDirectoryId: null,
+          sourceDirectoryId: null,
+          sourceFileId: '11',
+          presenceState: 'present',
+          updatedAtMs: 100
+        }
+      ]
+    }
+  }
+}
+
+function directoryHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { state: 'ready' }> {
+  return {
+    state: 'ready',
+    window: {
+      root: {
+        id: 'source:7',
+        label: 'Source Fixture',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        }
+      },
+      parentSourceDirectoryId: null,
+      offset: 0,
+      limit: 50,
+      totalRows: 1,
+      nodes: [
+        {
+          id: 'source-directory:12',
+          kind: 'directory',
+          label: 'Album',
+          parentSourceDirectoryId: null,
+          sourceDirectoryId: '12',
+          sourceFileId: null,
+          presenceState: 'present',
+          updatedAtMs: 100
+        }
+      ]
+    }
   }
 }

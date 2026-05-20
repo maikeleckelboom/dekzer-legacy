@@ -71,8 +71,12 @@ function formatNodeKind(kind: BrowserTreeNodeKind): string {
   switch (kind) {
     case 'fixtureRoot':
       return 'Fixture root'
+    case 'source':
+      return 'Source'
     case 'folder':
       return 'Folder'
+    case 'file':
+      return 'File'
     case 'playlistGroup':
       return 'Playlist group'
     case 'preparation':
