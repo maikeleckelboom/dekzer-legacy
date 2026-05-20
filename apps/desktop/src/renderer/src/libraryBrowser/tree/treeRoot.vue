@@ -26,7 +26,7 @@ defineOptions({
 
 const props = defineProps<{
   nodes: readonly BrowserTreeNode[]
-  selectedNodeId: BrowserTreeNodeId | null
+  selectedNodeId?: BrowserTreeNodeId
   expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   labelledBy: string
 }>()

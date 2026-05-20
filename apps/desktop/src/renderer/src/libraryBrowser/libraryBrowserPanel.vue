@@ -84,12 +84,12 @@ const defaultFixtureExpandedNodeIds = new Set<BrowserTreeNodeId>([
 ])
 const { hostStatus, hierarchyReadResult, hierarchyReadRequestError, hierarchyReadIsLoading } =
   useLibraryHierarchyRead()
-const selectedNodeId = ref<BrowserTreeNodeId | null>(null)
+const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 
 const hierarchyProjection = computed(() => {
-  if (hierarchyReadResult.value === null) {
-    return null
+  if (hierarchyReadResult.value === undefined) {
+    return undefined
   }
 
   return projectLibraryHierarchyReadToBrowserTree(hierarchyReadResult.value)
@@ -97,14 +97,14 @@ const hierarchyProjection = computed(() => {
 
 const liveTreeNodes = computed(() => {
   if (hierarchyProjection.value?.kind !== 'tree') {
-    return null
+    return undefined
   }
 
   return hierarchyProjection.value.nodes
 })
 
 const currentTreeNodes = computed(() => liveTreeNodes.value ?? libraryHierarchyFixtureTree.nodes)
-const isLiveTree = computed(() => liveTreeNodes.value !== null)
+const isLiveTree = computed(() => liveTreeNodes.value !== undefined)
 
 const modeEyebrow = computed(() => {
   if (isLiveTree.value) {
@@ -125,7 +125,7 @@ const panelDetail = computed(() => {
     return 'Showing a real library source through the desktop-owned read path.'
   }
 
-  if (hierarchyReadRequestError.value !== null) {
+  if (hierarchyReadRequestError.value !== undefined) {
     return `${hierarchyReadRequestError.value} Showing `
   }
 
@@ -141,7 +141,7 @@ const panelDetail = computed(() => {
     return `${hierarchyProjection.value.message} Showing `
   }
 
-  if (hostStatus.value === null) {
+  if (hostStatus.value === undefined) {
     return 'Checking library boundary host status. Showing '
   }
 
@@ -163,8 +163,8 @@ const selectedSummaryDetail = computed(() =>
 )
 
 const selectedNode = computed(() => {
-  if (selectedNodeId.value === null) {
-    return null
+  if (selectedNodeId.value === undefined) {
+    return undefined
   }
 
   return findNodeById(currentTreeNodes.value, selectedNodeId.value)
@@ -173,9 +173,9 @@ const selectedNode = computed(() => {
 watch(
   liveTreeNodes,
   (nodes) => {
-    const liveRootId = nodes?.[0]?.id ?? null
+    const liveRootId = nodes?.[0]?.id
 
-    if (liveRootId !== null) {
+    if (liveRootId !== undefined) {
       selectedNodeId.value = liveRootId
       expandedNodeIds.value = new Set([liveRootId])
       return
@@ -206,7 +206,7 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
 function findNodeById(
   nodes: readonly BrowserTreeNode[],
   nodeId: BrowserTreeNodeId
-): BrowserTreeNode | null {
+): BrowserTreeNode | undefined {
   for (const node of nodes) {
     if (node.id === nodeId) {
       return node
@@ -214,12 +214,12 @@ function findNodeById(
 
     const childMatch = findNodeById(node.children ?? [], nodeId)
 
-    if (childMatch !== null) {
+    if (childMatch !== undefined) {
       return childMatch
     }
   }
 
-  return null
+  return undefined
 }
 
 function formatHostState(state: LibraryBoundaryHostStatus['state']): string {

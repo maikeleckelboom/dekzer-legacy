@@ -44,19 +44,19 @@ export type LibraryHierarchyReadTarget =
   | {
       readonly kind: 'entryPoint'
       readonly entryPoint: LibraryHierarchyReadEntryPoint
-      readonly label?: string | null
+      readonly label?: string
     }
 
 export type LibraryHierarchyReadRequest = {
-  readonly target?: LibraryHierarchyReadTarget | null
-  readonly parentSourceDirectoryId?: string | null
+  readonly target?: LibraryHierarchyReadTarget
+  readonly parentSourceDirectoryId?: string
   readonly offset?: number
   readonly limit?: number
 }
 
 export type LibraryHierarchyReadRoot = {
   readonly id: string
-  readonly label: string | null
+  readonly label?: string
   readonly entryPoint: LibraryHierarchyReadEntryPoint
 }
 
@@ -64,20 +64,29 @@ export type LibraryHierarchyReadNodeKind = 'directory' | 'file'
 
 export type LibraryHierarchyReadNodePresenceState = 'present' | 'missing' | 'removed'
 
-export type LibraryHierarchyReadNode = {
-  readonly id: string
-  readonly kind: LibraryHierarchyReadNodeKind
-  readonly label: string
-  readonly parentSourceDirectoryId: string | null
-  readonly sourceDirectoryId: string | null
-  readonly sourceFileId: string | null
-  readonly presenceState: LibraryHierarchyReadNodePresenceState
-  readonly updatedAtMs: number
-}
+export type LibraryHierarchyReadNode =
+  | {
+      readonly id: string
+      readonly kind: 'directory'
+      readonly label: string
+      readonly sourceDirectoryId: string
+      readonly parentSourceDirectoryId?: string
+      readonly presenceState: LibraryHierarchyReadNodePresenceState
+      readonly updatedAtMs: number
+    }
+  | {
+      readonly id: string
+      readonly kind: 'file'
+      readonly label: string
+      readonly sourceFileId: string
+      readonly parentSourceDirectoryId?: string
+      readonly presenceState: LibraryHierarchyReadNodePresenceState
+      readonly updatedAtMs: number
+    }
 
 export type LibraryHierarchyReadWindow = {
   readonly root: LibraryHierarchyReadRoot
-  readonly parentSourceDirectoryId: string | null
+  readonly parentSourceDirectoryId?: string
   readonly offset: number
   readonly limit: number
   readonly totalRows: number

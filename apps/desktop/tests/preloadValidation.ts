@@ -116,7 +116,6 @@ function firstAvailableSourceReadRequest(): LibraryHierarchyReadRequest {
     target: {
       kind: 'firstAvailableSource'
     },
-    parentSourceDirectoryId: null,
     offset: 0,
     limit: 50
   }

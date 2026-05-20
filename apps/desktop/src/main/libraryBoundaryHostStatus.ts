@@ -28,7 +28,7 @@ export class LibraryBoundaryHostStatusController {
   readonly #host: LibraryBoundaryHost
   readonly #listeners = new Set<LibraryBoundaryHostStatusChangedCallback>()
   readonly #logger: LibraryBoundaryHostStatusLogger
-  #lastError: LibraryBoundaryHostStatusError | null = null
+  #lastError: LibraryBoundaryHostStatusError | undefined
 
   constructor(host: LibraryBoundaryHost, logger: LibraryBoundaryHostStatusLogger = console) {
     this.#host = host
@@ -56,13 +56,13 @@ export class LibraryBoundaryHostStatusController {
       return
     }
 
-    this.#lastError = null
+    this.#lastError = undefined
     const started = this.#host.start()
     this.#publish()
 
     try {
       await started
-      this.#lastError = null
+      this.#lastError = undefined
       this.#publish()
     } catch (error: unknown) {
       this.#lastError = createLibraryBoundaryHostStatusError(error)
@@ -107,21 +107,21 @@ export function registerLibraryBoundaryHostStatusIpc(
 
 export function createLibraryBoundaryHostStatus(
   host: LibraryBoundaryHost,
-  lastError: LibraryBoundaryHostStatusError | null = null
+  lastError?: LibraryBoundaryHostStatusError
 ): LibraryBoundaryHostStatus {
   return {
     state: projectState(host.state, lastError),
     environment: host.config.environment,
     binaryPolicy: projectBinaryPolicy(host.config.binaryPolicy),
-    lastError
+    lastError: lastError ?? null
   }
 }
 
 function projectState(
   state: LibraryBoundaryHostStatusState,
-  lastError: LibraryBoundaryHostStatusError | null
+  lastError: LibraryBoundaryHostStatusError | undefined
 ): LibraryBoundaryHostStatusState {
-  if (lastError !== null && state === 'idle') {
+  if (lastError !== undefined && state === 'idle') {
     return 'failed'
   }
 

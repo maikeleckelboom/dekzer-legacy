@@ -61,11 +61,11 @@ export class LibraryBoundaryHost {
   readonly #config: LibraryBoundaryHostConfig
   readonly #dependencies: LibraryBoundaryHostDependencies
   readonly #logger: LibraryBoundaryHostLogger
-  #client: LibraryBoundaryHostClient | null = null
-  #startPromise: Promise<LibraryBoundaryHostClient> | null = null
+  #client: LibraryBoundaryHostClient | undefined
+  #startPromise: Promise<LibraryBoundaryHostClient> | undefined
   #state: LibraryBoundaryHostState = 'idle'
-  #stopPromise: Promise<void> | null = null
-  #transport: LibraryBoundaryHostTransport | null = null
+  #stopPromise: Promise<void> | undefined
+  #transport: LibraryBoundaryHostTransport | undefined
 
   constructor(
     config: LibraryBoundaryHostConfig,
@@ -90,7 +90,7 @@ export class LibraryBoundaryHost {
   }
 
   get client(): LibraryBoundaryHostClient {
-    if (this.#client !== null && this.#state === 'started') {
+    if (this.#client !== undefined && this.#state === 'started') {
       return this.#client
     }
 
@@ -138,7 +138,7 @@ export class LibraryBoundaryHost {
       return
     }
 
-    if (this.#stopPromise !== null) {
+    if (this.#stopPromise !== undefined) {
       return this.#stopPromise
     }
 
@@ -171,9 +171,9 @@ export class LibraryBoundaryHost {
       return client
     } catch (cause) {
       await this.#transport?.close().catch(() => undefined)
-      this.#client = null
-      this.#transport = null
-      this.#startPromise = null
+      this.#client = undefined
+      this.#transport = undefined
+      this.#startPromise = undefined
 
       if (cause instanceof LibraryBoundaryHostError) {
         this.#state = 'idle'
@@ -211,13 +211,13 @@ export class LibraryBoundaryHost {
     try {
       await this.#startPromise?.catch(() => undefined)
       await this.#transport?.close()
-      this.#client = null
-      this.#transport = null
-      this.#startPromise = null
+      this.#client = undefined
+      this.#transport = undefined
+      this.#startPromise = undefined
       this.#state = 'stopped'
     } catch (cause) {
       this.#state = 'failed'
-      this.#stopPromise = null
+      this.#stopPromise = undefined
       throw cause
     }
   }

@@ -12,7 +12,7 @@ import { libraryBoundaryHostStatusIpcChannels } from '../shared/libraryBoundaryS
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
-let libraryBoundaryHostStatusController: LibraryBoundaryHostStatusController | null = null
+let libraryBoundaryHostStatusController: LibraryBoundaryHostStatusController | undefined
 let isQuittingAfterLibraryBoundaryHostStop = false
 
 function createWindow(): void {
@@ -87,7 +87,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', (event) => {
   if (
     isQuittingAfterLibraryBoundaryHostStop ||
-    libraryBoundaryHostStatusController === null ||
+    libraryBoundaryHostStatusController === undefined ||
     !libraryBoundaryHostStatusController.hasStarted
   ) {
     return

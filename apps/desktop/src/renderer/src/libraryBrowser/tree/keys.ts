@@ -50,7 +50,7 @@ export type TreeKeyboardIntent =
 
 export type ResolveTreeKeyboardIntentOptions = {
   readonly key: string
-  readonly activeNodeId: BrowserTreeNodeId | null
+  readonly activeNodeId?: BrowserTreeNodeId
   readonly visibleItems: readonly BrowserTreeVisibleItem[]
 }
 
@@ -58,21 +58,21 @@ export function resolveTreeKeyboardIntent(
   options: ResolveTreeKeyboardIntentOptions
 ): TreeKeyboardIntent {
   const activeItem =
-    options.activeNodeId === null
-      ? null
-      : (options.visibleItems.find((item) => item.id === options.activeNodeId) ?? null)
+    options.activeNodeId === undefined
+      ? undefined
+      : options.visibleItems.find((item) => item.id === options.activeNodeId)
 
   switch (options.key) {
     case treeKeyboardKeys.arrowUp:
       return resolveFocusIntent(
-        activeItem === null
+        activeItem === undefined
           ? getFirstVisibleNodeId(options.visibleItems)
           : getPreviousVisibleNodeId(options.visibleItems, activeItem.id)
       )
 
     case treeKeyboardKeys.arrowDown:
       return resolveFocusIntent(
-        activeItem === null
+        activeItem === undefined
           ? getFirstVisibleNodeId(options.visibleItems)
           : getNextVisibleNodeId(options.visibleItems, activeItem.id)
       )
@@ -84,7 +84,7 @@ export function resolveTreeKeyboardIntent(
       return resolveFocusIntent(getLastVisibleNodeId(options.visibleItems))
 
     case treeKeyboardKeys.arrowRight:
-      if (activeItem === null || !activeItem.hasChildren) {
+      if (activeItem === undefined || !activeItem.hasChildren) {
         return handledNoop()
       }
 
@@ -99,7 +99,7 @@ export function resolveTreeKeyboardIntent(
       return resolveFocusIntent(getFirstChildVisibleNodeId(options.visibleItems, activeItem.id))
 
     case treeKeyboardKeys.arrowLeft:
-      if (activeItem === null) {
+      if (activeItem === undefined) {
         return handledNoop()
       }
 
@@ -117,7 +117,7 @@ export function resolveTreeKeyboardIntent(
     case treeKeyboardKeys.space:
     case treeKeyboardKeys.spaceKey:
     case treeKeyboardKeys.legacySpace:
-      if (activeItem === null) {
+      if (activeItem === undefined) {
         return handledNoop()
       }
 
@@ -135,8 +135,8 @@ export function resolveTreeKeyboardIntent(
   }
 }
 
-function resolveFocusIntent(nodeId: BrowserTreeNodeId | null): TreeKeyboardIntent {
-  if (nodeId === null) {
+function resolveFocusIntent(nodeId: BrowserTreeNodeId | undefined): TreeKeyboardIntent {
+  if (nodeId === undefined) {
     return handledNoop()
   }
 

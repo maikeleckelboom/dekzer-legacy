@@ -25,7 +25,7 @@ export function projectLibraryHierarchyReadToBrowserTree(
     }
   }
 
-  if (result.window.root.label === null) {
+  if (result.window.root.label === undefined) {
     return {
       kind: 'unsupported',
       message: 'The hierarchy read target does not have a display label.'

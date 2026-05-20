@@ -109,14 +109,14 @@ function validatesVisibleHelpers(): void {
   assert.equal(getFirstVisibleNodeId(items), 'fixture-root')
   assert.equal(getLastVisibleNodeId(items), 'fixture-history')
   assert.equal(getNextVisibleNodeId(items, 'fixture-root'), 'fixture-artists')
-  assert.equal(getNextVisibleNodeId(items, 'fixture-history'), null)
+  assert.equal(getNextVisibleNodeId(items, 'fixture-history'), undefined)
   assert.equal(getPreviousVisibleNodeId(items, 'fixture-artists'), 'fixture-root')
-  assert.equal(getPreviousVisibleNodeId(items, 'fixture-root'), null)
+  assert.equal(getPreviousVisibleNodeId(items, 'fixture-root'), undefined)
   assert.equal(getParentVisibleNodeId(items, 'fixture-tracks-group'), 'fixture-tracks')
-  assert.equal(getParentVisibleNodeId(items, 'fixture-root'), null)
+  assert.equal(getParentVisibleNodeId(items, 'fixture-root'), undefined)
   assert.equal(getFirstChildVisibleNodeId(items, 'fixture-root'), 'fixture-artists')
   assert.equal(getFirstChildVisibleNodeId(items, 'fixture-tracks'), 'fixture-tracks-group')
-  assert.equal(getFirstChildVisibleNodeId(items, 'fixture-artists'), null)
+  assert.equal(getFirstChildVisibleNodeId(items, 'fixture-artists'), undefined)
 }
 
 function validatesKeyboardNavigation(): void {
@@ -146,8 +146,7 @@ function validatesKeyboardExpansion(): void {
   const collapsedRootItems = fixtureVisibleItems(collapsedFixtureIds)
   const leafRootItems = flattenVisibleTree({
     nodes: [leafRootNode()],
-    expandedNodeIds: new Set(),
-    selectedNodeId: null
+    expandedNodeIds: new Set()
   })
 
   assertIntent(resolveIntent(rootOnlyItems, 'fixture-tracks', 'ArrowRight'), {
@@ -285,15 +284,15 @@ function validatesRootQualityGateIncludesTreeValidation(): void {
 function fixtureVisibleItems(
   expandedNodeIds: ReadonlySet<BrowserTreeNodeId>,
   options: {
-    readonly selectedNodeId?: BrowserTreeNodeId | null
-    readonly activeNodeId?: BrowserTreeNodeId | null
+    readonly selectedNodeId?: BrowserTreeNodeId
+    readonly activeNodeId?: BrowserTreeNodeId
   } = {}
 ): readonly BrowserTreeVisibleItem[] {
   return flattenVisibleTree({
     nodes: libraryHierarchyFixtureTree.nodes,
     expandedNodeIds,
-    selectedNodeId: options.selectedNodeId ?? null,
-    activeNodeId: options.activeNodeId ?? null
+    ...(options.selectedNodeId === undefined ? {} : { selectedNodeId: options.selectedNodeId }),
+    ...(options.activeNodeId === undefined ? {} : { activeNodeId: options.activeNodeId })
   })
 }
 
@@ -369,7 +368,6 @@ function fileOnlyHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { st
           sourceId: '7'
         }
       },
-      parentSourceDirectoryId: null,
       offset: 0,
       limit: 50,
       totalRows: 1,
@@ -378,8 +376,6 @@ function fileOnlyHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { st
           id: 'source-file:11',
           kind: 'file',
           label: 'track.wav',
-          parentSourceDirectoryId: null,
-          sourceDirectoryId: null,
           sourceFileId: '11',
           presenceState: 'present',
           updatedAtMs: 100
@@ -401,7 +397,6 @@ function directoryHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { s
           sourceId: '7'
         }
       },
-      parentSourceDirectoryId: null,
       offset: 0,
       limit: 50,
       totalRows: 1,
@@ -410,9 +405,7 @@ function directoryHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { s
           id: 'source-directory:12',
           kind: 'directory',
           label: 'Album',
-          parentSourceDirectoryId: null,
           sourceDirectoryId: '12',
-          sourceFileId: null,
           presenceState: 'present',
           updatedAtMs: 100
         }

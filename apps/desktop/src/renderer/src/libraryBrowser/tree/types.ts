@@ -27,7 +27,7 @@ export type BrowserTreeFixture = {
 export type BrowserTreeVisibleItem = {
   readonly id: BrowserTreeNodeId
   readonly node: BrowserTreeNode
-  readonly parentId: BrowserTreeNodeId | null
+  readonly parentId?: BrowserTreeNodeId
   readonly level: number
   readonly visibleIndex: number
   readonly hasChildren: boolean

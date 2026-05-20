@@ -8,14 +8,14 @@ import type { BrowserTreeNode, BrowserTreeNodeId, BrowserTreeVisibleItem } from 
 
 export type UseTreeControllerOptions = {
   readonly nodes: ComputedRef<readonly BrowserTreeNode[]>
-  readonly selectedNodeId: ComputedRef<BrowserTreeNodeId | null>
+  readonly selectedNodeId: ComputedRef<BrowserTreeNodeId | undefined>
   readonly expandedNodeIds: ComputedRef<ReadonlySet<BrowserTreeNodeId>>
   readonly selectNode: (nodeId: BrowserTreeNodeId) => void
   readonly toggleNode: (nodeId: BrowserTreeNodeId) => void
 }
 
 export function useTreeController(options: UseTreeControllerOptions): TreeContext {
-  const activeNodeId: Ref<BrowserTreeNodeId | null> = ref(null)
+  const activeNodeId: Ref<BrowserTreeNodeId | undefined> = ref()
   const itemElements = new Map<BrowserTreeNodeId, HTMLElement>()
 
   const visibleItems = computed(() =>
@@ -31,16 +31,16 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     const items = visibleItems.value
 
     if (items.length === 0) {
-      activeNodeId.value = null
+      activeNodeId.value = undefined
       return
     }
 
-    if (activeNodeId.value !== null && items.some((item) => item.id === activeNodeId.value)) {
+    if (activeNodeId.value !== undefined && items.some((item) => item.id === activeNodeId.value)) {
       return
     }
 
     if (
-      options.selectedNodeId.value !== null &&
+      options.selectedNodeId.value !== undefined &&
       items.some((item) => item.id === options.selectedNodeId.value)
     ) {
       activeNodeId.value = options.selectedNodeId.value

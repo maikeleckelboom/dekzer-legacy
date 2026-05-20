@@ -12,7 +12,7 @@ const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
 export type NormalizedLibraryHierarchyReadRequest = {
   readonly target: LibraryHierarchyReadTarget
-  readonly parentSourceDirectoryId: string | null
+  readonly parentSourceDirectoryId?: string
   readonly offset: number
   readonly limit: number
 }
@@ -127,7 +127,7 @@ function normalizeLibraryHierarchyReadTarget(
   return {
     kind: 'entryPoint',
     entryPoint,
-    label: value.label === null || typeof value.label === 'string' ? value.label : undefined
+    ...(typeof value.label === 'string' ? { label: value.label } : {})
   }
 }
 
@@ -170,9 +170,9 @@ function invalidEntryPoint(): LibraryHierarchyReadResult {
 function normalizeNullableOpaqueId(
   value: unknown,
   fieldName: string
-): string | null | LibraryHierarchyReadResult {
+): string | undefined | LibraryHierarchyReadResult {
   if (value === null || value === undefined) {
-    return null
+    return undefined
   }
 
   if (isPositiveOpaqueId(value)) {

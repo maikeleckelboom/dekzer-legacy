@@ -9,6 +9,9 @@
   "compilerOptions": {
     "composite": true,
     "baseUrl": ".",
+    "strictNullChecks": true,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
     "paths": {
       "@renderer/*": [
         "src/renderer/src/*"

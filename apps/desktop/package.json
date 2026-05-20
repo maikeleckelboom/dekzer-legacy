@@ -13,6 +13,7 @@
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
     "validate:host": "tsx tests/hostValidation.ts",
     "validate:hierarchy-read": "tsx tests/hierarchyReadValidation.ts",
+    "validate:absence": "tsx tests/absenceValidation.ts",
     "validate:preload": "tsx tests/preloadValidation.ts",
     "validate:tree": "tsx tests/treeValidation.ts",
     "start:built": "electron-vite preview --ignoreConfigWarning",

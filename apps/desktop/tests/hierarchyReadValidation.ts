@@ -159,8 +159,6 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       id: 'source-file:11',
       kind: 'file',
       label: 'track.wav',
-      parentSourceDirectoryId: null,
-      sourceDirectoryId: null,
       sourceFileId: '11',
       presenceState: 'present',
       updatedAtMs: 101
@@ -282,7 +280,6 @@ function firstAvailableSourceReadRequest(): LibraryHierarchyReadRequest {
     target: {
       kind: 'firstAvailableSource'
     },
-    parentSourceDirectoryId: null,
     offset: 0,
     limit: 50
   }

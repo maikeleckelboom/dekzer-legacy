@@ -40,25 +40,49 @@ export function rootIdForLibraryHierarchyReadEntryPoint(
 
 export function mapLiteralHierarchyNode(
   row: LiteralHierarchyNode
-): LibraryHierarchyReadNode | null {
+): LibraryHierarchyReadNode | undefined {
   if (row.nodeKind === 'directory' && row.sourceDirectoryId === null) {
-    return null
+    return undefined
   }
 
   if (row.nodeKind === 'file' && row.sourceFileId === null) {
-    return null
+    return undefined
+  }
+
+  if (row.nodeKind === 'directory') {
+    const sourceDirectoryId = row.sourceDirectoryId
+
+    if (sourceDirectoryId === null) {
+      return undefined
+    }
+
+    return {
+      id: `source-directory:${sourceDirectoryId}`,
+      kind: 'directory',
+      label: row.displayName,
+      sourceDirectoryId,
+      ...(row.parentSourceDirectoryId === null
+        ? {}
+        : { parentSourceDirectoryId: row.parentSourceDirectoryId }),
+      presenceState: row.presenceState,
+      updatedAtMs: row.updatedAtMs
+    }
+  }
+
+  const sourceFileId = row.sourceFileId
+
+  if (sourceFileId === null) {
+    return undefined
   }
 
   return {
-    id:
-      row.nodeKind === 'directory'
-        ? `source-directory:${row.sourceDirectoryId}`
-        : `source-file:${row.sourceFileId}`,
-    kind: row.nodeKind,
+    id: `source-file:${sourceFileId}`,
+    kind: 'file',
     label: row.displayName,
-    parentSourceDirectoryId: row.parentSourceDirectoryId,
-    sourceDirectoryId: row.sourceDirectoryId,
-    sourceFileId: row.sourceFileId,
+    sourceFileId,
+    ...(row.parentSourceDirectoryId === null
+      ? {}
+      : { parentSourceDirectoryId: row.parentSourceDirectoryId }),
     presenceState: row.presenceState,
     updatedAtMs: row.updatedAtMs
   }

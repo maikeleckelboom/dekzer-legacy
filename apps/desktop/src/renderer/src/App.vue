@@ -72,16 +72,16 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundaryStatus'
 import LibraryBrowserPanel from './libraryBrowser/libraryBrowserPanel.vue'
 
-const hostStatus = ref<LibraryBoundaryHostStatus | null>(null)
-const hostStatusLoadError = ref<string | null>(null)
-let unsubscribeFromHostStatus: (() => void) | null = null
+const hostStatus = ref<LibraryBoundaryHostStatus>()
+const hostStatusLoadError = ref<string>()
+let unsubscribeFromHostStatus: (() => void) | undefined
 const stateRowClass =
   'grid gap-1.5 border-b border-(--color-border) px-5 py-[18px] last:border-b-0 min-[861px]:grid-cols-[170px_1fr] min-[861px]:gap-6'
 const stateLabelClass = 'text-[13px] text-(--color-text-muted)'
 const stateValueClass = 'text-[15px] font-[650] text-(--color-text)'
 
 const hostStateLabel = computed(() => {
-  if (hostStatus.value === null) {
+  if (hostStatus.value === undefined) {
     return 'Loading'
   }
 
@@ -89,7 +89,7 @@ const hostStateLabel = computed(() => {
 })
 
 const hostEnvironmentLabel = computed(() => {
-  if (hostStatus.value === null) {
+  if (hostStatus.value === undefined) {
     return 'Unknown'
   }
 
@@ -113,7 +113,7 @@ onMounted(() => {
     .getStatus()
     .then((status) => {
       hostStatus.value = status
-      hostStatusLoadError.value = null
+      hostStatusLoadError.value = undefined
     })
     .catch(() => {
       hostStatusLoadError.value = 'Unable to read library boundary host status.'
@@ -121,13 +121,13 @@ onMounted(() => {
 
   unsubscribeFromHostStatus = window.dekzer.libraryBoundary.onStatusChanged((status) => {
     hostStatus.value = status
-    hostStatusLoadError.value = null
+    hostStatusLoadError.value = undefined
   })
 })
 
 onUnmounted(() => {
   unsubscribeFromHostStatus?.()
-  unsubscribeFromHostStatus = null
+  unsubscribeFromHostStatus = undefined
 })
 
 function formatHostState(state: LibraryBoundaryHostStatus['state']): string {

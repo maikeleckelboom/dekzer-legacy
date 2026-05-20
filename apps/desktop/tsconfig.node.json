@@ -4,6 +4,9 @@
   "compilerOptions": {
     "baseUrl": ".",
     "composite": true,
+    "strictNullChecks": true,
+    "exactOptionalPropertyTypes": false,
+    "noUncheckedIndexedAccess": false,
     "paths": {
       "@dekzer/library-boundary-client": [
         "../../packages/library-boundary-client/src/index.ts"

@@ -57,7 +57,7 @@ export async function readLiteralHierarchyChildrenThroughHost(
 
     const reply = await client.readLiteralHierarchyChildren({
       entryPoint: resolvedTarget.entryPoint,
-      parentSourceDirectoryId: normalizedRequest.parentSourceDirectoryId,
+      parentSourceDirectoryId: normalizedRequest.parentSourceDirectoryId ?? null,
       offset: normalizedRequest.offset,
       limit: normalizedRequest.limit
     } satisfies ReadLiteralHierarchyChildrenRequest)
@@ -72,7 +72,7 @@ export async function readLiteralHierarchyChildrenThroughHost(
 
     const nodes = mapLiteralHierarchyNodes(reply.window.rows)
 
-    if (nodes === null) {
+    if (nodes === undefined) {
       return createHierarchyReadErrorResult(
         'readFailed',
         'readFailed',
@@ -84,7 +84,9 @@ export async function readLiteralHierarchyChildrenThroughHost(
       state: 'ready',
       window: {
         root: resolvedTarget.root,
-        parentSourceDirectoryId: reply.window.parentSourceDirectoryId,
+        ...(reply.window.parentSourceDirectoryId === null
+          ? {}
+          : { parentSourceDirectoryId: reply.window.parentSourceDirectoryId }),
         offset: reply.window.offset,
         limit: reply.window.limit,
         totalRows: reply.window.totalRows,
@@ -120,14 +122,14 @@ function getStartedClient(
 
 function mapLiteralHierarchyNodes(
   rows: Parameters<typeof mapLiteralHierarchyNode>[0][]
-): readonly LibraryHierarchyReadNode[] | null {
+): readonly LibraryHierarchyReadNode[] | undefined {
   const nodes: LibraryHierarchyReadNode[] = []
 
   for (const row of rows) {
     const node = mapLiteralHierarchyNode(row)
 
-    if (node === null) {
-      return null
+    if (node === undefined) {
+      return undefined
     }
 
     nodes.push(node)

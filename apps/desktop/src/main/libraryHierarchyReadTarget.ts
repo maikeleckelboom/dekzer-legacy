@@ -31,12 +31,12 @@ export async function resolveLibraryHierarchyReadTarget(
 
 function resolveEntryPointTarget(
   entryPoint: LibraryHierarchyReadEntryPoint,
-  label: string | null | undefined
+  label: string | undefined
 ): ResolvedLibraryHierarchyReadTarget {
   return {
     root: {
       id: rootIdForLibraryHierarchyReadEntryPoint(entryPoint),
-      label: normalizeOptionalLabel(label),
+      ...optionalLabelProperty(label),
       entryPoint
     },
     entryPoint: mapLibraryHierarchyReadEntryPoint(entryPoint)
@@ -76,11 +76,11 @@ async function resolveFirstAvailableSourceTarget(
   }
 }
 
-function normalizeOptionalLabel(value: string | null | undefined): string | null {
+function optionalLabelProperty(value: string | undefined): { readonly label?: string } {
   if (typeof value !== 'string') {
-    return null
+    return {}
   }
 
   const label = value.trim()
-  return label.length > 0 ? label : null
+  return label.length > 0 ? { label } : {}
 }

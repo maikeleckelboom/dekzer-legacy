@@ -3,24 +3,22 @@ import type { BrowserTreeNode, BrowserTreeNodeId, BrowserTreeVisibleItem } from 
 export type FlattenVisibleTreeOptions = {
   readonly nodes: readonly BrowserTreeNode[]
   readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
-  readonly selectedNodeId: BrowserTreeNodeId | null
-  readonly activeNodeId?: BrowserTreeNodeId | null
+  readonly selectedNodeId?: BrowserTreeNodeId
+  readonly activeNodeId?: BrowserTreeNodeId
 }
 
 export function flattenVisibleTree(
   options: FlattenVisibleTreeOptions
 ): readonly BrowserTreeVisibleItem[] {
   const visibleItems: BrowserTreeVisibleItem[] = []
-  const activeNodeId = options.activeNodeId ?? null
 
   appendVisibleNodes({
     nodes: options.nodes,
-    parentId: null,
     level: 1,
     visibleItems,
     expandedNodeIds: options.expandedNodeIds,
     selectedNodeId: options.selectedNodeId,
-    activeNodeId
+    activeNodeId: options.activeNodeId
   })
 
   return visibleItems
@@ -28,70 +26,70 @@ export function flattenVisibleTree(
 
 export function getFirstVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[]
-): BrowserTreeNodeId | null {
-  return visibleItems[0]?.id ?? null
+): BrowserTreeNodeId | undefined {
+  return visibleItems[0]?.id
 }
 
 export function getLastVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[]
-): BrowserTreeNodeId | null {
-  return visibleItems.at(-1)?.id ?? null
+): BrowserTreeNodeId | undefined {
+  return visibleItems.at(-1)?.id
 }
 
 export function getNextVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[],
   nodeId: BrowserTreeNodeId
-): BrowserTreeNodeId | null {
+): BrowserTreeNodeId | undefined {
   const visibleIndex = getVisibleItemIndex(visibleItems, nodeId)
 
   if (visibleIndex === -1) {
-    return null
+    return undefined
   }
 
-  return visibleItems[visibleIndex + 1]?.id ?? null
+  return visibleItems[visibleIndex + 1]?.id
 }
 
 export function getPreviousVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[],
   nodeId: BrowserTreeNodeId
-): BrowserTreeNodeId | null {
+): BrowserTreeNodeId | undefined {
   const visibleIndex = getVisibleItemIndex(visibleItems, nodeId)
 
   if (visibleIndex === -1) {
-    return null
+    return undefined
   }
 
-  return visibleItems[visibleIndex - 1]?.id ?? null
+  return visibleItems[visibleIndex - 1]?.id
 }
 
 export function getParentVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[],
   nodeId: BrowserTreeNodeId
-): BrowserTreeNodeId | null {
-  return visibleItems.find((item) => item.id === nodeId)?.parentId ?? null
+): BrowserTreeNodeId | undefined {
+  return visibleItems.find((item) => item.id === nodeId)?.parentId
 }
 
 export function getFirstChildVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[],
   nodeId: BrowserTreeNodeId
-): BrowserTreeNodeId | null {
+): BrowserTreeNodeId | undefined {
   const visibleIndex = getVisibleItemIndex(visibleItems, nodeId)
 
   if (visibleIndex === -1) {
-    return null
+    return undefined
   }
 
-  return visibleItems.slice(visibleIndex + 1).find((item) => item.parentId === nodeId)?.id ?? null
+  return visibleItems.slice(visibleIndex + 1).find((item) => item.parentId === nodeId)?.id
 }
 
 function appendVisibleNodes(options: {
   readonly nodes: readonly BrowserTreeNode[]
-  readonly parentId: BrowserTreeNodeId | null
+  readonly parentId?: BrowserTreeNodeId
   readonly level: number
   readonly visibleItems: BrowserTreeVisibleItem[]
   readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
-  readonly selectedNodeId: BrowserTreeNodeId | null
-  readonly activeNodeId: BrowserTreeNodeId | null
+  readonly selectedNodeId?: BrowserTreeNodeId
+  readonly activeNodeId?: BrowserTreeNodeId
 }): void {
   const siblingCount = options.nodes.length
 
@@ -103,7 +101,7 @@ function appendVisibleNodes(options: {
     options.visibleItems.push({
       id: node.id,
       node,
-      parentId: options.parentId,
+      ...(options.parentId === undefined ? {} : { parentId: options.parentId }),
       level: options.level,
       visibleIndex: options.visibleItems.length,
       hasChildren,
