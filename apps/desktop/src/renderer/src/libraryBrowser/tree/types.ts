@@ -1,6 +1,6 @@
-export type TreeNodeId = string
+export type BrowserTreeNodeId = string
 
-export type TreeNodeKind =
+export type BrowserTreeNodeKind =
   | 'fixtureRoot'
   | 'folder'
   | 'playlistGroup'
@@ -8,24 +8,24 @@ export type TreeNodeKind =
   | 'history'
   | 'trackGroup'
 
-export type TreeNode = {
-  readonly id: TreeNodeId
+export type BrowserTreeNode = {
+  readonly id: BrowserTreeNodeId
   readonly label: string
-  readonly kind: TreeNodeKind
+  readonly kind: BrowserTreeNodeKind
   readonly detail?: string
-  readonly children?: readonly TreeNode[]
+  readonly children?: readonly BrowserTreeNode[]
 }
 
-export type TreeFixture = {
+export type BrowserTreeFixture = {
   readonly name: string
   readonly detail: string
-  readonly nodes: readonly TreeNode[]
+  readonly nodes: readonly BrowserTreeNode[]
 }
 
-export type TreeVisibleItem = {
-  readonly id: TreeNodeId
-  readonly node: TreeNode
-  readonly parentId: TreeNodeId | null
+export type BrowserTreeVisibleItem = {
+  readonly id: BrowserTreeNodeId
+  readonly node: BrowserTreeNode
+  readonly parentId: BrowserTreeNodeId | null
   readonly level: number
   readonly visibleIndex: number
   readonly hasChildren: boolean

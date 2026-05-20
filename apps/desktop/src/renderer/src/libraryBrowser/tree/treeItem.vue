@@ -1,38 +1,94 @@
 <template>
   <div
-    :ref="(element) => tree.registerItemElement(item.id, element)"
+    ref="itemElement"
     class="group outline-none"
     role="treeitem"
-    :aria-expanded="getTreeItemAriaExpanded(item)"
-    :aria-level="item.level"
-    :aria-posinset="item.ariaPosInSet"
-    :aria-selected="getTreeItemAriaSelected(item)"
-    :aria-setsize="item.ariaSetSize"
-    :data-active="item.isActive ? 'true' : undefined"
-    :data-expanded="item.hasChildren ? String(item.isExpanded) : undefined"
-    :data-selected="item.isSelected ? 'true' : undefined"
-    :tabindex="tree.getItemTabIndex(item.id)"
-    @click="tree.handleItemClick(item, $event)"
-    @focus="tree.setActiveNode(item.id)"
-    @keydown="tree.handleItemKeydown(item, $event)"
+    :aria-expanded="getTreeItemAriaExpanded(props.item)"
+    :aria-level="props.item.level"
+    :aria-posinset="props.item.ariaPosInSet"
+    :aria-selected="getTreeItemAriaSelected(props.item)"
+    :aria-setsize="props.item.ariaSetSize"
+    :data-active="props.item.isActive ? 'true' : undefined"
+    :data-expanded="props.item.hasChildren ? String(props.item.isExpanded) : undefined"
+    :data-selected="props.item.isSelected ? 'true' : undefined"
+    :tabindex="tree.getItemTabIndex(props.item.id)"
+    @click="handleClick"
+    @focus="tree.focusNode(props.item.id)"
+    @keydown="handleKeydown"
   >
-    <TreeRow :item="item" />
+    <TreeRow :item="props.item" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { onBeforeUnmount, ref, watch } from 'vue'
+
 import { getTreeItemAriaExpanded, getTreeItemAriaSelected } from './aria'
 import { useTreeContext } from './context'
 import TreeRow from './treeRow.vue'
-import type { TreeVisibleItem } from './types'
+import type { BrowserTreeVisibleItem } from './types'
 
 defineOptions({
   name: 'TreeItem'
 })
 
-defineProps<{
-  item: TreeVisibleItem
+const props = defineProps<{
+  item: BrowserTreeVisibleItem
 }>()
 
 const tree = useTreeContext()
+const itemElement = ref<HTMLElement | null>(null)
+
+watch(
+  itemElement,
+  (element) => {
+    tree.registerItemElement(props.item.id, element)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  tree.registerItemElement(props.item.id, null)
+})
+
+function handleClick(event: MouseEvent): void {
+  tree.focusNode(props.item.id)
+
+  if (props.item.hasChildren && isBranchAffordanceEvent(event)) {
+    tree.toggleNode(props.item.id)
+    return
+  }
+
+  tree.selectNode(props.item.id)
+}
+
+function handleKeydown(event: KeyboardEvent): void {
+  const intent = tree.resolveKeyboardIntent(props.item, event.key)
+
+  if (intent.shouldPreventDefault) {
+    event.preventDefault()
+  }
+
+  switch (intent.kind) {
+    case 'focus':
+      tree.focusNode(intent.nodeId)
+      return
+    case 'expand':
+    case 'collapse':
+      tree.toggleNode(intent.nodeId)
+      return
+    case 'select':
+      tree.selectNode(intent.nodeId)
+      return
+    case 'none':
+      return
+  }
+}
+
+function isBranchAffordanceEvent(event: MouseEvent): boolean {
+  return (
+    event.target instanceof HTMLElement &&
+    event.target.closest('[data-tree-affordance="true"]') !== null
+  )
+}
 </script>

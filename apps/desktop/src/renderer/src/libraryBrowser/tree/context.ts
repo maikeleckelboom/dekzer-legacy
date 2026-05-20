@@ -1,22 +1,24 @@
-import type { ComputedRef, ComponentPublicInstance, Ref } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 
-import { createContext } from '../../rendererFoundation/context'
-import type { TreeNodeId, TreeVisibleItem } from './types'
+import { createRequiredContext } from '../../rendererFoundation/context'
+import type { TreeKeyboardIntent } from './keys'
+import type { BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
 
 export type TreeContext = {
-  readonly visibleItems: ComputedRef<readonly TreeVisibleItem[]>
-  readonly activeNodeId: Ref<TreeNodeId | null>
-  readonly getItemTabIndex: (nodeId: TreeNodeId) => 0 | -1
-  readonly setActiveNode: (nodeId: TreeNodeId) => void
-  readonly registerItemElement: (
-    nodeId: TreeNodeId,
-    element: Element | ComponentPublicInstance | null
-  ) => void
-  readonly handleItemClick: (item: TreeVisibleItem, event: MouseEvent) => void
-  readonly handleItemKeydown: (item: TreeVisibleItem, event: KeyboardEvent) => void
+  readonly visibleItems: ComputedRef<readonly BrowserTreeVisibleItem[]>
+  readonly activeNodeId: Ref<BrowserTreeNodeId | null>
+  readonly getItemTabIndex: (nodeId: BrowserTreeNodeId) => 0 | -1
+  readonly registerItemElement: (nodeId: BrowserTreeNodeId, element: HTMLElement | null) => void
+  readonly focusNode: (nodeId: BrowserTreeNodeId) => void
+  readonly selectNode: (nodeId: BrowserTreeNodeId) => void
+  readonly toggleNode: (nodeId: BrowserTreeNodeId) => void
+  readonly resolveKeyboardIntent: (item: BrowserTreeVisibleItem, key: string) => TreeKeyboardIntent
 }
 
-const treeContext = createContext<TreeContext>('Library browser tree')
+const treeContext = createRequiredContext<TreeContext>({
+  contextName: 'libraryBrowser.tree',
+  providerName: 'TreeRoot'
+})
 
-export const provideTreeContext = treeContext.provideContext
-export const useTreeContext = treeContext.injectContext
+export const provideTreeContext = treeContext.provide
+export const useTreeContext = treeContext.inject

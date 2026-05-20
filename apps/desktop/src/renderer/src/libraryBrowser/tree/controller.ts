@@ -1,22 +1,22 @@
-import type { ComponentPublicInstance, ComputedRef, Ref } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import { computed, nextTick, ref, watchEffect } from 'vue'
 
-import { resolveTreeKeyboardIntent } from './keys'
+import { resolveTreeKeyboardIntent, type TreeKeyboardIntent } from './keys'
 import { flattenVisibleTree, getFirstVisibleNodeId } from './projection'
 import type { TreeContext } from './context'
-import type { TreeNode, TreeNodeId, TreeVisibleItem } from './types'
+import type { BrowserTreeNode, BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
 
 export type UseTreeControllerOptions = {
-  readonly nodes: ComputedRef<readonly TreeNode[]>
-  readonly selectedNodeId: ComputedRef<TreeNodeId | null>
-  readonly expandedNodeIds: ComputedRef<ReadonlySet<TreeNodeId>>
-  readonly selectNode: (nodeId: TreeNodeId) => void
-  readonly toggleNode: (nodeId: TreeNodeId) => void
+  readonly nodes: ComputedRef<readonly BrowserTreeNode[]>
+  readonly selectedNodeId: ComputedRef<BrowserTreeNodeId | null>
+  readonly expandedNodeIds: ComputedRef<ReadonlySet<BrowserTreeNodeId>>
+  readonly selectNode: (nodeId: BrowserTreeNodeId) => void
+  readonly toggleNode: (nodeId: BrowserTreeNodeId) => void
 }
 
 export function useTreeController(options: UseTreeControllerOptions): TreeContext {
-  const activeNodeId: Ref<TreeNodeId | null> = ref(null)
-  const itemElements = new Map<TreeNodeId, HTMLElement>()
+  const activeNodeId: Ref<BrowserTreeNodeId | null> = ref(null)
+  const itemElements = new Map<BrowserTreeNodeId, HTMLElement>()
 
   const visibleItems = computed(() =>
     flattenVisibleTree({
@@ -50,21 +50,18 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     activeNodeId.value = getFirstVisibleNodeId(items)
   })
 
-  function getItemTabIndex(nodeId: TreeNodeId): 0 | -1 {
+  function getItemTabIndex(nodeId: BrowserTreeNodeId): 0 | -1 {
     return activeNodeId.value === nodeId ? 0 : -1
   }
 
-  function setActiveNode(nodeId: TreeNodeId): void {
+  function setActiveNode(nodeId: BrowserTreeNodeId): void {
     if (visibleItems.value.some((item) => item.id === nodeId)) {
       activeNodeId.value = nodeId
     }
   }
 
-  function registerItemElement(
-    nodeId: TreeNodeId,
-    element: Element | ComponentPublicInstance | null
-  ): void {
-    if (element instanceof HTMLElement) {
+  function registerItemElement(nodeId: BrowserTreeNodeId, element: HTMLElement | null): void {
+    if (element !== null) {
       itemElements.set(nodeId, element)
       return
     }
@@ -72,7 +69,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     itemElements.delete(nodeId)
   }
 
-  function focusNode(nodeId: TreeNodeId): void {
+  function focusNode(nodeId: BrowserTreeNodeId): void {
     setActiveNode(nodeId)
 
     void nextTick(() => {
@@ -80,58 +77,22 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     })
   }
 
-  function handleItemClick(item: TreeVisibleItem, event: MouseEvent): void {
-    focusNode(item.id)
-
-    if (item.hasChildren && isBranchAffordanceEvent(event)) {
-      options.toggleNode(item.id)
-      return
-    }
-
-    options.selectNode(item.id)
-  }
-
-  function handleItemKeydown(item: TreeVisibleItem, event: KeyboardEvent): void {
-    const intent = resolveTreeKeyboardIntent({
-      key: event.key,
+  function resolveKeyboardIntent(item: BrowserTreeVisibleItem, key: string): TreeKeyboardIntent {
+    return resolveTreeKeyboardIntent({
+      key,
       activeNodeId: item.id,
       visibleItems: visibleItems.value
     })
-
-    if (intent.shouldPreventDefault) {
-      event.preventDefault()
-    }
-
-    switch (intent.kind) {
-      case 'focus':
-        focusNode(intent.nodeId)
-        return
-      case 'expand':
-      case 'collapse':
-        options.toggleNode(intent.nodeId)
-        return
-      case 'select':
-        options.selectNode(intent.nodeId)
-        return
-      case 'none':
-        return
-    }
   }
 
   return {
     visibleItems,
     activeNodeId,
     getItemTabIndex,
-    setActiveNode,
     registerItemElement,
-    handleItemClick,
-    handleItemKeydown
+    focusNode,
+    selectNode: options.selectNode,
+    toggleNode: options.toggleNode,
+    resolveKeyboardIntent
   }
-}
-
-function isBranchAffordanceEvent(event: MouseEvent): boolean {
-  return (
-    event.target instanceof HTMLElement &&
-    event.target.closest('[data-tree-affordance="true"]') !== null
-  )
 }

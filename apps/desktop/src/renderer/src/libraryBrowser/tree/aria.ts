@@ -1,8 +1,8 @@
-import type { TreeVisibleItem } from './types'
+import type { BrowserTreeVisibleItem } from './types'
 
 export type AriaBoolean = 'false' | 'true'
 
-export function getTreeItemAriaExpanded(item: TreeVisibleItem): AriaBoolean | undefined {
+export function getTreeItemAriaExpanded(item: BrowserTreeVisibleItem): AriaBoolean | undefined {
   if (!item.hasChildren) {
     return undefined
   }
@@ -10,7 +10,7 @@ export function getTreeItemAriaExpanded(item: TreeVisibleItem): AriaBoolean | un
   return toAriaBoolean(item.isExpanded)
 }
 
-export function getTreeItemAriaSelected(item: TreeVisibleItem): AriaBoolean {
+export function getTreeItemAriaSelected(item: BrowserTreeVisibleItem): AriaBoolean {
   return toAriaBoolean(item.isSelected)
 }
 

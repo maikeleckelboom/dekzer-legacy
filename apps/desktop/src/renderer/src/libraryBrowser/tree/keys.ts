@@ -6,7 +6,7 @@ import {
   getParentVisibleNodeId,
   getPreviousVisibleNodeId
 } from './projection'
-import type { TreeNodeId, TreeVisibleItem } from './types'
+import type { BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
 
 export const treeKeyboardKeys = {
   arrowDown: 'ArrowDown',
@@ -29,29 +29,29 @@ export type TreeKeyboardIntent =
     }
   | {
       readonly kind: 'focus'
-      readonly nodeId: TreeNodeId
+      readonly nodeId: BrowserTreeNodeId
       readonly shouldPreventDefault: true
     }
   | {
       readonly kind: 'expand'
-      readonly nodeId: TreeNodeId
+      readonly nodeId: BrowserTreeNodeId
       readonly shouldPreventDefault: true
     }
   | {
       readonly kind: 'collapse'
-      readonly nodeId: TreeNodeId
+      readonly nodeId: BrowserTreeNodeId
       readonly shouldPreventDefault: true
     }
   | {
       readonly kind: 'select'
-      readonly nodeId: TreeNodeId
+      readonly nodeId: BrowserTreeNodeId
       readonly shouldPreventDefault: true
     }
 
 export type ResolveTreeKeyboardIntentOptions = {
   readonly key: string
-  readonly activeNodeId: TreeNodeId | null
-  readonly visibleItems: readonly TreeVisibleItem[]
+  readonly activeNodeId: BrowserTreeNodeId | null
+  readonly visibleItems: readonly BrowserTreeVisibleItem[]
 }
 
 export function resolveTreeKeyboardIntent(
@@ -135,7 +135,7 @@ export function resolveTreeKeyboardIntent(
   }
 }
 
-function resolveFocusIntent(nodeId: TreeNodeId | null): TreeKeyboardIntent {
+function resolveFocusIntent(nodeId: BrowserTreeNodeId | null): TreeKeyboardIntent {
   if (nodeId === null) {
     return handledNoop()
   }

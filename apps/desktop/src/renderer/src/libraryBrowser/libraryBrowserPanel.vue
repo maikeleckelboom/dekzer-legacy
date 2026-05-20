@@ -64,14 +64,14 @@ import { computed, ref } from 'vue'
 
 import { libraryHierarchyFixtureTree } from './libraryHierarchyFixture'
 import TreeRoot from './tree/treeRoot.vue'
-import type { TreeNode, TreeNodeId } from './tree/types'
+import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
 
 defineOptions({
   name: 'LibraryBrowserPanel'
 })
 
-const selectedNodeId = ref<TreeNodeId | null>('fixture-root')
-const expandedNodeIds = ref<ReadonlySet<TreeNodeId>>(
+const selectedNodeId = ref<BrowserTreeNodeId | null>('fixture-root')
+const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(
   new Set(['fixture-root', 'fixture-tracks', 'fixture-playlists'])
 )
 
@@ -83,11 +83,11 @@ const selectedNode = computed(() => {
   return findNodeById(libraryHierarchyFixtureTree.nodes, selectedNodeId.value)
 })
 
-function selectNode(nodeId: TreeNodeId): void {
+function selectNode(nodeId: BrowserTreeNodeId): void {
   selectedNodeId.value = nodeId
 }
 
-function toggleNode(nodeId: TreeNodeId): void {
+function toggleNode(nodeId: BrowserTreeNodeId): void {
   const nextExpandedNodeIds = new Set(expandedNodeIds.value)
 
   if (nextExpandedNodeIds.has(nodeId)) {
@@ -99,7 +99,10 @@ function toggleNode(nodeId: TreeNodeId): void {
   expandedNodeIds.value = nextExpandedNodeIds
 }
 
-function findNodeById(nodes: readonly TreeNode[], nodeId: TreeNodeId): TreeNode | null {
+function findNodeById(
+  nodes: readonly BrowserTreeNode[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeNode | null {
   for (const node of nodes) {
     if (node.id === nodeId) {
       return node

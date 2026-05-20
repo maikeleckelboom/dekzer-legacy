@@ -1,14 +1,16 @@
-import type { TreeNode, TreeNodeId, TreeVisibleItem } from './types'
+import type { BrowserTreeNode, BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
 
 export type FlattenVisibleTreeOptions = {
-  readonly nodes: readonly TreeNode[]
-  readonly expandedNodeIds: ReadonlySet<TreeNodeId>
-  readonly selectedNodeId: TreeNodeId | null
-  readonly activeNodeId?: TreeNodeId | null
+  readonly nodes: readonly BrowserTreeNode[]
+  readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
+  readonly selectedNodeId: BrowserTreeNodeId | null
+  readonly activeNodeId?: BrowserTreeNodeId | null
 }
 
-export function flattenVisibleTree(options: FlattenVisibleTreeOptions): readonly TreeVisibleItem[] {
-  const visibleItems: TreeVisibleItem[] = []
+export function flattenVisibleTree(
+  options: FlattenVisibleTreeOptions
+): readonly BrowserTreeVisibleItem[] {
+  const visibleItems: BrowserTreeVisibleItem[] = []
   const activeNodeId = options.activeNodeId ?? null
 
   appendVisibleNodes({
@@ -24,18 +26,22 @@ export function flattenVisibleTree(options: FlattenVisibleTreeOptions): readonly
   return visibleItems
 }
 
-export function getFirstVisibleNodeId(visibleItems: readonly TreeVisibleItem[]): TreeNodeId | null {
+export function getFirstVisibleNodeId(
+  visibleItems: readonly BrowserTreeVisibleItem[]
+): BrowserTreeNodeId | null {
   return visibleItems[0]?.id ?? null
 }
 
-export function getLastVisibleNodeId(visibleItems: readonly TreeVisibleItem[]): TreeNodeId | null {
+export function getLastVisibleNodeId(
+  visibleItems: readonly BrowserTreeVisibleItem[]
+): BrowserTreeNodeId | null {
   return visibleItems.at(-1)?.id ?? null
 }
 
 export function getNextVisibleNodeId(
-  visibleItems: readonly TreeVisibleItem[],
-  nodeId: TreeNodeId
-): TreeNodeId | null {
+  visibleItems: readonly BrowserTreeVisibleItem[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeNodeId | null {
   const visibleIndex = getVisibleItemIndex(visibleItems, nodeId)
 
   if (visibleIndex === -1) {
@@ -46,9 +52,9 @@ export function getNextVisibleNodeId(
 }
 
 export function getPreviousVisibleNodeId(
-  visibleItems: readonly TreeVisibleItem[],
-  nodeId: TreeNodeId
-): TreeNodeId | null {
+  visibleItems: readonly BrowserTreeVisibleItem[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeNodeId | null {
   const visibleIndex = getVisibleItemIndex(visibleItems, nodeId)
 
   if (visibleIndex === -1) {
@@ -59,16 +65,16 @@ export function getPreviousVisibleNodeId(
 }
 
 export function getParentVisibleNodeId(
-  visibleItems: readonly TreeVisibleItem[],
-  nodeId: TreeNodeId
-): TreeNodeId | null {
+  visibleItems: readonly BrowserTreeVisibleItem[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeNodeId | null {
   return visibleItems.find((item) => item.id === nodeId)?.parentId ?? null
 }
 
 export function getFirstChildVisibleNodeId(
-  visibleItems: readonly TreeVisibleItem[],
-  nodeId: TreeNodeId
-): TreeNodeId | null {
+  visibleItems: readonly BrowserTreeVisibleItem[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeNodeId | null {
   const visibleIndex = getVisibleItemIndex(visibleItems, nodeId)
 
   if (visibleIndex === -1) {
@@ -79,13 +85,13 @@ export function getFirstChildVisibleNodeId(
 }
 
 function appendVisibleNodes(options: {
-  readonly nodes: readonly TreeNode[]
-  readonly parentId: TreeNodeId | null
+  readonly nodes: readonly BrowserTreeNode[]
+  readonly parentId: BrowserTreeNodeId | null
   readonly level: number
-  readonly visibleItems: TreeVisibleItem[]
-  readonly expandedNodeIds: ReadonlySet<TreeNodeId>
-  readonly selectedNodeId: TreeNodeId | null
-  readonly activeNodeId: TreeNodeId | null
+  readonly visibleItems: BrowserTreeVisibleItem[]
+  readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
+  readonly selectedNodeId: BrowserTreeNodeId | null
+  readonly activeNodeId: BrowserTreeNodeId | null
 }): void {
   const siblingCount = options.nodes.length
 
@@ -122,10 +128,13 @@ function appendVisibleNodes(options: {
   })
 }
 
-function getVisibleItemIndex(visibleItems: readonly TreeVisibleItem[], nodeId: TreeNodeId): number {
+function getVisibleItemIndex(
+  visibleItems: readonly BrowserTreeVisibleItem[],
+  nodeId: BrowserTreeNodeId
+): number {
   return visibleItems.findIndex((item) => item.id === nodeId)
 }
 
-function getNodeChildren(node: TreeNode): readonly TreeNode[] {
+function getNodeChildren(node: BrowserTreeNode): readonly BrowserTreeNode[] {
   return node.children ?? []
 }

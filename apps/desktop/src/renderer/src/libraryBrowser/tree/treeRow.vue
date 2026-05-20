@@ -34,14 +34,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { TreeNodeKind, TreeVisibleItem } from './types'
+import type { BrowserTreeNodeKind, BrowserTreeVisibleItem } from './types'
 
 defineOptions({
   name: 'TreeRow'
 })
 
 const props = defineProps<{
-  item: TreeVisibleItem
+  item: BrowserTreeVisibleItem
 }>()
 
 const rowClass = computed(() => {
@@ -59,7 +59,7 @@ const rowStyle = computed(() => ({
 
 const branchGlyph = computed(() => {
   if (!props.item.hasChildren) {
-    return '-'
+    return ''
   }
 
   return props.item.isExpanded ? '-' : '+'
@@ -67,7 +67,7 @@ const branchGlyph = computed(() => {
 
 const kindLabel = computed(() => formatNodeKind(props.item.node.kind))
 
-function formatNodeKind(kind: TreeNodeKind): string {
+function formatNodeKind(kind: BrowserTreeNodeKind): string {
   switch (kind) {
     case 'fixtureRoot':
       return 'Fixture root'

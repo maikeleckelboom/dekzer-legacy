@@ -1,6 +1,11 @@
 import { strict as assert } from 'node:assert'
+import { readFileSync } from 'node:fs'
 
 import { libraryHierarchyFixtureTree } from '../src/renderer/src/libraryBrowser/libraryHierarchyFixture'
+import {
+  getTreeItemAriaExpanded,
+  getTreeItemAriaSelected
+} from '../src/renderer/src/libraryBrowser/tree/aria'
 import {
   resolveTreeKeyboardIntent,
   type TreeKeyboardIntent
@@ -15,18 +20,18 @@ import {
   getPreviousVisibleNodeId
 } from '../src/renderer/src/libraryBrowser/tree/projection'
 import type {
-  TreeNode,
-  TreeNodeId,
-  TreeVisibleItem
+  BrowserTreeNode,
+  BrowserTreeNodeId,
+  BrowserTreeVisibleItem
 } from '../src/renderer/src/libraryBrowser/tree/types'
 
-const expandedFixtureIds = new Set<TreeNodeId>([
+const expandedFixtureIds = new Set<BrowserTreeNodeId>([
   'fixture-root',
   'fixture-tracks',
   'fixture-playlists'
 ])
-const rootOnlyExpandedIds = new Set<TreeNodeId>(['fixture-root'])
-const collapsedFixtureIds = new Set<TreeNodeId>()
+const rootOnlyExpandedIds = new Set<BrowserTreeNodeId>(['fixture-root'])
+const collapsedFixtureIds = new Set<BrowserTreeNodeId>()
 
 void main()
 
@@ -37,6 +42,8 @@ function main(): void {
   validatesKeyboardExpansion()
   validatesKeyboardSelection()
   validatesFocusAndSelectionSeparation()
+  validatesAriaAttributes()
+  validatesRootQualityGateIncludesTreeValidation()
 }
 
 function validatesVisibleProjection(): void {
@@ -190,13 +197,47 @@ function validatesFocusAndSelectionSeparation(): void {
   assert.equal(getItem(items, 'fixture-albums').isActive, true)
 }
 
+function validatesAriaAttributes(): void {
+  const selectedItems = fixtureVisibleItems(expandedFixtureIds, {
+    selectedNodeId: 'fixture-tracks',
+    activeNodeId: 'fixture-tracks'
+  })
+  const expandedBranch = getItem(selectedItems, 'fixture-tracks')
+  const expandedRoot = getItem(selectedItems, 'fixture-root')
+  const leaf = getItem(selectedItems, 'fixture-artists')
+
+  assert.equal(getTreeItemAriaExpanded(expandedBranch), 'true')
+  assert.equal(getTreeItemAriaExpanded(expandedRoot), 'true')
+  assert.equal(getTreeItemAriaExpanded(leaf), undefined)
+  assert.equal(getTreeItemAriaSelected(expandedBranch), 'true')
+  assert.equal(getTreeItemAriaSelected(leaf), 'false')
+
+  const rootOnlyItems = fixtureVisibleItems(rootOnlyExpandedIds)
+  assert.equal(getTreeItemAriaExpanded(getItem(rootOnlyItems, 'fixture-tracks')), 'false')
+}
+
+function validatesRootQualityGateIncludesTreeValidation(): void {
+  const rootPackage = JSON.parse(
+    readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')
+  ) as {
+    readonly scripts?: Record<string, string>
+  }
+  const scripts = rootPackage.scripts ?? {}
+
+  assert.equal(
+    scripts['desktop:validate:library-tree'],
+    'pnpm --filter @dekzer/desktop run validate:library-tree'
+  )
+  assert.match(scripts.check ?? '', /pnpm run desktop:validate:library-tree/)
+}
+
 function fixtureVisibleItems(
-  expandedNodeIds: ReadonlySet<TreeNodeId>,
+  expandedNodeIds: ReadonlySet<BrowserTreeNodeId>,
   options: {
-    readonly selectedNodeId?: TreeNodeId | null
-    readonly activeNodeId?: TreeNodeId | null
+    readonly selectedNodeId?: BrowserTreeNodeId | null
+    readonly activeNodeId?: BrowserTreeNodeId | null
   } = {}
-): readonly TreeVisibleItem[] {
+): readonly BrowserTreeVisibleItem[] {
   return flattenVisibleTree({
     nodes: libraryHierarchyFixtureTree.nodes,
     expandedNodeIds,
@@ -206,8 +247,8 @@ function fixtureVisibleItems(
 }
 
 function resolveIntent(
-  visibleItems: readonly TreeVisibleItem[],
-  activeNodeId: TreeNodeId,
+  visibleItems: readonly BrowserTreeVisibleItem[],
+  activeNodeId: BrowserTreeNodeId,
   key: string
 ): TreeKeyboardIntent {
   return resolveTreeKeyboardIntent({
@@ -221,7 +262,7 @@ function assertIntent(
   intent: TreeKeyboardIntent,
   expected: {
     readonly kind: Exclude<TreeKeyboardIntent['kind'], 'none'>
-    readonly nodeId: TreeNodeId
+    readonly nodeId: BrowserTreeNodeId
   }
 ): void {
   assert.equal(intent.kind, expected.kind)
@@ -244,7 +285,10 @@ function assertUnhandled(intent: TreeKeyboardIntent): void {
   assert.equal(intent.shouldPreventDefault, false)
 }
 
-function getItem(visibleItems: readonly TreeVisibleItem[], nodeId: TreeNodeId): TreeVisibleItem {
+function getItem(
+  visibleItems: readonly BrowserTreeVisibleItem[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeVisibleItem {
   const item = visibleItems.find((candidate) => candidate.id === nodeId)
 
   if (item === undefined) {
@@ -254,7 +298,7 @@ function getItem(visibleItems: readonly TreeVisibleItem[], nodeId: TreeNodeId): 
   return item
 }
 
-function leafRootNode(): TreeNode {
+function leafRootNode(): BrowserTreeNode {
   return {
     id: 'leaf-root',
     label: 'Leaf root',
