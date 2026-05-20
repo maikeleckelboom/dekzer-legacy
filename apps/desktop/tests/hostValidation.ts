@@ -327,5 +327,9 @@ function validatesStatusIpcRegistration(config: LibraryBoundaryHostConfig): void
   )
 
   assert.equal(registeredChannel, libraryBoundaryHostStatusIpcChannels.getStatus)
-  assert.equal(registeredHandler?.().state, 'idle')
+  if (registeredHandler === null) {
+    assert.fail('expected status handler to be registered')
+  }
+
+  assert.equal(registeredHandler().state, 'idle')
 }

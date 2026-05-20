@@ -22,8 +22,10 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     flattenVisibleTree({
       nodes: options.nodes.value,
       expandedNodeIds: options.expandedNodeIds.value,
-      selectedNodeId: options.selectedNodeId.value,
-      activeNodeId: activeNodeId.value
+      ...(options.selectedNodeId.value === undefined
+        ? {}
+        : { selectedNodeId: options.selectedNodeId.value }),
+      ...(activeNodeId.value === undefined ? {} : { activeNodeId: activeNodeId.value })
     })
   )
 

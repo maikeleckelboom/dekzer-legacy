@@ -10,12 +10,10 @@
     "composite": true,
     "baseUrl": ".",
     "strictNullChecks": true,
-    "exactOptionalPropertyTypes": false,
-    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "paths": {
-      "@renderer/*": [
-        "src/renderer/src/*"
-      ]
+      "@renderer/*": ["src/renderer/src/*"]
     }
   }
 }

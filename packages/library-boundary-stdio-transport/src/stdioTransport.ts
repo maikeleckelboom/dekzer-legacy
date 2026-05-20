@@ -53,7 +53,9 @@ export class LibraryBoundaryStdioTransport
 {
   readonly ready: Promise<void>;
   readonly #child: ChildProcessWithoutNullStreams;
-  readonly #diagnostics?: (diagnostic: LibraryBoundaryStdioDiagnostic) => void;
+  readonly #diagnostics:
+    | ((diagnostic: LibraryBoundaryStdioDiagnostic) => void)
+    | undefined;
   readonly #pending = new Map<string, PendingRequest>();
   readonly #requestIdFactory: () => string;
   readonly #stdout: Interface;
@@ -332,7 +334,12 @@ export class LibraryBoundaryStdioTransport
     }
 
     if (this.#pending.size === 1) {
-      const [requestId] = this.#pending.keys();
+      const requestId = this.#pending.keys().next().value;
+      if (requestId === undefined) {
+        this.#rejectAllPending(error);
+        return;
+      }
+
       this.#rejectPending(requestId, error);
       return;
     }

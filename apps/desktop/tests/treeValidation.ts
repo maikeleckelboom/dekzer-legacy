@@ -315,13 +315,12 @@ function assertIntent(
     readonly nodeId: BrowserTreeNodeId
   }
 ): void {
-  assert.equal(intent.kind, expected.kind)
-  assert.equal(intent.shouldPreventDefault, true)
-
   if (intent.kind === 'none') {
     assert.fail('expected a state-changing keyboard intent')
   }
 
+  assert.equal(intent.kind, expected.kind)
+  assert.equal(intent.shouldPreventDefault, true)
   assert.equal(intent.nodeId, expected.nodeId)
 }
 

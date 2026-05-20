@@ -64,9 +64,9 @@ export function resolveLibraryBoundaryHostConfig(
     binaryPolicy: resolveLibraryBoundaryStdioBinaryPolicy({
       isDev: options.isDev,
       desktopAppPath: options.app.getAppPath(),
-      env: options.env,
-      platform: options.platform,
-      resourcesPath: options.resourcesPath
+      ...(options.env === undefined ? {} : { env: options.env }),
+      ...(options.platform === undefined ? {} : { platform: options.platform }),
+      ...(options.resourcesPath === undefined ? {} : { resourcesPath: options.resourcesPath })
     })
   }
 }

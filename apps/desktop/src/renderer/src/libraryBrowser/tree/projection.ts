@@ -17,8 +17,8 @@ export function flattenVisibleTree(
     level: 1,
     visibleItems,
     expandedNodeIds: options.expandedNodeIds,
-    selectedNodeId: options.selectedNodeId,
-    activeNodeId: options.activeNodeId
+    ...(options.selectedNodeId === undefined ? {} : { selectedNodeId: options.selectedNodeId }),
+    ...(options.activeNodeId === undefined ? {} : { activeNodeId: options.activeNodeId })
   })
 
   return visibleItems
@@ -119,8 +119,8 @@ function appendVisibleNodes(options: {
         level: options.level + 1,
         visibleItems: options.visibleItems,
         expandedNodeIds: options.expandedNodeIds,
-        selectedNodeId: options.selectedNodeId,
-        activeNodeId: options.activeNodeId
+        ...(options.selectedNodeId === undefined ? {} : { selectedNodeId: options.selectedNodeId }),
+        ...(options.activeNodeId === undefined ? {} : { activeNodeId: options.activeNodeId })
       })
     }
   })

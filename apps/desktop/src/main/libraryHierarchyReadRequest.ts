@@ -57,7 +57,7 @@ export function normalizeLibraryHierarchyReadRequest(
 
   return {
     target,
-    parentSourceDirectoryId,
+    ...(parentSourceDirectoryId === undefined ? {} : { parentSourceDirectoryId }),
     offset,
     limit
   }

@@ -36,14 +36,7 @@
     </header>
 
     <div class="grid gap-4 p-5">
-      <TreeRoot
-        :expanded-node-ids="expandedNodeIds"
-        labelled-by="library-hierarchy-title"
-        :nodes="currentTreeNodes"
-        :selected-node-id="selectedNodeId"
-        @select="selectNode"
-        @toggle="toggleNode"
-      />
+      <TreeRoot v-bind="treeRootProps" @select="selectNode" @toggle="toggleNode" />
 
       <aside
         class="rounded-sm border border-(--color-border) bg-(--color-background) px-4 py-3"
@@ -105,6 +98,12 @@ const liveTreeNodes = computed(() => {
 
 const currentTreeNodes = computed(() => liveTreeNodes.value ?? libraryHierarchyFixtureTree.nodes)
 const isLiveTree = computed(() => liveTreeNodes.value !== undefined)
+const treeRootProps = computed(() => ({
+  expandedNodeIds: expandedNodeIds.value,
+  labelledBy: 'library-hierarchy-title',
+  nodes: currentTreeNodes.value,
+  ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
+}))
 
 const modeEyebrow = computed(() => {
   if (isLiveTree.value) {
