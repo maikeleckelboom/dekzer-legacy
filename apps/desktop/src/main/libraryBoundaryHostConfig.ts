@@ -4,8 +4,7 @@ import process from 'node:process'
 
 import { LibraryBoundaryHostError } from './libraryBoundaryHostErrors'
 
-export const libraryBoundaryStdioBinaryEnvironmentVariable =
-  'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
+export const libraryBoundaryStdioBinaryEnvironmentVariable = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
 
 export type LibraryBoundaryHostEnvironment = 'development' | 'production'
 
@@ -14,9 +13,7 @@ export type LibraryBoundaryHostApp = {
   getAppPath(): string
 }
 
-export type LibraryBoundaryHostDevelopmentBinarySource =
-  | 'environmentOverride'
-  | 'repoDebugTarget'
+export type LibraryBoundaryHostDevelopmentBinarySource = 'environmentOverride' | 'repoDebugTarget'
 
 export type LibraryBoundaryHostDevelopmentBinaryPolicy = {
   readonly kind: 'developmentBinary'
@@ -95,8 +92,7 @@ export function resolveLibraryBoundaryStdioBinaryPolicy(
   }
 
   const env = options.env ?? process.env
-  const overridePath =
-    env[libraryBoundaryStdioBinaryEnvironmentVariable]?.trim()
+  const overridePath = env[libraryBoundaryStdioBinaryEnvironmentVariable]?.trim()
   if (overridePath !== undefined && overridePath.length > 0) {
     return {
       kind: 'developmentBinary',
@@ -146,12 +142,8 @@ export function resolveLibraryBoundaryStdioBinaryPath(
   return policy.binaryPath
 }
 
-function libraryBoundaryStdioExecutableName(
-  platform: NodeJS.Platform
-): string {
-  return platform === 'win32'
-    ? 'library-boundary-stdio.exe'
-    : 'library-boundary-stdio'
+function libraryBoundaryStdioExecutableName(platform: NodeJS.Platform): string {
+  return platform === 'win32' ? 'library-boundary-stdio.exe' : 'library-boundary-stdio'
 }
 
 function defaultElectronResourcesPath(): string | null {
@@ -161,7 +153,5 @@ function defaultElectronResourcesPath(): string | null {
     }
   ).resourcesPath
 
-  return typeof resourcesPath === 'string' && resourcesPath.length > 0
-    ? resourcesPath
-    : null
+  return typeof resourcesPath === 'string' && resourcesPath.length > 0 ? resourcesPath : null
 }
