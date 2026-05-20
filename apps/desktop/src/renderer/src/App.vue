@@ -3,7 +3,9 @@
     <section class="identity">
       <p class="kicker">Dekzer Desktop</p>
       <h1 id="dekzer-title">Dekzer</h1>
-      <p class="status">Desktop shell booted. Product subsystems are not imported yet.</p>
+      <p class="status inline-flex rounded-sm border border-white/10 px-3 py-2">
+        Desktop shell booted. Product subsystems are not imported yet.
+      </p>
     </section>
 
     <section class="state" aria-label="Workspace state">

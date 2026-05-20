@@ -1,4 +1,9 @@
-@import './base.css';
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import './base.css' layer(base);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Tailwind is renderer-edge styling only; Preflight stays omitted to preserve the existing reset. */
 
 body {
   overflow: hidden;
