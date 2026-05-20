@@ -4,7 +4,8 @@
       <p class="kicker">Dekzer Desktop</p>
       <h1 id="dekzer-title">Dekzer</h1>
       <p class="status inline-flex rounded-sm border border-white/10 px-3 py-2">
-        Desktop shell booted. Product subsystems are not imported yet.
+        Product subsystems are present in substrate form, but desktop product wiring is not active
+        yet.
       </p>
     </section>
 
@@ -22,8 +23,12 @@
         <strong>Not imported</strong>
       </div>
       <div>
-        <span>Music library substrate</span>
-        <strong>Not imported</strong>
+        <span>Library boundary</span>
+        <strong>Contract/client/stdio packages present</strong>
+      </div>
+      <div>
+        <span>Library UI</span>
+        <strong>Not wired</strong>
       </div>
       <div>
         <span>Exclave</span>
