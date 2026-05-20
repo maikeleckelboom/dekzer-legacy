@@ -14,7 +14,7 @@ Current state:
 - `packages/library-boundary-contract` is the generated-only TypeScript boundary contract package.
 - `packages/library-boundary-client` is the hand-authored, transport-agnostic TypeScript client/session package over the generated boundary contract.
 - `packages/library-boundary-stdio-transport` is the Node stdio transport package that implements the boundary client transport seam by spawning the Rust stdio server.
-- `apps/desktop/src/main` owns the lazy desktop library boundary host policy for stdio binary selection, Electron `userData`, environment selection, diagnostics routing, and shutdown lifecycle.
+- `apps/desktop/src/main` owns the lazy desktop library boundary host policy for stdio binary selection, Electron `userData`, environment selection, diagnostics routing, readiness, and shutdown lifecycle.
 - `workspace-host` is not imported.
 - Remaining `music-library-core` slices beyond the domain, SQLite store, boundary protocol, boundary service, stdio transport, generated boundary contract, TypeScript boundary client, and desktop host owner are not imported.
 - Exclave is an external dependency candidate, not vendored into this repo.
@@ -69,6 +69,12 @@ Current root scripts:
 - `fmt:rust` runs `cargo fmt --all --check`.
 - `lint:rust` runs `cargo clippy --workspace --all-targets -- -D warnings`.
 - `check` runs the boundary contract stale check, stdio transport contract stale check, TypeScript typechecks, desktop host validation, boundary client and stdio validation fixtures, Rust fmt, clippy, and test gates.
+
+Stdio readiness:
+
+- `crates/library-boundary-stdio` emits `{"type":"ready","server":"libraryBoundaryStdio"}` on stdout only after CLI parsing and `LibraryBoundaryService::open(...)` succeed.
+- `packages/library-boundary-stdio-transport` consumes that Rust-owned ready envelope contract and exposes `LibraryBoundaryStdioTransport.ready`.
+- The desktop main-process host awaits transport readiness before exposing a `LibraryBoundaryClient`; preload, renderer, IPC, file picker, root registration, scans, and event pumping remain unwired.
 
 Workspace ownership:
 

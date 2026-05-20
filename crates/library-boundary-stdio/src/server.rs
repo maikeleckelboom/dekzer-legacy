@@ -5,7 +5,7 @@ use library_boundary_service::LibraryBoundaryService;
 
 use crate::envelope::{
     StdioResponseEnvelope, StdioTransportErrorCode, command_outcome_response,
-    deserialize_request_frame, serialize_response_frame, transport_error_response,
+    deserialize_request_frame, ready_response, serialize_response_frame, transport_error_response,
 };
 
 #[derive(Debug)]
@@ -49,6 +49,8 @@ where
     R: BufRead,
     W: Write,
 {
+    write_response_frame(&mut writer, &ready_response())?;
+
     let mut line = String::new();
 
     loop {
@@ -161,8 +163,17 @@ mod tests {
             .expect("run server loop");
 
         let line = String::from_utf8(output).expect("utf8 output");
-        let response =
-            serde_json::from_str::<serde_json::Value>(line.trim_end()).expect("parse response");
+        let lines = line.lines().collect::<Vec<_>>();
+        assert_eq!(lines.len(), 2);
+        let ready = serde_json::from_str::<serde_json::Value>(lines[0]).expect("parse ready");
+        assert_eq!(
+            ready,
+            json!({
+                "type": "ready",
+                "server": "libraryBoundaryStdio"
+            })
+        );
+        let response = serde_json::from_str::<serde_json::Value>(lines[1]).expect("parse response");
         assert_eq!(response.pointer("/type"), Some(&json!("commandOutcome")));
         assert_eq!(response.pointer("/requestId"), Some(&json!("request-1")));
         assert_eq!(
@@ -202,7 +213,11 @@ mod tests {
         run_server_loop(&service, BufReader::new(Cursor::new(input)), &mut output)
             .expect("run server loop");
 
-        assert!(output.is_empty());
+        let text = String::from_utf8(output).expect("utf8 output");
+        assert_eq!(
+            text,
+            "{\"type\":\"ready\",\"server\":\"libraryBoundaryStdio\"}\n"
+        );
     }
 
     #[test]
@@ -230,8 +245,46 @@ mod tests {
             .expect("run server loop");
 
         let text = String::from_utf8(output).expect("utf8 output");
-        assert_eq!(text.lines().count(), 1);
+        assert_eq!(text.lines().count(), 2);
         assert!(text.ends_with('\n'));
-        assert!(serde_json::from_str::<serde_json::Value>(text.trim_end()).is_ok());
+        for line in text.lines() {
+            assert!(serde_json::from_str::<serde_json::Value>(line).is_ok());
+        }
+    }
+
+    #[test]
+    fn server_loop_writes_ready_before_command_response() {
+        let (tempdir, service) = open_service();
+        let source_root = tempdir.path().join("source-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let request = CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
+            RegisterLocalRootRequest {
+                absolute_path: source_root.to_string_lossy().into_owned(),
+            },
+        ));
+        let input = format!(
+            "{}\n",
+            serde_json::to_string(&json!({
+                "type": "command",
+                "requestId": "request-1",
+                "request": request
+            }))
+            .expect("serialize request")
+        );
+        let mut output = Vec::new();
+
+        run_server_loop(&service, BufReader::new(Cursor::new(input)), &mut output)
+            .expect("run server loop");
+
+        let text = String::from_utf8(output).expect("utf8 output");
+        let lines = text.lines().collect::<Vec<_>>();
+        assert_eq!(
+            lines.first(),
+            Some(&r#"{"type":"ready","server":"libraryBoundaryStdio"}"#)
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(lines[1]).expect("parse response")["type"],
+            json!("commandOutcome")
+        );
     }
 }

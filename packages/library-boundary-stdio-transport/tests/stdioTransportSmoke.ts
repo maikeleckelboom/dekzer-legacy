@@ -126,6 +126,7 @@ async function openClient(): Promise<{
       }
     }
   });
+  await transport.ready;
   return {
     transport,
     client: createLibraryBoundaryClient(transport)

@@ -13,11 +13,29 @@ type RequestEnvelope = {
 };
 
 const concurrentRequests: RequestEnvelope[] = [];
+const startupMode = process.argv[2] ?? "ready";
 
 const stdin = createInterface({
   input: process.stdin,
   crlfDelay: Infinity
 });
+
+if (startupMode === "exit-before-ready") {
+  process.exit(8);
+}
+
+if (startupMode === "malformed-before-ready") {
+  process.stdout.write("not-json\n");
+} else if (startupMode === "malformed-ready") {
+  writeEnvelope({
+    type: "ready",
+    server: "wrongServer"
+  });
+} else if (startupMode === "delayed-ready") {
+  globalThis.setTimeout(writeReady, 50);
+} else {
+  writeReady();
+}
 
 stdin.on("line", (line) => {
   if (line.trim().length === 0) {
@@ -48,6 +66,11 @@ stdin.on("line", (line) => {
 
   if (displayName === "malformed") {
     process.stdout.write("not-json\n");
+    return;
+  }
+
+  if (displayName === "duplicate-ready") {
+    writeReady();
     return;
   }
 
@@ -174,4 +197,11 @@ function writeTransportError(
 
 function writeEnvelope(envelope: unknown): void {
   process.stdout.write(`${JSON.stringify(envelope)}\n`);
+}
+
+function writeReady(): void {
+  writeEnvelope({
+    type: "ready",
+    server: "libraryBoundaryStdio"
+  });
 }

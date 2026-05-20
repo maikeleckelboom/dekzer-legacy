@@ -7,6 +7,7 @@ export type {
 } from "./generated/stdioEnvelope.js";
 
 export type LibraryBoundaryStdioLocalErrorCode =
+  | "closedBeforeReady"
   | "duplicateRequestId"
   | "executeAfterClose"
   | "malformedStdout"

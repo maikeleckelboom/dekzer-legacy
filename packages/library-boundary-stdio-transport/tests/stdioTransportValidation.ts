@@ -12,6 +12,9 @@ import type {
 
 import {
   createStdioCommandEnvelope,
+  isLibraryBoundaryStdioReadyEnvelope,
+  libraryBoundaryStdioReadyEnvelopeType,
+  libraryBoundaryStdioReadyServer,
   libraryBoundaryStdioRemoteErrorCodes,
   LibraryBoundaryStdioRemoteTransportError,
   LibraryBoundaryStdioProcessExitError,
@@ -35,11 +38,12 @@ function createPlaylistRequest(displayName: string): CommandRequest {
 }
 
 function createTransport(
-  requestIdFactory = sequentialRequestIdFactory()
+  requestIdFactory = sequentialRequestIdFactory(),
+  startupMode = "ready"
 ): LibraryBoundaryStdioTransport {
   return new LibraryBoundaryStdioTransport({
     serverBinaryPath: process.execPath,
-    serverArgs: [fixtureServerPath],
+    serverArgs: [fixtureServerPath, startupMode],
     userDataPath: process.cwd(),
     environment: "development",
     requestIdFactory
@@ -64,6 +68,138 @@ async function validatesRequestEnvelopeCreation(): Promise<void> {
     },
     "request envelope keeps requestId outside the generated CommandRequest"
   );
+}
+
+async function validatesGeneratedReadyEnvelopeContract(): Promise<void> {
+  equal(
+    libraryBoundaryStdioReadyEnvelopeType,
+    "ready",
+    "generated ready envelope type is stable"
+  );
+  equal(
+    libraryBoundaryStdioReadyServer,
+    "libraryBoundaryStdio",
+    "generated ready server is stable"
+  );
+
+  const ready = {
+    type: "ready",
+    server: "libraryBoundaryStdio"
+  };
+  equal(
+    isLibraryBoundaryStdioReadyEnvelope(ready),
+    true,
+    "generated ready type guard accepts valid ready"
+  );
+
+  deepEqual(
+    parseStdioResponseEnvelope(JSON.stringify(ready)),
+    ready,
+    "parser returns valid ready envelope"
+  );
+}
+
+async function validatesMalformedReadyRejects(): Promise<void> {
+  const error = throws(
+    () => parseStdioResponseEnvelope(JSON.stringify({
+      type: "ready",
+      server: "wrongServer"
+    })),
+    "malformed ready is rejected"
+  );
+
+  equal(
+    error.message,
+    "ready response envelope has invalid stdio ready shape",
+    "malformed ready failure is explicit"
+  );
+
+  const readyWithRequestId = throws(
+    () => parseStdioResponseEnvelope(JSON.stringify({
+      type: "ready",
+      server: "libraryBoundaryStdio",
+      requestId: "not-allowed"
+    })),
+    "ready with requestId is rejected"
+  );
+
+  equal(
+    readyWithRequestId.message,
+    "ready response envelope has invalid stdio ready shape",
+    "ready must not carry requestId"
+  );
+}
+
+async function validatesReadyResolvesOnlyAfterReadyEnvelope(): Promise<void> {
+  const transport = createTransport(sequentialRequestIdFactory(), "delayed-ready");
+  try {
+    let isReady = false;
+    void transport.ready.then(() => {
+      isReady = true;
+    });
+
+    await sleep(15);
+    equal(isReady, false, "ready remains pending before ready envelope");
+    await transport.ready;
+    equal(isReady, true, "ready resolves after ready envelope");
+  } finally {
+    await transport.close();
+  }
+}
+
+async function validatesExecuteBeforeReadyWaitsForReadiness(): Promise<void> {
+  const transport = createTransport(sequentialRequestIdFactory(), "delayed-ready");
+  try {
+    const outcomePromise = transport.execute(createPlaylistRequest("Success"));
+
+    await sleep(15);
+    await transport.ready;
+    const outcome = await outcomePromise;
+
+    equal(
+      successPlaylistId(outcome),
+      "1",
+      "execute before ready waits and then sends the command"
+    );
+  } finally {
+    await transport.close();
+  }
+}
+
+async function validatesProcessExitBeforeReadyRejectsReady(): Promise<void> {
+  const transport = createTransport(
+    sequentialRequestIdFactory(),
+    "exit-before-ready"
+  );
+  try {
+    const error = await rejects(
+      () => transport.ready,
+      LibraryBoundaryStdioProcessExitError,
+      "process exit before ready rejects ready"
+    );
+
+    equal(error.exitCode, 8, "pre-ready exit code is exposed");
+  } finally {
+    await transport.close();
+  }
+}
+
+async function validatesMalformedStdoutBeforeReadyRejectsReady(): Promise<void> {
+  const transport = createTransport(
+    sequentialRequestIdFactory(),
+    "malformed-before-ready"
+  );
+  try {
+    const error = await rejects(
+      () => transport.ready,
+      LibraryBoundaryStdioTransportError,
+      "malformed stdout before ready rejects ready"
+    );
+
+    equal(error.code, "malformedStdout", "pre-ready malformed stdout is local");
+  } finally {
+    await transport.close();
+  }
 }
 
 async function validatesSuccessResponseResolution(): Promise<void> {
@@ -237,6 +373,29 @@ async function validatesMalformedStdoutDoesNotCrash(): Promise<void> {
   }
 }
 
+async function validatesDuplicateReadyAfterReadyIsLifecycleFailure(): Promise<void> {
+  const transport = createTransport();
+  try {
+    await transport.ready;
+    const error = await rejects(
+      () => transport.execute(createPlaylistRequest("duplicate-ready")),
+      LibraryBoundaryStdioTransportError,
+      "duplicate ready rejects the in-flight request"
+    );
+
+    equal(error.code, "malformedStdout", "duplicate ready is malformed stdout");
+
+    const laterError = await rejects(
+      () => transport.execute(createPlaylistRequest("Success")),
+      LibraryBoundaryStdioTransportError,
+      "duplicate ready fails the transport for future execute calls"
+    );
+    equal(laterError.code, "executeAfterClose", "failed transport rejects later execute");
+  } finally {
+    await transport.close();
+  }
+}
+
 async function validatesUnknownResponseRequestIdRejectsPending(): Promise<void> {
   const transport = createTransport();
   try {
@@ -268,7 +427,7 @@ async function validatesStderrDiagnosticsAreForwarded(): Promise<void> {
   const diagnostics: string[] = [];
   const transport = new LibraryBoundaryStdioTransport({
     serverBinaryPath: process.execPath,
-    serverArgs: [fixtureServerPath],
+    serverArgs: [fixtureServerPath, "ready"],
     userDataPath: process.cwd(),
     environment: "development",
     requestIdFactory: sequentialRequestIdFactory(),
@@ -403,6 +562,12 @@ function deepEqual(actual: unknown, expected: unknown, message: string): void {
   }
 }
 
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, milliseconds);
+  });
+}
+
 function throws(action: () => unknown, message: string): Error {
   try {
     action();
@@ -436,6 +601,12 @@ async function rejects<ErrorType extends Error>(
 }
 
 await validatesRequestEnvelopeCreation();
+await validatesGeneratedReadyEnvelopeContract();
+await validatesMalformedReadyRejects();
+await validatesReadyResolvesOnlyAfterReadyEnvelope();
+await validatesExecuteBeforeReadyWaitsForReadiness();
+await validatesProcessExitBeforeReadyRejectsReady();
+await validatesMalformedStdoutBeforeReadyRejectsReady();
 await validatesSuccessResponseResolution();
 await validatesProtocolErrorOutcomeIsPreserved();
 await validatesClientTurnsProtocolErrorOutcomeIntoClientError();
@@ -444,6 +615,7 @@ await validatesUnknownRemoteTransportErrorCodePolicy();
 await validatesTransportErrorRejects();
 await validatesUnknownRemoteTransportErrorCodeRejectsAsMalformedStdout();
 await validatesMalformedStdoutDoesNotCrash();
+await validatesDuplicateReadyAfterReadyIsLifecycleFailure();
 await validatesUnknownResponseRequestIdRejectsPending();
 await validatesBlankStdoutLinesAreIgnored();
 await validatesStderrDiagnosticsAreForwarded();

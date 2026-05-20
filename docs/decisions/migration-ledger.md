@@ -224,6 +224,13 @@ with their TypeScript remote-code list generated from `crates/library-boundary-s
 correlation, write, and lifecycle failures in `packages/library-boundary-stdio-transport`; they are separate from remote
 server transport errors.
 
+The Rust stdio server now also owns a startup readiness envelope,
+`{"type":"ready","server":"libraryBoundaryStdio"}`, emitted on stdout only after CLI parsing and
+`LibraryBoundaryService::open(...)` succeed and before command handling begins. The TypeScript stdio transport consumes
+that generated ready contract, exposes `LibraryBoundaryStdioTransport.ready`, and waits before writing command envelopes.
+The desktop main-process host awaits readiness before exposing a transport-neutral `LibraryBoundaryClient`. Preload,
+renderer IPC, root registration, scans, and event pumping remain unwired.
+
 ### Desktop Main-Process Library Boundary Host Owner
 
 | Field                     | Value                                                                                                                                                                                                                                                                                                                                 |

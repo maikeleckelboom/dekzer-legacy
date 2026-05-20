@@ -4,11 +4,14 @@ import type {
 } from "@dekzer/library-boundary-contract";
 
 import {
+  isLibraryBoundaryStdioReadyEnvelope,
   isLibraryBoundaryStdioRemoteErrorCode,
+  type LibraryBoundaryStdioReadyEnvelope,
   type LibraryBoundaryStdioRemoteErrorCode
 } from "./generated/stdioEnvelope.js";
 
 export type {
+  LibraryBoundaryStdioReadyEnvelope,
   LibraryBoundaryStdioRemoteErrorCode
 } from "./generated/stdioEnvelope.js";
 
@@ -34,6 +37,7 @@ export type StdioRemoteTransportErrorEnvelope = {
 };
 
 export type StdioResponseEnvelope =
+  | LibraryBoundaryStdioReadyEnvelope
   | StdioCommandOutcomeEnvelope
   | StdioRemoteTransportErrorEnvelope;
 
@@ -58,6 +62,14 @@ export function parseStdioResponseEnvelope(line: string): StdioResponseEnvelope 
   const parsed = JSON.parse(line) as unknown;
   if (!isRecord(parsed)) {
     throw new Error("stdio response envelope must be a JSON object");
+  }
+
+  if (parsed.type === "ready") {
+    if (!isLibraryBoundaryStdioReadyEnvelope(parsed)) {
+      throw new Error("ready response envelope has invalid stdio ready shape");
+    }
+
+    return parsed;
   }
 
   if (parsed.type === "commandOutcome") {

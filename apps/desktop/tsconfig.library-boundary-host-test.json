@@ -13,6 +13,7 @@
     "types": ["node"]
   },
   "include": [
+    "src/main/libraryBoundaryHost.ts",
     "src/main/libraryBoundaryHostConfig.ts",
     "src/main/libraryBoundaryHostErrors.ts",
     "tests/libraryBoundaryHostConfigValidation.ts"

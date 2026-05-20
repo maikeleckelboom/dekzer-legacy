@@ -151,6 +151,12 @@ mod tests {
         assert!(
             artifact
                 .contents
+                .contains("export const libraryBoundaryStdioReadyEnvelopeType")
+        );
+        assert!(artifact.contents.contains("\"libraryBoundaryStdio\""));
+        assert!(
+            artifact
+                .contents
                 .contains("export const libraryBoundaryStdioRemoteErrorCodes")
         );
         assert!(artifact.contents.contains("\"invalidFrame\""));

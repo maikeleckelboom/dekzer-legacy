@@ -40,6 +40,7 @@ export type LibraryBoundaryStdioTransportOptions = {
 };
 
 type TransportState = "ready" | "closing" | "closed" | "failed";
+type TransportLifecycleState = "starting" | TransportState;
 
 type PendingRequest = {
   readonly requestId: string;
@@ -50,6 +51,7 @@ type PendingRequest = {
 export class LibraryBoundaryStdioTransport
   implements LibraryBoundaryTransport
 {
+  readonly ready: Promise<void>;
   readonly #child: ChildProcessWithoutNullStreams;
   readonly #diagnostics?: (diagnostic: LibraryBoundaryStdioDiagnostic) => void;
   readonly #pending = new Map<string, PendingRequest>();
@@ -57,9 +59,12 @@ export class LibraryBoundaryStdioTransport
   readonly #stdout: Interface;
   readonly #stderr: Interface;
   readonly #pendingEmptyResolvers = new Set<() => void>();
+  #readyReject!: (reason: unknown) => void;
+  #readyResolve!: () => void;
+  #readySettled = false;
   #closePromise: Promise<void> | null = null;
   #exitPromise: Promise<void>;
-  #state: TransportState = "ready";
+  #state: TransportLifecycleState = "starting";
   #writeQueue: Promise<void> = Promise.resolve();
 
   constructor(options: LibraryBoundaryStdioTransportOptions) {
@@ -88,6 +93,11 @@ export class LibraryBoundaryStdioTransport
       input: this.#child.stderr,
       crlfDelay: Infinity
     });
+    this.ready = new Promise((resolve, reject) => {
+      this.#readyResolve = resolve;
+      this.#readyReject = reject;
+    });
+    void this.ready.catch(() => undefined);
     this.#exitPromise = this.#createExitPromise();
 
     this.#stdout.on("line", (line) => this.#handleStdoutLine(line));
@@ -96,24 +106,29 @@ export class LibraryBoundaryStdioTransport
     });
   }
 
-  execute(request: CommandRequest): Promise<CommandOutcome> {
+  async execute(request: CommandRequest): Promise<CommandOutcome> {
+    if (this.#state !== "starting" && this.#state !== "ready") {
+      throw new LibraryBoundaryStdioTransportError(
+        "executeAfterClose",
+        `library boundary stdio transport cannot execute while ${this.#state}`
+      );
+    }
+
+    await this.ready;
+
     if (this.#state !== "ready") {
-      return Promise.reject(
-        new LibraryBoundaryStdioTransportError(
-          "executeAfterClose",
-          `library boundary stdio transport cannot execute while ${this.#state}`
-        )
+      throw new LibraryBoundaryStdioTransportError(
+        "executeAfterClose",
+        `library boundary stdio transport cannot execute while ${this.#state}`
       );
     }
 
     const requestId = this.#requestIdFactory();
     if (this.#pending.has(requestId)) {
-      return Promise.reject(
-        new LibraryBoundaryStdioTransportError(
-          "duplicateRequestId",
-          `duplicate stdio requestId generated: ${requestId}`,
-          { requestId }
-        )
+      throw new LibraryBoundaryStdioTransportError(
+        "duplicateRequestId",
+        `duplicate stdio requestId generated: ${requestId}`,
+        { requestId }
       );
     }
 
@@ -136,7 +151,7 @@ export class LibraryBoundaryStdioTransport
       );
     });
 
-    return pendingPromise(pending);
+    return await pendingPromise(pending);
   }
 
   close(): Promise<void> {
@@ -148,7 +163,16 @@ export class LibraryBoundaryStdioTransport
       return Promise.resolve();
     }
 
+    const wasStarting = this.#state === "starting";
     this.#state = "closing";
+    if (wasStarting) {
+      this.#rejectReady(
+        new LibraryBoundaryStdioTransportError(
+          "closedBeforeReady",
+          "library boundary stdio transport closed before the Rust server became ready"
+        )
+      );
+    }
     this.#closePromise = (async () => {
       await this.#waitForPendingRequests();
       if (!this.#child.stdin.destroyed) {
@@ -206,6 +230,25 @@ export class LibraryBoundaryStdioTransport
       return;
     }
 
+    if (envelope.type === "ready") {
+      this.#handleReadyEnvelope();
+      return;
+    }
+
+    if (this.#state === "starting") {
+      this.#diagnostics?.({
+        stream: "stdout",
+        line: "stdio process wrote a non-ready envelope before readiness"
+      });
+      this.#fail(
+        new LibraryBoundaryStdioTransportError(
+          "malformedStdout",
+          "library boundary stdio process wrote non-ready stdout before readiness"
+        )
+      );
+      return;
+    }
+
     if (envelope.type === "commandOutcome") {
       const pending = this.#pending.get(envelope.requestId);
       if (pending === undefined) {
@@ -220,6 +263,25 @@ export class LibraryBoundaryStdioTransport
     }
 
     this.#handleTransportErrorEnvelope(envelope);
+  }
+
+  #handleReadyEnvelope(): void {
+    if (this.#state !== "starting") {
+      this.#diagnostics?.({
+        stream: "stdout",
+        line: "duplicate stdio ready envelope"
+      });
+      this.#fail(
+        new LibraryBoundaryStdioTransportError(
+          "malformedStdout",
+          "library boundary stdio process wrote duplicate ready envelope"
+        )
+      );
+      return;
+    }
+
+    this.#state = "ready";
+    this.#resolveReady();
   }
 
   #handleTransportErrorEnvelope(
@@ -263,6 +325,11 @@ export class LibraryBoundaryStdioTransport
       "library boundary stdio process wrote malformed stdout",
       { cause }
     );
+
+    if (this.#state === "starting") {
+      this.#fail(error);
+      return;
+    }
 
     if (this.#pending.size === 1) {
       const [requestId] = this.#pending.keys();
@@ -320,6 +387,7 @@ export class LibraryBoundaryStdioTransport
           exitCode,
           signal
         );
+        this.#rejectReady(exitError);
         if (this.#pending.size > 0) {
           this.#rejectAllPending(exitError);
         }
@@ -335,7 +403,26 @@ export class LibraryBoundaryStdioTransport
 
   #fail(error: LibraryBoundaryStdioTransportError): void {
     this.#state = "failed";
+    this.#rejectReady(error);
     this.#rejectAllPending(error);
+  }
+
+  #resolveReady(): void {
+    if (this.#readySettled) {
+      return;
+    }
+
+    this.#readySettled = true;
+    this.#readyResolve();
+  }
+
+  #rejectReady(error: Error): void {
+    if (this.#readySettled) {
+      return;
+    }
+
+    this.#readySettled = true;
+    this.#readyReject(error);
   }
 
   #rejectPending(requestId: string, error: Error): boolean {

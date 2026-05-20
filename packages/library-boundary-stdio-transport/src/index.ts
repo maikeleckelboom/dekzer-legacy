@@ -25,9 +25,13 @@ export {
 export type {
   StdioCommandEnvelope,
   StdioCommandOutcomeEnvelope,
+  LibraryBoundaryStdioReadyEnvelope,
   StdioResponseEnvelope,
   StdioRemoteTransportErrorEnvelope
 } from "./envelope.js";
 export {
+  isLibraryBoundaryStdioReadyEnvelope,
+  libraryBoundaryStdioReadyEnvelopeType,
+  libraryBoundaryStdioReadyServer,
   libraryBoundaryStdioRemoteErrorCodes
 } from "./generated/stdioEnvelope.js";

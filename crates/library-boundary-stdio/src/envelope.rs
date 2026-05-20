@@ -3,6 +3,9 @@ use library_boundary_protocol::{CommandOutcome, CommandRequest};
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum StdioResponseEnvelope {
+    Ready {
+        server: StdioReadyServer,
+    },
     CommandOutcome {
         #[serde(rename = "requestId")]
         request_id: String,
@@ -13,6 +16,46 @@ pub(crate) enum StdioResponseEnvelope {
         request_id: Option<String>,
         error: StdioTransportErrorBody,
     },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StdioReadyServer {
+    LibraryBoundaryStdio,
+}
+
+pub(crate) const READY_ENVELOPE_TYPE: &str = "ready";
+pub(crate) const READY_SERVER: &str = "libraryBoundaryStdio";
+
+impl StdioReadyServer {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::LibraryBoundaryStdio => READY_SERVER,
+        }
+    }
+}
+
+impl serde::Serialize for StdioReadyServer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for StdioReadyServer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = <String as serde::Deserialize>::deserialize(deserializer)?;
+        match value.as_str() {
+            READY_SERVER => Ok(Self::LibraryBoundaryStdio),
+            _ => Err(serde::de::Error::custom(format!(
+                "unknown stdio ready server {value:?}"
+            ))),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -43,6 +86,14 @@ pub(crate) const REMOTE_TRANSPORT_ERROR_CODES: [StdioTransportErrorCode; 6] = [
 
 pub(crate) fn remote_transport_error_codes() -> &'static [StdioTransportErrorCode] {
     &REMOTE_TRANSPORT_ERROR_CODES
+}
+
+pub(crate) fn ready_envelope_type() -> &'static str {
+    READY_ENVELOPE_TYPE
+}
+
+pub(crate) fn ready_server_string() -> &'static str {
+    READY_SERVER
 }
 
 impl StdioTransportErrorCode {
@@ -84,6 +135,12 @@ impl<'de> serde::Deserialize<'de> for StdioTransportErrorCode {
                 "unknown stdio transport error code {value:?}"
             ))),
         }
+    }
+}
+
+pub(crate) fn ready_response() -> StdioResponseEnvelope {
+    StdioResponseEnvelope::Ready {
+        server: StdioReadyServer::LibraryBoundaryStdio,
     }
 }
 
@@ -191,7 +248,8 @@ mod tests {
 
     use super::{
         StdioResponseEnvelope, StdioTransportErrorCode, command_outcome_response,
-        deserialize_request_frame, serialize_response_frame, transport_error_response,
+        deserialize_request_frame, ready_response, serialize_response_frame,
+        transport_error_response,
     };
 
     fn register_root_request() -> CommandRequest {
@@ -200,6 +258,21 @@ mod tests {
                 absolute_path: "C:/Music".to_string(),
             },
         ))
+    }
+
+    #[test]
+    fn ready_response_serializes_as_stable_compact_line() {
+        let line = serialize_response_frame(&ready_response()).expect("serialize response");
+
+        assert!(!line.contains('\n'));
+        assert_eq!(line, r#"{"type":"ready","server":"libraryBoundaryStdio"}"#);
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&line).expect("parse response"),
+            json!({
+                "type": "ready",
+                "server": "libraryBoundaryStdio"
+            })
+        );
     }
 
     #[test]
