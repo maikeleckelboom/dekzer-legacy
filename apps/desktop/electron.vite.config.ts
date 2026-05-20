@@ -19,6 +19,7 @@ export default defineConfig({
       }
     }
   },
+  preload: {},
   renderer: {
     resolve: {
       alias: {

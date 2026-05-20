@@ -9,6 +9,11 @@ import {
   type LibraryBoundaryHostTransport
 } from '../src/main/libraryBoundaryHost'
 import {
+  createLibraryBoundaryHostStatus,
+  LibraryBoundaryHostStatusController,
+  registerLibraryBoundaryHostStatusIpc
+} from '../src/main/libraryBoundaryHostStatus'
+import {
   libraryBoundaryStdioBinaryEnvironmentVariable,
   resolveLibraryBoundaryHostConfig,
   resolveLibraryBoundaryStdioBinaryPath,
@@ -16,6 +21,11 @@ import {
   type LibraryBoundaryHostConfig
 } from '../src/main/libraryBoundaryHostConfig'
 import { LibraryBoundaryHostError } from '../src/main/libraryBoundaryHostErrors'
+import { createDesktopApi } from '../src/preload/libraryBoundaryPreload'
+import {
+  libraryBoundaryHostStatusIpcChannels,
+  type LibraryBoundaryHostStatus
+} from '../src/shared/libraryBoundaryStatus'
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-host-'))
 
@@ -100,6 +110,10 @@ async function main(): Promise<void> {
   await validatesHostStartWaitsForTransportReadiness(devConfig)
   await validatesReadinessFailureMapsToStartupFailure(devConfig)
   validatesHostConstructionDoesNotStartTransport(devConfig)
+  await validatesHostStatusProjection(devConfig)
+  await validatesMissingDevelopmentBinaryPublishesFailure(devConfig)
+  validatesStatusIpcRegistration(devConfig)
+  await validatesPreloadApiSurface()
 }
 
 async function validatesHostStartWaitsForTransportReadiness(
@@ -189,6 +203,134 @@ function validatesHostConstructionDoesNotStartTransport(config: LibraryBoundaryH
   assert.equal(transportCreations, 0)
 }
 
+async function validatesHostStatusProjection(config: LibraryBoundaryHostConfig): Promise<void> {
+  const idleHost = new LibraryBoundaryHost(config, silentLogger())
+  const idleStatus = createLibraryBoundaryHostStatus(idleHost)
+
+  assert.equal(idleStatus.state, 'idle')
+  assert.equal(idleStatus.environment, 'development')
+  assert.deepEqual(idleStatus.binaryPolicy, {
+    kind: 'developmentBinary',
+    source: 'environmentOverride'
+  })
+  assert.equal(idleStatus.lastError, null)
+
+  const ready = deferred<void>()
+  ready.resolve()
+
+  const fakeTransport = {
+    ready: ready.promise,
+    close: async () => undefined,
+    execute: async () => {
+      throw new Error('execute should not be called by host status validation')
+    }
+  } satisfies LibraryBoundaryHostTransport
+  const startedHost = new LibraryBoundaryHost(config, silentLogger(), {
+    createTransport: () => fakeTransport,
+    createClient: () => createFakeClient()
+  })
+  const controller = new LibraryBoundaryHostStatusController(startedHost, silentStatusLogger())
+
+  await controller.start()
+
+  const startedStatus = controller.getStatus()
+  assert.equal(startedStatus.state, 'started')
+  assert.equal(startedStatus.lastError, null)
+}
+
+async function validatesMissingDevelopmentBinaryPublishesFailure(
+  config: LibraryBoundaryHostConfig
+): Promise<void> {
+  const secretBinaryPath = join(tempRoot, 'missing-secret-binary')
+  const host = new LibraryBoundaryHost(config, silentLogger(), {
+    resolveStdioBinaryPath: () => {
+      throw new LibraryBoundaryHostError(
+        'missingDevelopmentBinary',
+        `Missing development library boundary stdio binary at ${secretBinaryPath}.`,
+        {
+          details: {
+            binaryPath: secretBinaryPath,
+            binarySource: 'environmentOverride'
+          }
+        }
+      )
+    }
+  })
+  const controller = new LibraryBoundaryHostStatusController(host, silentStatusLogger())
+
+  await controller.start()
+
+  const status = controller.getStatus()
+  assert.equal(status.state, 'failed')
+  assert.equal(status.lastError?.code, 'missingDevelopmentBinary')
+  assert.equal(
+    status.lastError?.message,
+    'The development library boundary stdio binary is missing.'
+  )
+  assert.equal(status.lastError?.message.includes(secretBinaryPath), false)
+}
+
+function validatesStatusIpcRegistration(config: LibraryBoundaryHostConfig): void {
+  const host = new LibraryBoundaryHost(config, silentLogger())
+  const controller = new LibraryBoundaryHostStatusController(host, silentStatusLogger())
+  let registeredChannel: string | null = null
+  let registeredHandler: (() => LibraryBoundaryHostStatus) | null = null
+
+  registerLibraryBoundaryHostStatusIpc(
+    {
+      handle(channel, listener): void {
+        registeredChannel = channel
+        registeredHandler = () => listener({})
+      }
+    },
+    controller
+  )
+
+  assert.equal(registeredChannel, libraryBoundaryHostStatusIpcChannels.getStatus)
+  assert.equal(registeredHandler?.().state, 'idle')
+}
+
+async function validatesPreloadApiSurface(): Promise<void> {
+  const status = testStatus()
+  const listeners = new Map<
+    string,
+    Set<(event: unknown, changedStatus: LibraryBoundaryHostStatus) => void>
+  >()
+  const api = createDesktopApi({
+    invoke: async (channel) => {
+      assert.equal(channel, libraryBoundaryHostStatusIpcChannels.getStatus)
+      return status
+    },
+    on: (channel, listener) => {
+      const channelListeners = listeners.get(channel) ?? new Set()
+      channelListeners.add(listener)
+      listeners.set(channel, channelListeners)
+    },
+    off: (channel, listener) => {
+      listeners.get(channel)?.delete(listener)
+    }
+  })
+
+  assert.deepEqual(Object.keys(api), ['libraryBoundary'])
+  assert.deepEqual(Object.keys(api.libraryBoundary).sort(), ['getStatus', 'onStatusChanged'])
+  assert.equal('client' in api.libraryBoundary, false)
+  assert.equal('transport' in api.libraryBoundary, false)
+  assert.equal(await api.libraryBoundary.getStatus(), status)
+
+  let receivedStatus: LibraryBoundaryHostStatus | null = null
+  const unsubscribe = api.libraryBoundary.onStatusChanged((changedStatus) => {
+    receivedStatus = changedStatus
+  })
+
+  emitStatus(listeners, status)
+  assert.equal(receivedStatus, status)
+
+  receivedStatus = null
+  unsubscribe()
+  emitStatus(listeners, status)
+  assert.equal(receivedStatus, null)
+}
+
 function testApp(options: { readonly appPath: string }): {
   getPath(name: 'userData'): string
   getAppPath(): string
@@ -236,6 +378,38 @@ function silentLogger(): {
 } {
   return {
     warn: () => undefined
+  }
+}
+
+function silentStatusLogger(): {
+  error(): void
+} {
+  return {
+    error: () => undefined
+  }
+}
+
+function testStatus(): LibraryBoundaryHostStatus {
+  return {
+    state: 'idle',
+    environment: 'development',
+    binaryPolicy: {
+      kind: 'developmentBinary',
+      source: 'environmentOverride'
+    },
+    lastError: null
+  }
+}
+
+function emitStatus(
+  listeners: ReadonlyMap<
+    string,
+    ReadonlySet<(event: unknown, changedStatus: LibraryBoundaryHostStatus) => void>
+  >,
+  status: LibraryBoundaryHostStatus
+): void {
+  for (const listener of listeners.get(libraryBoundaryHostStatusIpcChannels.statusChanged) ?? []) {
+    listener({}, status)
   }
 }
 

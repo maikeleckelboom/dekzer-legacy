@@ -1,12 +1,18 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createLibraryBoundaryHost, type LibraryBoundaryHost } from './libraryBoundaryHost'
+import {
+  LibraryBoundaryHostStatusController,
+  registerLibraryBoundaryHostStatusIpc
+} from './libraryBoundaryHostStatus'
+import { libraryBoundaryHostStatusIpcChannels } from '../shared/libraryBoundaryStatus'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
 let libraryBoundaryHost: LibraryBoundaryHost | null = null
+let libraryBoundaryHostStatusController: LibraryBoundaryHostStatusController | null = null
 let isQuittingAfterLibraryBoundaryHostStop = false
 
 function createWindow(): void {
@@ -20,6 +26,7 @@ function createWindow(): void {
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       sandbox: true
     }
@@ -48,6 +55,13 @@ app.whenReady().then(() => {
     app,
     isDev: is.dev
   })
+  libraryBoundaryHostStatusController = new LibraryBoundaryHostStatusController(libraryBoundaryHost)
+  registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
+  libraryBoundaryHostStatusController.onStatusChanged((status) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(libraryBoundaryHostStatusIpcChannels.statusChanged, status)
+    }
+  })
 
   electronApp.setAppUserModelId(appUserModelId)
 
@@ -56,6 +70,7 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+  void libraryBoundaryHostStatusController.start()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -71,14 +86,14 @@ app.on('window-all-closed', () => {
 app.on('before-quit', (event) => {
   if (
     isQuittingAfterLibraryBoundaryHostStop ||
-    libraryBoundaryHost === null ||
-    !libraryBoundaryHost.hasStarted
+    libraryBoundaryHostStatusController === null ||
+    !libraryBoundaryHostStatusController.hasStarted
   ) {
     return
   }
 
   event.preventDefault()
-  void libraryBoundaryHost
+  void libraryBoundaryHostStatusController
     .stop()
     .catch((error: unknown) => {
       console.error('[library-boundary-host] failed to stop cleanly', error)

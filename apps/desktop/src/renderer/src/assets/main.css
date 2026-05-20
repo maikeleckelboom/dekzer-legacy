@@ -80,8 +80,21 @@ h1 {
   font-weight: 650;
 }
 
-.state div:nth-child(n + 3) strong {
+.state strong.is-ready {
+  color: var(--color-accent);
+}
+
+.state strong.is-pending {
   color: var(--color-warning);
+}
+
+.state strong.is-failed {
+  color: var(--color-danger);
+}
+
+.state .error-row strong {
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 860px) {
