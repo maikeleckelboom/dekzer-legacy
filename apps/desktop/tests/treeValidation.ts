@@ -278,11 +278,8 @@ function validatesRootQualityGateIncludesTreeValidation(): void {
   }
   const scripts = rootPackage.scripts ?? {}
 
-  assert.equal(
-    scripts['desktop:validate:library-tree'],
-    'pnpm --filter @dekzer/desktop run validate:library-tree'
-  )
-  assert.match(scripts.check ?? '', /pnpm run desktop:validate:library-tree/)
+  assert.equal(scripts['desktop:validate:tree'], 'pnpm --filter @dekzer/desktop run validate:tree')
+  assert.match(scripts.check ?? '', /pnpm run desktop:validate:tree/)
 }
 
 function fixtureVisibleItems(

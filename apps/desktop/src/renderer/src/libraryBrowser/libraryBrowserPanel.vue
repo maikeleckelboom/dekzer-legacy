@@ -64,10 +64,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundaryStatus'
-import type { LibraryHierarchyReadResult } from '../../../shared/libraryHierarchyRead'
+import { useLibraryHierarchyRead } from './hierarchyRead'
 import { libraryHierarchyFixtureTree } from './libraryHierarchyFixture'
 import { projectLibraryHierarchyReadToBrowserTree } from './libraryHierarchyProjection'
 import TreeRoot from './tree/treeRoot.vue'
@@ -82,14 +82,10 @@ const defaultFixtureExpandedNodeIds = new Set<BrowserTreeNodeId>([
   'fixture-tracks',
   'fixture-playlists'
 ])
+const { hostStatus, hierarchyReadResult, hierarchyReadRequestError, hierarchyReadIsLoading } =
+  useLibraryHierarchyRead()
 const selectedNodeId = ref<BrowserTreeNodeId | null>(null)
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
-const hostStatus = ref<LibraryBoundaryHostStatus | null>(null)
-const hierarchyReadResult = ref<LibraryHierarchyReadResult | null>(null)
-const hierarchyReadBridgeError = ref<string | null>(null)
-const hierarchyReadIsLoading = ref(false)
-let hasRequestedHierarchyRead = false
-let unsubscribeFromHostStatus: (() => void) | null = null
 
 const hierarchyProjection = computed(() => {
   if (hierarchyReadResult.value === null) {
@@ -129,8 +125,8 @@ const panelDetail = computed(() => {
     return 'Showing a real library source through the desktop-owned read path.'
   }
 
-  if (hierarchyReadBridgeError.value !== null) {
-    return `${hierarchyReadBridgeError.value} Showing `
+  if (hierarchyReadRequestError.value !== null) {
+    return `${hierarchyReadRequestError.value} Showing `
   }
 
   if (hierarchyReadIsLoading.value) {
@@ -191,30 +187,6 @@ watch(
   { immediate: true }
 )
 
-onMounted(() => {
-  void window.dekzer.libraryBoundary
-    .getStatus()
-    .then((status) => {
-      hostStatus.value = status
-      hierarchyReadBridgeError.value = null
-      requestHierarchyReadIfStarted(status)
-    })
-    .catch(() => {
-      hierarchyReadBridgeError.value = 'Unable to read library boundary host status.'
-    })
-
-  unsubscribeFromHostStatus = window.dekzer.libraryBoundary.onStatusChanged((status) => {
-    hostStatus.value = status
-    hierarchyReadBridgeError.value = null
-    requestHierarchyReadIfStarted(status)
-  })
-})
-
-onUnmounted(() => {
-  unsubscribeFromHostStatus?.()
-  unsubscribeFromHostStatus = null
-})
-
 function selectNode(nodeId: BrowserTreeNodeId): void {
   selectedNodeId.value = nodeId
 }
@@ -229,35 +201,6 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
   }
 
   expandedNodeIds.value = nextExpandedNodeIds
-}
-
-function requestHierarchyReadIfStarted(status: LibraryBoundaryHostStatus): void {
-  if (status.state !== 'started' || hasRequestedHierarchyRead) {
-    return
-  }
-
-  hasRequestedHierarchyRead = true
-  void readFirstAvailableSourceHierarchy()
-}
-
-async function readFirstAvailableSourceHierarchy(): Promise<void> {
-  hierarchyReadIsLoading.value = true
-  hierarchyReadBridgeError.value = null
-
-  try {
-    hierarchyReadResult.value = await window.dekzer.libraryBoundary.readLiteralHierarchyChildren({
-      target: {
-        kind: 'firstAvailableSource'
-      },
-      parentSourceDirectoryId: null,
-      offset: 0,
-      limit: 50
-    })
-  } catch {
-    hierarchyReadBridgeError.value = 'Unable to request library hierarchy children.'
-  } finally {
-    hierarchyReadIsLoading.value = false
-  }
 }
 
 function findNodeById(

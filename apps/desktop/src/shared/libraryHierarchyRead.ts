@@ -25,6 +25,8 @@ export type LibraryHierarchyReadError = {
   readonly message: string
 }
 
+export type LibraryHierarchyReadErrorState = Exclude<LibraryHierarchyReadState, 'ready'>
+
 export type LibraryHierarchyReadEntryPoint =
   | {
       readonly kind: 'source'
@@ -88,6 +90,6 @@ export type LibraryHierarchyReadResult =
       readonly window: LibraryHierarchyReadWindow
     }
   | {
-      readonly state: Exclude<LibraryHierarchyReadState, 'ready'>
+      readonly state: LibraryHierarchyReadErrorState
       readonly error: LibraryHierarchyReadError
     }

@@ -10,7 +10,7 @@ Run it from the workspace root at `C:\dev\dekzer`.
 pnpm install
 pnpm run dev:desktop
 pnpm run typecheck
-pnpm --filter @dekzer/desktop run validate:library-boundary-host
+pnpm --filter @dekzer/desktop run validate:host
 pnpm run build:desktop
 ```
 
