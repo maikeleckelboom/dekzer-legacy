@@ -264,6 +264,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "library-boundary-stdio"
+version = "0.0.0"
+dependencies = [
+ "library-boundary-protocol",
+ "library-boundary-service",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "library-domain"
 version = "0.0.0"
 

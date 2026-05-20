@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "paths": {
+      "@dekzer/library-boundary-client": [
+        "../library-boundary-client/src/index.ts"
+      ],
+      "@dekzer/library-boundary-contract": [
+        "../library-boundary-contract/index.ts"
+      ]
+    },
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022",
+    "types": [
+      "node"
+    ],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ]
+}

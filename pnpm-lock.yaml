@@ -82,6 +82,22 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/library-boundary-stdio-transport:
+    dependencies:
+      '@dekzer/library-boundary-client':
+        specifier: workspace:*
+        version: link:../library-boundary-client
+      '@dekzer/library-boundary-contract':
+        specifier: workspace:*
+        version: link:../library-boundary-contract
+    devDependencies:
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
 packages:
 
   7zip-bin@5.2.0:
