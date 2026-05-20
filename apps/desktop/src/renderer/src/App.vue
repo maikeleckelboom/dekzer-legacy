@@ -25,6 +25,10 @@
         <span>Startup error</span>
         <strong>{{ hostStatus.lastError.code }}: {{ hostStatus.lastError.message }}</strong>
       </div>
+      <div v-if="hostStatusLoadError" class="error-row">
+        <span>Status bridge</span>
+        <strong>{{ hostStatusLoadError }}</strong>
+      </div>
       <div>
         <span>Product wiring</span>
         <strong class="is-pending">Not active yet</strong>
@@ -43,6 +47,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundaryStatus'
 
 const hostStatus = ref<LibraryBoundaryHostStatus | null>(null)
+const hostStatusLoadError = ref<string | null>(null)
 let unsubscribeFromHostStatus: (() => void) | null = null
 
 const hostStateLabel = computed(() => {
@@ -74,12 +79,19 @@ const hostStateClass = computed(() => {
 })
 
 onMounted(() => {
-  void window.desktop.libraryBoundary.getStatus().then((status) => {
-    hostStatus.value = status
-  })
+  void window.dekzer.libraryBoundary
+    .getStatus()
+    .then((status) => {
+      hostStatus.value = status
+      hostStatusLoadError.value = null
+    })
+    .catch(() => {
+      hostStatusLoadError.value = 'Unable to read library boundary host status.'
+    })
 
-  unsubscribeFromHostStatus = window.desktop.libraryBoundary.onStatusChanged((status) => {
+  unsubscribeFromHostStatus = window.dekzer.libraryBoundary.onStatusChanged((status) => {
     hostStatus.value = status
+    hostStatusLoadError.value = null
   })
 })
 

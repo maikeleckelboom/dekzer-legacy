@@ -1,6 +1,6 @@
 import {
   libraryBoundaryHostStatusIpcChannels,
-  type DesktopApi,
+  type DekzerRendererApi,
   type LibraryBoundaryHostStatus
 } from '../shared/libraryBoundaryStatus'
 
@@ -18,7 +18,20 @@ export type LibraryBoundaryPreloadIpcRenderer = {
   ): void
 }
 
-export function createDesktopApi(ipcRenderer: LibraryBoundaryPreloadIpcRenderer): DesktopApi {
+export type LibraryBoundaryPreloadContextBridge = {
+  exposeInMainWorld(apiKey: string, api: DekzerRendererApi): void
+}
+
+export function exposeDekzerRendererApi(
+  rendererContext: LibraryBoundaryPreloadContextBridge,
+  ipcRenderer: LibraryBoundaryPreloadIpcRenderer
+): void {
+  rendererContext.exposeInMainWorld('dekzer', createDekzerRendererApi(ipcRenderer))
+}
+
+export function createDekzerRendererApi(
+  ipcRenderer: LibraryBoundaryPreloadIpcRenderer
+): DekzerRendererApi {
   return {
     libraryBoundary: {
       async getStatus(): Promise<LibraryBoundaryHostStatus> {

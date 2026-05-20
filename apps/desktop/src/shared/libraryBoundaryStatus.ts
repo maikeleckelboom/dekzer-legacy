@@ -45,7 +45,7 @@ export type LibraryBoundaryHostStatus = {
 
 export type LibraryBoundaryHostStatusChangedCallback = (status: LibraryBoundaryHostStatus) => void
 
-export type DesktopApi = {
+export type DekzerRendererApi = {
   readonly libraryBoundary: {
     getStatus(): Promise<LibraryBoundaryHostStatus>
     onStatusChanged(callback: LibraryBoundaryHostStatusChangedCallback): () => void

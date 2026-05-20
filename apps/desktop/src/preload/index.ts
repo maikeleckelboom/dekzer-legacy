@@ -1,5 +1,5 @@
 import { contextBridge as rendererContext, ipcRenderer } from 'electron'
 
-import { createDesktopApi } from './libraryBoundaryPreload'
+import { exposeDekzerRendererApi } from './libraryBoundaryPreload'
 
-rendererContext.exposeInMainWorld('desktop', createDesktopApi(ipcRenderer))
+exposeDekzerRendererApi(rendererContext, ipcRenderer)

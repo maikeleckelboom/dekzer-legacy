@@ -21,7 +21,10 @@ import {
   type LibraryBoundaryHostConfig
 } from '../src/main/libraryBoundaryHostConfig'
 import { LibraryBoundaryHostError } from '../src/main/libraryBoundaryHostErrors'
-import { createDesktopApi } from '../src/preload/libraryBoundaryPreload'
+import {
+  createDekzerRendererApi,
+  exposeDekzerRendererApi
+} from '../src/preload/libraryBoundaryPreload'
 import {
   libraryBoundaryHostStatusIpcChannels,
   type LibraryBoundaryHostStatus
@@ -111,6 +114,7 @@ async function main(): Promise<void> {
   await validatesReadinessFailureMapsToStartupFailure(devConfig)
   validatesHostConstructionDoesNotStartTransport(devConfig)
   await validatesHostStatusProjection(devConfig)
+  await validatesStatusControllerPublishesAndUnsubscribes(devConfig)
   await validatesMissingDevelopmentBinaryPublishesFailure(devConfig)
   validatesStatusIpcRegistration(devConfig)
   await validatesPreloadApiSurface()
@@ -238,6 +242,40 @@ async function validatesHostStatusProjection(config: LibraryBoundaryHostConfig):
   assert.equal(startedStatus.lastError, null)
 }
 
+async function validatesStatusControllerPublishesAndUnsubscribes(
+  config: LibraryBoundaryHostConfig
+): Promise<void> {
+  const ready = deferred<void>()
+  const fakeTransport = {
+    ready: ready.promise,
+    close: async () => undefined,
+    execute: async () => {
+      throw new Error('execute should not be called by host status validation')
+    }
+  } satisfies LibraryBoundaryHostTransport
+  const host = new LibraryBoundaryHost(config, silentLogger(), {
+    createTransport: () => fakeTransport,
+    createClient: () => createFakeClient()
+  })
+  const controller = new LibraryBoundaryHostStatusController(host, silentStatusLogger())
+  const publishedStates: LibraryBoundaryHostStatus['state'][] = []
+  const unsubscribe = controller.onStatusChanged((status) => {
+    publishedStates.push(status.state)
+  })
+
+  const started = controller.start()
+  await Promise.resolve()
+  assert.deepEqual(publishedStates, ['starting'])
+
+  ready.resolve()
+  await started
+  assert.deepEqual(publishedStates, ['starting', 'started'])
+
+  unsubscribe()
+  await controller.start()
+  assert.deepEqual(publishedStates, ['starting', 'started'])
+}
+
 async function validatesMissingDevelopmentBinaryPublishesFailure(
   config: LibraryBoundaryHostConfig
 ): Promise<void> {
@@ -296,7 +334,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
     string,
     Set<(event: unknown, changedStatus: LibraryBoundaryHostStatus) => void>
   >()
-  const api = createDesktopApi({
+  const ipcRenderer = {
     invoke: async (channel) => {
       assert.equal(channel, libraryBoundaryHostStatusIpcChannels.getStatus)
       return status
@@ -309,12 +347,31 @@ async function validatesPreloadApiSurface(): Promise<void> {
     off: (channel, listener) => {
       listeners.get(channel)?.delete(listener)
     }
-  })
+  }
+  const exposedApis = new Map<string, unknown>()
+
+  exposeDekzerRendererApi(
+    {
+      exposeInMainWorld(apiKey, api): void {
+        exposedApis.set(apiKey, api)
+      }
+    },
+    ipcRenderer
+  )
+
+  assert.deepEqual([...exposedApis.keys()], ['dekzer'])
+  assert.equal(exposedApis.has('desktop'), false)
+
+  const api = createDekzerRendererApi(ipcRenderer)
 
   assert.deepEqual(Object.keys(api), ['libraryBoundary'])
   assert.deepEqual(Object.keys(api.libraryBoundary).sort(), ['getStatus', 'onStatusChanged'])
+  assert.equal('ipcRenderer' in api, false)
+  assert.equal('client' in api, false)
+  assert.equal('transport' in api, false)
   assert.equal('client' in api.libraryBoundary, false)
   assert.equal('transport' in api.libraryBoundary, false)
+  assert.equal('ipcRenderer' in api.libraryBoundary, false)
   assert.equal(await api.libraryBoundary.getStatus(), status)
 
   let receivedStatus: LibraryBoundaryHostStatus | null = null
