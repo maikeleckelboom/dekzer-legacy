@@ -14,8 +14,9 @@ Current state:
 - `packages/library-boundary-contract` is the generated-only TypeScript boundary contract package.
 - `packages/library-boundary-client` is the hand-authored, transport-agnostic TypeScript client/session package over the generated boundary contract.
 - `packages/library-boundary-stdio-transport` is the Node stdio transport package that implements the boundary client transport seam by spawning the Rust stdio server.
+- `apps/desktop/src/main` owns the lazy desktop library boundary host policy for stdio binary selection, Electron `userData`, environment selection, diagnostics routing, and shutdown lifecycle.
 - `workspace-host` is not imported.
-- Remaining `music-library-core` slices beyond the domain, SQLite store, boundary protocol, boundary service, stdio transport, generated boundary contract, and TypeScript boundary client are not imported.
+- Remaining `music-library-core` slices beyond the domain, SQLite store, boundary protocol, boundary service, stdio transport, generated boundary contract, TypeScript boundary client, and desktop host owner are not imported.
 - Exclave is an external dependency candidate, not vendored into this repo.
 
 Run workspace commands from this directory:
@@ -35,6 +36,7 @@ pnpm run library:client:test
 pnpm run library:stdio:typecheck
 pnpm run library:stdio:build
 pnpm run library:stdio:test
+pnpm --filter @dekzer/desktop run validate:library-boundary-host
 pnpm run check
 pnpm run build
 pnpm run test
@@ -59,13 +61,14 @@ Current root scripts:
 - `library:stdio:typecheck` typechecks the TypeScript stdio transport package.
 - `library:stdio:build` builds the generated boundary contract package, boundary client, and stdio transport package.
 - `library:stdio:test` builds the Rust stdio server and runs the stdio transport validation and cross-process smoke fixtures.
+- `pnpm --filter @dekzer/desktop run validate:library-boundary-host` validates the desktop main-process library boundary host config/error policy without launching Electron or requiring the Rust stdio binary.
 - `typecheck` runs the generated boundary contract package typecheck, boundary client typecheck, stdio transport typecheck, and desktop typecheck.
 - `build` builds the generated boundary contract package, boundary client, stdio transport package, and desktop app.
 - `test` runs the boundary client/session validation fixture, stdio transport validation and cross-process smoke fixtures, and the Rust workspace test suite.
 - `test:rust` runs `cargo test --workspace`.
 - `fmt:rust` runs `cargo fmt --all --check`.
 - `lint:rust` runs `cargo clippy --workspace --all-targets -- -D warnings`.
-- `check` runs the boundary contract stale check, stdio transport contract stale check, TypeScript typechecks, boundary client and stdio validation fixtures, Rust fmt, clippy, and test gates.
+- `check` runs the boundary contract stale check, stdio transport contract stale check, TypeScript typechecks, desktop host validation, boundary client and stdio validation fixtures, Rust fmt, clippy, and test gates.
 
 Workspace ownership:
 
@@ -74,4 +77,4 @@ Workspace ownership:
 - `crates/*` is for Rust workspace ownership, starting with `crates/library-domain`.
 - `docs/*` is for product canon, decisions, and architecture documents.
 
-Only `apps/desktop`, the migrated Rust library domain, store, boundary protocol, boundary service, stdio server crate, generated TypeScript boundary contract, transport-agnostic TypeScript boundary client, and stdio transport package are present as product code after this slice. See `docs/decisions/repo-consolidation-plan.md` and `docs/decisions/migration-ledger.md` for the migration plan.
+Only `apps/desktop`, its main-process library boundary host owner, the migrated Rust library domain, store, boundary protocol, boundary service, stdio server crate, generated TypeScript boundary contract, transport-agnostic TypeScript boundary client, and stdio transport package are present as product code after this slice. See `docs/decisions/repo-consolidation-plan.md` and `docs/decisions/migration-ledger.md` for the migration plan.

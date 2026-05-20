@@ -11,6 +11,7 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
+    "validate:library-boundary-host": "node -e \"require('fs').rmSync('.tmp-tests/library-boundary-host', { recursive: true, force: true })\" && tsc -p tsconfig.library-boundary-host-test.json && node .tmp-tests/library-boundary-host/tests/libraryBoundaryHostConfigValidation.js",
     "start:built": "electron-vite preview --ignoreConfigWarning",
     "dev": "electron-vite dev --ignoreConfigWarning",
     "build": "pnpm run clean && pnpm run typecheck && electron-vite build --ignoreConfigWarning",
@@ -21,6 +22,8 @@
     "build:linux": "pnpm run build && electron-builder --linux"
   },
   "dependencies": {
+    "@dekzer/library-boundary-client": "workspace:*",
+    "@dekzer/library-boundary-stdio-transport": "workspace:*",
     "@electron-toolkit/utils": "^4.0.0",
     "reka-ui": "^2.9.7"
   },

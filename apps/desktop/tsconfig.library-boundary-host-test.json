@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "incremental": false,
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "noEmit": false,
+    "outDir": ".tmp-tests/library-boundary-host",
+    "rootDir": ".",
+    "tsBuildInfoFile": ".tmp-tests/library-boundary-host.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": [
+    "src/main/libraryBoundaryHostConfig.ts",
+    "src/main/libraryBoundaryHostErrors.ts",
+    "tests/libraryBoundaryHostConfigValidation.ts"
+  ]
+}

@@ -2,7 +2,19 @@
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
   "include": ["electron.vite.config.*", "src/main/**/*"],
   "compilerOptions": {
+    "baseUrl": ".",
     "composite": true,
+    "paths": {
+      "@dekzer/library-boundary-client": [
+        "../../packages/library-boundary-client/src/index.ts"
+      ],
+      "@dekzer/library-boundary-contract": [
+        "../../packages/library-boundary-contract/index.ts"
+      ],
+      "@dekzer/library-boundary-stdio-transport": [
+        "../../packages/library-boundary-stdio-transport/src/index.ts"
+      ]
+    },
     "types": ["electron-vite/node"]
   }
 }

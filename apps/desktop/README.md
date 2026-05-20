@@ -10,7 +10,8 @@ Run it from the workspace root at `C:\dev\dekzer`.
 pnpm install
 pnpm run dev:desktop
 pnpm run typecheck
+pnpm --filter @dekzer/desktop run validate:library-boundary-host
 pnpm run build:desktop
 ```
 
-This package intentionally contains only the bootable desktop shell in this pass.
+This package intentionally contains the bootable desktop shell plus the lazy main-process library boundary host owner. The host does not expose renderer IPC, start the Rust stdio process automatically, or register library roots.

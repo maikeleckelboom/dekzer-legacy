@@ -5,10 +5,12 @@ directories:
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  - '!tests/*'
+  - '!.tmp-tests/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tsconfig.library-boundary-host-test.json}'
 win:
   executableName: Dekzer
 nsis:

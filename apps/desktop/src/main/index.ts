@@ -2,9 +2,15 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import {
+  createLibraryBoundaryHost,
+  type LibraryBoundaryHost
+} from './libraryBoundaryHost'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
+let libraryBoundaryHost: LibraryBoundaryHost | null = null
+let isQuittingAfterLibraryBoundaryHostStop = false
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -41,6 +47,11 @@ function createWindow(): void {
 app.setName(windowTitle)
 
 app.whenReady().then(() => {
+  libraryBoundaryHost = createLibraryBoundaryHost({
+    app,
+    isDev: is.dev
+  })
+
   electronApp.setAppUserModelId(appUserModelId)
 
   app.on('browser-window-created', (_, window) => {
@@ -58,4 +69,25 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', (event) => {
+  if (
+    isQuittingAfterLibraryBoundaryHostStop ||
+    libraryBoundaryHost === null ||
+    !libraryBoundaryHost.hasStarted
+  ) {
+    return
+  }
+
+  event.preventDefault()
+  void libraryBoundaryHost
+    .stop()
+    .catch((error: unknown) => {
+      console.error('[library-boundary-host] failed to stop cleanly', error)
+    })
+    .finally(() => {
+      isQuittingAfterLibraryBoundaryHostStop = true
+      app.quit()
+    })
 })

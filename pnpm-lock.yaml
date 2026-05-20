@@ -10,6 +10,12 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@dekzer/library-boundary-client':
+        specifier: workspace:*
+        version: link:../../packages/library-boundary-client
+      '@dekzer/library-boundary-stdio-transport':
+        specifier: workspace:*
+        version: link:../../packages/library-boundary-stdio-transport
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@42.0.0)
