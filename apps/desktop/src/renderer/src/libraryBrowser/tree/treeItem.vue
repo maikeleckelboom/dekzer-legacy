@@ -13,7 +13,7 @@
     :data-selected="props.item.isSelected ? 'true' : undefined"
     :tabindex="tree.getItemTabIndex(props.item.id)"
     @click="handleClick"
-    @focus="tree.focusNode(props.item.id)"
+    @focus="tree.setActiveNode(props.item.id)"
     @keydown="handleKeydown"
   >
     <TreeRow :item="props.item" />

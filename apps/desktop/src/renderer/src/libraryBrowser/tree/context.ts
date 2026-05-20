@@ -9,6 +9,7 @@ export type TreeContext = {
   readonly activeNodeId: Ref<BrowserTreeNodeId | null>
   readonly getItemTabIndex: (nodeId: BrowserTreeNodeId) => 0 | -1
   readonly registerItemElement: (nodeId: BrowserTreeNodeId, element: HTMLElement | null) => void
+  readonly setActiveNode: (nodeId: BrowserTreeNodeId) => void
   readonly focusNode: (nodeId: BrowserTreeNodeId) => void
   readonly selectNode: (nodeId: BrowserTreeNodeId) => void
   readonly toggleNode: (nodeId: BrowserTreeNodeId) => void

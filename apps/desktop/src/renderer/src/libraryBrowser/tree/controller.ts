@@ -90,6 +90,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     activeNodeId,
     getItemTabIndex,
     registerItemElement,
+    setActiveNode,
     focusNode,
     selectNode: options.selectNode,
     toggleNode: options.toggleNode,
