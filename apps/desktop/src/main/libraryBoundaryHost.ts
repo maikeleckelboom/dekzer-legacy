@@ -1,9 +1,17 @@
 import type { App } from 'electron'
+import type {
+  LibraryBoundaryClient as PackageLibraryBoundaryClient,
+  LibraryBoundaryTransport
+} from '@dekzer/library-boundary-client'
+import type {
+  LibraryBoundaryStdioDiagnostic as PackageLibraryBoundaryStdioDiagnostic,
+  LibraryBoundaryStdioTransport,
+  LibraryBoundaryStdioTransportOptions
+} from '@dekzer/library-boundary-stdio-transport'
 
 import {
   resolveLibraryBoundaryHostConfig,
   resolveLibraryBoundaryStdioBinaryPath,
-  type LibraryBoundaryHostEnvironment,
   type LibraryBoundaryHostConfig
 } from './libraryBoundaryHostConfig'
 import {
@@ -16,24 +24,17 @@ export type LibraryBoundaryHostLogger = {
   error?(message?: unknown, ...optionalParams: unknown[]): void
 }
 
-export type LibraryBoundaryHostClient = object
+export type LibraryBoundaryHostClient = Pick<
+  PackageLibraryBoundaryClient,
+  keyof PackageLibraryBoundaryClient
+>
 
-export type LibraryBoundaryHostTransport = {
-  readonly ready: Promise<void>
-  close(): Promise<void>
-}
+export type LibraryBoundaryHostTransport = Omit<LibraryBoundaryTransport, 'close'> &
+  Pick<LibraryBoundaryStdioTransport, 'ready' | 'close'>
 
-export type LibraryBoundaryStdioDiagnostic = {
-  readonly stream: 'stderr' | 'stdout'
-  readonly line: string
-}
+export type LibraryBoundaryStdioDiagnostic = PackageLibraryBoundaryStdioDiagnostic
 
-export type LibraryBoundaryHostTransportOptions = {
-  readonly serverBinaryPath: string
-  readonly userDataPath: string
-  readonly environment: LibraryBoundaryHostEnvironment
-  readonly diagnostics?: (diagnostic: LibraryBoundaryStdioDiagnostic) => void
-}
+export type LibraryBoundaryHostTransportOptions = LibraryBoundaryStdioTransportOptions
 
 export type LibraryBoundaryHostTransportFactory = (
   options: LibraryBoundaryHostTransportOptions
@@ -87,11 +88,7 @@ export class LibraryBoundaryHost {
   }
 
   get hasStarted(): boolean {
-    return (
-      this.#state === 'starting' ||
-      this.#state === 'started' ||
-      this.#state === 'stopping'
-    )
+    return this.#state === 'starting' || this.#state === 'started' || this.#state === 'stopping'
   }
 
   get client(): LibraryBoundaryHostClient {
@@ -139,11 +136,7 @@ export class LibraryBoundaryHost {
   }
 
   async stop(): Promise<void> {
-    if (
-      this.#state === 'idle' ||
-      this.#state === 'stopped' ||
-      this.#state === 'failed'
-    ) {
+    if (this.#state === 'idle' || this.#state === 'stopped' || this.#state === 'failed') {
       return
     }
 
@@ -159,11 +152,8 @@ export class LibraryBoundaryHost {
   async #start(): Promise<LibraryBoundaryHostClient> {
     try {
       const resolveStdioBinaryPath =
-        this.#dependencies.resolveStdioBinaryPath ??
-        resolveLibraryBoundaryStdioBinaryPath
-      const serverBinaryPath = resolveStdioBinaryPath(
-        this.#config.binaryPolicy
-      )
+        this.#dependencies.resolveStdioBinaryPath ?? resolveLibraryBoundaryStdioBinaryPath
+      const serverBinaryPath = resolveStdioBinaryPath(this.#config.binaryPolicy)
       const createTransport = await this.#resolveTransportFactory()
       const transport = createTransport({
         serverBinaryPath,
@@ -206,10 +196,7 @@ export class LibraryBoundaryHost {
       return this.#dependencies.createTransport
     }
 
-    const packageName = '@dekzer/library-boundary-stdio-transport'
-    const module = (await import(packageName)) as {
-      readonly createLibraryBoundaryStdioTransport: LibraryBoundaryHostTransportFactory
-    }
+    const module = await import('@dekzer/library-boundary-stdio-transport')
     return module.createLibraryBoundaryStdioTransport
   }
 
@@ -218,10 +205,7 @@ export class LibraryBoundaryHost {
       return this.#dependencies.createClient
     }
 
-    const packageName = '@dekzer/library-boundary-client'
-    const module = (await import(packageName)) as {
-      readonly createLibraryBoundaryClient: LibraryBoundaryHostClientFactory
-    }
+    const module = await import('@dekzer/library-boundary-client')
     return module.createLibraryBoundaryClient
   }
 
@@ -241,9 +225,7 @@ export class LibraryBoundaryHost {
   }
 
   #handleDiagnostic(diagnostic: LibraryBoundaryStdioDiagnostic): void {
-    this.#logger.warn(
-      `[library-boundary-host] ${diagnostic.stream}: ${diagnostic.line}`
-    )
+    this.#logger.warn(`[library-boundary-host] ${diagnostic.stream}: ${diagnostic.line}`)
   }
 
   #stateErrorForClientAccess(): LibraryBoundaryHostError {
@@ -274,8 +256,5 @@ export class LibraryBoundaryHost {
 export function createLibraryBoundaryHost(
   options: CreateLibraryBoundaryHostOptions
 ): LibraryBoundaryHost {
-  return new LibraryBoundaryHost(
-    resolveLibraryBoundaryHostConfig(options),
-    options.logger
-  )
+  return new LibraryBoundaryHost(resolveLibraryBoundaryHostConfig(options), options.logger)
 }

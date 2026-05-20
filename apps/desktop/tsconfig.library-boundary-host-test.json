@@ -8,7 +8,7 @@
     "moduleResolution": "Node",
     "noEmit": false,
     "outDir": ".tmp-tests/library-boundary-host",
-    "rootDir": ".",
+    "rootDir": "../..",
     "tsBuildInfoFile": ".tmp-tests/library-boundary-host.tsbuildinfo",
     "types": ["node"]
   },

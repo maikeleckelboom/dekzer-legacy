@@ -1,17 +1,12 @@
 import { strict as assert } from 'node:assert'
-import {
-  existsSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync
-} from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import {
   LibraryBoundaryHost,
-  type LibraryBoundaryHostClientFactory,
-  type LibraryBoundaryHostTransportFactory
+  type LibraryBoundaryHostClient,
+  type LibraryBoundaryHostTransport
 } from '../src/main/libraryBoundaryHost'
 import {
   libraryBoundaryStdioBinaryEnvironmentVariable,
@@ -70,21 +65,12 @@ async function main(): Promise<void> {
 
   assert.deepEqual(defaultDevConfig.binaryPolicy, {
     kind: 'developmentBinary',
-    binaryPath: join(
-      tempRoot,
-      'target',
-      'debug',
-      'library-boundary-stdio.exe'
-    ),
+    binaryPath: join(tempRoot, 'target', 'debug', 'library-boundary-stdio.exe'),
     source: 'repoDebugTarget'
   })
 
   assertHostError(
-    () =>
-      resolveLibraryBoundaryStdioBinaryPath(
-        defaultDevConfig.binaryPolicy,
-        () => false
-      ),
+    () => resolveLibraryBoundaryStdioBinaryPath(defaultDevConfig.binaryPolicy, () => false),
     'missingDevelopmentBinary'
   )
 
@@ -120,7 +106,7 @@ async function validatesHostStartWaitsForTransportReadiness(
   config: LibraryBoundaryHostConfig
 ): Promise<void> {
   const ready = deferred<void>()
-  const fakeClient = { marker: 'client' }
+  const fakeClient = createFakeClient()
   let createdClient = false
   const fakeTransport = {
     ready: ready.promise,
@@ -128,14 +114,14 @@ async function validatesHostStartWaitsForTransportReadiness(
     execute: async () => {
       throw new Error('execute should not be called by host validation')
     }
-  }
+  } satisfies LibraryBoundaryHostTransport
   const host = new LibraryBoundaryHost(config, silentLogger(), {
-    createTransport: (() => fakeTransport) as LibraryBoundaryHostTransportFactory,
-    createClient: ((transport) => {
+    createTransport: () => fakeTransport,
+    createClient: (transport) => {
       assert.equal(transport, fakeTransport)
       createdClient = true
       return fakeClient
-    }) as LibraryBoundaryHostClientFactory
+    }
   })
 
   const started = host.start()
@@ -168,12 +154,12 @@ async function validatesReadinessFailureMapsToStartupFailure(
     execute: async () => {
       throw new Error('execute should not be called by host validation')
     }
-  }
+  } satisfies LibraryBoundaryHostTransport
   const host = new LibraryBoundaryHost(config, silentLogger(), {
-    createTransport: (() => fakeTransport) as LibraryBoundaryHostTransportFactory,
-    createClient: (() => {
+    createTransport: () => fakeTransport,
+    createClient: () => {
       throw new Error('client should not be created before readiness')
-    }) as LibraryBoundaryHostClientFactory
+    }
   })
 
   const started = host.start()
@@ -181,10 +167,7 @@ async function validatesReadinessFailureMapsToStartupFailure(
 
   await assert.rejects(started, (error: unknown) => {
     assert.equal(error instanceof LibraryBoundaryHostError, true)
-    assert.equal(
-      (error as LibraryBoundaryHostError).code,
-      'stdioTransportStartupFailure'
-    )
+    assert.equal((error as LibraryBoundaryHostError).code, 'stdioTransportStartupFailure')
     assert.equal((error as Error).cause, startupFailure)
     return true
   })
@@ -192,15 +175,13 @@ async function validatesReadinessFailureMapsToStartupFailure(
   assert.equal(host.state, 'failed')
 }
 
-function validatesHostConstructionDoesNotStartTransport(
-  config: LibraryBoundaryHostConfig
-): void {
+function validatesHostConstructionDoesNotStartTransport(config: LibraryBoundaryHostConfig): void {
   let transportCreations = 0
   const host = new LibraryBoundaryHost(config, silentLogger(), {
-    createTransport: (() => {
+    createTransport: () => {
       transportCreations += 1
       throw new Error('transport should be lazy')
-    }) as LibraryBoundaryHostTransportFactory
+    }
   })
 
   assert.equal(host.state, 'idle')
@@ -223,10 +204,7 @@ function testApp(options: { readonly appPath: string }): {
   }
 }
 
-function assertHostError(
-  action: () => void,
-  code: LibraryBoundaryHostError['code']
-): void {
+function assertHostError(action: () => void, code: LibraryBoundaryHostError['code']): void {
   assert.throws(action, (error: unknown) => {
     assert.equal(error instanceof LibraryBoundaryHostError, true)
     assert.equal((error as LibraryBoundaryHostError).code, code)
@@ -259,4 +237,25 @@ function silentLogger(): {
   return {
     warn: () => undefined
   }
+}
+
+function createFakeClient(): LibraryBoundaryHostClient {
+  return {
+    registerLocalRoot: rejectUnexpectedClientCall,
+    runRootScan: rejectUnexpectedClientCall,
+    readNavigationRows: rejectUnexpectedClientCall,
+    loadNavigationRow: rejectUnexpectedClientCall,
+    loadNavigationRowByStableKey: rejectUnexpectedClientCall,
+    readLiteralHierarchyChildren: rejectUnexpectedClientCall,
+    readNavigationNodeLibraryBrowserWindow: rejectUnexpectedClientCall,
+    searchNavigationNodeLibraryBrowserWindow: rejectUnexpectedClientCall,
+    createPlaylist: rejectUnexpectedClientCall,
+    renamePlaylist: rejectUnexpectedClientCall,
+    deletePlaylist: rejectUnexpectedClientCall,
+    readPendingBoundaryEvents: rejectUnexpectedClientCall
+  } satisfies LibraryBoundaryHostClient
+}
+
+function rejectUnexpectedClientCall(): Promise<never> {
+  return Promise.reject(new Error('client methods should not be called by host validation'))
 }
