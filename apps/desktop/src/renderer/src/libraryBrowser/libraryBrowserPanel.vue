@@ -32,8 +32,9 @@
     </header>
 
     <div class="grid gap-4 p-5">
-      <LibraryHierarchyTree
+      <TreeRoot
         :expanded-node-ids="expandedNodeIds"
+        labelled-by="library-hierarchy-title"
         :nodes="libraryHierarchyFixtureTree.nodes"
         :selected-node-id="selectedNodeId"
         @select="selectNode"
@@ -62,15 +63,15 @@
 import { computed, ref } from 'vue'
 
 import { libraryHierarchyFixtureTree } from './libraryHierarchyFixture'
-import LibraryHierarchyTree from './libraryHierarchyTree.vue'
-import type { LibraryHierarchyNodeId, LibraryHierarchyTreeNode } from './libraryHierarchyTypes'
+import TreeRoot from './tree/treeRoot.vue'
+import type { TreeNode, TreeNodeId } from './tree/types'
 
 defineOptions({
   name: 'LibraryBrowserPanel'
 })
 
-const selectedNodeId = ref<LibraryHierarchyNodeId | null>('fixture-root')
-const expandedNodeIds = ref<ReadonlySet<LibraryHierarchyNodeId>>(
+const selectedNodeId = ref<TreeNodeId | null>('fixture-root')
+const expandedNodeIds = ref<ReadonlySet<TreeNodeId>>(
   new Set(['fixture-root', 'fixture-tracks', 'fixture-playlists'])
 )
 
@@ -82,11 +83,11 @@ const selectedNode = computed(() => {
   return findNodeById(libraryHierarchyFixtureTree.nodes, selectedNodeId.value)
 })
 
-function selectNode(nodeId: LibraryHierarchyNodeId): void {
+function selectNode(nodeId: TreeNodeId): void {
   selectedNodeId.value = nodeId
 }
 
-function toggleNode(nodeId: LibraryHierarchyNodeId): void {
+function toggleNode(nodeId: TreeNodeId): void {
   const nextExpandedNodeIds = new Set(expandedNodeIds.value)
 
   if (nextExpandedNodeIds.has(nodeId)) {
@@ -98,10 +99,7 @@ function toggleNode(nodeId: LibraryHierarchyNodeId): void {
   expandedNodeIds.value = nextExpandedNodeIds
 }
 
-function findNodeById(
-  nodes: readonly LibraryHierarchyTreeNode[],
-  nodeId: LibraryHierarchyNodeId
-): LibraryHierarchyTreeNode | null {
+function findNodeById(nodes: readonly TreeNode[], nodeId: TreeNodeId): TreeNode | null {
   for (const node of nodes) {
     if (node.id === nodeId) {
       return node

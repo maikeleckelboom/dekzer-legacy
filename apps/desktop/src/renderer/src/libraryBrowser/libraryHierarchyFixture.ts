@@ -1,6 +1,6 @@
-import type { LibraryHierarchyFixtureTree } from './libraryHierarchyTypes'
+import type { TreeFixture } from './tree/types'
 
-export const libraryHierarchyFixtureTree: LibraryHierarchyFixtureTree = {
+export const libraryHierarchyFixtureTree: TreeFixture = {
   name: 'Library hierarchy fixture',
   detail: 'Renderer-only demo input for tree interactions; not scanned and not live.',
   nodes: [

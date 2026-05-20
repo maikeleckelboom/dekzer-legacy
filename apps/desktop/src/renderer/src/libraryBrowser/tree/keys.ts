@@ -1,0 +1,162 @@
+import {
+  getFirstChildVisibleNodeId,
+  getFirstVisibleNodeId,
+  getLastVisibleNodeId,
+  getNextVisibleNodeId,
+  getParentVisibleNodeId,
+  getPreviousVisibleNodeId
+} from './projection'
+import type { TreeNodeId, TreeVisibleItem } from './types'
+
+export const treeKeyboardKeys = {
+  arrowDown: 'ArrowDown',
+  arrowLeft: 'ArrowLeft',
+  arrowRight: 'ArrowRight',
+  arrowUp: 'ArrowUp',
+  end: 'End',
+  enter: 'Enter',
+  escape: 'Escape',
+  home: 'Home',
+  legacySpace: 'Spacebar',
+  space: ' ',
+  spaceKey: 'Space'
+} as const
+
+export type TreeKeyboardIntent =
+  | {
+      readonly kind: 'none'
+      readonly shouldPreventDefault: boolean
+    }
+  | {
+      readonly kind: 'focus'
+      readonly nodeId: TreeNodeId
+      readonly shouldPreventDefault: true
+    }
+  | {
+      readonly kind: 'expand'
+      readonly nodeId: TreeNodeId
+      readonly shouldPreventDefault: true
+    }
+  | {
+      readonly kind: 'collapse'
+      readonly nodeId: TreeNodeId
+      readonly shouldPreventDefault: true
+    }
+  | {
+      readonly kind: 'select'
+      readonly nodeId: TreeNodeId
+      readonly shouldPreventDefault: true
+    }
+
+export type ResolveTreeKeyboardIntentOptions = {
+  readonly key: string
+  readonly activeNodeId: TreeNodeId | null
+  readonly visibleItems: readonly TreeVisibleItem[]
+}
+
+export function resolveTreeKeyboardIntent(
+  options: ResolveTreeKeyboardIntentOptions
+): TreeKeyboardIntent {
+  const activeItem =
+    options.activeNodeId === null
+      ? null
+      : (options.visibleItems.find((item) => item.id === options.activeNodeId) ?? null)
+
+  switch (options.key) {
+    case treeKeyboardKeys.arrowUp:
+      return resolveFocusIntent(
+        activeItem === null
+          ? getFirstVisibleNodeId(options.visibleItems)
+          : getPreviousVisibleNodeId(options.visibleItems, activeItem.id)
+      )
+
+    case treeKeyboardKeys.arrowDown:
+      return resolveFocusIntent(
+        activeItem === null
+          ? getFirstVisibleNodeId(options.visibleItems)
+          : getNextVisibleNodeId(options.visibleItems, activeItem.id)
+      )
+
+    case treeKeyboardKeys.home:
+      return resolveFocusIntent(getFirstVisibleNodeId(options.visibleItems))
+
+    case treeKeyboardKeys.end:
+      return resolveFocusIntent(getLastVisibleNodeId(options.visibleItems))
+
+    case treeKeyboardKeys.arrowRight:
+      if (activeItem === null || !activeItem.hasChildren) {
+        return handledNoop()
+      }
+
+      if (!activeItem.isExpanded) {
+        return {
+          kind: 'expand',
+          nodeId: activeItem.id,
+          shouldPreventDefault: true
+        }
+      }
+
+      return resolveFocusIntent(getFirstChildVisibleNodeId(options.visibleItems, activeItem.id))
+
+    case treeKeyboardKeys.arrowLeft:
+      if (activeItem === null) {
+        return handledNoop()
+      }
+
+      if (activeItem.hasChildren && activeItem.isExpanded) {
+        return {
+          kind: 'collapse',
+          nodeId: activeItem.id,
+          shouldPreventDefault: true
+        }
+      }
+
+      return resolveFocusIntent(getParentVisibleNodeId(options.visibleItems, activeItem.id))
+
+    case treeKeyboardKeys.enter:
+    case treeKeyboardKeys.space:
+    case treeKeyboardKeys.spaceKey:
+    case treeKeyboardKeys.legacySpace:
+      if (activeItem === null) {
+        return handledNoop()
+      }
+
+      return {
+        kind: 'select',
+        nodeId: activeItem.id,
+        shouldPreventDefault: true
+      }
+
+    case treeKeyboardKeys.escape:
+      return unhandled()
+
+    default:
+      return unhandled()
+  }
+}
+
+function resolveFocusIntent(nodeId: TreeNodeId | null): TreeKeyboardIntent {
+  if (nodeId === null) {
+    return handledNoop()
+  }
+
+  return {
+    kind: 'focus',
+    nodeId,
+    shouldPreventDefault: true
+  }
+}
+
+function handledNoop(): TreeKeyboardIntent {
+  return {
+    kind: 'none',
+    shouldPreventDefault: true
+  }
+}
+
+function unhandled(): TreeKeyboardIntent {
+  return {
+    kind: 'none',
+    shouldPreventDefault: false
+  }
+}

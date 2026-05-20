@@ -12,6 +12,7 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
     "validate:library-boundary-host": "tsx tests/libraryBoundaryHostConfigValidation.ts",
+    "validate:library-tree": "tsx tests/treeValidation.ts",
     "start:built": "electron-vite preview --ignoreConfigWarning",
     "dev": "electron-vite dev --ignoreConfigWarning",
     "build": "pnpm run clean && pnpm run typecheck && electron-vite build --ignoreConfigWarning",
