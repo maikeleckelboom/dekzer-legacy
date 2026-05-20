@@ -894,6 +894,7 @@ name = "xtask"
 version = "0.0.0"
 dependencies = [
  "library-boundary-protocol",
+ "library-boundary-stdio",
  "serde_json",
  "sha2",
  "tempfile",

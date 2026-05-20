@@ -1,5 +1,9 @@
 import { fileURLToPath } from "node:url";
 
+import {
+  createLibraryBoundaryClient,
+  LibraryBoundaryProtocolError
+} from "@dekzer/library-boundary-client";
 import type {
   CommandOutcome,
   CommandRequest,
@@ -8,9 +12,12 @@ import type {
 
 import {
   createStdioCommandEnvelope,
+  libraryBoundaryStdioRemoteErrorCodes,
+  LibraryBoundaryStdioRemoteTransportError,
   LibraryBoundaryStdioProcessExitError,
   LibraryBoundaryStdioTransport,
-  LibraryBoundaryStdioTransportError
+  LibraryBoundaryStdioTransportError,
+  parseStdioResponseEnvelope
 } from "../src/index.js";
 
 const fixtureServerPath = fileURLToPath(
@@ -99,17 +106,115 @@ async function validatesProtocolErrorOutcomeIsPreserved(): Promise<void> {
   }
 }
 
+async function validatesClientTurnsProtocolErrorOutcomeIntoClientError(): Promise<void> {
+  const transport = createTransport();
+  try {
+    const client = createLibraryBoundaryClient(transport);
+    const error = await rejects(
+      () => client.createPlaylist({ displayName: "protocol-error" }),
+      LibraryBoundaryProtocolError,
+      "client converts protocol error outcome into LibraryBoundaryProtocolError"
+    );
+    const expected: ProtocolError = {
+      type: "invalidRequest",
+      payload: { detail: "fixture protocol error" }
+    };
+
+    deepEqual(
+      error.protocolError,
+      expected,
+      "client layer preserves protocol error payload"
+    );
+  } finally {
+    await transport.close();
+  }
+}
+
+async function validatesRemoteTransportErrorCodeParsing(): Promise<void> {
+  deepEqual(
+    [...libraryBoundaryStdioRemoteErrorCodes],
+    [
+      "invalidFrame",
+      "invalidEnvelope",
+      "invalidRequestId",
+      "invalidCommandRequest",
+      "serverPanic",
+      "stdinReadFailure"
+    ],
+    "generated remote code list is the exact Rust stdout envelope code set"
+  );
+
+  for (const code of libraryBoundaryStdioRemoteErrorCodes) {
+    const envelope = parseStdioResponseEnvelope(JSON.stringify({
+      type: "transportError",
+      requestId: "request-1",
+      error: {
+        code,
+        message: `message for ${code}`
+      }
+    }));
+
+    must(
+      envelope.type === "transportError",
+      "expected parsed transport error envelope"
+    );
+    equal(envelope.error.code, code, `${code} parses as a remote error code`);
+  }
+}
+
+async function validatesUnknownRemoteTransportErrorCodePolicy(): Promise<void> {
+  const error = throws(
+    () => parseStdioResponseEnvelope(JSON.stringify({
+      type: "transportError",
+      requestId: "request-1",
+      error: {
+        code: "futureRemoteCode",
+        message: "unknown future code"
+      }
+    })),
+    "unknown remote transport error code is rejected by the parser"
+  );
+
+  equal(
+    error.message,
+    "transportError response error.code is not a known Rust stdio remote error code",
+    "unknown remote code policy is explicit"
+  );
+}
+
 async function validatesTransportErrorRejects(): Promise<void> {
   const transport = createTransport();
   try {
     const error = await rejects(
       () => transport.execute(createPlaylistRequest("transport-error")),
-      LibraryBoundaryStdioTransportError,
-      "transportError envelope rejects execute"
+      LibraryBoundaryStdioRemoteTransportError,
+      "remote transportError envelope rejects execute"
     );
 
-    equal(error.code, "transportError", "typed stdio error code is exposed");
+    equal(error.kind, "remoteTransportError", "remote error kind is explicit");
+    equal(error.source, "rustStdioServer", "remote error source is explicit");
+    equal(error.remoteCode, "invalidEnvelope", "remote code is preserved");
+    equal(
+      error.remoteMessage,
+      "fixture transport error",
+      "remote message is preserved"
+    );
     equal(error.requestId, "request-1", "transport error carries requestId");
+  } finally {
+    await transport.close();
+  }
+}
+
+async function validatesUnknownRemoteTransportErrorCodeRejectsAsMalformedStdout(): Promise<void> {
+  const transport = createTransport();
+  try {
+    const error = await rejects(
+      () => transport.execute(createPlaylistRequest("unknown-remote-transport-code")),
+      LibraryBoundaryStdioTransportError,
+      "unknown remote code rejects as local malformed stdout"
+    );
+
+    equal(error.code, "malformedStdout", "unknown remote code is a local parse failure");
   } finally {
     await transport.close();
   }
@@ -127,6 +232,22 @@ async function validatesMalformedStdoutDoesNotCrash(): Promise<void> {
 
     const outcome = await transport.execute(createPlaylistRequest("Success"));
     equal(outcome.type, "success", "transport continues after malformed stdout");
+  } finally {
+    await transport.close();
+  }
+}
+
+async function validatesUnknownResponseRequestIdRejectsPending(): Promise<void> {
+  const transport = createTransport();
+  try {
+    const error = await rejects(
+      () => transport.execute(createPlaylistRequest("unknown-response-request-id")),
+      LibraryBoundaryStdioTransportError,
+      "unknown response requestId rejects pending execute"
+    );
+
+    equal(error.code, "unknownRequestId", "unknown response requestId is local");
+    equal(error.requestId, "missing-request", "unknown response requestId is exposed");
   } finally {
     await transport.close();
   }
@@ -282,6 +403,20 @@ function deepEqual(actual: unknown, expected: unknown, message: string): void {
   }
 }
 
+function throws(action: () => unknown, message: string): Error {
+  try {
+    action();
+  } catch (error) {
+    if (error instanceof Error) {
+      return error;
+    }
+
+    throw new Error(`${message}: threw unexpected value ${String(error)}`);
+  }
+
+  throw new Error(`${message}: action did not throw`);
+}
+
 async function rejects<ErrorType extends Error>(
   action: () => Promise<unknown>,
   errorClass: new (...args: never[]) => ErrorType,
@@ -303,8 +438,13 @@ async function rejects<ErrorType extends Error>(
 await validatesRequestEnvelopeCreation();
 await validatesSuccessResponseResolution();
 await validatesProtocolErrorOutcomeIsPreserved();
+await validatesClientTurnsProtocolErrorOutcomeIntoClientError();
+await validatesRemoteTransportErrorCodeParsing();
+await validatesUnknownRemoteTransportErrorCodePolicy();
 await validatesTransportErrorRejects();
+await validatesUnknownRemoteTransportErrorCodeRejectsAsMalformedStdout();
 await validatesMalformedStdoutDoesNotCrash();
+await validatesUnknownResponseRequestIdRejectsPending();
 await validatesBlankStdoutLinesAreIgnored();
 await validatesStderrDiagnosticsAreForwarded();
 await validatesCloseRejectsLaterExecute();

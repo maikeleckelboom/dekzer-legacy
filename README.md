@@ -26,6 +26,8 @@ pnpm run dev:desktop
 pnpm run library:contract:export
 pnpm run library:contract:check
 pnpm run library:contract:build
+pnpm run library:stdio:contract:export
+pnpm run library:stdio:contract:check
 pnpm run typecheck
 pnpm run library:client:typecheck
 pnpm run library:client:build
@@ -49,6 +51,8 @@ Current root scripts:
 - `library:contract:export` regenerates `packages/library-boundary-contract` from `crates/library-boundary-protocol`.
 - `library:contract:check` verifies the generated boundary contract package is current.
 - `library:contract:build` builds the generated boundary contract package.
+- `library:stdio:contract:export` regenerates the Rust-owned stdio transport envelope artifact consumed by the TypeScript stdio transport package.
+- `library:stdio:contract:check` verifies the generated stdio transport envelope artifact is current.
 - `library:client:typecheck` typechecks the hand-authored TypeScript boundary client.
 - `library:client:build` builds the generated boundary contract package, then the TypeScript boundary client.
 - `library:client:test` runs the boundary client/session validation fixture.
@@ -61,7 +65,7 @@ Current root scripts:
 - `test:rust` runs `cargo test --workspace`.
 - `fmt:rust` runs `cargo fmt --all --check`.
 - `lint:rust` runs `cargo clippy --workspace --all-targets -- -D warnings`.
-- `check` runs the boundary contract stale check, TypeScript typechecks, boundary client and stdio validation fixtures, Rust fmt, clippy, and test gates.
+- `check` runs the boundary contract stale check, stdio transport contract stale check, TypeScript typechecks, boundary client and stdio validation fixtures, Rust fmt, clippy, and test gates.
 
 Workspace ownership:
 

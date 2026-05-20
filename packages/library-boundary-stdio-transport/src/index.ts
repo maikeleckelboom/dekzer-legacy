@@ -9,11 +9,13 @@ export type {
   LibraryBoundaryStdioTransportOptions
 } from "./stdioTransport.js";
 export {
+  LibraryBoundaryStdioRemoteTransportError,
   LibraryBoundaryStdioProcessExitError,
   LibraryBoundaryStdioTransportError
 } from "./errors.js";
 export type {
-  LibraryBoundaryStdioTransportErrorCode
+  LibraryBoundaryStdioLocalErrorCode,
+  LibraryBoundaryStdioRemoteErrorCode
 } from "./errors.js";
 export {
   createStdioCommandEnvelope,
@@ -24,6 +26,8 @@ export type {
   StdioCommandEnvelope,
   StdioCommandOutcomeEnvelope,
   StdioResponseEnvelope,
-  StdioTransportErrorCode,
-  StdioTransportErrorEnvelope
+  StdioRemoteTransportErrorEnvelope
 } from "./envelope.js";
+export {
+  libraryBoundaryStdioRemoteErrorCodes
+} from "./generated/stdioEnvelope.js";

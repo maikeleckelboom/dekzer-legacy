@@ -3,6 +3,15 @@ import type {
   CommandRequest
 } from "@dekzer/library-boundary-contract";
 
+import {
+  isLibraryBoundaryStdioRemoteErrorCode,
+  type LibraryBoundaryStdioRemoteErrorCode
+} from "./generated/stdioEnvelope.js";
+
+export type {
+  LibraryBoundaryStdioRemoteErrorCode
+} from "./generated/stdioEnvelope.js";
+
 export type StdioCommandEnvelope = {
   readonly type: "command";
   readonly requestId: string;
@@ -15,28 +24,18 @@ export type StdioCommandOutcomeEnvelope = {
   readonly outcome: CommandOutcome;
 };
 
-export type StdioTransportErrorCode =
-  | "invalidFrame"
-  | "invalidEnvelope"
-  | "invalidRequestId"
-  | "invalidCommandRequest"
-  | "serverPanic"
-  | "stdinReadFailure"
-  | "stdoutWriteFailure"
-  | "serviceOpenFailure";
-
-export type StdioTransportErrorEnvelope = {
+export type StdioRemoteTransportErrorEnvelope = {
   readonly type: "transportError";
   readonly requestId: string | null;
   readonly error: {
-    readonly code: StdioTransportErrorCode | string;
+    readonly code: LibraryBoundaryStdioRemoteErrorCode;
     readonly message: string;
   };
 };
 
 export type StdioResponseEnvelope =
   | StdioCommandOutcomeEnvelope
-  | StdioTransportErrorEnvelope;
+  | StdioRemoteTransportErrorEnvelope;
 
 export function createStdioCommandEnvelope(
   requestId: string,
@@ -90,6 +89,11 @@ export function parseStdioResponseEnvelope(line: string): StdioResponseEnvelope 
     }
     if (!isNonEmptyString(parsed.error.code)) {
       throw new Error("transportError response error.code must be a string");
+    }
+    if (!isLibraryBoundaryStdioRemoteErrorCode(parsed.error.code)) {
+      throw new Error(
+        "transportError response error.code is not a known Rust stdio remote error code"
+      );
     }
     if (typeof parsed.error.message !== "string") {
       throw new Error("transportError response error.message must be a string");

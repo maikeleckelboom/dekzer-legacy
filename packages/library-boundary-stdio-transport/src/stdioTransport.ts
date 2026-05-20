@@ -12,10 +12,11 @@ import {
   createStdioCommandEnvelope,
   parseStdioResponseEnvelope,
   serializeStdioCommandEnvelope,
-  type StdioTransportErrorEnvelope
+  type StdioRemoteTransportErrorEnvelope
 } from "./envelope.js";
 import {
   LibraryBoundaryStdioProcessExitError,
+  LibraryBoundaryStdioRemoteTransportError,
   LibraryBoundaryStdioTransportError
 } from "./errors.js";
 
@@ -208,10 +209,7 @@ export class LibraryBoundaryStdioTransport
     if (envelope.type === "commandOutcome") {
       const pending = this.#pending.get(envelope.requestId);
       if (pending === undefined) {
-        this.#diagnostics?.({
-          stream: "stdout",
-          line: `unknown stdio response requestId: ${envelope.requestId}`
-        });
+        this.#rejectForUnknownRequestId(envelope.requestId);
         return;
       }
 
@@ -225,10 +223,10 @@ export class LibraryBoundaryStdioTransport
   }
 
   #handleTransportErrorEnvelope(
-    envelope: StdioTransportErrorEnvelope
+    envelope: StdioRemoteTransportErrorEnvelope
   ): void {
-    const error = new LibraryBoundaryStdioTransportError(
-      "transportError",
+    const error = new LibraryBoundaryStdioRemoteTransportError(
+      envelope.error.code,
       envelope.error.message,
       { requestId: envelope.requestId }
     );
@@ -238,14 +236,25 @@ export class LibraryBoundaryStdioTransport
         return;
       }
 
-      this.#diagnostics?.({
-        stream: "stdout",
-        line: `unknown stdio transportError requestId: ${envelope.requestId}`
-      });
+      this.#rejectForUnknownRequestId(envelope.requestId);
       return;
     }
 
     this.#rejectAllPending(error);
+  }
+
+  #rejectForUnknownRequestId(requestId: string): void {
+    this.#diagnostics?.({
+      stream: "stdout",
+      line: `unknown stdio response requestId: ${requestId}`
+    });
+    this.#rejectAllPending(
+      new LibraryBoundaryStdioTransportError(
+        "unknownRequestId",
+        `library boundary stdio process wrote a response for unknown requestId: ${requestId}`,
+        { requestId }
+      )
+    );
   }
 
   #rejectForMalformedStdout(cause: unknown): void {

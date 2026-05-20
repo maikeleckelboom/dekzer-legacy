@@ -211,6 +211,10 @@ Active migration ledger. Controlled `music-library-core` slices moved so far: `c
 | Next sprint | Wire a later desktop/host owner to choose the binary path, user-data path, environment, diagnostics policy, and app lifecycle. Keep Electron preload, renderer state, and automatic event pumping out of this stdio transport owner |
 | Exit criterion satisfied | Yes: Dekzer now has a clean boundary-named stdio server and Node stdio transport package over the existing protocol/service/client seams, with request correlation owned only by the stdio envelope and a real cross-process persistence smoke |
 
+### Stdio Contract Hardening Note
+
+Protocol errors remain owned by `crates/library-boundary-protocol` and appear only as generated boundary contract `CommandOutcome` error payloads. Remote stdio server transport errors are Rust-owned stdout `transportError` envelopes, with their TypeScript remote-code list generated from `crates/library-boundary-stdio/src/envelope.rs` and checked by `library:stdio:contract:check`. Local TypeScript stdio transport errors remain child-process, framing, request correlation, write, and lifecycle failures in `packages/library-boundary-stdio-transport`; they are separate from remote server transport errors.
+
 ## Exit Gate For This Ledger
 
 The control-plane portion of this ledger is complete. Ongoing migration slices remain accepted only when:

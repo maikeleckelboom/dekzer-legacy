@@ -41,8 +41,35 @@ stdin.on("line", (line) => {
     return;
   }
 
+  if (displayName === "unknown-remote-transport-code") {
+    writeTransportError(envelope.requestId, "futureRemoteCode", "fixture unknown code");
+    return;
+  }
+
   if (displayName === "malformed") {
     process.stdout.write("not-json\n");
+    return;
+  }
+
+  if (displayName === "unknown-response-request-id") {
+    writeEnvelope({
+      type: "commandOutcome",
+      requestId: "missing-request",
+      outcome: {
+        type: "success",
+        payload: {
+          reply: {
+            type: "playlistWrite",
+            payload: {
+              type: "createPlaylist",
+              payload: {
+                playlistId: "13"
+              }
+            }
+          }
+        }
+      }
+    });
     return;
   }
 

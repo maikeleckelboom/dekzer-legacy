@@ -32,6 +32,19 @@ pub(crate) enum StdioTransportErrorCode {
     StdinReadFailure,
 }
 
+pub(crate) const REMOTE_TRANSPORT_ERROR_CODES: [StdioTransportErrorCode; 6] = [
+    StdioTransportErrorCode::InvalidFrame,
+    StdioTransportErrorCode::InvalidEnvelope,
+    StdioTransportErrorCode::InvalidRequestId,
+    StdioTransportErrorCode::InvalidCommandRequest,
+    StdioTransportErrorCode::ServerPanic,
+    StdioTransportErrorCode::StdinReadFailure,
+];
+
+pub(crate) fn remote_transport_error_codes() -> &'static [StdioTransportErrorCode] {
+    &REMOTE_TRANSPORT_ERROR_CODES
+}
+
 impl StdioTransportErrorCode {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
@@ -272,6 +285,68 @@ mod tests {
                 }
             })
         );
+    }
+
+    #[test]
+    fn transport_error_response_serializes_request_id() {
+        let response = transport_error_response(
+            Some("request-1".to_string()),
+            StdioTransportErrorCode::InvalidEnvelope,
+            "bad envelope",
+        );
+
+        let line = serialize_response_frame(&response).expect("serialize response");
+
+        assert!(!line.contains('\n'));
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&line).expect("parse response"),
+            json!({
+                "type": "transportError",
+                "requestId": "request-1",
+                "error": {
+                    "code": "invalidEnvelope",
+                    "message": "bad envelope"
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn every_remote_transport_error_code_serializes_to_stable_string() {
+        let expected = [
+            (StdioTransportErrorCode::InvalidFrame, "invalidFrame"),
+            (StdioTransportErrorCode::InvalidEnvelope, "invalidEnvelope"),
+            (
+                StdioTransportErrorCode::InvalidRequestId,
+                "invalidRequestId",
+            ),
+            (
+                StdioTransportErrorCode::InvalidCommandRequest,
+                "invalidCommandRequest",
+            ),
+            (StdioTransportErrorCode::ServerPanic, "serverPanic"),
+            (
+                StdioTransportErrorCode::StdinReadFailure,
+                "stdinReadFailure",
+            ),
+        ];
+
+        assert_eq!(
+            super::remote_transport_error_codes(),
+            expected.map(|(code, _)| code)
+        );
+        for (code, stable_string) in expected {
+            assert_eq!(code.as_str(), stable_string);
+            assert_eq!(
+                serde_json::to_value(code).expect("serialize code"),
+                json!(stable_string)
+            );
+            assert_eq!(
+                serde_json::from_value::<StdioTransportErrorCode>(json!(stable_string))
+                    .expect("deserialize code"),
+                code
+            );
+        }
     }
 
     #[test]
