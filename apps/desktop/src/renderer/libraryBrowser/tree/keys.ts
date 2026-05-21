@@ -43,7 +43,7 @@ export type TreeKeyboardIntent =
       readonly shouldPreventDefault: true
     }
   | {
-      readonly kind: 'requestChildren'
+      readonly kind: 'activateAction'
       readonly nodeId: BrowserTreeNodeId
       readonly shouldPreventDefault: true
     }
@@ -93,9 +93,9 @@ export function resolveTreeKeyboardIntent(
         return handledNoop()
       }
 
-      if (activeItem.canRequestChildren) {
+      if (activeItem.canActivateAction) {
         return {
-          kind: 'requestChildren',
+          kind: 'activateAction',
           nodeId: activeItem.id,
           shouldPreventDefault: true
         }
@@ -120,7 +120,11 @@ export function resolveTreeKeyboardIntent(
         return handledNoop()
       }
 
-      if (activeItem.canRequestChildren || activeItem.isLoadingChildren) {
+      if (activeItem.isActionItem) {
+        return resolveFocusIntent(getParentVisibleNodeId(options.visibleItems, activeItem.id))
+      }
+
+      if (activeItem.canActivateAction || activeItem.isActionLoading) {
         return handledNoop()
       }
 
@@ -140,6 +144,14 @@ export function resolveTreeKeyboardIntent(
     case treeKeyboardKeys.legacySpace:
       if (activeItem === undefined) {
         return handledNoop()
+      }
+
+      if (activeItem.isActionItem) {
+        return {
+          kind: 'activateAction',
+          nodeId: activeItem.id,
+          shouldPreventDefault: true
+        }
       }
 
       return {

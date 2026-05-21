@@ -21,7 +21,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [nodeId: BrowserTreeNodeId]
   toggle: [nodeId: BrowserTreeNodeId]
-  requestChildren: [nodeId: BrowserTreeNodeId]
+  activateAction: [nodeId: BrowserTreeNodeId]
 }>()
 
 const controller = useTreeController({
@@ -30,7 +30,7 @@ const controller = useTreeController({
   expandedNodeIds: computed(() => props.expandedNodeIds),
   selectNode: (nodeId) => emit('select', nodeId),
   toggleNode: (nodeId) => emit('toggle', nodeId),
-  requestChildren: (nodeId) => emit('requestChildren', nodeId)
+  activateAction: (nodeId) => emit('activateAction', nodeId)
 })
 
 // The DOM is intentionally flattened: hierarchy is declared through aria-level,

@@ -10,7 +10,7 @@ import {
   type TreeKeyboardIntent
 } from '../src/renderer/libraryBrowser/tree/keys'
 import {
-  canRequestBrowserTreeChildren,
+  canActivateBrowserTreeAction,
   canRevealBrowserTreeChildren,
   flattenVisibleTree,
   getFirstChildVisibleNodeId,
@@ -20,7 +20,7 @@ import {
   getNextVisibleNodeId,
   getParentVisibleNodeId,
   getPreviousVisibleNodeId,
-  isLoadingBrowserTreeChildren,
+  isBrowserTreeActionLoading,
   isBrowserTreeBranch,
   isBrowserTreeLeaf
 } from '../src/renderer/libraryBrowser/tree/projection'
@@ -154,15 +154,15 @@ function validatesExplicitChildrenAndActionModel(): void {
   assert.equal(isBrowserTreeLeaf(leaf), true)
   assert.equal(isBrowserTreeBranch(leaf), false)
   assert.equal(canRevealBrowserTreeChildren(leaf), false)
-  assert.equal(canRequestBrowserTreeChildren(leaf), false)
-  assert.equal(isLoadingBrowserTreeChildren(leaf), false)
+  assert.equal(canActivateBrowserTreeAction(leaf), false)
+  assert.equal(isBrowserTreeActionLoading(leaf), false)
   assert.deepEqual(getLoadedBrowserTreeChildren(leaf), [])
 
   assert.equal(isBrowserTreeLeaf(loadedBranch), false)
   assert.equal(isBrowserTreeBranch(loadedBranch), true)
   assert.equal(canRevealBrowserTreeChildren(loadedBranch), true)
-  assert.equal(canRequestBrowserTreeChildren(loadedBranch), false)
-  assert.equal(isLoadingBrowserTreeChildren(loadedBranch), false)
+  assert.equal(canActivateBrowserTreeAction(loadedBranch), false)
+  assert.equal(isBrowserTreeActionLoading(loadedBranch), false)
   assert.deepEqual(
     getLoadedBrowserTreeChildren(loadedBranch).map((node) => node.id),
     ['loaded-child']
@@ -172,15 +172,15 @@ function validatesExplicitChildrenAndActionModel(): void {
   assert.equal(isBrowserTreeLeaf(loadedEmptyBranch), false)
   assert.equal(isBrowserTreeBranch(loadedEmptyBranch), true)
   assert.equal(canRevealBrowserTreeChildren(loadedEmptyBranch), false)
-  assert.equal(canRequestBrowserTreeChildren(loadedEmptyBranch), false)
-  assert.equal(isLoadingBrowserTreeChildren(loadedEmptyBranch), false)
+  assert.equal(canActivateBrowserTreeAction(loadedEmptyBranch), false)
+  assert.equal(isBrowserTreeActionLoading(loadedEmptyBranch), false)
   assert.deepEqual(getLoadedBrowserTreeChildren(loadedEmptyBranch), [])
 
   assert.equal(isBrowserTreeLeaf(unloadedBranch), false)
   assert.equal(isBrowserTreeBranch(unloadedBranch), true)
   assert.equal(canRevealBrowserTreeChildren(unloadedBranch), false)
-  assert.equal(canRequestBrowserTreeChildren(unloadedBranch), true)
-  assert.equal(isLoadingBrowserTreeChildren(unloadedBranch), false)
+  assert.equal(canActivateBrowserTreeAction(unloadedBranch), true)
+  assert.equal(isBrowserTreeActionLoading(unloadedBranch), false)
   assert.deepEqual(getLoadedBrowserTreeChildren(unloadedBranch), [])
   assert.equal(unloadedBranch.children.kind, 'deferred')
   assert.equal(unloadedBranch.action?.kind, 'loadChildren')
@@ -188,8 +188,8 @@ function validatesExplicitChildrenAndActionModel(): void {
 
   assert.equal(isBrowserTreeBranch(loadingBranch), true)
   assert.equal(canRevealBrowserTreeChildren(loadingBranch), false)
-  assert.equal(canRequestBrowserTreeChildren(loadingBranch), false)
-  assert.equal(isLoadingBrowserTreeChildren(loadingBranch), true)
+  assert.equal(canActivateBrowserTreeAction(loadingBranch), false)
+  assert.equal(isBrowserTreeActionLoading(loadingBranch), true)
   assert.equal(loadingBranch.children.kind, 'deferred')
   assert.equal(loadingBranch.action?.kind, 'loadChildren')
   assert.equal(loadingBranch.action?.state.kind, 'loading')
@@ -197,8 +197,8 @@ function validatesExplicitChildrenAndActionModel(): void {
 
   assert.equal(isBrowserTreeBranch(failedBranch), true)
   assert.equal(canRevealBrowserTreeChildren(failedBranch), false)
-  assert.equal(canRequestBrowserTreeChildren(failedBranch), true)
-  assert.equal(isLoadingBrowserTreeChildren(failedBranch), false)
+  assert.equal(canActivateBrowserTreeAction(failedBranch), true)
+  assert.equal(isBrowserTreeActionLoading(failedBranch), false)
   assert.equal(failedBranch.children.kind, 'deferred')
   assert.equal(failedBranch.action?.kind, 'loadChildren')
   assert.equal(failedBranch.action?.state.kind, 'failed')
@@ -207,8 +207,8 @@ function validatesExplicitChildrenAndActionModel(): void {
   assert.equal(isBrowserTreeLeaf(moreAction), true)
   assert.equal(isBrowserTreeBranch(moreAction), false)
   assert.equal(canRevealBrowserTreeChildren(moreAction), false)
-  assert.equal(canRequestBrowserTreeChildren(moreAction), true)
-  assert.equal(isLoadingBrowserTreeChildren(moreAction), false)
+  assert.equal(canActivateBrowserTreeAction(moreAction), true)
+  assert.equal(isBrowserTreeActionLoading(moreAction), false)
   assert.deepEqual(getLoadedBrowserTreeChildren(moreAction), [])
   assert.equal(moreAction.children.kind, 'none')
   assert.equal(moreAction.action?.kind, 'loadMore')
@@ -248,10 +248,10 @@ function validatesVisibleProjection(): void {
   assert.equal(getItem(expandedItems, 'fixture-playlist-group').ariaSetSize, 1)
   assert.equal(getItem(expandedItems, 'fixture-root').isBranch, true)
   assert.equal(getItem(expandedItems, 'fixture-root').canRevealChildren, true)
-  assert.equal(getItem(expandedItems, 'fixture-root').canRequestChildren, false)
+  assert.equal(getItem(expandedItems, 'fixture-root').canActivateAction, false)
   assert.equal(getItem(expandedItems, 'fixture-artists').isBranch, false)
   assert.equal(getItem(expandedItems, 'fixture-artists').canRevealChildren, false)
-  assert.equal(getItem(expandedItems, 'fixture-artists').canRequestChildren, false)
+  assert.equal(getItem(expandedItems, 'fixture-artists').canActivateAction, false)
 
   const rootOnlyItems = fixtureVisibleItems(rootOnlyExpandedIds)
   assert.deepEqual(
@@ -308,16 +308,17 @@ function validatesDeferredActionProjection(): void {
     assert.equal(getFirstChildVisibleNodeId(items, item.id), undefined)
   }
 
-  assert.equal(getItem(items, 'unloaded-root').canRequestChildren, true)
-  assert.equal(getItem(items, 'unloaded-root').isLoadingChildren, false)
-  assert.equal(getItem(items, 'loading-root').canRequestChildren, false)
-  assert.equal(getItem(items, 'loading-root').isLoadingChildren, true)
-  assert.equal(getItem(items, 'failed-root').canRequestChildren, true)
-  assert.equal(getItem(items, 'failed-root').isLoadingChildren, false)
+  assert.equal(getItem(items, 'unloaded-root').canActivateAction, true)
+  assert.equal(getItem(items, 'unloaded-root').isActionLoading, false)
+  assert.equal(getItem(items, 'loading-root').canActivateAction, false)
+  assert.equal(getItem(items, 'loading-root').isActionLoading, true)
+  assert.equal(getItem(items, 'failed-root').canActivateAction, true)
+  assert.equal(getItem(items, 'failed-root').isActionLoading, false)
   assert.equal(getItem(items, 'more-root').isBranch, false)
   assert.equal(getItem(items, 'more-root').canRevealChildren, false)
-  assert.equal(getItem(items, 'more-root').canRequestChildren, true)
-  assert.equal(getItem(items, 'more-root').isLoadingChildren, false)
+  assert.equal(getItem(items, 'more-root').canActivateAction, true)
+  assert.equal(getItem(items, 'more-root').isActionLoading, false)
+  assert.equal(getItem(items, 'more-root').isActionItem, true)
 }
 
 function validatesKeyboardNavigation(): void {
@@ -378,16 +379,16 @@ function validatesKeyboardExpansion(): void {
   assertHandledNoop(resolveIntent(collapsedRootItems, 'fixture-root', 'ArrowLeft'))
   assertHandledNoop(resolveIntent(leafRootItems, 'leaf-root', 'ArrowLeft'))
   assertIntent(resolveIntent(unloadedBranchItems, 'unloaded-root', 'ArrowRight'), {
-    kind: 'requestChildren',
+    kind: 'activateAction',
     nodeId: 'unloaded-root'
   })
   assertHandledNoop(resolveIntent(unloadedBranchItems, 'loading-root', 'ArrowRight'))
   assertIntent(resolveIntent(unloadedBranchItems, 'failed-root', 'ArrowRight'), {
-    kind: 'requestChildren',
+    kind: 'activateAction',
     nodeId: 'failed-root'
   })
   assertIntent(resolveIntent(unloadedBranchItems, 'more-root', 'ArrowRight'), {
-    kind: 'requestChildren',
+    kind: 'activateAction',
     nodeId: 'more-root'
   })
   assertHandledNoop(resolveIntent(unloadedBranchItems, 'unloaded-root', 'ArrowLeft'))
@@ -407,6 +408,25 @@ function validatesKeyboardSelection(): void {
   assertIntent(resolveIntent(items, 'fixture-albums', ' '), {
     kind: 'select',
     nodeId: 'fixture-albums'
+  })
+
+  const actionItems = flattenVisibleTree({
+    nodes: [moreActionNode(), unloadedBranchNode()],
+    expandedNodeIds: new Set(['more-root', 'unloaded-root'])
+  })
+
+  assertIntent(resolveIntent(actionItems, 'more-root', 'Enter'), {
+    kind: 'activateAction',
+    nodeId: 'more-root'
+  })
+  assertIntent(resolveIntent(actionItems, 'more-root', ' '), {
+    kind: 'activateAction',
+    nodeId: 'more-root'
+  })
+
+  assertIntent(resolveIntent(actionItems, 'unloaded-root', 'Enter'), {
+    kind: 'select',
+    nodeId: 'unloaded-root'
   })
 }
 
@@ -450,9 +470,9 @@ function validatesAriaAttributes(): void {
     nodes: [unloadedBranchNode(), loadingBranchNode(), failedBranchNode(), moreActionNode()],
     expandedNodeIds: new Set(['unloaded-root', 'loading-root', 'failed-root', 'more-root'])
   })
-  assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'unloaded-root')), undefined)
-  assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'loading-root')), undefined)
-  assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'failed-root')), undefined)
+  assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'unloaded-root')), 'false')
+  assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'loading-root')), 'false')
+  assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'failed-root')), 'false')
   assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'more-root')), undefined)
 }
 
@@ -583,7 +603,7 @@ function validatesLibraryHierarchyReadProjection(): void {
   )
   assert.equal(getItem(directoryItems, 'source-directory:12').isBranch, true)
   assert.equal(getItem(directoryItems, 'source-directory:12').canRevealChildren, false)
-  assert.equal(getItem(directoryItems, 'source-directory:12').canRequestChildren, true)
+  assert.equal(getItem(directoryItems, 'source-directory:12').canActivateAction, true)
   assert.deepEqual(
     [...directoryProjection.bindingsById.entries()].filter(
       ([, binding]) => binding.kind === 'directory'

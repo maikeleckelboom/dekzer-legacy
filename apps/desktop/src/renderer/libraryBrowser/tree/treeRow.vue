@@ -42,7 +42,8 @@ const rowStyle = computed(() => ({
 
 const hasAffordance = computed(
   () =>
-    props.item.canRevealChildren || props.item.canRequestChildren || props.item.isLoadingChildren
+    !props.item.isActionItem &&
+    (props.item.canRevealChildren || props.item.canActivateAction || props.item.isActionLoading)
 )
 
 const actionStateDetail = computed(() => formatActionStateDetail(props.item.node.action?.state))

@@ -3,11 +3,19 @@ import type { BrowserTreeVisibleItem } from './types'
 export type AriaBoolean = 'false' | 'true'
 
 export function getTreeItemAriaExpanded(item: BrowserTreeVisibleItem): AriaBoolean | undefined {
-  if (!item.canRevealChildren) {
+  if (!item.isBranch) {
     return undefined
   }
 
-  return toAriaBoolean(item.isExpanded)
+  if (item.canRevealChildren) {
+    return toAriaBoolean(item.isExpanded)
+  }
+
+  if (item.canActivateAction || item.isActionLoading) {
+    return 'false'
+  }
+
+  return undefined
 }
 
 export function getTreeItemAriaSelected(item: BrowserTreeVisibleItem): AriaBoolean {

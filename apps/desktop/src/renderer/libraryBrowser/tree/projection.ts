@@ -50,11 +50,11 @@ export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
   return getLoadedBrowserTreeChildren(node).length > 0
 }
 
-export function canRequestBrowserTreeChildren(node: BrowserTreeNode): boolean {
+export function canActivateBrowserTreeAction(node: BrowserTreeNode): boolean {
   return node.action?.state.kind === 'idle' || node.action?.state.kind === 'failed'
 }
 
-export function isLoadingBrowserTreeChildren(node: BrowserTreeNode): boolean {
+export function isBrowserTreeActionLoading(node: BrowserTreeNode): boolean {
   return node.action?.state.kind === 'loading'
 }
 
@@ -125,9 +125,10 @@ function appendVisibleNodes(options: {
     const children = getLoadedBrowserTreeChildren(node)
     const isBranch = isBrowserTreeBranch(node)
     const canReveal = canRevealBrowserTreeChildren(node)
-    const canRequest = canRequestBrowserTreeChildren(node)
-    const isLoadingChildren = isLoadingBrowserTreeChildren(node)
+    const canActivate = canActivateBrowserTreeAction(node)
+    const isActionLoading = isBrowserTreeActionLoading(node)
     const isExpanded = canReveal && options.expandedNodeIds.has(node.id)
+    const isActionItem = node.action !== undefined && !isBranch
 
     options.visibleItems.push({
       id: node.id,
@@ -137,8 +138,9 @@ function appendVisibleNodes(options: {
       visibleIndex: options.visibleItems.length,
       isBranch,
       canRevealChildren: canReveal,
-      canRequestChildren: canRequest,
-      isLoadingChildren,
+      canActivateAction: canActivate,
+      isActionLoading,
+      isActionItem,
       isExpanded,
       isSelected: options.selectedNodeId === node.id,
       isActive: options.activeNodeId === node.id,

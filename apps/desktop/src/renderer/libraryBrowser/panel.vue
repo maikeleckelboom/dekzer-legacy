@@ -206,7 +206,7 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
   expandedNodeIds.value = nextExpandedNodeIds
 }
 
-function requestChildren(nodeId: BrowserTreeNodeId): void {
+function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
   void requestNodeChildren(nodeId)
 }
@@ -360,7 +360,7 @@ function formatNavigationKind(kind: string): string {
         v-bind="treeRootProps"
         @select="selectNode"
         @toggle="toggleNode"
-        @request-children="requestChildren"
+        @activate-action="activateNodeAction"
       />
 
       <aside

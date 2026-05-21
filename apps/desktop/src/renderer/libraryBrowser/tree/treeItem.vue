@@ -38,9 +38,17 @@ function handleClick(event: MouseEvent): void {
       return
     }
 
-    if (props.item.canRequestChildren) {
-      tree.requestChildren(props.item.id)
+    if (props.item.canActivateAction) {
+      tree.activateAction(props.item.id)
       return
+    }
+
+    return
+  }
+
+  if (props.item.isActionItem) {
+    if (props.item.canActivateAction) {
+      tree.activateAction(props.item.id)
     }
 
     return
@@ -64,8 +72,8 @@ function handleKeydown(event: KeyboardEvent): void {
     case 'collapse':
       tree.toggleNode(intent.nodeId)
       return
-    case 'requestChildren':
-      tree.requestChildren(intent.nodeId)
+    case 'activateAction':
+      tree.activateAction(intent.nodeId)
       return
     case 'select':
       tree.selectNode(intent.nodeId)
