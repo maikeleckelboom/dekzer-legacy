@@ -26,7 +26,7 @@ import type {
   SourceTarget
 } from './hierarchyState'
 import type { BrowserTreeNodeId } from './tree/types'
-import { copyReadEntryPoint, sameEntryPoint } from './entryPoint'
+import { copyEntryPoint, sameEntryPoint } from './entryPoint'
 
 const readLimit = 50
 const safeNavigationReadRequestFailure = 'Unable to request library navigation rows.'
@@ -704,7 +704,7 @@ function sourceReadRequest(target: SourceTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
-      entryPoint: copyReadEntryPoint(target.entryPoint),
+      entryPoint: copyEntryPoint(target.entryPoint),
       label: target.label
     },
     offset: 0,
@@ -716,7 +716,7 @@ function directoryReadRequest(target: DirectoryTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
-      entryPoint: copyReadEntryPoint(target.entryPoint),
+      entryPoint: copyEntryPoint(target.entryPoint),
       ...(target.label === undefined ? {} : { label: target.label })
     },
     parentDirectoryId: target.directoryId,
@@ -729,7 +729,7 @@ function moreReadRequest(target: MoreTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
-      entryPoint: copyReadEntryPoint(target.entryPoint),
+      entryPoint: copyEntryPoint(target.entryPoint),
       ...(target.label === undefined ? {} : { label: target.label })
     },
     ...(target.parentDirectoryId === undefined
@@ -746,7 +746,7 @@ function sourceLoadedTarget(target: SourceTarget): {
   readonly parentDirectoryId?: string
 } {
   return {
-    entryPoint: copyReadEntryPoint(target.entryPoint),
+    entryPoint: copyEntryPoint(target.entryPoint),
     label: target.label
   }
 }
@@ -757,7 +757,7 @@ function directoryLoadedTarget(target: DirectoryTarget): {
   readonly parentDirectoryId?: string
 } {
   return {
-    entryPoint: copyReadEntryPoint(target.entryPoint),
+    entryPoint: copyEntryPoint(target.entryPoint),
     ...(target.label === undefined ? {} : { label: target.label }),
     parentDirectoryId: target.directoryId
   }
@@ -825,7 +825,7 @@ function makeLoadedChildren(options: {
   const nextOffset = options.rows.length < options.totalRows ? options.rows.length : undefined
 
   return {
-    entryPoint: copyReadEntryPoint(options.entryPoint),
+    entryPoint: copyEntryPoint(options.entryPoint),
     ...(options.parentDirectoryId === undefined
       ? {}
       : { parentDirectoryId: options.parentDirectoryId }),

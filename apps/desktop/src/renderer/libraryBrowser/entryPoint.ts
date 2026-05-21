@@ -12,7 +12,7 @@ export function sameEntryPoint(left: EntryPoint, right: EntryPoint): boolean {
   return right.kind === 'sourceLocation' && left.sourceLocationId === right.sourceLocationId
 }
 
-export function copyReadEntryPoint(entryPoint: EntryPoint): EntryPoint {
+export function copyEntryPoint(entryPoint: EntryPoint): EntryPoint {
   switch (entryPoint.kind) {
     case 'source':
       return {

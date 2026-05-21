@@ -17,7 +17,7 @@ import type {
   BrowserTreeNode,
   BrowserTreeNodeId
 } from './tree/types'
-import { copyReadEntryPoint } from './entryPoint'
+import { copyEntryPoint } from './entryPoint'
 import {
   adaptLocationSourceDescriptor,
   getLocationSourcePresentation
@@ -308,7 +308,7 @@ function projectLiteralNode(options: {
       ...(node.parentDirectoryId === undefined
         ? {}
         : { parentDirectoryId: node.parentDirectoryId }),
-      entryPoint: copyReadEntryPoint(options.entryPoint),
+      entryPoint: copyEntryPoint(options.entryPoint),
       ...(options.label === undefined ? {} : { label: options.label })
     })
 
@@ -331,7 +331,7 @@ function projectLiteralNode(options: {
     kind: 'file',
     fileId: node.fileId,
     ...(node.parentDirectoryId === undefined ? {} : { parentDirectoryId: node.parentDirectoryId }),
-    entryPoint: copyReadEntryPoint(options.entryPoint)
+    entryPoint: copyEntryPoint(options.entryPoint)
   })
 
   return {
@@ -501,7 +501,7 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
 
   const target = {
     ownerNodeId: options.ownerId,
-    entryPoint: copyReadEntryPoint(options.children.entryPoint),
+    entryPoint: copyEntryPoint(options.children.entryPoint),
     ...(options.children.parentDirectoryId === undefined
       ? {}
       : { parentDirectoryId: options.children.parentDirectoryId }),
