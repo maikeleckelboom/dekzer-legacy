@@ -26,6 +26,7 @@ import type {
   SourceTarget
 } from './hierarchyState'
 import type { BrowserTreeNodeId } from './tree/types'
+import { copyReadEntryPoint, sameEntryPoint } from './entryPoint'
 
 const readLimit = 50
 const safeNavigationReadRequestFailure = 'Unable to request library navigation rows.'
@@ -878,31 +879,8 @@ function canReadMore(
   )
 }
 
-function sameEntryPoint(left: EntryPoint, right: EntryPoint): boolean {
-  if (left.kind !== right.kind) {
-    return false
-  }
-
-  if (left.kind === 'source') {
-    return right.kind === 'source' && left.sourceId === right.sourceId
-  }
-
-  return right.kind === 'sourceLocation' && left.sourceLocationId === right.sourceLocationId
-}
-
-function copyReadEntryPoint(entryPoint: EntryPoint): EntryPoint {
-  switch (entryPoint.kind) {
-    case 'source':
-      return {
-        kind: 'source',
-        sourceId: entryPoint.sourceId
-      }
-    case 'sourceLocation':
-      return {
-        kind: 'sourceLocation',
-        sourceLocationId: entryPoint.sourceLocationId
-      }
-  }
+function isPositiveOpaqueId(value: unknown): value is string {
+  return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
 }
 
 function withDiscoveredUnloadedSourceStates(
@@ -971,8 +949,4 @@ function createMoreRequestKey(target: MoreTarget): string {
   return `${createEntryPointRequestKey(target.entryPoint)}/directory:${
     target.parentDirectoryId ?? 'root'
   }/offset:${target.offset}`
-}
-
-function isPositiveOpaqueId(value: unknown): value is string {
-  return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
 }

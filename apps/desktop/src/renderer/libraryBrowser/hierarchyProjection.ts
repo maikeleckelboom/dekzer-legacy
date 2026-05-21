@@ -17,6 +17,7 @@ import type {
   BrowserTreeNode,
   BrowserTreeNodeId
 } from './tree/types'
+import { copyReadEntryPoint } from './entryPoint'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -604,21 +605,6 @@ function navigationNodeId(row: NavigationRow): BrowserTreeNodeId {
 
 function isPositiveOpaqueId(value: unknown): value is string {
   return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
-}
-
-function copyReadEntryPoint(entryPoint: EntryPoint): EntryPoint {
-  switch (entryPoint.kind) {
-    case 'source':
-      return {
-        kind: 'source',
-        sourceId: entryPoint.sourceId
-      }
-    case 'sourceLocation':
-      return {
-        kind: 'sourceLocation',
-        sourceLocationId: entryPoint.sourceLocationId
-      }
-  }
 }
 
 function formatNavigationSourceDetail(row: NavigationRow): string {

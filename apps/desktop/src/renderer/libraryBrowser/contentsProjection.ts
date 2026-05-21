@@ -1,7 +1,8 @@
-import type { ChildRow, EntryPoint, Presence } from '../../shared/libraryHierarchy/readChildren'
+import type { ChildRow, Presence } from '../../shared/libraryHierarchy/readChildren'
 import type { BrowserProjection } from './hierarchyProjection'
 import type { BrowserState, LoadedChildren, RowBinding } from './hierarchyState'
 import type { BrowserTreeNodeId } from './tree/types'
+import { sameEntryPoint } from './entryPoint'
 
 export type ContentProjectionKind =
   | 'emptySelection'
@@ -31,7 +32,6 @@ export type ContentRow = {
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
   readonly action?: ContentRowAction
-  readonly treeNodeId?: BrowserTreeNodeId
 }
 
 export type ContentProjection = {
@@ -275,9 +275,7 @@ function projectLoadedContents(options: {
   readonly children: LoadedChildren
   readonly bindingsById: BrowserProjection['bindingsById'] | undefined
 }): ContentProjection {
-  const rows: ContentRow[] = options.children.rows.map((row) =>
-    contentChildRow(row, options.bindingsById)
-  )
+  const rows: ContentRow[] = options.children.rows.map((row) => contentChildRow(row))
 
   if (options.children.nextOffset !== undefined) {
     rows.push(contentMoreRowForLoadedChildren(options))
@@ -302,13 +300,7 @@ function projectLoadedContents(options: {
   }
 }
 
-function contentChildRow(
-  row: ChildRow,
-  bindingsById: BrowserProjection['bindingsById'] | undefined
-): ContentRow {
-  const binding = bindingsById?.get(row.id)
-  const treeNodeId = binding?.kind === 'directory' || binding?.kind === 'file' ? row.id : undefined
-
+function contentChildRow(row: ChildRow): ContentRow {
   return {
     id: row.id,
     kind: row.kind,
@@ -316,8 +308,7 @@ function contentChildRow(
     presence: row.presence,
     updatedAtMs: row.updatedAtMs,
     detail: formatPresenceDetail(row),
-    icon: row.kind === 'directory' ? 'folder' : 'music',
-    ...(treeNodeId === undefined ? {} : { treeNodeId })
+    icon: row.kind === 'directory' ? 'folder' : 'music'
   }
 }
 
@@ -511,18 +502,6 @@ function findLoadedChildRow(state: BrowserState, nodeId: BrowserTreeNodeId): Chi
   }
 
   return undefined
-}
-
-function sameEntryPoint(left: EntryPoint, right: EntryPoint): boolean {
-  if (left.kind !== right.kind) {
-    return false
-  }
-
-  if (left.kind === 'source') {
-    return right.kind === 'source' && left.sourceId === right.sourceId
-  }
-
-  return right.kind === 'sourceLocation' && left.sourceLocationId === right.sourceLocationId
 }
 
 function formatLoadedDetail(children: LoadedChildren): string {
