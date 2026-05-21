@@ -42,6 +42,7 @@ const expandedFixtureIds = new Set<BrowserTreeNodeId>([
 ])
 const rootOnlyExpandedIds = new Set<BrowserTreeNodeId>(['fixture-root'])
 const collapsedFixtureIds = new Set<BrowserTreeNodeId>()
+const approvedRunScanRendererOwner = 'src/renderer/libraryBrowser/localRootActions.ts'
 void main()
 
 function main(): void {
@@ -516,16 +517,23 @@ function validatesRendererBoundaryOwnership(): void {
     /from ['"]path['"]/,
     /from ['"].*\/main\//,
     /\bshowOpenDialog\b/,
-    /\.runScan\(/
+    /\brunRootScan\b/
   ]
 
   for (const filePath of listSourceFiles(rendererSourceRoot)) {
+    const relativePath = normalizePath(relative(desktopRoot, filePath))
     const contents = readFileSync(filePath, 'utf8')
 
     for (const pattern of forbiddenPatterns) {
       if (pattern.test(contents)) {
-        violations.push(`${normalizePath(relative(desktopRoot, filePath))}: ${String(pattern)}`)
+        violations.push(`${relativePath}: ${String(pattern)}`)
       }
+    }
+
+    if (/\.runScan\(/.test(contents) && relativePath !== approvedRunScanRendererOwner) {
+      violations.push(
+        `${relativePath}: .runScan is only allowed in ${approvedRunScanRendererOwner}`
+      )
     }
   }
 

@@ -2,10 +2,10 @@
 import { computed, ref, watch } from 'vue'
 
 import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
-import type { LocalRootChoiceResult } from '../../shared/libraryRoots/chooseAndRegisterLocal'
-import { FolderPlusIcon, Icon } from '../icons'
+import { FolderPlusIcon, Icon, ScanIcon } from '../icons'
 import { useLibraryHierarchyRead } from './hierarchyRead'
 import { libraryHierarchyFixtureTree } from './fixture'
+import { useLocalRootActions } from './localRootActions'
 import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
@@ -27,11 +27,21 @@ const {
   browserProjection,
   requestDirectoryChildren
 } = useLibraryHierarchyRead()
+const {
+  registeredRootPath,
+  rootChoiceButtonLabel,
+  rootChoiceFeedback,
+  rootChoiceFeedbackClass,
+  canChooseLocalRoot,
+  scanFeedback,
+  scanFeedbackClass,
+  scanButtonLabel,
+  canRunRegisteredRootScan,
+  chooseAndRegisterLocalRoot,
+  runRegisteredRootScan
+} = useLocalRootActions()
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
-const rootChoiceStatus = ref<'idle' | 'choosing' | 'canceled' | 'registered' | 'failed'>('idle')
-const registeredRootPath = ref<string>()
-const rootChoiceFailureMessage = ref<string>()
 
 const liveTreeNodes = computed(() => {
   if (browserProjection.value?.kind !== 'tree') {
@@ -64,40 +74,6 @@ const modeEyebrow = computed(() => {
 })
 
 const modeBadge = computed(() => (isLiveTree.value ? 'Live read-only' : 'Demo input'))
-const safeRootChoiceFailure = 'Unable to add music folder.'
-const rootChoiceButtonLabel = computed(() =>
-  rootChoiceStatus.value === 'choosing' ? 'Adding folder' : 'Add music folder'
-)
-
-const rootChoiceFeedback = computed(() => {
-  switch (rootChoiceStatus.value) {
-    case 'idle':
-      return 'Choose a music folder to register it. Scan will not start.'
-    case 'choosing':
-      return 'Opening folder picker...'
-    case 'canceled':
-      return 'Folder selection canceled.'
-    case 'registered':
-      return 'Folder added. Scan is not started yet.'
-    case 'failed':
-      return rootChoiceFailureMessage.value ?? safeRootChoiceFailure
-    default:
-      return safeRootChoiceFailure
-  }
-})
-
-const rootChoiceFeedbackClass = computed(() => {
-  switch (rootChoiceStatus.value) {
-    case 'registered':
-      return 'text-(--color-accent)'
-    case 'failed':
-      return 'text-(--color-danger)'
-    case 'canceled':
-      return 'text-(--color-warning)'
-    default:
-      return 'text-(--color-text-muted)'
-  }
-})
 
 const panelDetail = computed(() => {
   if (isLiveTree.value) {
@@ -163,50 +139,6 @@ watch(
   },
   { immediate: true }
 )
-
-async function chooseAndRegisterLocalRoot(): Promise<void> {
-  if (rootChoiceStatus.value === 'choosing') {
-    return
-  }
-
-  rootChoiceStatus.value = 'choosing'
-  rootChoiceFailureMessage.value = undefined
-  registeredRootPath.value = undefined
-
-  try {
-    const result = await window.dekzer.library.roots.chooseAndRegisterLocal()
-
-    if (result.state === 'registered') {
-      rootChoiceStatus.value = 'registered'
-      registeredRootPath.value = result.root.canonicalPath
-      return
-    }
-
-    if (result.state === 'canceled') {
-      rootChoiceStatus.value = 'canceled'
-      return
-    }
-
-    rootChoiceStatus.value = 'failed'
-    rootChoiceFailureMessage.value = rootChoiceFailureFor(result.state)
-  } catch {
-    rootChoiceStatus.value = 'failed'
-    rootChoiceFailureMessage.value = safeRootChoiceFailure
-  }
-}
-
-function rootChoiceFailureFor(
-  state: Exclude<LocalRootChoiceResult['state'], 'canceled' | 'registered'>
-): string {
-  switch (state) {
-    case 'hostUnavailable':
-      return 'Library service is not ready. Try again when it has started.'
-    case 'registrationFailed':
-      return safeRootChoiceFailure
-    case 'dialogFailed':
-      return 'Unable to open folder picker.'
-  }
-}
 
 function selectNode(nodeId: BrowserTreeNodeId): void {
   selectedNodeId.value = nodeId
@@ -292,11 +224,21 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
           <button
             type="button"
             class="inline-flex min-h-9 min-w-[154px] items-center justify-center gap-2 rounded-sm border border-(--color-accent) bg-(--color-accent) px-3 py-2 text-sm font-bold text-(--color-background) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="rootChoiceStatus === 'choosing'"
+            :disabled="!canChooseLocalRoot"
             @click="chooseAndRegisterLocalRoot"
           >
             <Icon :icon="FolderPlusIcon" size="md" :decorative="true" />
             <span>{{ rootChoiceButtonLabel }}</span>
+          </button>
+          <button
+            v-if="registeredRootPath !== undefined"
+            type="button"
+            class="inline-flex min-h-9 min-w-[126px] items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="!canRunRegisteredRootScan"
+            @click="runRegisteredRootScan"
+          >
+            <Icon :icon="ScanIcon" size="md" :decorative="true" />
+            <span>{{ scanButtonLabel }}</span>
           </button>
           <span
             class="rounded-sm border px-2.5 py-1 text-xs font-semibold"
@@ -322,6 +264,9 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
       >
         <p class="text-sm font-semibold" :class="rootChoiceFeedbackClass">
           {{ rootChoiceFeedback }}
+        </p>
+        <p v-if="scanFeedback !== undefined" class="mt-1 text-sm" :class="scanFeedbackClass">
+          {{ scanFeedback }}
         </p>
         <p
           v-if="registeredRootPath !== undefined"
