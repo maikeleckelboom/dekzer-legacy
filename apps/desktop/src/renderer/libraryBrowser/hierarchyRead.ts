@@ -290,7 +290,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (!isExpectedWindow(result.window, 0, undefined)) {
+      if (!isExpectedWindow(result.window, 0, undefined, target.entryPoint)) {
         setSourceReadState(nodeId, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
@@ -358,7 +358,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (!isExpectedWindow(result.window, 0, target.sourceDirectoryId)) {
+      if (!isExpectedWindow(result.window, 0, target.sourceDirectoryId, target.entryPoint)) {
         setDirectoryReadState(target.sourceDirectoryId, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
@@ -440,7 +440,14 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (!isExpectedWindow(result.window, target.offset, target.parentSourceDirectoryId)) {
+      if (
+        !isExpectedWindow(
+          result.window,
+          target.offset,
+          target.parentSourceDirectoryId,
+          target.entryPoint
+        )
+      ) {
         setSourceMoreState(target, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
@@ -527,7 +534,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (!isExpectedWindow(result.window, target.offset, sourceDirectoryId)) {
+      if (!isExpectedWindow(result.window, target.offset, sourceDirectoryId, target.entryPoint)) {
         setDirectoryMoreState(target, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
@@ -838,13 +845,18 @@ function makeLoadedChildren(options: {
 function isExpectedWindow(
   window: ChildWindow,
   expectedOffset: number,
-  expectedParentSourceDirectoryId: string | undefined
+  expectedParentSourceDirectoryId: string | undefined,
+  expectedEntryPoint: EntryPoint
 ): boolean {
   if (window.offset !== expectedOffset) {
     return false
   }
 
   if ((window.parentSourceDirectoryId ?? undefined) !== expectedParentSourceDirectoryId) {
+    return false
+  }
+
+  if (!sameEntryPoint(window.root.entryPoint, expectedEntryPoint)) {
     return false
   }
 

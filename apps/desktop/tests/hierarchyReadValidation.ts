@@ -66,6 +66,7 @@ async function main(): Promise<void> {
   validatesNavigationReadIpcRegistration(config)
   await validatesRendererHierarchyReadController()
   await validatesRendererWindowedMore()
+  await validatesEntryPointRejection()
 }
 
 async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig): Promise<void> {
@@ -680,6 +681,229 @@ async function validatesRendererWindowedMore(): Promise<void> {
   directory14More.resolve(directoryMoreReadResult('14'))
   assert.equal(await staleMore, false)
   assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
+}
+
+async function validatesEntryPointRejection(): Promise<void> {
+  {
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async () => ({
+          state: 'ready',
+          window: {
+            root: {
+              id: 'source:999',
+              label: 'Wrong Source',
+              entryPoint: { kind: 'source', sourceId: '999' }
+            },
+            offset: 0,
+            limit: 50,
+            totalRows: 1,
+            nodes: [
+              {
+                id: 'source-file:999',
+                kind: 'file' as const,
+                label: 'intruder.wav',
+                sourceFileId: '999',
+                presenceState: 'present' as const,
+                updatedAtMs: 100
+              }
+            ]
+          }
+        })
+      })
+    )
+
+    await controller.refresh()
+    const sourceState = controller.sourceReadStates.value.get('navigation-row:7')
+    assert.equal(sourceState?.kind, 'failed')
+    assert.equal(
+      (sourceState as { detail: string })?.detail,
+      'The hierarchy read returned an unexpected child window.'
+    )
+    assert.equal(controller.directoryReadStates.value.size, 0)
+  }
+
+  {
+    let directoryReadAttempt = false
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async () => {
+          if (!directoryReadAttempt) {
+            directoryReadAttempt = true
+            return directoryRootHierarchyReadResult()
+          }
+
+          return {
+            state: 'ready' as const,
+            window: {
+              root: {
+                id: 'source:999',
+                label: 'Wrong Source',
+                entryPoint: { kind: 'source', sourceId: '999' }
+              },
+              parentSourceDirectoryId: '12',
+              offset: 0,
+              limit: 50,
+              totalRows: 1,
+              nodes: [
+                {
+                  id: 'source-file:999',
+                  kind: 'file' as const,
+                  label: 'intruder.wav',
+                  sourceFileId: '999',
+                  parentSourceDirectoryId: '12',
+                  presenceState: 'present' as const,
+                  updatedAtMs: 100
+                }
+              ]
+            }
+          }
+        }
+      })
+    )
+
+    await controller.refresh()
+    await controller.requestDirectoryChildren('source-directory:12')
+    const state = controller.directoryReadStates.value.get('12')
+    assert.equal(state?.kind, 'failed')
+    assert.equal(
+      (state as { detail: string })?.detail,
+      'The hierarchy read returned an unexpected child window.'
+    )
+  }
+
+  {
+    let readCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async () => {
+          readCount += 1
+
+          if (readCount === 1) {
+            return partialSourceHierarchyReadResult()
+          }
+
+          return {
+            state: 'ready' as const,
+            window: {
+              root: {
+                id: 'source:999',
+                label: 'Wrong Source',
+                entryPoint: { kind: 'source', sourceId: '999' }
+              },
+              offset: 2,
+              limit: 50,
+              totalRows: 3,
+              nodes: [
+                {
+                  id: 'source-file:999',
+                  kind: 'file' as const,
+                  label: 'intruder.wav',
+                  sourceFileId: '999',
+                  presenceState: 'present' as const,
+                  updatedAtMs: 100
+                }
+              ]
+            }
+          }
+        }
+      })
+    )
+
+    await controller.refresh()
+    const beforeState = controller.sourceReadStates.value.get('navigation-row:7')
+    assert.equal(beforeState?.kind, 'loaded')
+    if (beforeState?.kind === 'loaded') {
+      assert.equal(beforeState.children.rows.length, 2)
+    }
+
+    await controller.requestNodeChildren('more:navigation-row:7:2')
+    const afterState = controller.sourceReadStates.value.get('navigation-row:7')
+    assert.equal(afterState?.kind, 'loaded')
+    if (afterState?.kind === 'loaded') {
+      assert.equal(afterState.children.rows.length, 2)
+      assert.equal(afterState.children.more?.kind, 'failed')
+    }
+  }
+
+  {
+    let readCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async () => {
+          readCount += 1
+
+          if (readCount === 1) {
+            return {
+              state: 'ready' as const,
+              window: {
+                root: {
+                  id: 'source:7',
+                  label: 'Source Fixture',
+                  entryPoint: { kind: 'source' as const, sourceId: '7' }
+                },
+                offset: 0,
+                limit: 50,
+                totalRows: 1,
+                nodes: [directoryNode('12', 'Album')]
+              }
+            }
+          }
+
+          if (readCount === 2) {
+            return partialDirectoryHierarchyReadResult('12')
+          }
+
+          return {
+            state: 'ready' as const,
+            window: {
+              root: {
+                id: 'source:999',
+                label: 'Wrong Source',
+                entryPoint: { kind: 'source', sourceId: '999' }
+              },
+              parentSourceDirectoryId: '12',
+              offset: 1,
+              limit: 50,
+              totalRows: 2,
+              nodes: [
+                {
+                  id: 'source-file:12-b',
+                  kind: 'file' as const,
+                  label: 'b.wav',
+                  sourceFileId: '12-b',
+                  parentSourceDirectoryId: '12',
+                  presenceState: 'present' as const,
+                  updatedAtMs: 101
+                }
+              ]
+            }
+          }
+        }
+      })
+    )
+
+    await controller.refresh()
+    await controller.requestDirectoryChildren('source-directory:12')
+
+    const beforeState = controller.directoryReadStates.value.get('12')
+    assert.equal(beforeState?.kind, 'loaded')
+    if (beforeState?.kind === 'loaded') {
+      assert.equal(beforeState.children.rows.length, 1)
+    }
+
+    await controller.requestNodeChildren('more:source-directory:12:1')
+    const afterState = controller.directoryReadStates.value.get('12')
+    assert.equal(afterState?.kind, 'loaded')
+    if (afterState?.kind === 'loaded') {
+      assert.equal(afterState.children.rows.length, 1)
+      assert.equal(afterState.children.more?.kind, 'failed')
+    }
+  }
 }
 
 async function startedHostWithClient(
