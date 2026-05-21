@@ -6,6 +6,7 @@ import { FolderPlusIcon, Icon, ScanIcon } from '../icons'
 import { useLibraryHierarchyRead } from './hierarchyRead'
 import { libraryHierarchyFixtureTree } from './fixture'
 import { useLocalRootActions } from './localRootActions'
+import { useRootLifecycle } from './rootLifecycle'
 import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
@@ -19,29 +20,37 @@ const defaultFixtureExpandedNodeIds = new Set<BrowserTreeNodeId>([
   'fixture-tracks',
   'fixture-playlists'
 ])
+const hierarchyRead = useLibraryHierarchyRead()
+const rootActions = useLocalRootActions()
+const rootLifecycle = useRootLifecycle({
+  rootActions,
+  hierarchyRead
+})
 const {
   hostStatus,
   hierarchyReadResult,
   hierarchyReadRequestError,
   hierarchyReadIsLoading,
   browserProjection,
-  readFirstAvailableSourceHierarchy: refreshHierarchy,
   requestDirectoryChildren
-} = useLibraryHierarchyRead()
+} = hierarchyRead
 const {
-  scanStatus,
   registeredRootPath,
   rootChoiceButtonLabel,
   rootChoiceFeedback,
   rootChoiceFeedbackClass,
-  canChooseLocalRoot,
   scanFeedback,
   scanFeedbackClass,
-  scanButtonLabel,
-  canRunRegisteredRootScan,
-  chooseAndRegisterLocalRoot,
-  runRegisteredRootScan
-} = useLocalRootActions()
+  scanButtonLabel
+} = rootActions
+const {
+  refreshFeedback,
+  refreshFeedbackClass,
+  canAddMusicFolder,
+  canScanRoot,
+  addMusicFolder,
+  scanRoot
+} = rootLifecycle
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 
@@ -167,16 +176,6 @@ function requestChildren(nodeId: BrowserTreeNodeId): void {
   void requestDirectoryChildren(nodeId)
 }
 
-async function scanRoot(): Promise<void> {
-  const scanWasRequested = await runRegisteredRootScan()
-
-  if (!scanWasRequested || scanStatus.value !== 'scanned') {
-    return
-  }
-
-  await refreshHierarchy()
-}
-
 function findNodeById(
   nodes: readonly BrowserTreeNode[],
   nodeId: BrowserTreeNodeId
@@ -236,8 +235,8 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
           <button
             type="button"
             class="inline-flex min-h-9 min-w-[154px] items-center justify-center gap-2 rounded-sm border border-(--color-accent) bg-(--color-accent) px-3 py-2 text-sm font-bold text-(--color-background) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="!canChooseLocalRoot"
-            @click="chooseAndRegisterLocalRoot"
+            :disabled="!canAddMusicFolder"
+            @click="addMusicFolder"
           >
             <Icon :icon="FolderPlusIcon" size="md" :decorative="true" />
             <span>{{ rootChoiceButtonLabel }}</span>
@@ -246,7 +245,7 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
             v-if="registeredRootPath !== undefined"
             type="button"
             class="inline-flex min-h-9 min-w-[126px] items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="!canRunRegisteredRootScan"
+            :disabled="!canScanRoot"
             @click="scanRoot"
           >
             <Icon :icon="ScanIcon" size="md" :decorative="true" />
@@ -279,6 +278,9 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
         </p>
         <p v-if="scanFeedback !== undefined" class="mt-1 text-sm" :class="scanFeedbackClass">
           {{ scanFeedback }}
+        </p>
+        <p v-if="refreshFeedback !== undefined" class="mt-1 text-sm" :class="refreshFeedbackClass">
+          {{ refreshFeedback }}
         </p>
         <p
           v-if="registeredRootPath !== undefined"

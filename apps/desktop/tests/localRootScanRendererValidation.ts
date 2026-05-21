@@ -4,8 +4,13 @@ import { relative } from 'node:path'
 
 import {
   createLocalRootActionsController,
+  type LocalRootActionsController,
   type LibraryRootActionsApi
 } from '../src/renderer/libraryBrowser/localRootActions'
+import {
+  createRootLifecycleController,
+  type RootLifecycleController
+} from '../src/renderer/libraryBrowser/rootLifecycle'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { desktopRoot, listSourceFiles, normalizePath, rendererSourceRoot } from './support/files'
@@ -18,6 +23,9 @@ void main()
 async function main(): Promise<void> {
   await validatesScanUnavailableBeforeRegistration()
   await validatesScanUsesRegisteredRootId()
+  await validatesAddMusicFolderScansRegisteredRootAndRefreshesHierarchy()
+  await validatesRescanRefreshesHierarchy()
+  await validatesRefreshFailureDoesNotOverwriteScanSuccess()
   await validatesDuplicateScanRequestsArePrevented()
   await validatesScanFailureUsesSafeCopy()
   await validatesThrownScanErrorUsesSafeCopy()
@@ -26,6 +34,9 @@ async function main(): Promise<void> {
   await validatesCanceledSecondRegistrationPreservesRegisteredRootAndScanState()
   await validatesFailedSecondRegistrationPreservesRegisteredRootAndScanState()
   await validatesSuccessfulSecondRegistrationReplacesRootAndResetsScanState()
+  await validatesComposedCanceledSecondChoicePreservesRegisteredRootAndScanState()
+  await validatesComposedFailedSecondChoicePreservesRegisteredRootAndScanState()
+  await validatesComposedSuccessfulSecondChoiceReplacesRootAndResetsScanStateBeforeScanning()
   validatesRendererScanBoundaryOwnership()
 }
 
@@ -73,7 +84,7 @@ async function validatesScanUsesRegisteredRootId(): Promise<void> {
 
   assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
   assert.equal(controller.registeredRootPath.value, 'C:/Music/root-from-main-is-not-parsed')
-  assert.match(controller.rootChoiceFeedback.value, /Scan is not started yet/)
+  assert.equal(controller.rootChoiceFeedback.value, 'Folder added.')
   assert.equal(controller.canRunRegisteredRootScan.value, true)
 
   assert.equal(await controller.runRegisteredRootScan(), true)
@@ -86,13 +97,101 @@ async function validatesScanUsesRegisteredRootId(): Promise<void> {
     discoveredFileCount: 42,
     queuedSourceWorkItems: 8
   })
-  assert.match(
-    controller.scanFeedback.value ?? '',
-    /Scan complete\. Library view refresh requested\./
-  )
+  assert.match(controller.scanFeedback.value ?? '', /Scan complete\./)
   assert.match(controller.scanFeedback.value ?? '', /42 files discovered/)
   assert.match(controller.scanFeedback.value ?? '', /8 source work items queued/)
   assert.equal(choiceAttempts, 1)
+}
+
+async function validatesAddMusicFolderScansRegisteredRootAndRefreshesHierarchy(): Promise<void> {
+  const events: string[] = []
+  let receivedScanRequest: unknown = null
+  const { rootActions, lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () => {
+        events.push('choose')
+        return registeredChoice({
+          rootId: 'root-from-main',
+          canonicalPath: 'C:/Music/root-from-main-is-not-parsed'
+        })
+      },
+      runScan: async (request) => {
+        events.push('scan')
+        receivedScanRequest = request
+        return scannedRootResult({
+          rootId: 'root-from-main',
+          scanRunId: 'scan-42',
+          discoveredFileCount: 42,
+          queuedSourceWorkItems: 8
+        })
+      }
+    }),
+    async () => {
+      events.push('refresh')
+      return true
+    }
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), true)
+  assert.deepEqual(events, ['choose', 'scan', 'refresh'])
+  assert.deepEqual(receivedScanRequest, {
+    rootId: 'root-from-main'
+  })
+  assert.equal(rootActions.registeredRootPath.value, 'C:/Music/root-from-main-is-not-parsed')
+  assert.equal(rootActions.scanStatus.value, 'scanned')
+  assert.equal(lifecycle.refreshStatus.value, 'refreshed')
+  assert.equal(lifecycle.refreshFeedback.value, 'Library view refreshed.')
+  assert.equal(rootActions.scanButtonLabel.value, 'Rescan folder')
+}
+
+async function validatesRescanRefreshesHierarchy(): Promise<void> {
+  const refreshes: string[] = []
+  const { lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () => registeredChoice(),
+      runScan: async () => scannedRootResult()
+    }),
+    async () => {
+      refreshes.push('refresh')
+      return true
+    }
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), true)
+  assert.equal(await lifecycle.scanRoot(), true)
+  assert.deepEqual(refreshes, ['refresh', 'refresh'])
+}
+
+async function validatesRefreshFailureDoesNotOverwriteScanSuccess(): Promise<void> {
+  const { rootActions, lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () => registeredChoice(),
+      runScan: async () =>
+        scannedRootResult({
+          rootId: 'root-1',
+          scanRunId: 'scan-1',
+          discoveredFileCount: 12,
+          queuedSourceWorkItems: 8
+        })
+    }),
+    async () => false
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), false)
+  assert.equal(rootActions.rootChoiceStatus.value, 'registered')
+  assert.equal(rootActions.scanStatus.value, 'scanned')
+  assert.deepEqual(rootActions.scanSummary.value, {
+    rootId: 'root-1',
+    scanRunId: 'scan-1',
+    discoveredFileCount: 12,
+    queuedSourceWorkItems: 8
+  })
+  assert.equal(lifecycle.refreshStatus.value, 'failed')
+  assert.match(rootActions.scanFeedback.value ?? '', /Scan complete\./)
+  assert.equal(
+    lifecycle.refreshFeedback.value,
+    'Scan complete, but the library view could not refresh.'
+  )
 }
 
 async function validatesDuplicateScanRequestsArePrevented(): Promise<void> {
@@ -325,7 +424,161 @@ async function validatesSuccessfulSecondRegistrationReplacesRootAndResetsScanSta
   assert.equal(controller.registeredRootPath.value, 'C:/Music/Two')
   assert.equal(controller.scanStatus.value, 'idle')
   assert.equal(controller.scanSummary.value, undefined)
-  assert.match(controller.rootChoiceFeedback.value, /Scan is not started yet/)
+  assert.equal(controller.rootChoiceFeedback.value, 'Folder added.')
+}
+
+async function validatesComposedCanceledSecondChoicePreservesRegisteredRootAndScanState(): Promise<void> {
+  let refreshAttempts = 0
+  const choices = [
+    registeredChoice({
+      rootId: 'root-1',
+      canonicalPath: 'C:/Music/One'
+    }),
+    {
+      state: 'canceled'
+    } satisfies LocalRootChoiceResult
+  ]
+  const { rootActions, lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () => choices.shift() ?? assert.fail('unexpected choice'),
+      runScan: async () =>
+        scannedRootResult({
+          rootId: 'root-1',
+          scanRunId: 'scan-1',
+          discoveredFileCount: 12,
+          queuedSourceWorkItems: 8
+        })
+    }),
+    async () => {
+      refreshAttempts += 1
+      return true
+    }
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), true)
+  assert.equal(rootActions.scanStatus.value, 'scanned')
+  assert.equal(rootActions.scanSummary.value?.scanRunId, 'scan-1')
+  assert.equal(lifecycle.refreshStatus.value, 'refreshed')
+
+  assert.equal(await lifecycle.addMusicFolder(), false)
+  assert.equal(rootActions.rootChoiceStatus.value, 'canceled')
+  assert.equal(rootActions.registeredRootPath.value, 'C:/Music/One')
+  assert.equal(rootActions.scanStatus.value, 'scanned')
+  assert.deepEqual(rootActions.scanSummary.value, {
+    rootId: 'root-1',
+    scanRunId: 'scan-1',
+    discoveredFileCount: 12,
+    queuedSourceWorkItems: 8
+  })
+  assert.equal(lifecycle.refreshStatus.value, 'refreshed')
+  assert.equal(refreshAttempts, 1)
+}
+
+async function validatesComposedFailedSecondChoicePreservesRegisteredRootAndScanState(): Promise<void> {
+  let refreshAttempts = 0
+  const choices = [
+    registeredChoice({
+      rootId: 'root-1',
+      canonicalPath: 'C:/Music/One'
+    }),
+    failedChoice('registrationFailed')
+  ]
+  const { rootActions, lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () => choices.shift() ?? assert.fail('unexpected choice'),
+      runScan: async () =>
+        scannedRootResult({
+          rootId: 'root-1',
+          scanRunId: 'scan-1',
+          discoveredFileCount: 12,
+          queuedSourceWorkItems: 8
+        })
+    }),
+    async () => {
+      refreshAttempts += 1
+      return true
+    }
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), true)
+  assert.equal(await lifecycle.addMusicFolder(), false)
+  assert.equal(rootActions.rootChoiceStatus.value, 'failed')
+  assert.equal(rootActions.rootChoiceFeedback.value, 'Unable to add music folder.')
+  assert.equal(rootActions.registeredRootPath.value, 'C:/Music/One')
+  assert.equal(rootActions.scanStatus.value, 'scanned')
+  assert.deepEqual(rootActions.scanSummary.value, {
+    rootId: 'root-1',
+    scanRunId: 'scan-1',
+    discoveredFileCount: 12,
+    queuedSourceWorkItems: 8
+  })
+  assert.equal(refreshAttempts, 1)
+}
+
+async function validatesComposedSuccessfulSecondChoiceReplacesRootAndResetsScanStateBeforeScanning(): Promise<void> {
+  const secondScan = deferred<LocalRootScanResult>()
+  const choices = [
+    registeredChoice({
+      rootId: 'root-1',
+      canonicalPath: 'C:/Music/One'
+    }),
+    registeredChoice({
+      rootId: 'root-2',
+      canonicalPath: 'C:/Music/Two'
+    })
+  ]
+  const scanRequests: unknown[] = []
+  const { rootActions, lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () => choices.shift() ?? assert.fail('unexpected choice'),
+      runScan: async (request) => {
+        scanRequests.push(request)
+
+        if (scanRequests.length === 2) {
+          return secondScan.promise
+        }
+
+        return scannedRootResult({
+          rootId: 'root-1',
+          scanRunId: 'scan-1',
+          discoveredFileCount: 12,
+          queuedSourceWorkItems: 8
+        })
+      }
+    }),
+    async () => true
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), true)
+  assert.equal(rootActions.scanStatus.value, 'scanned')
+  assert.equal(rootActions.scanSummary.value?.rootId, 'root-1')
+
+  const pendingSecondAdd = lifecycle.addMusicFolder()
+  await flushPromises()
+
+  assert.equal(rootActions.registeredRootPath.value, 'C:/Music/Two')
+  assert.equal(rootActions.scanStatus.value, 'scanning')
+  assert.equal(rootActions.scanSummary.value, undefined)
+  assert.deepEqual(scanRequests[1], {
+    rootId: 'root-2'
+  })
+
+  secondScan.resolve(
+    scannedRootResult({
+      rootId: 'root-2',
+      scanRunId: 'scan-2',
+      discoveredFileCount: 4,
+      queuedSourceWorkItems: 2
+    })
+  )
+  assert.equal(await pendingSecondAdd, true)
+  assert.equal(rootActions.scanStatus.value, 'scanned')
+  assert.deepEqual(rootActions.scanSummary.value, {
+    rootId: 'root-2',
+    scanRunId: 'scan-2',
+    discoveredFileCount: 4,
+    queuedSourceWorkItems: 2
+  })
 }
 
 function validatesRendererScanBoundaryOwnership(): void {
@@ -346,6 +599,10 @@ function validatesRendererScanBoundaryOwnership(): void {
   ]
   const actionSource = readFileSync(
     new URL('../src/renderer/libraryBrowser/localRootActions.ts', import.meta.url),
+    'utf8'
+  )
+  const lifecycleSource = readFileSync(
+    new URL('../src/renderer/libraryBrowser/rootLifecycle.ts', import.meta.url),
     'utf8'
   )
   const panelSource = readFileSync(
@@ -384,14 +641,26 @@ function validatesRendererScanBoundaryOwnership(): void {
   assert.doesNotMatch(actionSource, /\bhierarchy\b/)
   assert.doesNotMatch(actionSource, /\bregisterLocal\b/)
   assert.doesNotMatch(actionSource, /\bclearRegisteredRoot\b/)
+  assert.match(lifecycleSource, /chooseAndRegisterLocalRoot\(\)/)
+  assert.match(lifecycleSource, /runRegisteredRootScan\(\)/)
+  assert.match(lifecycleSource, /refreshHierarchy\(\)/)
+  assert.doesNotMatch(lifecycleSource, /\brootId\b/)
+  assert.doesNotMatch(lifecycleSource, /\bBrowserTreeNodeId\b/)
+  assert.doesNotMatch(lifecycleSource, /source-directory:/)
+  assert.doesNotMatch(lifecycleSource, /source:/)
+  assert.doesNotMatch(lifecycleSource, /fixture-/)
+  assert.doesNotMatch(lifecycleSource, /\.split\(/)
+  assert.doesNotMatch(lifecycleSource, /\bdocument\./)
+  assert.doesNotMatch(lifecycleSource, /\bdataset\b/)
+  assert.doesNotMatch(lifecycleSource, /\bquerySelector\b/)
   assert.doesNotMatch(panelSource, /\.runScan\(/)
+  assert.doesNotMatch(panelSource, /\brunRegisteredRootScan\b/)
+  assert.doesNotMatch(panelSource, /\brefreshHierarchy\(\)/)
   assert.doesNotMatch(panelSource, /\brootId\b/)
-  assert.match(panelSource, /readFirstAvailableSourceHierarchy: refreshHierarchy/)
-  assert.match(panelSource, /const scanWasRequested = await runRegisteredRootScan\(\)/)
-  assert.match(panelSource, /scanStatus\.value !== 'scanned'/)
-  assert.match(panelSource, /await refreshHierarchy\(\)/)
+  assert.match(panelSource, /useRootLifecycle/)
   assert.match(panelSource, /v-if="registeredRootPath !== undefined"/)
   assert.match(panelSource, /@click="scanRoot"/)
+  assert.match(panelSource, /@click="addMusicFolder"/)
 }
 
 function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRootActionsApi {
@@ -408,6 +677,32 @@ function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRoo
     }),
     ...overrides
   }
+}
+
+function testRootLifecycle(
+  rootApi: LibraryRootActionsApi,
+  refreshHierarchy: () => Promise<boolean> = async () => true
+): {
+  readonly rootActions: LocalRootActionsController
+  readonly lifecycle: RootLifecycleController
+} {
+  const rootActions = createLocalRootActionsController(rootApi)
+  const lifecycle = createRootLifecycleController({
+    rootActions,
+    hierarchyRead: {
+      refreshHierarchy
+    }
+  })
+
+  return {
+    rootActions,
+    lifecycle
+  }
+}
+
+async function flushPromises(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
 }
 
 function registeredChoice(

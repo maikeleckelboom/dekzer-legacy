@@ -66,22 +66,31 @@ export function createLocalRootActionsController(
   const canRunRegisteredRootScan = computed(
     () => registeredRoot.value !== undefined && scanStatus.value !== 'scanning'
   )
-  const scanButtonLabel = computed(() =>
-    scanStatus.value === 'scanning' ? 'Scanning folder' : 'Scan folder'
-  )
+  const scanButtonLabel = computed(() => {
+    switch (scanStatus.value) {
+      case 'scanning':
+        return 'Scanning folder'
+      case 'scanned':
+        return 'Rescan folder'
+      case 'failed':
+        return 'Retry scan'
+      case 'idle':
+        return 'Scan folder'
+    }
+
+    return 'Scan folder'
+  })
 
   const rootChoiceFeedback = computed(() => {
     switch (rootChoiceStatus.value) {
       case 'idle':
-        return 'Choose a music folder to register it. Scan will not start.'
+        return 'Choose a music folder to add it to your library.'
       case 'choosing':
         return 'Opening folder picker...'
       case 'canceled':
         return 'Folder selection canceled.'
       case 'registered':
-        return scanStatus.value === 'idle'
-          ? 'Folder added. Scan is not started yet.'
-          : 'Folder added.'
+        return 'Folder added.'
       case 'failed':
         return rootChoiceFailureMessage.value ?? safeRootChoiceFailure
     }
@@ -109,7 +118,7 @@ export function createLocalRootActionsController(
 
     switch (scanStatus.value) {
       case 'idle':
-        return 'Scan this folder to discover library files.'
+        return 'Ready to scan this folder.'
       case 'scanning':
         return 'Scanning folder...'
       case 'scanned':
@@ -262,11 +271,11 @@ function scanSummaryFromResult(
 
 function scanSummaryText(summary: LocalRootScanSummary | undefined): string {
   if (summary === undefined) {
-    return 'Scan complete. Library view refresh requested.'
+    return 'Scan complete.'
   }
 
   return [
-    'Scan complete. Library view refresh requested.',
+    'Scan complete.',
     `${formatCount(summary.discoveredFileCount, 'file')} discovered.`,
     `${formatCount(summary.queuedSourceWorkItems, 'source work item')} queued.`
   ].join(' ')

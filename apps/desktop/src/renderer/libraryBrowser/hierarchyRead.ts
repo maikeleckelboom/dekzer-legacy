@@ -31,7 +31,8 @@ export type LibraryHierarchyReadController = {
   readonly directoryReadStates: Ref<ReadonlyMap<string, LibraryHierarchyDirectoryReadState>>
   readonly browserProjection: ComputedRef<LibraryHierarchyBrowserProjection | undefined>
   readonly currentRoot: ComputedRef<LibraryHierarchyReadChildrenRoot | undefined>
-  readonly readFirstAvailableSourceHierarchy: () => Promise<void>
+  readonly refreshHierarchy: () => Promise<boolean>
+  readonly readFirstAvailableSourceHierarchy: () => Promise<boolean>
   readonly requestDirectoryChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
   readonly start: () => void
   readonly stop: () => void
@@ -116,10 +117,10 @@ export function createLibraryHierarchyReadController(
     }
 
     hasRequestedHierarchyRead = true
-    void readFirstAvailableSourceHierarchy()
+    void refreshHierarchy()
   }
 
-  async function readFirstAvailableSourceHierarchy(): Promise<void> {
+  async function refreshHierarchy(): Promise<boolean> {
     const sequence = ++rootReadSequence
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
@@ -134,22 +135,27 @@ export function createLibraryHierarchyReadController(
       })
 
       if (sequence !== rootReadSequence) {
-        return
+        return false
       }
 
       hierarchyReadResult.value = result
       directoryReadStates.value =
         result.state === 'ready' ? withDiscoveredUnloadedDirectoryStates(result.window) : new Map()
+      return browserProjection.value?.kind === 'tree'
     } catch {
       if (sequence === rootReadSequence) {
         hierarchyReadRequestError.value = safeRootReadRequestFailure
       }
+
+      return false
     } finally {
       if (sequence === rootReadSequence) {
         hierarchyReadIsLoading.value = false
       }
     }
   }
+
+  const readFirstAvailableSourceHierarchy = refreshHierarchy
 
   async function requestDirectoryChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
     const projection = browserProjection.value
@@ -272,6 +278,7 @@ export function createLibraryHierarchyReadController(
     directoryReadStates,
     browserProjection,
     currentRoot,
+    refreshHierarchy,
     readFirstAvailableSourceHierarchy,
     requestDirectoryChildren,
     start,
