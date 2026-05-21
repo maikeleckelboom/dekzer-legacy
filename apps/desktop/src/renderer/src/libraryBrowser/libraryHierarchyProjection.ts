@@ -1,4 +1,7 @@
-import type { LibraryHierarchyReadResult } from '../../../shared/libraryHierarchyRead'
+import type {
+  LibraryHierarchyReadNode,
+  LibraryHierarchyReadResult
+} from '../../../shared/libraryHierarchyRead'
 import type { BrowserTreeNode } from './tree/types'
 
 export type LibraryHierarchyBrowserProjection =
@@ -39,23 +42,7 @@ export function projectLibraryHierarchyReadToBrowserTree(
     }
   }
 
-  const firstDirectory = result.window.nodes.find((node) => node.kind === 'directory')
-
-  if (firstDirectory !== undefined) {
-    return {
-      kind: 'unsupported',
-      message: `Folder "${firstDirectory.label}" needs unloaded child state before it can be shown as a live tree row.`
-    }
-  }
-
-  const children = result.window.nodes.map(
-    (node): BrowserTreeNode => ({
-      id: node.id,
-      label: node.label,
-      kind: 'file',
-      detail: formatNodeDetail(node.presenceState)
-    })
-  )
+  const children = result.window.nodes.map(projectReadNodeToBrowserTreeNode)
 
   return {
     kind: 'tree',
@@ -65,7 +52,10 @@ export function projectLibraryHierarchyReadToBrowserTree(
         label: result.window.root.label,
         kind: 'source',
         detail: formatRootDetail(result.window.totalRows),
-        ...(children.length > 0 ? { children } : {})
+        childrenState: {
+          kind: 'loaded',
+          children
+        }
       }
     ]
   }
@@ -73,13 +63,36 @@ export function projectLibraryHierarchyReadToBrowserTree(
 
 function formatRootDetail(totalRows: number): string {
   if (totalRows === 1) {
-    return '1 literal hierarchy row loaded read-only.'
+    return 'Loaded read-only from library backend. 1 literal hierarchy row available.'
   }
 
-  return `${totalRows} literal hierarchy rows loaded read-only.`
+  return `Loaded read-only from library backend. ${totalRows} literal hierarchy rows available.`
 }
 
-function formatNodeDetail(presenceState: string): string {
+function projectReadNodeToBrowserTreeNode(node: LibraryHierarchyReadNode): BrowserTreeNode {
+  if (node.kind === 'directory') {
+    return {
+      id: node.id,
+      label: node.label,
+      kind: 'folder',
+      detail: formatDirectoryDetail(node.presenceState),
+      childrenState: {
+        kind: 'unloaded',
+        detail: 'Children not loaded yet.'
+      }
+    }
+  }
+
+  return {
+    id: node.id,
+    label: node.label,
+    kind: 'file',
+    detail: formatFileDetail(node.presenceState),
+    childrenState: { kind: 'leaf' }
+  }
+}
+
+function formatFileDetail(presenceState: LibraryHierarchyReadNode['presenceState']): string {
   switch (presenceState) {
     case 'present':
       return 'Present file.'
@@ -87,7 +100,16 @@ function formatNodeDetail(presenceState: string): string {
       return 'Missing file.'
     case 'removed':
       return 'Removed file.'
-    default:
-      return 'File.'
+  }
+}
+
+function formatDirectoryDetail(presenceState: LibraryHierarchyReadNode['presenceState']): string {
+  switch (presenceState) {
+    case 'present':
+      return 'Present directory.'
+    case 'missing':
+      return 'Missing directory.'
+    case 'removed':
+      return 'Removed directory.'
   }
 }

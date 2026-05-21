@@ -84,7 +84,7 @@ export function resolveTreeKeyboardIntent(
       return resolveFocusIntent(getLastVisibleNodeId(options.visibleItems))
 
     case treeKeyboardKeys.arrowRight:
-      if (activeItem === undefined || !activeItem.hasChildren) {
+      if (activeItem === undefined || !activeItem.canExpand) {
         return handledNoop()
       }
 
@@ -103,7 +103,7 @@ export function resolveTreeKeyboardIntent(
         return handledNoop()
       }
 
-      if (activeItem.hasChildren && activeItem.isExpanded) {
+      if (activeItem.canExpand && activeItem.isExpanded) {
         return {
           kind: 'collapse',
           nodeId: activeItem.id,

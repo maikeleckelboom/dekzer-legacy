@@ -87,6 +87,16 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     })
   }
 
+  function toggleNode(nodeId: BrowserTreeNodeId): void {
+    const item = visibleItems.value.find((visibleItem) => visibleItem.id === nodeId)
+
+    if (item?.canExpand !== true) {
+      return
+    }
+
+    options.toggleNode(nodeId)
+  }
+
   return {
     visibleItems,
     activeNodeId,
@@ -95,7 +105,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     setActiveNode,
     focusNode,
     selectNode: options.selectNode,
-    toggleNode: options.toggleNode,
+    toggleNode,
     resolveKeyboardIntent
   }
 }

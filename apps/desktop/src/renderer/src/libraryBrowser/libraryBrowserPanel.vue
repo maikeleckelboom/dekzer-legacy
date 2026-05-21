@@ -63,6 +63,7 @@ import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundaryS
 import { useLibraryHierarchyRead } from './hierarchyRead'
 import { libraryHierarchyFixtureTree } from './libraryHierarchyFixture'
 import { projectLibraryHierarchyReadToBrowserTree } from './libraryHierarchyProjection'
+import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
 
@@ -211,7 +212,7 @@ function findNodeById(
       return node
     }
 
-    const childMatch = findNodeById(node.children ?? [], nodeId)
+    const childMatch = findNodeById(getLoadedBrowserTreeChildren(node), nodeId)
 
     if (childMatch !== undefined) {
       return childMatch

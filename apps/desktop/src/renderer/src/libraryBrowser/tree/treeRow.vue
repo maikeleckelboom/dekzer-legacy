@@ -6,8 +6,8 @@
   >
     <span
       class="grid h-7 w-7 shrink-0 place-items-center text-xs font-bold"
-      :class="item.hasChildren ? 'text-(--color-text-muted)' : 'text-(--color-border)'"
-      :data-tree-affordance="item.hasChildren ? 'true' : undefined"
+      :class="item.isBranch ? 'text-(--color-text-muted)' : 'text-(--color-border)'"
+      :data-tree-affordance="item.canExpand ? 'true' : undefined"
       aria-hidden="true"
     >
       {{ branchGlyph }}
@@ -20,6 +20,12 @@
         class="block truncate text-xs leading-5 text-(--color-text-muted)"
       >
         {{ item.node.detail }}
+      </span>
+      <span
+        v-if="childrenStateDetail"
+        class="block truncate text-xs leading-5 text-(--color-text-muted)"
+      >
+        {{ childrenStateDetail }}
       </span>
     </span>
 
@@ -34,7 +40,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { BrowserTreeNodeKind, BrowserTreeVisibleItem } from './types'
+import type { BrowserTreeChildrenState, BrowserTreeNodeKind, BrowserTreeVisibleItem } from './types'
 
 defineOptions({
   name: 'TreeRow'
@@ -48,7 +54,7 @@ const rowClass = computed(() => {
   const baseClass = props.item.isSelected
     ? 'border-l-(--color-accent) bg-(--color-surface-strong) text-(--color-text)'
     : 'border-l-transparent text-(--color-text-muted) hover:bg-white/5 hover:text-(--color-text)'
-  const branchClass = props.item.hasChildren ? 'font-semibold' : ''
+  const branchClass = props.item.isBranch ? 'font-semibold' : ''
 
   return [baseClass, branchClass]
 })
@@ -58,7 +64,7 @@ const rowStyle = computed(() => ({
 }))
 
 const branchGlyph = computed(() => {
-  if (!props.item.hasChildren) {
+  if (!props.item.canExpand) {
     return ''
   }
 
@@ -66,6 +72,7 @@ const branchGlyph = computed(() => {
 })
 
 const kindLabel = computed(() => formatNodeKind(props.item.node.kind))
+const childrenStateDetail = computed(() => formatChildrenStateDetail(props.item.node.childrenState))
 
 function formatNodeKind(kind: BrowserTreeNodeKind): string {
   switch (kind) {
@@ -85,6 +92,20 @@ function formatNodeKind(kind: BrowserTreeNodeKind): string {
       return 'History'
     case 'trackGroup':
       return 'Track group'
+  }
+}
+
+function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | undefined {
+  switch (state.kind) {
+    case 'leaf':
+    case 'loaded':
+      return undefined
+    case 'unloaded':
+      return state.detail ?? 'Children not loaded yet.'
+    case 'loading':
+      return state.detail ?? 'Loading children.'
+    case 'failed':
+      return state.detail
   }
 }
 </script>

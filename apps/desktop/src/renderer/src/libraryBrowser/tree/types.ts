@@ -10,12 +10,33 @@ export type BrowserTreeNodeKind =
   | 'history'
   | 'trackGroup'
 
+export type BrowserTreeChildrenState =
+  | {
+      readonly kind: 'leaf'
+    }
+  | {
+      readonly kind: 'loaded'
+      readonly children: readonly BrowserTreeNode[]
+    }
+  | {
+      readonly kind: 'unloaded'
+      readonly detail?: string
+    }
+  | {
+      readonly kind: 'loading'
+      readonly detail?: string
+    }
+  | {
+      readonly kind: 'failed'
+      readonly detail: string
+    }
+
 export type BrowserTreeNode = {
   readonly id: BrowserTreeNodeId
   readonly label: string
   readonly kind: BrowserTreeNodeKind
   readonly detail?: string
-  readonly children?: readonly BrowserTreeNode[]
+  readonly childrenState: BrowserTreeChildrenState
 }
 
 export type BrowserTreeFixture = {
@@ -30,7 +51,8 @@ export type BrowserTreeVisibleItem = {
   readonly parentId?: BrowserTreeNodeId
   readonly level: number
   readonly visibleIndex: number
-  readonly hasChildren: boolean
+  readonly isBranch: boolean
+  readonly canExpand: boolean
   readonly isExpanded: boolean
   readonly isSelected: boolean
   readonly isActive: boolean

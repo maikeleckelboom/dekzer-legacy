@@ -30,6 +30,26 @@ export function getFirstVisibleNodeId(
   return visibleItems[0]?.id
 }
 
+export function isBrowserTreeLeaf(node: BrowserTreeNode): boolean {
+  return node.childrenState.kind === 'leaf'
+}
+
+export function isBrowserTreeBranch(node: BrowserTreeNode): boolean {
+  return !isBrowserTreeLeaf(node)
+}
+
+export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly BrowserTreeNode[] {
+  if (node.childrenState.kind !== 'loaded') {
+    return []
+  }
+
+  return node.childrenState.children
+}
+
+export function canExpandBrowserTreeNode(node: BrowserTreeNode): boolean {
+  return getLoadedBrowserTreeChildren(node).length > 0
+}
+
 export function getLastVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[]
 ): BrowserTreeNodeId | undefined {
@@ -94,9 +114,10 @@ function appendVisibleNodes(options: {
   const siblingCount = options.nodes.length
 
   options.nodes.forEach((node, nodeIndex) => {
-    const children = getNodeChildren(node)
-    const hasChildren = children.length > 0
-    const isExpanded = hasChildren && options.expandedNodeIds.has(node.id)
+    const children = getLoadedBrowserTreeChildren(node)
+    const isBranch = isBrowserTreeBranch(node)
+    const canExpand = canExpandBrowserTreeNode(node)
+    const isExpanded = canExpand && options.expandedNodeIds.has(node.id)
 
     options.visibleItems.push({
       id: node.id,
@@ -104,7 +125,8 @@ function appendVisibleNodes(options: {
       ...(options.parentId === undefined ? {} : { parentId: options.parentId }),
       level: options.level,
       visibleIndex: options.visibleItems.length,
-      hasChildren,
+      isBranch,
+      canExpand,
       isExpanded,
       isSelected: options.selectedNodeId === node.id,
       isActive: options.activeNodeId === node.id,
@@ -131,8 +153,4 @@ function getVisibleItemIndex(
   nodeId: BrowserTreeNodeId
 ): number {
   return visibleItems.findIndex((item) => item.id === nodeId)
-}
-
-function getNodeChildren(node: BrowserTreeNode): readonly BrowserTreeNode[] {
-  return node.children ?? []
 }
