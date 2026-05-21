@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createLibraryBoundaryHost } from './libraryBoundary/host'
 import { registerReadChildrenIpc } from './libraryHierarchy/readChildren'
+import { registerReadNavigationRowsIpc } from './libraryNavigation/readRows'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import {
@@ -59,6 +60,7 @@ app.whenReady().then(() => {
   })
   libraryBoundaryHostStatusController = new LibraryBoundaryHostStatusController(host)
   registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
+  registerReadNavigationRowsIpc(ipcMain, host)
   registerReadChildrenIpc(ipcMain, host)
   registerLocalRootChoiceIpc(ipcMain, host, {
     dialog,

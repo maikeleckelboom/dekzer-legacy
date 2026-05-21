@@ -7,6 +7,11 @@ import {
   type LibraryHierarchyReadChildrenRequest,
   type LibraryHierarchyReadChildrenResult
 } from '../shared/libraryHierarchy/readChildren'
+import {
+  navigationReadChannels,
+  type LibraryNavigationReadRowsRequest,
+  type LibraryNavigationReadRowsResult
+} from '../shared/libraryNavigation/readRows'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
@@ -59,6 +64,16 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           return () => {
             ipcRenderer.off(hostStatusChannels.statusChanged, listener)
           }
+        }
+      },
+      navigation: {
+        async readRows(
+          request: LibraryNavigationReadRowsRequest
+        ): Promise<LibraryNavigationReadRowsResult> {
+          return (await ipcRenderer.invoke(
+            navigationReadChannels.readRows,
+            request
+          )) as LibraryNavigationReadRowsResult
         }
       },
       hierarchy: {

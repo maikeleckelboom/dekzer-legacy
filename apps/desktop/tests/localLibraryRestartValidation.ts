@@ -13,6 +13,7 @@ import {
 } from '../src/main/libraryBoundary/config'
 import { LibraryBoundaryHost } from '../src/main/libraryBoundary/host'
 import { readThroughHost } from '../src/main/libraryHierarchy/readChildren'
+import { readNavigationRowsThroughHost } from '../src/main/libraryNavigation/readRows'
 import { registerLocalRoot } from '../src/main/libraryRoots/registerLocalRoot'
 import { runLocalRootScanThroughHost } from '../src/main/libraryRoots/runScan'
 import type {
@@ -21,7 +22,6 @@ import type {
 } from '../src/shared/libraryHierarchy/readChildren'
 import { desktopRoot } from './support/files'
 import { silentLogger, testApp } from './support/libraryBoundary'
-import { firstAvailableSourceReadRequest } from './support/libraryHierarchy'
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-local-library-restart-'))
 
@@ -104,6 +104,7 @@ async function main(): Promise<void> {
   try {
     const restartedRead = await readPersistedCrateWindow(restartedHost)
     assert.deepEqual(restartedRead.crateRoot, firstRead.crateRoot)
+    assert.equal(restartedRead.sourceNavigationRowId, firstRead.sourceNavigationRowId)
     assert.deepEqual(restartedRead.crateDirectory, firstRead.crateDirectory)
     assert.deepEqual(restartedRead.crateFile, firstRead.crateFile)
     assertStorageStatus(readStorageStatus(boundaryBinaryPath, userDataPath), {
@@ -131,13 +132,39 @@ async function startRealBoundaryHost(
 
 async function readPersistedCrateWindow(host: LibraryBoundaryHost): Promise<{
   readonly crateRoot: LibraryHierarchyReadChildrenRoot
+  readonly sourceNavigationRowId: string
   readonly crateDirectory: LibraryHierarchyReadChildrenNode
   readonly crateFile: LibraryHierarchyReadChildrenNode
 }> {
-  const rootRead = await readThroughHost(host, firstAvailableSourceReadRequest())
+  const navigationRead = await readNavigationRowsThroughHost(host, {
+    parentNavigationRowId: null
+  })
+  assert.equal(navigationRead.state, 'ready')
+  if (navigationRead.state !== 'ready') {
+    assert.fail('expected persisted navigation rows to be ready')
+  }
+
+  const sourceRow = navigationRead.rows.find((row) => row.selectorKind === 'source')
+  assert.equal(sourceRow?.selectorPayload !== null, true)
+  if (sourceRow === undefined || sourceRow.selectorPayload === null) {
+    assert.fail('expected persisted source navigation row')
+  }
+
+  const rootRead = await readThroughHost(host, {
+    target: {
+      kind: 'entryPoint',
+      entryPoint: {
+        kind: 'source',
+        sourceId: sourceRow.selectorPayload
+      },
+      label: sourceRow.displayName
+    },
+    offset: 0,
+    limit: 50
+  })
   assert.equal(rootRead.state, 'ready')
   if (rootRead.state !== 'ready') {
-    assert.fail('expected first available source hierarchy read to be ready')
+    assert.fail('expected source navigation hierarchy read to be ready')
   }
 
   const crateDirectory = rootRead.window.nodes.find((node) => node.label === 'Crate')
@@ -169,6 +196,7 @@ async function readPersistedCrateWindow(host: LibraryBoundaryHost): Promise<{
 
   return {
     crateRoot: rootRead.window.root,
+    sourceNavigationRowId: sourceRow.navigationRowId,
     crateDirectory,
     crateFile
   }

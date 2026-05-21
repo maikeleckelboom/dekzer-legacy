@@ -6,6 +6,10 @@ import type {
   LibraryHierarchyReadChildrenRequest,
   LibraryHierarchyReadChildrenResult
 } from './libraryHierarchy/readChildren'
+import type {
+  LibraryNavigationReadRowsRequest,
+  LibraryNavigationReadRowsResult
+} from './libraryNavigation/readRows'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
 
@@ -15,6 +19,7 @@ export type RendererApi = {
 
 export type LibraryApi = {
   readonly host: LibraryHostApi
+  readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
   readonly roots: LibraryRootsApi
 }
@@ -28,6 +33,10 @@ export type LibraryHierarchyApi = {
   readChildren(
     request: LibraryHierarchyReadChildrenRequest
   ): Promise<LibraryHierarchyReadChildrenResult>
+}
+
+export type LibraryNavigationApi = {
+  readRows(request: LibraryNavigationReadRowsRequest): Promise<LibraryNavigationReadRowsResult>
 }
 
 export type LibraryRootsApi = {

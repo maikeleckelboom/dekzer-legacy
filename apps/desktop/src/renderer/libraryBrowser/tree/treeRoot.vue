@@ -15,6 +15,7 @@ const props = defineProps<{
   selectedNodeId?: BrowserTreeNodeId
   expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   labelledBy: string
+  emptyLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -46,7 +47,7 @@ provideTreeContext(controller)
     class="rounded-sm border border-dashed border-(--color-border) px-4 py-5 text-sm text-(--color-text-muted)"
     role="status"
   >
-    No fixture hierarchy nodes to display.
+    {{ emptyLabel ?? 'No tree rows to display.' }}
   </p>
 
   <div v-else class="space-y-1" role="tree" :aria-labelledby="labelledBy">

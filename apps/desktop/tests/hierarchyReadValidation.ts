@@ -15,6 +15,10 @@ import {
 } from '../src/main/libraryBoundary/config'
 import { readThroughHost, registerReadChildrenIpc } from '../src/main/libraryHierarchy/readChildren'
 import {
+  readNavigationRowsThroughHost,
+  registerReadNavigationRowsIpc
+} from '../src/main/libraryNavigation/readRows'
+import {
   createLibraryHierarchyReadController,
   type LibraryBrowserApi
 } from '../src/renderer/libraryBrowser/hierarchyRead'
@@ -25,6 +29,10 @@ import {
   type LibraryHierarchyReadChildrenRequest,
   type LibraryHierarchyReadChildrenResult
 } from '../src/shared/libraryHierarchy/readChildren'
+import {
+  navigationReadChannels,
+  type LibraryNavigationReadRowsResult
+} from '../src/shared/libraryNavigation/readRows'
 import { firstAvailableSourceReadRequest } from './support/libraryHierarchy'
 import { createFakeClient, deferred, silentLogger, testApp } from './support/libraryBoundary'
 
@@ -54,6 +62,8 @@ async function main(): Promise<void> {
 
   await validatesHierarchyReadHandler(config)
   validatesHierarchyReadIpcRegistration(config)
+  await validatesNavigationReadHandler(config)
+  validatesNavigationReadIpcRegistration(config)
   await validatesRendererHierarchyReadController()
 }
 
@@ -245,42 +255,140 @@ function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig
   assert.equal(typeof registration.handler, 'function')
 }
 
+async function validatesNavigationReadHandler(config: LibraryBoundaryHostConfig): Promise<void> {
+  const idleHost = new LibraryBoundaryHost(config, silentLogger())
+  const hostUnavailable = await readNavigationRowsThroughHost(idleHost, {
+    parentNavigationRowId: null
+  })
+
+  assert.equal(hostUnavailable.state, 'hostUnavailable')
+  assertNavigationReadError(hostUnavailable, 'hostNotStarted')
+
+  const successHost = await startedHostWithClient(
+    config,
+    createFakeClient({
+      readNavigationRows: async (request) => {
+        assert.deepEqual(request, {
+          parentNavigationRowId: null
+        })
+        return {
+          rows: [
+            {
+              navigationRowId: '7',
+              stableKey: 'source:7',
+              parentNavigationRowId: null,
+              family: 'sources',
+              rowKind: 'source',
+              displayName: 'Source Fixture',
+              siblingPosition: 0,
+              selectable: true,
+              selectorKind: 'source',
+              selectorPayload: '7',
+              updatedAtMs: 100,
+              rowVersion: '1'
+            }
+          ]
+        }
+      }
+    })
+  )
+  const success = await readNavigationRowsThroughHost(successHost, {
+    parentNavigationRowId: null
+  })
+
+  assert.equal(success.state, 'ready')
+  if (success.state !== 'ready') {
+    assert.fail('expected ready navigation read result')
+  }
+  assert.deepEqual(
+    success.rows.map((row) => row.displayName),
+    ['Source Fixture']
+  )
+
+  const invalid = await readNavigationRowsThroughHost(successHost, {
+    parentNavigationRowId: 'not-a-navigation-row-id'
+  })
+  assert.equal(invalid.state, 'invalidRequest')
+  assertNavigationReadError(invalid, 'invalidRequest')
+}
+
+function validatesNavigationReadIpcRegistration(config: LibraryBoundaryHostConfig): void {
+  const host = new LibraryBoundaryHost(config, silentLogger())
+
+  const registration: {
+    channel?: string
+    handler?: (request: unknown) => Promise<LibraryNavigationReadRowsResult>
+  } = {}
+
+  registerReadNavigationRowsIpc(
+    {
+      handle(channel, listener): void {
+        registration.channel = channel
+        registration.handler = (request) => listener({}, request)
+      }
+    },
+    host
+  )
+
+  assert.equal(registration.channel, navigationReadChannels.readRows)
+  assert.equal(typeof registration.handler, 'function')
+}
+
 async function validatesRendererHierarchyReadController(): Promise<void> {
   const requests: LibraryHierarchyReadChildrenRequest[] = []
+  const navigationRequests: unknown[] = []
   const directory12Read = deferred<LibraryHierarchyReadChildrenResult>()
   const directory14Read = deferred<LibraryHierarchyReadChildrenResult>()
   let directory13Attempts = 0
   const controller = createLibraryHierarchyReadController(
-    testLibraryApi(async (request) => {
-      const clonedRequest = structuredClone(request)
-      requests.push(clonedRequest)
+    testLibraryApi({
+      readRows: async (request) => {
+        navigationRequests.push(structuredClone(request))
+        return navigationSourceReadRowsResult()
+      },
+      readChildren: async (request) => {
+        const clonedRequest = structuredClone(request)
+        requests.push(clonedRequest)
 
-      if (clonedRequest.parentSourceDirectoryId === '12') {
-        return directory12Read.promise
+        if (clonedRequest.parentSourceDirectoryId === '12') {
+          return directory12Read.promise
+        }
+
+        if (clonedRequest.parentSourceDirectoryId === '13') {
+          directory13Attempts += 1
+          return directory13Attempts === 1
+            ? hierarchyReadError(
+                'readFailed',
+                'readFailed',
+                'Unable to read library hierarchy children.'
+              )
+            : emptyDirectoryHierarchyReadResult('13')
+        }
+
+        if (clonedRequest.parentSourceDirectoryId === '14') {
+          return directory14Read.promise
+        }
+
+        return directoryRootHierarchyReadResult()
       }
-
-      if (clonedRequest.parentSourceDirectoryId === '13') {
-        directory13Attempts += 1
-        return directory13Attempts === 1
-          ? hierarchyReadError(
-              'readFailed',
-              'readFailed',
-              'Unable to read library hierarchy children.'
-            )
-          : emptyDirectoryHierarchyReadResult('13')
-      }
-
-      if (clonedRequest.parentSourceDirectoryId === '14') {
-        return directory14Read.promise
-      }
-
-      return directoryRootHierarchyReadResult()
     })
   )
 
-  await controller.readFirstAvailableSourceHierarchy()
+  await controller.refreshHierarchy()
 
-  assert.deepEqual(requests[0], firstAvailableSourceReadRequest())
+  assert.deepEqual(navigationRequests, [{ parentNavigationRowId: null }])
+  assert.deepEqual(requests[0], {
+    target: {
+      kind: 'entryPoint',
+      entryPoint: {
+        kind: 'source',
+        sourceId: '7'
+      },
+      label: 'Source Fixture'
+    },
+    offset: 0,
+    limit: 50
+  })
   assert.equal(controller.currentRoot.value?.id, 'source:7')
   assert.equal(controller.directoryReadStates.value.get('12')?.kind, 'unloaded')
   assert.equal(controller.directoryReadStates.value.get('13')?.kind, 'unloaded')
@@ -294,9 +402,39 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   assert.deepEqual(
     [...projection.directoryReadTargetsByNodeId.entries()],
     [
-      ['source-directory:12', { sourceDirectoryId: '12' }],
-      ['source-directory:13', { sourceDirectoryId: '13' }],
-      ['source-directory:14', { sourceDirectoryId: '14' }]
+      [
+        'source-directory:12',
+        {
+          entryPoint: {
+            kind: 'source',
+            sourceId: '7'
+          },
+          label: 'Source Fixture',
+          sourceDirectoryId: '12'
+        }
+      ],
+      [
+        'source-directory:13',
+        {
+          entryPoint: {
+            kind: 'source',
+            sourceId: '7'
+          },
+          label: 'Source Fixture',
+          sourceDirectoryId: '13'
+        }
+      ],
+      [
+        'source-directory:14',
+        {
+          entryPoint: {
+            kind: 'source',
+            sourceId: '7'
+          },
+          label: 'Source Fixture',
+          sourceDirectoryId: '14'
+        }
+      ]
     ]
   )
   assert.equal(
@@ -347,7 +485,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   if (projection?.kind !== 'tree') {
     assert.fail('expected failed directory projection')
   }
-  assert.equal(firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:13'), 'failed')
+  assert.equal(firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:13'), 'loaded')
 
   assert.equal(await controller.requestDirectoryChildren('source-directory:13'), true)
   const retriedState = controller.directoryReadStates.value.get('13')
@@ -393,11 +531,12 @@ async function startedHostWithClient(
   return host
 }
 
-function testLibraryApi(
-  readChildren: (
+function testLibraryApi(options: {
+  readonly readRows?: LibraryBrowserApi['navigation']['readRows']
+  readonly readChildren: (
     request: LibraryHierarchyReadChildrenRequest
   ) => Promise<LibraryHierarchyReadChildrenResult>
-): LibraryBrowserApi {
+}): LibraryBrowserApi {
   return {
     host: {
       getStatus: async () => ({
@@ -411,8 +550,16 @@ function testLibraryApi(
       }),
       onStatusChanged: () => () => undefined
     },
+    navigation: {
+      readRows:
+        options.readRows ??
+        (async () => ({
+          state: 'ready',
+          rows: []
+        }))
+    },
     hierarchy: {
-      readChildren
+      readChildren: options.readChildren
     },
     roots: {
       chooseAndRegisterLocal: async () => ({
@@ -430,6 +577,30 @@ function testLibraryApi(
         }
       })
     }
+  }
+}
+
+function navigationSourceReadRowsResult(): Awaited<
+  ReturnType<LibraryBrowserApi['navigation']['readRows']>
+> {
+  return {
+    state: 'ready',
+    rows: [
+      {
+        navigationRowId: '7',
+        stableKey: 'source:7',
+        parentNavigationRowId: null,
+        family: 'sources',
+        rowKind: 'source',
+        displayName: 'Source Fixture',
+        siblingPosition: 0,
+        selectable: true,
+        selectorKind: 'source',
+        selectorPayload: '7',
+        updatedAtMs: 100,
+        rowVersion: '1'
+      }
+    ]
   }
 }
 
@@ -584,6 +755,17 @@ function assertReadError(
 ): void {
   if (result.state === 'ready') {
     assert.fail(`expected hierarchy read error ${String(code)}`)
+  }
+
+  assert.equal(result.error.code, code)
+}
+
+function assertNavigationReadError(
+  result: LibraryNavigationReadRowsResult,
+  code: Exclude<LibraryNavigationReadRowsResult, { state: 'ready' }>['error']['code']
+): void {
+  if (result.state === 'ready') {
+    assert.fail(`expected navigation read error ${String(code)}`)
   }
 
   assert.equal(result.error.code, code)

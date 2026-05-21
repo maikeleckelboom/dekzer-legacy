@@ -1,7 +1,6 @@
 import { strict as assert } from 'node:assert'
 
-import { libraryHierarchyFixtureTree } from '../src/renderer/libraryBrowser/fixture'
-import { projectReadResult } from '../src/renderer/libraryBrowser/hierarchyProjection'
+import { projectState } from '../src/renderer/libraryBrowser/hierarchyProjection'
 import {
   getTreeItemAriaExpanded,
   getTreeItemAriaSelected
@@ -31,6 +30,93 @@ import type {
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
 import type { LibraryHierarchyReadChildrenResult } from '../src/shared/libraryHierarchy/readChildren'
+import type { LibraryNavigationReadRowsResult } from '../src/shared/libraryNavigation/readRows'
+
+const libraryHierarchyFixtureTree = {
+  name: 'Tree validation fixture',
+  detail: 'Test-owned fixture input for generic tree interactions.',
+  nodes: [
+    {
+      id: 'fixture-root',
+      label: 'Fixture Library Root',
+      badgeLabel: 'Root',
+      detail: 'Demo root for renderer tree behavior.',
+      childrenState: {
+        kind: 'loaded',
+        children: [
+          {
+            id: 'fixture-artists',
+            label: 'Artists',
+            badgeLabel: 'Leaf',
+            detail: 'Fixture grouping placeholder.',
+            childrenState: { kind: 'leaf' }
+          },
+          {
+            id: 'fixture-albums',
+            label: 'Albums',
+            badgeLabel: 'Leaf',
+            detail: 'Fixture grouping placeholder.',
+            childrenState: { kind: 'leaf' }
+          },
+          {
+            id: 'fixture-tracks',
+            label: 'Tracks',
+            badgeLabel: 'Branch',
+            detail: 'Fixture grouping placeholder.',
+            childrenState: {
+              kind: 'loaded',
+              children: [
+                {
+                  id: 'fixture-tracks-group',
+                  label: 'Fixture Track Group',
+                  badgeLabel: 'Branch',
+                  detail: 'Demo child row for nested hierarchy rendering.',
+                  childrenState: { kind: 'leaf' }
+                }
+              ]
+            }
+          },
+          {
+            id: 'fixture-playlists',
+            label: 'Nested Branch',
+            badgeLabel: 'Branch',
+            detail: 'Fixture grouping placeholder.',
+            childrenState: {
+              kind: 'loaded',
+              children: [
+                {
+                  id: 'fixture-playlist-group',
+                  label: 'Fixture Nested Group',
+                  badgeLabel: 'Branch',
+                  detail: 'Demo child row for nested hierarchy rendering.',
+                  childrenState: { kind: 'leaf' }
+                }
+              ]
+            }
+          },
+          {
+            id: 'fixture-preparation',
+            label: 'Preparation',
+            badgeLabel: 'Leaf',
+            detail: 'Fixture workflow placeholder.',
+            childrenState: { kind: 'leaf' }
+          },
+          {
+            id: 'fixture-history',
+            label: 'History',
+            badgeLabel: 'Leaf',
+            detail: 'Fixture history placeholder.',
+            childrenState: { kind: 'leaf' }
+          }
+        ]
+      }
+    }
+  ]
+} satisfies {
+  readonly name: string
+  readonly detail: string
+  readonly nodes: readonly BrowserTreeNode[]
+}
 
 const expandedFixtureIds = new Set<BrowserTreeNodeId>([
   'fixture-root',
@@ -368,26 +454,38 @@ function validatesCollapseKeepsLoadedChildren(): void {
 }
 
 function validatesLibraryHierarchyReadProjection(): void {
-  const projected = projectReadResult(fileOnlyHierarchyReadResult())
+  const projected = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          window: fileOnlyHierarchyReadResult().window
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
 
-  assert.equal(projected.kind, 'tree')
-  if (projected.kind !== 'tree') {
+  assert.equal(projected?.kind, 'tree')
+  if (projected?.kind !== 'tree') {
     assert.fail('expected file-only hierarchy read result to project to browser tree')
   }
 
   assert.deepEqual(projected.nodes, [
     {
-      id: 'source:7',
+      id: 'navigation-row:7',
       label: 'Source Fixture',
-      kind: 'source',
-      detail: 'Loaded read-only from library backend. 1 literal hierarchy row available.',
+      badgeLabel: 'Source',
+      detail: 'Navigation source row. Updated 100.',
       childrenState: {
         kind: 'loaded',
         children: [
           {
             id: 'source-file:11',
             label: 'track.wav',
-            kind: 'file',
+            badgeLabel: 'File',
             detail: 'Present file.',
             childrenState: { kind: 'leaf' }
           }
@@ -396,24 +494,36 @@ function validatesLibraryHierarchyReadProjection(): void {
     }
   ])
 
-  const directoryProjection = projectReadResult(directoryHierarchyReadResult())
-  assert.equal(directoryProjection.kind, 'tree')
-  if (directoryProjection.kind !== 'tree') {
+  const directoryProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          window: directoryHierarchyReadResult().window
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
+  assert.equal(directoryProjection?.kind, 'tree')
+  if (directoryProjection?.kind !== 'tree') {
     assert.fail('expected directory hierarchy read result to project to browser tree')
   }
   assert.deepEqual(directoryProjection.nodes, [
     {
-      id: 'source:7',
+      id: 'navigation-row:7',
       label: 'Source Fixture',
-      kind: 'source',
-      detail: 'Loaded read-only from library backend. 1 literal hierarchy row available.',
+      badgeLabel: 'Source',
+      detail: 'Navigation source row. Updated 100.',
       childrenState: {
         kind: 'loaded',
         children: [
           {
             id: 'source-directory:12',
             label: 'Album',
-            kind: 'folder',
+            badgeLabel: 'Folder',
             detail: 'Present directory.',
             childrenState: {
               kind: 'unloaded',
@@ -426,39 +536,61 @@ function validatesLibraryHierarchyReadProjection(): void {
   ])
   const directoryItems = flattenVisibleTree({
     nodes: directoryProjection.nodes,
-    expandedNodeIds: new Set(['source:7', 'source-directory:12'])
+    expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
   })
   assert.deepEqual(
     directoryItems.map((item) => item.id),
-    ['source:7', 'source-directory:12']
+    ['navigation-row:7', 'source-directory:12']
   )
   assert.equal(getItem(directoryItems, 'source-directory:12').isBranch, true)
   assert.equal(getItem(directoryItems, 'source-directory:12').canRevealChildren, false)
   assert.equal(getItem(directoryItems, 'source-directory:12').canRequestChildren, true)
   assert.deepEqual(
     [...directoryProjection.directoryReadTargetsByNodeId.entries()],
-    [['source-directory:12', { sourceDirectoryId: '12' }]]
+    [
+      [
+        'source-directory:12',
+        {
+          entryPoint: {
+            kind: 'source',
+            sourceId: '7'
+          },
+          label: 'Source Fixture',
+          sourceDirectoryId: '12'
+        }
+      ]
+    ]
   )
 
-  const partialProjection = projectReadResult({
-    ...fileOnlyHierarchyReadResult(),
-    window: {
-      ...fileOnlyHierarchyReadResult().window,
-      totalRows: 2
-    }
+  const partialProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          window: {
+            ...fileOnlyHierarchyReadResult().window,
+            totalRows: 2
+          }
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
   })
-  assert.equal(partialProjection.kind, 'unsupported')
+  assert.equal(partialProjection?.nodes[0]?.childrenState.kind, 'loaded')
+  if (partialProjection.nodes[0]?.childrenState.kind !== 'loaded') {
+    assert.fail('expected partial projection to render a read state row')
+  }
+  assert.equal(partialProjection.nodes[0].childrenState.children[0]?.badgeLabel, 'State')
 }
 
 function validatesFixtureFallbackRemainsExplicit(): void {
-  assert.equal(libraryHierarchyFixtureTree.name, 'Library hierarchy fixture')
-  assert.match(libraryHierarchyFixtureTree.detail, /Renderer-only demo input/)
-  assert.equal(libraryHierarchyFixtureTree.nodes[0]?.kind, 'fixtureRoot')
+  assert.equal(libraryHierarchyFixtureTree.name, 'Tree validation fixture')
+  assert.match(libraryHierarchyFixtureTree.detail, /Test-owned fixture input/)
+  assert.equal(libraryHierarchyFixtureTree.nodes[0]?.badgeLabel, 'Root')
   assert.equal(libraryHierarchyFixtureTree.nodes[0]?.childrenState.kind, 'loaded')
-  assert.doesNotMatch(
-    JSON.stringify(libraryHierarchyFixtureTree),
-    /Loaded read-only from library backend/
-  )
+  assert.doesNotMatch(JSON.stringify(libraryHierarchyFixtureTree), /Loaded from literal hierarchy/)
   assert.doesNotMatch(JSON.stringify(libraryHierarchyFixtureTree), /Children not loaded yet/)
   assertFixtureNodesHaveExplicitChildrenState(libraryHierarchyFixtureTree.nodes)
 }
@@ -540,7 +672,7 @@ function leafRootNode(): BrowserTreeNode {
   return {
     id: 'leaf-root',
     label: 'Leaf root',
-    kind: 'folder',
+    badgeLabel: 'Branch',
     childrenState: { kind: 'leaf' }
   }
 }
@@ -549,14 +681,14 @@ function loadedBranchRootNode(): BrowserTreeNode {
   return {
     id: 'loaded-root',
     label: 'Loaded root',
-    kind: 'folder',
+    badgeLabel: 'Branch',
     childrenState: {
       kind: 'loaded',
       children: [
         {
           id: 'loaded-child',
           label: 'Loaded child',
-          kind: 'file',
+          badgeLabel: 'Leaf',
           childrenState: { kind: 'leaf' }
         }
       ]
@@ -568,7 +700,7 @@ function loadedEmptyBranchRootNode(): BrowserTreeNode {
   return {
     id: 'loaded-empty-root',
     label: 'Loaded empty root',
-    kind: 'folder',
+    badgeLabel: 'Branch',
     childrenState: {
       kind: 'loaded',
       children: []
@@ -580,7 +712,7 @@ function unloadedBranchNode(): BrowserTreeNode {
   return {
     id: 'unloaded-root',
     label: 'Unloaded root',
-    kind: 'folder',
+    badgeLabel: 'Branch',
     childrenState: {
       kind: 'unloaded',
       detail: 'Children not loaded yet.'
@@ -592,7 +724,7 @@ function loadingBranchNode(): BrowserTreeNode {
   return {
     id: 'loading-root',
     label: 'Loading root',
-    kind: 'folder',
+    badgeLabel: 'Branch',
     childrenState: {
       kind: 'loading',
       detail: 'Loading children.'
@@ -604,7 +736,7 @@ function failedBranchNode(): BrowserTreeNode {
   return {
     id: 'failed-root',
     label: 'Failed root',
-    kind: 'folder',
+    badgeLabel: 'Branch',
     childrenState: {
       kind: 'failed',
       detail: 'Unable to load children.'
@@ -641,6 +773,28 @@ function fileOnlyHierarchyReadResult(): Extract<
         }
       ]
     }
+  }
+}
+
+function navigationSourceReadRowsResult(): LibraryNavigationReadRowsResult {
+  return {
+    state: 'ready',
+    rows: [
+      {
+        navigationRowId: '7',
+        stableKey: 'source:7',
+        parentNavigationRowId: null,
+        family: 'sources',
+        rowKind: 'source',
+        displayName: 'Source Fixture',
+        siblingPosition: 0,
+        selectable: true,
+        selectorKind: 'source',
+        selectorPayload: '7',
+        updatedAtMs: 100,
+        rowVersion: '1'
+      }
+    ]
   }
 }
 

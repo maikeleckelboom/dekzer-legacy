@@ -10,6 +10,10 @@ import {
   hierarchyReadChannels,
   type LibraryHierarchyReadChildrenResult
 } from '../src/shared/libraryHierarchy/readChildren'
+import {
+  navigationReadChannels,
+  type LibraryNavigationReadRowsResult
+} from '../src/shared/libraryNavigation/readRows'
 import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
@@ -26,6 +30,28 @@ async function validatesPreloadApiSurface(): Promise<void> {
   const hierarchyRequest = firstAvailableSourceReadRequest()
   const scanRequest = {
     rootId: 'root-1'
+  }
+  const navigationRequest = {
+    parentNavigationRowId: null
+  }
+  const navigationResult: LibraryNavigationReadRowsResult = {
+    state: 'ready',
+    rows: [
+      {
+        navigationRowId: '7',
+        stableKey: 'source:7',
+        parentNavigationRowId: null,
+        family: 'sources',
+        rowKind: 'source',
+        displayName: 'Source Fixture',
+        siblingPosition: 0,
+        selectable: true,
+        selectorKind: 'source',
+        selectorPayload: '7',
+        updatedAtMs: 100,
+        rowVersion: '1'
+      }
+    ]
   }
   const hierarchyResult: LibraryHierarchyReadChildrenResult = {
     state: 'noTarget',
@@ -48,6 +74,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
     discoveredFileCount: 12,
     queuedSourceWorkItems: 8
   }
+  let receivedNavigationRequest: unknown = null
   let receivedHierarchyRequest: unknown = null
   let receivedChoiceArgs: readonly unknown[] | undefined
   let receivedScanRequest: unknown = null
@@ -66,6 +93,12 @@ async function validatesPreloadApiSurface(): Promise<void> {
         assert.equal(args.length, 1)
         receivedHierarchyRequest = args[0]
         return hierarchyResult
+      }
+
+      if (channel === navigationReadChannels.readRows) {
+        assert.equal(args.length, 1)
+        receivedNavigationRequest = args[0]
+        return navigationResult
       }
 
       if (channel === rootChannels.chooseAndRegisterLocal) {
@@ -108,9 +141,10 @@ async function validatesPreloadApiSurface(): Promise<void> {
 
   assert.deepEqual(Object.keys(api), ['library'])
   assert.equal('libraryBoundary' in api, false)
-  assert.deepEqual(Object.keys(api.library).sort(), ['hierarchy', 'host', 'roots'])
+  assert.deepEqual(Object.keys(api.library).sort(), ['hierarchy', 'host', 'navigation', 'roots'])
   assert.deepEqual(Object.keys(api.library.host).sort(), ['getStatus', 'onStatusChanged'])
   assert.deepEqual(Object.keys(api.library.hierarchy), ['readChildren'])
+  assert.deepEqual(Object.keys(api.library.navigation), ['readRows'])
   assert.deepEqual(Object.keys(api.library.roots).sort(), ['chooseAndRegisterLocal', 'runScan'])
   assert.equal('ipcRenderer' in api, false)
   assert.equal('libraryBoundary' in api, false)
@@ -123,10 +157,16 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.equal('getStatus' in api.library, false)
   assert.equal('onStatusChanged' in api.library, false)
   assert.equal('readLiteralHierarchyChildren' in api.library, false)
+  assert.equal('readNavigationRows' in api.library, false)
   assert.equal('registerLocal' in api.library, false)
   assert.equal('registerLocalRoot' in api.library, false)
   assert.equal('registerLocal' in api.library.roots, false)
   assert.equal('readLiteralHierarchyChildren' in api.library.hierarchy, false)
+  assert.equal('client' in api.library.navigation, false)
+  assert.equal('transport' in api.library.navigation, false)
+  assert.equal('ipcRenderer' in api.library.navigation, false)
+  assert.equal('readLiteralHierarchyChildren' in api.library.navigation, false)
+  assert.equal('registerLocalRoot' in api.library.navigation, false)
   assert.equal('registerLocalRoot' in api.library.roots, false)
   assert.equal('runRootScan' in api.library.roots, false)
   assert.equal('client' in api.library.roots, false)
@@ -146,6 +186,8 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(receivedChoiceArgs, [])
   assert.equal(await api.library.roots.runScan(scanRequest), scanResult)
   assert.equal(receivedScanRequest, scanRequest)
+  assert.equal(await api.library.navigation.readRows(navigationRequest), navigationResult)
+  assert.equal(receivedNavigationRequest, navigationRequest)
   assert.equal(await api.library.hierarchy.readChildren(hierarchyRequest), hierarchyResult)
   assert.equal(receivedHierarchyRequest, hierarchyRequest)
 

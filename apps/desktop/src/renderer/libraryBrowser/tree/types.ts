@@ -1,15 +1,5 @@
 export type BrowserTreeNodeId = string
 
-export type BrowserTreeNodeKind =
-  | 'fixtureRoot'
-  | 'source'
-  | 'folder'
-  | 'file'
-  | 'playlistGroup'
-  | 'preparation'
-  | 'history'
-  | 'trackGroup'
-
 export type BrowserTreeChildrenState =
   | {
       readonly kind: 'leaf'
@@ -34,15 +24,9 @@ export type BrowserTreeChildrenState =
 export type BrowserTreeNode = {
   readonly id: BrowserTreeNodeId
   readonly label: string
-  readonly kind: BrowserTreeNodeKind
+  readonly badgeLabel: string
   readonly detail?: string
   readonly childrenState: BrowserTreeChildrenState
-}
-
-export type BrowserTreeFixture = {
-  readonly name: string
-  readonly detail: string
-  readonly nodes: readonly BrowserTreeNode[]
 }
 
 export type BrowserTreeVisibleItem = {

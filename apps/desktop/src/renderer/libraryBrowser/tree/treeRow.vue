@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { BrowserTreeChildrenState, BrowserTreeNodeKind, BrowserTreeVisibleItem } from './types'
+import type { BrowserTreeChildrenState, BrowserTreeVisibleItem } from './types'
 import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
 
 defineOptions({
@@ -25,29 +25,7 @@ const rowStyle = computed(() => ({
   paddingLeft: `${0.75 + (props.item.level - 1) * 1.25}rem`
 }))
 
-const kindLabel = computed(() => formatNodeKind(props.item.node.kind))
 const childrenStateDetail = computed(() => formatChildrenStateDetail(props.item.node.childrenState))
-
-function formatNodeKind(kind: BrowserTreeNodeKind): string {
-  switch (kind) {
-    case 'fixtureRoot':
-      return 'Fixture root'
-    case 'source':
-      return 'Source'
-    case 'folder':
-      return 'Folder'
-    case 'file':
-      return 'File'
-    case 'playlistGroup':
-      return 'Playlist group'
-    case 'preparation':
-      return 'Preparation'
-    case 'history':
-      return 'History'
-    case 'trackGroup':
-      return 'Track group'
-  }
-}
 
 function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | undefined {
   switch (state.kind) {
@@ -102,7 +80,7 @@ function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | un
     <span
       class="shrink-0 rounded-sm border border-(--color-border) px-2 py-0.5 text-[11px] font-semibold uppercase leading-4 text-(--color-text-muted)"
     >
-      {{ kindLabel }}
+      {{ item.node.badgeLabel }}
     </span>
   </div>
 </template>

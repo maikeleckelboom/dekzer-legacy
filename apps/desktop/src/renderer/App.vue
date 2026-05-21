@@ -107,7 +107,7 @@ function formatEnvironment(environment: LibraryBoundaryHostStatus['environment']
       <p
         class="inline-flex max-w-[460px] rounded-sm border border-white/10 px-3 py-2 text-lg text-(--color-text-muted)"
       >
-        Desktop app ready. Product wiring is not active yet.
+        Desktop app ready. Local library navigation is active.
       </p>
     </section>
 
@@ -142,12 +142,14 @@ function formatEnvironment(environment: LibraryBoundaryHostStatus['environment']
         </div>
         <div :class="stateRowClass">
           <span :class="stateLabelClass">Product wiring</span>
-          <strong :class="[stateValueClass, 'text-(--color-warning)']">Not active yet</strong>
+          <strong :class="[stateValueClass, 'text-(--color-accent)']"
+            >Library browser active</strong
+          >
         </div>
         <div :class="stateRowClass">
           <span :class="stateLabelClass">Library UI</span>
-          <strong :class="[stateValueClass, 'text-(--color-warning)']">
-            Read-only path guarded
+          <strong :class="[stateValueClass, 'text-(--color-accent)']">
+            Persisted navigation
           </strong>
         </div>
       </section>
