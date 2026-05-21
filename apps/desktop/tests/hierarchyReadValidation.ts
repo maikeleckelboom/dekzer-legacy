@@ -452,6 +452,13 @@ function testLibraryBoundary(
       lastError: null
     }),
     onStatusChanged: () => () => undefined,
+    registerLocalRoot: async () => ({
+      state: 'registrationFailed',
+      error: {
+        code: 'registrationFailed',
+        message: 'Local root registration should not be called by hierarchy read validation.'
+      }
+    }),
     readLiteralHierarchyChildren
   }
 }

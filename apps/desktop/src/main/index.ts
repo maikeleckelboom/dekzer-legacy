@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createLibraryBoundaryHost } from './libraryBoundary/host'
 import { registerLibraryHierarchyReadIpc } from './libraryHierarchy/read'
+import { registerLocalRootRegistrationIpc } from './libraryRoots/registerLocalRoot'
 import {
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
@@ -58,6 +59,7 @@ app.whenReady().then(() => {
   libraryBoundaryHostStatusController = new LibraryBoundaryHostStatusController(host)
   registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
   registerLibraryHierarchyReadIpc(ipcMain, host)
+  registerLocalRootRegistrationIpc(ipcMain, host)
   libraryBoundaryHostStatusController.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(libraryBoundaryHostStatusIpcChannels.statusChanged, status)

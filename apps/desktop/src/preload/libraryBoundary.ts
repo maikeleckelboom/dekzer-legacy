@@ -8,6 +8,11 @@ import {
   type LibraryHierarchyReadRequest,
   type LibraryHierarchyReadResult
 } from '../shared/libraryHierarchy/read'
+import {
+  libraryRootRegistrationIpcChannels,
+  type LocalRootRegistrationRequest,
+  type LocalRootRegistrationResult
+} from '../shared/libraryRoots/registerLocalRoot'
 
 type IpcRendererEventLike = unknown
 
@@ -51,6 +56,14 @@ export function createDekzerRendererApi(
           libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren,
           request
         )) as LibraryHierarchyReadResult
+      },
+      async registerLocalRoot(
+        request: LocalRootRegistrationRequest
+      ): Promise<LocalRootRegistrationResult> {
+        return (await ipcRenderer.invoke(
+          libraryRootRegistrationIpcChannels.registerLocalRoot,
+          request
+        )) as LocalRootRegistrationResult
       },
       onStatusChanged(callback) {
         const listener = (
