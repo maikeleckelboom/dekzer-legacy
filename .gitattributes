@@ -62,6 +62,8 @@ Cargo.lock text eol=lf
 *.html text eol=lf
 *.vue text eol=lf
 *.svg text eol=lf
+*.mts text eol=lf
+*.cts text eol=lf
 
 # ====================================================================
 # 4. Binary Assets (Do Not Modify)
