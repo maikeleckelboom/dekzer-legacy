@@ -24,12 +24,16 @@ import {
   isBrowserTreeBranch,
   isBrowserTreeLeaf
 } from '../src/renderer/libraryBrowser/tree/projection'
+import type { LoadedHierarchyChildrenState } from '../src/renderer/libraryBrowser/hierarchyState'
 import type {
   BrowserTreeNode,
   BrowserTreeNodeId,
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
-import type { LibraryHierarchyReadChildrenResult } from '../src/shared/libraryHierarchy/readChildren'
+import type {
+  LibraryHierarchyReadChildrenResult,
+  LibraryHierarchyReadChildrenWindow
+} from '../src/shared/libraryHierarchy/readChildren'
 import type { LibraryNavigationReadRowsResult } from '../src/shared/libraryNavigation/readRows'
 
 const libraryHierarchyFixtureTree = {
@@ -461,7 +465,7 @@ function validatesLibraryHierarchyReadProjection(): void {
         'navigation-row:7',
         {
           kind: 'loaded',
-          window: fileOnlyHierarchyReadResult().window
+          children: loadedChildrenFromWindow(fileOnlyHierarchyReadResult().window)
         }
       ]
     ]),
@@ -501,7 +505,7 @@ function validatesLibraryHierarchyReadProjection(): void {
         'navigation-row:7',
         {
           kind: 'loaded',
-          window: directoryHierarchyReadResult().window
+          children: loadedChildrenFromWindow(directoryHierarchyReadResult().window)
         }
       ]
     ]),
@@ -569,20 +573,43 @@ function validatesLibraryHierarchyReadProjection(): void {
         'navigation-row:7',
         {
           kind: 'loaded',
-          window: {
+          children: loadedChildrenFromWindow({
             ...fileOnlyHierarchyReadResult().window,
             totalRows: 2
-          }
+          })
         }
       ]
     ]),
     directoryReadStates: new Map()
   })
-  assert.equal(partialProjection?.nodes[0]?.childrenState.kind, 'loaded')
-  if (partialProjection.nodes[0]?.childrenState.kind !== 'loaded') {
-    assert.fail('expected partial projection to render a read state row')
+  assert.equal(partialProjection?.kind, 'tree')
+  if (partialProjection?.kind !== 'tree') {
+    assert.fail('expected partial hierarchy read result to project to browser tree')
   }
-  assert.equal(partialProjection.nodes[0].childrenState.children[0]?.badgeLabel, 'State')
+  const partialSourceNode = partialProjection.nodes[0]
+  assert.equal(partialSourceNode?.childrenState.kind, 'loaded')
+  if (partialSourceNode?.childrenState.kind !== 'loaded') {
+    assert.fail('expected partial projection to render loaded children')
+  }
+  assert.deepEqual(
+    partialSourceNode.childrenState.children.map((node) => node.id),
+    ['source-file:11', 'continuation:navigation-row:7:1']
+  )
+  assert.equal(partialSourceNode.childrenState.children[0]?.badgeLabel, 'File')
+  assert.equal(partialSourceNode.childrenState.children[1]?.badgeLabel, 'More')
+  assert.deepEqual(
+    partialProjection.continuationReadTargetsByNodeId.get('continuation:navigation-row:7:1'),
+    {
+      ownerNodeId: 'navigation-row:7',
+      entryPoint: {
+        kind: 'source',
+        sourceId: '7'
+      },
+      label: 'Source Fixture',
+      offset: 1,
+      limit: 50
+    }
+  )
 }
 
 function validatesFixtureFallbackRemainsExplicit(): void {
@@ -827,5 +854,23 @@ function directoryHierarchyReadResult(): Extract<
         }
       ]
     }
+  }
+}
+
+function loadedChildrenFromWindow(
+  window: LibraryHierarchyReadChildrenWindow
+): LoadedHierarchyChildrenState {
+  const nextOffset = window.nodes.length < window.totalRows ? window.nodes.length : undefined
+
+  return {
+    entryPoint: window.root.entryPoint,
+    ...(window.parentSourceDirectoryId === undefined
+      ? {}
+      : { parentSourceDirectoryId: window.parentSourceDirectoryId }),
+    ...(window.root.label === undefined ? {} : { label: window.root.label }),
+    rows: window.nodes,
+    totalRows: window.totalRows,
+    ...(nextOffset === undefined ? {} : { nextOffset }),
+    limit: window.limit
   }
 }

@@ -1,6 +1,6 @@
 import type {
   LibraryHierarchyReadChildrenEntryPoint,
-  LibraryHierarchyReadChildrenWindow
+  LibraryHierarchyReadChildrenNode
 } from '../../shared/libraryHierarchy/readChildren'
 import type {
   LibraryNavigationReadRowsResult,
@@ -19,6 +19,38 @@ export type SourceReadTarget = {
   readonly label: string
 }
 
+export type ContinuationReadTarget = {
+  readonly ownerNodeId: string
+  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly parentSourceDirectoryId?: string
+  readonly label?: string
+  readonly offset: number
+  readonly limit: number
+}
+
+export type HierarchyContinuationReadState =
+  | {
+      readonly kind: 'loading'
+      readonly requestKey: string
+      readonly sequence: number
+      readonly detail?: string
+    }
+  | {
+      readonly kind: 'failed'
+      readonly detail: string
+    }
+
+export type LoadedHierarchyChildrenState = {
+  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly parentSourceDirectoryId?: string
+  readonly label?: string
+  readonly rows: readonly LibraryHierarchyReadChildrenNode[]
+  readonly totalRows: number
+  readonly nextOffset?: number
+  readonly limit: number
+  readonly continuation?: HierarchyContinuationReadState
+}
+
 export type DirectoryReadState =
   | {
       readonly kind: 'unloaded'
@@ -32,7 +64,7 @@ export type DirectoryReadState =
     }
   | {
       readonly kind: 'loaded'
-      readonly window: LibraryHierarchyReadChildrenWindow
+      readonly children: LoadedHierarchyChildrenState
     }
   | {
       readonly kind: 'failed'
@@ -52,7 +84,7 @@ export type SourceReadState =
     }
   | {
       readonly kind: 'loaded'
-      readonly window: LibraryHierarchyReadChildrenWindow
+      readonly children: LoadedHierarchyChildrenState
     }
   | {
       readonly kind: 'failed'
@@ -85,6 +117,13 @@ export type HierarchyProjectionRow =
       readonly kind: 'readState'
       readonly state: 'loading' | 'empty' | 'unavailable' | 'error'
       readonly ownerId: string
+      readonly detail: string
+    }
+  | {
+      readonly kind: 'continuation'
+      readonly state: 'available' | 'loading' | 'error'
+      readonly ownerId: string
+      readonly target: ContinuationReadTarget
       readonly detail: string
     }
 

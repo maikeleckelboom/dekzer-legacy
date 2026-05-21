@@ -65,6 +65,7 @@ async function main(): Promise<void> {
   await validatesNavigationReadHandler(config)
   validatesNavigationReadIpcRegistration(config)
   await validatesRendererHierarchyReadController()
+  await validatesRendererWindowedHierarchyContinuation()
 }
 
 async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig): Promise<void> {
@@ -493,18 +494,222 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   if (retriedState?.kind !== 'loaded') {
     assert.fail('expected retried directory read to load')
   }
-  assert.deepEqual(retriedState.window.nodes, [])
+  assert.deepEqual(retriedState.children.rows, [])
   projection = controller.browserProjection.value
   assert.equal(projection?.kind, 'tree')
   if (projection?.kind !== 'tree') {
     assert.fail('expected empty directory projection')
   }
   assert.equal(firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:13'), 'loaded')
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:13'), [
+    'read-state:source-directory:13:empty'
+  ])
 
   const staleDirectoryRequest = controller.requestDirectoryChildren('source-directory:14')
   await controller.readFirstAvailableSourceHierarchy()
   directory14Read.resolve(loadedDirectoryHierarchyReadResult('14'))
   assert.equal(await staleDirectoryRequest, false)
+  assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
+}
+
+async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
+  const requests: LibraryHierarchyReadChildrenRequest[] = []
+  const directory14Continuation = deferred<LibraryHierarchyReadChildrenResult>()
+  let rootReads = 0
+  let directory12ContinuationAttempts = 0
+  const controller = createLibraryHierarchyReadController(
+    testLibraryApi({
+      readRows: async () => navigationSourceReadRowsResult(),
+      readChildren: async (request) => {
+        const clonedRequest = structuredClone(request)
+        requests.push(clonedRequest)
+
+        if (clonedRequest.parentSourceDirectoryId === undefined) {
+          if (clonedRequest.offset === 2) {
+            return sourceContinuationHierarchyReadResult()
+          }
+
+          rootReads += 1
+          return rootReads === 1
+            ? partialSourceHierarchyReadResult()
+            : refreshedSourceHierarchyReadResult()
+        }
+
+        if (clonedRequest.parentSourceDirectoryId === '12') {
+          if (clonedRequest.offset === 1) {
+            directory12ContinuationAttempts += 1
+            return directory12ContinuationAttempts === 1
+              ? hierarchyReadError(
+                  'readFailed',
+                  'readFailed',
+                  'Unable to read more directory children.'
+                )
+              : directoryContinuationHierarchyReadResult('12')
+          }
+
+          return partialDirectoryHierarchyReadResult('12')
+        }
+
+        if (clonedRequest.parentSourceDirectoryId === '14') {
+          if (clonedRequest.offset === 1) {
+            return directory14Continuation.promise
+          }
+
+          return partialDirectoryHierarchyReadResult('14')
+        }
+
+        return emptyDirectoryHierarchyReadResult(clonedRequest.parentSourceDirectoryId)
+      }
+    })
+  )
+
+  await controller.refreshHierarchy()
+
+  let projection = controller.browserProjection.value
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected partial source hierarchy projection')
+  }
+
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'navigation-row:7'), [
+    'source-directory:12',
+    'source-directory:14',
+    'continuation:navigation-row:7:2'
+  ])
+  assert.equal(projection.rowsByNodeId.get('continuation:navigation-row:7:2')?.kind, 'continuation')
+  assert.deepEqual(
+    projection.continuationReadTargetsByNodeId.get('continuation:navigation-row:7:2'),
+    {
+      ownerNodeId: 'navigation-row:7',
+      entryPoint: {
+        kind: 'source',
+        sourceId: '7'
+      },
+      label: 'Source Fixture',
+      offset: 2,
+      limit: 50
+    }
+  )
+  assert.equal(requests.length, 1)
+
+  assert.equal(await controller.requestNodeChildren('continuation:navigation-row:7:2'), true)
+  assert.deepEqual(requests[1], {
+    target: {
+      kind: 'entryPoint',
+      entryPoint: {
+        kind: 'source',
+        sourceId: '7'
+      },
+      label: 'Source Fixture'
+    },
+    offset: 2,
+    limit: 50
+  })
+
+  projection = controller.browserProjection.value
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected completed source hierarchy projection')
+  }
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'navigation-row:7'), [
+    'source-directory:12',
+    'source-directory:14',
+    'source-file:99'
+  ])
+  assert.equal(projection.continuationReadTargetsByNodeId.size, 0)
+
+  assert.equal(await controller.requestDirectoryChildren('source-directory:12'), true)
+  projection = controller.browserProjection.value
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected partial directory hierarchy projection')
+  }
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:12'), [
+    'source-file:12-a',
+    'continuation:source-directory:12:1'
+  ])
+  assert.deepEqual(
+    projection.continuationReadTargetsByNodeId.get('continuation:source-directory:12:1'),
+    {
+      ownerNodeId: 'source-directory:12',
+      entryPoint: {
+        kind: 'source',
+        sourceId: '7'
+      },
+      label: 'Source Fixture',
+      parentSourceDirectoryId: '12',
+      offset: 1,
+      limit: 50
+    }
+  )
+
+  assert.equal(await controller.requestNodeChildren('continuation:source-directory:12:1'), true)
+  assert.deepEqual(requests[3], {
+    target: {
+      kind: 'entryPoint',
+      entryPoint: {
+        kind: 'source',
+        sourceId: '7'
+      },
+      label: 'Source Fixture'
+    },
+    parentSourceDirectoryId: '12',
+    offset: 1,
+    limit: 50
+  })
+  projection = controller.browserProjection.value
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected failed continuation projection')
+  }
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:12'), [
+    'source-file:12-a',
+    'continuation:source-directory:12:1'
+  ])
+  assert.equal(
+    projection.rowsByNodeId.get('continuation:source-directory:12:1')?.kind,
+    'continuation'
+  )
+  assert.equal(
+    findProjectedNode(projection.nodes, 'continuation:source-directory:12:1')?.childrenState.kind,
+    'failed'
+  )
+
+  assert.equal(await controller.requestNodeChildren('continuation:source-directory:12:1'), true)
+  projection = controller.browserProjection.value
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected retried continuation projection')
+  }
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:12'), [
+    'source-file:12-a',
+    'source-file:12-b'
+  ])
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'navigation-row:7'), [
+    'source-directory:12',
+    'source-directory:14',
+    'source-file:99'
+  ])
+
+  assert.equal(await controller.requestDirectoryChildren('source-directory:14'), true)
+  const staleContinuation = controller.requestNodeChildren('continuation:source-directory:14:1')
+  assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'loaded')
+  projection = controller.browserProjection.value
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected loading continuation projection')
+  }
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:14'), [
+    'source-file:14-a',
+    'continuation:source-directory:14:1'
+  ])
+  assert.equal(
+    findProjectedNode(projection.nodes, 'continuation:source-directory:14:1')?.childrenState.kind,
+    'loading'
+  )
+  await controller.readFirstAvailableSourceHierarchy()
+  directory14Continuation.resolve(directoryContinuationHierarchyReadResult('14'))
+  assert.equal(await staleContinuation, false)
   assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
 }
 
@@ -631,6 +836,84 @@ function directoryRootHierarchyReadResult(): Extract<
   }
 }
 
+function partialSourceHierarchyReadResult(): Extract<
+  LibraryHierarchyReadChildrenResult,
+  { state: 'ready' }
+> {
+  return {
+    state: 'ready',
+    window: {
+      root: {
+        id: 'source:7',
+        label: 'Source Fixture',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        }
+      },
+      offset: 0,
+      limit: 50,
+      totalRows: 3,
+      nodes: [directoryNode('12', 'Album'), directoryNode('14', 'Stale Album')]
+    }
+  }
+}
+
+function sourceContinuationHierarchyReadResult(): Extract<
+  LibraryHierarchyReadChildrenResult,
+  { state: 'ready' }
+> {
+  return {
+    state: 'ready',
+    window: {
+      root: {
+        id: 'source:7',
+        label: 'Source Fixture',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        }
+      },
+      offset: 2,
+      limit: 50,
+      totalRows: 3,
+      nodes: [
+        {
+          id: 'source-file:99',
+          kind: 'file',
+          label: 'root-track.wav',
+          sourceFileId: '99',
+          presenceState: 'present',
+          updatedAtMs: 101
+        }
+      ]
+    }
+  }
+}
+
+function refreshedSourceHierarchyReadResult(): Extract<
+  LibraryHierarchyReadChildrenResult,
+  { state: 'ready' }
+> {
+  return {
+    state: 'ready',
+    window: {
+      root: {
+        id: 'source:7',
+        label: 'Source Fixture',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        }
+      },
+      offset: 0,
+      limit: 50,
+      totalRows: 2,
+      nodes: [directoryNode('12', 'Album'), directoryNode('14', 'Stale Album')]
+    }
+  }
+}
+
 function loadedDirectoryHierarchyReadResult(
   parentSourceDirectoryId: string
 ): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
@@ -660,6 +943,72 @@ function loadedDirectoryHierarchyReadResult(
           updatedAtMs: 101
         },
         directoryNode('99', 'Nested Album', parentSourceDirectoryId)
+      ]
+    }
+  }
+}
+
+function partialDirectoryHierarchyReadResult(
+  parentSourceDirectoryId: string
+): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
+  return {
+    state: 'ready',
+    window: {
+      root: {
+        id: 'source:7',
+        label: 'Source Fixture',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        }
+      },
+      parentSourceDirectoryId,
+      offset: 0,
+      limit: 50,
+      totalRows: 2,
+      nodes: [
+        {
+          id: `source-file:${parentSourceDirectoryId}-a`,
+          kind: 'file',
+          label: 'a.wav',
+          sourceFileId: `${parentSourceDirectoryId}-a`,
+          parentSourceDirectoryId,
+          presenceState: 'present',
+          updatedAtMs: 101
+        }
+      ]
+    }
+  }
+}
+
+function directoryContinuationHierarchyReadResult(
+  parentSourceDirectoryId: string
+): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
+  return {
+    state: 'ready',
+    window: {
+      root: {
+        id: 'source:7',
+        label: 'Source Fixture',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        }
+      },
+      parentSourceDirectoryId,
+      offset: 1,
+      limit: 50,
+      totalRows: 2,
+      nodes: [
+        {
+          id: `source-file:${parentSourceDirectoryId}-b`,
+          kind: 'file',
+          label: 'b.wav',
+          sourceFileId: `${parentSourceDirectoryId}-b`,
+          parentSourceDirectoryId,
+          presenceState: 'present',
+          updatedAtMs: 102
+        }
       ]
     }
   }
@@ -726,6 +1075,16 @@ function firstProjectedDirectoryStateKind(
   nodeId: string
 ): string | undefined {
   return findProjectedNode(nodes, nodeId)?.childrenState.kind
+}
+
+function firstLoadedChildIds(nodes: readonly BrowserTreeNode[], nodeId: string): readonly string[] {
+  const node = findProjectedNode(nodes, nodeId)
+
+  if (node?.childrenState.kind !== 'loaded') {
+    return []
+  }
+
+  return node.childrenState.children.map((child) => child.id)
 }
 
 function findProjectedNode(

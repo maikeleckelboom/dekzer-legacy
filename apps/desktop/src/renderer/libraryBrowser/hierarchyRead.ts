@@ -4,6 +4,7 @@ import type { ComputedRef, Ref } from 'vue'
 import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
 import type {
   LibraryHierarchyReadChildrenEntryPoint,
+  LibraryHierarchyReadChildrenNode,
   LibraryHierarchyReadChildrenRequest,
   LibraryHierarchyReadChildrenResult,
   LibraryHierarchyReadChildrenRoot,
@@ -16,8 +17,11 @@ import type {
 import type { RendererApi } from '../../shared/rendererApi'
 import { projectState, type HierarchyProjection } from './hierarchyProjection'
 import type {
+  ContinuationReadTarget,
   DirectoryReadState,
   DirectoryReadTarget,
+  HierarchyContinuationReadState,
+  LoadedHierarchyChildrenState,
   SourceReadState,
   SourceReadTarget
 } from './hierarchyState'
@@ -27,7 +31,7 @@ const readLimit = 50
 const safeNavigationReadRequestFailure = 'Unable to request library navigation rows.'
 const safeSourceReadRequestFailure = 'Unable to request library source hierarchy children.'
 const safeChildReadRequestFailure = 'Unable to request library hierarchy directory children.'
-const safePartialChildReadFailure = 'The hierarchy read returned a partial child window.'
+const safeUnexpectedChildWindowFailure = 'The hierarchy read returned an unexpected child window.'
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
 export type LibraryBrowserApi = RendererApi['library']
@@ -220,6 +224,12 @@ export function createLibraryHierarchyReadController(
       return readDirectoryChildren(directoryTarget)
     }
 
+    const continuationTarget = projection.continuationReadTargetsByNodeId.get(nodeId)
+
+    if (continuationTarget !== undefined) {
+      return readContinuationChildren(continuationTarget)
+    }
+
     return false
   }
 
@@ -278,14 +288,21 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
+      if (!isExpectedWindow(result.window, 0, undefined)) {
+        setSourceReadState(nodeId, {
+          kind: 'failed',
+          detail: safeUnexpectedChildWindowFailure
+        })
+        return true
+      }
+
       setSourceReadState(
         nodeId,
         {
           kind: 'loaded',
-          window: result.window
+          children: loadedHierarchyChildrenFromWindow(result.window, sourceLoadedTarget(target))
         },
-        result.window,
-        target
+        result.window
       )
       return true
     } catch {
@@ -339,10 +356,10 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (!isCompleteWindow(result.window)) {
+      if (!isExpectedWindow(result.window, 0, target.sourceDirectoryId)) {
         setDirectoryReadState(target.sourceDirectoryId, {
           kind: 'failed',
-          detail: safePartialChildReadFailure
+          detail: safeUnexpectedChildWindowFailure
         })
         return true
       }
@@ -351,10 +368,9 @@ export function createLibraryHierarchyReadController(
         target.sourceDirectoryId,
         {
           kind: 'loaded',
-          window: result.window
+          children: loadedHierarchyChildrenFromWindow(result.window, directoryLoadedTarget(target))
         },
-        result.window,
-        target
+        result.window
       )
       return true
     } catch {
@@ -374,17 +390,191 @@ export function createLibraryHierarchyReadController(
     }
   }
 
+  async function readContinuationChildren(target: ContinuationReadTarget): Promise<boolean> {
+    if (target.parentSourceDirectoryId === undefined) {
+      return readSourceContinuation(target)
+    }
+
+    return readDirectoryContinuation(target)
+  }
+
+  async function readSourceContinuation(target: ContinuationReadTarget): Promise<boolean> {
+    const requestKey = createContinuationRequestKey(target)
+    const currentState = sourceReadStates.value.get(target.ownerNodeId)
+
+    if (!canReadContinuation(currentState, target)) {
+      return false
+    }
+
+    if (
+      currentState.children.continuation?.kind === 'loading' &&
+      currentState.children.continuation.requestKey === requestKey
+    ) {
+      return false
+    }
+
+    const sequence = ++sourceReadSequence
+    hierarchyReadIsLoading.value = true
+    hierarchyReadRequestError.value = undefined
+    setSourceContinuationState(target, {
+      kind: 'loading',
+      requestKey,
+      sequence,
+      detail: 'Loading more literal hierarchy rows.'
+    })
+
+    try {
+      const result = await libraryApi.hierarchy.readChildren(continuationReadRequest(target))
+
+      if (!isCurrentSourceContinuationLoading(target, requestKey, sequence)) {
+        return false
+      }
+
+      if (result.state !== 'ready') {
+        setSourceContinuationState(target, {
+          kind: 'failed',
+          detail: result.error.message
+        })
+        return true
+      }
+
+      if (!isExpectedWindow(result.window, target.offset, target.parentSourceDirectoryId)) {
+        setSourceContinuationState(target, {
+          kind: 'failed',
+          detail: safeUnexpectedChildWindowFailure
+        })
+        return true
+      }
+
+      const state = sourceReadStates.value.get(target.ownerNodeId)
+
+      if (!canReadContinuation(state, target)) {
+        return false
+      }
+
+      setSourceReadState(
+        target.ownerNodeId,
+        {
+          kind: 'loaded',
+          children: appendHierarchyChildrenWindow(state.children, result.window)
+        },
+        result.window
+      )
+      return true
+    } catch {
+      if (isCurrentSourceContinuationLoading(target, requestKey, sequence)) {
+        hierarchyReadRequestError.value = safeSourceReadRequestFailure
+        setSourceContinuationState(target, {
+          kind: 'failed',
+          detail: safeSourceReadRequestFailure
+        })
+        return true
+      }
+
+      return false
+    } finally {
+      if (sequence === sourceReadSequence) {
+        hierarchyReadIsLoading.value = false
+      }
+    }
+  }
+
+  async function readDirectoryContinuation(target: ContinuationReadTarget): Promise<boolean> {
+    const sourceDirectoryId = target.parentSourceDirectoryId
+
+    if (sourceDirectoryId === undefined) {
+      return false
+    }
+
+    const requestKey = createContinuationRequestKey(target)
+    const currentState = directoryReadStates.value.get(sourceDirectoryId)
+
+    if (!canReadContinuation(currentState, target)) {
+      return false
+    }
+
+    if (
+      currentState.children.continuation?.kind === 'loading' &&
+      currentState.children.continuation.requestKey === requestKey
+    ) {
+      return false
+    }
+
+    const sequence = ++directoryReadSequence
+    hierarchyReadIsLoading.value = true
+    hierarchyReadRequestError.value = undefined
+    setDirectoryContinuationState(target, {
+      kind: 'loading',
+      requestKey,
+      sequence,
+      detail: 'Loading more children.'
+    })
+
+    try {
+      const result = await libraryApi.hierarchy.readChildren(continuationReadRequest(target))
+
+      if (!isCurrentDirectoryContinuationLoading(target, requestKey, sequence)) {
+        return false
+      }
+
+      if (result.state !== 'ready') {
+        setDirectoryContinuationState(target, {
+          kind: 'failed',
+          detail: result.error.message
+        })
+        return true
+      }
+
+      if (!isExpectedWindow(result.window, target.offset, sourceDirectoryId)) {
+        setDirectoryContinuationState(target, {
+          kind: 'failed',
+          detail: safeUnexpectedChildWindowFailure
+        })
+        return true
+      }
+
+      const state = directoryReadStates.value.get(sourceDirectoryId)
+
+      if (!canReadContinuation(state, target)) {
+        return false
+      }
+
+      setDirectoryReadState(
+        sourceDirectoryId,
+        {
+          kind: 'loaded',
+          children: appendHierarchyChildrenWindow(state.children, result.window)
+        },
+        result.window
+      )
+      return true
+    } catch {
+      if (isCurrentDirectoryContinuationLoading(target, requestKey, sequence)) {
+        setDirectoryContinuationState(target, {
+          kind: 'failed',
+          detail: safeChildReadRequestFailure
+        })
+        return true
+      }
+
+      return false
+    } finally {
+      if (sequence === directoryReadSequence) {
+        hierarchyReadIsLoading.value = false
+      }
+    }
+  }
+
   function setSourceReadState(
     nodeId: string,
     state: SourceReadState,
-    discoveredWindow?: LibraryHierarchyReadChildrenWindow,
-    target?: SourceReadTarget
+    discoveredWindow?: LibraryHierarchyReadChildrenWindow
   ): void {
     const nextStates = new Map(sourceReadStates.value)
     nextStates.set(nodeId, state)
     sourceReadStates.value = nextStates
 
-    if (discoveredWindow !== undefined && target !== undefined) {
+    if (discoveredWindow !== undefined) {
       const nextDirectoryStates = new Map(directoryReadStates.value)
       addDiscoveredUnloadedDirectoryStates(nextDirectoryStates, discoveredWindow)
       directoryReadStates.value = nextDirectoryStates
@@ -394,17 +584,54 @@ export function createLibraryHierarchyReadController(
   function setDirectoryReadState(
     sourceDirectoryId: string,
     state: DirectoryReadState,
-    discoveredWindow?: LibraryHierarchyReadChildrenWindow,
-    target?: DirectoryReadTarget
+    discoveredWindow?: LibraryHierarchyReadChildrenWindow
   ): void {
     const nextStates = new Map(directoryReadStates.value)
     nextStates.set(sourceDirectoryId, state)
 
-    if (discoveredWindow !== undefined && target !== undefined) {
+    if (discoveredWindow !== undefined) {
       addDiscoveredUnloadedDirectoryStates(nextStates, discoveredWindow)
     }
 
     directoryReadStates.value = nextStates
+  }
+
+  function setSourceContinuationState(
+    target: ContinuationReadTarget,
+    continuation: HierarchyContinuationReadState
+  ): void {
+    const state = sourceReadStates.value.get(target.ownerNodeId)
+
+    if (!canReadContinuation(state, target)) {
+      return
+    }
+
+    setSourceReadState(target.ownerNodeId, {
+      kind: 'loaded',
+      children: withHierarchyContinuation(state.children, continuation)
+    })
+  }
+
+  function setDirectoryContinuationState(
+    target: ContinuationReadTarget,
+    continuation: HierarchyContinuationReadState
+  ): void {
+    const sourceDirectoryId = target.parentSourceDirectoryId
+
+    if (sourceDirectoryId === undefined) {
+      return
+    }
+
+    const state = directoryReadStates.value.get(sourceDirectoryId)
+
+    if (!canReadContinuation(state, target)) {
+      return
+    }
+
+    setDirectoryReadState(sourceDirectoryId, {
+      kind: 'loaded',
+      children: withHierarchyContinuation(state.children, continuation)
+    })
   }
 
   function isCurrentSourceLoading(nodeId: string, requestKey: string, sequence: number): boolean {
@@ -422,6 +649,42 @@ export function createLibraryHierarchyReadController(
     const state = directoryReadStates.value.get(sourceDirectoryId)
     return (
       state?.kind === 'loading' && state.requestKey === requestKey && state.sequence === sequence
+    )
+  }
+
+  function isCurrentSourceContinuationLoading(
+    target: ContinuationReadTarget,
+    requestKey: string,
+    sequence: number
+  ): boolean {
+    const state = sourceReadStates.value.get(target.ownerNodeId)
+    const continuation = state?.kind === 'loaded' ? state.children.continuation : undefined
+
+    return (
+      continuation?.kind === 'loading' &&
+      continuation.requestKey === requestKey &&
+      continuation.sequence === sequence
+    )
+  }
+
+  function isCurrentDirectoryContinuationLoading(
+    target: ContinuationReadTarget,
+    requestKey: string,
+    sequence: number
+  ): boolean {
+    const sourceDirectoryId = target.parentSourceDirectoryId
+
+    if (sourceDirectoryId === undefined) {
+      return false
+    }
+
+    const state = directoryReadStates.value.get(sourceDirectoryId)
+    const continuation = state?.kind === 'loaded' ? state.children.continuation : undefined
+
+    return (
+      continuation?.kind === 'loading' &&
+      continuation.requestKey === requestKey &&
+      continuation.sequence === sequence
     )
   }
 
@@ -469,6 +732,175 @@ function directoryReadRequest(target: DirectoryReadTarget): LibraryHierarchyRead
     offset: 0,
     limit: readLimit
   }
+}
+
+function continuationReadRequest(
+  target: ContinuationReadTarget
+): LibraryHierarchyReadChildrenRequest {
+  return {
+    target: {
+      kind: 'entryPoint',
+      entryPoint: copyReadEntryPoint(target.entryPoint),
+      ...(target.label === undefined ? {} : { label: target.label })
+    },
+    ...(target.parentSourceDirectoryId === undefined
+      ? {}
+      : { parentSourceDirectoryId: target.parentSourceDirectoryId }),
+    offset: target.offset,
+    limit: target.limit
+  }
+}
+
+function sourceLoadedTarget(target: SourceReadTarget): {
+  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly label?: string
+  readonly parentSourceDirectoryId?: string
+} {
+  return {
+    entryPoint: copyReadEntryPoint(target.entryPoint),
+    label: target.label
+  }
+}
+
+function directoryLoadedTarget(target: DirectoryReadTarget): {
+  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly label?: string
+  readonly parentSourceDirectoryId?: string
+} {
+  return {
+    entryPoint: copyReadEntryPoint(target.entryPoint),
+    ...(target.label === undefined ? {} : { label: target.label }),
+    parentSourceDirectoryId: target.sourceDirectoryId
+  }
+}
+
+function loadedHierarchyChildrenFromWindow(
+  window: LibraryHierarchyReadChildrenWindow,
+  target: {
+    readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+    readonly label?: string
+    readonly parentSourceDirectoryId?: string
+  }
+): LoadedHierarchyChildrenState {
+  return loadedHierarchyChildren({
+    entryPoint: target.entryPoint,
+    ...(target.label === undefined ? {} : { label: target.label }),
+    ...(target.parentSourceDirectoryId === undefined
+      ? {}
+      : { parentSourceDirectoryId: target.parentSourceDirectoryId }),
+    rows: window.nodes,
+    totalRows: window.totalRows,
+    limit: window.limit
+  })
+}
+
+function appendHierarchyChildrenWindow(
+  children: LoadedHierarchyChildrenState,
+  window: LibraryHierarchyReadChildrenWindow
+): LoadedHierarchyChildrenState {
+  return loadedHierarchyChildren({
+    entryPoint: children.entryPoint,
+    ...(children.label === undefined ? {} : { label: children.label }),
+    ...(children.parentSourceDirectoryId === undefined
+      ? {}
+      : { parentSourceDirectoryId: children.parentSourceDirectoryId }),
+    rows: [...children.rows, ...window.nodes],
+    totalRows: window.totalRows,
+    limit: window.limit
+  })
+}
+
+function withHierarchyContinuation(
+  children: LoadedHierarchyChildrenState,
+  continuation: HierarchyContinuationReadState
+): LoadedHierarchyChildrenState {
+  return loadedHierarchyChildren({
+    entryPoint: children.entryPoint,
+    ...(children.label === undefined ? {} : { label: children.label }),
+    ...(children.parentSourceDirectoryId === undefined
+      ? {}
+      : { parentSourceDirectoryId: children.parentSourceDirectoryId }),
+    rows: children.rows,
+    totalRows: children.totalRows,
+    limit: children.limit,
+    continuation
+  })
+}
+
+function loadedHierarchyChildren(options: {
+  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly parentSourceDirectoryId?: string
+  readonly label?: string
+  readonly rows: readonly LibraryHierarchyReadChildrenNode[]
+  readonly totalRows: number
+  readonly limit: number
+  readonly continuation?: HierarchyContinuationReadState
+}): LoadedHierarchyChildrenState {
+  const nextOffset = options.rows.length < options.totalRows ? options.rows.length : undefined
+
+  return {
+    entryPoint: copyReadEntryPoint(options.entryPoint),
+    ...(options.parentSourceDirectoryId === undefined
+      ? {}
+      : { parentSourceDirectoryId: options.parentSourceDirectoryId }),
+    ...(options.label === undefined ? {} : { label: options.label }),
+    rows: options.rows,
+    totalRows: options.totalRows,
+    ...(nextOffset === undefined ? {} : { nextOffset }),
+    limit: Math.min(options.limit, readLimit),
+    ...(options.continuation === undefined ? {} : { continuation: options.continuation })
+  }
+}
+
+function isExpectedWindow(
+  window: LibraryHierarchyReadChildrenWindow,
+  expectedOffset: number,
+  expectedParentSourceDirectoryId: string | undefined
+): boolean {
+  if (window.offset !== expectedOffset) {
+    return false
+  }
+
+  if ((window.parentSourceDirectoryId ?? undefined) !== expectedParentSourceDirectoryId) {
+    return false
+  }
+
+  if (window.nodes.length > window.limit) {
+    return false
+  }
+
+  if (window.offset + window.nodes.length > window.totalRows) {
+    return false
+  }
+
+  return window.offset >= window.totalRows || window.nodes.length > 0
+}
+
+function canReadContinuation(
+  state: SourceReadState | DirectoryReadState | undefined,
+  target: ContinuationReadTarget
+): state is Extract<SourceReadState | DirectoryReadState, { readonly kind: 'loaded' }> {
+  return (
+    state?.kind === 'loaded' &&
+    state.children.nextOffset === target.offset &&
+    sameEntryPoint(state.children.entryPoint, target.entryPoint) &&
+    (state.children.parentSourceDirectoryId ?? undefined) === target.parentSourceDirectoryId
+  )
+}
+
+function sameEntryPoint(
+  left: LibraryHierarchyReadChildrenEntryPoint,
+  right: LibraryHierarchyReadChildrenEntryPoint
+): boolean {
+  if (left.kind !== right.kind) {
+    return false
+  }
+
+  if (left.kind === 'source') {
+    return right.kind === 'source' && left.sourceId === right.sourceId
+  }
+
+  return right.kind === 'sourceLocation' && left.sourceLocationId === right.sourceLocationId
 }
 
 function copyReadEntryPoint(
@@ -555,14 +987,12 @@ function createDirectoryRequestKey(
   return `${createEntryPointRequestKey(entryPoint)}/directory:${sourceDirectoryId}`
 }
 
-function isPositiveOpaqueId(value: unknown): value is string {
-  return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
+function createContinuationRequestKey(target: ContinuationReadTarget): string {
+  return `${createEntryPointRequestKey(target.entryPoint)}/directory:${
+    target.parentSourceDirectoryId ?? 'root'
+  }/offset:${target.offset}`
 }
 
-function isCompleteWindow(window: {
-  readonly offset: number
-  readonly nodes: readonly unknown[]
-  readonly totalRows: number
-}): boolean {
-  return window.offset === 0 && window.nodes.length === window.totalRows
+function isPositiveOpaqueId(value: unknown): value is string {
+  return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
 }

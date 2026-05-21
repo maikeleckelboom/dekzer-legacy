@@ -151,6 +151,8 @@ const selectedSummaryDetail = computed(() => {
       return 'Literal file backed by source_file_id.'
     case 'readState':
       return row.detail
+    case 'continuation':
+      return row.detail
   }
 
   return 'Selected library browser row.'
@@ -257,6 +259,8 @@ function formatSelectedRowKind(kind: HierarchyProjectionRow['kind']): string {
       return 'Literal file row'
     case 'readState':
       return 'Read state row'
+    case 'continuation':
+      return 'Continuation row'
   }
 }
 
