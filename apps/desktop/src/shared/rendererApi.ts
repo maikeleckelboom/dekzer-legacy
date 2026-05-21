@@ -4,8 +4,8 @@ import type {
 } from './libraryBoundary/status'
 import type { ReadRequest, ReadResult } from './libraryHierarchy/readChildren'
 import type {
-  LibraryNavigationReadRowsRequest,
-  LibraryNavigationReadRowsResult
+  NavigationReadRowsRequest,
+  NavigationReadRowsResult
 } from './libraryNavigation/readRows'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
@@ -31,7 +31,7 @@ export type LibraryHierarchyApi = {
 }
 
 export type LibraryNavigationApi = {
-  readRows(request: LibraryNavigationReadRowsRequest): Promise<LibraryNavigationReadRowsResult>
+  readRows(request: NavigationReadRowsRequest): Promise<NavigationReadRowsResult>
 }
 
 export type LibraryRootsApi = {

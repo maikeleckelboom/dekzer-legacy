@@ -31,7 +31,7 @@ import type {
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
 import type { ReadResult, ChildWindow } from '../src/shared/libraryHierarchy/readChildren'
-import type { LibraryNavigationReadRowsResult } from '../src/shared/libraryNavigation/readRows'
+import type { NavigationReadRowsResult } from '../src/shared/libraryNavigation/readRows'
 
 const libraryHierarchyFixtureTree = {
   name: 'Tree validation fixture',
@@ -804,7 +804,7 @@ function fileOnlyHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> 
   }
 }
 
-function navigationSourceReadRowsResult(): LibraryNavigationReadRowsResult {
+function navigationSourceReadRowsResult(): NavigationReadRowsResult {
   return {
     state: 'ready',
     rows: [

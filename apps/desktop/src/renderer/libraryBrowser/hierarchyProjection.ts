@@ -1,5 +1,5 @@
 import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
-import type { LibraryNavigationRow } from '../../shared/libraryNavigation/readRows'
+import type { NavigationRow } from '../../shared/libraryNavigation/readRows'
 import type {
   DirectoryState,
   LoadedChildren,
@@ -73,7 +73,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
 }
 
 function projectNavigationRow(options: {
-  readonly row: LibraryNavigationRow
+  readonly row: NavigationRow
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -497,7 +497,7 @@ function trackedMoreNode(
   return node
 }
 
-function sourceReadTargetFor(row: LibraryNavigationRow): SourceTarget | undefined {
+function sourceReadTargetFor(row: NavigationRow): SourceTarget | undefined {
   if (row.selectorKind === 'source' && isPositiveOpaqueId(row.selectorPayload)) {
     return {
       navigationRowId: row.navigationRowId,
@@ -523,7 +523,7 @@ function sourceReadTargetFor(row: LibraryNavigationRow): SourceTarget | undefine
   return undefined
 }
 
-function navigationNodeId(row: LibraryNavigationRow): BrowserTreeNodeId {
+function navigationNodeId(row: NavigationRow): BrowserTreeNodeId {
   return `navigation-row:${row.navigationRowId}`
 }
 
@@ -546,15 +546,15 @@ function copyReadEntryPoint(entryPoint: EntryPoint): EntryPoint {
   }
 }
 
-function formatNavigationSourceDetail(row: LibraryNavigationRow): string {
+function formatNavigationSourceDetail(row: NavigationRow): string {
   return `Navigation source row. ${formatRowFreshness(row)}`
 }
 
-function formatNavigationDetail(row: LibraryNavigationRow): string {
+function formatNavigationDetail(row: NavigationRow): string {
   return `Navigation ${formatNavigationRowKind(row.rowKind)} row. ${formatRowFreshness(row)}`
 }
 
-function formatNavigationRowKind(rowKind: LibraryNavigationRow['rowKind']): string {
+function formatNavigationRowKind(rowKind: NavigationRow['rowKind']): string {
   switch (rowKind) {
     case 'view':
       return 'view'
@@ -575,7 +575,7 @@ function formatNavigationRowKind(rowKind: LibraryNavigationRow['rowKind']): stri
   }
 }
 
-function formatRowFreshness(row: LibraryNavigationRow): string {
+function formatRowFreshness(row: NavigationRow): string {
   return `Updated ${row.updatedAtMs}.`
 }
 

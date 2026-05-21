@@ -2,13 +2,9 @@ export const navigationReadChannels = {
   readRows: 'desktop:library-navigation:read-rows'
 } as const
 
-export type LibraryNavigationReadRowsState =
-  | 'ready'
-  | 'hostUnavailable'
-  | 'invalidRequest'
-  | 'readFailed'
+export type NavigationReadRowsState = 'ready' | 'hostUnavailable' | 'invalidRequest' | 'readFailed'
 
-export type LibraryNavigationReadRowsErrorCode =
+export type NavigationReadRowsErrorCode =
   | 'hostNotStarted'
   | 'hostStopping'
   | 'hostStopped'
@@ -16,16 +12,16 @@ export type LibraryNavigationReadRowsErrorCode =
   | 'invalidRequest'
   | 'readFailed'
 
-export type LibraryNavigationReadRowsError = {
-  readonly code: LibraryNavigationReadRowsErrorCode
+export type NavigationReadRowsError = {
+  readonly code: NavigationReadRowsErrorCode
   readonly message: string
 }
 
-export type LibraryNavigationReadRowsErrorState = Exclude<LibraryNavigationReadRowsState, 'ready'>
+export type NavigationReadRowsErrorState = Exclude<NavigationReadRowsState, 'ready'>
 
-export type LibraryNavigationRowFamily = 'views' | 'collections' | 'preparation' | 'sources'
+export type NavigationRowFamily = 'views' | 'collections' | 'preparation' | 'sources'
 
-export type LibraryNavigationRowKind =
+export type NavigationRowKind =
   | 'view'
   | 'collectionGroup'
   | 'playlist'
@@ -35,7 +31,7 @@ export type LibraryNavigationRowKind =
   | 'locationGroup'
   | 'location'
 
-export type LibraryNavigationRowSelectorKind =
+export type NavigationRowSelectorKind =
   | 'allMedia'
   | 'allAudio'
   | 'allVideos'
@@ -47,31 +43,31 @@ export type LibraryNavigationRowSelectorKind =
   | 'playlist'
   | 'prepPolicyScope'
 
-export type LibraryNavigationRow = {
+export type NavigationRow = {
   readonly navigationRowId: string
   readonly stableKey: string
   readonly parentNavigationRowId: string | null
-  readonly family: LibraryNavigationRowFamily | null
-  readonly rowKind: LibraryNavigationRowKind
+  readonly family: NavigationRowFamily | null
+  readonly rowKind: NavigationRowKind
   readonly displayName: string
   readonly siblingPosition: number
   readonly selectable: boolean
-  readonly selectorKind: LibraryNavigationRowSelectorKind | null
+  readonly selectorKind: NavigationRowSelectorKind | null
   readonly selectorPayload: string | null
   readonly updatedAtMs: number
   readonly rowVersion: string
 }
 
-export type LibraryNavigationReadRowsRequest = {
+export type NavigationReadRowsRequest = {
   readonly parentNavigationRowId?: string | null
 }
 
-export type LibraryNavigationReadRowsResult =
+export type NavigationReadRowsResult =
   | {
       readonly state: 'ready'
-      readonly rows: readonly LibraryNavigationRow[]
+      readonly rows: readonly NavigationRow[]
     }
   | {
-      readonly state: LibraryNavigationReadRowsErrorState
-      readonly error: LibraryNavigationReadRowsError
+      readonly state: NavigationReadRowsErrorState
+      readonly error: NavigationReadRowsError
     }

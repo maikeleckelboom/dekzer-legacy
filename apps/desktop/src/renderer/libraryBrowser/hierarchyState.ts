@@ -1,7 +1,7 @@
 import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
 import type {
-  LibraryNavigationReadRowsResult,
-  LibraryNavigationRow
+  NavigationReadRowsResult,
+  NavigationRow
 } from '../../shared/libraryNavigation/readRows'
 
 export type DirectoryTarget = {
@@ -91,11 +91,11 @@ export type SourceState =
 export type RowBinding =
   | {
       readonly kind: 'navigation'
-      readonly navigationRow: LibraryNavigationRow
+      readonly navigationRow: NavigationRow
     }
   | {
       readonly kind: 'source'
-      readonly navigationRow: LibraryNavigationRow
+      readonly navigationRow: NavigationRow
       readonly target: SourceTarget
     }
   | {
@@ -126,7 +126,7 @@ export type RowBinding =
     }
 
 export type BrowserState = {
-  readonly navigationReadResult?: LibraryNavigationReadRowsResult
+  readonly navigationReadResult?: NavigationReadRowsResult
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
 }

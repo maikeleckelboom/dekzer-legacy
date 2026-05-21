@@ -1,19 +1,22 @@
-import type { NavigationRow, ReadNavigationRowsRequest } from '@dekzer/library-boundary-contract'
+import type {
+  NavigationRow as ContractNavigationRow,
+  ReadNavigationRowsRequest
+} from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
   navigationReadChannels,
-  type LibraryNavigationReadRowsErrorCode,
-  type LibraryNavigationReadRowsErrorState,
-  type LibraryNavigationReadRowsResult,
-  type LibraryNavigationRow
+  type NavigationReadRowsErrorCode,
+  type NavigationReadRowsErrorState,
+  type NavigationReadRowsResult,
+  type NavigationRow
 } from '../../shared/libraryNavigation/readRows'
 
 export type LibraryNavigationReadRowsIpcMain = {
   handle(
     channel: string,
-    listener: (event: unknown, request: unknown) => Promise<LibraryNavigationReadRowsResult>
+    listener: (event: unknown, request: unknown) => Promise<NavigationReadRowsResult>
   ): void
 }
 
@@ -31,7 +34,7 @@ export function registerReadNavigationRowsIpc(
 export async function readNavigationRowsThroughHost(
   host: LibraryBoundaryHost,
   request: unknown
-): Promise<LibraryNavigationReadRowsResult> {
+): Promise<NavigationReadRowsResult> {
   const normalizedRequest = normalizeRequest(request)
 
   if (isReadRowsResult(normalizedRequest)) {
@@ -62,9 +65,7 @@ export async function readNavigationRowsThroughHost(
   }
 }
 
-function normalizeRequest(
-  request: unknown
-): ReadNavigationRowsRequest | LibraryNavigationReadRowsResult {
+function normalizeRequest(request: unknown): ReadNavigationRowsRequest | NavigationReadRowsResult {
   if (!isRecord(request)) {
     return createReadRowsErrorResult(
       'invalidRequest',
@@ -99,7 +100,7 @@ function normalizeRequest(
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | LibraryNavigationReadRowsResult {
+): LibraryBoundaryHostClient | NavigationReadRowsResult {
   try {
     return host.client
   } catch (error: unknown) {
@@ -118,7 +119,7 @@ function getStartedClient(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): LibraryNavigationReadRowsResult {
+): NavigationReadRowsResult {
   return createReadRowsErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
@@ -129,7 +130,7 @@ function hostUnavailableResult(
 function hostErrorCode(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): LibraryNavigationReadRowsErrorCode {
+): NavigationReadRowsErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }
@@ -165,10 +166,10 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
 }
 
 function createReadRowsErrorResult(
-  state: LibraryNavigationReadRowsErrorState,
-  code: LibraryNavigationReadRowsErrorCode,
+  state: NavigationReadRowsErrorState,
+  code: NavigationReadRowsErrorCode,
   message: string
-): LibraryNavigationReadRowsResult {
+): NavigationReadRowsResult {
   return {
     state,
     error: {
@@ -178,7 +179,7 @@ function createReadRowsErrorResult(
   }
 }
 
-function mapNavigationRow(row: NavigationRow): LibraryNavigationRow {
+function mapNavigationRow(row: ContractNavigationRow): NavigationRow {
   return {
     navigationRowId: row.navigationRowId,
     stableKey: row.stableKey,
@@ -195,7 +196,7 @@ function mapNavigationRow(row: NavigationRow): LibraryNavigationRow {
   }
 }
 
-function isReadRowsResult(value: unknown): value is LibraryNavigationReadRowsResult {
+function isReadRowsResult(value: unknown): value is NavigationReadRowsResult {
   return isRecord(value) && typeof value.state === 'string'
 }
 

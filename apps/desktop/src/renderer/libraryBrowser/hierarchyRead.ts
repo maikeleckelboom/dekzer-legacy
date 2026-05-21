@@ -11,8 +11,8 @@ import type {
   ChildWindow
 } from '../../shared/libraryHierarchy/readChildren'
 import type {
-  LibraryNavigationReadRowsResult,
-  LibraryNavigationRow
+  NavigationReadRowsResult,
+  NavigationRow
 } from '../../shared/libraryNavigation/readRows'
 import type { RendererApi } from '../../shared/rendererApi'
 import { projectState, type BrowserProjection } from './hierarchyProjection'
@@ -38,7 +38,7 @@ export type LibraryBrowserApi = RendererApi['library']
 
 export type LibraryHierarchyReadController = {
   readonly hostStatus: Ref<LibraryBoundaryHostStatus | undefined>
-  readonly navigationReadResult: Ref<LibraryNavigationReadRowsResult | undefined>
+  readonly navigationReadResult: Ref<NavigationReadRowsResult | undefined>
   readonly hierarchyReadResult: Ref<ReadResult | undefined>
   readonly navigationReadRequestError: Ref<string | undefined>
   readonly hierarchyReadRequestError: Ref<string | undefined>
@@ -80,7 +80,7 @@ export function createLibraryHierarchyReadController(
   libraryApi: LibraryBrowserApi
 ): LibraryHierarchyReadController {
   const hostStatus = ref<LibraryBoundaryHostStatus>()
-  const navigationReadResult = ref<LibraryNavigationReadRowsResult>()
+  const navigationReadResult = ref<NavigationReadRowsResult>()
   const hierarchyReadResult = ref<ReadResult>()
   const navigationReadRequestError = ref<string>()
   const hierarchyReadRequestError = ref<string>()
@@ -906,7 +906,7 @@ function copyReadEntryPoint(entryPoint: EntryPoint): EntryPoint {
 }
 
 function withDiscoveredUnloadedSourceStates(
-  rows: readonly LibraryNavigationRow[]
+  rows: readonly NavigationRow[]
 ): ReadonlyMap<string, SourceState> {
   const states = new Map<string, SourceState>()
 
@@ -936,7 +936,7 @@ function addDiscoveredUnloadedDirectoryStates(
   }
 }
 
-function sourceReadEntryPointFor(row: LibraryNavigationRow): EntryPoint | undefined {
+function sourceReadEntryPointFor(row: NavigationRow): EntryPoint | undefined {
   if (row.selectorKind === 'source' && isPositiveOpaqueId(row.selectorPayload)) {
     return {
       kind: 'source',

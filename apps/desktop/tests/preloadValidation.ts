@@ -9,7 +9,7 @@ import {
 import { hierarchyReadChannels, type ReadResult } from '../src/shared/libraryHierarchy/readChildren'
 import {
   navigationReadChannels,
-  type LibraryNavigationReadRowsResult
+  type NavigationReadRowsResult
 } from '../src/shared/libraryNavigation/readRows'
 import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
@@ -31,7 +31,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
   const navigationRequest = {
     parentNavigationRowId: null
   }
-  const navigationResult: LibraryNavigationReadRowsResult = {
+  const navigationResult: NavigationReadRowsResult = {
     state: 'ready',
     rows: [
       {

@@ -31,7 +31,7 @@ import {
 } from '../src/shared/libraryHierarchy/readChildren'
 import {
   navigationReadChannels,
-  type LibraryNavigationReadRowsResult
+  type NavigationReadRowsResult
 } from '../src/shared/libraryNavigation/readRows'
 import { firstAvailableSourceReadRequest } from './support/libraryHierarchy'
 import { createFakeClient, deferred, silentLogger, testApp } from './support/libraryBoundary'
@@ -319,7 +319,7 @@ function validatesNavigationReadIpcRegistration(config: LibraryBoundaryHostConfi
 
   const registration: {
     channel?: string
-    handler?: (request: unknown) => Promise<LibraryNavigationReadRowsResult>
+    handler?: (request: unknown) => Promise<NavigationReadRowsResult>
   } = {}
 
   registerReadNavigationRowsIpc(
@@ -1296,8 +1296,8 @@ function assertReadError(result: ReadResult, code: ReadErrorCode): void {
 }
 
 function assertNavigationReadError(
-  result: LibraryNavigationReadRowsResult,
-  code: Exclude<LibraryNavigationReadRowsResult, { state: 'ready' }>['error']['code']
+  result: NavigationReadRowsResult,
+  code: Exclude<NavigationReadRowsResult, { state: 'ready' }>['error']['code']
 ): void {
   if (result.state === 'ready') {
     assert.fail(`expected navigation read error ${String(code)}`)

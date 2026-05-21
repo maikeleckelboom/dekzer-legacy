@@ -9,8 +9,8 @@ import {
 } from '../shared/libraryHierarchy/readChildren'
 import {
   navigationReadChannels,
-  type LibraryNavigationReadRowsRequest,
-  type LibraryNavigationReadRowsResult
+  type NavigationReadRowsRequest,
+  type NavigationReadRowsResult
 } from '../shared/libraryNavigation/readRows'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
@@ -67,13 +67,11 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         }
       },
       navigation: {
-        async readRows(
-          request: LibraryNavigationReadRowsRequest
-        ): Promise<LibraryNavigationReadRowsResult> {
+        async readRows(request: NavigationReadRowsRequest): Promise<NavigationReadRowsResult> {
           return (await ipcRenderer.invoke(
             navigationReadChannels.readRows,
             request
-          )) as LibraryNavigationReadRowsResult
+          )) as NavigationReadRowsResult
         }
       },
       hierarchy: {
