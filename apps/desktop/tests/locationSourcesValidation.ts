@@ -147,7 +147,10 @@ function validatesRoleAndAvailabilityBadges(): void {
     'persisted' satisfies LocationSourceIconBadge | undefined
   )
 
-  const primaryLibraryDescriptor: Pick<LocationSourceDescriptor, 'availability' | 'health' | 'role'> = {
+  const primaryLibraryDescriptor: Pick<
+    LocationSourceDescriptor,
+    'availability' | 'health' | 'role'
+  > = {
     availability: 'offline',
     health: 'healthy',
     role: 'primaryLibrary'

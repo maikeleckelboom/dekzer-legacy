@@ -18,10 +18,7 @@ import type {
   BrowserTreeNodeId
 } from './tree/types'
 import { copyEntryPoint } from './entryPoint'
-import {
-  adaptLocationSourceDescriptor,
-  getLocationSourcePresentation
-} from './locationSources'
+import { adaptLocationSourceDescriptor, getLocationSourcePresentation } from './locationSources'
 
 export type BrowserProjection = {
   readonly kind: 'tree'

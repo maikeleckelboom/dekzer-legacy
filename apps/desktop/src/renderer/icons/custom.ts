@@ -17,16 +17,12 @@ export const SdCardIcon = defineComponent({
   inheritAttrs: false,
   setup(_, { attrs }) {
     return () =>
-      h(
-        'svg',
-        { ...svgAttrs, ...attrs },
-        [
-          h('rect', { width: '18', height: '18', x: '3', y: '3', rx: '2', ry: '2' }),
-          h('line', { x1: '7', x2: '7', y1: '3', y2: '9' }),
-          h('line', { x1: '11', x2: '11', y1: '3', y2: '9' }),
-          h('line', { x1: '15', x2: '15', y1: '3', y2: '9' }),
-          h('path', { d: 'M3 11h18' })
-        ]
-      )
+      h('svg', { ...svgAttrs, ...attrs }, [
+        h('rect', { width: '18', height: '18', x: '3', y: '3', rx: '2', ry: '2' }),
+        h('line', { x1: '7', x2: '7', y1: '3', y2: '9' }),
+        h('line', { x1: '11', x2: '11', y1: '3', y2: '9' }),
+        h('line', { x1: '15', x2: '15', y1: '3', y2: '9' }),
+        h('path', { d: 'M3 11h18' })
+      ])
   }
 })

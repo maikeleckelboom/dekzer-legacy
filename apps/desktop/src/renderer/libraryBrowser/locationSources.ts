@@ -205,7 +205,10 @@ const fallbackDescriptor: LocationSourceDescriptor = {
 
 export function adaptLocationSourceDescriptor(input: SourceAdapterInput): LocationSourceDescriptor {
   const kind = resolveSourceKindFromRow(input.rowKind, input.selectorKind)
-  const availability = resolveAvailabilityFromSourceState(input.sourceStateKind, input.sourceStateFailed)
+  const availability = resolveAvailabilityFromSourceState(
+    input.sourceStateKind,
+    input.sourceStateFailed
+  )
   const health = resolveHealthFromSourceState(input.sourceStateKind, input.sourceStateFailed)
   const role = resolveRoleFromRowKind(input.rowKind)
 
@@ -219,7 +222,10 @@ export function adaptLocationSourceDescriptor(input: SourceAdapterInput): Locati
   }
 }
 
-function resolveSourceKindFromRow(rowKind: string, selectorKind: string | null): LocationSourceKind {
+function resolveSourceKindFromRow(
+  rowKind: string,
+  selectorKind: string | null
+): LocationSourceKind {
   if (rowKind === 'source' && selectorKind === 'source') {
     return 'localLibrary'
   }

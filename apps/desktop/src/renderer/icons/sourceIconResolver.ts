@@ -60,7 +60,9 @@ export function resolveSourceIcon(icon: LocationSourceIcon): IconComponent {
   }
 }
 
-export function resolveSourceIconBadge(badge: LocationSourceIconBadge | undefined): IconComponent | undefined {
+export function resolveSourceIconBadge(
+  badge: LocationSourceIconBadge | undefined
+): IconComponent | undefined {
   switch (badge) {
     case 'available':
       return CircleCheckIcon
