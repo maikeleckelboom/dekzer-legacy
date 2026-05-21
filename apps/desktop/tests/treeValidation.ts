@@ -14,6 +14,7 @@ import {
   type TreeKeyboardIntent
 } from '../src/renderer/libraryBrowser/tree/keys'
 import {
+  canRequestBrowserTreeChildren,
   canRevealBrowserTreeChildren,
   flattenVisibleTree,
   getFirstChildVisibleNodeId,
@@ -23,6 +24,7 @@ import {
   getNextVisibleNodeId,
   getParentVisibleNodeId,
   getPreviousVisibleNodeId,
+  isLoadingBrowserTreeChildren,
   isBrowserTreeBranch,
   isBrowserTreeLeaf
 } from '../src/renderer/libraryBrowser/tree/projection'
@@ -55,6 +57,8 @@ function main(): void {
   validatesKeyboardSelection()
   validatesFocusAndSelectionSeparation()
   validatesAriaAttributes()
+  validatesRequestChildrenWiring()
+  validatesCollapseKeepsLoadedChildren()
   validatesLibraryHierarchyReadProjection()
   validatesFixtureFallbackRemainsExplicit()
   validatesRendererBoundaryOwnership()
@@ -72,29 +76,47 @@ function validatesExplicitChildrenStateModel(): void {
   assert.equal(isBrowserTreeLeaf(leaf), true)
   assert.equal(isBrowserTreeBranch(leaf), false)
   assert.equal(canRevealBrowserTreeChildren(leaf), false)
+  assert.equal(canRequestBrowserTreeChildren(leaf), false)
+  assert.equal(isLoadingBrowserTreeChildren(leaf), false)
   assert.deepEqual(getLoadedBrowserTreeChildren(leaf), [])
 
   assert.equal(isBrowserTreeLeaf(loadedBranch), false)
   assert.equal(isBrowserTreeBranch(loadedBranch), true)
   assert.equal(canRevealBrowserTreeChildren(loadedBranch), true)
+  assert.equal(canRequestBrowserTreeChildren(loadedBranch), false)
+  assert.equal(isLoadingBrowserTreeChildren(loadedBranch), false)
   assert.deepEqual(
     getLoadedBrowserTreeChildren(loadedBranch).map((node) => node.id),
     ['loaded-child']
   )
 
+  const loadedEmptyBranch = loadedEmptyBranchRootNode()
+  assert.equal(isBrowserTreeLeaf(loadedEmptyBranch), false)
+  assert.equal(isBrowserTreeBranch(loadedEmptyBranch), true)
+  assert.equal(canRevealBrowserTreeChildren(loadedEmptyBranch), false)
+  assert.equal(canRequestBrowserTreeChildren(loadedEmptyBranch), false)
+  assert.equal(isLoadingBrowserTreeChildren(loadedEmptyBranch), false)
+  assert.deepEqual(getLoadedBrowserTreeChildren(loadedEmptyBranch), [])
+
   assert.equal(isBrowserTreeLeaf(unloadedBranch), false)
   assert.equal(isBrowserTreeBranch(unloadedBranch), true)
   assert.equal(canRevealBrowserTreeChildren(unloadedBranch), false)
+  assert.equal(canRequestBrowserTreeChildren(unloadedBranch), true)
+  assert.equal(isLoadingBrowserTreeChildren(unloadedBranch), false)
   assert.deepEqual(getLoadedBrowserTreeChildren(unloadedBranch), [])
   assert.equal(unloadedBranch.childrenState.kind, 'unloaded')
 
   assert.equal(isBrowserTreeBranch(loadingBranch), true)
   assert.equal(canRevealBrowserTreeChildren(loadingBranch), false)
+  assert.equal(canRequestBrowserTreeChildren(loadingBranch), false)
+  assert.equal(isLoadingBrowserTreeChildren(loadingBranch), true)
   assert.equal(loadingBranch.childrenState.kind, 'loading')
   assert.notEqual(loadingBranch.childrenState.kind, unloadedBranch.childrenState.kind)
 
   assert.equal(isBrowserTreeBranch(failedBranch), true)
   assert.equal(canRevealBrowserTreeChildren(failedBranch), false)
+  assert.equal(canRequestBrowserTreeChildren(failedBranch), true)
+  assert.equal(isLoadingBrowserTreeChildren(failedBranch), false)
   assert.equal(failedBranch.childrenState.kind, 'failed')
   assert.equal(failedBranch.childrenState.detail, 'Unable to load children.')
 
@@ -139,8 +161,10 @@ function validatesVisibleProjection(): void {
   assert.equal(getItem(expandedItems, 'fixture-playlist-group').ariaSetSize, 1)
   assert.equal(getItem(expandedItems, 'fixture-root').isBranch, true)
   assert.equal(getItem(expandedItems, 'fixture-root').canRevealChildren, true)
+  assert.equal(getItem(expandedItems, 'fixture-root').canRequestChildren, false)
   assert.equal(getItem(expandedItems, 'fixture-artists').isBranch, false)
   assert.equal(getItem(expandedItems, 'fixture-artists').canRevealChildren, false)
+  assert.equal(getItem(expandedItems, 'fixture-artists').canRequestChildren, false)
 
   const rootOnlyItems = fixtureVisibleItems(rootOnlyExpandedIds)
   assert.deepEqual(
@@ -196,6 +220,13 @@ function validatesUnloadedBranchProjection(): void {
     assert.equal(item.isExpanded, false)
     assert.equal(getFirstChildVisibleNodeId(items, item.id), undefined)
   }
+
+  assert.equal(getItem(items, 'unloaded-root').canRequestChildren, true)
+  assert.equal(getItem(items, 'unloaded-root').isLoadingChildren, false)
+  assert.equal(getItem(items, 'loading-root').canRequestChildren, false)
+  assert.equal(getItem(items, 'loading-root').isLoadingChildren, true)
+  assert.equal(getItem(items, 'failed-root').canRequestChildren, true)
+  assert.equal(getItem(items, 'failed-root').isLoadingChildren, false)
 }
 
 function validatesKeyboardNavigation(): void {
@@ -255,9 +286,15 @@ function validatesKeyboardExpansion(): void {
   })
   assertHandledNoop(resolveIntent(collapsedRootItems, 'fixture-root', 'ArrowLeft'))
   assertHandledNoop(resolveIntent(leafRootItems, 'leaf-root', 'ArrowLeft'))
-  assertHandledNoop(resolveIntent(unloadedBranchItems, 'unloaded-root', 'ArrowRight'))
+  assertIntent(resolveIntent(unloadedBranchItems, 'unloaded-root', 'ArrowRight'), {
+    kind: 'requestChildren',
+    nodeId: 'unloaded-root'
+  })
   assertHandledNoop(resolveIntent(unloadedBranchItems, 'loading-root', 'ArrowRight'))
-  assertHandledNoop(resolveIntent(unloadedBranchItems, 'failed-root', 'ArrowRight'))
+  assertIntent(resolveIntent(unloadedBranchItems, 'failed-root', 'ArrowRight'), {
+    kind: 'requestChildren',
+    nodeId: 'failed-root'
+  })
   assertHandledNoop(resolveIntent(unloadedBranchItems, 'unloaded-root', 'ArrowLeft'))
   assertHandledNoop(resolveIntent(unloadedBranchItems, 'loading-root', 'ArrowLeft'))
   assertHandledNoop(resolveIntent(unloadedBranchItems, 'failed-root', 'ArrowLeft'))
@@ -307,6 +344,12 @@ function validatesAriaAttributes(): void {
   const rootOnlyItems = fixtureVisibleItems(rootOnlyExpandedIds)
   assert.equal(getTreeItemAriaExpanded(getItem(rootOnlyItems, 'fixture-tracks')), 'false')
 
+  const loadedEmptyItems = flattenVisibleTree({
+    nodes: [loadedEmptyBranchRootNode()],
+    expandedNodeIds: new Set(['loaded-empty-root'])
+  })
+  assert.equal(getTreeItemAriaExpanded(getItem(loadedEmptyItems, 'loaded-empty-root')), undefined)
+
   const unloadedItems = flattenVisibleTree({
     nodes: [unloadedBranchNode(), loadingBranchNode(), failedBranchNode()],
     expandedNodeIds: new Set(['unloaded-root', 'loading-root', 'failed-root'])
@@ -314,6 +357,57 @@ function validatesAriaAttributes(): void {
   assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'unloaded-root')), undefined)
   assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'loading-root')), undefined)
   assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'failed-root')), undefined)
+}
+
+function validatesRequestChildrenWiring(): void {
+  const treeRootSource = readFileSync(
+    new URL('../src/renderer/libraryBrowser/tree/treeRoot.vue', import.meta.url),
+    'utf8'
+  )
+  const treeItemSource = readFileSync(
+    new URL('../src/renderer/libraryBrowser/tree/treeItem.vue', import.meta.url),
+    'utf8'
+  )
+  const treeRowSource = readFileSync(
+    new URL('../src/renderer/libraryBrowser/tree/treeRow.vue', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(treeRootSource, /requestChildren: \[nodeId: BrowserTreeNodeId\]/)
+  assert.match(treeRootSource, /requestChildren: \(nodeId\) => emit\('requestChildren', nodeId\)/)
+  assert.match(treeItemSource, /if \(props\.item\.canRequestChildren\)/)
+  assert.match(treeItemSource, /tree\.requestChildren\(props\.item\.id\)/)
+  assert.match(treeItemSource, /case 'requestChildren':/)
+  assert.match(treeRowSource, /:data-tree-affordance="item\.isBranch \? 'true' : undefined"/)
+  assert.match(
+    treeRowSource,
+    /v-if="item\.canRevealChildren \|\| item\.canRequestChildren \|\| item\.isLoadingChildren"/
+  )
+}
+
+function validatesCollapseKeepsLoadedChildren(): void {
+  const loadedBranch = loadedBranchRootNode()
+  const expandedItems = flattenVisibleTree({
+    nodes: [loadedBranch],
+    expandedNodeIds: new Set(['loaded-root'])
+  })
+  const collapsedItems = flattenVisibleTree({
+    nodes: [loadedBranch],
+    expandedNodeIds: new Set()
+  })
+
+  assert.deepEqual(
+    expandedItems.map((item) => item.id),
+    ['loaded-root', 'loaded-child']
+  )
+  assert.deepEqual(
+    collapsedItems.map((item) => item.id),
+    ['loaded-root']
+  )
+  assert.deepEqual(
+    getLoadedBrowserTreeChildren(loadedBranch).map((node) => node.id),
+    ['loaded-child']
+  )
 }
 
 function validatesLibraryHierarchyReadProjection(): void {
@@ -385,6 +479,11 @@ function validatesLibraryHierarchyReadProjection(): void {
   )
   assert.equal(getItem(directoryItems, 'source-directory:12').isBranch, true)
   assert.equal(getItem(directoryItems, 'source-directory:12').canRevealChildren, false)
+  assert.equal(getItem(directoryItems, 'source-directory:12').canRequestChildren, true)
+  assert.deepEqual(
+    [...directoryProjection.directoryReadTargetsByNodeId.entries()],
+    [['source-directory:12', { sourceDirectoryId: '12' }]]
+  )
 
   const partialProjection = projectLibraryHierarchyReadToBrowserTree({
     ...fileOnlyHierarchyReadResult(),
@@ -415,7 +514,10 @@ function validatesRendererBoundaryOwnership(): void {
     /@dekzer\/library-boundary-client/,
     /@dekzer\/library-boundary-stdio-transport/,
     /\bLibraryBoundaryClient\b/,
-    /\bipcRenderer\b/
+    /\bipcRenderer\b/,
+    /from ['"]node:fs['"]/,
+    /from ['"]fs['"]/,
+    /from ['"].*\/main\//
   ]
 
   for (const filePath of listSourceFiles(rendererSourceRoot)) {
@@ -580,6 +682,18 @@ function loadedBranchRootNode(): BrowserTreeNode {
           childrenState: { kind: 'leaf' }
         }
       ]
+    }
+  }
+}
+
+function loadedEmptyBranchRootNode(): BrowserTreeNode {
+  return {
+    id: 'loaded-empty-root',
+    label: 'Loaded empty root',
+    kind: 'folder',
+    childrenState: {
+      kind: 'loaded',
+      children: []
     }
   }
 }

@@ -32,8 +32,17 @@ onBeforeUnmount(() => {
 function handleClick(event: MouseEvent): void {
   tree.focusNode(props.item.id)
 
-  if (props.item.canRevealChildren && isBranchAffordanceEvent(event)) {
-    tree.toggleNode(props.item.id)
+  if (isBranchAffordanceEvent(event)) {
+    if (props.item.canRevealChildren) {
+      tree.toggleNode(props.item.id)
+      return
+    }
+
+    if (props.item.canRequestChildren) {
+      tree.requestChildren(props.item.id)
+      return
+    }
+
     return
   }
 
@@ -54,6 +63,9 @@ function handleKeydown(event: KeyboardEvent): void {
     case 'expand':
     case 'collapse':
       tree.toggleNode(intent.nodeId)
+      return
+    case 'requestChildren':
+      tree.requestChildren(intent.nodeId)
       return
     case 'select':
       tree.selectNode(intent.nodeId)

@@ -12,6 +12,7 @@ export type UseTreeControllerOptions = {
   readonly expandedNodeIds: ComputedRef<ReadonlySet<BrowserTreeNodeId>>
   readonly selectNode: (nodeId: BrowserTreeNodeId) => void
   readonly toggleNode: (nodeId: BrowserTreeNodeId) => void
+  readonly requestChildren: (nodeId: BrowserTreeNodeId) => void
 }
 
 export function useTreeController(options: UseTreeControllerOptions): TreeContext {
@@ -97,6 +98,16 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     options.toggleNode(nodeId)
   }
 
+  function requestChildren(nodeId: BrowserTreeNodeId): void {
+    const item = visibleItems.value.find((visibleItem) => visibleItem.id === nodeId)
+
+    if (item?.canRequestChildren !== true) {
+      return
+    }
+
+    options.requestChildren(nodeId)
+  }
+
   return {
     visibleItems,
     activeNodeId,
@@ -106,6 +117,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     focusNode,
     selectNode: options.selectNode,
     toggleNode,
+    requestChildren,
     resolveKeyboardIntent
   }
 }

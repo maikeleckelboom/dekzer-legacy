@@ -50,6 +50,14 @@ export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
   return getLoadedBrowserTreeChildren(node).length > 0
 }
 
+export function canRequestBrowserTreeChildren(node: BrowserTreeNode): boolean {
+  return node.childrenState.kind === 'unloaded' || node.childrenState.kind === 'failed'
+}
+
+export function isLoadingBrowserTreeChildren(node: BrowserTreeNode): boolean {
+  return node.childrenState.kind === 'loading'
+}
+
 export function getLastVisibleNodeId(
   visibleItems: readonly BrowserTreeVisibleItem[]
 ): BrowserTreeNodeId | undefined {
@@ -117,6 +125,8 @@ function appendVisibleNodes(options: {
     const children = getLoadedBrowserTreeChildren(node)
     const isBranch = isBrowserTreeBranch(node)
     const canReveal = canRevealBrowserTreeChildren(node)
+    const canRequest = canRequestBrowserTreeChildren(node)
+    const isLoadingChildren = isLoadingBrowserTreeChildren(node)
     const isExpanded = canReveal && options.expandedNodeIds.has(node.id)
 
     options.visibleItems.push({
@@ -127,6 +137,8 @@ function appendVisibleNodes(options: {
       visibleIndex: options.visibleItems.length,
       isBranch,
       canRevealChildren: canReveal,
+      canRequestChildren: canRequest,
+      isLoadingChildren,
       isExpanded,
       isSelected: options.selectedNodeId === node.id,
       isActive: options.activeNodeId === node.id,

@@ -2,12 +2,21 @@ import type {
   LibraryHierarchyReadNode,
   LibraryHierarchyReadResult
 } from '../../shared/libraryHierarchy/read'
-import type { BrowserTreeNode } from './tree/types'
+import type {
+  LibraryHierarchyBrowserState,
+  LibraryHierarchyDirectoryReadState,
+  LibraryHierarchyDirectoryReadTarget
+} from './hierarchyState'
+import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
 
 export type LibraryHierarchyBrowserProjection =
   | {
       readonly kind: 'tree'
       readonly nodes: readonly BrowserTreeNode[]
+      readonly directoryReadTargetsByNodeId: ReadonlyMap<
+        BrowserTreeNodeId,
+        LibraryHierarchyDirectoryReadTarget
+      >
     }
   | {
       readonly kind: 'unavailable'
@@ -18,8 +27,28 @@ export type LibraryHierarchyBrowserProjection =
       readonly message: string
     }
 
+export function projectLibraryHierarchyBrowserStateToBrowserTree(
+  state: LibraryHierarchyBrowserState
+): LibraryHierarchyBrowserProjection | undefined {
+  if (state.rootReadResult === undefined) {
+    return undefined
+  }
+
+  return projectLibraryHierarchyReadResultToBrowserTree(
+    state.rootReadResult,
+    state.directoryReadStates
+  )
+}
+
 export function projectLibraryHierarchyReadToBrowserTree(
   result: LibraryHierarchyReadResult
+): LibraryHierarchyBrowserProjection {
+  return projectLibraryHierarchyReadResultToBrowserTree(result, new Map())
+}
+
+function projectLibraryHierarchyReadResultToBrowserTree(
+  result: LibraryHierarchyReadResult,
+  directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
 ): LibraryHierarchyBrowserProjection {
   if (result.state !== 'ready') {
     return {
@@ -42,7 +71,15 @@ export function projectLibraryHierarchyReadToBrowserTree(
     }
   }
 
-  const children = result.window.nodes.map(projectReadNodeToBrowserTreeNode)
+  const directoryReadTargetsByNodeId = new Map<
+    BrowserTreeNodeId,
+    LibraryHierarchyDirectoryReadTarget
+  >()
+  const children = projectReadNodesToBrowserTreeNodes({
+    nodes: result.window.nodes,
+    directoryReadStates,
+    directoryReadTargetsByNodeId
+  })
 
   return {
     kind: 'tree',
@@ -57,7 +94,8 @@ export function projectLibraryHierarchyReadToBrowserTree(
           children
         }
       }
-    ]
+    ],
+    directoryReadTargetsByNodeId
   }
 }
 
@@ -69,17 +107,42 @@ function formatRootDetail(totalRows: number): string {
   return `Loaded read-only from library backend. ${totalRows} literal hierarchy rows available.`
 }
 
-function projectReadNodeToBrowserTreeNode(node: LibraryHierarchyReadNode): BrowserTreeNode {
+function projectReadNodesToBrowserTreeNodes(options: {
+  readonly nodes: readonly LibraryHierarchyReadNode[]
+  readonly directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
+  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, LibraryHierarchyDirectoryReadTarget>
+}): readonly BrowserTreeNode[] {
+  return options.nodes.map((node) =>
+    projectReadNodeToBrowserTreeNode({
+      node,
+      directoryReadStates: options.directoryReadStates,
+      directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId
+    })
+  )
+}
+
+function projectReadNodeToBrowserTreeNode(options: {
+  readonly node: LibraryHierarchyReadNode
+  readonly directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
+  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, LibraryHierarchyDirectoryReadTarget>
+}): BrowserTreeNode {
+  const node = options.node
+
   if (node.kind === 'directory') {
+    options.directoryReadTargetsByNodeId.set(node.id, {
+      sourceDirectoryId: node.sourceDirectoryId
+    })
+
     return {
       id: node.id,
       label: node.label,
       kind: 'folder',
       detail: formatDirectoryDetail(node.presenceState),
-      childrenState: {
-        kind: 'unloaded',
-        detail: 'Children not loaded yet.'
-      }
+      childrenState: projectDirectoryChildrenState({
+        state: options.directoryReadStates.get(node.sourceDirectoryId),
+        directoryReadStates: options.directoryReadStates,
+        directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId
+      })
     }
   }
 
@@ -90,6 +153,59 @@ function projectReadNodeToBrowserTreeNode(node: LibraryHierarchyReadNode): Brows
     detail: formatFileDetail(node.presenceState),
     childrenState: { kind: 'leaf' }
   }
+}
+
+function projectDirectoryChildrenState(options: {
+  readonly state: LibraryHierarchyDirectoryReadState | undefined
+  readonly directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
+  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, LibraryHierarchyDirectoryReadTarget>
+}): BrowserTreeNode['childrenState'] {
+  const state = options.state
+
+  if (state === undefined || state.kind === 'unloaded') {
+    return {
+      kind: 'unloaded',
+      detail: state?.detail ?? 'Children not loaded yet.'
+    }
+  }
+
+  if (state.kind === 'loading') {
+    return {
+      kind: 'loading',
+      detail: state.detail ?? 'Loading children.'
+    }
+  }
+
+  if (state.kind === 'failed') {
+    return {
+      kind: 'failed',
+      detail: state.detail
+    }
+  }
+
+  if (!isCompleteWindow(state.window)) {
+    return {
+      kind: 'failed',
+      detail: 'The hierarchy read returned a partial child window.'
+    }
+  }
+
+  return {
+    kind: 'loaded',
+    children: projectReadNodesToBrowserTreeNodes({
+      nodes: state.window.nodes,
+      directoryReadStates: options.directoryReadStates,
+      directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId
+    })
+  }
+}
+
+function isCompleteWindow(window: {
+  readonly offset: number
+  readonly nodes: readonly unknown[]
+  readonly totalRows: number
+}): boolean {
+  return window.offset === 0 && window.nodes.length === window.totalRows
 }
 
 function formatFileDetail(presenceState: LibraryHierarchyReadNode['presenceState']): string {

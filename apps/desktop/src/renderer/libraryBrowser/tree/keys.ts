@@ -43,6 +43,11 @@ export type TreeKeyboardIntent =
       readonly shouldPreventDefault: true
     }
   | {
+      readonly kind: 'requestChildren'
+      readonly nodeId: BrowserTreeNodeId
+      readonly shouldPreventDefault: true
+    }
+  | {
       readonly kind: 'select'
       readonly nodeId: BrowserTreeNodeId
       readonly shouldPreventDefault: true
@@ -84,7 +89,19 @@ export function resolveTreeKeyboardIntent(
       return resolveFocusIntent(getLastVisibleNodeId(options.visibleItems))
 
     case treeKeyboardKeys.arrowRight:
-      if (activeItem === undefined || !activeItem.canRevealChildren) {
+      if (activeItem === undefined) {
+        return handledNoop()
+      }
+
+      if (activeItem.canRequestChildren) {
+        return {
+          kind: 'requestChildren',
+          nodeId: activeItem.id,
+          shouldPreventDefault: true
+        }
+      }
+
+      if (!activeItem.canRevealChildren) {
         return handledNoop()
       }
 
@@ -100,6 +117,10 @@ export function resolveTreeKeyboardIntent(
 
     case treeKeyboardKeys.arrowLeft:
       if (activeItem === undefined) {
+        return handledNoop()
+      }
+
+      if (activeItem.canRequestChildren || activeItem.isLoadingChildren) {
         return handledNoop()
       }
 

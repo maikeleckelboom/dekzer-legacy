@@ -4,7 +4,6 @@ import { computed, ref, watch } from 'vue'
 import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
 import { useLibraryHierarchyRead } from './hierarchyRead'
 import { libraryHierarchyFixtureTree } from './fixture'
-import { projectLibraryHierarchyReadToBrowserTree } from './hierarchyProjection'
 import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
@@ -18,26 +17,25 @@ const defaultFixtureExpandedNodeIds = new Set<BrowserTreeNodeId>([
   'fixture-tracks',
   'fixture-playlists'
 ])
-const { hostStatus, hierarchyReadResult, hierarchyReadRequestError, hierarchyReadIsLoading } =
-  useLibraryHierarchyRead()
+const {
+  hostStatus,
+  hierarchyReadResult,
+  hierarchyReadRequestError,
+  hierarchyReadIsLoading,
+  browserProjection,
+  requestDirectoryChildren
+} = useLibraryHierarchyRead()
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 
-const hierarchyProjection = computed(() => {
-  if (hierarchyReadResult.value === undefined) {
-    return undefined
-  }
-
-  return projectLibraryHierarchyReadToBrowserTree(hierarchyReadResult.value)
-})
-
 const liveTreeNodes = computed(() => {
-  if (hierarchyProjection.value?.kind !== 'tree') {
+  if (browserProjection.value?.kind !== 'tree') {
     return undefined
   }
 
-  return hierarchyProjection.value.nodes
+  return browserProjection.value.nodes
 })
+const liveRootNodeId = computed(() => liveTreeNodes.value?.[0]?.id)
 
 const currentTreeNodes = computed(() => liveTreeNodes.value ?? libraryHierarchyFixtureTree.nodes)
 const isLiveTree = computed(() => liveTreeNodes.value !== undefined)
@@ -75,12 +73,12 @@ const panelDetail = computed(() => {
     return 'Checking for a real library hierarchy. Showing '
   }
 
-  if (hierarchyProjection.value?.kind === 'unsupported') {
-    return `${hierarchyProjection.value.message} Showing `
+  if (browserProjection.value?.kind === 'unsupported') {
+    return `${browserProjection.value.message} Showing `
   }
 
-  if (hierarchyProjection.value?.kind === 'unavailable') {
-    return `${hierarchyProjection.value.message} Showing `
+  if (browserProjection.value?.kind === 'unavailable') {
+    return `${browserProjection.value.message} Showing `
   }
 
   if (hostStatus.value === undefined) {
@@ -113,10 +111,8 @@ const selectedNode = computed(() => {
 })
 
 watch(
-  liveTreeNodes,
-  (nodes) => {
-    const liveRootId = nodes?.[0]?.id
-
+  liveRootNodeId,
+  (liveRootId) => {
     if (liveRootId !== undefined) {
       selectedNodeId.value = liveRootId
       expandedNodeIds.value = new Set([liveRootId])
@@ -143,6 +139,15 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
   }
 
   expandedNodeIds.value = nextExpandedNodeIds
+}
+
+function requestChildren(nodeId: BrowserTreeNodeId): void {
+  if (!isLiveTree.value) {
+    return
+  }
+
+  expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
+  void requestDirectoryChildren(nodeId)
 }
 
 function findNodeById(
@@ -220,7 +225,12 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
     </header>
 
     <div class="grid gap-4 p-5">
-      <TreeRoot v-bind="treeRootProps" @select="selectNode" @toggle="toggleNode" />
+      <TreeRoot
+        v-bind="treeRootProps"
+        @select="selectNode"
+        @toggle="toggleNode"
+        @request-children="requestChildren"
+      />
 
       <aside
         class="rounded-sm border border-(--color-border) bg-(--color-background) px-4 py-3"
