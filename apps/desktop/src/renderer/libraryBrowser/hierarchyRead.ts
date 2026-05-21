@@ -286,12 +286,29 @@ function directoryReadRequest(
   return {
     target: {
       kind: 'entryPoint',
-      entryPoint: root.entryPoint,
+      entryPoint: copyReadEntryPoint(root.entryPoint),
       ...(root.label === undefined ? {} : { label: root.label })
     },
     parentSourceDirectoryId,
     offset: 0,
     limit: readLimit
+  }
+}
+
+function copyReadEntryPoint(
+  entryPoint: LibraryHierarchyReadChildrenRoot['entryPoint']
+): LibraryHierarchyReadChildrenRoot['entryPoint'] {
+  switch (entryPoint.kind) {
+    case 'source':
+      return {
+        kind: 'source',
+        sourceId: entryPoint.sourceId
+      }
+    case 'sourceLocation':
+      return {
+        kind: 'sourceLocation',
+        sourceLocationId: entryPoint.sourceLocationId
+      }
   }
 }
 

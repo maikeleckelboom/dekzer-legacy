@@ -252,13 +252,14 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   let directory13Attempts = 0
   const controller = createLibraryHierarchyReadController(
     testLibraryApi(async (request) => {
-      requests.push(request)
+      const clonedRequest = structuredClone(request)
+      requests.push(clonedRequest)
 
-      if (request.parentSourceDirectoryId === '12') {
+      if (clonedRequest.parentSourceDirectoryId === '12') {
         return directory12Read.promise
       }
 
-      if (request.parentSourceDirectoryId === '13') {
+      if (clonedRequest.parentSourceDirectoryId === '13') {
         directory13Attempts += 1
         return directory13Attempts === 1
           ? hierarchyReadError(
@@ -269,7 +270,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
           : emptyDirectoryHierarchyReadResult('13')
       }
 
-      if (request.parentSourceDirectoryId === '14') {
+      if (clonedRequest.parentSourceDirectoryId === '14') {
         return directory14Read.promise
       }
 
