@@ -1,4 +1,4 @@
-export const libraryBoundaryHostStatusIpcChannels = {
+export const hostStatusChannels = {
   getStatus: 'desktop:library-boundary:get-status',
   statusChanged: 'desktop:library-boundary:status-changed'
 } as const

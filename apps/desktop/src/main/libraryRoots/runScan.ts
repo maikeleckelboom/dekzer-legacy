@@ -2,7 +2,7 @@ import type { RunRootScanRequest } from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
-import { libraryRootsIpcChannels } from '../../shared/libraryRoots/channels'
+import { rootChannels } from '../../shared/libraryRoots/channels'
 import type {
   LocalRootScanErrorCode,
   LocalRootScanErrorState,
@@ -21,7 +21,7 @@ export function registerLocalRootScanIpc(
   ipcMain: LocalRootScanIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(libraryRootsIpcChannels.runScan, (_event, request) =>
+  ipcMain.handle(rootChannels.runScan, (_event, request) =>
     runLocalRootScanThroughHost(host, request)
   )
 }

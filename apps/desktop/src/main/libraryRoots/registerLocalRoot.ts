@@ -8,7 +8,7 @@ import {
   type LocalRootRegistrationRequest,
   type LocalRootRegistrationResult
 } from '../../shared/libraryRoots/registerLocalRoot'
-import { libraryRootsIpcChannels } from '../../shared/libraryRoots/channels'
+import { rootChannels } from '../../shared/libraryRoots/channels'
 
 export type LocalRootRegistrationIpcMain = {
   handle(
@@ -21,7 +21,7 @@ export function registerLocalRootRegistrationIpc(
   ipcMain: LocalRootRegistrationIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(libraryRootsIpcChannels.registerLocal, (_event, request) =>
+  ipcMain.handle(rootChannels.registerLocal, (_event, request) =>
     registerLocalRootThroughHost(host, request)
   )
 }

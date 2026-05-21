@@ -21,7 +21,7 @@ import {
 } from '../src/main/libraryBoundary/config'
 import { LibraryBoundaryHostError } from '../src/main/libraryBoundary/errors'
 import {
-  libraryBoundaryHostStatusIpcChannels,
+  hostStatusChannels,
   type LibraryBoundaryHostStatus
 } from '../src/shared/libraryBoundary/status'
 import {
@@ -329,7 +329,7 @@ function validatesStatusIpcRegistration(config: LibraryBoundaryHostConfig): void
     controller
   )
 
-  assert.equal(registration.channel, libraryBoundaryHostStatusIpcChannels.getStatus)
+  assert.equal(registration.channel, hostStatusChannels.getStatus)
 
   const handler = registration.handler
   if (handler === undefined) {

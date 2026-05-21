@@ -3,14 +3,14 @@ import { strict as assert } from 'node:assert'
 import { firstAvailableSourceReadRequest } from './support/libraryHierarchy'
 import { createRendererApi, exposeRendererApi } from '../src/preload/rendererApi'
 import {
-  libraryBoundaryHostStatusIpcChannels,
+  hostStatusChannels,
   type LibraryBoundaryHostStatus
 } from '../src/shared/libraryBoundary/status'
 import {
-  libraryHierarchyReadChildrenIpcChannels,
+  hierarchyReadChannels,
   type LibraryHierarchyReadChildrenResult
 } from '../src/shared/libraryHierarchy/readChildren'
-import { libraryRootsIpcChannels } from '../src/shared/libraryRoots/channels'
+import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootRegistrationResult } from '../src/shared/libraryRoots/registerLocalRoot'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { emitStatus, testStatus } from './support/libraryBoundary'
@@ -60,24 +60,24 @@ async function validatesPreloadApiSurface(): Promise<void> {
   >()
   const ipcRenderer = {
     invoke: async (channel, ...args) => {
-      if (channel === libraryBoundaryHostStatusIpcChannels.getStatus) {
+      if (channel === hostStatusChannels.getStatus) {
         assert.deepEqual(args, [])
         return status
       }
 
-      if (channel === libraryHierarchyReadChildrenIpcChannels.readChildren) {
+      if (channel === hierarchyReadChannels.readChildren) {
         assert.equal(args.length, 1)
         receivedHierarchyRequest = args[0]
         return hierarchyResult
       }
 
-      if (channel === libraryRootsIpcChannels.registerLocal) {
+      if (channel === rootChannels.registerLocal) {
         assert.equal(args.length, 1)
         receivedRegistrationRequest = args[0]
         return registrationResult
       }
 
-      if (channel === libraryRootsIpcChannels.runScan) {
+      if (channel === rootChannels.runScan) {
         assert.equal(args.length, 1)
         receivedScanRequest = args[0]
         return scanResult

@@ -13,7 +13,7 @@ import {
   registerLocalRootScanIpc,
   runLocalRootScanThroughHost
 } from '../src/main/libraryRoots/runScan'
-import { libraryRootsIpcChannels } from '../src/shared/libraryRoots/channels'
+import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import {
   createFakeClient,
@@ -143,7 +143,7 @@ function validatesLocalRootScanIpcRegistration(config: LibraryBoundaryHostConfig
     host
   )
 
-  assert.equal(registration.channel, libraryRootsIpcChannels.runScan)
+  assert.equal(registration.channel, rootChannels.runScan)
   assert.equal(typeof registration.handler, 'function')
 }
 

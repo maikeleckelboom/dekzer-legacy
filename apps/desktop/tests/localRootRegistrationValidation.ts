@@ -13,7 +13,7 @@ import {
   registerLocalRootRegistrationIpc,
   registerLocalRootThroughHost
 } from '../src/main/libraryRoots/registerLocalRoot'
-import { libraryRootsIpcChannels } from '../src/shared/libraryRoots/channels'
+import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootRegistrationResult } from '../src/shared/libraryRoots/registerLocalRoot'
 import {
   createFakeClient,
@@ -135,7 +135,7 @@ function validatesLocalRootRegistrationIpcRegistration(config: LibraryBoundaryHo
     host
   )
 
-  assert.equal(registration.channel, libraryRootsIpcChannels.registerLocal)
+  assert.equal(registration.channel, rootChannels.registerLocal)
   assert.equal(typeof registration.handler, 'function')
 }
 

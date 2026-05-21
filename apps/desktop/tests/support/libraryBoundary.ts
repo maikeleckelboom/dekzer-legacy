@@ -9,7 +9,7 @@ import {
 import type { LibraryBoundaryHostConfig } from '../../src/main/libraryBoundary/config'
 import { LibraryBoundaryHostError } from '../../src/main/libraryBoundary/errors'
 import {
-  libraryBoundaryHostStatusIpcChannels,
+  hostStatusChannels,
   type LibraryBoundaryHostStatus
 } from '../../src/shared/libraryBoundary/status'
 
@@ -93,7 +93,7 @@ export function emitStatus(
   >,
   status: LibraryBoundaryHostStatus
 ): void {
-  for (const listener of listeners.get(libraryBoundaryHostStatusIpcChannels.statusChanged) ?? []) {
+  for (const listener of listeners.get(hostStatusChannels.statusChanged) ?? []) {
     listener({}, status)
   }
 }

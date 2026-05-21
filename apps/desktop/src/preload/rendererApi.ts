@@ -1,9 +1,9 @@
 import {
-  libraryBoundaryHostStatusIpcChannels,
+  hostStatusChannels,
   type LibraryBoundaryHostStatus
 } from '../shared/libraryBoundary/status'
 import {
-  libraryHierarchyReadChildrenIpcChannels,
+  hierarchyReadChannels,
   type LibraryHierarchyReadChildrenRequest,
   type LibraryHierarchyReadChildrenResult
 } from '../shared/libraryHierarchy/readChildren'
@@ -11,7 +11,7 @@ import {
   type LocalRootRegistrationRequest,
   type LocalRootRegistrationResult
 } from '../shared/libraryRoots/registerLocalRoot'
-import { libraryRootsIpcChannels } from '../shared/libraryRoots/channels'
+import { rootChannels } from '../shared/libraryRoots/channels'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
 import type { RendererApi } from '../shared/rendererApi'
 
@@ -46,7 +46,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       host: {
         async getStatus(): Promise<LibraryBoundaryHostStatus> {
           return (await ipcRenderer.invoke(
-            libraryBoundaryHostStatusIpcChannels.getStatus
+            hostStatusChannels.getStatus
           )) as LibraryBoundaryHostStatus
         },
         onStatusChanged(callback) {
@@ -57,10 +57,10 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             callback(status)
           }
 
-          ipcRenderer.on(libraryBoundaryHostStatusIpcChannels.statusChanged, listener)
+          ipcRenderer.on(hostStatusChannels.statusChanged, listener)
 
           return () => {
-            ipcRenderer.off(libraryBoundaryHostStatusIpcChannels.statusChanged, listener)
+            ipcRenderer.off(hostStatusChannels.statusChanged, listener)
           }
         }
       },
@@ -69,7 +69,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: LibraryHierarchyReadChildrenRequest
         ): Promise<LibraryHierarchyReadChildrenResult> {
           return (await ipcRenderer.invoke(
-            libraryHierarchyReadChildrenIpcChannels.readChildren,
+            hierarchyReadChannels.readChildren,
             request
           )) as LibraryHierarchyReadChildrenResult
         }
@@ -79,15 +79,12 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: LocalRootRegistrationRequest
         ): Promise<LocalRootRegistrationResult> {
           return (await ipcRenderer.invoke(
-            libraryRootsIpcChannels.registerLocal,
+            rootChannels.registerLocal,
             request
           )) as LocalRootRegistrationResult
         },
         async runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult> {
-          return (await ipcRenderer.invoke(
-            libraryRootsIpcChannels.runScan,
-            request
-          )) as LocalRootScanResult
+          return (await ipcRenderer.invoke(rootChannels.runScan, request)) as LocalRootScanResult
         }
       }
     }

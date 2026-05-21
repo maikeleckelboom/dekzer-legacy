@@ -1,4 +1,4 @@
-export const libraryHierarchyReadChildrenIpcChannels = {
+export const hierarchyReadChannels = {
   readChildren: 'desktop:library-hierarchy:read-children'
 } as const
 

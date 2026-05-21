@@ -23,7 +23,7 @@ import {
 } from '../src/renderer/libraryBrowser/hierarchyRead'
 import type { BrowserTreeNode } from '../src/renderer/libraryBrowser/tree/types'
 import {
-  libraryHierarchyReadChildrenIpcChannels,
+  hierarchyReadChannels,
   type LibraryHierarchyReadChildrenErrorCode,
   type LibraryHierarchyReadChildrenRequest,
   type LibraryHierarchyReadChildrenResult
@@ -255,7 +255,7 @@ function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig
     host
   )
 
-  assert.equal(registration.channel, libraryHierarchyReadChildrenIpcChannels.readChildren)
+  assert.equal(registration.channel, hierarchyReadChannels.readChildren)
   assert.equal(typeof registration.handler, 'function')
 }
 

@@ -1,7 +1,7 @@
 import type { ReadLiteralHierarchyChildrenRequest } from '@dekzer/library-boundary-contract'
 
 import {
-  libraryHierarchyReadChildrenIpcChannels,
+  hierarchyReadChannels,
   type LibraryHierarchyReadChildrenErrorCode,
   type LibraryHierarchyReadChildrenNode,
   type LibraryHierarchyReadChildrenResult
@@ -27,7 +27,7 @@ export function registerLibraryHierarchyReadChildrenIpc(
   ipcMain: LibraryHierarchyReadChildrenIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(libraryHierarchyReadChildrenIpcChannels.readChildren, (_event, request) =>
+  ipcMain.handle(hierarchyReadChannels.readChildren, (_event, request) =>
     readLibraryHierarchyChildrenThroughHost(host, request)
   )
 }

@@ -10,7 +10,7 @@ import {
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
 } from './libraryBoundary/status'
-import { libraryBoundaryHostStatusIpcChannels } from '../shared/libraryBoundary/status'
+import { hostStatusChannels } from '../shared/libraryBoundary/status'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
@@ -64,7 +64,7 @@ app.whenReady().then(() => {
   registerLocalRootScanIpc(ipcMain, host)
   libraryBoundaryHostStatusController.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send(libraryBoundaryHostStatusIpcChannels.statusChanged, status)
+      window.webContents.send(hostStatusChannels.statusChanged, status)
     }
   })
 

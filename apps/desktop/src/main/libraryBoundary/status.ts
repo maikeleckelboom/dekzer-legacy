@@ -1,5 +1,5 @@
 import {
-  libraryBoundaryHostStatusIpcChannels,
+  hostStatusChannels,
   type LibraryBoundaryHostStatus,
   type LibraryBoundaryHostStatusBinaryPolicy,
   type LibraryBoundaryHostStatusChangedCallback,
@@ -99,7 +99,7 @@ export function registerLibraryBoundaryHostStatusIpc(
   ipcMain: LibraryBoundaryHostStatusIpcMain,
   controller: LibraryBoundaryHostStatusController
 ): void {
-  ipcMain.handle(libraryBoundaryHostStatusIpcChannels.getStatus, () => controller.getStatus())
+  ipcMain.handle(hostStatusChannels.getStatus, () => controller.getStatus())
 }
 
 export function createLibraryBoundaryHostStatus(
