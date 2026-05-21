@@ -31,19 +31,19 @@ export function getFirstVisibleNodeId(
 }
 
 export function isBrowserTreeLeaf(node: BrowserTreeNode): boolean {
-  return node.childrenState.kind === 'leaf'
+  return node.children.kind === 'none'
 }
 
 export function isBrowserTreeBranch(node: BrowserTreeNode): boolean {
-  return !isBrowserTreeLeaf(node)
+  return node.children.kind !== 'none'
 }
 
 export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly BrowserTreeNode[] {
-  if (node.childrenState.kind !== 'loaded') {
+  if (node.children.kind !== 'loaded') {
     return []
   }
 
-  return node.childrenState.children
+  return node.children.children
 }
 
 export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
@@ -51,11 +51,11 @@ export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
 }
 
 export function canRequestBrowserTreeChildren(node: BrowserTreeNode): boolean {
-  return node.childrenState.kind === 'unloaded' || node.childrenState.kind === 'failed'
+  return node.action?.state.kind === 'idle' || node.action?.state.kind === 'failed'
 }
 
 export function isLoadingBrowserTreeChildren(node: BrowserTreeNode): boolean {
-  return node.childrenState.kind === 'loading'
+  return node.action?.state.kind === 'loading'
 }
 
 export function getLastVisibleNodeId(

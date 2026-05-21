@@ -1,15 +1,21 @@
 export type BrowserTreeNodeId = string
 
-export type BrowserTreeChildrenState =
+export type BrowserTreeChildren =
   | {
-      readonly kind: 'leaf'
+      readonly kind: 'none'
     }
   | {
       readonly kind: 'loaded'
       readonly children: readonly BrowserTreeNode[]
     }
   | {
-      readonly kind: 'unloaded'
+      readonly kind: 'deferred'
+      readonly detail?: string
+    }
+
+export type BrowserTreeActionState =
+  | {
+      readonly kind: 'idle'
       readonly detail?: string
     }
   | {
@@ -21,12 +27,36 @@ export type BrowserTreeChildrenState =
       readonly detail: string
     }
 
+export type BrowserTreeAction =
+  | {
+      readonly kind: 'loadChildren'
+      readonly state: BrowserTreeActionState
+    }
+  | {
+      readonly kind: 'loadMore'
+      readonly state: BrowserTreeActionState
+    }
+
+export type BrowserTreeIcon =
+  | 'source'
+  | 'navigation'
+  | 'folder'
+  | 'folderOpen'
+  | 'file'
+  | 'music'
+  | 'more'
+  | 'loading'
+  | 'warning'
+  | 'state'
+
 export type BrowserTreeNode = {
   readonly id: BrowserTreeNodeId
   readonly label: string
-  readonly badgeLabel: string
+  readonly badgeLabel?: string
   readonly detail?: string
-  readonly childrenState: BrowserTreeChildrenState
+  readonly icon?: BrowserTreeIcon
+  readonly children: BrowserTreeChildren
+  readonly action?: BrowserTreeAction
 }
 
 export type BrowserTreeVisibleItem = {

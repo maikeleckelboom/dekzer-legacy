@@ -412,7 +412,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   )
   assert.equal(
     firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:12'),
-    'unloaded'
+    'deferred'
   )
   assert.equal(await controller.requestDirectoryChildren('source-directory:99'), false)
   assert.equal(requests.length, 1)
@@ -448,7 +448,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   assert.equal(firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:12'), 'loaded')
   assert.equal(
     firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:99'),
-    'unloaded'
+    'deferred'
   )
 
   assert.equal(await controller.requestDirectoryChildren('source-directory:13'), true)
@@ -549,6 +549,18 @@ async function validatesRendererWindowedMore(): Promise<void> {
     'more:navigation-row:7:2'
   ])
   assert.equal(projection.bindingsById.get('more:navigation-row:7:2')?.kind, 'more')
+  assert.equal(
+    findProjectedNode(projection.nodes, 'more:navigation-row:7:2')?.children.kind,
+    'none'
+  )
+  assert.equal(
+    findProjectedNode(projection.nodes, 'more:navigation-row:7:2')?.action?.kind,
+    'loadMore'
+  )
+  assert.equal(
+    findProjectedNode(projection.nodes, 'more:navigation-row:7:2')?.action?.state.kind,
+    'idle'
+  )
   assert.deepEqual(
     (projection.bindingsById.get('more:navigation-row:7:2') as { target: unknown } | undefined)
       ?.target,
@@ -641,7 +653,15 @@ async function validatesRendererWindowedMore(): Promise<void> {
   ])
   assert.equal(projection.bindingsById.get('more:source-directory:12:1')?.kind, 'more')
   assert.equal(
-    findProjectedNode(projection.nodes, 'more:source-directory:12:1')?.childrenState.kind,
+    findProjectedNode(projection.nodes, 'more:source-directory:12:1')?.children.kind,
+    'none'
+  )
+  assert.equal(
+    findProjectedNode(projection.nodes, 'more:source-directory:12:1')?.action?.kind,
+    'loadMore'
+  )
+  assert.equal(
+    findProjectedNode(projection.nodes, 'more:source-directory:12:1')?.action?.state.kind,
     'failed'
   )
 
@@ -674,7 +694,15 @@ async function validatesRendererWindowedMore(): Promise<void> {
     'more:source-directory:14:1'
   ])
   assert.equal(
-    findProjectedNode(projection.nodes, 'more:source-directory:14:1')?.childrenState.kind,
+    findProjectedNode(projection.nodes, 'more:source-directory:14:1')?.children.kind,
+    'none'
+  )
+  assert.equal(
+    findProjectedNode(projection.nodes, 'more:source-directory:14:1')?.action?.kind,
+    'loadMore'
+  )
+  assert.equal(
+    findProjectedNode(projection.nodes, 'more:source-directory:14:1')?.action?.state.kind,
     'loading'
   )
   await controller.loadFirstSource()
@@ -1253,17 +1281,17 @@ function firstProjectedDirectoryStateKind(
   nodes: readonly BrowserTreeNode[],
   nodeId: string
 ): string | undefined {
-  return findProjectedNode(nodes, nodeId)?.childrenState.kind
+  return findProjectedNode(nodes, nodeId)?.children.kind
 }
 
 function firstLoadedChildIds(nodes: readonly BrowserTreeNode[], nodeId: string): readonly string[] {
   const node = findProjectedNode(nodes, nodeId)
 
-  if (node?.childrenState.kind !== 'loaded') {
+  if (node?.children.kind !== 'loaded') {
     return []
   }
 
-  return node.childrenState.children.map((child) => child.id)
+  return node.children.children.map((child) => child.id)
 }
 
 function findProjectedNode(
@@ -1275,8 +1303,8 @@ function findProjectedNode(
       return node
     }
 
-    if (node.childrenState.kind === 'loaded') {
-      const child = findProjectedNode(node.childrenState.children, nodeId)
+    if (node.children.kind === 'loaded') {
+      const child = findProjectedNode(node.children.children, nodeId)
 
       if (child !== undefined) {
         return child

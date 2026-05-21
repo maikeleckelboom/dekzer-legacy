@@ -9,7 +9,14 @@ import type {
   SourceState,
   SourceTarget
 } from './hierarchyState'
-import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
+import type {
+  BrowserTreeAction,
+  BrowserTreeActionState,
+  BrowserTreeChildren,
+  BrowserTreeIcon,
+  BrowserTreeNode,
+  BrowserTreeNodeId
+} from './tree/types'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -18,6 +25,11 @@ export type BrowserProjection = {
 }
 
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
+
+type ProjectedNodeState = {
+  readonly children: BrowserTreeChildren
+  readonly action?: BrowserTreeAction
+}
 
 export function projectState(state: BrowserState): BrowserProjection | undefined {
   if (state.navigationReadResult === undefined) {
@@ -92,8 +104,9 @@ function projectNavigationRow(options: {
       id: nodeId,
       label: options.row.displayName,
       badgeLabel: 'Source',
+      icon: 'source',
       detail: formatNavigationSourceDetail(options.row),
-      childrenState: projectSourceChildren({
+      ...projectSourceChildren({
         ownerId: nodeId,
         target: sourceTarget,
         state: options.sourceReadStates.get(nodeId),
@@ -112,8 +125,9 @@ function projectNavigationRow(options: {
     id: nodeId,
     label: options.row.displayName,
     badgeLabel: 'Navigation',
+    icon: 'navigation',
     detail: formatNavigationDetail(options.row),
-    childrenState: {
+    children: {
       kind: 'loaded',
       children: [
         trackedReadStateNode(
@@ -136,58 +150,69 @@ function projectSourceChildren(options: {
   readonly state: SourceState | undefined
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
-}): BrowserTreeNode['childrenState'] {
+}): ProjectedNodeState {
   const state = options.state
 
   if (state === undefined || state.kind === 'unloaded') {
+    const detail = state?.detail ?? 'Literal hierarchy not loaded yet.'
+
     return {
-      kind: 'unloaded',
-      detail: state?.detail ?? 'Literal hierarchy not loaded yet.'
+      children: {
+        kind: 'deferred',
+        detail
+      },
+      action: loadChildrenAction('idle', detail)
     }
   }
 
   if (state.kind === 'loading') {
     return {
-      kind: 'loaded',
-      children: [
-        trackedReadStateNode(
-          {
-            ownerId: options.ownerId,
-            state: 'loading',
-            label: 'Loading hierarchy',
-            detail: state.detail ?? 'Loading literal hierarchy children.'
-          },
-          options.bindingsById
-        )
-      ]
+      children: {
+        kind: 'loaded',
+        children: [
+          trackedReadStateNode(
+            {
+              ownerId: options.ownerId,
+              state: 'loading',
+              label: 'Loading hierarchy',
+              detail: state.detail ?? 'Loading literal hierarchy children.'
+            },
+            options.bindingsById
+          )
+        ]
+      }
     }
   }
 
   if (state.kind === 'failed') {
     return {
-      kind: 'loaded',
-      children: [
-        trackedReadStateNode(
-          {
-            ownerId: options.ownerId,
-            state: 'error',
-            label: 'Hierarchy unavailable',
-            detail: state.detail
-          },
-          options.bindingsById
-        )
-      ]
+      children: {
+        kind: 'loaded',
+        children: [
+          trackedReadStateNode(
+            {
+              ownerId: options.ownerId,
+              state: 'error',
+              label: 'Hierarchy unavailable',
+              detail: state.detail
+            },
+            options.bindingsById
+          )
+        ]
+      }
     }
   }
 
   return {
-    kind: 'loaded',
-    children: projectLoadedHierarchyChildren({
-      ownerId: options.ownerId,
-      children: state.children,
-      directoryReadStates: options.directoryReadStates,
-      bindingsById: options.bindingsById
-    })
+    children: {
+      kind: 'loaded',
+      children: projectLoadedHierarchyChildren({
+        ownerId: options.ownerId,
+        children: state.children,
+        directoryReadStates: options.directoryReadStates,
+        bindingsById: options.bindingsById
+      })
+    }
   }
 }
 
@@ -277,8 +302,9 @@ function projectLiteralNode(options: {
       id: node.id,
       label: node.label,
       badgeLabel: 'Folder',
+      icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
-      childrenState: projectDirectoryChildren({
+      ...projectDirectoryChildren({
         ownerId: node.id,
         state: options.directoryReadStates.get(node.directoryId),
         directoryReadStates: options.directoryReadStates,
@@ -298,8 +324,9 @@ function projectLiteralNode(options: {
     id: node.id,
     label: node.label,
     badgeLabel: 'File',
+    icon: 'music',
     detail: formatFileDetail(node.presence),
-    childrenState: { kind: 'leaf' }
+    children: { kind: 'none' }
   }
 }
 
@@ -308,58 +335,69 @@ function projectDirectoryChildren(options: {
   readonly state: DirectoryState | undefined
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
-}): BrowserTreeNode['childrenState'] {
+}): ProjectedNodeState {
   const state = options.state
 
   if (state === undefined || state.kind === 'unloaded') {
+    const detail = state?.detail ?? 'Children not loaded yet.'
+
     return {
-      kind: 'unloaded',
-      detail: state?.detail ?? 'Children not loaded yet.'
+      children: {
+        kind: 'deferred',
+        detail
+      },
+      action: loadChildrenAction('idle', detail)
     }
   }
 
   if (state.kind === 'loading') {
     return {
-      kind: 'loaded',
-      children: [
-        trackedReadStateNode(
-          {
-            ownerId: options.ownerId,
-            state: 'loading',
-            label: 'Loading children',
-            detail: state.detail ?? 'Loading children.'
-          },
-          options.bindingsById
-        )
-      ]
+      children: {
+        kind: 'loaded',
+        children: [
+          trackedReadStateNode(
+            {
+              ownerId: options.ownerId,
+              state: 'loading',
+              label: 'Loading children',
+              detail: state.detail ?? 'Loading children.'
+            },
+            options.bindingsById
+          )
+        ]
+      }
     }
   }
 
   if (state.kind === 'failed') {
     return {
-      kind: 'loaded',
-      children: [
-        trackedReadStateNode(
-          {
-            ownerId: options.ownerId,
-            state: 'error',
-            label: 'Children unavailable',
-            detail: state.detail
-          },
-          options.bindingsById
-        )
-      ]
+      children: {
+        kind: 'loaded',
+        children: [
+          trackedReadStateNode(
+            {
+              ownerId: options.ownerId,
+              state: 'error',
+              label: 'Children unavailable',
+              detail: state.detail
+            },
+            options.bindingsById
+          )
+        ]
+      }
     }
   }
 
   return {
-    kind: 'loaded',
-    children: projectLoadedHierarchyChildren({
-      ownerId: options.ownerId,
-      children: state.children,
-      directoryReadStates: options.directoryReadStates,
-      bindingsById: options.bindingsById
-    })
+    children: {
+      kind: 'loaded',
+      children: projectLoadedHierarchyChildren({
+        ownerId: options.ownerId,
+        children: state.children,
+        directoryReadStates: options.directoryReadStates,
+        bindingsById: options.bindingsById
+      })
+    }
   }
 }
 
@@ -390,8 +428,29 @@ function readStateNode(options: {
     label: options.label,
     badgeLabel: 'State',
     detail: options.detail,
-    childrenState: { kind: 'leaf' }
+    icon: readStateIcon(options.state),
+    children: { kind: 'none' }
   }
+}
+
+function loadChildrenAction(
+  stateKind: 'idle' | 'loading' | 'failed',
+  detail?: string
+): BrowserTreeAction {
+  const state: BrowserTreeActionState =
+    stateKind === 'loading'
+      ? {
+          kind: 'loading',
+          ...(detail === undefined ? {} : { detail })
+        }
+      : stateKind === 'failed'
+        ? { kind: 'failed', detail: detail ?? 'Load failed.' }
+        : {
+            kind: 'idle',
+            ...(detail === undefined ? {} : { detail })
+          }
+
+  return { kind: 'loadChildren', state }
 }
 
 function trackedReadStateNode(
@@ -443,21 +502,12 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
       : more?.kind === 'loading'
         ? (more.detail ?? 'Loading more literal hierarchy rows.')
         : formatMoreDetail(offset, options.children.limit, options.children.totalRows)
-  const childrenState =
+  const actionState: BrowserTreeActionState =
     more?.kind === 'failed'
-      ? ({
-          kind: 'failed',
-          detail
-        } as const)
+      ? { kind: 'failed', detail }
       : more?.kind === 'loading'
-        ? ({
-            kind: 'loading',
-            detail
-          } as const)
-        : ({
-            kind: 'unloaded',
-            detail
-          } as const)
+        ? { kind: 'loading', detail }
+        : { kind: 'idle', detail }
 
   return {
     node: {
@@ -469,7 +519,9 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
             ? 'Loading more rows'
             : 'Load more rows',
       badgeLabel: 'More',
-      childrenState
+      icon: moreIcon(more),
+      children: { kind: 'none' },
+      action: { kind: 'loadMore', state: actionState }
     },
     target,
     detail
@@ -495,6 +547,29 @@ function trackedMoreNode(
   })
 
   return node
+}
+
+function readStateIcon(state: 'loading' | 'empty' | 'unavailable' | 'error'): BrowserTreeIcon {
+  switch (state) {
+    case 'loading':
+      return 'loading'
+    case 'error':
+    case 'unavailable':
+      return 'warning'
+    case 'empty':
+      return 'state'
+  }
+}
+
+function moreIcon(more: LoadedChildren['more']): BrowserTreeIcon {
+  switch (more?.kind) {
+    case 'loading':
+      return 'loading'
+    case 'failed':
+      return 'warning'
+    default:
+      return 'more'
+  }
 }
 
 function sourceReadTargetFor(row: NavigationRow): SourceTarget | undefined {

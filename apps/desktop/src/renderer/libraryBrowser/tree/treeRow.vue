@@ -1,8 +1,23 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { BrowserTreeChildrenState, BrowserTreeVisibleItem } from './types'
-import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
+import type { BrowserTreeActionState, BrowserTreeIcon, BrowserTreeVisibleItem } from './types'
+import {
+  DisclosureClosedIcon,
+  DisclosureOpenIcon,
+  FileIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  Icon,
+  LoadingIcon,
+  MoreIcon,
+  MusicIcon,
+  NavigationIcon,
+  SourceIcon,
+  StateIcon,
+  WarningIcon
+} from '../../icons'
+import type { IconComponent } from '../../icons'
 
 defineOptions({
   name: 'TreeRow'
@@ -25,20 +40,65 @@ const rowStyle = computed(() => ({
   paddingLeft: `${0.75 + (props.item.level - 1) * 1.25}rem`
 }))
 
-const childrenStateDetail = computed(() => formatChildrenStateDetail(props.item.node.childrenState))
+const hasAffordance = computed(
+  () =>
+    props.item.canRevealChildren || props.item.canRequestChildren || props.item.isLoadingChildren
+)
 
-function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | undefined {
+const actionStateDetail = computed(() => formatActionStateDetail(props.item.node.action?.state))
+
+const rowIcon = computed<IconComponent | undefined>(() => resolveRowIcon(props.item))
+
+function formatActionStateDetail(state: BrowserTreeActionState | undefined): string | undefined {
+  if (state === undefined) {
+    return undefined
+  }
+
   switch (state.kind) {
-    case 'leaf':
-    case 'loaded':
-      return undefined
-    case 'unloaded':
-      return state.detail ?? 'Children not loaded yet.'
+    case 'idle':
+      return state.detail
     case 'loading':
-      return state.detail ?? 'Loading children.'
+      return state.detail ?? 'Loading.'
     case 'failed':
       return state.detail
   }
+}
+
+function resolveRowIcon(item: BrowserTreeVisibleItem): IconComponent | undefined {
+  const iconKind = resolveExpandedIconKind(item)
+
+  switch (iconKind) {
+    case 'source':
+      return SourceIcon
+    case 'navigation':
+      return NavigationIcon
+    case 'folder':
+      return FolderIcon
+    case 'folderOpen':
+      return FolderOpenIcon
+    case 'file':
+      return FileIcon
+    case 'music':
+      return MusicIcon
+    case 'more':
+      return MoreIcon
+    case 'loading':
+      return LoadingIcon
+    case 'warning':
+      return WarningIcon
+    case 'state':
+      return StateIcon
+    default:
+      return undefined
+  }
+}
+
+function resolveExpandedIconKind(item: BrowserTreeVisibleItem): BrowserTreeIcon | undefined {
+  if (item.node.icon === 'folder' && item.isExpanded) {
+    return 'folderOpen'
+  }
+
+  return item.node.icon
 }
 </script>
 
@@ -50,15 +110,19 @@ function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | un
   >
     <span
       class="grid h-7 w-7 shrink-0 place-items-center"
-      :data-tree-affordance="item.isBranch ? 'true' : undefined"
+      :data-tree-affordance="hasAffordance ? 'true' : undefined"
       aria-hidden="true"
     >
       <Icon
-        v-if="item.canRevealChildren || item.canRequestChildren || item.isLoadingChildren"
+        v-if="hasAffordance"
         :icon="item.isExpanded ? DisclosureOpenIcon : DisclosureClosedIcon"
         size="sm"
         :decorative="true"
       />
+    </span>
+
+    <span class="grid h-7 w-7 shrink-0 place-items-center" aria-hidden="true">
+      <Icon v-if="rowIcon" :icon="rowIcon" size="sm" :decorative="true" />
     </span>
 
     <span class="min-w-0 flex-1">
@@ -70,14 +134,15 @@ function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | un
         {{ item.node.detail }}
       </span>
       <span
-        v-if="childrenStateDetail"
+        v-if="actionStateDetail"
         class="block truncate text-xs leading-5 text-(--color-text-muted)"
       >
-        {{ childrenStateDetail }}
+        {{ actionStateDetail }}
       </span>
     </span>
 
     <span
+      v-if="item.node.badgeLabel"
       class="shrink-0 rounded-sm border border-(--color-border) px-2 py-0.5 text-[11px] font-semibold uppercase leading-4 text-(--color-text-muted)"
     >
       {{ item.node.badgeLabel }}
