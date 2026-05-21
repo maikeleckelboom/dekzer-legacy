@@ -28,6 +28,7 @@ import {
   type LibraryHierarchyReadRequest,
   type LibraryHierarchyReadResult
 } from '../src/shared/libraryHierarchy/read'
+import { firstAvailableSourceReadRequest } from './support/libraryHierarchy'
 import { createFakeClient, deferred, silentLogger, testApp } from './support/libraryBoundary'
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-hierarchy-read-'))
@@ -452,16 +453,6 @@ function testLibraryBoundary(
     }),
     onStatusChanged: () => () => undefined,
     readLiteralHierarchyChildren
-  }
-}
-
-function firstAvailableSourceReadRequest(): LibraryHierarchyReadRequest {
-  return {
-    target: {
-      kind: 'firstAvailableSource'
-    },
-    offset: 0,
-    limit: 50
   }
 }
 

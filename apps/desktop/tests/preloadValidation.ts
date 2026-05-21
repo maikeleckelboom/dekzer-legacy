@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert'
 
+import { firstAvailableSourceReadRequest } from './support/libraryHierarchy'
 import { createDekzerRendererApi, exposeDekzerRendererApi } from '../src/preload/libraryBoundary'
 import {
   libraryBoundaryHostStatusIpcChannels,
@@ -7,7 +8,6 @@ import {
 } from '../src/shared/libraryBoundary/status'
 import {
   libraryHierarchyReadIpcChannels,
-  type LibraryHierarchyReadRequest,
   type LibraryHierarchyReadResult
 } from '../src/shared/libraryHierarchy/read'
 import { emitStatus, testStatus } from './support/libraryBoundary'
@@ -106,14 +106,4 @@ async function validatesPreloadApiSurface(): Promise<void> {
   unsubscribe()
   emitStatus(listeners, status)
   assert.equal(receivedStatus, null)
-}
-
-function firstAvailableSourceReadRequest(): LibraryHierarchyReadRequest {
-  return {
-    target: {
-      kind: 'firstAvailableSource'
-    },
-    offset: 0,
-    limit: 50
-  }
 }

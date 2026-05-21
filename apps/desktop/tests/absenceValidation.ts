@@ -1,16 +1,13 @@
 import { strict as assert } from 'node:assert'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
+import { relative } from 'node:path'
+
+import { desktopRoot, sourceRoot, listSourceFiles, normalizePath } from './support/files'
 
 type AllowedNullUse = {
   readonly reason: string
   readonly patterns: readonly RegExp[]
 }
-
-const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const sourceRoot = join(desktopRoot, 'src')
-const workspaceRoot = resolve(desktopRoot, '..', '..')
 
 const allowedNullUses: ReadonlyMap<string, AllowedNullUse> = new Map([
   [
@@ -99,7 +96,6 @@ void main()
 
 function main(): void {
   validatesNoCasualSourceNull()
-  validatesAbsenceValidationIsInChecks()
 }
 
 function validatesNoCasualSourceNull(): void {
@@ -125,51 +121,6 @@ function validatesNoCasualSourceNull(): void {
 
   assert.deepEqual(violations, [], formatViolations(violations))
 }
-
-function validatesAbsenceValidationIsInChecks(): void {
-  const desktopPackage = readJson(join(desktopRoot, 'package.json'))
-  const rootPackage = readJson(join(workspaceRoot, 'package.json'))
-
-  assert.equal(desktopPackage.scripts?.['validate:absence'], 'tsx tests/absenceValidation.ts')
-  assert.equal(
-    rootPackage.scripts?.['desktop:validate:absence'],
-    'pnpm --filter @dekzer/desktop run validate:absence'
-  )
-  assert.match(rootPackage.scripts?.check ?? '', /pnpm run desktop:validate:absence/)
-}
-
-function listSourceFiles(root: string): readonly string[] {
-  const files: string[] = []
-
-  for (const entry of readdirSync(root)) {
-    const entryPath = join(root, entry)
-    const stats = statSync(entryPath)
-
-    if (stats.isDirectory()) {
-      files.push(...listSourceFiles(entryPath))
-      continue
-    }
-
-    if (entryPath.endsWith('.ts') || entryPath.endsWith('.vue')) {
-      files.push(entryPath)
-    }
-  }
-
-  return files
-}
-
-function readJson(filePath: string): {
-  readonly scripts?: Record<string, string>
-} {
-  return JSON.parse(readFileSync(filePath, 'utf8')) as {
-    readonly scripts?: Record<string, string>
-  }
-}
-
-function normalizePath(path: string): string {
-  return path.split(sep).join('/')
-}
-
 function formatViolations(violations: readonly string[]): string {
   return [
     'Unexpected app-owned null usage in desktop source.',

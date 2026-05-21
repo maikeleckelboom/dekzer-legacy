@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { readFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 
+import { desktopRoot, rendererSourceRoot, listSourceFiles, normalizePath } from './support/files'
 import { libraryHierarchyFixtureTree } from '../src/renderer/libraryBrowser/fixture'
 import { projectLibraryHierarchyReadToBrowserTree } from '../src/renderer/libraryBrowser/hierarchyProjection'
 import {
@@ -42,9 +42,6 @@ const expandedFixtureIds = new Set<BrowserTreeNodeId>([
 ])
 const rootOnlyExpandedIds = new Set<BrowserTreeNodeId>(['fixture-root'])
 const collapsedFixtureIds = new Set<BrowserTreeNodeId>()
-const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const rendererSourceRoot = join(desktopRoot, 'src', 'renderer')
-
 void main()
 
 function main(): void {
@@ -63,7 +60,6 @@ function main(): void {
   validatesFixtureFallbackRemainsExplicit()
   validatesRendererBoundaryOwnership()
   validatesStrictTypecheckFlagsRemainEnabled()
-  validatesRootQualityGateIncludesTreeValidation()
 }
 
 function validatesExplicitChildrenStateModel(): void {
@@ -549,18 +545,6 @@ function validatesStrictTypecheckFlagsRemainEnabled(): void {
   }
 }
 
-function validatesRootQualityGateIncludesTreeValidation(): void {
-  const rootPackage = JSON.parse(
-    readFileSync(new URL('../../../package.json', import.meta.url), 'utf8')
-  ) as {
-    readonly scripts?: Record<string, string>
-  }
-  const scripts = rootPackage.scripts ?? {}
-
-  assert.equal(scripts['desktop:validate:tree'], 'pnpm --filter @dekzer/desktop run validate:tree')
-  assert.match(scripts.check ?? '', /pnpm run desktop:validate:tree/)
-}
-
 function fixtureVisibleItems(
   expandedNodeIds: ReadonlySet<BrowserTreeNodeId>,
   options: {
@@ -581,30 +565,6 @@ function assertFixtureNodesHaveExplicitChildrenState(nodes: readonly BrowserTree
     assert.equal(typeof node.childrenState.kind, 'string')
     assertFixtureNodesHaveExplicitChildrenState(getLoadedBrowserTreeChildren(node))
   }
-}
-
-function listSourceFiles(root: string): readonly string[] {
-  const files: string[] = []
-
-  for (const entry of readdirSync(root)) {
-    const entryPath = join(root, entry)
-    const stats = statSync(entryPath)
-
-    if (stats.isDirectory()) {
-      files.push(...listSourceFiles(entryPath))
-      continue
-    }
-
-    if (entryPath.endsWith('.ts') || entryPath.endsWith('.vue')) {
-      files.push(entryPath)
-    }
-  }
-
-  return files
-}
-
-function normalizePath(path: string): string {
-  return path.split(sep).join('/')
 }
 
 function resolveIntent(

@@ -1,0 +1,32 @@
+import { spawnSync } from 'node:child_process'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+const validations = [
+  'tests/absenceValidation.ts',
+  'tests/hierarchyReadValidation.ts',
+  'tests/hostValidation.ts',
+  'tests/iconValidation.ts',
+  'tests/preloadValidation.ts',
+  'tests/treeValidation.ts'
+] as const
+
+for (const validation of validations) {
+  console.log(`\n> desktop validation: ${validation}`)
+
+  const result = spawnSync(`pnpm exec tsx ${validation}`, {
+    cwd: desktopRoot,
+    stdio: 'inherit',
+    shell: true
+  })
+
+  if (result.error !== undefined) {
+    throw result.error
+  }
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1)
+  }
+}
