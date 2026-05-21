@@ -9,11 +9,7 @@ import {
   type LibraryBoundaryHostConfig
 } from '../src/main/libraryBoundary/config'
 import { LibraryBoundaryHost } from '../src/main/libraryBoundary/host'
-import {
-  registerLocalRootRegistrationIpc,
-  registerLocalRootThroughHost
-} from '../src/main/libraryRoots/registerLocalRoot'
-import { rootChannels } from '../src/shared/libraryRoots/channels'
+import { registerLocalRoot } from '../src/main/libraryRoots/registerLocalRoot'
 import type { LocalRootRegistrationResult } from '../src/shared/libraryRoots/registerLocalRoot'
 import {
   createFakeClient,
@@ -47,21 +43,20 @@ async function main(): Promise<void> {
   })
 
   await validatesLocalRootRegistrationHandler(config)
-  validatesLocalRootRegistrationIpcRegistration(config)
 }
 
 async function validatesLocalRootRegistrationHandler(
   config: LibraryBoundaryHostConfig
 ): Promise<void> {
   const idleHost = new LibraryBoundaryHost(config, silentLogger())
-  const hostUnavailable = await registerLocalRootThroughHost(idleHost, {
+  const hostUnavailable = await registerLocalRoot(idleHost, {
     absolutePath: 'C:/Music'
   })
 
   assert.equal(hostUnavailable.state, 'hostUnavailable')
   assertRegistrationError(hostUnavailable, 'hostNotStarted')
 
-  const invalidRequest = await registerLocalRootThroughHost(
+  const invalidRequest = await registerLocalRoot(
     await startedHostWithClient(config, createFakeClient()),
     {
       absolutePath: '   '
@@ -72,7 +67,7 @@ async function validatesLocalRootRegistrationHandler(
   assertRegistrationError(invalidRequest, 'invalidRequest')
 
   let receivedAbsolutePath = ''
-  const success = await registerLocalRootThroughHost(
+  const success = await registerLocalRoot(
     await startedHostWithClient(
       config,
       createFakeClient({
@@ -99,7 +94,7 @@ async function validatesLocalRootRegistrationHandler(
     }
   } satisfies LocalRootRegistrationResult)
 
-  const failure = await registerLocalRootThroughHost(
+  const failure = await registerLocalRoot(
     await startedHostWithClient(
       config,
       createFakeClient({
@@ -115,28 +110,6 @@ async function validatesLocalRootRegistrationHandler(
 
   assert.equal(failure.state, 'registrationFailed')
   assertRegistrationError(failure, 'registrationFailed')
-}
-
-function validatesLocalRootRegistrationIpcRegistration(config: LibraryBoundaryHostConfig): void {
-  const host = new LibraryBoundaryHost(config, silentLogger())
-
-  const registration: {
-    channel?: string
-    handler?: (request: unknown) => Promise<LocalRootRegistrationResult>
-  } = {}
-
-  registerLocalRootRegistrationIpc(
-    {
-      handle(channel, listener): void {
-        registration.channel = channel
-        registration.handler = (request) => listener({}, request)
-      }
-    },
-    host
-  )
-
-  assert.equal(registration.channel, rootChannels.registerLocal)
-  assert.equal(typeof registration.handler, 'function')
 }
 
 function assertRegistrationError(

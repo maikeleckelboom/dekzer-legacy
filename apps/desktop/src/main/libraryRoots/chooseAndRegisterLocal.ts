@@ -7,7 +7,7 @@ import type {
   LocalRootRegistrationRequest,
   LocalRootRegistrationResult
 } from '../../shared/libraryRoots/registerLocalRoot'
-import { registerLocalRootThroughHost } from './registerLocalRoot'
+import { registerLocalRoot } from './registerLocalRoot'
 
 export type LocalRootChoiceIpcMain = {
   handle(
@@ -71,7 +71,7 @@ export async function chooseAndRegisterLocalRoot(
 
   try {
     return mapRegistrationResult(
-      await (dependencies.registerLocalRoot ?? registerLocalRootThroughHost)(host, {
+      await (dependencies.registerLocalRoot ?? registerLocalRoot)(host, {
         absolutePath: selectedPath
       })
     )

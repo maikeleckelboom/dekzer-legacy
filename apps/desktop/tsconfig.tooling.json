@@ -1,6 +1,14 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
-  "include": ["scripts/**/*", "tooling/**/*", "tests/**/*", "src/main/**/*", "src/preload/**/*", "src/shared/**/*"],
+  "include": [
+    "scripts/**/*",
+    "tooling/**/*",
+    "tests/**/*",
+    "src/main/**/*",
+    "src/preload/**/*",
+    "src/shared/**/*",
+    "src/renderer/libraryBrowser/**/*.ts"
+  ],
   "compilerOptions": {
     "baseUrl": ".",
     "composite": true,

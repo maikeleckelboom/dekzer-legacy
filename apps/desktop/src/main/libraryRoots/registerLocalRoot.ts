@@ -8,25 +8,8 @@ import {
   type LocalRootRegistrationRequest,
   type LocalRootRegistrationResult
 } from '../../shared/libraryRoots/registerLocalRoot'
-import { rootChannels } from '../../shared/libraryRoots/channels'
 
-export type LocalRootRegistrationIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<LocalRootRegistrationResult>
-  ): void
-}
-
-export function registerLocalRootRegistrationIpc(
-  ipcMain: LocalRootRegistrationIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(rootChannels.registerLocal, (_event, request) =>
-    registerLocalRootThroughHost(host, request)
-  )
-}
-
-export async function registerLocalRootThroughHost(
+export async function registerLocalRoot(
   host: LibraryBoundaryHost,
   request: unknown
 ): Promise<LocalRootRegistrationResult> {
