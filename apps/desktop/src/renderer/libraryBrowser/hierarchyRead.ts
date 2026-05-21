@@ -1,8 +1,8 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { Ref } from 'vue'
 
-import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundaryStatus'
-import type { LibraryHierarchyReadResult } from '../../../shared/libraryHierarchyRead'
+import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundaryStatus'
+import type { LibraryHierarchyReadResult } from '../../shared/libraryHierarchyRead'
 
 export function useLibraryHierarchyRead(): {
   readonly hostStatus: Ref<LibraryBoundaryHostStatus | undefined>

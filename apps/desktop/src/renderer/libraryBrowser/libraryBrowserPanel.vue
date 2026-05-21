@@ -59,7 +59,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundaryStatus'
+import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundaryStatus'
 import { useLibraryHierarchyRead } from './hierarchyRead'
 import { libraryHierarchyFixtureTree } from './libraryHierarchyFixture'
 import { projectLibraryHierarchyReadToBrowserTree } from './libraryHierarchyProjection'

@@ -3,16 +3,16 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { libraryHierarchyFixtureTree } from '../src/renderer/src/libraryBrowser/libraryHierarchyFixture'
-import { projectLibraryHierarchyReadToBrowserTree } from '../src/renderer/src/libraryBrowser/libraryHierarchyProjection'
+import { libraryHierarchyFixtureTree } from '../src/renderer/libraryBrowser/libraryHierarchyFixture'
+import { projectLibraryHierarchyReadToBrowserTree } from '../src/renderer/libraryBrowser/libraryHierarchyProjection'
 import {
   getTreeItemAriaExpanded,
   getTreeItemAriaSelected
-} from '../src/renderer/src/libraryBrowser/tree/aria'
+} from '../src/renderer/libraryBrowser/tree/aria'
 import {
   resolveTreeKeyboardIntent,
   type TreeKeyboardIntent
-} from '../src/renderer/src/libraryBrowser/tree/keys'
+} from '../src/renderer/libraryBrowser/tree/keys'
 import {
   canRevealBrowserTreeChildren,
   flattenVisibleTree,
@@ -25,12 +25,12 @@ import {
   getPreviousVisibleNodeId,
   isBrowserTreeBranch,
   isBrowserTreeLeaf
-} from '../src/renderer/src/libraryBrowser/tree/projection'
+} from '../src/renderer/libraryBrowser/tree/projection'
 import type {
   BrowserTreeNode,
   BrowserTreeNodeId,
   BrowserTreeVisibleItem
-} from '../src/renderer/src/libraryBrowser/tree/types'
+} from '../src/renderer/libraryBrowser/tree/types'
 import type { LibraryHierarchyReadResult } from '../src/shared/libraryHierarchyRead'
 
 const expandedFixtureIds = new Set<BrowserTreeNodeId>([
@@ -41,7 +41,7 @@ const expandedFixtureIds = new Set<BrowserTreeNodeId>([
 const rootOnlyExpandedIds = new Set<BrowserTreeNodeId>(['fixture-root'])
 const collapsedFixtureIds = new Set<BrowserTreeNodeId>()
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const rendererSourceRoot = join(desktopRoot, 'src', 'renderer', 'src')
+const rendererSourceRoot = join(desktopRoot, 'src', 'renderer')
 
 void main()
 
@@ -99,7 +99,7 @@ function validatesExplicitChildrenStateModel(): void {
   assert.equal(failedBranch.childrenState.detail, 'Unable to load children.')
 
   const treeTypesSource = readFileSync(
-    new URL('../src/renderer/src/libraryBrowser/tree/types.ts', import.meta.url),
+    new URL('../src/renderer/libraryBrowser/tree/types.ts', import.meta.url),
     'utf8'
   )
   assert.match(treeTypesSource, /readonly childrenState: BrowserTreeChildrenState/)

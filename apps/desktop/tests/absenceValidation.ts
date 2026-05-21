@@ -95,21 +95,21 @@ const allowedNullUses: ReadonlyMap<string, AllowedNullUse> = new Map([
     }
   ],
   [
-    'src/renderer/src/libraryBrowser/tree/context.ts',
+    'src/renderer/libraryBrowser/tree/context.ts',
     {
       reason: 'Vue DOM element ref compatibility',
       patterns: [/element: HTMLElement \| null/]
     }
   ],
   [
-    'src/renderer/src/libraryBrowser/tree/controller.ts',
+    'src/renderer/libraryBrowser/tree/controller.ts',
     {
       reason: 'Vue DOM element ref compatibility',
       patterns: [/element: HTMLElement \| null/, /element !== null/]
     }
   ],
   [
-    'src/renderer/src/libraryBrowser/tree/treeItem.vue',
+    'src/renderer/libraryBrowser/tree/treeItem.vue',
     {
       reason: 'Vue template ref and DOM API compatibility',
       patterns: [

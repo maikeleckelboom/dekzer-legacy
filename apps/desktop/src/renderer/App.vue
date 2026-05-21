@@ -69,7 +69,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundaryStatus'
+import type { LibraryBoundaryHostStatus } from '../shared/libraryBoundaryStatus'
 import LibraryBrowserPanel from './libraryBrowser/libraryBrowserPanel.vue'
 
 const hostStatus = ref<LibraryBoundaryHostStatus>()
