@@ -1,19 +1,40 @@
 export { default as Icon } from './icon.vue'
 export type { IconComponent, IconSize, IconTone, IconProps } from './types'
 export {
+  ArchiveIcon,
+  CircleCheckIcon,
+  CircleDotIcon,
+  CircleIcon,
+  CircleOffIcon,
+  CircleXIcon,
+  CloudIcon,
+  CloudSyncIcon,
+  DatabaseIcon,
   DisclosureOpenIcon,
   DisclosureClosedIcon,
+  DiscIcon,
   FileIcon,
   FolderIcon,
   FolderOpenIcon,
   FolderPlusIcon,
+  HardDriveIcon,
   LoadingIcon,
+  LockIcon,
   MoreIcon,
   MusicIcon,
   NavigationIcon,
+  NetworkIcon,
+  PinIcon,
+  PinOffIcon,
+  RefreshCwIcon,
   ScanIcon,
+  ServerIcon,
+  SmartphoneIcon,
   SourceIcon,
   StateIcon,
+  TriangleAlertIcon,
+  UsbIcon,
   WarningIcon
 } from './lucide'
-export * from './custom'
+export { SdCardIcon } from './custom'
+export { resolveSourceIcon, resolveSourceIconBadge } from './sourceIconResolver'

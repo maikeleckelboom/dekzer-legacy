@@ -18,6 +18,10 @@ import type {
   BrowserTreeNodeId
 } from './tree/types'
 import { copyReadEntryPoint } from './entryPoint'
+import {
+  adaptLocationSourceDescriptor,
+  getLocationSourcePresentation
+} from './locationSources'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -95,6 +99,15 @@ function projectNavigationRow(options: {
   const sourceTarget = sourceReadTargetFor(options.row)
 
   if (sourceTarget !== undefined) {
+    const sourceState = options.sourceReadStates.get(nodeId)
+    const descriptor = adaptLocationSourceDescriptor({
+      rowKind: options.row.rowKind,
+      selectorKind: options.row.selectorKind,
+      sourceStateKind: sourceState?.kind,
+      sourceStateFailed: sourceState?.kind === 'failed'
+    })
+    const presentation = getLocationSourcePresentation(descriptor)
+
     options.bindingsById.set(nodeId, {
       kind: 'source',
       navigationRow: options.row,
@@ -104,13 +117,13 @@ function projectNavigationRow(options: {
     return {
       id: nodeId,
       label: options.row.displayName,
-      badgeLabel: 'Source',
+      badgeLabel: presentation.label,
       icon: 'source',
       detail: formatNavigationSourceDetail(options.row),
       ...projectSourceChildren({
         ownerId: nodeId,
         target: sourceTarget,
-        state: options.sourceReadStates.get(nodeId),
+        state: sourceState,
         directoryReadStates: options.directoryReadStates,
         bindingsById: options.bindingsById
       })

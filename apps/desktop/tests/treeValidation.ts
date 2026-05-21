@@ -525,7 +525,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     {
       id: 'navigation-row:7',
       label: 'Source Fixture',
-      badgeLabel: 'Source',
+      badgeLabel: 'Local Library',
       icon: 'source',
       detail: 'Navigation source row. Updated 100.',
       children: {
@@ -565,7 +565,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     {
       id: 'navigation-row:7',
       label: 'Source Fixture',
-      badgeLabel: 'Source',
+      badgeLabel: 'Local Library',
       icon: 'source',
       detail: 'Navigation source row. Updated 100.',
       children: {

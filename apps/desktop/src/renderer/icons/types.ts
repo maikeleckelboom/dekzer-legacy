@@ -1,6 +1,7 @@
+import type { Component } from 'vue'
 import type { LucideIcon } from '@lucide/vue'
 
-export type IconComponent = LucideIcon
+export type IconComponent = LucideIcon | Component
 
 export type IconSize = 'xs' | 'sm' | 'md' | 'lg'
 
