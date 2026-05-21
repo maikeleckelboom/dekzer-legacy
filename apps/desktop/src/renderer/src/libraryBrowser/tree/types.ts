@@ -52,7 +52,7 @@ export type BrowserTreeVisibleItem = {
   readonly level: number
   readonly visibleIndex: number
   readonly isBranch: boolean
-  readonly canExpand: boolean
+  readonly canRevealChildren: boolean
   readonly isExpanded: boolean
   readonly isSelected: boolean
   readonly isActive: boolean

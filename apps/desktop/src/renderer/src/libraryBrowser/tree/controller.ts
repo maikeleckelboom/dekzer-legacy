@@ -90,7 +90,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
   function toggleNode(nodeId: BrowserTreeNodeId): void {
     const item = visibleItems.value.find((visibleItem) => visibleItem.id === nodeId)
 
-    if (item?.canExpand !== true) {
+    if (item?.canRevealChildren !== true) {
       return
     }
 

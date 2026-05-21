@@ -7,7 +7,7 @@
     <span
       class="grid h-7 w-7 shrink-0 place-items-center text-xs font-bold"
       :class="item.isBranch ? 'text-(--color-text-muted)' : 'text-(--color-border)'"
-      :data-tree-affordance="item.canExpand ? 'true' : undefined"
+      :data-tree-affordance="item.canRevealChildren ? 'true' : undefined"
       aria-hidden="true"
     >
       {{ branchGlyph }}
@@ -64,7 +64,7 @@ const rowStyle = computed(() => ({
 }))
 
 const branchGlyph = computed(() => {
-  if (!props.item.canExpand) {
+  if (!props.item.canRevealChildren) {
     return ''
   }
 

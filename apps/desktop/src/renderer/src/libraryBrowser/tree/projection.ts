@@ -46,7 +46,7 @@ export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly Br
   return node.childrenState.children
 }
 
-export function canExpandBrowserTreeNode(node: BrowserTreeNode): boolean {
+export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
   return getLoadedBrowserTreeChildren(node).length > 0
 }
 
@@ -116,8 +116,8 @@ function appendVisibleNodes(options: {
   options.nodes.forEach((node, nodeIndex) => {
     const children = getLoadedBrowserTreeChildren(node)
     const isBranch = isBrowserTreeBranch(node)
-    const canExpand = canExpandBrowserTreeNode(node)
-    const isExpanded = canExpand && options.expandedNodeIds.has(node.id)
+    const canReveal = canRevealBrowserTreeChildren(node)
+    const isExpanded = canReveal && options.expandedNodeIds.has(node.id)
 
     options.visibleItems.push({
       id: node.id,
@@ -126,7 +126,7 @@ function appendVisibleNodes(options: {
       level: options.level,
       visibleIndex: options.visibleItems.length,
       isBranch,
-      canExpand,
+      canRevealChildren: canReveal,
       isExpanded,
       isSelected: options.selectedNodeId === node.id,
       isActive: options.activeNodeId === node.id,

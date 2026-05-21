@@ -3,7 +3,7 @@ import type { BrowserTreeVisibleItem } from './types'
 export type AriaBoolean = 'false' | 'true'
 
 export function getTreeItemAriaExpanded(item: BrowserTreeVisibleItem): AriaBoolean | undefined {
-  if (!item.canExpand) {
+  if (!item.canRevealChildren) {
     return undefined
   }
 
