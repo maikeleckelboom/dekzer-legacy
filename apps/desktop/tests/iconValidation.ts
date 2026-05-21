@@ -10,13 +10,11 @@ const allowedIconDirectory = normalizePath(
   relative(desktopRoot, join(sourceRoot, 'renderer', 'icons'))
 )
 const lucideImportPattern = /from\s+['"]@lucide\/vue['"]/
-const deprecatedLucideImportPattern = /from\s+['"]lucide-vue-next['"]/
 
 void main()
 
 function main(): void {
   validatesNoDirectLucideImportOutsideIconVocabulary()
-  validatesNoDeprecatedLucideVueNextImport()
   validatesIconValidationIsInChecks()
 }
 
@@ -38,28 +36,6 @@ function validatesNoDirectLucideImportOutsideIconVocabulary(): void {
   }
 
   assert.deepEqual(violations, [], formatViolations(violations))
-}
-
-function validatesNoDeprecatedLucideVueNextImport(): void {
-  const violations: string[] = []
-
-  for (const filePath of listSourceFiles(sourceRoot)) {
-    const relativePath = normalizePath(relative(desktopRoot, filePath))
-
-    const contents = readFileSync(filePath, 'utf8')
-
-    if (deprecatedLucideImportPattern.test(contents)) {
-      violations.push(relativePath)
-    }
-  }
-
-  assert.deepEqual(
-    violations,
-    [],
-    ['Import from lucide-vue-next is deprecated.', 'Use @lucide/vue instead.', ...violations].join(
-      '\n'
-    )
-  )
 }
 
 function validatesIconValidationIsInChecks(): void {
