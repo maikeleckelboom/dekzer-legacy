@@ -1,16 +1,14 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 
+import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
 import type {
-  DekzerRendererApi,
-  LibraryBoundaryHostStatus
-} from '../../shared/libraryBoundary/status'
-import type {
-  LibraryHierarchyReadRequest,
-  LibraryHierarchyReadResult,
-  LibraryHierarchyReadRoot,
-  LibraryHierarchyReadWindow
-} from '../../shared/libraryHierarchy/read'
+  LibraryHierarchyReadChildrenRequest,
+  LibraryHierarchyReadChildrenResult,
+  LibraryHierarchyReadChildrenRoot,
+  LibraryHierarchyReadChildrenWindow
+} from '../../shared/libraryHierarchy/readChildren'
+import type { RendererApi } from '../../shared/rendererApi'
 import {
   projectLibraryHierarchyBrowserStateToBrowserTree,
   type LibraryHierarchyBrowserProjection
@@ -26,16 +24,16 @@ const safeRootReadRequestFailure = 'Unable to request library hierarchy children
 const safeChildReadRequestFailure = 'Unable to request library hierarchy directory children.'
 const safePartialChildReadFailure = 'The hierarchy read returned a partial child window.'
 
-export type LibraryHierarchyBoundaryApi = DekzerRendererApi['libraryBoundary']
+export type LibraryHierarchyReadApi = RendererApi['library']
 
 export type LibraryHierarchyReadController = {
   readonly hostStatus: Ref<LibraryBoundaryHostStatus | undefined>
-  readonly hierarchyReadResult: Ref<LibraryHierarchyReadResult | undefined>
+  readonly hierarchyReadResult: Ref<LibraryHierarchyReadChildrenResult | undefined>
   readonly hierarchyReadRequestError: Ref<string | undefined>
   readonly hierarchyReadIsLoading: Ref<boolean>
   readonly directoryReadStates: Ref<ReadonlyMap<string, LibraryHierarchyDirectoryReadState>>
   readonly browserProjection: ComputedRef<LibraryHierarchyBrowserProjection | undefined>
-  readonly currentRoot: ComputedRef<LibraryHierarchyReadRoot | undefined>
+  readonly currentRoot: ComputedRef<LibraryHierarchyReadChildrenRoot | undefined>
   readonly readFirstAvailableSourceHierarchy: () => Promise<void>
   readonly requestDirectoryChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
   readonly start: () => void
@@ -43,9 +41,9 @@ export type LibraryHierarchyReadController = {
 }
 
 export function useLibraryHierarchyRead(
-  libraryBoundary: LibraryHierarchyBoundaryApi = getDekzerRendererApi().libraryBoundary
+  libraryApi: LibraryHierarchyReadApi = getRendererApi().library
 ): LibraryHierarchyReadController {
-  const controller = createLibraryHierarchyReadController(libraryBoundary)
+  const controller = createLibraryHierarchyReadController(libraryApi)
 
   onMounted(() => {
     controller.start()
@@ -58,15 +56,15 @@ export function useLibraryHierarchyRead(
   return controller
 }
 
-function getDekzerRendererApi(): DekzerRendererApi {
-  return (window as unknown as { readonly dekzer: DekzerRendererApi }).dekzer
+function getRendererApi(): RendererApi {
+  return (window as unknown as { readonly dekzer: RendererApi }).dekzer
 }
 
 export function createLibraryHierarchyReadController(
-  libraryBoundary: LibraryHierarchyBoundaryApi
+  libraryApi: LibraryHierarchyReadApi
 ): LibraryHierarchyReadController {
   const hostStatus = ref<LibraryBoundaryHostStatus>()
-  const hierarchyReadResult = ref<LibraryHierarchyReadResult>()
+  const hierarchyReadResult = ref<LibraryHierarchyReadChildrenResult>()
   const hierarchyReadRequestError = ref<string>()
   const hierarchyReadIsLoading = ref(false)
   const directoryReadStates = shallowRef<ReadonlyMap<string, LibraryHierarchyDirectoryReadState>>(
@@ -92,7 +90,7 @@ export function createLibraryHierarchyReadController(
   )
 
   function start(): void {
-    void libraryBoundary
+    void libraryApi.host
       .getStatus()
       .then((status) => {
         hostStatus.value = status
@@ -103,7 +101,7 @@ export function createLibraryHierarchyReadController(
         hierarchyReadRequestError.value = 'Unable to read library boundary host status.'
       })
 
-    unsubscribeFromHostStatus = libraryBoundary.onStatusChanged((status) => {
+    unsubscribeFromHostStatus = libraryApi.host.onStatusChanged((status) => {
       hostStatus.value = status
       hierarchyReadRequestError.value = undefined
       requestHierarchyReadIfStarted(status)
@@ -130,7 +128,7 @@ export function createLibraryHierarchyReadController(
     hierarchyReadRequestError.value = undefined
 
     try {
-      const result = await libraryBoundary.readLiteralHierarchyChildren({
+      const result = await libraryApi.hierarchy.readChildren({
         target: {
           kind: 'firstAvailableSource'
         },
@@ -197,7 +195,7 @@ export function createLibraryHierarchyReadController(
     })
 
     try {
-      const result = await libraryBoundary.readLiteralHierarchyChildren(
+      const result = await libraryApi.hierarchy.readChildren(
         directoryReadRequest(root, target.sourceDirectoryId)
       )
 
@@ -246,7 +244,7 @@ export function createLibraryHierarchyReadController(
   function setDirectoryReadState(
     sourceDirectoryId: string,
     state: LibraryHierarchyDirectoryReadState,
-    discoveredWindow?: LibraryHierarchyReadWindow
+    discoveredWindow?: LibraryHierarchyReadChildrenWindow
   ): void {
     const nextStates = new Map(directoryReadStates.value)
     nextStates.set(sourceDirectoryId, state)
@@ -285,9 +283,9 @@ export function createLibraryHierarchyReadController(
 }
 
 function directoryReadRequest(
-  root: LibraryHierarchyReadRoot,
+  root: LibraryHierarchyReadChildrenRoot,
   parentSourceDirectoryId: string
-): LibraryHierarchyReadRequest {
+): LibraryHierarchyReadChildrenRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -301,7 +299,7 @@ function directoryReadRequest(
 }
 
 function withDiscoveredUnloadedDirectoryStates(
-  window: LibraryHierarchyReadWindow
+  window: LibraryHierarchyReadChildrenWindow
 ): ReadonlyMap<string, LibraryHierarchyDirectoryReadState> {
   const states = new Map<string, LibraryHierarchyDirectoryReadState>()
   addDiscoveredUnloadedDirectoryStates(states, window)
@@ -310,7 +308,7 @@ function withDiscoveredUnloadedDirectoryStates(
 
 function addDiscoveredUnloadedDirectoryStates(
   states: Map<string, LibraryHierarchyDirectoryReadState>,
-  window: LibraryHierarchyReadWindow
+  window: LibraryHierarchyReadChildrenWindow
 ): void {
   for (const node of window.nodes) {
     if (node.kind === 'directory' && !states.has(node.sourceDirectoryId)) {
@@ -323,7 +321,7 @@ function addDiscoveredUnloadedDirectoryStates(
 }
 
 function createDirectoryRequestKey(
-  root: LibraryHierarchyReadRoot,
+  root: LibraryHierarchyReadChildrenRoot,
   sourceDirectoryId: string
 ): string {
   const rootKey =
@@ -334,6 +332,6 @@ function createDirectoryRequestKey(
   return `${rootKey}/directory:${sourceDirectoryId}`
 }
 
-function isCompleteWindow(window: LibraryHierarchyReadWindow): boolean {
+function isCompleteWindow(window: LibraryHierarchyReadChildrenWindow): boolean {
   return window.offset === 0 && window.nodes.length === window.totalRows
 }

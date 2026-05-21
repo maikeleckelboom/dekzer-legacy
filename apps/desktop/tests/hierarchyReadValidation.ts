@@ -14,20 +14,20 @@ import {
   type LibraryBoundaryHostConfig
 } from '../src/main/libraryBoundary/config'
 import {
-  readLiteralHierarchyChildrenThroughHost,
-  registerLibraryHierarchyReadIpc
-} from '../src/main/libraryHierarchy/read'
+  readLibraryHierarchyChildrenThroughHost,
+  registerLibraryHierarchyReadChildrenIpc
+} from '../src/main/libraryHierarchy/readChildren'
 import {
   createLibraryHierarchyReadController,
-  type LibraryHierarchyBoundaryApi
+  type LibraryHierarchyReadApi
 } from '../src/renderer/libraryBrowser/hierarchyRead'
 import type { BrowserTreeNode } from '../src/renderer/libraryBrowser/tree/types'
 import {
-  libraryHierarchyReadIpcChannels,
-  type LibraryHierarchyReadErrorCode,
-  type LibraryHierarchyReadRequest,
-  type LibraryHierarchyReadResult
-} from '../src/shared/libraryHierarchy/read'
+  libraryHierarchyReadChildrenIpcChannels,
+  type LibraryHierarchyReadChildrenErrorCode,
+  type LibraryHierarchyReadChildrenRequest,
+  type LibraryHierarchyReadChildrenResult
+} from '../src/shared/libraryHierarchy/readChildren'
 import { firstAvailableSourceReadRequest } from './support/libraryHierarchy'
 import { createFakeClient, deferred, silentLogger, testApp } from './support/libraryBoundary'
 
@@ -64,7 +64,7 @@ async function main(): Promise<void> {
 
 async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig): Promise<void> {
   const idleHost = new LibraryBoundaryHost(config, silentLogger())
-  const hostUnavailable = await readLiteralHierarchyChildrenThroughHost(
+  const hostUnavailable = await readLibraryHierarchyChildrenThroughHost(
     idleHost,
     firstAvailableSourceReadRequest()
   )
@@ -80,7 +80,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       })
     })
   )
-  const noTarget = await readLiteralHierarchyChildrenThroughHost(
+  const noTarget = await readLibraryHierarchyChildrenThroughHost(
     noTargetHost,
     firstAvailableSourceReadRequest()
   )
@@ -147,7 +147,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       }
     })
   )
-  const success = await readLiteralHierarchyChildrenThroughHost(
+  const success = await readLibraryHierarchyChildrenThroughHost(
     successHost,
     firstAvailableSourceReadRequest()
   )
@@ -169,7 +169,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
     }
   ])
 
-  const invalidTarget = await readLiteralHierarchyChildrenThroughHost(successHost, {
+  const invalidTarget = await readLibraryHierarchyChildrenThroughHost(successHost, {
     target: {
       kind: 'entryPoint',
       entryPoint: {
@@ -182,7 +182,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
   assert.equal(invalidTarget.state, 'invalidRequest')
   assertReadError(invalidTarget, 'invalidRequest')
 
-  const malformedRow = await readLiteralHierarchyChildrenThroughHost(
+  const malformedRow = await readLibraryHierarchyChildrenThroughHost(
     await startedHostWithClient(
       config,
       createFakeClient({
@@ -242,10 +242,10 @@ function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig
 
   const registration: {
     channel?: string
-    handler?: (request: unknown) => Promise<LibraryHierarchyReadResult>
+    handler?: (request: unknown) => Promise<LibraryHierarchyReadChildrenResult>
   } = {}
 
-  registerLibraryHierarchyReadIpc(
+  registerLibraryHierarchyReadChildrenIpc(
     {
       handle(channel, listener): void {
         registration.channel = channel
@@ -255,17 +255,17 @@ function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig
     host
   )
 
-  assert.equal(registration.channel, libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren)
+  assert.equal(registration.channel, libraryHierarchyReadChildrenIpcChannels.readChildren)
   assert.equal(typeof registration.handler, 'function')
 }
 
 async function validatesRendererHierarchyReadController(): Promise<void> {
-  const requests: LibraryHierarchyReadRequest[] = []
-  const directory12Read = deferred<LibraryHierarchyReadResult>()
-  const directory14Read = deferred<LibraryHierarchyReadResult>()
+  const requests: LibraryHierarchyReadChildrenRequest[] = []
+  const directory12Read = deferred<LibraryHierarchyReadChildrenResult>()
+  const directory14Read = deferred<LibraryHierarchyReadChildrenResult>()
   let directory13Attempts = 0
   const controller = createLibraryHierarchyReadController(
-    testLibraryBoundary(async (request) => {
+    testLibraryApi(async (request) => {
       requests.push(request)
 
       if (request.parentSourceDirectoryId === '12') {
@@ -436,35 +436,41 @@ async function startedHostWithClient(
   return host
 }
 
-function testLibraryBoundary(
-  readLiteralHierarchyChildren: (
-    request: LibraryHierarchyReadRequest
-  ) => Promise<LibraryHierarchyReadResult>
-): LibraryHierarchyBoundaryApi {
+function testLibraryApi(
+  readChildren: (
+    request: LibraryHierarchyReadChildrenRequest
+  ) => Promise<LibraryHierarchyReadChildrenResult>
+): LibraryHierarchyReadApi {
   return {
-    getStatus: async () => ({
-      state: 'started',
-      environment: 'development',
-      binaryPolicy: {
-        kind: 'developmentBinary',
-        source: 'environmentOverride'
-      },
-      lastError: null
-    }),
-    onStatusChanged: () => () => undefined,
-    registerLocalRoot: async () => ({
-      state: 'registrationFailed',
-      error: {
-        code: 'registrationFailed',
-        message: 'Local root registration should not be called by hierarchy read validation.'
-      }
-    }),
-    readLiteralHierarchyChildren
+    host: {
+      getStatus: async () => ({
+        state: 'started',
+        environment: 'development',
+        binaryPolicy: {
+          kind: 'developmentBinary',
+          source: 'environmentOverride'
+        },
+        lastError: null
+      }),
+      onStatusChanged: () => () => undefined
+    },
+    hierarchy: {
+      readChildren
+    },
+    roots: {
+      registerLocal: async () => ({
+        state: 'registrationFailed',
+        error: {
+          code: 'registrationFailed',
+          message: 'Local root registration should not be called by hierarchy read validation.'
+        }
+      })
+    }
   }
 }
 
 function directoryRootHierarchyReadResult(): Extract<
-  LibraryHierarchyReadResult,
+  LibraryHierarchyReadChildrenResult,
   { state: 'ready' }
 > {
   return {
@@ -492,7 +498,7 @@ function directoryRootHierarchyReadResult(): Extract<
 
 function loadedDirectoryHierarchyReadResult(
   parentSourceDirectoryId: string
-): Extract<LibraryHierarchyReadResult, { state: 'ready' }> {
+): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -526,7 +532,7 @@ function loadedDirectoryHierarchyReadResult(
 
 function emptyDirectoryHierarchyReadResult(
   parentSourceDirectoryId: string
-): Extract<LibraryHierarchyReadResult, { state: 'ready' }> {
+): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -548,10 +554,10 @@ function emptyDirectoryHierarchyReadResult(
 }
 
 function hierarchyReadError(
-  state: Exclude<LibraryHierarchyReadResult['state'], 'ready'>,
-  code: LibraryHierarchyReadErrorCode,
+  state: Exclude<LibraryHierarchyReadChildrenResult['state'], 'ready'>,
+  code: LibraryHierarchyReadChildrenErrorCode,
   message: string
-): LibraryHierarchyReadResult {
+): LibraryHierarchyReadChildrenResult {
   return {
     state,
     error: {
@@ -566,7 +572,7 @@ function directoryNode(
   label: string,
   parentSourceDirectoryId?: string
 ): Extract<
-  Extract<LibraryHierarchyReadResult, { state: 'ready' }>['window']['nodes'][number],
+  Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }>['window']['nodes'][number],
   { kind: 'directory' }
 > {
   return {
@@ -609,8 +615,8 @@ function findProjectedNode(
 }
 
 function assertReadError(
-  result: LibraryHierarchyReadResult,
-  code: LibraryHierarchyReadErrorCode
+  result: LibraryHierarchyReadChildrenResult,
+  code: LibraryHierarchyReadChildrenErrorCode
 ): void {
   if (result.state === 'ready') {
     assert.fail(`expected hierarchy read error ${String(code)}`)

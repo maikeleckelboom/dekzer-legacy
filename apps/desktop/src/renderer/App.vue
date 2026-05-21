@@ -41,7 +41,7 @@ const hostStateClass = computed(() => {
 })
 
 onMounted(() => {
-  void window.dekzer.libraryBoundary
+  void window.dekzer.library.host
     .getStatus()
     .then((status) => {
       hostStatus.value = status
@@ -51,7 +51,7 @@ onMounted(() => {
       hostStatusLoadError.value = 'Unable to read library boundary host status.'
     })
 
-  unsubscribeFromHostStatus = window.dekzer.libraryBoundary.onStatusChanged((status) => {
+  unsubscribeFromHostStatus = window.dekzer.library.host.onStatusChanged((status) => {
     hostStatus.value = status
     hostStatusLoadError.value = undefined
   })

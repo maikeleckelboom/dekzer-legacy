@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
-import type { DekzerRendererApi } from '../shared/libraryBoundary/status'
+import type { RendererApi } from '../shared/rendererApi'
 
 declare global {
   interface Window {
-    readonly dekzer: DekzerRendererApi
+    readonly dekzer: RendererApi
   }
 }

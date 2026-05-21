@@ -1,5 +1,5 @@
-export const libraryRootRegistrationIpcChannels = {
-  registerLocalRoot: 'desktop:library-roots:register-local-root'
+export const libraryRootsIpcChannels = {
+  registerLocal: 'desktop:library-roots:register-local'
 } as const
 
 export type LocalRootRegistrationState =

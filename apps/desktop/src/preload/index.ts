@@ -1,5 +1,5 @@
 import { contextBridge as rendererContext, ipcRenderer } from 'electron'
 
-import { exposeDekzerRendererApi } from './libraryBoundary'
+import { exposeRendererApi } from './rendererApi'
 
-exposeDekzerRendererApi(rendererContext, ipcRenderer)
+exposeRendererApi(rendererContext, ipcRenderer)

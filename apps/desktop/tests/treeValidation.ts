@@ -33,7 +33,7 @@ import type {
   BrowserTreeNodeId,
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
-import type { LibraryHierarchyReadResult } from '../src/shared/libraryHierarchy/read'
+import type { LibraryHierarchyReadChildrenResult } from '../src/shared/libraryHierarchy/readChildren'
 
 const expandedFixtureIds = new Set<BrowserTreeNodeId>([
   'fixture-root',
@@ -694,7 +694,10 @@ function failedBranchNode(): BrowserTreeNode {
   }
 }
 
-function fileOnlyHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { state: 'ready' }> {
+function fileOnlyHierarchyReadResult(): Extract<
+  LibraryHierarchyReadChildrenResult,
+  { state: 'ready' }
+> {
   return {
     state: 'ready',
     window: {
@@ -723,7 +726,10 @@ function fileOnlyHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { st
   }
 }
 
-function directoryHierarchyReadResult(): Extract<LibraryHierarchyReadResult, { state: 'ready' }> {
+function directoryHierarchyReadResult(): Extract<
+  LibraryHierarchyReadChildrenResult,
+  { state: 'ready' }
+> {
   return {
     state: 'ready',
     window: {

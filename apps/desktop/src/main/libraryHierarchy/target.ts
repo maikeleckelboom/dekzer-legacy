@@ -1,27 +1,27 @@
 import type { LiteralHierarchyEntryPoint } from '@dekzer/library-boundary-contract'
 
 import type {
-  LibraryHierarchyReadEntryPoint,
-  LibraryHierarchyReadResult,
-  LibraryHierarchyReadRoot,
-  LibraryHierarchyReadTarget
-} from '../../shared/libraryHierarchy/read'
+  LibraryHierarchyReadChildrenEntryPoint,
+  LibraryHierarchyReadChildrenResult,
+  LibraryHierarchyReadChildrenRoot,
+  LibraryHierarchyReadChildrenTarget
+} from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
-  mapLibraryHierarchyReadEntryPoint,
-  rootIdForLibraryHierarchyReadEntryPoint
+  mapLibraryHierarchyReadChildrenEntryPoint,
+  rootIdForLibraryHierarchyReadChildrenEntryPoint
 } from './mapping'
 import { createHierarchyReadErrorResult, isPositiveOpaqueId } from './request'
 
-export type ResolvedLibraryHierarchyReadTarget = {
-  readonly root: LibraryHierarchyReadRoot
+export type ResolvedLibraryHierarchyReadChildrenTarget = {
+  readonly root: LibraryHierarchyReadChildrenRoot
   readonly entryPoint: LiteralHierarchyEntryPoint
 }
 
-export async function resolveLibraryHierarchyReadTarget(
+export async function resolveLibraryHierarchyReadChildrenTarget(
   client: LibraryBoundaryHostClient,
-  target: LibraryHierarchyReadTarget
-): Promise<ResolvedLibraryHierarchyReadTarget | LibraryHierarchyReadResult> {
+  target: LibraryHierarchyReadChildrenTarget
+): Promise<ResolvedLibraryHierarchyReadChildrenTarget | LibraryHierarchyReadChildrenResult> {
   if (target.kind === 'entryPoint') {
     return resolveEntryPointTarget(target.entryPoint, target.label)
   }
@@ -30,22 +30,22 @@ export async function resolveLibraryHierarchyReadTarget(
 }
 
 function resolveEntryPointTarget(
-  entryPoint: LibraryHierarchyReadEntryPoint,
+  entryPoint: LibraryHierarchyReadChildrenEntryPoint,
   label: string | undefined
-): ResolvedLibraryHierarchyReadTarget {
+): ResolvedLibraryHierarchyReadChildrenTarget {
   return {
     root: {
-      id: rootIdForLibraryHierarchyReadEntryPoint(entryPoint),
+      id: rootIdForLibraryHierarchyReadChildrenEntryPoint(entryPoint),
       ...optionalLabelProperty(label),
       entryPoint
     },
-    entryPoint: mapLibraryHierarchyReadEntryPoint(entryPoint)
+    entryPoint: mapLibraryHierarchyReadChildrenEntryPoint(entryPoint)
   }
 }
 
 async function resolveFirstAvailableSourceTarget(
   client: LibraryBoundaryHostClient
-): Promise<ResolvedLibraryHierarchyReadTarget | LibraryHierarchyReadResult> {
+): Promise<ResolvedLibraryHierarchyReadChildrenTarget | LibraryHierarchyReadChildrenResult> {
   const navigationRows = await client.readNavigationRows({
     parentNavigationRowId: null
   })
@@ -61,18 +61,18 @@ async function resolveFirstAvailableSourceTarget(
     )
   }
 
-  const entryPoint: LibraryHierarchyReadEntryPoint = {
+  const entryPoint: LibraryHierarchyReadChildrenEntryPoint = {
     kind: 'source',
     sourceId: sourceRow.selectorPayload
   }
 
   return {
     root: {
-      id: rootIdForLibraryHierarchyReadEntryPoint(entryPoint),
+      id: rootIdForLibraryHierarchyReadChildrenEntryPoint(entryPoint),
       label: sourceRow.displayName,
       entryPoint
     },
-    entryPoint: mapLibraryHierarchyReadEntryPoint(entryPoint)
+    entryPoint: mapLibraryHierarchyReadChildrenEntryPoint(entryPoint)
   }
 }
 

@@ -55,7 +55,7 @@ const allowedNullUses: ReadonlyMap<string, AllowedNullUse> = new Map([
     }
   ],
   [
-    'src/main/libraryHierarchy/read.ts',
+    'src/main/libraryHierarchy/readChildren.ts',
     {
       reason: 'generated hierarchy protocol compatibility',
       patterns: [

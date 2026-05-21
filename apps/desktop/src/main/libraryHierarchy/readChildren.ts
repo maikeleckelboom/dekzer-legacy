@@ -1,57 +1,60 @@
 import type { ReadLiteralHierarchyChildrenRequest } from '@dekzer/library-boundary-contract'
 
 import {
-  libraryHierarchyReadIpcChannels,
-  type LibraryHierarchyReadErrorCode,
-  type LibraryHierarchyReadNode,
-  type LibraryHierarchyReadResult
-} from '../../shared/libraryHierarchy/read'
+  libraryHierarchyReadChildrenIpcChannels,
+  type LibraryHierarchyReadChildrenErrorCode,
+  type LibraryHierarchyReadChildrenNode,
+  type LibraryHierarchyReadChildrenResult
+} from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import { mapLiteralHierarchyNode } from './mapping'
 import {
   createHierarchyReadErrorResult,
-  isLibraryHierarchyReadResult,
-  normalizeLibraryHierarchyReadRequest
+  isLibraryHierarchyReadChildrenResult,
+  normalizeLibraryHierarchyReadChildrenRequest
 } from './request'
-import { resolveLibraryHierarchyReadTarget } from './target'
+import { resolveLibraryHierarchyReadChildrenTarget } from './target'
 
-export type LibraryHierarchyReadIpcMain = {
+export type LibraryHierarchyReadChildrenIpcMain = {
   handle(
     channel: string,
-    listener: (event: unknown, request: unknown) => Promise<LibraryHierarchyReadResult>
+    listener: (event: unknown, request: unknown) => Promise<LibraryHierarchyReadChildrenResult>
   ): void
 }
 
-export function registerLibraryHierarchyReadIpc(
-  ipcMain: LibraryHierarchyReadIpcMain,
+export function registerLibraryHierarchyReadChildrenIpc(
+  ipcMain: LibraryHierarchyReadChildrenIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren, (_event, request) =>
-    readLiteralHierarchyChildrenThroughHost(host, request)
+  ipcMain.handle(libraryHierarchyReadChildrenIpcChannels.readChildren, (_event, request) =>
+    readLibraryHierarchyChildrenThroughHost(host, request)
   )
 }
 
-export async function readLiteralHierarchyChildrenThroughHost(
+export async function readLibraryHierarchyChildrenThroughHost(
   host: LibraryBoundaryHost,
   request: unknown
-): Promise<LibraryHierarchyReadResult> {
-  const normalizedRequest = normalizeLibraryHierarchyReadRequest(request)
+): Promise<LibraryHierarchyReadChildrenResult> {
+  const normalizedRequest = normalizeLibraryHierarchyReadChildrenRequest(request)
 
-  if (isLibraryHierarchyReadResult(normalizedRequest)) {
+  if (isLibraryHierarchyReadChildrenResult(normalizedRequest)) {
     return normalizedRequest
   }
 
   const client = getStartedClient(host)
 
-  if (isLibraryHierarchyReadResult(client)) {
+  if (isLibraryHierarchyReadChildrenResult(client)) {
     return client
   }
 
   try {
-    const resolvedTarget = await resolveLibraryHierarchyReadTarget(client, normalizedRequest.target)
+    const resolvedTarget = await resolveLibraryHierarchyReadChildrenTarget(
+      client,
+      normalizedRequest.target
+    )
 
-    if (isLibraryHierarchyReadResult(resolvedTarget)) {
+    if (isLibraryHierarchyReadChildrenResult(resolvedTarget)) {
       return resolvedTarget
     }
 
@@ -104,7 +107,7 @@ export async function readLiteralHierarchyChildrenThroughHost(
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | LibraryHierarchyReadResult {
+): LibraryBoundaryHostClient | LibraryHierarchyReadChildrenResult {
   try {
     return host.client
   } catch (error: unknown) {
@@ -122,8 +125,8 @@ function getStartedClient(
 
 function mapLiteralHierarchyNodes(
   rows: Parameters<typeof mapLiteralHierarchyNode>[0][]
-): readonly LibraryHierarchyReadNode[] | undefined {
-  const nodes: LibraryHierarchyReadNode[] = []
+): readonly LibraryHierarchyReadChildrenNode[] | undefined {
+  const nodes: LibraryHierarchyReadChildrenNode[] = []
 
   for (const row of rows) {
     const node = mapLiteralHierarchyNode(row)
@@ -141,7 +144,7 @@ function mapLiteralHierarchyNodes(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): LibraryHierarchyReadResult {
+): LibraryHierarchyReadChildrenResult {
   return createHierarchyReadErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
@@ -152,7 +155,7 @@ function hostUnavailableResult(
 function hostErrorCode(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): LibraryHierarchyReadErrorCode {
+): LibraryHierarchyReadChildrenErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }

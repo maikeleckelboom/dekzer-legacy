@@ -1,12 +1,3 @@
-import type {
-  LibraryHierarchyReadRequest,
-  LibraryHierarchyReadResult
-} from '../libraryHierarchy/read'
-import type {
-  LocalRootRegistrationRequest,
-  LocalRootRegistrationResult
-} from '../libraryRoots/registerLocalRoot'
-
 export const libraryBoundaryHostStatusIpcChannels = {
   getStatus: 'desktop:library-boundary:get-status',
   statusChanged: 'desktop:library-boundary:status-changed'
@@ -53,14 +44,3 @@ export type LibraryBoundaryHostStatus = {
 }
 
 export type LibraryBoundaryHostStatusChangedCallback = (status: LibraryBoundaryHostStatus) => void
-
-export type DekzerRendererApi = {
-  readonly libraryBoundary: {
-    getStatus(): Promise<LibraryBoundaryHostStatus>
-    onStatusChanged(callback: LibraryBoundaryHostStatusChangedCallback): () => void
-    registerLocalRoot(request: LocalRootRegistrationRequest): Promise<LocalRootRegistrationResult>
-    readLiteralHierarchyChildren(
-      request: LibraryHierarchyReadRequest
-    ): Promise<LibraryHierarchyReadResult>
-  }
-}

@@ -4,12 +4,12 @@ import type {
 } from '@dekzer/library-boundary-contract'
 
 import type {
-  LibraryHierarchyReadEntryPoint,
-  LibraryHierarchyReadNode
-} from '../../shared/libraryHierarchy/read'
+  LibraryHierarchyReadChildrenEntryPoint,
+  LibraryHierarchyReadChildrenNode
+} from '../../shared/libraryHierarchy/readChildren'
 
-export function mapLibraryHierarchyReadEntryPoint(
-  entryPoint: LibraryHierarchyReadEntryPoint
+export function mapLibraryHierarchyReadChildrenEntryPoint(
+  entryPoint: LibraryHierarchyReadChildrenEntryPoint
 ): LiteralHierarchyEntryPoint {
   if (entryPoint.kind === 'source') {
     return {
@@ -28,8 +28,8 @@ export function mapLibraryHierarchyReadEntryPoint(
   }
 }
 
-export function rootIdForLibraryHierarchyReadEntryPoint(
-  entryPoint: LibraryHierarchyReadEntryPoint
+export function rootIdForLibraryHierarchyReadChildrenEntryPoint(
+  entryPoint: LibraryHierarchyReadChildrenEntryPoint
 ): string {
   if (entryPoint.kind === 'source') {
     return `source:${entryPoint.sourceId}`
@@ -40,7 +40,7 @@ export function rootIdForLibraryHierarchyReadEntryPoint(
 
 export function mapLiteralHierarchyNode(
   row: LiteralHierarchyNode
-): LibraryHierarchyReadNode | undefined {
+): LibraryHierarchyReadChildrenNode | undefined {
   if (row.nodeKind === 'directory' && row.sourceDirectoryId === null) {
     return undefined
   }

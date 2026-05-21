@@ -3,7 +3,7 @@ import type { RegisterLocalRootRequest } from '@dekzer/library-boundary-contract
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
-  libraryRootRegistrationIpcChannels,
+  libraryRootsIpcChannels,
   type LocalRootRegistrationErrorCode,
   type LocalRootRegistrationErrorState,
   type LocalRootRegistrationRequest,
@@ -21,7 +21,7 @@ export function registerLocalRootRegistrationIpc(
   ipcMain: LocalRootRegistrationIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(libraryRootRegistrationIpcChannels.registerLocalRoot, (_event, request) =>
+  ipcMain.handle(libraryRootsIpcChannels.registerLocal, (_event, request) =>
     registerLocalRootThroughHost(host, request)
   )
 }
