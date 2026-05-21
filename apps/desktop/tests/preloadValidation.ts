@@ -11,7 +11,7 @@ import {
   type LibraryHierarchyReadChildrenResult
 } from '../src/shared/libraryHierarchy/readChildren'
 import { rootChannels } from '../src/shared/libraryRoots/channels'
-import type { LocalRootRegistrationResult } from '../src/shared/libraryRoots/registerLocalRoot'
+import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { emitStatus, testStatus } from './support/libraryBoundary'
 
@@ -24,9 +24,6 @@ async function main(): Promise<void> {
 async function validatesPreloadApiSurface(): Promise<void> {
   const status = testStatus()
   const hierarchyRequest = firstAvailableSourceReadRequest()
-  const registrationRequest = {
-    absolutePath: 'C:/Music'
-  }
   const scanRequest = {
     rootId: 'root-1'
   }
@@ -37,7 +34,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
       message: 'No library source is available for a literal hierarchy read.'
     }
   }
-  const registrationResult: LocalRootRegistrationResult = {
+  const choiceResult: LocalRootChoiceResult = {
     state: 'registered',
     root: {
       rootId: '7',
@@ -52,7 +49,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
     queuedSourceWorkItems: 8
   }
   let receivedHierarchyRequest: unknown = null
-  let receivedRegistrationRequest: unknown = null
+  let receivedChoiceArgs: readonly unknown[] | undefined
   let receivedScanRequest: unknown = null
   const listeners = new Map<
     string,
@@ -71,10 +68,9 @@ async function validatesPreloadApiSurface(): Promise<void> {
         return hierarchyResult
       }
 
-      if (channel === rootChannels.registerLocal) {
-        assert.equal(args.length, 1)
-        receivedRegistrationRequest = args[0]
-        return registrationResult
+      if (channel === rootChannels.chooseAndRegisterLocal) {
+        receivedChoiceArgs = args
+        return choiceResult
       }
 
       if (channel === rootChannels.runScan) {
@@ -115,8 +111,9 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(Object.keys(api.library).sort(), ['hierarchy', 'host', 'roots'])
   assert.deepEqual(Object.keys(api.library.host).sort(), ['getStatus', 'onStatusChanged'])
   assert.deepEqual(Object.keys(api.library.hierarchy), ['readChildren'])
-  assert.deepEqual(Object.keys(api.library.roots).sort(), ['registerLocal', 'runScan'])
+  assert.deepEqual(Object.keys(api.library.roots).sort(), ['chooseAndRegisterLocal', 'runScan'])
   assert.equal('ipcRenderer' in api, false)
+  assert.equal('libraryBoundary' in api, false)
   assert.equal('client' in api, false)
   assert.equal('transport' in api, false)
   assert.equal('client' in api.library, false)
@@ -126,7 +123,9 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.equal('getStatus' in api.library, false)
   assert.equal('onStatusChanged' in api.library, false)
   assert.equal('readLiteralHierarchyChildren' in api.library, false)
+  assert.equal('registerLocal' in api.library, false)
   assert.equal('registerLocalRoot' in api.library, false)
+  assert.equal('registerLocal' in api.library.roots, false)
   assert.equal('readLiteralHierarchyChildren' in api.library.hierarchy, false)
   assert.equal('registerLocalRoot' in api.library.roots, false)
   assert.equal('runRootScan' in api.library.roots, false)
@@ -134,8 +133,17 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.equal('transport' in api.library.roots, false)
   assert.equal('ipcRenderer' in api.library.roots, false)
   assert.equal(await api.library.host.getStatus(), status)
-  assert.equal(await api.library.roots.registerLocal(registrationRequest), registrationResult)
-  assert.equal(receivedRegistrationRequest, registrationRequest)
+  assert.equal(
+    await (
+      api.library.roots.chooseAndRegisterLocal as (
+        request?: unknown
+      ) => Promise<LocalRootChoiceResult>
+    )({
+      absolutePath: 'C:/RendererMustNotControlThis'
+    }),
+    choiceResult
+  )
+  assert.deepEqual(receivedChoiceArgs, [])
   assert.equal(await api.library.roots.runScan(scanRequest), scanResult)
   assert.equal(receivedScanRequest, scanRequest)
   assert.equal(await api.library.hierarchy.readChildren(hierarchyRequest), hierarchyResult)

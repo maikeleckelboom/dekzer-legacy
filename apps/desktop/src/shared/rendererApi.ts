@@ -6,10 +6,7 @@ import type {
   LibraryHierarchyReadChildrenRequest,
   LibraryHierarchyReadChildrenResult
 } from './libraryHierarchy/readChildren'
-import type {
-  LocalRootRegistrationRequest,
-  LocalRootRegistrationResult
-} from './libraryRoots/registerLocalRoot'
+import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
 
 export type RendererApi = {
@@ -34,6 +31,6 @@ export type LibraryHierarchyApi = {
 }
 
 export type LibraryRootsApi = {
-  registerLocal(request: LocalRootRegistrationRequest): Promise<LocalRootRegistrationResult>
+  chooseAndRegisterLocal(): Promise<LocalRootChoiceResult>
   runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult>
 }

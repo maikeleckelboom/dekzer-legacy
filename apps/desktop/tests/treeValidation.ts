@@ -509,9 +509,14 @@ function validatesRendererBoundaryOwnership(): void {
     /@dekzer\/library-boundary-stdio-transport/,
     /\bLibraryBoundaryClient\b/,
     /\bipcRenderer\b/,
+    /from ['"]electron['"]/,
     /from ['"]node:fs['"]/,
     /from ['"]fs['"]/,
-    /from ['"].*\/main\//
+    /from ['"]node:path['"]/,
+    /from ['"]path['"]/,
+    /from ['"].*\/main\//,
+    /\bshowOpenDialog\b/,
+    /\.runScan\(/
   ]
 
   for (const filePath of listSourceFiles(rendererSourceRoot)) {

@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createLibraryBoundaryHost } from './libraryBoundary/host'
 import { registerLibraryHierarchyReadChildrenIpc } from './libraryHierarchy/readChildren'
+import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootRegistrationIpc } from './libraryRoots/registerLocalRoot'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import {
@@ -60,6 +61,10 @@ app.whenReady().then(() => {
   libraryBoundaryHostStatusController = new LibraryBoundaryHostStatusController(host)
   registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
   registerLibraryHierarchyReadChildrenIpc(ipcMain, host)
+  registerLocalRootChoiceIpc(ipcMain, host, {
+    dialog,
+    getParentWindow: getLibraryRootChoiceParentWindow
+  })
   registerLocalRootRegistrationIpc(ipcMain, host)
   registerLocalRootScanIpc(ipcMain, host)
   libraryBoundaryHostStatusController.onStatusChanged((status) => {
@@ -81,6 +86,16 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+function getLibraryRootChoiceParentWindow(): BrowserWindow | undefined {
+  const focusedWindow = BrowserWindow.getFocusedWindow()
+
+  if (focusedWindow) {
+    return focusedWindow
+  }
+
+  return BrowserWindow.getAllWindows()[0]
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

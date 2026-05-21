@@ -7,11 +7,8 @@ import {
   type LibraryHierarchyReadChildrenRequest,
   type LibraryHierarchyReadChildrenResult
 } from '../shared/libraryHierarchy/readChildren'
-import {
-  type LocalRootRegistrationRequest,
-  type LocalRootRegistrationResult
-} from '../shared/libraryRoots/registerLocalRoot'
 import { rootChannels } from '../shared/libraryRoots/channels'
+import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
 import type { RendererApi } from '../shared/rendererApi'
 
@@ -75,13 +72,10 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         }
       },
       roots: {
-        async registerLocal(
-          request: LocalRootRegistrationRequest
-        ): Promise<LocalRootRegistrationResult> {
+        async chooseAndRegisterLocal(): Promise<LocalRootChoiceResult> {
           return (await ipcRenderer.invoke(
-            rootChannels.registerLocal,
-            request
-          )) as LocalRootRegistrationResult
+            rootChannels.chooseAndRegisterLocal
+          )) as LocalRootChoiceResult
         },
         async runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult> {
           return (await ipcRenderer.invoke(rootChannels.runScan, request)) as LocalRootScanResult

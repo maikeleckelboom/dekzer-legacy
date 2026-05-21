@@ -458,11 +458,11 @@ function testLibraryApi(
       readChildren
     },
     roots: {
-      registerLocal: async () => ({
-        state: 'registrationFailed',
+      chooseAndRegisterLocal: async () => ({
+        state: 'dialogFailed',
         error: {
-          code: 'registrationFailed',
-          message: 'Local root registration should not be called by hierarchy read validation.'
+          code: 'dialogFailed',
+          message: 'Local root choice should not be called by hierarchy read validation.'
         }
       }),
       runScan: async () => ({
