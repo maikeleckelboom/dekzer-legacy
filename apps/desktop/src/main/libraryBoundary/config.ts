@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import process from 'node:process'
 
 import { LibraryBoundaryHostError } from './errors'
 
 export const libraryBoundaryStdioBinaryEnvironmentVariable = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
+export const libraryBoundaryUserDataEnvironmentVariable = 'DEKZER_LIBRARY_USER_DATA_PATH'
 
 export type LibraryBoundaryHostEnvironment = 'development' | 'production'
 
@@ -31,8 +32,16 @@ export type LibraryBoundaryHostBinaryPolicy =
   | LibraryBoundaryHostDevelopmentBinaryPolicy
   | LibraryBoundaryHostPackagedBinaryPolicy
 
-export type LibraryBoundaryHostConfig = {
+export type LibraryBoundaryHostStorageSource = 'electronUserData' | 'environmentOverride'
+
+export type LibraryBoundaryHostStorageEnvironment = {
+  readonly kind: 'userDataRoot'
   readonly userDataPath: string
+  readonly source: LibraryBoundaryHostStorageSource
+}
+
+export type LibraryBoundaryHostConfig = {
+  readonly storageEnvironment: LibraryBoundaryHostStorageEnvironment
   readonly environment: LibraryBoundaryHostEnvironment
   readonly binaryPolicy: LibraryBoundaryHostBinaryPolicy
 }
@@ -59,7 +68,7 @@ export function resolveLibraryBoundaryHostConfig(
   options: ResolveLibraryBoundaryHostConfigOptions
 ): LibraryBoundaryHostConfig {
   return {
-    userDataPath: options.app.getPath('userData'),
+    storageEnvironment: resolveLibraryBoundaryStorageEnvironment(options.app, options.env),
     environment: selectLibraryBoundaryHostEnvironment(options.isDev),
     binaryPolicy: resolveLibraryBoundaryStdioBinaryPolicy({
       isDev: options.isDev,
@@ -69,6 +78,19 @@ export function resolveLibraryBoundaryHostConfig(
       ...(options.resourcesPath === undefined ? {} : { resourcesPath: options.resourcesPath })
     })
   }
+}
+
+export function resolveLibraryBoundaryStorageEnvironment(
+  app: LibraryBoundaryHostApp,
+  env: NodeJS.ProcessEnv = process.env
+): LibraryBoundaryHostStorageEnvironment {
+  const overridePath = env[libraryBoundaryUserDataEnvironmentVariable]?.trim()
+
+  if (overridePath !== undefined && overridePath.length > 0) {
+    return normalizeStorageEnvironmentPath(overridePath, 'environmentOverride')
+  }
+
+  return normalizeStorageEnvironmentPath(app.getPath('userData'), 'electronUserData')
 }
 
 export function selectLibraryBoundaryHostEnvironment(
@@ -145,6 +167,32 @@ export function resolveLibraryBoundaryStdioBinaryPath(
 
 function libraryBoundaryStdioExecutableName(platform: NodeJS.Platform): string {
   return platform === 'win32' ? 'library-boundary-stdio.exe' : 'library-boundary-stdio'
+}
+
+function normalizeStorageEnvironmentPath(
+  userDataPath: string,
+  source: LibraryBoundaryHostStorageSource
+): LibraryBoundaryHostStorageEnvironment {
+  const trimmedPath = userDataPath.trim()
+
+  if (trimmedPath.length === 0 || !isAbsolute(trimmedPath)) {
+    throw new LibraryBoundaryHostError(
+      'invalidUserDataPath',
+      `Library boundary user data path must be an absolute path from ${source}.`,
+      {
+        details: {
+          userDataPath,
+          userDataSource: source
+        }
+      }
+    )
+  }
+
+  return {
+    kind: 'userDataRoot',
+    userDataPath: resolve(trimmedPath),
+    source
+  }
 }
 
 function defaultElectronResourcesPath(): string | undefined {

@@ -8,7 +8,6 @@ use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
     LibraryStoreContext, MovePlaylistEntryInput, RegisterLocalRootInput,
     RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput, SqliteDurableStore,
-    durable_store_path,
 };
 
 use crate::session_events::LibraryBoundaryEventStream;
@@ -19,6 +18,7 @@ use crate::snapshot_read_protocol::{
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
     map_search_navigation_node_library_browser_window_reply, store_literal_hierarchy_entry_point,
 };
+use crate::storage_environment::resolve_library_storage_environment;
 
 pub struct LibraryBoundaryService {
     durable_store: SqliteDurableStore,
@@ -27,21 +27,20 @@ pub struct LibraryBoundaryService {
 
 impl LibraryBoundaryService {
     pub fn open(store_context: LibraryStoreContext) -> protocol::ProtocolResult<Self> {
-        if store_context.user_data_path.trim().is_empty() {
-            return Err(protocol::ProtocolError::InvalidRequest {
-                detail: "libraryStore userDataPath must not be empty".to_string(),
-            });
-        }
-
-        let database_path =
-            durable_store_path(&store_context.user_data_path, store_context.environment);
-        if let Some(parent) = database_path.parent() {
-            fs::create_dir_all(parent).map_err(|error| protocol::ProtocolError::HostFailure {
-                detail: format!("failed to prepare durable store directory: {error}"),
+        let storage_environment =
+            resolve_library_storage_environment(&store_context).map_err(|error| {
+                protocol::ProtocolError::InvalidRequest {
+                    detail: error.to_string(),
+                }
             })?;
-        }
+        fs::create_dir_all(storage_environment.storage_root_path()).map_err(|error| {
+            protocol::ProtocolError::HostFailure {
+                detail: format!("failed to prepare durable store directory: {error}"),
+            }
+        })?;
 
-        let durable_store = SqliteDurableStore::open(&database_path).map_err(map_store_error)?;
+        let durable_store = SqliteDurableStore::open(storage_environment.durable_store_path())
+            .map_err(map_store_error)?;
         Self::from_store(durable_store)
     }
 
@@ -532,6 +531,38 @@ mod tests {
         let service = LibraryBoundaryService::open(context.clone()).expect("open service");
 
         (tempdir, context, service)
+    }
+
+    #[test]
+    fn open_creates_the_explicit_storage_parent_before_sqlite_bootstrap() {
+        let tempdir = TempDir::new().expect("create tempdir");
+        let user_data_path = tempdir.path().join("missing").join("user-data");
+        let context = LibraryStoreContext {
+            user_data_path: user_data_path.to_string_lossy().into_owned(),
+            environment: StoreEnvironment::Development,
+        };
+        let database_path = durable_store_path(&context.user_data_path, context.environment);
+
+        assert!(!database_path.exists());
+        let _service = LibraryBoundaryService::open(context).expect("open boundary service");
+
+        assert!(database_path.exists());
+        assert!(database_path.parent().expect("database parent").exists());
+    }
+
+    #[test]
+    fn open_rejects_relative_user_data_paths() {
+        let result = LibraryBoundaryService::open(LibraryStoreContext {
+            user_data_path: "relative-user-data".to_string(),
+            environment: StoreEnvironment::Development,
+        });
+        let error = match result {
+            Ok(_) => panic!("relative user data path should be rejected"),
+            Err(error) => error,
+        };
+
+        assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
+        assert_eq!(error.code(), "INVALID_REQUEST");
     }
 
     fn expect_success(outcome: CommandOutcome) -> CommandReply {

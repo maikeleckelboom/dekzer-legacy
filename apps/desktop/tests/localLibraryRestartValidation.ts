@@ -1,4 +1,5 @@
 import { strict as assert } from 'node:assert'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -38,14 +39,31 @@ async function main(): Promise<void> {
   const crateDirectory = join(musicRoot, 'Crate')
   mkdirSync(crateDirectory, { recursive: true })
   writeFileSync(join(crateDirectory, 'amen.wav'), Buffer.from('not-real-audio'))
+  const boundaryBinaryPath = resolveBoundaryBinaryPath()
+  const expectedUserDataPath = join(tempRoot, 'user-data')
 
   const config = resolveLibraryBoundaryHostConfig({
     app: testApp(tempRoot, { appPath: desktopRoot }),
     isDev: true,
     env: {
-      [libraryBoundaryStdioBinaryEnvironmentVariable]: resolveBoundaryBinaryPath()
+      [libraryBoundaryStdioBinaryEnvironmentVariable]: boundaryBinaryPath
     },
     platform: process.platform
+  })
+  const userDataPath = config.storageEnvironment.userDataPath
+  const developmentDatabasePath = join(userDataPath, 'development', 'library.sqlite3')
+
+  assert.deepEqual(config.storageEnvironment, {
+    kind: 'userDataRoot',
+    userDataPath: expectedUserDataPath,
+    source: 'electronUserData'
+  })
+  assert.equal(existsSync(userDataPath), false)
+  assertStorageStatus(readStorageStatus(boundaryBinaryPath, userDataPath), {
+    userDataPath,
+    developmentDatabasePath,
+    developmentDatabaseExists: false,
+    developmentStorageRootExists: false
   })
 
   const firstHost = await startRealBoundaryHost(config)
@@ -72,6 +90,12 @@ async function main(): Promise<void> {
 
     firstRead = await readPersistedCrateWindow(firstHost)
     assert.equal(firstRead.crateFile.label, 'amen.wav')
+    assertStorageStatus(readStorageStatus(boundaryBinaryPath, userDataPath), {
+      userDataPath,
+      developmentDatabasePath,
+      developmentDatabaseExists: true,
+      developmentStorageRootExists: true
+    })
   } finally {
     await firstHost.stop()
   }
@@ -82,6 +106,12 @@ async function main(): Promise<void> {
     assert.deepEqual(restartedRead.crateRoot, firstRead.crateRoot)
     assert.deepEqual(restartedRead.crateDirectory, firstRead.crateDirectory)
     assert.deepEqual(restartedRead.crateFile, firstRead.crateFile)
+    assertStorageStatus(readStorageStatus(boundaryBinaryPath, userDataPath), {
+      userDataPath,
+      developmentDatabasePath,
+      developmentDatabaseExists: true,
+      developmentStorageRootExists: true
+    })
   } finally {
     await restartedHost.stop()
   }
@@ -163,4 +193,73 @@ function resolveBoundaryBinaryPath(): string {
 
   assert.equal(existsSync(binaryPath), true, `expected Rust stdio binary to exist at ${binaryPath}`)
   return binaryPath
+}
+
+type StorageStatusEnvelope = {
+  readonly type: 'storageStatus'
+  readonly userDataPath: string
+  readonly development: StorageEnvironmentStatus
+  readonly production: StorageEnvironmentStatus
+}
+
+type StorageEnvironmentStatus = {
+  readonly environment: 'development' | 'production'
+  readonly storageRootPath: string
+  readonly storageRootExists: boolean
+  readonly durableStorePath: string
+  readonly durableStoreExists: boolean
+  readonly artifactFileStorePath: string
+  readonly artifactFileStoreExists: boolean
+  readonly walPath: string
+  readonly walExists: boolean
+  readonly shmPath: string
+  readonly shmExists: boolean
+}
+
+function readStorageStatus(binaryPath: string, userDataPath: string): StorageStatusEnvelope {
+  const result = spawnSync(binaryPath, ['storage', 'status', '--user-data', userDataPath], {
+    encoding: 'utf8'
+  })
+
+  if (result.error !== undefined) {
+    throw result.error
+  }
+
+  assert.equal(result.status, 0, result.stderr)
+  const parsed = JSON.parse(result.stdout.trim()) as StorageStatusEnvelope
+  assert.equal(parsed.type, 'storageStatus')
+  return parsed
+}
+
+function assertStorageStatus(
+  status: StorageStatusEnvelope,
+  expected: {
+    readonly userDataPath: string
+    readonly developmentDatabasePath: string
+    readonly developmentDatabaseExists: boolean
+    readonly developmentStorageRootExists: boolean
+  }
+): void {
+  assert.equal(status.userDataPath, expected.userDataPath)
+  assert.equal(status.development.environment, 'development')
+  assert.equal(status.development.storageRootPath, join(expected.userDataPath, 'development'))
+  assert.equal(status.development.storageRootExists, expected.developmentStorageRootExists)
+  assert.equal(status.development.durableStorePath, expected.developmentDatabasePath)
+  assert.equal(status.development.durableStoreExists, expected.developmentDatabaseExists)
+  assert.equal(
+    status.development.artifactFileStorePath,
+    join(expected.userDataPath, 'development', 'library.sqlite3.artifact-file-store')
+  )
+  assert.equal(
+    status.development.walPath,
+    join(expected.userDataPath, 'development', 'library.sqlite3-wal')
+  )
+  assert.equal(
+    status.development.shmPath,
+    join(expected.userDataPath, 'development', 'library.sqlite3-shm')
+  )
+  assert.equal(status.production.environment, 'production')
+  assert.equal(status.production.storageRootPath, expected.userDataPath)
+  assert.equal(status.production.durableStorePath, join(expected.userDataPath, 'library.sqlite3'))
+  assert.equal(status.production.durableStoreExists, false)
 }

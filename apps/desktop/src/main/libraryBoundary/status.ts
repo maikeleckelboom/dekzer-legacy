@@ -157,6 +157,8 @@ function createLibraryBoundaryHostStatusError(error: unknown): LibraryBoundaryHo
 
 function statusMessageForHostError(code: LibraryBoundaryHostErrorCode): string {
   switch (code) {
+    case 'invalidUserDataPath':
+      return 'The library boundary user data path is invalid.'
     case 'missingDevelopmentBinary':
       return 'The development library boundary stdio binary is missing.'
     case 'packagedBinaryUnavailable':

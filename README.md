@@ -76,6 +76,14 @@ Stdio readiness:
 - `packages/library-boundary-stdio-transport` consumes that Rust-owned ready envelope contract and exposes `LibraryBoundaryStdioTransport.ready`.
 - The desktop main-process host awaits transport readiness before exposing a `LibraryBoundaryClient`; preload, renderer, IPC, file picker, root registration, scans, and event pumping remain unwired.
 
+Desktop library storage:
+
+- Production resolves the library user data root from Electron main's `app.getPath("userData")`; the Rust store derives `library.sqlite3` under that root.
+- Development resolves the same host-owned user data root, marks the store environment as `development`, and the Rust store derives `development/library.sqlite3` under that root so renderer HMR does not relocate storage.
+- `DEKZER_LIBRARY_USER_DATA_PATH` may override the user data root for local diagnostics. The path must be absolute, and the override is resolved only in `apps/desktop/src/main/libraryBoundary/config.ts`.
+- `library-boundary-stdio storage status --user-data <path>` prints the derived development and production database, sidecar, WAL, and SHM paths without opening or resetting SQLite.
+- `library-boundary-stdio storage reset --user-data <path> --confirm-delete` deletes only the derived development storage directory. Reset is not automatic and is not exposed through the renderer.
+
 Workspace ownership:
 
 - `apps/*` is for product applications.

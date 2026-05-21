@@ -14,6 +14,7 @@ import {
 } from '../src/main/libraryBoundary/status'
 import {
   libraryBoundaryStdioBinaryEnvironmentVariable,
+  libraryBoundaryUserDataEnvironmentVariable,
   resolveLibraryBoundaryHostConfig,
   resolveLibraryBoundaryStdioBinaryPath,
   selectLibraryBoundaryHostEnvironment,
@@ -61,7 +62,11 @@ async function main(): Promise<void> {
   })
 
   assert.equal(devConfig.environment, 'development')
-  assert.equal(devConfig.userDataPath, join(tempRoot, 'user-data'))
+  assert.deepEqual(devConfig.storageEnvironment, {
+    kind: 'userDataRoot',
+    userDataPath: join(tempRoot, 'user-data'),
+    source: 'electronUserData'
+  })
   assert.deepEqual(devConfig.binaryPolicy, {
     kind: 'developmentBinary',
     binaryPath: resolve(fakeBinaryPath),
@@ -109,6 +114,36 @@ async function main(): Promise<void> {
   assertHostError(
     () => resolveLibraryBoundaryStdioBinaryPath(prodConfig.binaryPolicy),
     'packagedBinaryUnavailable'
+  )
+
+  const overriddenUserDataPath = join(tempRoot, 'diagnostic-user-data')
+  const overriddenStorageConfig = resolveLibraryBoundaryHostConfig({
+    app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
+    isDev: true,
+    env: {
+      [libraryBoundaryStdioBinaryEnvironmentVariable]: fakeBinaryPath,
+      [libraryBoundaryUserDataEnvironmentVariable]: overriddenUserDataPath
+    },
+    platform: 'linux'
+  })
+
+  assert.deepEqual(overriddenStorageConfig.storageEnvironment, {
+    kind: 'userDataRoot',
+    userDataPath: overriddenUserDataPath,
+    source: 'environmentOverride'
+  })
+
+  assertHostError(
+    () =>
+      resolveLibraryBoundaryHostConfig({
+        app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
+        isDev: true,
+        env: {
+          [libraryBoundaryUserDataEnvironmentVariable]: 'relative-user-data'
+        },
+        platform: 'linux'
+      }),
+    'invalidUserDataPath'
   )
 
   assert.equal(existsSync(fakeBinaryPath), true)

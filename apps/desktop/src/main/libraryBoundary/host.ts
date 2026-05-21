@@ -152,7 +152,7 @@ export class LibraryBoundaryHost {
       const createTransport = await this.#resolveTransportFactory()
       const transport = createTransport({
         serverBinaryPath,
-        userDataPath: this.#config.userDataPath,
+        userDataPath: this.#config.storageEnvironment.userDataPath,
         environment: this.#config.environment,
         diagnostics: (diagnostic) => this.#handleDiagnostic(diagnostic)
       })

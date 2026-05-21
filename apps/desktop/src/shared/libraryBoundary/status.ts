@@ -25,6 +25,7 @@ export type LibraryBoundaryHostStatusBinaryPolicy =
 
 export type LibraryBoundaryHostStatusError = {
   readonly code:
+    | 'invalidUserDataPath'
     | 'missingDevelopmentBinary'
     | 'packagedBinaryUnavailable'
     | 'stdioTransportStartupFailure'

@@ -7,6 +7,7 @@ export type LibraryBoundaryHostState =
   | 'failed'
 
 export type LibraryBoundaryHostErrorCode =
+  | 'invalidUserDataPath'
   | 'missingDevelopmentBinary'
   | 'packagedBinaryUnavailable'
   | 'stdioTransportStartupFailure'
@@ -21,6 +22,8 @@ export type LibraryBoundaryHostErrorDetails = {
   readonly executableName?: string
   readonly resourceRoot?: string
   readonly state?: LibraryBoundaryHostState
+  readonly userDataPath?: string
+  readonly userDataSource?: string
 }
 
 export class LibraryBoundaryHostError extends Error {

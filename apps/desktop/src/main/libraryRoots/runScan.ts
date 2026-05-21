@@ -125,6 +125,7 @@ function hostErrorCode(
   }
 
   switch (error.code) {
+    case 'invalidUserDataPath':
     case 'notStarted':
     case 'alreadyStarted':
     case 'missingDevelopmentBinary':
