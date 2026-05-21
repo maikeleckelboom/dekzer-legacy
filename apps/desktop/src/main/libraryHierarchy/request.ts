@@ -12,7 +12,7 @@ const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
 export type NormalizedRequest = {
   readonly target: ReadTarget
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
   readonly offset: number
   readonly limit: number
 }
@@ -32,13 +32,13 @@ export function normalizeRequest(request: unknown): NormalizedRequest | ReadResu
     return target
   }
 
-  const parentSourceDirectoryId = normalizeNullableOpaqueId(
-    request.parentSourceDirectoryId,
-    'parentSourceDirectoryId'
+  const parentDirectoryId = normalizeNullableOpaqueId(
+    request.parentDirectoryId,
+    'parentDirectoryId'
   )
 
-  if (isReadResult(parentSourceDirectoryId)) {
-    return parentSourceDirectoryId
+  if (isReadResult(parentDirectoryId)) {
+    return parentDirectoryId
   }
 
   const offset = normalizeOffset(request.offset)
@@ -55,7 +55,7 @@ export function normalizeRequest(request: unknown): NormalizedRequest | ReadResu
 
   return {
     target,
-    ...(parentSourceDirectoryId === undefined ? {} : { parentSourceDirectoryId }),
+    ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     offset,
     limit
   }

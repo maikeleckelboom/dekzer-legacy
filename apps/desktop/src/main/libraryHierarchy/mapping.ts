@@ -53,11 +53,11 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
       id: `source-directory:${sourceDirectoryId}`,
       kind: 'directory',
       label: row.displayName,
-      sourceDirectoryId,
+      directoryId: sourceDirectoryId,
       ...(row.parentSourceDirectoryId === null
         ? {}
-        : { parentSourceDirectoryId: row.parentSourceDirectoryId }),
-      presenceState: row.presenceState,
+        : { parentDirectoryId: row.parentSourceDirectoryId }),
+      presence: row.presenceState,
       updatedAtMs: row.updatedAtMs
     }
   }
@@ -72,11 +72,11 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
     id: `source-file:${sourceFileId}`,
     kind: 'file',
     label: row.displayName,
-    sourceFileId,
+    fileId: sourceFileId,
     ...(row.parentSourceDirectoryId === null
       ? {}
-      : { parentSourceDirectoryId: row.parentSourceDirectoryId }),
-    presenceState: row.presenceState,
+      : { parentDirectoryId: row.parentSourceDirectoryId }),
+    presence: row.presenceState,
     updatedAtMs: row.updatedAtMs
   }
 }

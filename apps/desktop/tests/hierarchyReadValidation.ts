@@ -161,8 +161,8 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       id: 'source-file:11',
       kind: 'file',
       label: 'track.wav',
-      sourceFileId: '11',
-      presenceState: 'present',
+      fileId: '11',
+      presence: 'present',
       updatedAtMs: 101
     }
   ])
@@ -352,11 +352,11 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
         const clonedRequest = structuredClone(request)
         requests.push(clonedRequest)
 
-        if (clonedRequest.parentSourceDirectoryId === '12') {
+        if (clonedRequest.parentDirectoryId === '12') {
           return directory12Read.promise
         }
 
-        if (clonedRequest.parentSourceDirectoryId === '13') {
+        if (clonedRequest.parentDirectoryId === '13') {
           directory13Attempts += 1
           return directory13Attempts === 1
             ? hierarchyReadError(
@@ -367,7 +367,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
             : emptyDirectoryReadResult('13')
         }
 
-        if (clonedRequest.parentSourceDirectoryId === '14') {
+        if (clonedRequest.parentDirectoryId === '14') {
           return directory14Read.promise
         }
 
@@ -429,7 +429,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
       },
       label: 'Source Fixture'
     },
-    parentSourceDirectoryId: '12',
+    parentDirectoryId: '12',
     offset: 0,
     limit: 50
   })
@@ -496,7 +496,7 @@ async function validatesRendererWindowedMore(): Promise<void> {
         const clonedRequest = structuredClone(request)
         requests.push(clonedRequest)
 
-        if (clonedRequest.parentSourceDirectoryId === undefined) {
+        if (clonedRequest.parentDirectoryId === undefined) {
           if (clonedRequest.offset === 2) {
             return sourceMoreReadResult()
           }
@@ -507,7 +507,7 @@ async function validatesRendererWindowedMore(): Promise<void> {
             : refreshedSourceHierarchyReadResult()
         }
 
-        if (clonedRequest.parentSourceDirectoryId === '12') {
+        if (clonedRequest.parentDirectoryId === '12') {
           if (clonedRequest.offset === 1) {
             directory12MoreAttempts += 1
             return directory12MoreAttempts === 1
@@ -522,7 +522,7 @@ async function validatesRendererWindowedMore(): Promise<void> {
           return partialDirectoryHierarchyReadResult('12')
         }
 
-        if (clonedRequest.parentSourceDirectoryId === '14') {
+        if (clonedRequest.parentDirectoryId === '14') {
           if (clonedRequest.offset === 1) {
             return directory14More.promise
           }
@@ -530,7 +530,7 @@ async function validatesRendererWindowedMore(): Promise<void> {
           return partialDirectoryHierarchyReadResult('14')
         }
 
-        return emptyDirectoryReadResult(clonedRequest.parentSourceDirectoryId)
+        return emptyDirectoryReadResult(clonedRequest.parentDirectoryId)
       }
     })
   )
@@ -610,7 +610,7 @@ async function validatesRendererWindowedMore(): Promise<void> {
         sourceId: '7'
       },
       label: 'Source Fixture',
-      parentSourceDirectoryId: '12',
+      parentDirectoryId: '12',
       offset: 1,
       limit: 50
     }
@@ -626,7 +626,7 @@ async function validatesRendererWindowedMore(): Promise<void> {
       },
       label: 'Source Fixture'
     },
-    parentSourceDirectoryId: '12',
+    parentDirectoryId: '12',
     offset: 1,
     limit: 50
   })
@@ -704,8 +704,8 @@ async function validatesEntryPointRejection(): Promise<void> {
                 id: 'source-file:999',
                 kind: 'file' as const,
                 label: 'intruder.wav',
-                sourceFileId: '999',
-                presenceState: 'present' as const,
+                fileId: '999',
+                presence: 'present' as const,
                 updatedAtMs: 100
               }
             ]
@@ -743,7 +743,7 @@ async function validatesEntryPointRejection(): Promise<void> {
                 label: 'Wrong Source',
                 entryPoint: { kind: 'source', sourceId: '999' }
               },
-              parentSourceDirectoryId: '12',
+              parentDirectoryId: '12',
               offset: 0,
               limit: 50,
               totalRows: 1,
@@ -752,9 +752,9 @@ async function validatesEntryPointRejection(): Promise<void> {
                   id: 'source-file:999',
                   kind: 'file' as const,
                   label: 'intruder.wav',
-                  sourceFileId: '999',
-                  parentSourceDirectoryId: '12',
-                  presenceState: 'present' as const,
+                  fileId: '999',
+                  parentDirectoryId: '12',
+                  presence: 'present' as const,
                   updatedAtMs: 100
                 }
               ]
@@ -802,8 +802,8 @@ async function validatesEntryPointRejection(): Promise<void> {
                   id: 'source-file:999',
                   kind: 'file' as const,
                   label: 'intruder.wav',
-                  sourceFileId: '999',
-                  presenceState: 'present' as const,
+                  fileId: '999',
+                  presence: 'present' as const,
                   updatedAtMs: 100
                 }
               ]
@@ -866,7 +866,7 @@ async function validatesEntryPointRejection(): Promise<void> {
                 label: 'Wrong Source',
                 entryPoint: { kind: 'source', sourceId: '999' }
               },
-              parentSourceDirectoryId: '12',
+              parentDirectoryId: '12',
               offset: 1,
               limit: 50,
               totalRows: 2,
@@ -875,9 +875,9 @@ async function validatesEntryPointRejection(): Promise<void> {
                   id: 'source-file:12-b',
                   kind: 'file' as const,
                   label: 'b.wav',
-                  sourceFileId: '12-b',
-                  parentSourceDirectoryId: '12',
-                  presenceState: 'present' as const,
+                  fileId: '12-b',
+                  parentDirectoryId: '12',
+                  presence: 'present' as const,
                   updatedAtMs: 101
                 }
               ]
@@ -1064,8 +1064,8 @@ function sourceMoreReadResult(): Extract<ReadResult, { state: 'ready' }> {
           id: 'source-file:99',
           kind: 'file',
           label: 'root-track.wav',
-          sourceFileId: '99',
-          presenceState: 'present',
+          fileId: '99',
+          presence: 'present',
           updatedAtMs: 101
         }
       ]
@@ -1094,7 +1094,7 @@ function refreshedSourceHierarchyReadResult(): Extract<ReadResult, { state: 'rea
 }
 
 function loadedDirectoryReadResult(
-  parentSourceDirectoryId: string
+  parentDirectoryId: string
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1107,28 +1107,28 @@ function loadedDirectoryReadResult(
           sourceId: '7'
         }
       },
-      parentSourceDirectoryId,
+      parentDirectoryId,
       offset: 0,
       limit: 50,
       totalRows: 2,
       nodes: [
         {
-          id: `source-file:${parentSourceDirectoryId}-track`,
+          id: `source-file:${parentDirectoryId}-track`,
           kind: 'file',
           label: 'track.wav',
-          sourceFileId: `${parentSourceDirectoryId}11`,
-          parentSourceDirectoryId,
-          presenceState: 'present',
+          fileId: `${parentDirectoryId}11`,
+          parentDirectoryId,
+          presence: 'present',
           updatedAtMs: 101
         },
-        directoryNode('99', 'Nested Album', parentSourceDirectoryId)
+        directoryNode('99', 'Nested Album', parentDirectoryId)
       ]
     }
   }
 }
 
 function partialDirectoryHierarchyReadResult(
-  parentSourceDirectoryId: string
+  parentDirectoryId: string
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1141,18 +1141,18 @@ function partialDirectoryHierarchyReadResult(
           sourceId: '7'
         }
       },
-      parentSourceDirectoryId,
+      parentDirectoryId,
       offset: 0,
       limit: 50,
       totalRows: 2,
       nodes: [
         {
-          id: `source-file:${parentSourceDirectoryId}-a`,
+          id: `source-file:${parentDirectoryId}-a`,
           kind: 'file',
           label: 'a.wav',
-          sourceFileId: `${parentSourceDirectoryId}-a`,
-          parentSourceDirectoryId,
-          presenceState: 'present',
+          fileId: `${parentDirectoryId}-a`,
+          parentDirectoryId,
+          presence: 'present',
           updatedAtMs: 101
         }
       ]
@@ -1161,7 +1161,7 @@ function partialDirectoryHierarchyReadResult(
 }
 
 function directoryMoreReadResult(
-  parentSourceDirectoryId: string
+  parentDirectoryId: string
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1174,18 +1174,18 @@ function directoryMoreReadResult(
           sourceId: '7'
         }
       },
-      parentSourceDirectoryId,
+      parentDirectoryId,
       offset: 1,
       limit: 50,
       totalRows: 2,
       nodes: [
         {
-          id: `source-file:${parentSourceDirectoryId}-b`,
+          id: `source-file:${parentDirectoryId}-b`,
           kind: 'file',
           label: 'b.wav',
-          sourceFileId: `${parentSourceDirectoryId}-b`,
-          parentSourceDirectoryId,
-          presenceState: 'present',
+          fileId: `${parentDirectoryId}-b`,
+          parentDirectoryId,
+          presence: 'present',
           updatedAtMs: 102
         }
       ]
@@ -1194,7 +1194,7 @@ function directoryMoreReadResult(
 }
 
 function emptyDirectoryReadResult(
-  parentSourceDirectoryId: string
+  parentDirectoryId: string
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1207,7 +1207,7 @@ function emptyDirectoryReadResult(
           sourceId: '7'
         }
       },
-      parentSourceDirectoryId,
+      parentDirectoryId,
       offset: 0,
       limit: 50,
       totalRows: 0,
@@ -1231,20 +1231,20 @@ function hierarchyReadError(
 }
 
 function directoryNode(
-  sourceDirectoryId: string,
+  directoryId: string,
   label: string,
-  parentSourceDirectoryId?: string
+  parentDirectoryId?: string
 ): Extract<
   Extract<ReadResult, { state: 'ready' }>['window']['nodes'][number],
   { kind: 'directory' }
 > {
   return {
-    id: `source-directory:${sourceDirectoryId}`,
+    id: `source-directory:${directoryId}`,
     kind: 'directory',
     label,
-    sourceDirectoryId,
-    ...(parentSourceDirectoryId === undefined ? {} : { parentSourceDirectoryId }),
-    presenceState: 'present',
+    directoryId,
+    ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
+    presence: 'present',
     updatedAtMs: 100
   }
 }

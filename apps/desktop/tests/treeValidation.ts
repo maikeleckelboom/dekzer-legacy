@@ -555,7 +555,7 @@ function validatesLibraryHierarchyReadProjection(): void {
         'source-directory:12',
         {
           kind: 'directory',
-          sourceDirectoryId: '12',
+          directoryId: '12',
           entryPoint: {
             kind: 'source',
             sourceId: '7'
@@ -795,8 +795,8 @@ function fileOnlyHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> 
           id: 'source-file:11',
           kind: 'file',
           label: 'track.wav',
-          sourceFileId: '11',
-          presenceState: 'present',
+          fileId: '11',
+          presence: 'present',
           updatedAtMs: 100
         }
       ]
@@ -846,8 +846,8 @@ function directoryHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }>
           id: 'source-directory:12',
           kind: 'directory',
           label: 'Album',
-          sourceDirectoryId: '12',
-          presenceState: 'present',
+          directoryId: '12',
+          presence: 'present',
           updatedAtMs: 100
         }
       ]
@@ -860,9 +860,9 @@ function loadedChildrenFromWindow(window: ChildWindow): LoadedChildren {
 
   return {
     entryPoint: window.root.entryPoint,
-    ...(window.parentSourceDirectoryId === undefined
+    ...(window.parentDirectoryId === undefined
       ? {}
-      : { parentSourceDirectoryId: window.parentSourceDirectoryId }),
+      : { parentDirectoryId: window.parentDirectoryId }),
     ...(window.root.label === undefined ? {} : { label: window.root.label }),
     rows: window.nodes,
     totalRows: window.totalRows,

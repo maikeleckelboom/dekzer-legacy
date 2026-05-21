@@ -176,7 +176,7 @@ async function readPersistedCrateWindow(host: LibraryBoundaryHost): Promise<{
       entryPoint: rootRead.window.root.entryPoint,
       ...(rootRead.window.root.label === undefined ? {} : { label: rootRead.window.root.label })
     },
-    parentSourceDirectoryId: crateDirectory.sourceDirectoryId,
+    parentDirectoryId: crateDirectory.directoryId,
     offset: 0,
     limit: 50
   })

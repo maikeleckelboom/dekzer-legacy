@@ -265,10 +265,10 @@ function projectLiteralNode(options: {
   if (node.kind === 'directory') {
     options.bindingsById.set(node.id, {
       kind: 'directory',
-      sourceDirectoryId: node.sourceDirectoryId,
-      ...(node.parentSourceDirectoryId === undefined
+      directoryId: node.directoryId,
+      ...(node.parentDirectoryId === undefined
         ? {}
-        : { parentSourceDirectoryId: node.parentSourceDirectoryId }),
+        : { parentDirectoryId: node.parentDirectoryId }),
       entryPoint: copyReadEntryPoint(options.entryPoint),
       ...(options.label === undefined ? {} : { label: options.label })
     })
@@ -277,10 +277,10 @@ function projectLiteralNode(options: {
       id: node.id,
       label: node.label,
       badgeLabel: 'Folder',
-      detail: formatDirectoryDetail(node.presenceState),
+      detail: formatDirectoryDetail(node.presence),
       childrenState: projectDirectoryChildren({
         ownerId: node.id,
-        state: options.directoryReadStates.get(node.sourceDirectoryId),
+        state: options.directoryReadStates.get(node.directoryId),
         directoryReadStates: options.directoryReadStates,
         bindingsById: options.bindingsById
       })
@@ -289,10 +289,8 @@ function projectLiteralNode(options: {
 
   options.bindingsById.set(node.id, {
     kind: 'file',
-    sourceFileId: node.sourceFileId,
-    ...(node.parentSourceDirectoryId === undefined
-      ? {}
-      : { parentSourceDirectoryId: node.parentSourceDirectoryId }),
+    fileId: node.fileId,
+    ...(node.parentDirectoryId === undefined ? {} : { parentDirectoryId: node.parentDirectoryId }),
     entryPoint: copyReadEntryPoint(options.entryPoint)
   })
 
@@ -300,7 +298,7 @@ function projectLiteralNode(options: {
     id: node.id,
     label: node.label,
     badgeLabel: 'File',
-    detail: formatFileDetail(node.presenceState),
+    detail: formatFileDetail(node.presence),
     childrenState: { kind: 'leaf' }
   }
 }
@@ -431,9 +429,9 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
   const target = {
     ownerNodeId: options.ownerId,
     entryPoint: copyReadEntryPoint(options.children.entryPoint),
-    ...(options.children.parentSourceDirectoryId === undefined
+    ...(options.children.parentDirectoryId === undefined
       ? {}
-      : { parentSourceDirectoryId: options.children.parentSourceDirectoryId }),
+      : { parentDirectoryId: options.children.parentDirectoryId }),
     ...(options.children.label === undefined ? {} : { label: options.children.label }),
     offset,
     limit: options.children.limit
@@ -585,8 +583,8 @@ function formatMoreDetail(offset: number, limit: number, totalRows: number): str
   return `Rows ${offset + 1}-${Math.min(offset + limit, totalRows)} of ${totalRows} are available.`
 }
 
-function formatFileDetail(presenceState: ChildRow['presenceState']): string {
-  switch (presenceState) {
+function formatFileDetail(presence: ChildRow['presence']): string {
+  switch (presence) {
     case 'present':
       return 'Present file.'
     case 'missing':
@@ -596,8 +594,8 @@ function formatFileDetail(presenceState: ChildRow['presenceState']): string {
   }
 }
 
-function formatDirectoryDetail(presenceState: ChildRow['presenceState']): string {
-  switch (presenceState) {
+function formatDirectoryDetail(presence: ChildRow['presence']): string {
+  switch (presence) {
     case 'present':
       return 'Present directory.'
     case 'missing':

@@ -225,7 +225,7 @@ export function createLibraryHierarchyReadController(
         return readDirectory({
           entryPoint: binding.entryPoint,
           ...(binding.label === undefined ? {} : { label: binding.label }),
-          sourceDirectoryId: binding.sourceDirectoryId
+          directoryId: binding.directoryId
         })
       case 'more':
         return readMore(binding.target)
@@ -250,7 +250,7 @@ export function createLibraryHierarchyReadController(
     return readDirectory({
       entryPoint: binding.entryPoint,
       ...(binding.label === undefined ? {} : { label: binding.label }),
-      sourceDirectoryId: binding.sourceDirectoryId
+      directoryId: binding.directoryId
     })
   }
 
@@ -326,8 +326,8 @@ export function createLibraryHierarchyReadController(
   }
 
   async function readDirectory(target: DirectoryTarget): Promise<boolean> {
-    const requestKey = createDirectoryRequestKey(target.entryPoint, target.sourceDirectoryId)
-    const currentState = directoryReadStates.value.get(target.sourceDirectoryId)
+    const requestKey = createDirectoryRequestKey(target.entryPoint, target.directoryId)
+    const currentState = directoryReadStates.value.get(target.directoryId)
 
     if (currentState?.kind === 'loading' && currentState.requestKey === requestKey) {
       return false
@@ -336,7 +336,7 @@ export function createLibraryHierarchyReadController(
     const sequence = ++directoryReadSequence
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
-    setDirectoryReadState(target.sourceDirectoryId, {
+    setDirectoryReadState(target.directoryId, {
       kind: 'loading',
       requestKey,
       sequence,
@@ -346,20 +346,20 @@ export function createLibraryHierarchyReadController(
     try {
       const result = await libraryApi.hierarchy.readChildren(directoryReadRequest(target))
 
-      if (!isCurrentDirectoryLoading(target.sourceDirectoryId, requestKey, sequence)) {
+      if (!isCurrentDirectoryLoading(target.directoryId, requestKey, sequence)) {
         return false
       }
 
       if (result.state !== 'ready') {
-        setDirectoryReadState(target.sourceDirectoryId, {
+        setDirectoryReadState(target.directoryId, {
           kind: 'failed',
           detail: result.error.message
         })
         return true
       }
 
-      if (!isExpectedWindow(result.window, 0, target.sourceDirectoryId, target.entryPoint)) {
-        setDirectoryReadState(target.sourceDirectoryId, {
+      if (!isExpectedWindow(result.window, 0, target.directoryId, target.entryPoint)) {
+        setDirectoryReadState(target.directoryId, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
         })
@@ -367,7 +367,7 @@ export function createLibraryHierarchyReadController(
       }
 
       setDirectoryReadState(
-        target.sourceDirectoryId,
+        target.directoryId,
         {
           kind: 'loaded',
           children: loadedChildrenFromWindow(result.window, directoryLoadedTarget(target))
@@ -376,8 +376,8 @@ export function createLibraryHierarchyReadController(
       )
       return true
     } catch {
-      if (isCurrentDirectoryLoading(target.sourceDirectoryId, requestKey, sequence)) {
-        setDirectoryReadState(target.sourceDirectoryId, {
+      if (isCurrentDirectoryLoading(target.directoryId, requestKey, sequence)) {
+        setDirectoryReadState(target.directoryId, {
           kind: 'failed',
           detail: safeChildReadRequestFailure
         })
@@ -393,7 +393,7 @@ export function createLibraryHierarchyReadController(
   }
 
   async function readMore(target: MoreTarget): Promise<boolean> {
-    if (target.parentSourceDirectoryId === undefined) {
+    if (target.parentDirectoryId === undefined) {
       return readSourceMore(target)
     }
 
@@ -441,12 +441,7 @@ export function createLibraryHierarchyReadController(
       }
 
       if (
-        !isExpectedWindow(
-          result.window,
-          target.offset,
-          target.parentSourceDirectoryId,
-          target.entryPoint
-        )
+        !isExpectedWindow(result.window, target.offset, target.parentDirectoryId, target.entryPoint)
       ) {
         setSourceMoreState(target, {
           kind: 'failed',
@@ -489,14 +484,14 @@ export function createLibraryHierarchyReadController(
   }
 
   async function readDirectoryMore(target: MoreTarget): Promise<boolean> {
-    const sourceDirectoryId = target.parentSourceDirectoryId
+    const directoryId = target.parentDirectoryId
 
-    if (sourceDirectoryId === undefined) {
+    if (directoryId === undefined) {
       return false
     }
 
     const requestKey = createMoreRequestKey(target)
-    const currentState = directoryReadStates.value.get(sourceDirectoryId)
+    const currentState = directoryReadStates.value.get(directoryId)
 
     if (!canReadMore(currentState, target)) {
       return false
@@ -534,7 +529,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (!isExpectedWindow(result.window, target.offset, sourceDirectoryId, target.entryPoint)) {
+      if (!isExpectedWindow(result.window, target.offset, directoryId, target.entryPoint)) {
         setDirectoryMoreState(target, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
@@ -542,14 +537,14 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      const state = directoryReadStates.value.get(sourceDirectoryId)
+      const state = directoryReadStates.value.get(directoryId)
 
       if (!canReadMore(state, target)) {
         return false
       }
 
       setDirectoryReadState(
-        sourceDirectoryId,
+        directoryId,
         {
           kind: 'loaded',
           children: appendHierarchyChildrenWindow(state.children, result.window)
@@ -591,12 +586,12 @@ export function createLibraryHierarchyReadController(
   }
 
   function setDirectoryReadState(
-    sourceDirectoryId: string,
+    directoryId: string,
     state: DirectoryState,
     discoveredWindow?: ChildWindow
   ): void {
     const nextStates = new Map(directoryReadStates.value)
-    nextStates.set(sourceDirectoryId, state)
+    nextStates.set(directoryId, state)
 
     if (discoveredWindow !== undefined) {
       addDiscoveredUnloadedDirectoryStates(nextStates, discoveredWindow)
@@ -619,19 +614,19 @@ export function createLibraryHierarchyReadController(
   }
 
   function setDirectoryMoreState(target: MoreTarget, more: MoreState): void {
-    const sourceDirectoryId = target.parentSourceDirectoryId
+    const directoryId = target.parentDirectoryId
 
-    if (sourceDirectoryId === undefined) {
+    if (directoryId === undefined) {
       return
     }
 
-    const state = directoryReadStates.value.get(sourceDirectoryId)
+    const state = directoryReadStates.value.get(directoryId)
 
     if (!canReadMore(state, target)) {
       return
     }
 
-    setDirectoryReadState(sourceDirectoryId, {
+    setDirectoryReadState(directoryId, {
       kind: 'loaded',
       children: withMoreState(state.children, more)
     })
@@ -645,11 +640,11 @@ export function createLibraryHierarchyReadController(
   }
 
   function isCurrentDirectoryLoading(
-    sourceDirectoryId: string,
+    directoryId: string,
     requestKey: string,
     sequence: number
   ): boolean {
-    const state = directoryReadStates.value.get(sourceDirectoryId)
+    const state = directoryReadStates.value.get(directoryId)
     return (
       state?.kind === 'loading' && state.requestKey === requestKey && state.sequence === sequence
     )
@@ -671,13 +666,13 @@ export function createLibraryHierarchyReadController(
     requestKey: string,
     sequence: number
   ): boolean {
-    const sourceDirectoryId = target.parentSourceDirectoryId
+    const directoryId = target.parentDirectoryId
 
-    if (sourceDirectoryId === undefined) {
+    if (directoryId === undefined) {
       return false
     }
 
-    const state = directoryReadStates.value.get(sourceDirectoryId)
+    const state = directoryReadStates.value.get(directoryId)
     const more = state?.kind === 'loaded' ? state.children.more : undefined
 
     return more?.kind === 'loading' && more.requestKey === requestKey && more.sequence === sequence
@@ -723,7 +718,7 @@ function directoryReadRequest(target: DirectoryTarget): ReadRequest {
       entryPoint: copyReadEntryPoint(target.entryPoint),
       ...(target.label === undefined ? {} : { label: target.label })
     },
-    parentSourceDirectoryId: target.sourceDirectoryId,
+    parentDirectoryId: target.directoryId,
     offset: 0,
     limit: readLimit
   }
@@ -736,9 +731,9 @@ function moreReadRequest(target: MoreTarget): ReadRequest {
       entryPoint: copyReadEntryPoint(target.entryPoint),
       ...(target.label === undefined ? {} : { label: target.label })
     },
-    ...(target.parentSourceDirectoryId === undefined
+    ...(target.parentDirectoryId === undefined
       ? {}
-      : { parentSourceDirectoryId: target.parentSourceDirectoryId }),
+      : { parentDirectoryId: target.parentDirectoryId }),
     offset: target.offset,
     limit: target.limit
   }
@@ -747,7 +742,7 @@ function moreReadRequest(target: MoreTarget): ReadRequest {
 function sourceLoadedTarget(target: SourceTarget): {
   readonly entryPoint: EntryPoint
   readonly label?: string
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
 } {
   return {
     entryPoint: copyReadEntryPoint(target.entryPoint),
@@ -758,12 +753,12 @@ function sourceLoadedTarget(target: SourceTarget): {
 function directoryLoadedTarget(target: DirectoryTarget): {
   readonly entryPoint: EntryPoint
   readonly label?: string
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
 } {
   return {
     entryPoint: copyReadEntryPoint(target.entryPoint),
     ...(target.label === undefined ? {} : { label: target.label }),
-    parentSourceDirectoryId: target.sourceDirectoryId
+    parentDirectoryId: target.directoryId
   }
 }
 
@@ -772,15 +767,15 @@ function loadedChildrenFromWindow(
   target: {
     readonly entryPoint: EntryPoint
     readonly label?: string
-    readonly parentSourceDirectoryId?: string
+    readonly parentDirectoryId?: string
   }
 ): LoadedChildren {
   return makeLoadedChildren({
     entryPoint: target.entryPoint,
     ...(target.label === undefined ? {} : { label: target.label }),
-    ...(target.parentSourceDirectoryId === undefined
+    ...(target.parentDirectoryId === undefined
       ? {}
-      : { parentSourceDirectoryId: target.parentSourceDirectoryId }),
+      : { parentDirectoryId: target.parentDirectoryId }),
     rows: window.nodes,
     totalRows: window.totalRows,
     limit: window.limit
@@ -794,9 +789,9 @@ function appendHierarchyChildrenWindow(
   return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
-    ...(children.parentSourceDirectoryId === undefined
+    ...(children.parentDirectoryId === undefined
       ? {}
-      : { parentSourceDirectoryId: children.parentSourceDirectoryId }),
+      : { parentDirectoryId: children.parentDirectoryId }),
     rows: [...children.rows, ...window.nodes],
     totalRows: window.totalRows,
     limit: window.limit
@@ -807,9 +802,9 @@ function withMoreState(children: LoadedChildren, more: MoreState): LoadedChildre
   return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
-    ...(children.parentSourceDirectoryId === undefined
+    ...(children.parentDirectoryId === undefined
       ? {}
-      : { parentSourceDirectoryId: children.parentSourceDirectoryId }),
+      : { parentDirectoryId: children.parentDirectoryId }),
     rows: children.rows,
     totalRows: children.totalRows,
     limit: children.limit,
@@ -819,7 +814,7 @@ function withMoreState(children: LoadedChildren, more: MoreState): LoadedChildre
 
 function makeLoadedChildren(options: {
   readonly entryPoint: EntryPoint
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
   readonly label?: string
   readonly rows: readonly ChildRow[]
   readonly totalRows: number
@@ -830,9 +825,9 @@ function makeLoadedChildren(options: {
 
   return {
     entryPoint: copyReadEntryPoint(options.entryPoint),
-    ...(options.parentSourceDirectoryId === undefined
+    ...(options.parentDirectoryId === undefined
       ? {}
-      : { parentSourceDirectoryId: options.parentSourceDirectoryId }),
+      : { parentDirectoryId: options.parentDirectoryId }),
     ...(options.label === undefined ? {} : { label: options.label }),
     rows: options.rows,
     totalRows: options.totalRows,
@@ -845,14 +840,14 @@ function makeLoadedChildren(options: {
 function isExpectedWindow(
   window: ChildWindow,
   expectedOffset: number,
-  expectedParentSourceDirectoryId: string | undefined,
+  expectedParentDirectoryId: string | undefined,
   expectedEntryPoint: EntryPoint
 ): boolean {
   if (window.offset !== expectedOffset) {
     return false
   }
 
-  if ((window.parentSourceDirectoryId ?? undefined) !== expectedParentSourceDirectoryId) {
+  if ((window.parentDirectoryId ?? undefined) !== expectedParentDirectoryId) {
     return false
   }
 
@@ -879,7 +874,7 @@ function canReadMore(
     state?.kind === 'loaded' &&
     state.children.nextOffset === target.offset &&
     sameEntryPoint(state.children.entryPoint, target.entryPoint) &&
-    (state.children.parentSourceDirectoryId ?? undefined) === target.parentSourceDirectoryId
+    (state.children.parentDirectoryId ?? undefined) === target.parentDirectoryId
   )
 }
 
@@ -932,8 +927,8 @@ function addDiscoveredUnloadedDirectoryStates(
   window: ChildWindow
 ): void {
   for (const node of window.nodes) {
-    if (node.kind === 'directory' && !states.has(node.sourceDirectoryId)) {
-      states.set(node.sourceDirectoryId, {
+    if (node.kind === 'directory' && !states.has(node.directoryId)) {
+      states.set(node.directoryId, {
         kind: 'unloaded',
         detail: 'Children not loaded yet.'
       })
@@ -968,13 +963,13 @@ function createEntryPointRequestKey(entryPoint: EntryPoint): string {
   }
 }
 
-function createDirectoryRequestKey(entryPoint: EntryPoint, sourceDirectoryId: string): string {
-  return `${createEntryPointRequestKey(entryPoint)}/directory:${sourceDirectoryId}`
+function createDirectoryRequestKey(entryPoint: EntryPoint, directoryId: string): string {
+  return `${createEntryPointRequestKey(entryPoint)}/directory:${directoryId}`
 }
 
 function createMoreRequestKey(target: MoreTarget): string {
   return `${createEntryPointRequestKey(target.entryPoint)}/directory:${
-    target.parentSourceDirectoryId ?? 'root'
+    target.parentDirectoryId ?? 'root'
   }/offset:${target.offset}`
 }
 

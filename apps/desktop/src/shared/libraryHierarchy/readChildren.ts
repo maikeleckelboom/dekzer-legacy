@@ -49,7 +49,7 @@ export type ReadTarget =
 
 export type ReadRequest = {
   readonly target?: ReadTarget
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
   readonly offset?: number
   readonly limit?: number
 }
@@ -69,24 +69,24 @@ export type ChildRow =
       readonly id: string
       readonly kind: 'directory'
       readonly label: string
-      readonly sourceDirectoryId: string
-      readonly parentSourceDirectoryId?: string
-      readonly presenceState: Presence
+      readonly directoryId: string
+      readonly parentDirectoryId?: string
+      readonly presence: Presence
       readonly updatedAtMs: number
     }
   | {
       readonly id: string
       readonly kind: 'file'
       readonly label: string
-      readonly sourceFileId: string
-      readonly parentSourceDirectoryId?: string
-      readonly presenceState: Presence
+      readonly fileId: string
+      readonly parentDirectoryId?: string
+      readonly presence: Presence
       readonly updatedAtMs: number
     }
 
 export type ChildWindow = {
   readonly root: ReadRoot
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
   readonly offset: number
   readonly limit: number
   readonly totalRows: number

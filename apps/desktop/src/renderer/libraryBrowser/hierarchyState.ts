@@ -7,7 +7,7 @@ import type {
 export type DirectoryTarget = {
   readonly entryPoint: EntryPoint
   readonly label?: string
-  readonly sourceDirectoryId: string
+  readonly directoryId: string
 }
 
 export type SourceTarget = {
@@ -19,7 +19,7 @@ export type SourceTarget = {
 export type MoreTarget = {
   readonly ownerNodeId: string
   readonly entryPoint: EntryPoint
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
   readonly label?: string
   readonly offset: number
   readonly limit: number
@@ -39,7 +39,7 @@ export type MoreState =
 
 export type LoadedChildren = {
   readonly entryPoint: EntryPoint
-  readonly parentSourceDirectoryId?: string
+  readonly parentDirectoryId?: string
   readonly label?: string
   readonly rows: readonly ChildRow[]
   readonly totalRows: number
@@ -100,15 +100,15 @@ export type RowBinding =
     }
   | {
       readonly kind: 'directory'
-      readonly sourceDirectoryId: string
-      readonly parentSourceDirectoryId?: string
+      readonly directoryId: string
+      readonly parentDirectoryId?: string
       readonly entryPoint: EntryPoint
       readonly label?: string
     }
   | {
       readonly kind: 'file'
-      readonly sourceFileId: string
-      readonly parentSourceDirectoryId?: string
+      readonly fileId: string
+      readonly parentDirectoryId?: string
       readonly entryPoint: EntryPoint
     }
   | {

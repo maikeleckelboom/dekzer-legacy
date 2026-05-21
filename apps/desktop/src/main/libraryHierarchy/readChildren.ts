@@ -50,7 +50,7 @@ export async function readThroughHost(
 
     const reply = await client.readLiteralHierarchyChildren({
       entryPoint: resolvedTarget.entryPoint,
-      parentSourceDirectoryId: normalizedRequest.parentSourceDirectoryId ?? null,
+      parentSourceDirectoryId: normalizedRequest.parentDirectoryId ?? null,
       offset: normalizedRequest.offset,
       limit: normalizedRequest.limit
     } satisfies ReadLiteralHierarchyChildrenRequest)
@@ -79,7 +79,7 @@ export async function readThroughHost(
         root: resolvedTarget.root,
         ...(reply.window.parentSourceDirectoryId === null
           ? {}
-          : { parentSourceDirectoryId: reply.window.parentSourceDirectoryId }),
+          : { parentDirectoryId: reply.window.parentSourceDirectoryId }),
         offset: reply.window.offset,
         limit: reply.window.limit,
         totalRows: reply.window.totalRows,
