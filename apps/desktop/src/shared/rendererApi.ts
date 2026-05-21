@@ -10,6 +10,7 @@ import type {
   LocalRootRegistrationRequest,
   LocalRootRegistrationResult
 } from './libraryRoots/registerLocalRoot'
+import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
 
 export type RendererApi = {
   readonly library: LibraryApi
@@ -34,4 +35,5 @@ export type LibraryHierarchyApi = {
 
 export type LibraryRootsApi = {
   registerLocal(request: LocalRootRegistrationRequest): Promise<LocalRootRegistrationResult>
+  runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult>
 }

@@ -10,10 +10,9 @@ import {
   libraryHierarchyReadChildrenIpcChannels,
   type LibraryHierarchyReadChildrenResult
 } from '../src/shared/libraryHierarchy/readChildren'
-import {
-  libraryRootsIpcChannels,
-  type LocalRootRegistrationResult
-} from '../src/shared/libraryRoots/registerLocalRoot'
+import { libraryRootsIpcChannels } from '../src/shared/libraryRoots/channels'
+import type { LocalRootRegistrationResult } from '../src/shared/libraryRoots/registerLocalRoot'
+import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { emitStatus, testStatus } from './support/libraryBoundary'
 
 void main()
@@ -27,6 +26,9 @@ async function validatesPreloadApiSurface(): Promise<void> {
   const hierarchyRequest = firstAvailableSourceReadRequest()
   const registrationRequest = {
     absolutePath: 'C:/Music'
+  }
+  const scanRequest = {
+    rootId: 'root-1'
   }
   const hierarchyResult: LibraryHierarchyReadChildrenResult = {
     state: 'noTarget',
@@ -42,8 +44,16 @@ async function validatesPreloadApiSurface(): Promise<void> {
       canonicalPath: 'C:/Music'
     }
   }
+  const scanResult: LocalRootScanResult = {
+    state: 'scanned',
+    rootId: 'root-1',
+    scanRunId: 'scan-1',
+    discoveredFileCount: 12,
+    queuedSourceWorkItems: 8
+  }
   let receivedHierarchyRequest: unknown = null
   let receivedRegistrationRequest: unknown = null
+  let receivedScanRequest: unknown = null
   const listeners = new Map<
     string,
     Set<(event: unknown, changedStatus: LibraryBoundaryHostStatus) => void>
@@ -65,6 +75,12 @@ async function validatesPreloadApiSurface(): Promise<void> {
         assert.equal(args.length, 1)
         receivedRegistrationRequest = args[0]
         return registrationResult
+      }
+
+      if (channel === libraryRootsIpcChannels.runScan) {
+        assert.equal(args.length, 1)
+        receivedScanRequest = args[0]
+        return scanResult
       }
 
       throw new Error(`unexpected preload invoke channel ${channel}`)
@@ -99,7 +115,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(Object.keys(api.library).sort(), ['hierarchy', 'host', 'roots'])
   assert.deepEqual(Object.keys(api.library.host).sort(), ['getStatus', 'onStatusChanged'])
   assert.deepEqual(Object.keys(api.library.hierarchy), ['readChildren'])
-  assert.deepEqual(Object.keys(api.library.roots), ['registerLocal'])
+  assert.deepEqual(Object.keys(api.library.roots).sort(), ['registerLocal', 'runScan'])
   assert.equal('ipcRenderer' in api, false)
   assert.equal('client' in api, false)
   assert.equal('transport' in api, false)
@@ -113,9 +129,15 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.equal('registerLocalRoot' in api.library, false)
   assert.equal('readLiteralHierarchyChildren' in api.library.hierarchy, false)
   assert.equal('registerLocalRoot' in api.library.roots, false)
+  assert.equal('runRootScan' in api.library.roots, false)
+  assert.equal('client' in api.library.roots, false)
+  assert.equal('transport' in api.library.roots, false)
+  assert.equal('ipcRenderer' in api.library.roots, false)
   assert.equal(await api.library.host.getStatus(), status)
   assert.equal(await api.library.roots.registerLocal(registrationRequest), registrationResult)
   assert.equal(receivedRegistrationRequest, registrationRequest)
+  assert.equal(await api.library.roots.runScan(scanRequest), scanResult)
+  assert.equal(receivedScanRequest, scanRequest)
   assert.equal(await api.library.hierarchy.readChildren(hierarchyRequest), hierarchyResult)
   assert.equal(receivedHierarchyRequest, hierarchyRequest)
 

@@ -1,7 +1,3 @@
-export const libraryRootsIpcChannels = {
-  registerLocal: 'desktop:library-roots:register-local'
-} as const
-
 export type LocalRootRegistrationState =
   | 'registered'
   | 'hostUnavailable'

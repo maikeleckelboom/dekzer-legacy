@@ -1,7 +1,12 @@
 import { strict as assert } from 'node:assert'
 import { join } from 'node:path'
 
-import type { LibraryBoundaryHostClient } from '../../src/main/libraryBoundary/host'
+import {
+  LibraryBoundaryHost,
+  type LibraryBoundaryHostClient,
+  type LibraryBoundaryHostTransport
+} from '../../src/main/libraryBoundary/host'
+import type { LibraryBoundaryHostConfig } from '../../src/main/libraryBoundary/config'
 import { LibraryBoundaryHostError } from '../../src/main/libraryBoundary/errors'
 import {
   libraryBoundaryHostStatusIpcChannels,
@@ -111,6 +116,29 @@ export function createFakeClient(
     readPendingBoundaryEvents: rejectUnexpectedClientCall,
     ...overrides
   } as LibraryBoundaryHostClient
+}
+
+export async function startedHostWithClient(
+  config: LibraryBoundaryHostConfig,
+  client: LibraryBoundaryHostClient
+): Promise<LibraryBoundaryHost> {
+  const ready = deferred<void>()
+  ready.resolve()
+
+  const host = new LibraryBoundaryHost(config, silentLogger(), {
+    createTransport: () =>
+      ({
+        ready: ready.promise,
+        close: async () => undefined,
+        execute: async () => {
+          throw new Error('transport execute should not be called when using a fake client')
+        }
+      }) satisfies LibraryBoundaryHostTransport,
+    createClient: () => client
+  })
+
+  await host.start()
+  return host
 }
 
 function rejectUnexpectedClientCall(): Promise<never> {

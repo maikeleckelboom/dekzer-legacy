@@ -464,6 +464,13 @@ function testLibraryApi(
           code: 'registrationFailed',
           message: 'Local root registration should not be called by hierarchy read validation.'
         }
+      }),
+      runScan: async () => ({
+        state: 'scanFailed',
+        error: {
+          code: 'scanFailed',
+          message: 'Local root scan should not be called by hierarchy read validation.'
+        }
       })
     }
   }

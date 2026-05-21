@@ -4,24 +4,23 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
-  LibraryBoundaryHost,
-  type LibraryBoundaryHostClient,
-  type LibraryBoundaryHostTransport
-} from '../src/main/libraryBoundary/host'
-import {
   libraryBoundaryStdioBinaryEnvironmentVariable,
   resolveLibraryBoundaryHostConfig,
   type LibraryBoundaryHostConfig
 } from '../src/main/libraryBoundary/config'
+import { LibraryBoundaryHost } from '../src/main/libraryBoundary/host'
 import {
   registerLocalRootRegistrationIpc,
   registerLocalRootThroughHost
 } from '../src/main/libraryRoots/registerLocalRoot'
+import { libraryRootsIpcChannels } from '../src/shared/libraryRoots/channels'
+import type { LocalRootRegistrationResult } from '../src/shared/libraryRoots/registerLocalRoot'
 import {
-  libraryRootsIpcChannels,
-  type LocalRootRegistrationResult
-} from '../src/shared/libraryRoots/registerLocalRoot'
-import { createFakeClient, deferred, silentLogger, testApp } from './support/libraryBoundary'
+  createFakeClient,
+  silentLogger,
+  startedHostWithClient,
+  testApp
+} from './support/libraryBoundary'
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-local-root-registration-'))
 
@@ -138,29 +137,6 @@ function validatesLocalRootRegistrationIpcRegistration(config: LibraryBoundaryHo
 
   assert.equal(registration.channel, libraryRootsIpcChannels.registerLocal)
   assert.equal(typeof registration.handler, 'function')
-}
-
-async function startedHostWithClient(
-  config: LibraryBoundaryHostConfig,
-  client: LibraryBoundaryHostClient
-): Promise<LibraryBoundaryHost> {
-  const ready = deferred<void>()
-  ready.resolve()
-
-  const host = new LibraryBoundaryHost(config, silentLogger(), {
-    createTransport: () =>
-      ({
-        ready: ready.promise,
-        close: async () => undefined,
-        execute: async () => {
-          throw new Error('execute should not be called by local root registration validation')
-        }
-      }) satisfies LibraryBoundaryHostTransport,
-    createClient: () => client
-  })
-
-  await host.start()
-  return host
 }
 
 function assertRegistrationError(

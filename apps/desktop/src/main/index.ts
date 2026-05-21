@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { createLibraryBoundaryHost } from './libraryBoundary/host'
 import { registerLibraryHierarchyReadChildrenIpc } from './libraryHierarchy/readChildren'
 import { registerLocalRootRegistrationIpc } from './libraryRoots/registerLocalRoot'
+import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import {
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
@@ -60,6 +61,7 @@ app.whenReady().then(() => {
   registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
   registerLibraryHierarchyReadChildrenIpc(ipcMain, host)
   registerLocalRootRegistrationIpc(ipcMain, host)
+  registerLocalRootScanIpc(ipcMain, host)
   libraryBoundaryHostStatusController.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(libraryBoundaryHostStatusIpcChannels.statusChanged, status)

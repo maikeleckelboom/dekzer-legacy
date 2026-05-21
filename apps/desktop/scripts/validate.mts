@@ -10,6 +10,7 @@ const validations = [
   'tests/hostValidation.ts',
   'tests/iconValidation.ts',
   'tests/localRootRegistrationValidation.ts',
+  'tests/localRootScanValidation.ts',
   'tests/preloadValidation.ts',
   'tests/treeValidation.ts'
 ] as const

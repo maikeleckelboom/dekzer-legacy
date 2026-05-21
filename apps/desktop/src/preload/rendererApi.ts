@@ -8,10 +8,11 @@ import {
   type LibraryHierarchyReadChildrenResult
 } from '../shared/libraryHierarchy/readChildren'
 import {
-  libraryRootsIpcChannels,
   type LocalRootRegistrationRequest,
   type LocalRootRegistrationResult
 } from '../shared/libraryRoots/registerLocalRoot'
+import { libraryRootsIpcChannels } from '../shared/libraryRoots/channels'
+import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
 import type { RendererApi } from '../shared/rendererApi'
 
 type IpcRendererEventLike = unknown
@@ -81,6 +82,12 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             libraryRootsIpcChannels.registerLocal,
             request
           )) as LocalRootRegistrationResult
+        },
+        async runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult> {
+          return (await ipcRenderer.invoke(
+            libraryRootsIpcChannels.runScan,
+            request
+          )) as LocalRootScanResult
         }
       }
     }

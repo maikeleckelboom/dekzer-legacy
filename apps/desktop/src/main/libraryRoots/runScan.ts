@@ -1,95 +1,95 @@
-import type { RegisterLocalRootRequest } from '@dekzer/library-boundary-contract'
+import type { RunRootScanRequest } from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
-import {
-  type LocalRootRegistrationErrorCode,
-  type LocalRootRegistrationErrorState,
-  type LocalRootRegistrationRequest,
-  type LocalRootRegistrationResult
-} from '../../shared/libraryRoots/registerLocalRoot'
 import { libraryRootsIpcChannels } from '../../shared/libraryRoots/channels'
+import type {
+  LocalRootScanErrorCode,
+  LocalRootScanErrorState,
+  LocalRootScanRequest,
+  LocalRootScanResult
+} from '../../shared/libraryRoots/runScan'
 
-export type LocalRootRegistrationIpcMain = {
+export type LocalRootScanIpcMain = {
   handle(
     channel: string,
-    listener: (event: unknown, request: unknown) => Promise<LocalRootRegistrationResult>
+    listener: (event: unknown, request: unknown) => Promise<LocalRootScanResult>
   ): void
 }
 
-export function registerLocalRootRegistrationIpc(
-  ipcMain: LocalRootRegistrationIpcMain,
+export function registerLocalRootScanIpc(
+  ipcMain: LocalRootScanIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(libraryRootsIpcChannels.registerLocal, (_event, request) =>
-    registerLocalRootThroughHost(host, request)
+  ipcMain.handle(libraryRootsIpcChannels.runScan, (_event, request) =>
+    runLocalRootScanThroughHost(host, request)
   )
 }
 
-export async function registerLocalRootThroughHost(
+export async function runLocalRootScanThroughHost(
   host: LibraryBoundaryHost,
   request: unknown
-): Promise<LocalRootRegistrationResult> {
-  const normalizedRequest = normalizeLocalRootRegistrationRequest(request)
+): Promise<LocalRootScanResult> {
+  const normalizedRequest = normalizeLocalRootScanRequest(request)
 
-  if (isLocalRootRegistrationResult(normalizedRequest)) {
+  if (isLocalRootScanResult(normalizedRequest)) {
     return normalizedRequest
   }
 
   const client = getStartedClient(host)
 
-  if (isLocalRootRegistrationResult(client)) {
+  if (isLocalRootScanResult(client)) {
     return client
   }
 
   try {
-    const reply = await client.registerLocalRoot({
-      absolutePath: normalizedRequest.absolutePath
-    } satisfies RegisterLocalRootRequest)
+    const reply = await client.runRootScan({
+      rootId: normalizedRequest.rootId
+    } satisfies RunRootScanRequest)
 
     return {
-      state: 'registered',
-      root: {
-        rootId: reply.rootId,
-        canonicalPath: reply.canonicalPath
-      }
+      state: 'scanned',
+      rootId: reply.rootId,
+      scanRunId: reply.scanRunId,
+      discoveredFileCount: reply.discoveredFileCount,
+      queuedSourceWorkItems: reply.queuedSourceWorkItems
     }
   } catch {
-    return createLocalRootRegistrationErrorResult(
-      'registrationFailed',
-      'registrationFailed',
-      'Unable to register local library root.'
+    return createLocalRootScanErrorResult(
+      'scanFailed',
+      'scanFailed',
+      'Unable to run local library root scan.'
     )
   }
 }
 
-function normalizeLocalRootRegistrationRequest(
+function normalizeLocalRootScanRequest(
   request: unknown
-): LocalRootRegistrationRequest | LocalRootRegistrationResult {
+): LocalRootScanRequest | LocalRootScanResult {
   if (!isRecord(request)) {
-    return createLocalRootRegistrationErrorResult(
+    return createLocalRootScanErrorResult(
       'invalidRequest',
       'invalidRequest',
-      'Local root registration requires a request object.'
+      'Local root scan requires a request object.'
     )
   }
 
-  if (typeof request.absolutePath !== 'string' || request.absolutePath.trim().length === 0) {
-    return createLocalRootRegistrationErrorResult(
+  if (typeof request.rootId !== 'string' || request.rootId.trim().length === 0) {
+    return createLocalRootScanErrorResult(
       'invalidRequest',
       'invalidRequest',
-      'Local root registration absolutePath is invalid.'
+      'Local root scan rootId is invalid.'
     )
   }
 
   return {
-    absolutePath: request.absolutePath
+    rootId: request.rootId
   }
 }
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | LocalRootRegistrationResult {
+): LibraryBoundaryHostClient | LocalRootScanResult {
   try {
     return host.client
   } catch (error: unknown) {
@@ -97,7 +97,7 @@ function getStartedClient(
       return hostUnavailableResult(host, error)
     }
 
-    return createLocalRootRegistrationErrorResult(
+    return createLocalRootScanErrorResult(
       'hostUnavailable',
       'hostFailed',
       'The library boundary host is unavailable.'
@@ -108,8 +108,8 @@ function getStartedClient(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): LocalRootRegistrationResult {
-  return createLocalRootRegistrationErrorResult(
+): LocalRootScanResult {
+  return createLocalRootScanErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
     hostErrorMessage(host, error)
@@ -119,7 +119,7 @@ function hostUnavailableResult(
 function hostErrorCode(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): LocalRootRegistrationErrorCode {
+): LocalRootScanErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }
@@ -153,11 +153,11 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
   }
 }
 
-function createLocalRootRegistrationErrorResult(
-  state: LocalRootRegistrationErrorState,
-  code: LocalRootRegistrationErrorCode,
+function createLocalRootScanErrorResult(
+  state: LocalRootScanErrorState,
+  code: LocalRootScanErrorCode,
   message: string
-): LocalRootRegistrationResult {
+): LocalRootScanResult {
   return {
     state,
     error: {
@@ -167,7 +167,7 @@ function createLocalRootRegistrationErrorResult(
   }
 }
 
-function isLocalRootRegistrationResult(value: unknown): value is LocalRootRegistrationResult {
+function isLocalRootScanResult(value: unknown): value is LocalRootScanResult {
   return isRecord(value) && typeof value.state === 'string'
 }
 
