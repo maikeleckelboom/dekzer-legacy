@@ -139,7 +139,6 @@ export function createLocalRootActionsController(
 
     rootChoiceStatus.value = 'choosing'
     rootChoiceFailureMessage.value = undefined
-    clearRegisteredRoot()
 
     try {
       const result = await rootApi.chooseAndRegisterLocal()
@@ -196,11 +195,6 @@ export function createLocalRootActionsController(
       scanFailureMessage.value = safeRootScanFailure
       return true
     }
-  }
-
-  function clearRegisteredRoot(): void {
-    registeredRoot.value = undefined
-    resetScanState()
   }
 
   function resetScanState(): void {

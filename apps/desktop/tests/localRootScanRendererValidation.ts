@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
+import { relative } from 'node:path'
 
 import {
   createLocalRootActionsController,
@@ -7,7 +8,10 @@ import {
 } from '../src/renderer/libraryBrowser/localRootActions'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
+import { desktopRoot, listSourceFiles, normalizePath, rendererSourceRoot } from './support/files'
 import { deferred } from './support/libraryBoundary'
+
+const approvedRunScanRendererOwner = 'src/renderer/libraryBrowser/localRootActions.ts'
 
 void main()
 
@@ -18,7 +22,10 @@ async function main(): Promise<void> {
   await validatesScanFailureUsesSafeCopy()
   await validatesThrownScanErrorUsesSafeCopy()
   await validatesCanceledRegistrationDoesNotEnableScan()
-  await validatesNewRegistrationResetsScanState()
+  await validatesFailedRegistrationDoesNotEnableScan()
+  await validatesCanceledSecondRegistrationPreservesRegisteredRootAndScanState()
+  await validatesFailedSecondRegistrationPreservesRegisteredRootAndScanState()
+  await validatesSuccessfulSecondRegistrationReplacesRootAndResetsScanState()
   validatesRendererScanBoundaryOwnership()
 }
 
@@ -169,7 +176,120 @@ async function validatesCanceledRegistrationDoesNotEnableScan(): Promise<void> {
   assert.equal(scanAttempts, 0)
 }
 
-async function validatesNewRegistrationResetsScanState(): Promise<void> {
+async function validatesFailedRegistrationDoesNotEnableScan(): Promise<void> {
+  let scanAttempts = 0
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      chooseAndRegisterLocal: async () => failedChoice('dialogFailed'),
+      runScan: async () => {
+        scanAttempts += 1
+        return scannedRootResult()
+      }
+    })
+  )
+
+  assert.equal(await controller.chooseAndRegisterLocalRoot(), false)
+  assert.equal(controller.rootChoiceStatus.value, 'failed')
+  assert.equal(controller.registeredRoot.value, undefined)
+  assert.equal(controller.canRunRegisteredRootScan.value, false)
+  assert.equal(controller.scanFeedback.value, undefined)
+  assert.equal(await controller.runRegisteredRootScan(), false)
+  assert.equal(scanAttempts, 0)
+}
+
+async function validatesCanceledSecondRegistrationPreservesRegisteredRootAndScanState(): Promise<void> {
+  const secondChoice = deferred<LocalRootChoiceResult>()
+  const choices = [
+    registeredChoice({
+      rootId: 'root-1',
+      canonicalPath: 'C:/Music/One'
+    }),
+    secondChoice.promise
+  ]
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      chooseAndRegisterLocal: async () => choices.shift() ?? assert.fail('unexpected choice'),
+      runScan: async () =>
+        scannedRootResult({
+          rootId: 'root-1',
+          scanRunId: 'scan-1',
+          discoveredFileCount: 12,
+          queuedSourceWorkItems: 8
+        })
+    })
+  )
+
+  assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
+  assert.equal(await controller.runRegisteredRootScan(), true)
+  assert.equal(controller.scanStatus.value, 'scanned')
+  assert.deepEqual(controller.scanSummary.value, {
+    rootId: 'root-1',
+    scanRunId: 'scan-1',
+    discoveredFileCount: 12,
+    queuedSourceWorkItems: 8
+  })
+
+  const pendingChoice = controller.chooseAndRegisterLocalRoot()
+  assert.equal(controller.rootChoiceStatus.value, 'choosing')
+  assert.equal(controller.registeredRootPath.value, 'C:/Music/One')
+  assert.equal(controller.canRunRegisteredRootScan.value, true)
+  assert.equal(controller.scanStatus.value, 'scanned')
+  assert.equal(controller.scanSummary.value?.scanRunId, 'scan-1')
+
+  secondChoice.resolve({
+    state: 'canceled'
+  })
+  assert.equal(await pendingChoice, false)
+  assert.equal(controller.rootChoiceStatus.value, 'canceled')
+  assert.equal(controller.registeredRootPath.value, 'C:/Music/One')
+  assert.equal(controller.scanStatus.value, 'scanned')
+  assert.deepEqual(controller.scanSummary.value, {
+    rootId: 'root-1',
+    scanRunId: 'scan-1',
+    discoveredFileCount: 12,
+    queuedSourceWorkItems: 8
+  })
+  assert.match(controller.scanFeedback.value ?? '', /12 files discovered/)
+}
+
+async function validatesFailedSecondRegistrationPreservesRegisteredRootAndScanState(): Promise<void> {
+  const choices = [
+    registeredChoice({
+      rootId: 'root-1',
+      canonicalPath: 'C:/Music/One'
+    }),
+    failedChoice('registrationFailed')
+  ]
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      chooseAndRegisterLocal: async () => choices.shift() ?? assert.fail('unexpected choice'),
+      runScan: async () =>
+        scannedRootResult({
+          rootId: 'root-1',
+          scanRunId: 'scan-1',
+          discoveredFileCount: 12,
+          queuedSourceWorkItems: 8
+        })
+    })
+  )
+
+  assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
+  assert.equal(await controller.runRegisteredRootScan(), true)
+
+  assert.equal(await controller.chooseAndRegisterLocalRoot(), false)
+  assert.equal(controller.rootChoiceStatus.value, 'failed')
+  assert.equal(controller.rootChoiceFeedback.value, 'Unable to add music folder.')
+  assert.equal(controller.registeredRootPath.value, 'C:/Music/One')
+  assert.equal(controller.scanStatus.value, 'scanned')
+  assert.deepEqual(controller.scanSummary.value, {
+    rootId: 'root-1',
+    scanRunId: 'scan-1',
+    discoveredFileCount: 12,
+    queuedSourceWorkItems: 8
+  })
+}
+
+async function validatesSuccessfulSecondRegistrationReplacesRootAndResetsScanState(): Promise<void> {
   const choices = [
     registeredChoice({
       rootId: 'root-1',
@@ -206,6 +326,21 @@ async function validatesNewRegistrationResetsScanState(): Promise<void> {
 }
 
 function validatesRendererScanBoundaryOwnership(): void {
+  const violations: string[] = []
+  const forbiddenPatterns = [
+    /@dekzer\/library-boundary-client/,
+    /@dekzer\/library-boundary-stdio-transport/,
+    /\bLibraryBoundaryClient\b/,
+    /\bipcRenderer\b/,
+    /from ['"]electron['"]/,
+    /from ['"]node:fs['"]/,
+    /from ['"]fs['"]/,
+    /from ['"]node:path['"]/,
+    /from ['"]path['"]/,
+    /from ['"].*\/main\//,
+    /\bshowOpenDialog\b/,
+    /\brunRootScan\b/
+  ]
   const actionSource = readFileSync(
     new URL('../src/renderer/libraryBrowser/localRootActions.ts', import.meta.url),
     'utf8'
@@ -215,6 +350,24 @@ function validatesRendererScanBoundaryOwnership(): void {
     'utf8'
   )
 
+  for (const filePath of listSourceFiles(rendererSourceRoot)) {
+    const relativePath = normalizePath(relative(desktopRoot, filePath))
+    const contents = readFileSync(filePath, 'utf8')
+
+    for (const pattern of forbiddenPatterns) {
+      if (pattern.test(contents)) {
+        violations.push(`${relativePath}: ${String(pattern)}`)
+      }
+    }
+
+    if (/\.runScan\(/.test(contents) && relativePath !== approvedRunScanRendererOwner) {
+      violations.push(
+        `${relativePath}: .runScan is only allowed in ${approvedRunScanRendererOwner}`
+      )
+    }
+  }
+
+  assert.deepEqual(violations, [])
   assert.match(actionSource, /rootApi\.runScan\(\{\s*rootId: root\.rootId\s*\}\)/s)
   assert.doesNotMatch(actionSource, /\bBrowserTreeNodeId\b/)
   assert.doesNotMatch(actionSource, /source-directory:/)
@@ -227,6 +380,7 @@ function validatesRendererScanBoundaryOwnership(): void {
   assert.doesNotMatch(actionSource, /\breadChildren\b/)
   assert.doesNotMatch(actionSource, /\bhierarchy\b/)
   assert.doesNotMatch(actionSource, /\bregisterLocal\b/)
+  assert.doesNotMatch(actionSource, /\bclearRegisteredRoot\b/)
   assert.doesNotMatch(panelSource, /\.runScan\(/)
   assert.doesNotMatch(panelSource, /\brootId\b/)
   assert.match(panelSource, /v-if="registeredRootPath !== undefined"/)
@@ -261,6 +415,18 @@ function registeredChoice(
   return {
     state: 'registered',
     root
+  }
+}
+
+function failedChoice(
+  state: Exclude<LocalRootChoiceResult['state'], 'canceled' | 'registered'>
+): LocalRootChoiceResult {
+  return {
+    state,
+    error: {
+      code: state === 'dialogFailed' ? 'dialogFailed' : 'registrationFailed',
+      message: 'fixture backend details must not be displayed'
+    }
   }
 }
 
