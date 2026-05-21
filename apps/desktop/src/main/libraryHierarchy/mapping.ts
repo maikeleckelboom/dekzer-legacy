@@ -8,7 +8,7 @@ import type {
   LibraryHierarchyReadChildrenNode
 } from '../../shared/libraryHierarchy/readChildren'
 
-export function mapLibraryHierarchyReadChildrenEntryPoint(
+export function mapReadEntryPointToLiteralEntryPoint(
   entryPoint: LibraryHierarchyReadChildrenEntryPoint
 ): LiteralHierarchyEntryPoint {
   if (entryPoint.kind === 'source') {
@@ -28,7 +28,7 @@ export function mapLibraryHierarchyReadChildrenEntryPoint(
   }
 }
 
-export function rootIdForLibraryHierarchyReadChildrenEntryPoint(
+export function rootNodeIdForReadEntryPoint(
   entryPoint: LibraryHierarchyReadChildrenEntryPoint
 ): string {
   if (entryPoint.kind === 'source') {

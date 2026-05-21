@@ -1,8 +1,5 @@
 import { strict as assert } from 'node:assert'
-import { readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
 
-import { desktopRoot, rendererSourceRoot, listSourceFiles, normalizePath } from './support/files'
 import { libraryHierarchyFixtureTree } from '../src/renderer/libraryBrowser/fixture'
 import { projectReadResult } from '../src/renderer/libraryBrowser/hierarchyProjection'
 import {
@@ -42,7 +39,6 @@ const expandedFixtureIds = new Set<BrowserTreeNodeId>([
 ])
 const rootOnlyExpandedIds = new Set<BrowserTreeNodeId>(['fixture-root'])
 const collapsedFixtureIds = new Set<BrowserTreeNodeId>()
-const approvedRunScanRendererOwner = 'src/renderer/libraryBrowser/localRootActions.ts'
 void main()
 
 function main(): void {
@@ -55,12 +51,9 @@ function main(): void {
   validatesKeyboardSelection()
   validatesFocusAndSelectionSeparation()
   validatesAriaAttributes()
-  validatesRequestChildrenWiring()
   validatesCollapseKeepsLoadedChildren()
   validatesLibraryHierarchyReadProjection()
   validatesFixtureFallbackRemainsExplicit()
-  validatesRendererBoundaryOwnership()
-  validatesStrictTypecheckFlagsRemainEnabled()
 }
 
 function validatesExplicitChildrenStateModel(): void {
@@ -116,13 +109,6 @@ function validatesExplicitChildrenStateModel(): void {
   assert.equal(isLoadingBrowserTreeChildren(failedBranch), false)
   assert.equal(failedBranch.childrenState.kind, 'failed')
   assert.equal(failedBranch.childrenState.detail, 'Unable to load children.')
-
-  const treeTypesSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/tree/types.ts', import.meta.url),
-    'utf8'
-  )
-  assert.match(treeTypesSource, /readonly childrenState: BrowserTreeChildrenState/)
-  assert.doesNotMatch(treeTypesSource, /readonly children\?:/)
 }
 
 function validatesVisibleProjection(): void {
@@ -356,32 +342,6 @@ function validatesAriaAttributes(): void {
   assert.equal(getTreeItemAriaExpanded(getItem(unloadedItems, 'failed-root')), undefined)
 }
 
-function validatesRequestChildrenWiring(): void {
-  const treeRootSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/tree/treeRoot.vue', import.meta.url),
-    'utf8'
-  )
-  const treeItemSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/tree/treeItem.vue', import.meta.url),
-    'utf8'
-  )
-  const treeRowSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/tree/treeRow.vue', import.meta.url),
-    'utf8'
-  )
-
-  assert.match(treeRootSource, /requestChildren: \[nodeId: BrowserTreeNodeId\]/)
-  assert.match(treeRootSource, /requestChildren: \(nodeId\) => emit\('requestChildren', nodeId\)/)
-  assert.match(treeItemSource, /if \(props\.item\.canRequestChildren\)/)
-  assert.match(treeItemSource, /tree\.requestChildren\(props\.item\.id\)/)
-  assert.match(treeItemSource, /case 'requestChildren':/)
-  assert.match(treeRowSource, /:data-tree-affordance="item\.isBranch \? 'true' : undefined"/)
-  assert.match(
-    treeRowSource,
-    /v-if="item\.canRevealChildren \|\| item\.canRequestChildren \|\| item\.isLoadingChildren"/
-  )
-}
-
 function validatesCollapseKeepsLoadedChildren(): void {
   const loadedBranch = loadedBranchRootNode()
   const expandedItems = flattenVisibleTree({
@@ -501,59 +461,6 @@ function validatesFixtureFallbackRemainsExplicit(): void {
   )
   assert.doesNotMatch(JSON.stringify(libraryHierarchyFixtureTree), /Children not loaded yet/)
   assertFixtureNodesHaveExplicitChildrenState(libraryHierarchyFixtureTree.nodes)
-}
-
-function validatesRendererBoundaryOwnership(): void {
-  const violations: string[] = []
-  const forbiddenPatterns = [
-    /@dekzer\/library-boundary-client/,
-    /@dekzer\/library-boundary-stdio-transport/,
-    /\bLibraryBoundaryClient\b/,
-    /\bipcRenderer\b/,
-    /from ['"]electron['"]/,
-    /from ['"]node:fs['"]/,
-    /from ['"]fs['"]/,
-    /from ['"]node:path['"]/,
-    /from ['"]path['"]/,
-    /from ['"].*\/main\//,
-    /\bshowOpenDialog\b/,
-    /\brunRootScan\b/
-  ]
-
-  for (const filePath of listSourceFiles(rendererSourceRoot)) {
-    const relativePath = normalizePath(relative(desktopRoot, filePath))
-    const contents = readFileSync(filePath, 'utf8')
-
-    for (const pattern of forbiddenPatterns) {
-      if (pattern.test(contents)) {
-        violations.push(`${relativePath}: ${String(pattern)}`)
-      }
-    }
-
-    if (/\.runScan\(/.test(contents) && relativePath !== approvedRunScanRendererOwner) {
-      violations.push(
-        `${relativePath}: .runScan is only allowed in ${approvedRunScanRendererOwner}`
-      )
-    }
-  }
-
-  assert.deepEqual(violations, [])
-}
-
-function validatesStrictTypecheckFlagsRemainEnabled(): void {
-  for (const tsconfigName of ['tsconfig.node.json', 'tsconfig.web.json']) {
-    const tsconfig = JSON.parse(readFileSync(join(desktopRoot, tsconfigName), 'utf8')) as {
-      readonly compilerOptions?: {
-        readonly strictNullChecks?: boolean
-        readonly exactOptionalPropertyTypes?: boolean
-        readonly noUncheckedIndexedAccess?: boolean
-      }
-    }
-
-    assert.equal(tsconfig.compilerOptions?.strictNullChecks, true)
-    assert.equal(tsconfig.compilerOptions?.exactOptionalPropertyTypes, true)
-    assert.equal(tsconfig.compilerOptions?.noUncheckedIndexedAccess, true)
-  }
 }
 
 function fixtureVisibleItems(

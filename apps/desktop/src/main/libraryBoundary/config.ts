@@ -5,7 +5,7 @@ import process from 'node:process'
 import { LibraryBoundaryHostError } from './errors'
 
 export const libraryBoundaryStdioBinaryEnvironmentVariable = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
-export const libraryBoundaryUserDataEnvironmentVariable = 'DEKZER_LIBRARY_USER_DATA_PATH'
+export const desktopLibraryUserDataEnvironmentVariable = 'DESKTOP_LIBRARY_USER_DATA_PATH'
 
 export type LibraryBoundaryHostEnvironment = 'development' | 'production'
 
@@ -84,7 +84,7 @@ export function resolveLibraryBoundaryStorageEnvironment(
   app: LibraryBoundaryHostApp,
   env: NodeJS.ProcessEnv = process.env
 ): LibraryBoundaryHostStorageEnvironment {
-  const overridePath = env[libraryBoundaryUserDataEnvironmentVariable]?.trim()
+  const overridePath = env[desktopLibraryUserDataEnvironmentVariable]?.trim()
 
   if (overridePath !== undefined && overridePath.length > 0) {
     return normalizeStorageEnvironmentPath(overridePath, 'environmentOverride')

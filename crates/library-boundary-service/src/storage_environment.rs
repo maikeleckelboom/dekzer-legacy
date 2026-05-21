@@ -1,6 +1,6 @@
 use std::ffi::OsString;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use library_store_sqlite::{
     LibraryStoreContext, SqliteDurableStoreAppOwnedState, StoreEnvironment, durable_store_path,
@@ -195,6 +195,17 @@ fn validate_user_data_path(
         ));
     }
 
+    if path
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(LibraryStorageEnvironmentError::InvalidUserDataPath(
+            format!(
+                "libraryStore userDataPath must not contain parent directory segments: {trimmed_path:?}"
+            ),
+        ));
+    }
+
     Ok(path)
 }
 
@@ -301,6 +312,22 @@ mod tests {
             environment: StoreEnvironment::Development,
         })
         .expect_err("relative user data root is invalid");
+
+        assert!(matches!(
+            error,
+            LibraryStorageEnvironmentError::InvalidUserDataPath(_)
+        ));
+    }
+
+    #[test]
+    fn rejects_parent_directory_segments_in_user_data_roots() {
+        let tempdir = TempDir::new().expect("create tempdir");
+        let user_data_path = tempdir.path().join("user-data").join("..").join("other");
+        let error = resolve_library_storage_environment(&LibraryStoreContext {
+            user_data_path: user_data_path.to_string_lossy().into_owned(),
+            environment: StoreEnvironment::Development,
+        })
+        .expect_err("parent directory segments are rejected");
 
         assert!(matches!(
             error,

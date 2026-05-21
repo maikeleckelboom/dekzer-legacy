@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 
 import {
-  libraryBoundaryUserDataEnvironmentVariable,
+  desktopLibraryUserDataEnvironmentVariable,
   resolveLibraryBoundaryHostConfig
 } from '../src/main/libraryBoundary/config'
 import { assertHostError, testApp } from './support/libraryBoundary'
@@ -28,11 +28,16 @@ void main()
   })
 
 async function main(): Promise<void> {
+  validatesCanonicalUserDataEnvironmentVariable()
   validatesProductionAndDevelopmentStorageRootsAreExplicit()
   validatesUserDataEnvironmentOverride()
   validatesInvalidUserDataRootsAreRejected()
   validatesUserDataOverrideIsResolvedAtOneMainBoundary()
   validatesRendererHasNoStoragePathAuthority()
+}
+
+function validatesCanonicalUserDataEnvironmentVariable(): void {
+  assert.equal(desktopLibraryUserDataEnvironmentVariable, 'DESKTOP_LIBRARY_USER_DATA_PATH')
 }
 
 function validatesProductionAndDevelopmentStorageRootsAreExplicit(): void {
@@ -68,7 +73,7 @@ function validatesUserDataEnvironmentOverride(): void {
     app: testApp(tempRoot, { appPath }),
     isDev: true,
     env: {
-      [libraryBoundaryUserDataEnvironmentVariable]: overridePath
+      [desktopLibraryUserDataEnvironmentVariable]: overridePath
     },
     platform: 'linux'
   })
@@ -89,7 +94,7 @@ function validatesInvalidUserDataRootsAreRejected(): void {
         app: testApp(tempRoot, { appPath }),
         isDev: true,
         env: {
-          [libraryBoundaryUserDataEnvironmentVariable]: 'relative-user-data'
+          [desktopLibraryUserDataEnvironmentVariable]: 'relative-user-data'
         },
         platform: 'linux'
       }),
@@ -114,7 +119,7 @@ function validatesInvalidUserDataRootsAreRejected(): void {
 function validatesUserDataOverrideIsResolvedAtOneMainBoundary(): void {
   const violations = sourceFilesContaining(
     sourceRoot,
-    new RegExp(libraryBoundaryUserDataEnvironmentVariable)
+    new RegExp(desktopLibraryUserDataEnvironmentVariable)
   ).filter((filePath) => filePath !== 'src/main/libraryBoundary/config.ts')
 
   assert.deepEqual(violations, [])
@@ -123,7 +128,7 @@ function validatesUserDataOverrideIsResolvedAtOneMainBoundary(): void {
 function validatesRendererHasNoStoragePathAuthority(): void {
   const violations = sourceFilesContaining(
     rendererSourceRoot,
-    /\b(DEKZER_LIBRARY_USER_DATA_PATH|userDataPath|library\.sqlite3|sqlite)\b/i
+    /\b(DESKTOP_LIBRARY_USER_DATA_PATH|userDataPath|library\.sqlite3|sqlite)\b/i
   )
 
   assert.deepEqual(violations, [])

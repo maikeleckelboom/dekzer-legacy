@@ -194,19 +194,6 @@ where
             continue;
         }
 
-        if let Some(value) = argument.strip_prefix("--user-data-path=") {
-            set_once(&mut user_data_path, "--user-data", value.to_string())?;
-            continue;
-        }
-
-        if argument == "--user-data-path" {
-            let value = iter
-                .next()
-                .ok_or(CliError::MissingValue("--user-data-path"))?;
-            set_once(&mut user_data_path, "--user-data", value)?;
-            continue;
-        }
-
         if argument == "--confirm-delete" {
             if confirm_delete {
                 return Err(CliError::DuplicateArgument("--confirm-delete"));
@@ -340,6 +327,21 @@ mod tests {
                 user_data_path: "C:/Dekzer".to_string(),
                 confirm_delete: true,
             }))
+        );
+    }
+
+    #[test]
+    fn rejects_user_data_path_alias_for_storage_commands() {
+        let error = parse_cli_args([
+            "storage".to_string(),
+            "status".to_string(),
+            "--user-data-path=C:/Dekzer".to_string(),
+        ])
+        .expect_err("storage commands accept only --user-data");
+
+        assert_eq!(
+            error,
+            CliError::UnknownArgument("--user-data-path=C:/Dekzer".to_string())
         );
     }
 

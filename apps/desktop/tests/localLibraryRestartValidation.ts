@@ -12,7 +12,7 @@ import {
   type LibraryBoundaryHostConfig
 } from '../src/main/libraryBoundary/config'
 import { LibraryBoundaryHost } from '../src/main/libraryBoundary/host'
-import { readLibraryHierarchyChildrenThroughHost } from '../src/main/libraryHierarchy/readChildren'
+import { readThroughHost } from '../src/main/libraryHierarchy/readChildren'
 import { registerLocalRoot } from '../src/main/libraryRoots/registerLocalRoot'
 import { runLocalRootScanThroughHost } from '../src/main/libraryRoots/runScan'
 import type {
@@ -134,10 +134,7 @@ async function readPersistedCrateWindow(host: LibraryBoundaryHost): Promise<{
   readonly crateDirectory: LibraryHierarchyReadChildrenNode
   readonly crateFile: LibraryHierarchyReadChildrenNode
 }> {
-  const rootRead = await readLibraryHierarchyChildrenThroughHost(
-    host,
-    firstAvailableSourceReadRequest()
-  )
+  const rootRead = await readThroughHost(host, firstAvailableSourceReadRequest())
   assert.equal(rootRead.state, 'ready')
   if (rootRead.state !== 'ready') {
     assert.fail('expected first available source hierarchy read to be ready')
@@ -149,7 +146,7 @@ async function readPersistedCrateWindow(host: LibraryBoundaryHost): Promise<{
     assert.fail('expected scanned Crate directory to be available')
   }
 
-  const crateRead = await readLibraryHierarchyChildrenThroughHost(host, {
+  const crateRead = await readThroughHost(host, {
     target: {
       kind: 'entryPoint',
       entryPoint: rootRead.window.root.entryPoint,

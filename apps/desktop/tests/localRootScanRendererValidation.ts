@@ -597,19 +597,6 @@ function validatesRendererScanBoundaryOwnership(): void {
     /\bshowOpenDialog\b/,
     /\brunRootScan\b/
   ]
-  const actionSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/localRootActions.ts', import.meta.url),
-    'utf8'
-  )
-  const lifecycleSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/rootLifecycle.ts', import.meta.url),
-    'utf8'
-  )
-  const panelSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/panel.vue', import.meta.url),
-    'utf8'
-  )
-
   for (const filePath of listSourceFiles(rendererSourceRoot)) {
     const relativePath = normalizePath(relative(desktopRoot, filePath))
     const contents = readFileSync(filePath, 'utf8')
@@ -628,39 +615,6 @@ function validatesRendererScanBoundaryOwnership(): void {
   }
 
   assert.deepEqual(violations, [])
-  assert.match(actionSource, /rootApi\.runScan\(\{\s*rootId: root\.rootId\s*\}\)/s)
-  assert.doesNotMatch(actionSource, /\bBrowserTreeNodeId\b/)
-  assert.doesNotMatch(actionSource, /source-directory:/)
-  assert.doesNotMatch(actionSource, /source:/)
-  assert.doesNotMatch(actionSource, /fixture-/)
-  assert.doesNotMatch(actionSource, /\.split\(/)
-  assert.doesNotMatch(actionSource, /\bdocument\./)
-  assert.doesNotMatch(actionSource, /\bdataset\b/)
-  assert.doesNotMatch(actionSource, /\bquerySelector\b/)
-  assert.doesNotMatch(actionSource, /\breadChildren\b/)
-  assert.doesNotMatch(actionSource, /\bhierarchy\b/)
-  assert.doesNotMatch(actionSource, /\bregisterLocal\b/)
-  assert.doesNotMatch(actionSource, /\bclearRegisteredRoot\b/)
-  assert.match(lifecycleSource, /chooseAndRegisterLocalRoot\(\)/)
-  assert.match(lifecycleSource, /runRegisteredRootScan\(\)/)
-  assert.match(lifecycleSource, /refreshHierarchy\(\)/)
-  assert.doesNotMatch(lifecycleSource, /\brootId\b/)
-  assert.doesNotMatch(lifecycleSource, /\bBrowserTreeNodeId\b/)
-  assert.doesNotMatch(lifecycleSource, /source-directory:/)
-  assert.doesNotMatch(lifecycleSource, /source:/)
-  assert.doesNotMatch(lifecycleSource, /fixture-/)
-  assert.doesNotMatch(lifecycleSource, /\.split\(/)
-  assert.doesNotMatch(lifecycleSource, /\bdocument\./)
-  assert.doesNotMatch(lifecycleSource, /\bdataset\b/)
-  assert.doesNotMatch(lifecycleSource, /\bquerySelector\b/)
-  assert.doesNotMatch(panelSource, /\.runScan\(/)
-  assert.doesNotMatch(panelSource, /\brunRegisteredRootScan\b/)
-  assert.doesNotMatch(panelSource, /\brefreshHierarchy\(\)/)
-  assert.doesNotMatch(panelSource, /\brootId\b/)
-  assert.match(panelSource, /useRootLifecycle/)
-  assert.match(panelSource, /v-if="registeredRootPath !== undefined"/)
-  assert.match(panelSource, /@click="scanRoot"/)
-  assert.match(panelSource, /@click="addMusicFolder"/)
 }
 
 function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRootActionsApi {

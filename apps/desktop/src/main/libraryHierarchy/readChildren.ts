@@ -9,12 +9,8 @@ import {
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import { mapLiteralHierarchyNode } from './mapping'
-import {
-  createHierarchyReadErrorResult,
-  isLibraryHierarchyReadChildrenResult,
-  normalizeLibraryHierarchyReadChildrenRequest
-} from './request'
-import { resolveLibraryHierarchyReadChildrenTarget } from './target'
+import { createHierarchyReadErrorResult, isReadResult, normalizeRequest } from './request'
+import { resolveTarget } from './target'
 
 export type LibraryHierarchyReadChildrenIpcMain = {
   handle(
@@ -23,38 +19,35 @@ export type LibraryHierarchyReadChildrenIpcMain = {
   ): void
 }
 
-export function registerLibraryHierarchyReadChildrenIpc(
+export function registerReadChildrenIpc(
   ipcMain: LibraryHierarchyReadChildrenIpcMain,
   host: LibraryBoundaryHost
 ): void {
   ipcMain.handle(hierarchyReadChannels.readChildren, (_event, request) =>
-    readLibraryHierarchyChildrenThroughHost(host, request)
+    readThroughHost(host, request)
   )
 }
 
-export async function readLibraryHierarchyChildrenThroughHost(
+export async function readThroughHost(
   host: LibraryBoundaryHost,
   request: unknown
 ): Promise<LibraryHierarchyReadChildrenResult> {
-  const normalizedRequest = normalizeLibraryHierarchyReadChildrenRequest(request)
+  const normalizedRequest = normalizeRequest(request)
 
-  if (isLibraryHierarchyReadChildrenResult(normalizedRequest)) {
+  if (isReadResult(normalizedRequest)) {
     return normalizedRequest
   }
 
   const client = getStartedClient(host)
 
-  if (isLibraryHierarchyReadChildrenResult(client)) {
+  if (isReadResult(client)) {
     return client
   }
 
   try {
-    const resolvedTarget = await resolveLibraryHierarchyReadChildrenTarget(
-      client,
-      normalizedRequest.target
-    )
+    const resolvedTarget = await resolveTarget(client, normalizedRequest.target)
 
-    if (isLibraryHierarchyReadChildrenResult(resolvedTarget)) {
+    if (isReadResult(resolvedTarget)) {
       return resolvedTarget
     }
 

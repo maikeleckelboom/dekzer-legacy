@@ -3,11 +3,11 @@ import type {
   LibraryHierarchyReadChildrenWindow
 } from '../../shared/libraryHierarchy/readChildren'
 
-export type LibraryHierarchyDirectoryReadTarget = {
+export type DirectoryReadTarget = {
   readonly sourceDirectoryId: string
 }
 
-export type LibraryHierarchyDirectoryReadState =
+export type DirectoryReadState =
   | {
       readonly kind: 'unloaded'
       readonly detail?: string
@@ -27,7 +27,7 @@ export type LibraryHierarchyDirectoryReadState =
       readonly detail: string
     }
 
-export type LibraryHierarchyBrowserState = {
+export type HierarchyState = {
   readonly rootReadResult?: LibraryHierarchyReadChildrenResult
-  readonly directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
 }

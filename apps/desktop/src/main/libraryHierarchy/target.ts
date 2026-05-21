@@ -7,21 +7,18 @@ import type {
   LibraryHierarchyReadChildrenTarget
 } from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHostClient } from '../libraryBoundary/host'
-import {
-  mapLibraryHierarchyReadChildrenEntryPoint,
-  rootIdForLibraryHierarchyReadChildrenEntryPoint
-} from './mapping'
+import { mapReadEntryPointToLiteralEntryPoint, rootNodeIdForReadEntryPoint } from './mapping'
 import { createHierarchyReadErrorResult, isPositiveOpaqueId } from './request'
 
-export type ResolvedLibraryHierarchyReadChildrenTarget = {
+export type ResolvedTarget = {
   readonly root: LibraryHierarchyReadChildrenRoot
   readonly entryPoint: LiteralHierarchyEntryPoint
 }
 
-export async function resolveLibraryHierarchyReadChildrenTarget(
+export async function resolveTarget(
   client: LibraryBoundaryHostClient,
   target: LibraryHierarchyReadChildrenTarget
-): Promise<ResolvedLibraryHierarchyReadChildrenTarget | LibraryHierarchyReadChildrenResult> {
+): Promise<ResolvedTarget | LibraryHierarchyReadChildrenResult> {
   if (target.kind === 'entryPoint') {
     return resolveEntryPointTarget(target.entryPoint, target.label)
   }
@@ -32,20 +29,20 @@ export async function resolveLibraryHierarchyReadChildrenTarget(
 function resolveEntryPointTarget(
   entryPoint: LibraryHierarchyReadChildrenEntryPoint,
   label: string | undefined
-): ResolvedLibraryHierarchyReadChildrenTarget {
+): ResolvedTarget {
   return {
     root: {
-      id: rootIdForLibraryHierarchyReadChildrenEntryPoint(entryPoint),
+      id: rootNodeIdForReadEntryPoint(entryPoint),
       ...optionalLabelProperty(label),
       entryPoint
     },
-    entryPoint: mapLibraryHierarchyReadChildrenEntryPoint(entryPoint)
+    entryPoint: mapReadEntryPointToLiteralEntryPoint(entryPoint)
   }
 }
 
 async function resolveFirstAvailableSourceTarget(
   client: LibraryBoundaryHostClient
-): Promise<ResolvedLibraryHierarchyReadChildrenTarget | LibraryHierarchyReadChildrenResult> {
+): Promise<ResolvedTarget | LibraryHierarchyReadChildrenResult> {
   const navigationRows = await client.readNavigationRows({
     parentNavigationRowId: null
   })
@@ -68,11 +65,11 @@ async function resolveFirstAvailableSourceTarget(
 
   return {
     root: {
-      id: rootIdForLibraryHierarchyReadChildrenEntryPoint(entryPoint),
+      id: rootNodeIdForReadEntryPoint(entryPoint),
       label: sourceRow.displayName,
       entryPoint
     },
-    entryPoint: mapLibraryHierarchyReadChildrenEntryPoint(entryPoint)
+    entryPoint: mapReadEntryPointToLiteralEntryPoint(entryPoint)
   }
 }
 

@@ -45,17 +45,15 @@ where
 fn run_storage_command(command: StorageCommand) -> Result<(), StorageCommandError> {
     match command {
         StorageCommand::Status(config) => {
+            let development_environment =
+                storage_environment(&config.user_data_path, StoreEnvironment::Development)?;
+            let production_environment =
+                storage_environment(&config.user_data_path, StoreEnvironment::Production)?;
             let status = StorageStatusEnvelope {
                 envelope_type: "storageStatus",
-                user_data_path: config.user_data_path.clone(),
-                development: storage_environment_status(
-                    &config.user_data_path,
-                    StoreEnvironment::Development,
-                )?,
-                production: storage_environment_status(
-                    &config.user_data_path,
-                    StoreEnvironment::Production,
-                )?,
+                user_data_path: path_string(development_environment.user_data_path()),
+                development: StorageEnvironmentStatus::from_environment(&development_environment),
+                production: StorageEnvironmentStatus::from_environment(&production_environment),
             };
             println!("{}", serde_json::to_string(&status)?);
             Ok(())
@@ -75,16 +73,15 @@ fn run_storage_command(command: StorageCommand) -> Result<(), StorageCommandErro
     }
 }
 
-fn storage_environment_status(
+fn storage_environment(
     user_data_path: &str,
     environment: StoreEnvironment,
-) -> Result<StorageEnvironmentStatus, StorageCommandError> {
-    let resolved = resolve_library_storage_environment(&LibraryStoreContext {
+) -> Result<LibraryStorageEnvironment, StorageCommandError> {
+    resolve_library_storage_environment(&LibraryStoreContext {
         user_data_path: user_data_path.to_string(),
         environment,
-    })?;
-
-    Ok(StorageEnvironmentStatus::from_environment(&resolved))
+    })
+    .map_err(StorageCommandError::from)
 }
 
 #[derive(Debug)]

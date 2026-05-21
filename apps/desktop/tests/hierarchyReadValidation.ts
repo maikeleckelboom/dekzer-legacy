@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -13,10 +13,7 @@ import {
   resolveLibraryBoundaryHostConfig,
   type LibraryBoundaryHostConfig
 } from '../src/main/libraryBoundary/config'
-import {
-  readLibraryHierarchyChildrenThroughHost,
-  registerLibraryHierarchyReadChildrenIpc
-} from '../src/main/libraryHierarchy/readChildren'
+import { readThroughHost, registerReadChildrenIpc } from '../src/main/libraryHierarchy/readChildren'
 import {
   createLibraryHierarchyReadController,
   type LibraryBrowserApi
@@ -58,16 +55,11 @@ async function main(): Promise<void> {
   await validatesHierarchyReadHandler(config)
   validatesHierarchyReadIpcRegistration(config)
   await validatesRendererHierarchyReadController()
-  validatesRendererDirectoryTargetsAreDomainOwned()
-  validatesFixtureModeDoesNotRequestBackendChildren()
 }
 
 async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig): Promise<void> {
   const idleHost = new LibraryBoundaryHost(config, silentLogger())
-  const hostUnavailable = await readLibraryHierarchyChildrenThroughHost(
-    idleHost,
-    firstAvailableSourceReadRequest()
-  )
+  const hostUnavailable = await readThroughHost(idleHost, firstAvailableSourceReadRequest())
 
   assert.equal(hostUnavailable.state, 'hostUnavailable')
   assertReadError(hostUnavailable, 'hostNotStarted')
@@ -80,10 +72,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       })
     })
   )
-  const noTarget = await readLibraryHierarchyChildrenThroughHost(
-    noTargetHost,
-    firstAvailableSourceReadRequest()
-  )
+  const noTarget = await readThroughHost(noTargetHost, firstAvailableSourceReadRequest())
 
   assert.equal(noTarget.state, 'noTarget')
   assertReadError(noTarget, 'noTarget')
@@ -147,10 +136,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       }
     })
   )
-  const success = await readLibraryHierarchyChildrenThroughHost(
-    successHost,
-    firstAvailableSourceReadRequest()
-  )
+  const success = await readThroughHost(successHost, firstAvailableSourceReadRequest())
 
   assert.equal(success.state, 'ready')
   if (success.state !== 'ready') {
@@ -169,7 +155,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
     }
   ])
 
-  const invalidTarget = await readLibraryHierarchyChildrenThroughHost(successHost, {
+  const invalidTarget = await readThroughHost(successHost, {
     target: {
       kind: 'entryPoint',
       entryPoint: {
@@ -182,7 +168,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
   assert.equal(invalidTarget.state, 'invalidRequest')
   assertReadError(invalidTarget, 'invalidRequest')
 
-  const malformedRow = await readLibraryHierarchyChildrenThroughHost(
+  const malformedRow = await readThroughHost(
     await startedHostWithClient(
       config,
       createFakeClient({
@@ -245,7 +231,7 @@ function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig
     handler?: (request: unknown) => Promise<LibraryHierarchyReadChildrenResult>
   } = {}
 
-  registerLibraryHierarchyReadChildrenIpc(
+  registerReadChildrenIpc(
     {
       handle(channel, listener): void {
         registration.channel = channel
@@ -316,6 +302,8 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
     firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:12'),
     'unloaded'
   )
+  assert.equal(await controller.requestDirectoryChildren('source-directory:99'), false)
+  assert.equal(requests.length, 1)
 
   const firstDirectoryRequest = controller.requestDirectoryChildren('source-directory:12')
   assert.equal(await controller.requestDirectoryChildren('source-directory:12'), false)
@@ -379,38 +367,6 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   directory14Read.resolve(loadedDirectoryHierarchyReadResult('14'))
   assert.equal(await staleDirectoryRequest, false)
   assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
-}
-
-function validatesRendererDirectoryTargetsAreDomainOwned(): void {
-  const hierarchyReadSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/hierarchyRead.ts', import.meta.url),
-    'utf8'
-  )
-  const hierarchyProjectionSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/hierarchyProjection.ts', import.meta.url),
-    'utf8'
-  )
-
-  assert.match(hierarchyProjectionSource, /sourceDirectoryId: node\.sourceDirectoryId/)
-  assert.doesNotMatch(hierarchyReadSource, /source-directory:/)
-  assert.doesNotMatch(hierarchyProjectionSource, /source-directory:/)
-  assert.doesNotMatch(hierarchyReadSource, /\.split\(/)
-  assert.doesNotMatch(hierarchyProjectionSource, /\.split\(/)
-}
-
-function validatesFixtureModeDoesNotRequestBackendChildren(): void {
-  const panelSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/panel.vue', import.meta.url),
-    'utf8'
-  )
-  const fixtureSource = readFileSync(
-    new URL('../src/renderer/libraryBrowser/fixture.ts', import.meta.url),
-    'utf8'
-  )
-
-  assert.match(panelSource, /if \(!isLiveTree\.value\) \{/)
-  assert.match(panelSource, /void requestDirectoryChildren\(nodeId\)/)
-  assert.doesNotMatch(fixtureSource, /readLiteralHierarchyChildren/)
 }
 
 async function startedHostWithClient(

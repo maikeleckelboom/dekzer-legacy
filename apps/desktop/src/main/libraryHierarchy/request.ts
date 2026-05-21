@@ -10,16 +10,16 @@ const defaultLiteralHierarchyReadLimit = 50
 const maxLiteralHierarchyReadLimit = 200
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
-export type NormalizedLibraryHierarchyReadChildrenRequest = {
+export type NormalizedRequest = {
   readonly target: LibraryHierarchyReadChildrenTarget
   readonly parentSourceDirectoryId?: string
   readonly offset: number
   readonly limit: number
 }
 
-export function normalizeLibraryHierarchyReadChildrenRequest(
+export function normalizeRequest(
   request: unknown
-): NormalizedLibraryHierarchyReadChildrenRequest | LibraryHierarchyReadChildrenResult {
+): NormalizedRequest | LibraryHierarchyReadChildrenResult {
   if (!isRecord(request)) {
     return createHierarchyReadErrorResult(
       'invalidRequest',
@@ -28,9 +28,9 @@ export function normalizeLibraryHierarchyReadChildrenRequest(
     )
   }
 
-  const target = normalizeLibraryHierarchyReadChildrenTarget(request.target)
+  const target = normalizeTarget(request.target)
 
-  if (isLibraryHierarchyReadChildrenResult(target)) {
+  if (isReadResult(target)) {
     return target
   }
 
@@ -39,19 +39,19 @@ export function normalizeLibraryHierarchyReadChildrenRequest(
     'parentSourceDirectoryId'
   )
 
-  if (isLibraryHierarchyReadChildrenResult(parentSourceDirectoryId)) {
+  if (isReadResult(parentSourceDirectoryId)) {
     return parentSourceDirectoryId
   }
 
   const offset = normalizeOffset(request.offset)
 
-  if (isLibraryHierarchyReadChildrenResult(offset)) {
+  if (isReadResult(offset)) {
     return offset
   }
 
   const limit = normalizeLimit(request.limit)
 
-  if (isLibraryHierarchyReadChildrenResult(limit)) {
+  if (isReadResult(limit)) {
     return limit
   }
 
@@ -77,9 +77,7 @@ export function createHierarchyReadErrorResult(
   }
 }
 
-export function isLibraryHierarchyReadChildrenResult(
-  value: unknown
-): value is LibraryHierarchyReadChildrenResult {
+export function isReadResult(value: unknown): value is LibraryHierarchyReadChildrenResult {
   return isRecord(value) && typeof value.state === 'string'
 }
 
@@ -87,7 +85,7 @@ export function isPositiveOpaqueId(value: unknown): value is string {
   return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
 }
 
-function normalizeLibraryHierarchyReadChildrenTarget(
+function normalizeTarget(
   value: unknown
 ): LibraryHierarchyReadChildrenTarget | LibraryHierarchyReadChildrenResult {
   if (value === null || value === undefined) {
@@ -122,7 +120,7 @@ function normalizeLibraryHierarchyReadChildrenTarget(
 
   const entryPoint = normalizeEntryPoint(value.entryPoint)
 
-  if (isLibraryHierarchyReadChildrenResult(entryPoint)) {
+  if (isReadResult(entryPoint)) {
     return entryPoint
   }
 

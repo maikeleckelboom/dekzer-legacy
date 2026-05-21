@@ -9,11 +9,8 @@ import type {
   LibraryHierarchyReadChildrenWindow
 } from '../../shared/libraryHierarchy/readChildren'
 import type { RendererApi } from '../../shared/rendererApi'
-import { projectBrowserState, type LibraryHierarchyBrowserProjection } from './hierarchyProjection'
-import type {
-  LibraryHierarchyDirectoryReadState,
-  LibraryHierarchyDirectoryReadTarget
-} from './hierarchyState'
+import { projectState, type HierarchyProjection } from './hierarchyProjection'
+import type { DirectoryReadState, DirectoryReadTarget } from './hierarchyState'
 import type { BrowserTreeNodeId } from './tree/types'
 
 const readLimit = 50
@@ -28,8 +25,8 @@ export type LibraryHierarchyReadController = {
   readonly hierarchyReadResult: Ref<LibraryHierarchyReadChildrenResult | undefined>
   readonly hierarchyReadRequestError: Ref<string | undefined>
   readonly hierarchyReadIsLoading: Ref<boolean>
-  readonly directoryReadStates: Ref<ReadonlyMap<string, LibraryHierarchyDirectoryReadState>>
-  readonly browserProjection: ComputedRef<LibraryHierarchyBrowserProjection | undefined>
+  readonly directoryReadStates: Ref<ReadonlyMap<string, DirectoryReadState>>
+  readonly browserProjection: ComputedRef<HierarchyProjection | undefined>
   readonly currentRoot: ComputedRef<LibraryHierarchyReadChildrenRoot | undefined>
   readonly refreshHierarchy: () => Promise<boolean>
   readonly readFirstAvailableSourceHierarchy: () => Promise<boolean>
@@ -65,9 +62,7 @@ export function createLibraryHierarchyReadController(
   const hierarchyReadResult = ref<LibraryHierarchyReadChildrenResult>()
   const hierarchyReadRequestError = ref<string>()
   const hierarchyReadIsLoading = ref(false)
-  const directoryReadStates = shallowRef<ReadonlyMap<string, LibraryHierarchyDirectoryReadState>>(
-    new Map()
-  )
+  const directoryReadStates = shallowRef<ReadonlyMap<string, DirectoryReadState>>(new Map())
   let hasRequestedHierarchyRead = false
   let unsubscribeFromHostStatus: (() => void) | undefined
   let rootReadSequence = 0
@@ -79,7 +74,7 @@ export function createLibraryHierarchyReadController(
   })
 
   const browserProjection = computed(() =>
-    projectBrowserState({
+    projectState({
       ...(hierarchyReadResult.value === undefined
         ? {}
         : { rootReadResult: hierarchyReadResult.value }),
@@ -173,9 +168,7 @@ export function createLibraryHierarchyReadController(
     return readDirectoryChildren(target)
   }
 
-  async function readDirectoryChildren(
-    target: LibraryHierarchyDirectoryReadTarget
-  ): Promise<boolean> {
+  async function readDirectoryChildren(target: DirectoryReadTarget): Promise<boolean> {
     const root = currentRoot.value
 
     if (root === undefined) {
@@ -246,7 +239,7 @@ export function createLibraryHierarchyReadController(
 
   function setDirectoryReadState(
     sourceDirectoryId: string,
-    state: LibraryHierarchyDirectoryReadState,
+    state: DirectoryReadState,
     discoveredWindow?: LibraryHierarchyReadChildrenWindow
   ): void {
     const nextStates = new Map(directoryReadStates.value)
@@ -304,14 +297,14 @@ function directoryReadRequest(
 
 function withDiscoveredUnloadedDirectoryStates(
   window: LibraryHierarchyReadChildrenWindow
-): ReadonlyMap<string, LibraryHierarchyDirectoryReadState> {
-  const states = new Map<string, LibraryHierarchyDirectoryReadState>()
+): ReadonlyMap<string, DirectoryReadState> {
+  const states = new Map<string, DirectoryReadState>()
   addDiscoveredUnloadedDirectoryStates(states, window)
   return states
 }
 
 function addDiscoveredUnloadedDirectoryStates(
-  states: Map<string, LibraryHierarchyDirectoryReadState>,
+  states: Map<string, DirectoryReadState>,
   window: LibraryHierarchyReadChildrenWindow
 ): void {
   for (const node of window.nodes) {

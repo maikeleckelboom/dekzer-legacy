@@ -13,8 +13,8 @@ import {
   registerLibraryBoundaryHostStatusIpc
 } from '../src/main/libraryBoundary/status'
 import {
+  desktopLibraryUserDataEnvironmentVariable,
   libraryBoundaryStdioBinaryEnvironmentVariable,
-  libraryBoundaryUserDataEnvironmentVariable,
   resolveLibraryBoundaryHostConfig,
   resolveLibraryBoundaryStdioBinaryPath,
   selectLibraryBoundaryHostEnvironment,
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
     isDev: true,
     env: {
       [libraryBoundaryStdioBinaryEnvironmentVariable]: fakeBinaryPath,
-      [libraryBoundaryUserDataEnvironmentVariable]: overriddenUserDataPath
+      [desktopLibraryUserDataEnvironmentVariable]: overriddenUserDataPath
     },
     platform: 'linux'
   })
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
         app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
         isDev: true,
         env: {
-          [libraryBoundaryUserDataEnvironmentVariable]: 'relative-user-data'
+          [desktopLibraryUserDataEnvironmentVariable]: 'relative-user-data'
         },
         platform: 'linux'
       }),

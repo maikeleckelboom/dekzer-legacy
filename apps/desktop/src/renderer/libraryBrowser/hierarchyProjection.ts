@@ -2,21 +2,14 @@ import type {
   LibraryHierarchyReadChildrenNode,
   LibraryHierarchyReadChildrenResult
 } from '../../shared/libraryHierarchy/readChildren'
-import type {
-  LibraryHierarchyBrowserState,
-  LibraryHierarchyDirectoryReadState,
-  LibraryHierarchyDirectoryReadTarget
-} from './hierarchyState'
+import type { DirectoryReadState, DirectoryReadTarget, HierarchyState } from './hierarchyState'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
 
-export type LibraryHierarchyBrowserProjection =
+export type HierarchyProjection =
   | {
       readonly kind: 'tree'
       readonly nodes: readonly BrowserTreeNode[]
-      readonly directoryReadTargetsByNodeId: ReadonlyMap<
-        BrowserTreeNodeId,
-        LibraryHierarchyDirectoryReadTarget
-      >
+      readonly directoryReadTargetsByNodeId: ReadonlyMap<BrowserTreeNodeId, DirectoryReadTarget>
     }
   | {
       readonly kind: 'unavailable'
@@ -27,9 +20,7 @@ export type LibraryHierarchyBrowserProjection =
       readonly message: string
     }
 
-export function projectBrowserState(
-  state: LibraryHierarchyBrowserState
-): LibraryHierarchyBrowserProjection | undefined {
+export function projectState(state: HierarchyState): HierarchyProjection | undefined {
   if (state.rootReadResult === undefined) {
     return undefined
   }
@@ -37,16 +28,14 @@ export function projectBrowserState(
   return projectResult(state.rootReadResult, state.directoryReadStates)
 }
 
-export function projectReadResult(
-  result: LibraryHierarchyReadChildrenResult
-): LibraryHierarchyBrowserProjection {
+export function projectReadResult(result: LibraryHierarchyReadChildrenResult): HierarchyProjection {
   return projectResult(result, new Map())
 }
 
 function projectResult(
   result: LibraryHierarchyReadChildrenResult,
-  directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
-): LibraryHierarchyBrowserProjection {
+  directoryReadStates: ReadonlyMap<string, DirectoryReadState>
+): HierarchyProjection {
   if (result.state !== 'ready') {
     return {
       kind: 'unavailable',
@@ -68,10 +57,7 @@ function projectResult(
     }
   }
 
-  const directoryReadTargetsByNodeId = new Map<
-    BrowserTreeNodeId,
-    LibraryHierarchyDirectoryReadTarget
-  >()
+  const directoryReadTargetsByNodeId = new Map<BrowserTreeNodeId, DirectoryReadTarget>()
   const children = projectNodes({
     nodes: result.window.nodes,
     directoryReadStates,
@@ -106,8 +92,8 @@ function formatRootDetail(totalRows: number): string {
 
 function projectNodes(options: {
   readonly nodes: readonly LibraryHierarchyReadChildrenNode[]
-  readonly directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, LibraryHierarchyDirectoryReadTarget>
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
+  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
 }): readonly BrowserTreeNode[] {
   return options.nodes.map((node) =>
     projectNode({
@@ -120,8 +106,8 @@ function projectNodes(options: {
 
 function projectNode(options: {
   readonly node: LibraryHierarchyReadChildrenNode
-  readonly directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, LibraryHierarchyDirectoryReadTarget>
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
+  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
 }): BrowserTreeNode {
   const node = options.node
 
@@ -153,9 +139,9 @@ function projectNode(options: {
 }
 
 function projectDirectoryChildren(options: {
-  readonly state: LibraryHierarchyDirectoryReadState | undefined
-  readonly directoryReadStates: ReadonlyMap<string, LibraryHierarchyDirectoryReadState>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, LibraryHierarchyDirectoryReadTarget>
+  readonly state: DirectoryReadState | undefined
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
+  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
 }): BrowserTreeNode['childrenState'] {
   const state = options.state
 
