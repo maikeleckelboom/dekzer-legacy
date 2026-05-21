@@ -10,7 +10,7 @@ defineOptions({
   name: 'TreeRoot'
 })
 
-const props = defineProps<{
+const { nodes, expandedNodeIds, selectedNodeId } = defineProps<{
   nodes: readonly BrowserTreeNode[]
   selectedNodeId?: BrowserTreeNodeId
   expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
@@ -25,17 +25,17 @@ const emit = defineEmits<{
 }>()
 
 const controller = useTreeController({
-  nodes: computed(() => props.nodes),
-  selectedNodeId: computed(() => props.selectedNodeId),
-  expandedNodeIds: computed(() => props.expandedNodeIds),
-  selectNode: (nodeId) => emit('select', nodeId),
-  toggleNode: (nodeId) => emit('toggle', nodeId),
-  activateAction: (nodeId) => emit('activateAction', nodeId)
+  nodes: computed(() => nodes),
+  selectedNodeId: computed(() => selectedNodeId),
+  expandedNodeIds: computed(() => expandedNodeIds),
+  selectNode: (id) => emit('select', id),
+  toggleNode: (id) => emit('toggle', id),
+  activateAction: (id) => emit('activateAction', id)
 })
 
 // The DOM is intentionally flattened: hierarchy is declared through aria-level,
 // aria-posinset, and aria-setsize. Keyboard order, visual order, and projection
-// order remain identical; hierarchy belongs to the projection, not nested DOM state.
+// order remain identical; hierarchy belongs to the projection, not the nested DOM state.
 const visibleItems = controller.visibleItems
 
 provideTreeContext(controller)

@@ -1,0 +1,595 @@
+import type { ChildRow, EntryPoint, Presence } from '../../shared/libraryHierarchy/readChildren'
+import type { BrowserProjection } from './hierarchyProjection'
+import type { BrowserState, LoadedChildren, RowBinding } from './hierarchyState'
+import type { BrowserTreeNodeId } from './tree/types'
+
+export type ContentProjectionKind =
+  | 'emptySelection'
+  | 'unsupported'
+  | 'notLoaded'
+  | 'loading'
+  | 'failed'
+  | 'ready'
+
+export type ContentRowKind = 'directory' | 'file' | 'state' | 'more'
+
+export type ContentRowIcon = 'folder' | 'music' | 'more' | 'loading' | 'warning' | 'state'
+
+export type ContentRowAction = {
+  readonly kind: 'loadChildren' | 'loadMore'
+  readonly nodeId: BrowserTreeNodeId
+  readonly label: string
+}
+
+export type ContentRow = {
+  readonly id: string
+  readonly kind: ContentRowKind
+  readonly label: string
+  readonly presence?: Presence
+  readonly updatedAtMs?: number
+  readonly detail?: string
+  readonly icon?: ContentRowIcon
+  readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
+  readonly action?: ContentRowAction
+  readonly treeNodeId?: BrowserTreeNodeId
+}
+
+export type ContentProjection = {
+  readonly kind: ContentProjectionKind
+  readonly title: string
+  readonly detail?: string
+  readonly rows: readonly ContentRow[]
+}
+
+export type ProjectContentsOptions = {
+  readonly state: BrowserState
+  readonly selectedNodeId?: BrowserTreeNodeId
+  readonly bindingsById?: BrowserProjection['bindingsById']
+}
+
+export function projectContents(options: ProjectContentsOptions): ContentProjection {
+  const selectedNodeId = options.selectedNodeId
+
+  if (selectedNodeId === undefined) {
+    return stateProjection({
+      kind: 'emptySelection',
+      ownerId: 'selection',
+      title: 'Library contents',
+      state: 'empty',
+      label: 'No row selected',
+      detail: 'Select a source or folder to show its immediate persisted contents.'
+    })
+  }
+
+  const binding = options.bindingsById?.get(selectedNodeId)
+
+  if (binding === undefined) {
+    return stateProjection({
+      kind: 'unsupported',
+      ownerId: selectedNodeId,
+      title: 'Selection unavailable',
+      state: 'unsupported',
+      label: 'Selection unavailable',
+      detail: 'The selected row is not available in the current browser projection.'
+    })
+  }
+
+  switch (binding.kind) {
+    case 'source':
+      return projectSourceContents({
+        state: options.state,
+        selectedNodeId,
+        binding,
+        bindingsById: options.bindingsById
+      })
+    case 'directory':
+      return projectDirectoryContents({
+        state: options.state,
+        selectedNodeId,
+        binding,
+        bindingsById: options.bindingsById
+      })
+    case 'file':
+      return projectFileContents({
+        state: options.state,
+        selectedNodeId
+      })
+    case 'navigation':
+      return stateProjection({
+        kind: 'unsupported',
+        ownerId: selectedNodeId,
+        title: binding.navigationRow.displayName,
+        state: 'unsupported',
+        label: 'Hierarchy unavailable',
+        detail: 'This navigation row does not expose a literal hierarchy entry point yet.'
+      })
+    case 'readState':
+      return stateProjection({
+        kind:
+          binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'failed' : 'ready',
+        ownerId: selectedNodeId,
+        title: 'Browser row state',
+        state: contentStateFromReadState(binding.state),
+        label: formatReadStateLabel(binding.state),
+        detail: binding.detail
+      })
+    case 'more':
+      return {
+        kind: 'ready',
+        title: 'More rows',
+        detail: binding.detail,
+        rows: [contentMoreRow(selectedNodeId, binding)]
+      }
+  }
+}
+
+function projectSourceContents(options: {
+  readonly state: BrowserState
+  readonly selectedNodeId: BrowserTreeNodeId
+  readonly binding: Extract<RowBinding, { readonly kind: 'source' }>
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+}): ContentProjection {
+  const sourceState = options.state.sourceReadStates.get(options.selectedNodeId)
+  const title = options.binding.target.label
+
+  if (sourceState === undefined || sourceState.kind === 'unloaded') {
+    const detail = sourceState?.detail ?? 'Literal hierarchy not loaded yet.'
+
+    return loadableStateProjection({
+      kind: 'notLoaded',
+      ownerId: options.selectedNodeId,
+      title,
+      state: 'notLoaded',
+      label: 'Contents not loaded',
+      detail,
+      action: {
+        kind: 'loadChildren',
+        nodeId: options.selectedNodeId,
+        label: 'Load contents'
+      }
+    })
+  }
+
+  if (sourceState.kind === 'loading') {
+    return stateProjection({
+      kind: 'loading',
+      ownerId: options.selectedNodeId,
+      title,
+      state: 'loading',
+      label: 'Loading contents',
+      detail: sourceState.detail ?? 'Loading literal hierarchy children.'
+    })
+  }
+
+  if (sourceState.kind === 'failed') {
+    return loadableStateProjection({
+      kind: 'failed',
+      ownerId: options.selectedNodeId,
+      title,
+      state: 'failed',
+      label: 'Contents unavailable',
+      detail: sourceState.detail,
+      action: {
+        kind: 'loadChildren',
+        nodeId: options.selectedNodeId,
+        label: 'Retry'
+      }
+    })
+  }
+
+  return projectLoadedContents({
+    ownerNodeId: options.selectedNodeId,
+    title,
+    children: sourceState.children,
+    bindingsById: options.bindingsById
+  })
+}
+
+function projectDirectoryContents(options: {
+  readonly state: BrowserState
+  readonly selectedNodeId: BrowserTreeNodeId
+  readonly binding: Extract<RowBinding, { readonly kind: 'directory' }>
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+}): ContentProjection {
+  const directoryRow = findLoadedChildRow(options.state, options.selectedNodeId)
+  const directoryState = options.state.directoryReadStates.get(options.binding.directoryId)
+  const title = directoryRow?.label ?? 'Selected folder'
+
+  if (directoryState === undefined || directoryState.kind === 'unloaded') {
+    const detail = directoryState?.detail ?? 'Children not loaded yet.'
+
+    return loadableStateProjection({
+      kind: 'notLoaded',
+      ownerId: options.selectedNodeId,
+      title,
+      state: 'notLoaded',
+      label: 'Contents not loaded',
+      detail,
+      action: {
+        kind: 'loadChildren',
+        nodeId: options.selectedNodeId,
+        label: 'Load contents'
+      }
+    })
+  }
+
+  if (directoryState.kind === 'loading') {
+    return stateProjection({
+      kind: 'loading',
+      ownerId: options.selectedNodeId,
+      title,
+      state: 'loading',
+      label: 'Loading contents',
+      detail: directoryState.detail ?? 'Loading children.'
+    })
+  }
+
+  if (directoryState.kind === 'failed') {
+    return loadableStateProjection({
+      kind: 'failed',
+      ownerId: options.selectedNodeId,
+      title,
+      state: 'failed',
+      label: 'Contents unavailable',
+      detail: directoryState.detail,
+      action: {
+        kind: 'loadChildren',
+        nodeId: options.selectedNodeId,
+        label: 'Retry'
+      }
+    })
+  }
+
+  return projectLoadedContents({
+    ownerNodeId: options.selectedNodeId,
+    title,
+    children: directoryState.children,
+    bindingsById: options.bindingsById
+  })
+}
+
+function projectFileContents(options: {
+  readonly state: BrowserState
+  readonly selectedNodeId: BrowserTreeNodeId
+}): ContentProjection {
+  const fileRow = findLoadedChildRow(options.state, options.selectedNodeId)
+  const title = fileRow?.label ?? 'Selected file'
+  const detail =
+    fileRow === undefined
+      ? 'This literal file row does not expose hierarchy children.'
+      : `${formatPresenceDetail(fileRow)} Updated ${fileRow.updatedAtMs}.`
+
+  return stateProjection({
+    kind: 'ready',
+    ownerId: options.selectedNodeId,
+    title,
+    state: 'file',
+    label: 'File selected',
+    detail
+  })
+}
+
+function projectLoadedContents(options: {
+  readonly ownerNodeId: BrowserTreeNodeId
+  readonly title: string
+  readonly children: LoadedChildren
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+}): ContentProjection {
+  const rows: ContentRow[] = options.children.rows.map((row) =>
+    contentChildRow(row, options.bindingsById)
+  )
+
+  if (options.children.nextOffset !== undefined) {
+    rows.push(contentMoreRowForLoadedChildren(options))
+  }
+
+  if (rows.length === 0) {
+    rows.push(
+      stateRow({
+        ownerId: options.ownerNodeId,
+        state: 'empty',
+        label: 'Empty folder',
+        detail: 'No literal hierarchy rows are available here.'
+      })
+    )
+  }
+
+  return {
+    kind: 'ready',
+    title: options.title,
+    detail: formatLoadedDetail(options.children),
+    rows
+  }
+}
+
+function contentChildRow(
+  row: ChildRow,
+  bindingsById: BrowserProjection['bindingsById'] | undefined
+): ContentRow {
+  const binding = bindingsById?.get(row.id)
+  const treeNodeId = binding?.kind === 'directory' || binding?.kind === 'file' ? row.id : undefined
+
+  return {
+    id: row.id,
+    kind: row.kind,
+    label: row.label,
+    presence: row.presence,
+    updatedAtMs: row.updatedAtMs,
+    detail: formatPresenceDetail(row),
+    icon: row.kind === 'directory' ? 'folder' : 'music',
+    ...(treeNodeId === undefined ? {} : { treeNodeId })
+  }
+}
+
+function contentMoreRowForLoadedChildren(options: {
+  readonly ownerNodeId: BrowserTreeNodeId
+  readonly children: LoadedChildren
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+}): ContentRow {
+  const moreBinding = findMoreBinding({
+    ownerNodeId: options.ownerNodeId,
+    children: options.children,
+    bindingsById: options.bindingsById
+  })
+
+  if (moreBinding === undefined) {
+    return stateRow({
+      ownerId: options.ownerNodeId,
+      state: 'unsupported',
+      label: 'More rows unavailable',
+      detail: 'More rows are available, but no projected more action is available.'
+    })
+  }
+
+  return contentMoreRow(moreBinding.nodeId, moreBinding.binding)
+}
+
+function contentMoreRow(
+  nodeId: BrowserTreeNodeId,
+  binding: Extract<RowBinding, { readonly kind: 'more' }>
+): ContentRow {
+  const action =
+    binding.state === 'loading'
+      ? undefined
+      : {
+          kind: 'loadMore' as const,
+          nodeId,
+          label: binding.state === 'error' ? 'Retry' : 'Load more'
+        }
+
+  return {
+    id: nodeId,
+    kind: 'more',
+    label:
+      binding.state === 'error'
+        ? 'Retry loading more rows'
+        : binding.state === 'loading'
+          ? 'Loading more rows'
+          : 'Load more rows',
+    detail: binding.detail,
+    icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more',
+    ...(action === undefined ? {} : { action })
+  }
+}
+
+function stateProjection(options: {
+  readonly kind: ContentProjectionKind
+  readonly ownerId: string
+  readonly title: string
+  readonly state: Exclude<ContentRow['state'], undefined>
+  readonly label: string
+  readonly detail: string
+}): ContentProjection {
+  return {
+    kind: options.kind,
+    title: options.title,
+    detail: options.detail,
+    rows: [
+      stateRow({
+        ownerId: options.ownerId,
+        state: options.state,
+        label: options.label,
+        detail: options.detail
+      })
+    ]
+  }
+}
+
+function loadableStateProjection(options: {
+  readonly kind: ContentProjectionKind
+  readonly ownerId: string
+  readonly title: string
+  readonly state: Exclude<ContentRow['state'], undefined>
+  readonly label: string
+  readonly detail: string
+  readonly action: ContentRowAction
+}): ContentProjection {
+  return {
+    kind: options.kind,
+    title: options.title,
+    detail: options.detail,
+    rows: [
+      stateRow({
+        ownerId: options.ownerId,
+        state: options.state,
+        label: options.label,
+        detail: options.detail,
+        action: options.action
+      })
+    ]
+  }
+}
+
+function stateRow(options: {
+  readonly ownerId: string
+  readonly state: Exclude<ContentRow['state'], undefined>
+  readonly label: string
+  readonly detail: string
+  readonly action?: ContentRowAction
+}): ContentRow {
+  return {
+    id: `contents-state:${options.ownerId}:${options.state}`,
+    kind: 'state',
+    label: options.label,
+    detail: options.detail,
+    state: options.state,
+    icon: contentStateIcon(options.state),
+    ...(options.action === undefined ? {} : { action: options.action })
+  }
+}
+
+function findMoreBinding(options: {
+  readonly ownerNodeId: BrowserTreeNodeId
+  readonly children: LoadedChildren
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+}):
+  | {
+      readonly nodeId: BrowserTreeNodeId
+      readonly binding: Extract<RowBinding, { readonly kind: 'more' }>
+    }
+  | undefined {
+  const nextOffset = options.children.nextOffset
+
+  if (nextOffset === undefined || options.bindingsById === undefined) {
+    return undefined
+  }
+
+  for (const [nodeId, binding] of options.bindingsById) {
+    if (binding.kind !== 'more') {
+      continue
+    }
+
+    if (binding.ownerId !== options.ownerNodeId) {
+      continue
+    }
+
+    if (binding.target.offset !== nextOffset) {
+      continue
+    }
+
+    if (binding.target.limit !== options.children.limit) {
+      continue
+    }
+
+    if ((binding.target.parentDirectoryId ?? undefined) !== options.children.parentDirectoryId) {
+      continue
+    }
+
+    if (!sameEntryPoint(binding.target.entryPoint, options.children.entryPoint)) {
+      continue
+    }
+
+    return { nodeId, binding }
+  }
+
+  return undefined
+}
+
+function findLoadedChildRow(state: BrowserState, nodeId: BrowserTreeNodeId): ChildRow | undefined {
+  for (const sourceState of state.sourceReadStates.values()) {
+    if (sourceState.kind !== 'loaded') {
+      continue
+    }
+
+    const row = sourceState.children.rows.find((candidate) => candidate.id === nodeId)
+
+    if (row !== undefined) {
+      return row
+    }
+  }
+
+  for (const directoryState of state.directoryReadStates.values()) {
+    if (directoryState.kind !== 'loaded') {
+      continue
+    }
+
+    const row = directoryState.children.rows.find((candidate) => candidate.id === nodeId)
+
+    if (row !== undefined) {
+      return row
+    }
+  }
+
+  return undefined
+}
+
+function sameEntryPoint(left: EntryPoint, right: EntryPoint): boolean {
+  if (left.kind !== right.kind) {
+    return false
+  }
+
+  if (left.kind === 'source') {
+    return right.kind === 'source' && left.sourceId === right.sourceId
+  }
+
+  return right.kind === 'sourceLocation' && left.sourceLocationId === right.sourceLocationId
+}
+
+function formatLoadedDetail(children: LoadedChildren): string {
+  if (children.nextOffset === undefined) {
+    return `${children.rows.length} ${formatRowsNoun(children.rows.length)} loaded.`
+  }
+
+  return `${children.rows.length} of ${children.totalRows} rows loaded.`
+}
+
+function formatRowsNoun(count: number): string {
+  return count === 1 ? 'row' : 'rows'
+}
+
+function formatPresenceDetail(row: ChildRow): string {
+  const subject = row.kind === 'directory' ? 'directory' : 'file'
+
+  switch (row.presence) {
+    case 'present':
+      return `Present ${subject}.`
+    case 'missing':
+      return `Missing ${subject}.`
+    case 'removed':
+      return `Removed ${subject}.`
+  }
+}
+
+function contentStateFromReadState(
+  state: Extract<RowBinding, { readonly kind: 'readState' }>['state']
+): Exclude<ContentRow['state'], undefined> {
+  switch (state) {
+    case 'loading':
+      return 'loading'
+    case 'empty':
+      return 'empty'
+    case 'unavailable':
+      return 'unsupported'
+    case 'error':
+      return 'failed'
+  }
+}
+
+function formatReadStateLabel(
+  state: Extract<RowBinding, { readonly kind: 'readState' }>['state']
+): string {
+  switch (state) {
+    case 'loading':
+      return 'Loading'
+    case 'empty':
+      return 'Empty'
+    case 'unavailable':
+      return 'Unavailable'
+    case 'error':
+      return 'Unavailable'
+  }
+}
+
+function contentStateIcon(state: Exclude<ContentRow['state'], undefined>): ContentRowIcon {
+  switch (state) {
+    case 'loading':
+      return 'loading'
+    case 'failed':
+    case 'unsupported':
+      return 'warning'
+    case 'empty':
+    case 'notLoaded':
+    case 'file':
+      return 'state'
+  }
+}
