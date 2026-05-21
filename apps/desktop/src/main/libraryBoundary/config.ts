@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import process from 'node:process'
 
-import { LibraryBoundaryHostError } from './libraryBoundaryHostErrors'
+import { LibraryBoundaryHostError } from './errors'
 
 export const libraryBoundaryStdioBinaryEnvironmentVariable = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
 
@@ -24,7 +24,7 @@ export type LibraryBoundaryHostDevelopmentBinaryPolicy = {
 export type LibraryBoundaryHostPackagedBinaryPolicy = {
   readonly kind: 'packagedBinaryUnavailable'
   readonly executableName: string
-  readonly resourceRoot: string | null
+  readonly resourceRoot?: string
 }
 
 export type LibraryBoundaryHostBinaryPolicy =
@@ -42,7 +42,7 @@ export type ResolveLibraryBoundaryHostConfigOptions = {
   readonly isDev: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly platform?: NodeJS.Platform
-  readonly resourcesPath?: string | null
+  readonly resourcesPath?: string
 }
 
 export type ResolveLibraryBoundaryStdioBinaryPolicyOptions = {
@@ -50,7 +50,7 @@ export type ResolveLibraryBoundaryStdioBinaryPolicyOptions = {
   readonly desktopAppPath: string
   readonly env?: NodeJS.ProcessEnv
   readonly platform?: NodeJS.Platform
-  readonly resourcesPath?: string | null
+  readonly resourcesPath?: string
 }
 
 type BinaryExists = (binaryPath: string) => boolean
@@ -84,10 +84,11 @@ export function resolveLibraryBoundaryStdioBinaryPolicy(
   const executableName = libraryBoundaryStdioExecutableName(platform)
 
   if (!options.isDev) {
+    const resourceRoot = options.resourcesPath ?? defaultElectronResourcesPath()
     return {
       kind: 'packagedBinaryUnavailable',
       executableName,
-      resourceRoot: options.resourcesPath ?? defaultElectronResourcesPath()
+      ...(resourceRoot === undefined ? {} : { resourceRoot })
     }
   }
 
@@ -120,7 +121,7 @@ export function resolveLibraryBoundaryStdioBinaryPath(
       {
         details: {
           executableName: policy.executableName,
-          resourceRoot: policy.resourceRoot
+          ...(policy.resourceRoot === undefined ? {} : { resourceRoot: policy.resourceRoot })
         }
       }
     )
@@ -146,12 +147,12 @@ function libraryBoundaryStdioExecutableName(platform: NodeJS.Platform): string {
   return platform === 'win32' ? 'library-boundary-stdio.exe' : 'library-boundary-stdio'
 }
 
-function defaultElectronResourcesPath(): string | null {
+function defaultElectronResourcesPath(): string | undefined {
   const resourcesPath = (
     process as NodeJS.Process & {
       readonly resourcesPath?: string
     }
   ).resourcesPath
 
-  return typeof resourcesPath === 'string' && resourcesPath.length > 0 ? resourcesPath : null
+  return typeof resourcesPath === 'string' && resourcesPath.length > 0 ? resourcesPath : undefined
 }

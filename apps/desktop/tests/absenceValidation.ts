@@ -14,58 +14,21 @@ const workspaceRoot = resolve(desktopRoot, '..', '..')
 
 const allowedNullUses: ReadonlyMap<string, AllowedNullUse> = new Map([
   [
-    'src/shared/libraryBoundaryStatus.ts',
+    'src/shared/libraryBoundary/status.ts',
     {
       reason: 'renderer-visible host status contract',
       patterns: [/readonly lastError: LibraryBoundaryHostStatusError \| null/]
     }
   ],
   [
-    'src/main/libraryBoundaryHost.ts',
-    {
-      reason: 'Electron resources option compatibility',
-      patterns: [/readonly resourcesPath\?: string \| null/]
-    }
-  ],
-  [
-    'src/main/libraryBoundaryHostConfig.ts',
-    {
-      reason: 'Electron resources path compatibility',
-      patterns: [
-        /readonly resourceRoot: string \| null/,
-        /readonly resourcesPath\?: string \| null/,
-        /function defaultElectronResourcesPath\(\): string \| null/,
-        /return typeof resourcesPath === 'string' && resourcesPath.length > 0 \? resourcesPath : null/
-      ]
-    }
-  ],
-  [
-    'src/main/libraryBoundaryHostErrors.ts',
-    {
-      reason: 'Electron resources path diagnostic compatibility',
-      patterns: [/readonly resourceRoot\?: string \| null/]
-    }
-  ],
-  [
-    'src/main/libraryBoundaryHostStatus.ts',
+    'src/main/libraryBoundary/status.ts',
     {
       reason: 'renderer-visible host status contract normalization',
       patterns: [/lastError: lastError \?\? null/]
     }
   ],
   [
-    'src/main/libraryHierarchyRead.ts',
-    {
-      reason: 'generated hierarchy protocol compatibility',
-      patterns: [
-        /parentSourceDirectoryId: normalizedRequest.parentSourceDirectoryId \?\? null/,
-        /if \(reply.window === null\)/,
-        /\.\.\.\(reply.window.parentSourceDirectoryId === null/
-      ]
-    }
-  ],
-  [
-    'src/main/libraryHierarchyReadMapping.ts',
+    'src/main/libraryHierarchy/mapping.ts',
     {
       reason: 'generated hierarchy row compatibility',
       patterns: [
@@ -78,7 +41,7 @@ const allowedNullUses: ReadonlyMap<string, AllowedNullUse> = new Map([
     }
   ],
   [
-    'src/main/libraryHierarchyReadRequest.ts',
+    'src/main/libraryHierarchy/request.ts',
     {
       reason: 'unknown IPC input normalization',
       patterns: [
@@ -88,10 +51,21 @@ const allowedNullUses: ReadonlyMap<string, AllowedNullUse> = new Map([
     }
   ],
   [
-    'src/main/libraryHierarchyReadTarget.ts',
+    'src/main/libraryHierarchy/target.ts',
     {
       reason: 'generated navigation protocol compatibility',
       patterns: [/parentNavigationRowId: null/, /sourceRow.selectorPayload === null/]
+    }
+  ],
+  [
+    'src/main/libraryHierarchy/read.ts',
+    {
+      reason: 'generated hierarchy protocol compatibility',
+      patterns: [
+        /parentSourceDirectoryId: normalizedRequest.parentSourceDirectoryId \?\? null/,
+        /if \(reply.window === null\)/,
+        /\.\.\.\(reply.window.parentSourceDirectoryId === null/
+      ]
     }
   ],
   [

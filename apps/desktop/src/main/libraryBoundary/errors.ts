@@ -19,7 +19,7 @@ export type LibraryBoundaryHostErrorDetails = {
   readonly binaryPath?: string
   readonly binarySource?: string
   readonly executableName?: string
-  readonly resourceRoot?: string | null
+  readonly resourceRoot?: string
   readonly state?: LibraryBoundaryHostState
 }
 

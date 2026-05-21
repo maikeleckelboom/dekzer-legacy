@@ -2,13 +2,13 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { createLibraryBoundaryHost } from './libraryBoundaryHost'
-import { registerLibraryHierarchyReadIpc } from './libraryHierarchyRead'
+import { createLibraryBoundaryHost } from './libraryBoundary/host'
+import { registerLibraryHierarchyReadIpc } from './libraryHierarchy/read'
 import {
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
-} from './libraryBoundaryHostStatus'
-import { libraryBoundaryHostStatusIpcChannels } from '../shared/libraryBoundaryStatus'
+} from './libraryBoundary/status'
+import { libraryBoundaryHostStatusIpcChannels } from '../shared/libraryBoundary/status'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'

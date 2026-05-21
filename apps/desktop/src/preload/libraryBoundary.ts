@@ -2,12 +2,12 @@ import {
   libraryBoundaryHostStatusIpcChannels,
   type DekzerRendererApi,
   type LibraryBoundaryHostStatus
-} from '../shared/libraryBoundaryStatus'
+} from '../shared/libraryBoundary/status'
 import {
   libraryHierarchyReadIpcChannels,
   type LibraryHierarchyReadRequest,
   type LibraryHierarchyReadResult
-} from '../shared/libraryHierarchyRead'
+} from '../shared/libraryHierarchy/read'
 
 type IpcRendererEventLike = unknown
 

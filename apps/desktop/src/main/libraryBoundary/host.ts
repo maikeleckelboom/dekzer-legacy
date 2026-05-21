@@ -12,11 +12,8 @@ import {
   resolveLibraryBoundaryHostConfig,
   resolveLibraryBoundaryStdioBinaryPath,
   type LibraryBoundaryHostConfig
-} from './libraryBoundaryHostConfig'
-import {
-  LibraryBoundaryHostError,
-  type LibraryBoundaryHostState
-} from './libraryBoundaryHostErrors'
+} from './config'
+import { LibraryBoundaryHostError, type LibraryBoundaryHostState } from './errors'
 
 export type LibraryBoundaryHostLogger = {
   warn(message?: unknown, ...optionalParams: unknown[]): void
@@ -53,7 +50,7 @@ export type CreateLibraryBoundaryHostOptions = {
   readonly isDev: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly platform?: NodeJS.Platform
-  readonly resourcesPath?: string | null
+  readonly resourcesPath?: string
   readonly logger?: LibraryBoundaryHostLogger
 }
 

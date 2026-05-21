@@ -1,17 +1,3 @@
-<template>
-  <p
-    v-if="visibleItems.length === 0"
-    class="rounded-sm border border-dashed border-(--color-border) px-4 py-5 text-sm text-(--color-text-muted)"
-    role="status"
-  >
-    No fixture hierarchy nodes to display.
-  </p>
-
-  <div v-else class="space-y-1" role="tree" :aria-labelledby="labelledBy">
-    <TreeItem v-for="item in visibleItems" :key="item.id" :item="item" />
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed } from 'vue'
 
@@ -51,3 +37,17 @@ const visibleItems = controller.visibleItems
 
 provideTreeContext(controller)
 </script>
+
+<template>
+  <p
+    v-if="visibleItems.length === 0"
+    class="rounded-sm border border-dashed border-(--color-border) px-4 py-5 text-sm text-(--color-text-muted)"
+    role="status"
+  >
+    No fixture hierarchy nodes to display.
+  </p>
+
+  <div v-else class="space-y-1" role="tree" :aria-labelledby="labelledBy">
+    <TreeItem v-for="item in visibleItems" :key="item.id" :item="item" />
+  </div>
+</template>

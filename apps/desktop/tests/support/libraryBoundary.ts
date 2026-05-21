@@ -1,12 +1,12 @@
 import { strict as assert } from 'node:assert'
 import { join } from 'node:path'
 
-import type { LibraryBoundaryHostClient } from '../src/main/libraryBoundaryHost'
-import { LibraryBoundaryHostError } from '../src/main/libraryBoundaryHostErrors'
+import type { LibraryBoundaryHostClient } from '../../src/main/libraryBoundary/host'
+import { LibraryBoundaryHostError } from '../../src/main/libraryBoundary/errors'
 import {
   libraryBoundaryHostStatusIpcChannels,
   type LibraryBoundaryHostStatus
-} from '../src/shared/libraryBoundaryStatus'
+} from '../../src/shared/libraryBoundary/status'
 
 export function testApp(
   tempRoot: string,

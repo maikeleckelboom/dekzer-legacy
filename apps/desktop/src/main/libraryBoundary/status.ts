@@ -5,13 +5,10 @@ import {
   type LibraryBoundaryHostStatusChangedCallback,
   type LibraryBoundaryHostStatusError,
   type LibraryBoundaryHostStatusState
-} from '../shared/libraryBoundaryStatus'
-import type { LibraryBoundaryHost } from './libraryBoundaryHost'
-import type { LibraryBoundaryHostBinaryPolicy } from './libraryBoundaryHostConfig'
-import {
-  LibraryBoundaryHostError,
-  type LibraryBoundaryHostErrorCode
-} from './libraryBoundaryHostErrors'
+} from '../../shared/libraryBoundary/status'
+import type { LibraryBoundaryHost } from './host'
+import type { LibraryBoundaryHostBinaryPolicy } from './config'
+import { LibraryBoundaryHostError, type LibraryBoundaryHostErrorCode } from './errors'
 
 export type LibraryBoundaryHostStatusLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void

@@ -5,16 +5,16 @@ import {
   type LibraryHierarchyReadErrorCode,
   type LibraryHierarchyReadNode,
   type LibraryHierarchyReadResult
-} from '../shared/libraryHierarchyRead'
-import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from './libraryBoundaryHost'
-import { LibraryBoundaryHostError } from './libraryBoundaryHostErrors'
-import { mapLiteralHierarchyNode } from './libraryHierarchyReadMapping'
+} from '../../shared/libraryHierarchy/read'
+import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
+import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
+import { mapLiteralHierarchyNode } from './mapping'
 import {
   createHierarchyReadErrorResult,
   isLibraryHierarchyReadResult,
   normalizeLibraryHierarchyReadRequest
-} from './libraryHierarchyReadRequest'
-import { resolveLibraryHierarchyReadTarget } from './libraryHierarchyReadTarget'
+} from './request'
+import { resolveLibraryHierarchyReadTarget } from './target'
 
 export type LibraryHierarchyReadIpcMain = {
   handle(

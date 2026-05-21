@@ -1,25 +1,3 @@
-<template>
-  <div
-    ref="itemElement"
-    class="group outline-none"
-    role="treeitem"
-    :aria-expanded="getTreeItemAriaExpanded(props.item)"
-    :aria-level="props.item.level"
-    :aria-posinset="props.item.ariaPosInSet"
-    :aria-selected="getTreeItemAriaSelected(props.item)"
-    :aria-setsize="props.item.ariaSetSize"
-    :data-active="props.item.isActive ? 'true' : undefined"
-    :data-expanded="props.item.canRevealChildren ? String(props.item.isExpanded) : undefined"
-    :data-selected="props.item.isSelected ? 'true' : undefined"
-    :tabindex="tree.getItemTabIndex(props.item.id)"
-    @click="handleClick"
-    @focus="tree.setActiveNode(props.item.id)"
-    @keydown="handleKeydown"
-  >
-    <TreeRow :item="props.item" />
-  </div>
-</template>
-
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 
@@ -92,3 +70,25 @@ function isBranchAffordanceEvent(event: MouseEvent): boolean {
   )
 }
 </script>
+
+<template>
+  <div
+    ref="itemElement"
+    class="group outline-none"
+    role="treeitem"
+    :aria-expanded="getTreeItemAriaExpanded(props.item)"
+    :aria-level="props.item.level"
+    :aria-posinset="props.item.ariaPosInSet"
+    :aria-selected="getTreeItemAriaSelected(props.item)"
+    :aria-setsize="props.item.ariaSetSize"
+    :data-active="props.item.isActive ? 'true' : undefined"
+    :data-expanded="props.item.canRevealChildren ? String(props.item.isExpanded) : undefined"
+    :data-selected="props.item.isSelected ? 'true' : undefined"
+    :tabindex="tree.getItemTabIndex(props.item.id)"
+    @click="handleClick"
+    @focus="tree.setActiveNode(props.item.id)"
+    @keydown="handleKeydown"
+  >
+    <TreeRow :item="props.item" />
+  </div>
+</template>

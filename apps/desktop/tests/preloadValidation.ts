@@ -1,19 +1,16 @@
 import { strict as assert } from 'node:assert'
 
-import {
-  createDekzerRendererApi,
-  exposeDekzerRendererApi
-} from '../src/preload/libraryBoundaryPreload'
+import { createDekzerRendererApi, exposeDekzerRendererApi } from '../src/preload/libraryBoundary'
 import {
   libraryBoundaryHostStatusIpcChannels,
   type LibraryBoundaryHostStatus
-} from '../src/shared/libraryBoundaryStatus'
+} from '../src/shared/libraryBoundary/status'
 import {
   libraryHierarchyReadIpcChannels,
   type LibraryHierarchyReadRequest,
   type LibraryHierarchyReadResult
-} from '../src/shared/libraryHierarchyRead'
-import { emitStatus, testStatus } from './libraryBoundaryValidationSupport'
+} from '../src/shared/libraryHierarchy/read'
+import { emitStatus, testStatus } from './support/libraryBoundary'
 
 void main()
 

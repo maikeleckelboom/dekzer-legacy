@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 
-import { createRequiredContext } from '../../rendererFoundation/context'
+import { createRequiredContext } from '../../vue/context'
 import type { TreeKeyboardIntent } from './keys'
 import type { BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
 

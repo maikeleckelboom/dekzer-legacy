@@ -1,68 +1,10 @@
-<template>
-  <section
-    class="border border-(--color-border) bg-(--color-surface)"
-    aria-labelledby="library-hierarchy-title"
-  >
-    <header class="border-b border-(--color-border) px-5 py-4">
-      <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-normal text-(--color-accent)">
-            {{ modeEyebrow }}
-          </p>
-          <h2
-            id="library-hierarchy-title"
-            class="mt-1 text-xl font-bold leading-7 text-(--color-text)"
-          >
-            Library hierarchy foundation
-          </h2>
-        </div>
-        <span
-          class="rounded-sm border px-2.5 py-1 text-xs font-semibold"
-          :class="
-            isLiveTree
-              ? 'border-(--color-accent) text-(--color-accent)'
-              : 'border-(--color-warning) text-(--color-warning)'
-          "
-        >
-          {{ modeBadge }}
-        </span>
-      </div>
-      <p class="mt-3 max-w-2xl text-sm leading-6 text-(--color-text-muted)">
-        {{ panelDetail }}
-        <span v-if="!isLiveTree" class="font-semibold text-(--color-text)">
-          {{ libraryHierarchyFixtureTree.name }}
-        </span>
-      </p>
-    </header>
-
-    <div class="grid gap-4 p-5">
-      <TreeRoot v-bind="treeRootProps" @select="selectNode" @toggle="toggleNode" />
-
-      <aside
-        class="rounded-sm border border-(--color-border) bg-(--color-background) px-4 py-3"
-        aria-live="polite"
-      >
-        <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
-          {{ selectedSummaryLabel }}
-        </p>
-        <p class="mt-1 text-sm font-semibold text-(--color-text)">
-          {{ selectedNode?.label ?? 'None selected' }}
-        </p>
-        <p class="mt-1 text-xs leading-5 text-(--color-text-muted)">
-          {{ selectedNode?.detail ?? selectedSummaryDetail }}
-        </p>
-      </aside>
-    </div>
-  </section>
-</template>
-
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundaryStatus'
+import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
 import { useLibraryHierarchyRead } from './hierarchyRead'
-import { libraryHierarchyFixtureTree } from './libraryHierarchyFixture'
-import { projectLibraryHierarchyReadToBrowserTree } from './libraryHierarchyProjection'
+import { libraryHierarchyFixtureTree } from './fixture'
+import { projectLibraryHierarchyReadToBrowserTree } from './hierarchyProjection'
 import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
@@ -239,3 +181,61 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
   }
 }
 </script>
+
+<template>
+  <section
+    class="border border-(--color-border) bg-(--color-surface)"
+    aria-labelledby="library-hierarchy-title"
+  >
+    <header class="border-b border-(--color-border) px-5 py-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-normal text-(--color-accent)">
+            {{ modeEyebrow }}
+          </p>
+          <h2
+            id="library-hierarchy-title"
+            class="mt-1 text-xl font-bold leading-7 text-(--color-text)"
+          >
+            Library hierarchy foundation
+          </h2>
+        </div>
+        <span
+          class="rounded-sm border px-2.5 py-1 text-xs font-semibold"
+          :class="
+            isLiveTree
+              ? 'border-(--color-accent) text-(--color-accent)'
+              : 'border-(--color-warning) text-(--color-warning)'
+          "
+        >
+          {{ modeBadge }}
+        </span>
+      </div>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-(--color-text-muted)">
+        {{ panelDetail }}
+        <span v-if="!isLiveTree" class="font-semibold text-(--color-text)">
+          {{ libraryHierarchyFixtureTree.name }}
+        </span>
+      </p>
+    </header>
+
+    <div class="grid gap-4 p-5">
+      <TreeRoot v-bind="treeRootProps" @select="selectNode" @toggle="toggleNode" />
+
+      <aside
+        class="rounded-sm border border-(--color-border) bg-(--color-background) px-4 py-3"
+        aria-live="polite"
+      >
+        <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
+          {{ selectedSummaryLabel }}
+        </p>
+        <p class="mt-1 text-sm font-semibold text-(--color-text)">
+          {{ selectedNode?.label ?? 'None selected' }}
+        </p>
+        <p class="mt-1 text-xs leading-5 text-(--color-text-muted)">
+          {{ selectedNode?.detail ?? selectedSummaryDetail }}
+        </p>
+      </aside>
+    </div>
+  </section>
+</template>

@@ -1,42 +1,3 @@
-<template>
-  <div
-    class="flex min-w-0 items-center gap-2 rounded-sm border-l-2 px-3 py-2 text-left transition group-focus-visible:ring-2 group-focus-visible:ring-(--color-accent) group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-(--color-background)"
-    :class="rowClass"
-    :style="rowStyle"
-  >
-    <span
-      class="grid h-7 w-7 shrink-0 place-items-center text-xs font-bold"
-      :class="item.isBranch ? 'text-(--color-text-muted)' : 'text-(--color-border)'"
-      :data-tree-affordance="item.canRevealChildren ? 'true' : undefined"
-      aria-hidden="true"
-    >
-      {{ branchGlyph }}
-    </span>
-
-    <span class="min-w-0 flex-1">
-      <span class="block truncate text-sm font-semibold leading-5">{{ item.node.label }}</span>
-      <span
-        v-if="item.node.detail"
-        class="block truncate text-xs leading-5 text-(--color-text-muted)"
-      >
-        {{ item.node.detail }}
-      </span>
-      <span
-        v-if="childrenStateDetail"
-        class="block truncate text-xs leading-5 text-(--color-text-muted)"
-      >
-        {{ childrenStateDetail }}
-      </span>
-    </span>
-
-    <span
-      class="shrink-0 rounded-sm border border-(--color-border) px-2 py-0.5 text-[11px] font-semibold uppercase leading-4 text-(--color-text-muted)"
-    >
-      {{ kindLabel }}
-    </span>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed } from 'vue'
 
@@ -109,3 +70,42 @@ function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | un
   }
 }
 </script>
+
+<template>
+  <div
+    class="flex min-w-0 items-center gap-2 rounded-sm border-l-2 px-3 py-2 text-left transition group-focus-visible:ring-2 group-focus-visible:ring-(--color-accent) group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-(--color-background)"
+    :class="rowClass"
+    :style="rowStyle"
+  >
+    <span
+      class="grid h-7 w-7 shrink-0 place-items-center text-xs font-bold"
+      :class="item.isBranch ? 'text-(--color-text-muted)' : 'text-(--color-border)'"
+      :data-tree-affordance="item.canRevealChildren ? 'true' : undefined"
+      aria-hidden="true"
+    >
+      {{ branchGlyph }}
+    </span>
+
+    <span class="min-w-0 flex-1">
+      <span class="block truncate text-sm font-semibold leading-5">{{ item.node.label }}</span>
+      <span
+        v-if="item.node.detail"
+        class="block truncate text-xs leading-5 text-(--color-text-muted)"
+      >
+        {{ item.node.detail }}
+      </span>
+      <span
+        v-if="childrenStateDetail"
+        class="block truncate text-xs leading-5 text-(--color-text-muted)"
+      >
+        {{ childrenStateDetail }}
+      </span>
+    </span>
+
+    <span
+      class="shrink-0 rounded-sm border border-(--color-border) px-2 py-0.5 text-[11px] font-semibold uppercase leading-4 text-(--color-text-muted)"
+    >
+      {{ kindLabel }}
+    </span>
+  </div>
+</template>

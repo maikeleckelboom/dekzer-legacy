@@ -6,7 +6,7 @@ import type {
 import type {
   LibraryHierarchyReadEntryPoint,
   LibraryHierarchyReadNode
-} from '../shared/libraryHierarchyRead'
+} from '../../shared/libraryHierarchy/read'
 
 export function mapLibraryHierarchyReadEntryPoint(
   entryPoint: LibraryHierarchyReadEntryPoint

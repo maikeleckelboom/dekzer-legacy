@@ -7,28 +7,23 @@ import {
   LibraryBoundaryHost,
   type LibraryBoundaryHostClient,
   type LibraryBoundaryHostTransport
-} from '../src/main/libraryBoundaryHost'
+} from '../src/main/libraryBoundary/host'
 import {
   libraryBoundaryStdioBinaryEnvironmentVariable,
   resolveLibraryBoundaryHostConfig,
   type LibraryBoundaryHostConfig
-} from '../src/main/libraryBoundaryHostConfig'
+} from '../src/main/libraryBoundary/config'
 import {
   readLiteralHierarchyChildrenThroughHost,
   registerLibraryHierarchyReadIpc
-} from '../src/main/libraryHierarchyRead'
+} from '../src/main/libraryHierarchy/read'
 import {
   libraryHierarchyReadIpcChannels,
   type LibraryHierarchyReadErrorCode,
   type LibraryHierarchyReadRequest,
   type LibraryHierarchyReadResult
-} from '../src/shared/libraryHierarchyRead'
-import {
-  createFakeClient,
-  deferred,
-  silentLogger,
-  testApp
-} from './libraryBoundaryValidationSupport'
+} from '../src/shared/libraryHierarchy/read'
+import { createFakeClient, deferred, silentLogger, testApp } from './support/libraryBoundary'
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-hierarchy-read-'))
 

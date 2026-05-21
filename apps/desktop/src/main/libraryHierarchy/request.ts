@@ -4,7 +4,7 @@ import {
   type LibraryHierarchyReadErrorState,
   type LibraryHierarchyReadResult,
   type LibraryHierarchyReadTarget
-} from '../shared/libraryHierarchyRead'
+} from '../../shared/libraryHierarchy/read'
 
 const defaultLiteralHierarchyReadLimit = 50
 const maxLiteralHierarchyReadLimit = 200

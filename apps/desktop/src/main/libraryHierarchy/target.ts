@@ -5,13 +5,13 @@ import type {
   LibraryHierarchyReadResult,
   LibraryHierarchyReadRoot,
   LibraryHierarchyReadTarget
-} from '../shared/libraryHierarchyRead'
-import type { LibraryBoundaryHostClient } from './libraryBoundaryHost'
+} from '../../shared/libraryHierarchy/read'
+import type { LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
   mapLibraryHierarchyReadEntryPoint,
   rootIdForLibraryHierarchyReadEntryPoint
-} from './libraryHierarchyReadMapping'
-import { createHierarchyReadErrorResult, isPositiveOpaqueId } from './libraryHierarchyReadRequest'
+} from './mapping'
+import { createHierarchyReadErrorResult, isPositiveOpaqueId } from './request'
 
 export type ResolvedLibraryHierarchyReadTarget = {
   readonly root: LibraryHierarchyReadRoot

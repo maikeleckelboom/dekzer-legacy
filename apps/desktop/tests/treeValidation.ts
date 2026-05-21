@@ -3,8 +3,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { libraryHierarchyFixtureTree } from '../src/renderer/libraryBrowser/libraryHierarchyFixture'
-import { projectLibraryHierarchyReadToBrowserTree } from '../src/renderer/libraryBrowser/libraryHierarchyProjection'
+import { libraryHierarchyFixtureTree } from '../src/renderer/libraryBrowser/fixture'
+import { projectLibraryHierarchyReadToBrowserTree } from '../src/renderer/libraryBrowser/hierarchyProjection'
 import {
   getTreeItemAriaExpanded,
   getTreeItemAriaSelected
@@ -31,7 +31,7 @@ import type {
   BrowserTreeNodeId,
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
-import type { LibraryHierarchyReadResult } from '../src/shared/libraryHierarchyRead'
+import type { LibraryHierarchyReadResult } from '../src/shared/libraryHierarchy/read'
 
 const expandedFixtureIds = new Set<BrowserTreeNodeId>([
   'fixture-root',

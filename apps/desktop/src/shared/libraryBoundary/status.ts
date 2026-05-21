@@ -1,7 +1,7 @@
 import type {
   LibraryHierarchyReadRequest,
   LibraryHierarchyReadResult
-} from './libraryHierarchyRead'
+} from '../libraryHierarchy/read'
 
 export const libraryBoundaryHostStatusIpcChannels = {
   getStatus: 'desktop:library-boundary:get-status',

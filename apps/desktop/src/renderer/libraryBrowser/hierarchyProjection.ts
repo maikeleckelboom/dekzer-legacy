@@ -1,7 +1,7 @@
 import type {
   LibraryHierarchyReadNode,
   LibraryHierarchyReadResult
-} from '../../shared/libraryHierarchyRead'
+} from '../../shared/libraryHierarchy/read'
 import type { BrowserTreeNode } from './tree/types'
 
 export type LibraryHierarchyBrowserProjection =

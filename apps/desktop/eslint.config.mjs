@@ -33,6 +33,12 @@ export default defineConfig(
             lang: 'ts'
           }
         }
+      ],
+      'vue/block-order': [
+        'error',
+        {
+          order: ['script', 'template', 'style']
+        }
       ]
     }
   },

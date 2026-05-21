@@ -6,24 +6,24 @@ import { join, resolve } from 'node:path'
 import {
   LibraryBoundaryHost,
   type LibraryBoundaryHostTransport
-} from '../src/main/libraryBoundaryHost'
+} from '../src/main/libraryBoundary/host'
 import {
   createLibraryBoundaryHostStatus,
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
-} from '../src/main/libraryBoundaryHostStatus'
+} from '../src/main/libraryBoundary/status'
 import {
   libraryBoundaryStdioBinaryEnvironmentVariable,
   resolveLibraryBoundaryHostConfig,
   resolveLibraryBoundaryStdioBinaryPath,
   selectLibraryBoundaryHostEnvironment,
   type LibraryBoundaryHostConfig
-} from '../src/main/libraryBoundaryHostConfig'
-import { LibraryBoundaryHostError } from '../src/main/libraryBoundaryHostErrors'
+} from '../src/main/libraryBoundary/config'
+import { LibraryBoundaryHostError } from '../src/main/libraryBoundary/errors'
 import {
   libraryBoundaryHostStatusIpcChannels,
   type LibraryBoundaryHostStatus
-} from '../src/shared/libraryBoundaryStatus'
+} from '../src/shared/libraryBoundary/status'
 import {
   assertHostError,
   createFakeClient,
@@ -31,7 +31,7 @@ import {
   silentLogger,
   silentStatusLogger,
   testApp
-} from './libraryBoundaryValidationSupport'
+} from './support/libraryBoundary'
 
 const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-host-'))
 
