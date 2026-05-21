@@ -1,0 +1,19 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": ["tooling/**/*", "tests/**/*"],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "composite": true,
+    "strictNullChecks": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@dekzer/library-boundary-client": ["../../packages/library-boundary-client/src/index.ts"],
+      "@dekzer/library-boundary-contract": ["../../packages/library-boundary-contract/index.ts"],
+      "@dekzer/library-boundary-stdio-transport": [
+        "../../packages/library-boundary-stdio-transport/src/index.ts"
+      ]
+    },
+    "types": ["node"]
+  }
+}

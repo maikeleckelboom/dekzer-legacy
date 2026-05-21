@@ -7,10 +7,11 @@
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache . --max-warnings=0",
-    "clean": "tsx scripts/clean.mts",
+    "clean": "tsx tooling/clean.mts",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
-    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
+    "typecheck:tooling": "tsc --noEmit -p tsconfig.tooling.json --composite false",
+    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web && pnpm run typecheck:tooling",
     "validate:host": "tsx tests/hostValidation.ts",
     "validate:hierarchy-read": "tsx tests/hierarchyReadValidation.ts",
     "validate:absence": "tsx tests/absenceValidation.ts",

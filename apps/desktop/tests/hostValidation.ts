@@ -313,23 +313,28 @@ async function validatesMissingDevelopmentBinaryPublishesFailure(
 function validatesStatusIpcRegistration(config: LibraryBoundaryHostConfig): void {
   const host = new LibraryBoundaryHost(config, silentLogger())
   const controller = new LibraryBoundaryHostStatusController(host, silentStatusLogger())
-  let registeredChannel: string | null = null
-  let registeredHandler: (() => LibraryBoundaryHostStatus) | null = null
+
+  const registration: {
+    channel?: string
+    handler?: () => LibraryBoundaryHostStatus
+  } = {}
 
   registerLibraryBoundaryHostStatusIpc(
     {
       handle(channel, listener): void {
-        registeredChannel = channel
-        registeredHandler = () => listener({})
+        registration.channel = channel
+        registration.handler = () => listener({})
       }
     },
     controller
   )
 
-  assert.equal(registeredChannel, libraryBoundaryHostStatusIpcChannels.getStatus)
-  if (registeredHandler === null) {
+  assert.equal(registration.channel, libraryBoundaryHostStatusIpcChannels.getStatus)
+
+  const handler = registration.handler
+  if (handler === undefined) {
     assert.fail('expected status handler to be registered')
   }
 
-  assert.equal(registeredHandler().state, 'idle')
+  assert.equal(handler().state, 'idle')
 }

@@ -235,21 +235,24 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
 
 function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig): void {
   const host = new LibraryBoundaryHost(config, silentLogger())
-  let registeredChannel: string | null = null
-  let registeredHandler: ((request: unknown) => Promise<LibraryHierarchyReadResult>) | null = null
+
+  const registration: {
+    channel?: string
+    handler?: (request: unknown) => Promise<LibraryHierarchyReadResult>
+  } = {}
 
   registerLibraryHierarchyReadIpc(
     {
       handle(channel, listener): void {
-        registeredChannel = channel
-        registeredHandler = (request) => listener({}, request)
+        registration.channel = channel
+        registration.handler = (request) => listener({}, request)
       }
     },
     host
   )
 
-  assert.equal(registeredChannel, libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren)
-  assert.equal(typeof registeredHandler, 'function')
+  assert.equal(registration.channel, libraryHierarchyReadIpcChannels.readLiteralHierarchyChildren)
+  assert.equal(typeof registration.handler, 'function')
 }
 
 async function startedHostWithClient(
