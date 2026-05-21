@@ -2,7 +2,7 @@ export const hierarchyReadChannels = {
   readChildren: 'desktop:library-hierarchy:read-children'
 } as const
 
-export type LibraryHierarchyReadChildrenState =
+export type ReadState =
   | 'ready'
   | 'hostUnavailable'
   | 'noTarget'
@@ -10,7 +10,7 @@ export type LibraryHierarchyReadChildrenState =
   | 'invalidRequest'
   | 'readFailed'
 
-export type LibraryHierarchyReadChildrenErrorCode =
+export type ReadErrorCode =
   | 'hostNotStarted'
   | 'hostStopping'
   | 'hostStopped'
@@ -20,17 +20,14 @@ export type LibraryHierarchyReadChildrenErrorCode =
   | 'invalidRequest'
   | 'readFailed'
 
-export type LibraryHierarchyReadChildrenError = {
-  readonly code: LibraryHierarchyReadChildrenErrorCode
+export type ReadError = {
+  readonly code: ReadErrorCode
   readonly message: string
 }
 
-export type LibraryHierarchyReadChildrenErrorState = Exclude<
-  LibraryHierarchyReadChildrenState,
-  'ready'
->
+export type ReadErrorState = Exclude<ReadState, 'ready'>
 
-export type LibraryHierarchyReadChildrenEntryPoint =
+export type EntryPoint =
   | {
       readonly kind: 'source'
       readonly sourceId: string
@@ -40,41 +37,41 @@ export type LibraryHierarchyReadChildrenEntryPoint =
       readonly sourceLocationId: string
     }
 
-export type LibraryHierarchyReadChildrenTarget =
+export type ReadTarget =
   | {
       readonly kind: 'firstAvailableSource'
     }
   | {
       readonly kind: 'entryPoint'
-      readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+      readonly entryPoint: EntryPoint
       readonly label?: string
     }
 
-export type LibraryHierarchyReadChildrenRequest = {
-  readonly target?: LibraryHierarchyReadChildrenTarget
+export type ReadRequest = {
+  readonly target?: ReadTarget
   readonly parentSourceDirectoryId?: string
   readonly offset?: number
   readonly limit?: number
 }
 
-export type LibraryHierarchyReadChildrenRoot = {
+export type ReadRoot = {
   readonly id: string
   readonly label?: string
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly entryPoint: EntryPoint
 }
 
-export type LibraryHierarchyReadChildrenNodeKind = 'directory' | 'file'
+export type NodeKind = 'directory' | 'file'
 
-export type LibraryHierarchyReadChildrenNodePresenceState = 'present' | 'missing' | 'removed'
+export type Presence = 'present' | 'missing' | 'removed'
 
-export type LibraryHierarchyReadChildrenNode =
+export type ChildRow =
   | {
       readonly id: string
       readonly kind: 'directory'
       readonly label: string
       readonly sourceDirectoryId: string
       readonly parentSourceDirectoryId?: string
-      readonly presenceState: LibraryHierarchyReadChildrenNodePresenceState
+      readonly presenceState: Presence
       readonly updatedAtMs: number
     }
   | {
@@ -83,25 +80,25 @@ export type LibraryHierarchyReadChildrenNode =
       readonly label: string
       readonly sourceFileId: string
       readonly parentSourceDirectoryId?: string
-      readonly presenceState: LibraryHierarchyReadChildrenNodePresenceState
+      readonly presenceState: Presence
       readonly updatedAtMs: number
     }
 
-export type LibraryHierarchyReadChildrenWindow = {
-  readonly root: LibraryHierarchyReadChildrenRoot
+export type ChildWindow = {
+  readonly root: ReadRoot
   readonly parentSourceDirectoryId?: string
   readonly offset: number
   readonly limit: number
   readonly totalRows: number
-  readonly nodes: readonly LibraryHierarchyReadChildrenNode[]
+  readonly nodes: readonly ChildRow[]
 }
 
-export type LibraryHierarchyReadChildrenResult =
+export type ReadResult =
   | {
       readonly state: 'ready'
-      readonly window: LibraryHierarchyReadChildrenWindow
+      readonly window: ChildWindow
     }
   | {
-      readonly state: LibraryHierarchyReadChildrenErrorState
-      readonly error: LibraryHierarchyReadChildrenError
+      readonly state: ReadErrorState
+      readonly error: ReadError
     }

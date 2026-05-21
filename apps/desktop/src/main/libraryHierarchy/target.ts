@@ -1,24 +1,24 @@
 import type { LiteralHierarchyEntryPoint } from '@dekzer/library-boundary-contract'
 
 import type {
-  LibraryHierarchyReadChildrenEntryPoint,
-  LibraryHierarchyReadChildrenResult,
-  LibraryHierarchyReadChildrenRoot,
-  LibraryHierarchyReadChildrenTarget
+  EntryPoint,
+  ReadResult,
+  ReadRoot,
+  ReadTarget
 } from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import { mapReadEntryPointToLiteralEntryPoint, rootNodeIdForReadEntryPoint } from './mapping'
 import { createHierarchyReadErrorResult, isPositiveOpaqueId } from './request'
 
 export type ResolvedTarget = {
-  readonly root: LibraryHierarchyReadChildrenRoot
+  readonly root: ReadRoot
   readonly entryPoint: LiteralHierarchyEntryPoint
 }
 
 export async function resolveTarget(
   client: LibraryBoundaryHostClient,
-  target: LibraryHierarchyReadChildrenTarget
-): Promise<ResolvedTarget | LibraryHierarchyReadChildrenResult> {
+  target: ReadTarget
+): Promise<ResolvedTarget | ReadResult> {
   if (target.kind === 'entryPoint') {
     return resolveEntryPointTarget(target.entryPoint, target.label)
   }
@@ -27,7 +27,7 @@ export async function resolveTarget(
 }
 
 function resolveEntryPointTarget(
-  entryPoint: LibraryHierarchyReadChildrenEntryPoint,
+  entryPoint: EntryPoint,
   label: string | undefined
 ): ResolvedTarget {
   return {
@@ -42,7 +42,7 @@ function resolveEntryPointTarget(
 
 async function resolveFirstAvailableSourceTarget(
   client: LibraryBoundaryHostClient
-): Promise<ResolvedTarget | LibraryHierarchyReadChildrenResult> {
+): Promise<ResolvedTarget | ReadResult> {
   const navigationRows = await client.readNavigationRows({
     parentNavigationRowId: null
   })
@@ -58,7 +58,7 @@ async function resolveFirstAvailableSourceTarget(
     )
   }
 
-  const entryPoint: LibraryHierarchyReadChildrenEntryPoint = {
+  const entryPoint: EntryPoint = {
     kind: 'source',
     sourceId: sourceRow.selectorPayload
   }

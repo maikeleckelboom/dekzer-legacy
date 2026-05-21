@@ -3,13 +3,10 @@ import type {
   LiteralHierarchyNode
 } from '@dekzer/library-boundary-contract'
 
-import type {
-  LibraryHierarchyReadChildrenEntryPoint,
-  LibraryHierarchyReadChildrenNode
-} from '../../shared/libraryHierarchy/readChildren'
+import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
 
 export function mapReadEntryPointToLiteralEntryPoint(
-  entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  entryPoint: EntryPoint
 ): LiteralHierarchyEntryPoint {
   if (entryPoint.kind === 'source') {
     return {
@@ -28,9 +25,7 @@ export function mapReadEntryPointToLiteralEntryPoint(
   }
 }
 
-export function rootNodeIdForReadEntryPoint(
-  entryPoint: LibraryHierarchyReadChildrenEntryPoint
-): string {
+export function rootNodeIdForReadEntryPoint(entryPoint: EntryPoint): string {
   if (entryPoint.kind === 'source') {
     return `source:${entryPoint.sourceId}`
   }
@@ -38,9 +33,7 @@ export function rootNodeIdForReadEntryPoint(
   return `source-location:${entryPoint.sourceLocationId}`
 }
 
-export function mapLiteralHierarchyNode(
-  row: LiteralHierarchyNode
-): LibraryHierarchyReadChildrenNode | undefined {
+export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | undefined {
   if (row.nodeKind === 'directory' && row.sourceDirectoryId === null) {
     return undefined
   }

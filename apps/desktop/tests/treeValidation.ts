@@ -24,16 +24,13 @@ import {
   isBrowserTreeBranch,
   isBrowserTreeLeaf
 } from '../src/renderer/libraryBrowser/tree/projection'
-import type { LoadedHierarchyChildrenState } from '../src/renderer/libraryBrowser/hierarchyState'
+import type { LoadedChildren } from '../src/renderer/libraryBrowser/hierarchyState'
 import type {
   BrowserTreeNode,
   BrowserTreeNodeId,
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
-import type {
-  LibraryHierarchyReadChildrenResult,
-  LibraryHierarchyReadChildrenWindow
-} from '../src/shared/libraryHierarchy/readChildren'
+import type { ReadResult, ChildWindow } from '../src/shared/libraryHierarchy/readChildren'
 import type { LibraryNavigationReadRowsResult } from '../src/shared/libraryNavigation/readRows'
 
 const libraryHierarchyFixtureTree = {
@@ -550,17 +547,20 @@ function validatesLibraryHierarchyReadProjection(): void {
   assert.equal(getItem(directoryItems, 'source-directory:12').canRevealChildren, false)
   assert.equal(getItem(directoryItems, 'source-directory:12').canRequestChildren, true)
   assert.deepEqual(
-    [...directoryProjection.directoryReadTargetsByNodeId.entries()],
+    [...directoryProjection.bindingsById.entries()].filter(
+      ([, binding]) => binding.kind === 'directory'
+    ),
     [
       [
         'source-directory:12',
         {
+          kind: 'directory',
+          sourceDirectoryId: '12',
           entryPoint: {
             kind: 'source',
             sourceId: '7'
           },
-          label: 'Source Fixture',
-          sourceDirectoryId: '12'
+          label: 'Source Fixture'
         }
       ]
     ]
@@ -593,12 +593,16 @@ function validatesLibraryHierarchyReadProjection(): void {
   }
   assert.deepEqual(
     partialSourceNode.childrenState.children.map((node) => node.id),
-    ['source-file:11', 'continuation:navigation-row:7:1']
+    ['source-file:11', 'more:navigation-row:7:1']
   )
   assert.equal(partialSourceNode.childrenState.children[0]?.badgeLabel, 'File')
   assert.equal(partialSourceNode.childrenState.children[1]?.badgeLabel, 'More')
   assert.deepEqual(
-    partialProjection.continuationReadTargetsByNodeId.get('continuation:navigation-row:7:1'),
+    (
+      partialProjection.bindingsById.get('more:navigation-row:7:1') as
+        | { target: unknown }
+        | undefined
+    )?.target,
     {
       ownerNodeId: 'navigation-row:7',
       entryPoint: {
@@ -771,10 +775,7 @@ function failedBranchNode(): BrowserTreeNode {
   }
 }
 
-function fileOnlyHierarchyReadResult(): Extract<
-  LibraryHierarchyReadChildrenResult,
-  { state: 'ready' }
-> {
+function fileOnlyHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -825,10 +826,7 @@ function navigationSourceReadRowsResult(): LibraryNavigationReadRowsResult {
   }
 }
 
-function directoryHierarchyReadResult(): Extract<
-  LibraryHierarchyReadChildrenResult,
-  { state: 'ready' }
-> {
+function directoryHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -857,9 +855,7 @@ function directoryHierarchyReadResult(): Extract<
   }
 }
 
-function loadedChildrenFromWindow(
-  window: LibraryHierarchyReadChildrenWindow
-): LoadedHierarchyChildrenState {
+function loadedChildrenFromWindow(window: ChildWindow): LoadedChildren {
   const nextOffset = window.nodes.length < window.totalRows ? window.nodes.length : undefined
 
   return {

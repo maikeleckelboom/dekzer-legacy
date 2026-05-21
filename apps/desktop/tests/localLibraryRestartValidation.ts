@@ -16,10 +16,7 @@ import { readThroughHost } from '../src/main/libraryHierarchy/readChildren'
 import { readNavigationRowsThroughHost } from '../src/main/libraryNavigation/readRows'
 import { registerLocalRoot } from '../src/main/libraryRoots/registerLocalRoot'
 import { runLocalRootScanThroughHost } from '../src/main/libraryRoots/runScan'
-import type {
-  LibraryHierarchyReadChildrenNode,
-  LibraryHierarchyReadChildrenRoot
-} from '../src/shared/libraryHierarchy/readChildren'
+import type { ChildRow, ReadRoot } from '../src/shared/libraryHierarchy/readChildren'
 import { desktopRoot } from './support/files'
 import { silentLogger, testApp } from './support/libraryBoundary'
 
@@ -131,10 +128,10 @@ async function startRealBoundaryHost(
 }
 
 async function readPersistedCrateWindow(host: LibraryBoundaryHost): Promise<{
-  readonly crateRoot: LibraryHierarchyReadChildrenRoot
+  readonly crateRoot: ReadRoot
   readonly sourceNavigationRowId: string
-  readonly crateDirectory: LibraryHierarchyReadChildrenNode
-  readonly crateFile: LibraryHierarchyReadChildrenNode
+  readonly crateDirectory: ChildRow
+  readonly crateFile: ChildRow
 }> {
   const navigationRead = await readNavigationRowsThroughHost(host, {
     parentNavigationRowId: null

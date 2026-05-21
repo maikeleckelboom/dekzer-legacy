@@ -635,7 +635,7 @@ function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRoo
 
 function testRootLifecycle(
   rootApi: LibraryRootActionsApi,
-  refreshHierarchy: () => Promise<boolean> = async () => true
+  refresh: () => Promise<boolean> = async () => true
 ): {
   readonly rootActions: LocalRootActionsController
   readonly lifecycle: RootLifecycleController
@@ -644,7 +644,7 @@ function testRootLifecycle(
   const lifecycle = createRootLifecycleController({
     rootActions,
     hierarchyRead: {
-      refreshHierarchy
+      refresh
     }
   })
 

@@ -6,10 +6,7 @@ import {
   hostStatusChannels,
   type LibraryBoundaryHostStatus
 } from '../src/shared/libraryBoundary/status'
-import {
-  hierarchyReadChannels,
-  type LibraryHierarchyReadChildrenResult
-} from '../src/shared/libraryHierarchy/readChildren'
+import { hierarchyReadChannels, type ReadResult } from '../src/shared/libraryHierarchy/readChildren'
 import {
   navigationReadChannels,
   type LibraryNavigationReadRowsResult
@@ -53,7 +50,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
       }
     ]
   }
-  const hierarchyResult: LibraryHierarchyReadChildrenResult = {
+  const hierarchyResult: ReadResult = {
     state: 'noTarget',
     error: {
       code: 'noTarget',

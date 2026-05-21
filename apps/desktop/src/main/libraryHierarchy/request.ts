@@ -1,9 +1,9 @@
 import {
-  type LibraryHierarchyReadChildrenEntryPoint,
-  type LibraryHierarchyReadChildrenErrorCode,
-  type LibraryHierarchyReadChildrenErrorState,
-  type LibraryHierarchyReadChildrenResult,
-  type LibraryHierarchyReadChildrenTarget
+  type EntryPoint,
+  type ReadErrorCode,
+  type ReadErrorState,
+  type ReadResult,
+  type ReadTarget
 } from '../../shared/libraryHierarchy/readChildren'
 
 const defaultLiteralHierarchyReadLimit = 50
@@ -11,15 +11,13 @@ const maxLiteralHierarchyReadLimit = 200
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
 export type NormalizedRequest = {
-  readonly target: LibraryHierarchyReadChildrenTarget
+  readonly target: ReadTarget
   readonly parentSourceDirectoryId?: string
   readonly offset: number
   readonly limit: number
 }
 
-export function normalizeRequest(
-  request: unknown
-): NormalizedRequest | LibraryHierarchyReadChildrenResult {
+export function normalizeRequest(request: unknown): NormalizedRequest | ReadResult {
   if (!isRecord(request)) {
     return createHierarchyReadErrorResult(
       'invalidRequest',
@@ -64,10 +62,10 @@ export function normalizeRequest(
 }
 
 export function createHierarchyReadErrorResult(
-  state: LibraryHierarchyReadChildrenErrorState,
-  code: LibraryHierarchyReadChildrenErrorCode,
+  state: ReadErrorState,
+  code: ReadErrorCode,
   message: string
-): LibraryHierarchyReadChildrenResult {
+): ReadResult {
   return {
     state,
     error: {
@@ -77,7 +75,7 @@ export function createHierarchyReadErrorResult(
   }
 }
 
-export function isReadResult(value: unknown): value is LibraryHierarchyReadChildrenResult {
+export function isReadResult(value: unknown): value is ReadResult {
   return isRecord(value) && typeof value.state === 'string'
 }
 
@@ -85,9 +83,7 @@ export function isPositiveOpaqueId(value: unknown): value is string {
   return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
 }
 
-function normalizeTarget(
-  value: unknown
-): LibraryHierarchyReadChildrenTarget | LibraryHierarchyReadChildrenResult {
+function normalizeTarget(value: unknown): ReadTarget | ReadResult {
   if (value === null || value === undefined) {
     return createHierarchyReadErrorResult(
       'noTarget',
@@ -131,9 +127,7 @@ function normalizeTarget(
   }
 }
 
-function normalizeEntryPoint(
-  value: Record<string, unknown>
-): LibraryHierarchyReadChildrenEntryPoint | LibraryHierarchyReadChildrenResult {
+function normalizeEntryPoint(value: Record<string, unknown>): EntryPoint | ReadResult {
   if (value.kind === 'source') {
     if (!isPositiveOpaqueId(value.sourceId)) {
       return invalidEntryPoint()
@@ -159,7 +153,7 @@ function normalizeEntryPoint(
   return invalidEntryPoint()
 }
 
-function invalidEntryPoint(): LibraryHierarchyReadChildrenResult {
+function invalidEntryPoint(): ReadResult {
   return createHierarchyReadErrorResult(
     'invalidRequest',
     'invalidRequest',
@@ -170,7 +164,7 @@ function invalidEntryPoint(): LibraryHierarchyReadChildrenResult {
 function normalizeNullableOpaqueId(
   value: unknown,
   fieldName: string
-): string | undefined | LibraryHierarchyReadChildrenResult {
+): string | undefined | ReadResult {
   if (value === null || value === undefined) {
     return undefined
   }
@@ -186,7 +180,7 @@ function normalizeNullableOpaqueId(
   )
 }
 
-function normalizeOffset(value: unknown): number | LibraryHierarchyReadChildrenResult {
+function normalizeOffset(value: unknown): number | ReadResult {
   if (value === undefined) {
     return 0
   }
@@ -202,7 +196,7 @@ function normalizeOffset(value: unknown): number | LibraryHierarchyReadChildrenR
   )
 }
 
-function normalizeLimit(value: unknown): number | LibraryHierarchyReadChildrenResult {
+function normalizeLimit(value: unknown): number | ReadResult {
   if (value === undefined) {
     return defaultLiteralHierarchyReadLimit
   }

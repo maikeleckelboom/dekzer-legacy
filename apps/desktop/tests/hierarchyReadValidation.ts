@@ -25,9 +25,9 @@ import {
 import type { BrowserTreeNode } from '../src/renderer/libraryBrowser/tree/types'
 import {
   hierarchyReadChannels,
-  type LibraryHierarchyReadChildrenErrorCode,
-  type LibraryHierarchyReadChildrenRequest,
-  type LibraryHierarchyReadChildrenResult
+  type ReadErrorCode,
+  type ReadRequest,
+  type ReadResult
 } from '../src/shared/libraryHierarchy/readChildren'
 import {
   navigationReadChannels,
@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   await validatesNavigationReadHandler(config)
   validatesNavigationReadIpcRegistration(config)
   await validatesRendererHierarchyReadController()
-  await validatesRendererWindowedHierarchyContinuation()
+  await validatesRendererWindowedMore()
 }
 
 async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig): Promise<void> {
@@ -239,7 +239,7 @@ function validatesHierarchyReadIpcRegistration(config: LibraryBoundaryHostConfig
 
   const registration: {
     channel?: string
-    handler?: (request: unknown) => Promise<LibraryHierarchyReadChildrenResult>
+    handler?: (request: unknown) => Promise<ReadResult>
   } = {}
 
   registerReadChildrenIpc(
@@ -336,10 +336,10 @@ function validatesNavigationReadIpcRegistration(config: LibraryBoundaryHostConfi
 }
 
 async function validatesRendererHierarchyReadController(): Promise<void> {
-  const requests: LibraryHierarchyReadChildrenRequest[] = []
+  const requests: ReadRequest[] = []
   const navigationRequests: unknown[] = []
-  const directory12Read = deferred<LibraryHierarchyReadChildrenResult>()
-  const directory14Read = deferred<LibraryHierarchyReadChildrenResult>()
+  const directory12Read = deferred<ReadResult>()
+  const directory14Read = deferred<ReadResult>()
   let directory13Attempts = 0
   const controller = createLibraryHierarchyReadController(
     testLibraryApi({
@@ -363,7 +363,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
                 'readFailed',
                 'Unable to read library hierarchy children.'
               )
-            : emptyDirectoryHierarchyReadResult('13')
+            : emptyDirectoryReadResult('13')
         }
 
         if (clonedRequest.parentSourceDirectoryId === '14') {
@@ -375,7 +375,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
     })
   )
 
-  await controller.refreshHierarchy()
+  await controller.refresh()
 
   assert.deepEqual(navigationRequests, [{ parentNavigationRowId: null }])
   assert.deepEqual(requests[0], {
@@ -400,43 +400,14 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   if (projection?.kind !== 'tree') {
     assert.fail('expected live hierarchy projection')
   }
+  assert.equal(projection.bindingsById.get('source-directory:12')?.kind, 'directory')
   assert.deepEqual(
-    [...projection.directoryReadTargetsByNodeId.entries()],
-    [
-      [
-        'source-directory:12',
-        {
-          entryPoint: {
-            kind: 'source',
-            sourceId: '7'
-          },
-          label: 'Source Fixture',
-          sourceDirectoryId: '12'
-        }
-      ],
-      [
-        'source-directory:13',
-        {
-          entryPoint: {
-            kind: 'source',
-            sourceId: '7'
-          },
-          label: 'Source Fixture',
-          sourceDirectoryId: '13'
-        }
-      ],
-      [
-        'source-directory:14',
-        {
-          entryPoint: {
-            kind: 'source',
-            sourceId: '7'
-          },
-          label: 'Source Fixture',
-          sourceDirectoryId: '14'
-        }
-      ]
-    ]
+    (projection.bindingsById.get('source-directory:12') as { entryPoint: unknown } | undefined)
+      ?.entryPoint,
+    {
+      kind: 'source',
+      sourceId: '7'
+    }
   )
   assert.equal(
     firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:12'),
@@ -463,7 +434,7 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   })
   assert.equal(controller.directoryReadStates.value.get('12')?.kind, 'loading')
 
-  directory12Read.resolve(loadedDirectoryHierarchyReadResult('12'))
+  directory12Read.resolve(loadedDirectoryReadResult('12'))
   assert.equal(await firstDirectoryRequest, true)
   assert.equal(controller.directoryReadStates.value.get('12')?.kind, 'loaded')
   assert.equal(controller.directoryReadStates.value.get('99')?.kind, 'unloaded')
@@ -506,17 +477,17 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   ])
 
   const staleDirectoryRequest = controller.requestDirectoryChildren('source-directory:14')
-  await controller.readFirstAvailableSourceHierarchy()
-  directory14Read.resolve(loadedDirectoryHierarchyReadResult('14'))
+  await controller.loadFirstSource()
+  directory14Read.resolve(loadedDirectoryReadResult('14'))
   assert.equal(await staleDirectoryRequest, false)
   assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
 }
 
-async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
-  const requests: LibraryHierarchyReadChildrenRequest[] = []
-  const directory14Continuation = deferred<LibraryHierarchyReadChildrenResult>()
+async function validatesRendererWindowedMore(): Promise<void> {
+  const requests: ReadRequest[] = []
+  const directory14More = deferred<ReadResult>()
   let rootReads = 0
-  let directory12ContinuationAttempts = 0
+  let directory12MoreAttempts = 0
   const controller = createLibraryHierarchyReadController(
     testLibraryApi({
       readRows: async () => navigationSourceReadRowsResult(),
@@ -526,7 +497,7 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
 
         if (clonedRequest.parentSourceDirectoryId === undefined) {
           if (clonedRequest.offset === 2) {
-            return sourceContinuationHierarchyReadResult()
+            return sourceMoreReadResult()
           }
 
           rootReads += 1
@@ -537,14 +508,14 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
 
         if (clonedRequest.parentSourceDirectoryId === '12') {
           if (clonedRequest.offset === 1) {
-            directory12ContinuationAttempts += 1
-            return directory12ContinuationAttempts === 1
+            directory12MoreAttempts += 1
+            return directory12MoreAttempts === 1
               ? hierarchyReadError(
                   'readFailed',
                   'readFailed',
                   'Unable to read more directory children.'
                 )
-              : directoryContinuationHierarchyReadResult('12')
+              : directoryMoreReadResult('12')
           }
 
           return partialDirectoryHierarchyReadResult('12')
@@ -552,18 +523,18 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
 
         if (clonedRequest.parentSourceDirectoryId === '14') {
           if (clonedRequest.offset === 1) {
-            return directory14Continuation.promise
+            return directory14More.promise
           }
 
           return partialDirectoryHierarchyReadResult('14')
         }
 
-        return emptyDirectoryHierarchyReadResult(clonedRequest.parentSourceDirectoryId)
+        return emptyDirectoryReadResult(clonedRequest.parentSourceDirectoryId)
       }
     })
   )
 
-  await controller.refreshHierarchy()
+  await controller.refresh()
 
   let projection = controller.browserProjection.value
   assert.equal(projection?.kind, 'tree')
@@ -574,11 +545,12 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
   assert.deepEqual(firstLoadedChildIds(projection.nodes, 'navigation-row:7'), [
     'source-directory:12',
     'source-directory:14',
-    'continuation:navigation-row:7:2'
+    'more:navigation-row:7:2'
   ])
-  assert.equal(projection.rowsByNodeId.get('continuation:navigation-row:7:2')?.kind, 'continuation')
+  assert.equal(projection.bindingsById.get('more:navigation-row:7:2')?.kind, 'more')
   assert.deepEqual(
-    projection.continuationReadTargetsByNodeId.get('continuation:navigation-row:7:2'),
+    (projection.bindingsById.get('more:navigation-row:7:2') as { target: unknown } | undefined)
+      ?.target,
     {
       ownerNodeId: 'navigation-row:7',
       entryPoint: {
@@ -592,7 +564,7 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
   )
   assert.equal(requests.length, 1)
 
-  assert.equal(await controller.requestNodeChildren('continuation:navigation-row:7:2'), true)
+  assert.equal(await controller.requestNodeChildren('more:navigation-row:7:2'), true)
   assert.deepEqual(requests[1], {
     target: {
       kind: 'entryPoint',
@@ -616,7 +588,6 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
     'source-directory:14',
     'source-file:99'
   ])
-  assert.equal(projection.continuationReadTargetsByNodeId.size, 0)
 
   assert.equal(await controller.requestDirectoryChildren('source-directory:12'), true)
   projection = controller.browserProjection.value
@@ -626,10 +597,11 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
   }
   assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:12'), [
     'source-file:12-a',
-    'continuation:source-directory:12:1'
+    'more:source-directory:12:1'
   ])
   assert.deepEqual(
-    projection.continuationReadTargetsByNodeId.get('continuation:source-directory:12:1'),
+    (projection.bindingsById.get('more:source-directory:12:1') as { target: unknown } | undefined)
+      ?.target,
     {
       ownerNodeId: 'source-directory:12',
       entryPoint: {
@@ -643,7 +615,7 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
     }
   )
 
-  assert.equal(await controller.requestNodeChildren('continuation:source-directory:12:1'), true)
+  assert.equal(await controller.requestNodeChildren('more:source-directory:12:1'), true)
   assert.deepEqual(requests[3], {
     target: {
       kind: 'entryPoint',
@@ -660,26 +632,23 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
   projection = controller.browserProjection.value
   assert.equal(projection?.kind, 'tree')
   if (projection?.kind !== 'tree') {
-    assert.fail('expected failed continuation projection')
+    assert.fail('expected failed more projection')
   }
   assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:12'), [
     'source-file:12-a',
-    'continuation:source-directory:12:1'
+    'more:source-directory:12:1'
   ])
+  assert.equal(projection.bindingsById.get('more:source-directory:12:1')?.kind, 'more')
   assert.equal(
-    projection.rowsByNodeId.get('continuation:source-directory:12:1')?.kind,
-    'continuation'
-  )
-  assert.equal(
-    findProjectedNode(projection.nodes, 'continuation:source-directory:12:1')?.childrenState.kind,
+    findProjectedNode(projection.nodes, 'more:source-directory:12:1')?.childrenState.kind,
     'failed'
   )
 
-  assert.equal(await controller.requestNodeChildren('continuation:source-directory:12:1'), true)
+  assert.equal(await controller.requestNodeChildren('more:source-directory:12:1'), true)
   projection = controller.browserProjection.value
   assert.equal(projection?.kind, 'tree')
   if (projection?.kind !== 'tree') {
-    assert.fail('expected retried continuation projection')
+    assert.fail('expected retried more projection')
   }
   assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:12'), [
     'source-file:12-a',
@@ -692,24 +661,24 @@ async function validatesRendererWindowedHierarchyContinuation(): Promise<void> {
   ])
 
   assert.equal(await controller.requestDirectoryChildren('source-directory:14'), true)
-  const staleContinuation = controller.requestNodeChildren('continuation:source-directory:14:1')
+  const staleMore = controller.requestNodeChildren('more:source-directory:14:1')
   assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'loaded')
   projection = controller.browserProjection.value
   assert.equal(projection?.kind, 'tree')
   if (projection?.kind !== 'tree') {
-    assert.fail('expected loading continuation projection')
+    assert.fail('expected loading more projection')
   }
   assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:14'), [
     'source-file:14-a',
-    'continuation:source-directory:14:1'
+    'more:source-directory:14:1'
   ])
   assert.equal(
-    findProjectedNode(projection.nodes, 'continuation:source-directory:14:1')?.childrenState.kind,
+    findProjectedNode(projection.nodes, 'more:source-directory:14:1')?.childrenState.kind,
     'loading'
   )
-  await controller.readFirstAvailableSourceHierarchy()
-  directory14Continuation.resolve(directoryContinuationHierarchyReadResult('14'))
-  assert.equal(await staleContinuation, false)
+  await controller.loadFirstSource()
+  directory14More.resolve(directoryMoreReadResult('14'))
+  assert.equal(await staleMore, false)
   assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
 }
 
@@ -738,9 +707,7 @@ async function startedHostWithClient(
 
 function testLibraryApi(options: {
   readonly readRows?: LibraryBrowserApi['navigation']['readRows']
-  readonly readChildren: (
-    request: LibraryHierarchyReadChildrenRequest
-  ) => Promise<LibraryHierarchyReadChildrenResult>
+  readonly readChildren: (request: ReadRequest) => Promise<ReadResult>
 }): LibraryBrowserApi {
   return {
     host: {
@@ -809,10 +776,7 @@ function navigationSourceReadRowsResult(): Awaited<
   }
 }
 
-function directoryRootHierarchyReadResult(): Extract<
-  LibraryHierarchyReadChildrenResult,
-  { state: 'ready' }
-> {
+function directoryRootHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -836,10 +800,7 @@ function directoryRootHierarchyReadResult(): Extract<
   }
 }
 
-function partialSourceHierarchyReadResult(): Extract<
-  LibraryHierarchyReadChildrenResult,
-  { state: 'ready' }
-> {
+function partialSourceHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -859,10 +820,7 @@ function partialSourceHierarchyReadResult(): Extract<
   }
 }
 
-function sourceContinuationHierarchyReadResult(): Extract<
-  LibraryHierarchyReadChildrenResult,
-  { state: 'ready' }
-> {
+function sourceMoreReadResult(): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -891,10 +849,7 @@ function sourceContinuationHierarchyReadResult(): Extract<
   }
 }
 
-function refreshedSourceHierarchyReadResult(): Extract<
-  LibraryHierarchyReadChildrenResult,
-  { state: 'ready' }
-> {
+function refreshedSourceHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -914,9 +869,9 @@ function refreshedSourceHierarchyReadResult(): Extract<
   }
 }
 
-function loadedDirectoryHierarchyReadResult(
+function loadedDirectoryReadResult(
   parentSourceDirectoryId: string
-): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
+): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -950,7 +905,7 @@ function loadedDirectoryHierarchyReadResult(
 
 function partialDirectoryHierarchyReadResult(
   parentSourceDirectoryId: string
-): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
+): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -981,9 +936,9 @@ function partialDirectoryHierarchyReadResult(
   }
 }
 
-function directoryContinuationHierarchyReadResult(
+function directoryMoreReadResult(
   parentSourceDirectoryId: string
-): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
+): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -1014,9 +969,9 @@ function directoryContinuationHierarchyReadResult(
   }
 }
 
-function emptyDirectoryHierarchyReadResult(
+function emptyDirectoryReadResult(
   parentSourceDirectoryId: string
-): Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }> {
+): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -1038,10 +993,10 @@ function emptyDirectoryHierarchyReadResult(
 }
 
 function hierarchyReadError(
-  state: Exclude<LibraryHierarchyReadChildrenResult['state'], 'ready'>,
-  code: LibraryHierarchyReadChildrenErrorCode,
+  state: Exclude<ReadResult['state'], 'ready'>,
+  code: ReadErrorCode,
   message: string
-): LibraryHierarchyReadChildrenResult {
+): ReadResult {
   return {
     state,
     error: {
@@ -1056,7 +1011,7 @@ function directoryNode(
   label: string,
   parentSourceDirectoryId?: string
 ): Extract<
-  Extract<LibraryHierarchyReadChildrenResult, { state: 'ready' }>['window']['nodes'][number],
+  Extract<ReadResult, { state: 'ready' }>['window']['nodes'][number],
   { kind: 'directory' }
 > {
   return {
@@ -1108,10 +1063,7 @@ function findProjectedNode(
   return undefined
 }
 
-function assertReadError(
-  result: LibraryHierarchyReadChildrenResult,
-  code: LibraryHierarchyReadChildrenErrorCode
-): void {
+function assertReadError(result: ReadResult, code: ReadErrorCode): void {
   if (result.state === 'ready') {
     assert.fail(`expected hierarchy read error ${String(code)}`)
   }

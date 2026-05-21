@@ -9,7 +9,7 @@ import { useRootLifecycle } from './rootLifecycle'
 import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
-import type { HierarchyProjectionRow } from './hierarchyState'
+import type { RowBinding } from './hierarchyState'
 
 defineOptions({
   name: 'LibraryBrowserPanel'
@@ -19,7 +19,7 @@ const hierarchyRead = useLibraryHierarchyRead()
 const rootActions = useLocalRootActions()
 const rootLifecycle = useRootLifecycle({
   rootActions,
-  hierarchyRead
+  hierarchyRead: { refresh: hierarchyRead.refresh }
 })
 const {
   hostStatus,
@@ -61,8 +61,8 @@ const preferredLiveNodeId = computed(() => {
     return undefined
   }
 
-  for (const [nodeId, row] of projection.rowsByNodeId) {
-    if (row.kind === 'sourceEntry') {
+  for (const [nodeId, binding] of projection.bindingsById) {
+    if (binding.kind === 'source') {
       return nodeId
     }
   }
@@ -143,15 +143,15 @@ const selectedSummaryDetail = computed(() => {
   switch (row.kind) {
     case 'navigation':
       return `${formatNavigationKind(row.navigationRow.rowKind)} navigation row.`
-    case 'sourceEntry':
+    case 'source':
       return 'Source entry point backed by a maintained navigation row.'
-    case 'literalDirectory':
+    case 'directory':
       return 'Literal directory backed by source_directory_id.'
-    case 'literalFile':
+    case 'file':
       return 'Literal file backed by source_file_id.'
     case 'readState':
       return row.detail
-    case 'continuation':
+    case 'more':
       return row.detail
   }
 
@@ -171,7 +171,7 @@ const selectedProjectionRow = computed(() => {
     return undefined
   }
 
-  return browserProjection.value?.rowsByNodeId.get(selectedNodeId.value)
+  return browserProjection.value?.bindingsById.get(selectedNodeId.value)
 })
 
 watch(
@@ -247,20 +247,20 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
   }
 }
 
-function formatSelectedRowKind(kind: HierarchyProjectionRow['kind']): string {
+function formatSelectedRowKind(kind: RowBinding['kind']): string {
   switch (kind) {
     case 'navigation':
       return 'Navigation row'
-    case 'sourceEntry':
+    case 'source':
       return 'Source entry row'
-    case 'literalDirectory':
+    case 'directory':
       return 'Literal directory row'
-    case 'literalFile':
+    case 'file':
       return 'Literal file row'
     case 'readState':
       return 'Read state row'
-    case 'continuation':
-      return 'Continuation row'
+    case 'more':
+      return 'More row'
   }
 }
 
@@ -301,7 +301,7 @@ function formatNavigationKind(kind: string): string {
         <div class="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
-            class="inline-flex min-h-9 min-w-[154px] items-center justify-center gap-2 rounded-sm border border-(--color-accent) bg-(--color-accent) px-3 py-2 text-sm font-bold text-(--color-background) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex min-h-9 min-w-38.5 items-center justify-center gap-2 rounded-sm border border-(--color-accent) bg-(--color-accent) px-3 py-2 text-sm font-bold text-(--color-background) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!canAddMusicFolder"
             @click="addMusicFolder"
           >
@@ -311,7 +311,7 @@ function formatNavigationKind(kind: string): string {
           <button
             v-if="registeredRootPath !== undefined"
             type="button"
-            class="inline-flex min-h-9 min-w-[126px] items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex min-h-9 min-w-31.5 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!canScanRoot"
             @click="scanRoot"
           >

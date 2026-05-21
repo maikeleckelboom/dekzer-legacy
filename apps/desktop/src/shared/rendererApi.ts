@@ -2,10 +2,7 @@ import type {
   LibraryBoundaryHostStatus,
   LibraryBoundaryHostStatusChangedCallback
 } from './libraryBoundary/status'
-import type {
-  LibraryHierarchyReadChildrenRequest,
-  LibraryHierarchyReadChildrenResult
-} from './libraryHierarchy/readChildren'
+import type { ReadRequest, ReadResult } from './libraryHierarchy/readChildren'
 import type {
   LibraryNavigationReadRowsRequest,
   LibraryNavigationReadRowsResult
@@ -30,9 +27,7 @@ export type LibraryHostApi = {
 }
 
 export type LibraryHierarchyApi = {
-  readChildren(
-    request: LibraryHierarchyReadChildrenRequest
-  ): Promise<LibraryHierarchyReadChildrenResult>
+  readChildren(request: ReadRequest): Promise<ReadResult>
 }
 
 export type LibraryNavigationApi = {

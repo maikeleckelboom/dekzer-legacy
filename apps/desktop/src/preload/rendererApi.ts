@@ -4,8 +4,8 @@ import {
 } from '../shared/libraryBoundary/status'
 import {
   hierarchyReadChannels,
-  type LibraryHierarchyReadChildrenRequest,
-  type LibraryHierarchyReadChildrenResult
+  type ReadRequest,
+  type ReadResult
 } from '../shared/libraryHierarchy/readChildren'
 import {
   navigationReadChannels,
@@ -77,13 +77,11 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         }
       },
       hierarchy: {
-        async readChildren(
-          request: LibraryHierarchyReadChildrenRequest
-        ): Promise<LibraryHierarchyReadChildrenResult> {
+        async readChildren(request: ReadRequest): Promise<ReadResult> {
           return (await ipcRenderer.invoke(
             hierarchyReadChannels.readChildren,
             request
-          )) as LibraryHierarchyReadChildrenResult
+          )) as ReadResult
         }
       },
       roots: {

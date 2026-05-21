@@ -3,27 +3,27 @@ import type { ComputedRef, Ref } from 'vue'
 
 import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
 import type {
-  LibraryHierarchyReadChildrenEntryPoint,
-  LibraryHierarchyReadChildrenNode,
-  LibraryHierarchyReadChildrenRequest,
-  LibraryHierarchyReadChildrenResult,
-  LibraryHierarchyReadChildrenRoot,
-  LibraryHierarchyReadChildrenWindow
+  EntryPoint,
+  ChildRow,
+  ReadRequest,
+  ReadResult,
+  ReadRoot,
+  ChildWindow
 } from '../../shared/libraryHierarchy/readChildren'
 import type {
   LibraryNavigationReadRowsResult,
   LibraryNavigationRow
 } from '../../shared/libraryNavigation/readRows'
 import type { RendererApi } from '../../shared/rendererApi'
-import { projectState, type HierarchyProjection } from './hierarchyProjection'
+import { projectState, type BrowserProjection } from './hierarchyProjection'
 import type {
-  ContinuationReadTarget,
-  DirectoryReadState,
-  DirectoryReadTarget,
-  HierarchyContinuationReadState,
-  LoadedHierarchyChildrenState,
-  SourceReadState,
-  SourceReadTarget
+  MoreTarget,
+  DirectoryState,
+  DirectoryTarget,
+  MoreState,
+  LoadedChildren,
+  SourceState,
+  SourceTarget
 } from './hierarchyState'
 import type { BrowserTreeNodeId } from './tree/types'
 
@@ -39,17 +39,17 @@ export type LibraryBrowserApi = RendererApi['library']
 export type LibraryHierarchyReadController = {
   readonly hostStatus: Ref<LibraryBoundaryHostStatus | undefined>
   readonly navigationReadResult: Ref<LibraryNavigationReadRowsResult | undefined>
-  readonly hierarchyReadResult: Ref<LibraryHierarchyReadChildrenResult | undefined>
+  readonly hierarchyReadResult: Ref<ReadResult | undefined>
   readonly navigationReadRequestError: Ref<string | undefined>
   readonly hierarchyReadRequestError: Ref<string | undefined>
   readonly navigationReadIsLoading: Ref<boolean>
   readonly hierarchyReadIsLoading: Ref<boolean>
-  readonly sourceReadStates: Ref<ReadonlyMap<string, SourceReadState>>
-  readonly directoryReadStates: Ref<ReadonlyMap<string, DirectoryReadState>>
-  readonly browserProjection: ComputedRef<HierarchyProjection | undefined>
-  readonly currentRoot: ComputedRef<LibraryHierarchyReadChildrenRoot | undefined>
-  readonly refreshHierarchy: () => Promise<boolean>
-  readonly readFirstAvailableSourceHierarchy: () => Promise<boolean>
+  readonly sourceReadStates: Ref<ReadonlyMap<string, SourceState>>
+  readonly directoryReadStates: Ref<ReadonlyMap<string, DirectoryState>>
+  readonly browserProjection: ComputedRef<BrowserProjection | undefined>
+  readonly currentRoot: ComputedRef<ReadRoot | undefined>
+  readonly refresh: () => Promise<boolean>
+  readonly loadFirstSource: () => Promise<boolean>
   readonly requestNodeChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
   readonly requestDirectoryChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
   readonly start: () => void
@@ -81,13 +81,13 @@ export function createLibraryHierarchyReadController(
 ): LibraryHierarchyReadController {
   const hostStatus = ref<LibraryBoundaryHostStatus>()
   const navigationReadResult = ref<LibraryNavigationReadRowsResult>()
-  const hierarchyReadResult = ref<LibraryHierarchyReadChildrenResult>()
+  const hierarchyReadResult = ref<ReadResult>()
   const navigationReadRequestError = ref<string>()
   const hierarchyReadRequestError = ref<string>()
   const navigationReadIsLoading = ref(false)
   const hierarchyReadIsLoading = ref(false)
-  const sourceReadStates = shallowRef<ReadonlyMap<string, SourceReadState>>(new Map())
-  const directoryReadStates = shallowRef<ReadonlyMap<string, DirectoryReadState>>(new Map())
+  const sourceReadStates = shallowRef<ReadonlyMap<string, SourceState>>(new Map())
+  const directoryReadStates = shallowRef<ReadonlyMap<string, DirectoryState>>(new Map())
   let hasRequestedNavigationRead = false
   let unsubscribeFromHostStatus: (() => void) | undefined
   let navigationReadSequence = 0
@@ -141,17 +141,17 @@ export function createLibraryHierarchyReadController(
     }
 
     hasRequestedNavigationRead = true
-    void refreshHierarchy()
+    void refresh()
   }
 
-  async function refreshHierarchy(): Promise<boolean> {
+  async function refresh(): Promise<boolean> {
     const readNavigationSucceeded = await refreshNavigationRows()
 
     if (!readNavigationSucceeded) {
       return false
     }
 
-    return readFirstAvailableSourceHierarchy()
+    return loadFirstSource()
   }
 
   async function refreshNavigationRows(): Promise<boolean> {
@@ -189,20 +189,20 @@ export function createLibraryHierarchyReadController(
     }
   }
 
-  async function readFirstAvailableSourceHierarchy(): Promise<boolean> {
+  async function loadFirstSource(): Promise<boolean> {
     const projection = browserProjection.value
 
     if (projection?.kind !== 'tree') {
       return false
     }
 
-    const firstSourceTarget = projection.sourceReadTargetsByNodeId.entries().next()
-
-    if (firstSourceTarget.done === true) {
-      return projection.nodes.length > 0
+    for (const [nodeId, binding] of projection.bindingsById) {
+      if (binding.kind === 'source') {
+        return readSource(nodeId, binding.target)
+      }
     }
 
-    return readSourceChildren(firstSourceTarget.value[0], firstSourceTarget.value[1])
+    return projection.nodes.length > 0
   }
 
   async function requestNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
@@ -212,22 +212,23 @@ export function createLibraryHierarchyReadController(
       return false
     }
 
-    const sourceTarget = projection.sourceReadTargetsByNodeId.get(nodeId)
+    const binding = projection.bindingsById.get(nodeId)
 
-    if (sourceTarget !== undefined) {
-      return readSourceChildren(nodeId, sourceTarget)
+    if (binding === undefined) {
+      return false
     }
 
-    const directoryTarget = projection.directoryReadTargetsByNodeId.get(nodeId)
-
-    if (directoryTarget !== undefined) {
-      return readDirectoryChildren(directoryTarget)
-    }
-
-    const continuationTarget = projection.continuationReadTargetsByNodeId.get(nodeId)
-
-    if (continuationTarget !== undefined) {
-      return readContinuationChildren(continuationTarget)
+    switch (binding.kind) {
+      case 'source':
+        return readSource(nodeId, binding.target)
+      case 'directory':
+        return readDirectory({
+          entryPoint: binding.entryPoint,
+          ...(binding.label === undefined ? {} : { label: binding.label }),
+          sourceDirectoryId: binding.sourceDirectoryId
+        })
+      case 'more':
+        return readMore(binding.target)
     }
 
     return false
@@ -240,19 +241,20 @@ export function createLibraryHierarchyReadController(
       return false
     }
 
-    const target = projection.directoryReadTargetsByNodeId.get(nodeId)
+    const binding = projection.bindingsById.get(nodeId)
 
-    if (target === undefined) {
+    if (binding === undefined || binding.kind !== 'directory') {
       return false
     }
 
-    return readDirectoryChildren(target)
+    return readDirectory({
+      entryPoint: binding.entryPoint,
+      ...(binding.label === undefined ? {} : { label: binding.label }),
+      sourceDirectoryId: binding.sourceDirectoryId
+    })
   }
 
-  async function readSourceChildren(
-    nodeId: BrowserTreeNodeId,
-    target: SourceReadTarget
-  ): Promise<boolean> {
+  async function readSource(nodeId: BrowserTreeNodeId, target: SourceTarget): Promise<boolean> {
     const requestKey = createEntryPointRequestKey(target.entryPoint)
     const currentState = sourceReadStates.value.get(nodeId)
 
@@ -300,7 +302,7 @@ export function createLibraryHierarchyReadController(
         nodeId,
         {
           kind: 'loaded',
-          children: loadedHierarchyChildrenFromWindow(result.window, sourceLoadedTarget(target))
+          children: loadedChildrenFromWindow(result.window, sourceLoadedTarget(target))
         },
         result.window
       )
@@ -323,7 +325,7 @@ export function createLibraryHierarchyReadController(
     }
   }
 
-  async function readDirectoryChildren(target: DirectoryReadTarget): Promise<boolean> {
+  async function readDirectory(target: DirectoryTarget): Promise<boolean> {
     const requestKey = createDirectoryRequestKey(target.entryPoint, target.sourceDirectoryId)
     const currentState = directoryReadStates.value.get(target.sourceDirectoryId)
 
@@ -368,7 +370,7 @@ export function createLibraryHierarchyReadController(
         target.sourceDirectoryId,
         {
           kind: 'loaded',
-          children: loadedHierarchyChildrenFromWindow(result.window, directoryLoadedTarget(target))
+          children: loadedChildrenFromWindow(result.window, directoryLoadedTarget(target))
         },
         result.window
       )
@@ -390,25 +392,25 @@ export function createLibraryHierarchyReadController(
     }
   }
 
-  async function readContinuationChildren(target: ContinuationReadTarget): Promise<boolean> {
+  async function readMore(target: MoreTarget): Promise<boolean> {
     if (target.parentSourceDirectoryId === undefined) {
-      return readSourceContinuation(target)
+      return readSourceMore(target)
     }
 
-    return readDirectoryContinuation(target)
+    return readDirectoryMore(target)
   }
 
-  async function readSourceContinuation(target: ContinuationReadTarget): Promise<boolean> {
-    const requestKey = createContinuationRequestKey(target)
+  async function readSourceMore(target: MoreTarget): Promise<boolean> {
+    const requestKey = createMoreRequestKey(target)
     const currentState = sourceReadStates.value.get(target.ownerNodeId)
 
-    if (!canReadContinuation(currentState, target)) {
+    if (!canReadMore(currentState, target)) {
       return false
     }
 
     if (
-      currentState.children.continuation?.kind === 'loading' &&
-      currentState.children.continuation.requestKey === requestKey
+      currentState.children.more?.kind === 'loading' &&
+      currentState.children.more.requestKey === requestKey
     ) {
       return false
     }
@@ -416,7 +418,7 @@ export function createLibraryHierarchyReadController(
     const sequence = ++sourceReadSequence
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
-    setSourceContinuationState(target, {
+    setSourceMoreState(target, {
       kind: 'loading',
       requestKey,
       sequence,
@@ -424,14 +426,14 @@ export function createLibraryHierarchyReadController(
     })
 
     try {
-      const result = await libraryApi.hierarchy.readChildren(continuationReadRequest(target))
+      const result = await libraryApi.hierarchy.readChildren(moreReadRequest(target))
 
-      if (!isCurrentSourceContinuationLoading(target, requestKey, sequence)) {
+      if (!isCurrentSourceMoreLoading(target, requestKey, sequence)) {
         return false
       }
 
       if (result.state !== 'ready') {
-        setSourceContinuationState(target, {
+        setSourceMoreState(target, {
           kind: 'failed',
           detail: result.error.message
         })
@@ -439,7 +441,7 @@ export function createLibraryHierarchyReadController(
       }
 
       if (!isExpectedWindow(result.window, target.offset, target.parentSourceDirectoryId)) {
-        setSourceContinuationState(target, {
+        setSourceMoreState(target, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
         })
@@ -448,7 +450,7 @@ export function createLibraryHierarchyReadController(
 
       const state = sourceReadStates.value.get(target.ownerNodeId)
 
-      if (!canReadContinuation(state, target)) {
+      if (!canReadMore(state, target)) {
         return false
       }
 
@@ -462,9 +464,9 @@ export function createLibraryHierarchyReadController(
       )
       return true
     } catch {
-      if (isCurrentSourceContinuationLoading(target, requestKey, sequence)) {
+      if (isCurrentSourceMoreLoading(target, requestKey, sequence)) {
         hierarchyReadRequestError.value = safeSourceReadRequestFailure
-        setSourceContinuationState(target, {
+        setSourceMoreState(target, {
           kind: 'failed',
           detail: safeSourceReadRequestFailure
         })
@@ -479,23 +481,23 @@ export function createLibraryHierarchyReadController(
     }
   }
 
-  async function readDirectoryContinuation(target: ContinuationReadTarget): Promise<boolean> {
+  async function readDirectoryMore(target: MoreTarget): Promise<boolean> {
     const sourceDirectoryId = target.parentSourceDirectoryId
 
     if (sourceDirectoryId === undefined) {
       return false
     }
 
-    const requestKey = createContinuationRequestKey(target)
+    const requestKey = createMoreRequestKey(target)
     const currentState = directoryReadStates.value.get(sourceDirectoryId)
 
-    if (!canReadContinuation(currentState, target)) {
+    if (!canReadMore(currentState, target)) {
       return false
     }
 
     if (
-      currentState.children.continuation?.kind === 'loading' &&
-      currentState.children.continuation.requestKey === requestKey
+      currentState.children.more?.kind === 'loading' &&
+      currentState.children.more.requestKey === requestKey
     ) {
       return false
     }
@@ -503,7 +505,7 @@ export function createLibraryHierarchyReadController(
     const sequence = ++directoryReadSequence
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
-    setDirectoryContinuationState(target, {
+    setDirectoryMoreState(target, {
       kind: 'loading',
       requestKey,
       sequence,
@@ -511,14 +513,14 @@ export function createLibraryHierarchyReadController(
     })
 
     try {
-      const result = await libraryApi.hierarchy.readChildren(continuationReadRequest(target))
+      const result = await libraryApi.hierarchy.readChildren(moreReadRequest(target))
 
-      if (!isCurrentDirectoryContinuationLoading(target, requestKey, sequence)) {
+      if (!isCurrentDirectoryMoreLoading(target, requestKey, sequence)) {
         return false
       }
 
       if (result.state !== 'ready') {
-        setDirectoryContinuationState(target, {
+        setDirectoryMoreState(target, {
           kind: 'failed',
           detail: result.error.message
         })
@@ -526,7 +528,7 @@ export function createLibraryHierarchyReadController(
       }
 
       if (!isExpectedWindow(result.window, target.offset, sourceDirectoryId)) {
-        setDirectoryContinuationState(target, {
+        setDirectoryMoreState(target, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
         })
@@ -535,7 +537,7 @@ export function createLibraryHierarchyReadController(
 
       const state = directoryReadStates.value.get(sourceDirectoryId)
 
-      if (!canReadContinuation(state, target)) {
+      if (!canReadMore(state, target)) {
         return false
       }
 
@@ -549,8 +551,8 @@ export function createLibraryHierarchyReadController(
       )
       return true
     } catch {
-      if (isCurrentDirectoryContinuationLoading(target, requestKey, sequence)) {
-        setDirectoryContinuationState(target, {
+      if (isCurrentDirectoryMoreLoading(target, requestKey, sequence)) {
+        setDirectoryMoreState(target, {
           kind: 'failed',
           detail: safeChildReadRequestFailure
         })
@@ -567,8 +569,8 @@ export function createLibraryHierarchyReadController(
 
   function setSourceReadState(
     nodeId: string,
-    state: SourceReadState,
-    discoveredWindow?: LibraryHierarchyReadChildrenWindow
+    state: SourceState,
+    discoveredWindow?: ChildWindow
   ): void {
     const nextStates = new Map(sourceReadStates.value)
     nextStates.set(nodeId, state)
@@ -583,8 +585,8 @@ export function createLibraryHierarchyReadController(
 
   function setDirectoryReadState(
     sourceDirectoryId: string,
-    state: DirectoryReadState,
-    discoveredWindow?: LibraryHierarchyReadChildrenWindow
+    state: DirectoryState,
+    discoveredWindow?: ChildWindow
   ): void {
     const nextStates = new Map(directoryReadStates.value)
     nextStates.set(sourceDirectoryId, state)
@@ -596,26 +598,20 @@ export function createLibraryHierarchyReadController(
     directoryReadStates.value = nextStates
   }
 
-  function setSourceContinuationState(
-    target: ContinuationReadTarget,
-    continuation: HierarchyContinuationReadState
-  ): void {
+  function setSourceMoreState(target: MoreTarget, more: MoreState): void {
     const state = sourceReadStates.value.get(target.ownerNodeId)
 
-    if (!canReadContinuation(state, target)) {
+    if (!canReadMore(state, target)) {
       return
     }
 
     setSourceReadState(target.ownerNodeId, {
       kind: 'loaded',
-      children: withHierarchyContinuation(state.children, continuation)
+      children: withMoreState(state.children, more)
     })
   }
 
-  function setDirectoryContinuationState(
-    target: ContinuationReadTarget,
-    continuation: HierarchyContinuationReadState
-  ): void {
+  function setDirectoryMoreState(target: MoreTarget, more: MoreState): void {
     const sourceDirectoryId = target.parentSourceDirectoryId
 
     if (sourceDirectoryId === undefined) {
@@ -624,13 +620,13 @@ export function createLibraryHierarchyReadController(
 
     const state = directoryReadStates.value.get(sourceDirectoryId)
 
-    if (!canReadContinuation(state, target)) {
+    if (!canReadMore(state, target)) {
       return
     }
 
     setDirectoryReadState(sourceDirectoryId, {
       kind: 'loaded',
-      children: withHierarchyContinuation(state.children, continuation)
+      children: withMoreState(state.children, more)
     })
   }
 
@@ -652,23 +648,19 @@ export function createLibraryHierarchyReadController(
     )
   }
 
-  function isCurrentSourceContinuationLoading(
-    target: ContinuationReadTarget,
+  function isCurrentSourceMoreLoading(
+    target: MoreTarget,
     requestKey: string,
     sequence: number
   ): boolean {
     const state = sourceReadStates.value.get(target.ownerNodeId)
-    const continuation = state?.kind === 'loaded' ? state.children.continuation : undefined
+    const more = state?.kind === 'loaded' ? state.children.more : undefined
 
-    return (
-      continuation?.kind === 'loading' &&
-      continuation.requestKey === requestKey &&
-      continuation.sequence === sequence
-    )
+    return more?.kind === 'loading' && more.requestKey === requestKey && more.sequence === sequence
   }
 
-  function isCurrentDirectoryContinuationLoading(
-    target: ContinuationReadTarget,
+  function isCurrentDirectoryMoreLoading(
+    target: MoreTarget,
     requestKey: string,
     sequence: number
   ): boolean {
@@ -679,13 +671,9 @@ export function createLibraryHierarchyReadController(
     }
 
     const state = directoryReadStates.value.get(sourceDirectoryId)
-    const continuation = state?.kind === 'loaded' ? state.children.continuation : undefined
+    const more = state?.kind === 'loaded' ? state.children.more : undefined
 
-    return (
-      continuation?.kind === 'loading' &&
-      continuation.requestKey === requestKey &&
-      continuation.sequence === sequence
-    )
+    return more?.kind === 'loading' && more.requestKey === requestKey && more.sequence === sequence
   }
 
   return {
@@ -700,8 +688,8 @@ export function createLibraryHierarchyReadController(
     directoryReadStates,
     browserProjection,
     currentRoot,
-    refreshHierarchy,
-    readFirstAvailableSourceHierarchy,
+    refresh,
+    loadFirstSource,
     requestNodeChildren,
     requestDirectoryChildren,
     start,
@@ -709,7 +697,7 @@ export function createLibraryHierarchyReadController(
   }
 }
 
-function sourceReadRequest(target: SourceReadTarget): LibraryHierarchyReadChildrenRequest {
+function sourceReadRequest(target: SourceTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -721,7 +709,7 @@ function sourceReadRequest(target: SourceReadTarget): LibraryHierarchyReadChildr
   }
 }
 
-function directoryReadRequest(target: DirectoryReadTarget): LibraryHierarchyReadChildrenRequest {
+function directoryReadRequest(target: DirectoryTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -734,9 +722,7 @@ function directoryReadRequest(target: DirectoryReadTarget): LibraryHierarchyRead
   }
 }
 
-function continuationReadRequest(
-  target: ContinuationReadTarget
-): LibraryHierarchyReadChildrenRequest {
+function moreReadRequest(target: MoreTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -751,8 +737,8 @@ function continuationReadRequest(
   }
 }
 
-function sourceLoadedTarget(target: SourceReadTarget): {
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+function sourceLoadedTarget(target: SourceTarget): {
+  readonly entryPoint: EntryPoint
   readonly label?: string
   readonly parentSourceDirectoryId?: string
 } {
@@ -762,8 +748,8 @@ function sourceLoadedTarget(target: SourceReadTarget): {
   }
 }
 
-function directoryLoadedTarget(target: DirectoryReadTarget): {
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+function directoryLoadedTarget(target: DirectoryTarget): {
+  readonly entryPoint: EntryPoint
   readonly label?: string
   readonly parentSourceDirectoryId?: string
 } {
@@ -774,15 +760,15 @@ function directoryLoadedTarget(target: DirectoryReadTarget): {
   }
 }
 
-function loadedHierarchyChildrenFromWindow(
-  window: LibraryHierarchyReadChildrenWindow,
+function loadedChildrenFromWindow(
+  window: ChildWindow,
   target: {
-    readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+    readonly entryPoint: EntryPoint
     readonly label?: string
     readonly parentSourceDirectoryId?: string
   }
-): LoadedHierarchyChildrenState {
-  return loadedHierarchyChildren({
+): LoadedChildren {
+  return makeLoadedChildren({
     entryPoint: target.entryPoint,
     ...(target.label === undefined ? {} : { label: target.label }),
     ...(target.parentSourceDirectoryId === undefined
@@ -795,10 +781,10 @@ function loadedHierarchyChildrenFromWindow(
 }
 
 function appendHierarchyChildrenWindow(
-  children: LoadedHierarchyChildrenState,
-  window: LibraryHierarchyReadChildrenWindow
-): LoadedHierarchyChildrenState {
-  return loadedHierarchyChildren({
+  children: LoadedChildren,
+  window: ChildWindow
+): LoadedChildren {
+  return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
     ...(children.parentSourceDirectoryId === undefined
@@ -810,11 +796,8 @@ function appendHierarchyChildrenWindow(
   })
 }
 
-function withHierarchyContinuation(
-  children: LoadedHierarchyChildrenState,
-  continuation: HierarchyContinuationReadState
-): LoadedHierarchyChildrenState {
-  return loadedHierarchyChildren({
+function withMoreState(children: LoadedChildren, more: MoreState): LoadedChildren {
+  return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
     ...(children.parentSourceDirectoryId === undefined
@@ -823,19 +806,19 @@ function withHierarchyContinuation(
     rows: children.rows,
     totalRows: children.totalRows,
     limit: children.limit,
-    continuation
+    more
   })
 }
 
-function loadedHierarchyChildren(options: {
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+function makeLoadedChildren(options: {
+  readonly entryPoint: EntryPoint
   readonly parentSourceDirectoryId?: string
   readonly label?: string
-  readonly rows: readonly LibraryHierarchyReadChildrenNode[]
+  readonly rows: readonly ChildRow[]
   readonly totalRows: number
   readonly limit: number
-  readonly continuation?: HierarchyContinuationReadState
-}): LoadedHierarchyChildrenState {
+  readonly more?: MoreState
+}): LoadedChildren {
   const nextOffset = options.rows.length < options.totalRows ? options.rows.length : undefined
 
   return {
@@ -848,12 +831,12 @@ function loadedHierarchyChildren(options: {
     totalRows: options.totalRows,
     ...(nextOffset === undefined ? {} : { nextOffset }),
     limit: Math.min(options.limit, readLimit),
-    ...(options.continuation === undefined ? {} : { continuation: options.continuation })
+    ...(options.more === undefined ? {} : { more: options.more })
   }
 }
 
 function isExpectedWindow(
-  window: LibraryHierarchyReadChildrenWindow,
+  window: ChildWindow,
   expectedOffset: number,
   expectedParentSourceDirectoryId: string | undefined
 ): boolean {
@@ -876,10 +859,10 @@ function isExpectedWindow(
   return window.offset >= window.totalRows || window.nodes.length > 0
 }
 
-function canReadContinuation(
-  state: SourceReadState | DirectoryReadState | undefined,
-  target: ContinuationReadTarget
-): state is Extract<SourceReadState | DirectoryReadState, { readonly kind: 'loaded' }> {
+function canReadMore(
+  state: SourceState | DirectoryState | undefined,
+  target: MoreTarget
+): state is Extract<SourceState | DirectoryState, { readonly kind: 'loaded' }> {
   return (
     state?.kind === 'loaded' &&
     state.children.nextOffset === target.offset &&
@@ -888,10 +871,7 @@ function canReadContinuation(
   )
 }
 
-function sameEntryPoint(
-  left: LibraryHierarchyReadChildrenEntryPoint,
-  right: LibraryHierarchyReadChildrenEntryPoint
-): boolean {
+function sameEntryPoint(left: EntryPoint, right: EntryPoint): boolean {
   if (left.kind !== right.kind) {
     return false
   }
@@ -903,9 +883,7 @@ function sameEntryPoint(
   return right.kind === 'sourceLocation' && left.sourceLocationId === right.sourceLocationId
 }
 
-function copyReadEntryPoint(
-  entryPoint: LibraryHierarchyReadChildrenEntryPoint
-): LibraryHierarchyReadChildrenEntryPoint {
+function copyReadEntryPoint(entryPoint: EntryPoint): EntryPoint {
   switch (entryPoint.kind) {
     case 'source':
       return {
@@ -922,8 +900,8 @@ function copyReadEntryPoint(
 
 function withDiscoveredUnloadedSourceStates(
   rows: readonly LibraryNavigationRow[]
-): ReadonlyMap<string, SourceReadState> {
-  const states = new Map<string, SourceReadState>()
+): ReadonlyMap<string, SourceState> {
+  const states = new Map<string, SourceState>()
 
   for (const row of rows) {
     if (sourceReadEntryPointFor(row) !== undefined) {
@@ -938,8 +916,8 @@ function withDiscoveredUnloadedSourceStates(
 }
 
 function addDiscoveredUnloadedDirectoryStates(
-  states: Map<string, DirectoryReadState>,
-  window: LibraryHierarchyReadChildrenWindow
+  states: Map<string, DirectoryState>,
+  window: ChildWindow
 ): void {
   for (const node of window.nodes) {
     if (node.kind === 'directory' && !states.has(node.sourceDirectoryId)) {
@@ -951,9 +929,7 @@ function addDiscoveredUnloadedDirectoryStates(
   }
 }
 
-function sourceReadEntryPointFor(
-  row: LibraryNavigationRow
-): LibraryHierarchyReadChildrenEntryPoint | undefined {
+function sourceReadEntryPointFor(row: LibraryNavigationRow): EntryPoint | undefined {
   if (row.selectorKind === 'source' && isPositiveOpaqueId(row.selectorPayload)) {
     return {
       kind: 'source',
@@ -971,7 +947,7 @@ function sourceReadEntryPointFor(
   return undefined
 }
 
-function createEntryPointRequestKey(entryPoint: LibraryHierarchyReadChildrenEntryPoint): string {
+function createEntryPointRequestKey(entryPoint: EntryPoint): string {
   switch (entryPoint.kind) {
     case 'source':
       return `source:${entryPoint.sourceId}`
@@ -980,14 +956,11 @@ function createEntryPointRequestKey(entryPoint: LibraryHierarchyReadChildrenEntr
   }
 }
 
-function createDirectoryRequestKey(
-  entryPoint: LibraryHierarchyReadChildrenEntryPoint,
-  sourceDirectoryId: string
-): string {
+function createDirectoryRequestKey(entryPoint: EntryPoint, sourceDirectoryId: string): string {
   return `${createEntryPointRequestKey(entryPoint)}/directory:${sourceDirectoryId}`
 }
 
-function createContinuationRequestKey(target: ContinuationReadTarget): string {
+function createMoreRequestKey(target: MoreTarget): string {
   return `${createEntryPointRequestKey(target.entryPoint)}/directory:${
     target.parentSourceDirectoryId ?? 'root'
   }/offset:${target.offset}`

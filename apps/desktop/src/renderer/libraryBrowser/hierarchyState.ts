@@ -1,34 +1,31 @@
-import type {
-  LibraryHierarchyReadChildrenEntryPoint,
-  LibraryHierarchyReadChildrenNode
-} from '../../shared/libraryHierarchy/readChildren'
+import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
 import type {
   LibraryNavigationReadRowsResult,
   LibraryNavigationRow
 } from '../../shared/libraryNavigation/readRows'
 
-export type DirectoryReadTarget = {
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+export type DirectoryTarget = {
+  readonly entryPoint: EntryPoint
   readonly label?: string
   readonly sourceDirectoryId: string
 }
 
-export type SourceReadTarget = {
+export type SourceTarget = {
   readonly navigationRowId: string
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly entryPoint: EntryPoint
   readonly label: string
 }
 
-export type ContinuationReadTarget = {
+export type MoreTarget = {
   readonly ownerNodeId: string
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly entryPoint: EntryPoint
   readonly parentSourceDirectoryId?: string
   readonly label?: string
   readonly offset: number
   readonly limit: number
 }
 
-export type HierarchyContinuationReadState =
+export type MoreState =
   | {
       readonly kind: 'loading'
       readonly requestKey: string
@@ -40,18 +37,18 @@ export type HierarchyContinuationReadState =
       readonly detail: string
     }
 
-export type LoadedHierarchyChildrenState = {
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+export type LoadedChildren = {
+  readonly entryPoint: EntryPoint
   readonly parentSourceDirectoryId?: string
   readonly label?: string
-  readonly rows: readonly LibraryHierarchyReadChildrenNode[]
+  readonly rows: readonly ChildRow[]
   readonly totalRows: number
   readonly nextOffset?: number
   readonly limit: number
-  readonly continuation?: HierarchyContinuationReadState
+  readonly more?: MoreState
 }
 
-export type DirectoryReadState =
+export type DirectoryState =
   | {
       readonly kind: 'unloaded'
       readonly detail?: string
@@ -64,14 +61,14 @@ export type DirectoryReadState =
     }
   | {
       readonly kind: 'loaded'
-      readonly children: LoadedHierarchyChildrenState
+      readonly children: LoadedChildren
     }
   | {
       readonly kind: 'failed'
       readonly detail: string
     }
 
-export type SourceReadState =
+export type SourceState =
   | {
       readonly kind: 'unloaded'
       readonly detail?: string
@@ -84,34 +81,35 @@ export type SourceReadState =
     }
   | {
       readonly kind: 'loaded'
-      readonly children: LoadedHierarchyChildrenState
+      readonly children: LoadedChildren
     }
   | {
       readonly kind: 'failed'
       readonly detail: string
     }
 
-export type HierarchyProjectionRow =
+export type RowBinding =
   | {
       readonly kind: 'navigation'
       readonly navigationRow: LibraryNavigationRow
     }
   | {
-      readonly kind: 'sourceEntry'
+      readonly kind: 'source'
       readonly navigationRow: LibraryNavigationRow
-      readonly target: SourceReadTarget
+      readonly target: SourceTarget
     }
   | {
-      readonly kind: 'literalDirectory'
+      readonly kind: 'directory'
       readonly sourceDirectoryId: string
       readonly parentSourceDirectoryId?: string
-      readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+      readonly entryPoint: EntryPoint
+      readonly label?: string
     }
   | {
-      readonly kind: 'literalFile'
+      readonly kind: 'file'
       readonly sourceFileId: string
       readonly parentSourceDirectoryId?: string
-      readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+      readonly entryPoint: EntryPoint
     }
   | {
       readonly kind: 'readState'
@@ -120,15 +118,15 @@ export type HierarchyProjectionRow =
       readonly detail: string
     }
   | {
-      readonly kind: 'continuation'
+      readonly kind: 'more'
       readonly state: 'available' | 'loading' | 'error'
       readonly ownerId: string
-      readonly target: ContinuationReadTarget
+      readonly target: MoreTarget
       readonly detail: string
     }
 
-export type HierarchyState = {
+export type BrowserState = {
   readonly navigationReadResult?: LibraryNavigationReadRowsResult
-  readonly sourceReadStates: ReadonlyMap<string, SourceReadState>
-  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
+  readonly sourceReadStates: ReadonlyMap<string, SourceState>
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
 }

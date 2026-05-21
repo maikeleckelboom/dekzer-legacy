@@ -1,6 +1,6 @@
-import type { LibraryHierarchyReadChildrenRequest } from '../../src/shared/libraryHierarchy/readChildren'
+import type { ReadRequest } from '../../src/shared/libraryHierarchy/readChildren'
 
-export function firstAvailableSourceReadRequest(): LibraryHierarchyReadChildrenRequest {
+export function firstAvailableSourceReadRequest(): ReadRequest {
   return {
     target: {
       kind: 'firstAvailableSource'

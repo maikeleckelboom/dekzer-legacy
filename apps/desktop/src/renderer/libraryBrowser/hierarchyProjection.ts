@@ -1,32 +1,25 @@
-import type {
-  LibraryHierarchyReadChildrenEntryPoint,
-  LibraryHierarchyReadChildrenNode
-} from '../../shared/libraryHierarchy/readChildren'
+import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryNavigationRow } from '../../shared/libraryNavigation/readRows'
 import type {
-  ContinuationReadTarget,
-  DirectoryReadState,
-  DirectoryReadTarget,
-  HierarchyProjectionRow,
-  HierarchyState,
-  LoadedHierarchyChildrenState,
-  SourceReadState,
-  SourceReadTarget
+  DirectoryState,
+  LoadedChildren,
+  MoreTarget,
+  RowBinding,
+  BrowserState,
+  SourceState,
+  SourceTarget
 } from './hierarchyState'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
 
-export type HierarchyProjection = {
+export type BrowserProjection = {
   readonly kind: 'tree'
   readonly nodes: readonly BrowserTreeNode[]
-  readonly rowsByNodeId: ReadonlyMap<BrowserTreeNodeId, HierarchyProjectionRow>
-  readonly sourceReadTargetsByNodeId: ReadonlyMap<BrowserTreeNodeId, SourceReadTarget>
-  readonly directoryReadTargetsByNodeId: ReadonlyMap<BrowserTreeNodeId, DirectoryReadTarget>
-  readonly continuationReadTargetsByNodeId: ReadonlyMap<BrowserTreeNodeId, ContinuationReadTarget>
+  readonly bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>
 }
 
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
-export function projectState(state: HierarchyState): HierarchyProjection | undefined {
+export function projectState(state: BrowserState): BrowserProjection | undefined {
   if (state.navigationReadResult === undefined) {
     return undefined
   }
@@ -34,11 +27,8 @@ export function projectState(state: HierarchyState): HierarchyProjection | undef
   return projectNavigationResult(state)
 }
 
-function projectNavigationResult(state: HierarchyState): HierarchyProjection {
-  const rowsByNodeId = new Map<BrowserTreeNodeId, HierarchyProjectionRow>()
-  const sourceReadTargetsByNodeId = new Map<BrowserTreeNodeId, SourceReadTarget>()
-  const directoryReadTargetsByNodeId = new Map<BrowserTreeNodeId, DirectoryReadTarget>()
-  const continuationReadTargetsByNodeId = new Map<BrowserTreeNodeId, ContinuationReadTarget>()
+function projectNavigationResult(state: BrowserState): BrowserProjection {
+  const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
   const result = state.navigationReadResult
 
   if (result === undefined) {
@@ -75,38 +65,28 @@ function projectNavigationResult(state: HierarchyState): HierarchyProjection {
         row,
         sourceReadStates: state.sourceReadStates,
         directoryReadStates: state.directoryReadStates,
-        rowsByNodeId,
-        sourceReadTargetsByNodeId,
-        directoryReadTargetsByNodeId,
-        continuationReadTargetsByNodeId
+        bindingsById
       })
     ),
-    rowsByNodeId,
-    sourceReadTargetsByNodeId,
-    directoryReadTargetsByNodeId,
-    continuationReadTargetsByNodeId
+    bindingsById
   }
 }
 
 function projectNavigationRow(options: {
   readonly row: LibraryNavigationRow
-  readonly sourceReadStates: ReadonlyMap<string, SourceReadState>
-  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
-  readonly rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>
-  readonly sourceReadTargetsByNodeId: Map<BrowserTreeNodeId, SourceReadTarget>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
-  readonly continuationReadTargetsByNodeId: Map<BrowserTreeNodeId, ContinuationReadTarget>
+  readonly sourceReadStates: ReadonlyMap<string, SourceState>
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode {
   const nodeId = navigationNodeId(options.row)
   const sourceTarget = sourceReadTargetFor(options.row)
 
   if (sourceTarget !== undefined) {
-    options.rowsByNodeId.set(nodeId, {
-      kind: 'sourceEntry',
+    options.bindingsById.set(nodeId, {
+      kind: 'source',
       navigationRow: options.row,
       target: sourceTarget
     })
-    options.sourceReadTargetsByNodeId.set(nodeId, sourceTarget)
 
     return {
       id: nodeId,
@@ -118,14 +98,12 @@ function projectNavigationRow(options: {
         target: sourceTarget,
         state: options.sourceReadStates.get(nodeId),
         directoryReadStates: options.directoryReadStates,
-        rowsByNodeId: options.rowsByNodeId,
-        directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId,
-        continuationReadTargetsByNodeId: options.continuationReadTargetsByNodeId
+        bindingsById: options.bindingsById
       })
     }
   }
 
-  options.rowsByNodeId.set(nodeId, {
+  options.bindingsById.set(nodeId, {
     kind: 'navigation',
     navigationRow: options.row
   })
@@ -145,7 +123,7 @@ function projectNavigationRow(options: {
             label: 'Unavailable',
             detail: 'This navigation row does not expose a literal hierarchy entry point yet.'
           },
-          options.rowsByNodeId
+          options.bindingsById
         )
       ]
     }
@@ -154,12 +132,10 @@ function projectNavigationRow(options: {
 
 function projectSourceChildren(options: {
   readonly ownerId: string
-  readonly target: SourceReadTarget
-  readonly state: SourceReadState | undefined
-  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
-  readonly rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
-  readonly continuationReadTargetsByNodeId: Map<BrowserTreeNodeId, ContinuationReadTarget>
+  readonly target: SourceTarget
+  readonly state: SourceState | undefined
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode['childrenState'] {
   const state = options.state
 
@@ -181,7 +157,7 @@ function projectSourceChildren(options: {
             label: 'Loading hierarchy',
             detail: state.detail ?? 'Loading literal hierarchy children.'
           },
-          options.rowsByNodeId
+          options.bindingsById
         )
       ]
     }
@@ -198,7 +174,7 @@ function projectSourceChildren(options: {
             label: 'Hierarchy unavailable',
             detail: state.detail
           },
-          options.rowsByNodeId
+          options.bindingsById
         )
       ]
     }
@@ -210,20 +186,16 @@ function projectSourceChildren(options: {
       ownerId: options.ownerId,
       children: state.children,
       directoryReadStates: options.directoryReadStates,
-      rowsByNodeId: options.rowsByNodeId,
-      directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId,
-      continuationReadTargetsByNodeId: options.continuationReadTargetsByNodeId
+      bindingsById: options.bindingsById
     })
   }
 }
 
 function projectLoadedHierarchyChildren(options: {
   readonly ownerId: string
-  readonly children: LoadedHierarchyChildrenState
-  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
-  readonly rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
-  readonly continuationReadTargetsByNodeId: Map<BrowserTreeNodeId, ContinuationReadTarget>
+  readonly children: LoadedChildren
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
   if (options.children.rows.length === 0 && options.children.nextOffset === undefined) {
     return [
@@ -234,7 +206,7 @@ function projectLoadedHierarchyChildren(options: {
           label: 'Empty folder',
           detail: 'No literal hierarchy rows are available here.'
         },
-        options.rowsByNodeId
+        options.bindingsById
       )
     ]
   }
@@ -244,9 +216,7 @@ function projectLoadedHierarchyChildren(options: {
     entryPoint: options.children.entryPoint,
     ...(options.children.label === undefined ? {} : { label: options.children.label }),
     directoryReadStates: options.directoryReadStates,
-    rowsByNodeId: options.rowsByNodeId,
-    directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId,
-    continuationReadTargetsByNodeId: options.continuationReadTargetsByNodeId
+    bindingsById: options.bindingsById
   })
 
   if (options.children.nextOffset === undefined) {
@@ -255,25 +225,22 @@ function projectLoadedHierarchyChildren(options: {
 
   return [
     ...projectedNodes,
-    trackedContinuationNode(
+    trackedMoreNode(
       {
         ownerId: options.ownerId,
         children: options.children
       },
-      options.rowsByNodeId,
-      options.continuationReadTargetsByNodeId
+      options.bindingsById
     )
   ]
 }
 
 function projectLiteralNodes(options: {
-  readonly nodes: readonly LibraryHierarchyReadChildrenNode[]
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly nodes: readonly ChildRow[]
+  readonly entryPoint: EntryPoint
   readonly label?: string
-  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
-  readonly rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
-  readonly continuationReadTargetsByNodeId: Map<BrowserTreeNodeId, ContinuationReadTarget>
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
   return options.nodes.map((node) =>
     projectLiteralNode({
@@ -281,38 +248,29 @@ function projectLiteralNodes(options: {
       entryPoint: options.entryPoint,
       ...(options.label === undefined ? {} : { label: options.label }),
       directoryReadStates: options.directoryReadStates,
-      rowsByNodeId: options.rowsByNodeId,
-      directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId,
-      continuationReadTargetsByNodeId: options.continuationReadTargetsByNodeId
+      bindingsById: options.bindingsById
     })
   )
 }
 
 function projectLiteralNode(options: {
-  readonly node: LibraryHierarchyReadChildrenNode
-  readonly entryPoint: LibraryHierarchyReadChildrenEntryPoint
+  readonly node: ChildRow
+  readonly entryPoint: EntryPoint
   readonly label?: string
-  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
-  readonly rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
-  readonly continuationReadTargetsByNodeId: Map<BrowserTreeNodeId, ContinuationReadTarget>
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode {
   const node = options.node
 
   if (node.kind === 'directory') {
-    const target = {
-      entryPoint: copyReadEntryPoint(options.entryPoint),
-      ...(options.label === undefined ? {} : { label: options.label }),
-      sourceDirectoryId: node.sourceDirectoryId
-    }
-    options.directoryReadTargetsByNodeId.set(node.id, target)
-    options.rowsByNodeId.set(node.id, {
-      kind: 'literalDirectory',
+    options.bindingsById.set(node.id, {
+      kind: 'directory',
       sourceDirectoryId: node.sourceDirectoryId,
       ...(node.parentSourceDirectoryId === undefined
         ? {}
         : { parentSourceDirectoryId: node.parentSourceDirectoryId }),
-      entryPoint: target.entryPoint
+      entryPoint: copyReadEntryPoint(options.entryPoint),
+      ...(options.label === undefined ? {} : { label: options.label })
     })
 
     return {
@@ -322,18 +280,15 @@ function projectLiteralNode(options: {
       detail: formatDirectoryDetail(node.presenceState),
       childrenState: projectDirectoryChildren({
         ownerId: node.id,
-        target,
         state: options.directoryReadStates.get(node.sourceDirectoryId),
         directoryReadStates: options.directoryReadStates,
-        rowsByNodeId: options.rowsByNodeId,
-        directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId,
-        continuationReadTargetsByNodeId: options.continuationReadTargetsByNodeId
+        bindingsById: options.bindingsById
       })
     }
   }
 
-  options.rowsByNodeId.set(node.id, {
-    kind: 'literalFile',
+  options.bindingsById.set(node.id, {
+    kind: 'file',
     sourceFileId: node.sourceFileId,
     ...(node.parentSourceDirectoryId === undefined
       ? {}
@@ -352,12 +307,9 @@ function projectLiteralNode(options: {
 
 function projectDirectoryChildren(options: {
   readonly ownerId: string
-  readonly target: DirectoryReadTarget
-  readonly state: DirectoryReadState | undefined
-  readonly directoryReadStates: ReadonlyMap<string, DirectoryReadState>
-  readonly rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>
-  readonly directoryReadTargetsByNodeId: Map<BrowserTreeNodeId, DirectoryReadTarget>
-  readonly continuationReadTargetsByNodeId: Map<BrowserTreeNodeId, ContinuationReadTarget>
+  readonly state: DirectoryState | undefined
+  readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode['childrenState'] {
   const state = options.state
 
@@ -379,7 +331,7 @@ function projectDirectoryChildren(options: {
             label: 'Loading children',
             detail: state.detail ?? 'Loading children.'
           },
-          options.rowsByNodeId
+          options.bindingsById
         )
       ]
     }
@@ -396,7 +348,7 @@ function projectDirectoryChildren(options: {
             label: 'Children unavailable',
             detail: state.detail
           },
-          options.rowsByNodeId
+          options.bindingsById
         )
       ]
     }
@@ -408,9 +360,7 @@ function projectDirectoryChildren(options: {
       ownerId: options.ownerId,
       children: state.children,
       directoryReadStates: options.directoryReadStates,
-      rowsByNodeId: options.rowsByNodeId,
-      directoryReadTargetsByNodeId: options.directoryReadTargetsByNodeId,
-      continuationReadTargetsByNodeId: options.continuationReadTargetsByNodeId
+      bindingsById: options.bindingsById
     })
   }
 }
@@ -420,17 +370,14 @@ function emptyProjection(options: {
   readonly state: 'loading' | 'empty' | 'unavailable' | 'error'
   readonly label: string
   readonly detail: string
-}): HierarchyProjection {
-  const rowsByNodeId = new Map<BrowserTreeNodeId, HierarchyProjectionRow>()
-  const node = trackedReadStateNode(options, rowsByNodeId)
+}): BrowserProjection {
+  const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
+  const node = trackedReadStateNode(options, bindingsById)
 
   return {
     kind: 'tree',
     nodes: [node],
-    rowsByNodeId,
-    sourceReadTargetsByNodeId: new Map(),
-    directoryReadTargetsByNodeId: new Map(),
-    continuationReadTargetsByNodeId: new Map()
+    bindingsById
   }
 }
 
@@ -456,11 +403,11 @@ function trackedReadStateNode(
     readonly label: string
     readonly detail: string
   },
-  rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
 ): BrowserTreeNode {
   const node = readStateNode(options)
 
-  rowsByNodeId.set(node.id, {
+  bindingsById.set(node.id, {
     kind: 'readState',
     state: options.state,
     ownerId: options.ownerId,
@@ -470,18 +417,15 @@ function trackedReadStateNode(
   return node
 }
 
-function continuationNode(options: {
-  readonly ownerId: string
-  readonly children: LoadedHierarchyChildrenState
-}): {
+function moreNode(options: { readonly ownerId: string; readonly children: LoadedChildren }): {
   readonly node: BrowserTreeNode
-  readonly target: ContinuationReadTarget
+  readonly target: MoreTarget
   readonly detail: string
 } {
   const offset = options.children.nextOffset
 
   if (offset === undefined) {
-    throw new Error('Continuation rows require a next offset.')
+    throw new Error('More rows require a next offset.')
   }
 
   const target = {
@@ -494,20 +438,20 @@ function continuationNode(options: {
     offset,
     limit: options.children.limit
   }
-  const continuation = options.children.continuation
+  const more = options.children.more
   const detail =
-    continuation?.kind === 'failed'
-      ? continuation.detail
-      : continuation?.kind === 'loading'
-        ? (continuation.detail ?? 'Loading more literal hierarchy rows.')
-        : formatContinuationDetail(offset, options.children.limit, options.children.totalRows)
+    more?.kind === 'failed'
+      ? more.detail
+      : more?.kind === 'loading'
+        ? (more.detail ?? 'Loading more literal hierarchy rows.')
+        : formatMoreDetail(offset, options.children.limit, options.children.totalRows)
   const childrenState =
-    continuation?.kind === 'failed'
+    more?.kind === 'failed'
       ? ({
           kind: 'failed',
           detail
         } as const)
-      : continuation?.kind === 'loading'
+      : more?.kind === 'loading'
         ? ({
             kind: 'loading',
             detail
@@ -519,11 +463,11 @@ function continuationNode(options: {
 
   return {
     node: {
-      id: `continuation:${options.ownerId}:${offset}`,
+      id: `more:${options.ownerId}:${offset}`,
       label:
-        continuation?.kind === 'failed'
+        more?.kind === 'failed'
           ? 'Retry loading more rows'
-          : continuation?.kind === 'loading'
+          : more?.kind === 'loading'
             ? 'Loading more rows'
             : 'Load more rows',
       badgeLabel: 'More',
@@ -534,35 +478,28 @@ function continuationNode(options: {
   }
 }
 
-function trackedContinuationNode(
+function trackedMoreNode(
   options: {
     readonly ownerId: string
-    readonly children: LoadedHierarchyChildrenState
+    readonly children: LoadedChildren
   },
-  rowsByNodeId: Map<BrowserTreeNodeId, HierarchyProjectionRow>,
-  continuationReadTargetsByNodeId: Map<BrowserTreeNodeId, ContinuationReadTarget>
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
 ): BrowserTreeNode {
-  const { node, target, detail } = continuationNode(options)
-  const continuation = options.children.continuation
+  const { node, target, detail } = moreNode(options)
+  const more = options.children.more
 
-  rowsByNodeId.set(node.id, {
-    kind: 'continuation',
-    state:
-      continuation?.kind === 'failed'
-        ? 'error'
-        : continuation?.kind === 'loading'
-          ? 'loading'
-          : 'available',
+  bindingsById.set(node.id, {
+    kind: 'more',
+    state: more?.kind === 'failed' ? 'error' : more?.kind === 'loading' ? 'loading' : 'available',
     ownerId: options.ownerId,
     target,
     detail
   })
-  continuationReadTargetsByNodeId.set(node.id, target)
 
   return node
 }
 
-function sourceReadTargetFor(row: LibraryNavigationRow): SourceReadTarget | undefined {
+function sourceReadTargetFor(row: LibraryNavigationRow): SourceTarget | undefined {
   if (row.selectorKind === 'source' && isPositiveOpaqueId(row.selectorPayload)) {
     return {
       navigationRowId: row.navigationRowId,
@@ -596,9 +533,7 @@ function isPositiveOpaqueId(value: unknown): value is string {
   return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
 }
 
-function copyReadEntryPoint(
-  entryPoint: LibraryHierarchyReadChildrenEntryPoint
-): LibraryHierarchyReadChildrenEntryPoint {
+function copyReadEntryPoint(entryPoint: EntryPoint): EntryPoint {
   switch (entryPoint.kind) {
     case 'source':
       return {
@@ -646,13 +581,11 @@ function formatRowFreshness(row: LibraryNavigationRow): string {
   return `Updated ${row.updatedAtMs}.`
 }
 
-function formatContinuationDetail(offset: number, limit: number, totalRows: number): string {
+function formatMoreDetail(offset: number, limit: number, totalRows: number): string {
   return `Rows ${offset + 1}-${Math.min(offset + limit, totalRows)} of ${totalRows} are available.`
 }
 
-function formatFileDetail(
-  presenceState: LibraryHierarchyReadChildrenNode['presenceState']
-): string {
+function formatFileDetail(presenceState: ChildRow['presenceState']): string {
   switch (presenceState) {
     case 'present':
       return 'Present file.'
@@ -663,9 +596,7 @@ function formatFileDetail(
   }
 }
 
-function formatDirectoryDetail(
-  presenceState: LibraryHierarchyReadChildrenNode['presenceState']
-): string {
+function formatDirectoryDetail(presenceState: ChildRow['presenceState']): string {
   switch (presenceState) {
     case 'present':
       return 'Present directory.'

@@ -2,9 +2,9 @@ import type { ReadLiteralHierarchyChildrenRequest } from '@dekzer/library-bounda
 
 import {
   hierarchyReadChannels,
-  type LibraryHierarchyReadChildrenErrorCode,
-  type LibraryHierarchyReadChildrenNode,
-  type LibraryHierarchyReadChildrenResult
+  type ReadErrorCode,
+  type ChildRow,
+  type ReadResult
 } from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
@@ -13,10 +13,7 @@ import { createHierarchyReadErrorResult, isReadResult, normalizeRequest } from '
 import { resolveTarget } from './target'
 
 export type LibraryHierarchyReadChildrenIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<LibraryHierarchyReadChildrenResult>
-  ): void
+  handle(channel: string, listener: (event: unknown, request: unknown) => Promise<ReadResult>): void
 }
 
 export function registerReadChildrenIpc(
@@ -31,7 +28,7 @@ export function registerReadChildrenIpc(
 export async function readThroughHost(
   host: LibraryBoundaryHost,
   request: unknown
-): Promise<LibraryHierarchyReadChildrenResult> {
+): Promise<ReadResult> {
   const normalizedRequest = normalizeRequest(request)
 
   if (isReadResult(normalizedRequest)) {
@@ -98,9 +95,7 @@ export async function readThroughHost(
   }
 }
 
-function getStartedClient(
-  host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | LibraryHierarchyReadChildrenResult {
+function getStartedClient(host: LibraryBoundaryHost): LibraryBoundaryHostClient | ReadResult {
   try {
     return host.client
   } catch (error: unknown) {
@@ -118,8 +113,8 @@ function getStartedClient(
 
 function mapLiteralHierarchyNodes(
   rows: Parameters<typeof mapLiteralHierarchyNode>[0][]
-): readonly LibraryHierarchyReadChildrenNode[] | undefined {
-  const nodes: LibraryHierarchyReadChildrenNode[] = []
+): readonly ChildRow[] | undefined {
+  const nodes: ChildRow[] = []
 
   for (const row of rows) {
     const node = mapLiteralHierarchyNode(row)
@@ -137,7 +132,7 @@ function mapLiteralHierarchyNodes(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): LibraryHierarchyReadChildrenResult {
+): ReadResult {
   return createHierarchyReadErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
@@ -145,10 +140,7 @@ function hostUnavailableResult(
   )
 }
 
-function hostErrorCode(
-  host: LibraryBoundaryHost,
-  error: LibraryBoundaryHostError
-): LibraryHierarchyReadChildrenErrorCode {
+function hostErrorCode(host: LibraryBoundaryHost, error: LibraryBoundaryHostError): ReadErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }

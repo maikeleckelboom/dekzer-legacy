@@ -18,7 +18,7 @@ export type RootLifecycleController = {
 
 export type RootLifecycleDependencies = {
   readonly rootActions: LocalRootActionsController
-  readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refreshHierarchy'>
+  readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
 }
 
 const safeRefreshFailure = 'Scan complete, but the library view could not refresh.'
@@ -105,7 +105,7 @@ export function createRootLifecycleController(
     let refreshed = false
 
     try {
-      refreshed = await dependencies.hierarchyRead.refreshHierarchy()
+      refreshed = await dependencies.hierarchyRead.refresh()
     } catch {
       refreshed = false
     }
