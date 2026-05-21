@@ -19,7 +19,7 @@ import {
 } from '../src/main/libraryHierarchy/readChildren'
 import {
   createLibraryHierarchyReadController,
-  type LibraryHierarchyReadApi
+  type LibraryBrowserApi
 } from '../src/renderer/libraryBrowser/hierarchyRead'
 import type { BrowserTreeNode } from '../src/renderer/libraryBrowser/tree/types'
 import {
@@ -440,7 +440,7 @@ function testLibraryApi(
   readChildren: (
     request: LibraryHierarchyReadChildrenRequest
   ) => Promise<LibraryHierarchyReadChildrenResult>
-): LibraryHierarchyReadApi {
+): LibraryBrowserApi {
   return {
     host: {
       getStatus: async () => ({

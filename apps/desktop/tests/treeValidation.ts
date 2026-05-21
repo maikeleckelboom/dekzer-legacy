@@ -4,7 +4,7 @@ import { join, relative } from 'node:path'
 
 import { desktopRoot, rendererSourceRoot, listSourceFiles, normalizePath } from './support/files'
 import { libraryHierarchyFixtureTree } from '../src/renderer/libraryBrowser/fixture'
-import { projectLibraryHierarchyReadToBrowserTree } from '../src/renderer/libraryBrowser/hierarchyProjection'
+import { projectReadResult } from '../src/renderer/libraryBrowser/hierarchyProjection'
 import {
   getTreeItemAriaExpanded,
   getTreeItemAriaSelected
@@ -407,7 +407,7 @@ function validatesCollapseKeepsLoadedChildren(): void {
 }
 
 function validatesLibraryHierarchyReadProjection(): void {
-  const projected = projectLibraryHierarchyReadToBrowserTree(fileOnlyHierarchyReadResult())
+  const projected = projectReadResult(fileOnlyHierarchyReadResult())
 
   assert.equal(projected.kind, 'tree')
   if (projected.kind !== 'tree') {
@@ -435,9 +435,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     }
   ])
 
-  const directoryProjection = projectLibraryHierarchyReadToBrowserTree(
-    directoryHierarchyReadResult()
-  )
+  const directoryProjection = projectReadResult(directoryHierarchyReadResult())
   assert.equal(directoryProjection.kind, 'tree')
   if (directoryProjection.kind !== 'tree') {
     assert.fail('expected directory hierarchy read result to project to browser tree')
@@ -481,7 +479,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     [['source-directory:12', { sourceDirectoryId: '12' }]]
   )
 
-  const partialProjection = projectLibraryHierarchyReadToBrowserTree({
+  const partialProjection = projectReadResult({
     ...fileOnlyHierarchyReadResult(),
     window: {
       ...fileOnlyHierarchyReadResult().window,

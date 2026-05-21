@@ -9,22 +9,19 @@ import type {
   LibraryHierarchyReadChildrenWindow
 } from '../../shared/libraryHierarchy/readChildren'
 import type { RendererApi } from '../../shared/rendererApi'
-import {
-  projectLibraryHierarchyBrowserStateToBrowserTree,
-  type LibraryHierarchyBrowserProjection
-} from './hierarchyProjection'
+import { projectBrowserState, type LibraryHierarchyBrowserProjection } from './hierarchyProjection'
 import type {
   LibraryHierarchyDirectoryReadState,
   LibraryHierarchyDirectoryReadTarget
 } from './hierarchyState'
 import type { BrowserTreeNodeId } from './tree/types'
 
-const literalHierarchyReadLimit = 50
+const readLimit = 50
 const safeRootReadRequestFailure = 'Unable to request library hierarchy children.'
 const safeChildReadRequestFailure = 'Unable to request library hierarchy directory children.'
 const safePartialChildReadFailure = 'The hierarchy read returned a partial child window.'
 
-export type LibraryHierarchyReadApi = RendererApi['library']
+export type LibraryBrowserApi = RendererApi['library']
 
 export type LibraryHierarchyReadController = {
   readonly hostStatus: Ref<LibraryBoundaryHostStatus | undefined>
@@ -41,7 +38,7 @@ export type LibraryHierarchyReadController = {
 }
 
 export function useLibraryHierarchyRead(
-  libraryApi: LibraryHierarchyReadApi = getRendererApi().library
+  libraryApi: LibraryBrowserApi = getRendererApi().library
 ): LibraryHierarchyReadController {
   const controller = createLibraryHierarchyReadController(libraryApi)
 
@@ -61,7 +58,7 @@ function getRendererApi(): RendererApi {
 }
 
 export function createLibraryHierarchyReadController(
-  libraryApi: LibraryHierarchyReadApi
+  libraryApi: LibraryBrowserApi
 ): LibraryHierarchyReadController {
   const hostStatus = ref<LibraryBoundaryHostStatus>()
   const hierarchyReadResult = ref<LibraryHierarchyReadChildrenResult>()
@@ -81,7 +78,7 @@ export function createLibraryHierarchyReadController(
   })
 
   const browserProjection = computed(() =>
-    projectLibraryHierarchyBrowserStateToBrowserTree({
+    projectBrowserState({
       ...(hierarchyReadResult.value === undefined
         ? {}
         : { rootReadResult: hierarchyReadResult.value }),
@@ -133,7 +130,7 @@ export function createLibraryHierarchyReadController(
           kind: 'firstAvailableSource'
         },
         offset: 0,
-        limit: literalHierarchyReadLimit
+        limit: readLimit
       })
 
       if (sequence !== rootReadSequence) {
@@ -294,7 +291,7 @@ function directoryReadRequest(
     },
     parentSourceDirectoryId,
     offset: 0,
-    limit: literalHierarchyReadLimit
+    limit: readLimit
   }
 }
 
