@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import type { BrowserTreeChildrenState, BrowserTreeNodeKind, BrowserTreeVisibleItem } from './types'
+import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
 
 defineOptions({
   name: 'TreeRow'
@@ -23,14 +24,6 @@ const rowClass = computed(() => {
 const rowStyle = computed(() => ({
   paddingLeft: `${0.75 + (props.item.level - 1) * 1.25}rem`
 }))
-
-const branchGlyph = computed(() => {
-  if (!props.item.canRevealChildren) {
-    return ''
-  }
-
-  return props.item.isExpanded ? '-' : '+'
-})
 
 const kindLabel = computed(() => formatNodeKind(props.item.node.kind))
 const childrenStateDetail = computed(() => formatChildrenStateDetail(props.item.node.childrenState))
@@ -78,12 +71,16 @@ function formatChildrenStateDetail(state: BrowserTreeChildrenState): string | un
     :style="rowStyle"
   >
     <span
-      class="grid h-7 w-7 shrink-0 place-items-center text-xs font-bold"
-      :class="item.isBranch ? 'text-(--color-text-muted)' : 'text-(--color-border)'"
+      class="grid h-7 w-7 shrink-0 place-items-center"
       :data-tree-affordance="item.canRevealChildren ? 'true' : undefined"
       aria-hidden="true"
     >
-      {{ branchGlyph }}
+      <Icon
+        v-if="item.canRevealChildren"
+        :icon="item.isExpanded ? DisclosureOpenIcon : DisclosureClosedIcon"
+        size="sm"
+        :decorative="true"
+      />
     </span>
 
     <span class="min-w-0 flex-1">

@@ -3,4 +3,42 @@
 @import './base.css' layer(base);
 @import 'tailwindcss/utilities.css' layer(utilities);
 
-/* Tailwind is renderer-edge styling only; Preflight stays omitted to preserve the existing reset. */
+@layer components {
+  .app-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .app-icon--xs {
+    width: 12px;
+    height: 12px;
+  }
+  .app-icon--sm {
+    width: 14px;
+    height: 14px;
+  }
+  .app-icon--md {
+    width: 16px;
+    height: 16px;
+  }
+  .app-icon--lg {
+    width: 20px;
+    height: 20px;
+  }
+  .app-icon--inherit {
+    color: currentColor;
+  }
+  .app-icon--muted {
+    color: var(--color-text-muted);
+  }
+  .app-icon--primary {
+    color: var(--color-accent);
+  }
+  .app-icon--warning {
+    color: var(--color-warning);
+  }
+  .app-icon--danger {
+    color: var(--color-danger);
+  }
+}

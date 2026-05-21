@@ -17,6 +17,7 @@
     "validate:absence": "tsx tests/absenceValidation.ts",
     "validate:preload": "tsx tests/preloadValidation.ts",
     "validate:tree": "tsx tests/treeValidation.ts",
+    "validate:icons": "tsx tests/iconValidation.ts",
     "start:built": "electron-vite preview --ignoreConfigWarning",
     "dev": "electron-vite dev --ignoreConfigWarning",
     "build": "pnpm run clean && pnpm run typecheck && electron-vite build --ignoreConfigWarning",
@@ -30,6 +31,7 @@
     "@dekzer/library-boundary-client": "workspace:*",
     "@dekzer/library-boundary-stdio-transport": "workspace:*",
     "@electron-toolkit/utils": "^4.0.0",
+    "@lucide/vue": "^1.16.0",
     "reka-ui": "^2.9.7"
   },
   "devDependencies": {
