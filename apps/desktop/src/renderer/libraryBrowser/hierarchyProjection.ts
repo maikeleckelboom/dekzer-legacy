@@ -129,7 +129,7 @@ function projectNavigationRow(options: {
     detail: formatNavigationDetail(options.row),
     children: {
       kind: 'loaded',
-      children: [
+      nodes: [
         trackedReadStateNode(
           {
             ownerId: nodeId,
@@ -169,7 +169,7 @@ function projectSourceChildren(options: {
     return {
       children: {
         kind: 'loaded',
-        children: [
+        nodes: [
           trackedReadStateNode(
             {
               ownerId: options.ownerId,
@@ -188,7 +188,7 @@ function projectSourceChildren(options: {
     return {
       children: {
         kind: 'loaded',
-        children: [
+        nodes: [
           trackedReadStateNode(
             {
               ownerId: options.ownerId,
@@ -206,7 +206,7 @@ function projectSourceChildren(options: {
   return {
     children: {
       kind: 'loaded',
-      children: projectLoadedHierarchyChildren({
+      nodes: projectLoadedHierarchyChildren({
         ownerId: options.ownerId,
         children: state.children,
         directoryReadStates: options.directoryReadStates,
@@ -354,7 +354,7 @@ function projectDirectoryChildren(options: {
     return {
       children: {
         kind: 'loaded',
-        children: [
+        nodes: [
           trackedReadStateNode(
             {
               ownerId: options.ownerId,
@@ -373,7 +373,7 @@ function projectDirectoryChildren(options: {
     return {
       children: {
         kind: 'loaded',
-        children: [
+        nodes: [
           trackedReadStateNode(
             {
               ownerId: options.ownerId,
@@ -391,7 +391,7 @@ function projectDirectoryChildren(options: {
   return {
     children: {
       kind: 'loaded',
-      children: projectLoadedHierarchyChildren({
+      nodes: projectLoadedHierarchyChildren({
         ownerId: options.ownerId,
         children: state.children,
         directoryReadStates: options.directoryReadStates,

@@ -6,7 +6,7 @@ export type BrowserTreeChildren =
     }
   | {
       readonly kind: 'loaded'
-      readonly children: readonly BrowserTreeNode[]
+      readonly nodes: readonly BrowserTreeNode[]
     }
   | {
       readonly kind: 'deferred'

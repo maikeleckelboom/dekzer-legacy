@@ -43,7 +43,7 @@ export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly Br
     return []
   }
 
-  return node.children.children
+  return node.children.nodes
 }
 
 export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {

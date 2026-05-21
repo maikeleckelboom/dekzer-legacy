@@ -1291,7 +1291,7 @@ function firstLoadedChildIds(nodes: readonly BrowserTreeNode[], nodeId: string):
     return []
   }
 
-  return node.children.children.map((child) => child.id)
+  return node.children.nodes.map((child) => child.id)
 }
 
 function findProjectedNode(
@@ -1304,7 +1304,7 @@ function findProjectedNode(
     }
 
     if (node.children.kind === 'loaded') {
-      const child = findProjectedNode(node.children.children, nodeId)
+      const child = findProjectedNode(node.children.nodes, nodeId)
 
       if (child !== undefined) {
         return child

@@ -44,7 +44,7 @@ const libraryHierarchyFixtureTree = {
       detail: 'Demo root for renderer tree behavior.',
       children: {
         kind: 'loaded',
-        children: [
+        nodes: [
           {
             id: 'fixture-artists',
             label: 'Artists',
@@ -66,7 +66,7 @@ const libraryHierarchyFixtureTree = {
             detail: 'Fixture grouping placeholder.',
             children: {
               kind: 'loaded',
-              children: [
+              nodes: [
                 {
                   id: 'fixture-tracks-group',
                   label: 'Fixture Track Group',
@@ -84,7 +84,7 @@ const libraryHierarchyFixtureTree = {
             detail: 'Fixture grouping placeholder.',
             children: {
               kind: 'loaded',
-              children: [
+              nodes: [
                 {
                   id: 'fixture-playlist-group',
                   label: 'Fixture Nested Group',
@@ -530,7 +530,7 @@ function validatesLibraryHierarchyReadProjection(): void {
       detail: 'Navigation source row. Updated 100.',
       children: {
         kind: 'loaded',
-        children: [
+        nodes: [
           {
             id: 'source-file:11',
             label: 'track.wav',
@@ -570,7 +570,7 @@ function validatesLibraryHierarchyReadProjection(): void {
       detail: 'Navigation source row. Updated 100.',
       children: {
         kind: 'loaded',
-        children: [
+        nodes: [
           {
             id: 'source-directory:12',
             label: 'Album',
@@ -650,18 +650,18 @@ function validatesLibraryHierarchyReadProjection(): void {
     assert.fail('expected partial projection to render loaded children')
   }
   assert.deepEqual(
-    partialSourceNode.children.children.map((node) => node.id),
+    partialSourceNode.children.nodes.map((node) => node.id),
     ['source-file:11', 'more:navigation-row:7:1']
   )
-  assert.equal(partialSourceNode.children.children[0]?.badgeLabel, 'File')
-  assert.equal(partialSourceNode.children.children[0]?.icon, 'music')
-  assert.equal(partialSourceNode.children.children[1]?.badgeLabel, 'More')
-  assert.equal(partialSourceNode.children.children[1]?.icon, 'more')
-  assert.equal(partialSourceNode.children.children[1]?.children.kind, 'none')
-  assert.equal(partialSourceNode.children.children[1]?.action?.kind, 'loadMore')
-  assert.equal(partialSourceNode.children.children[1]?.action?.state.kind, 'idle')
+  assert.equal(partialSourceNode.children.nodes[0]?.badgeLabel, 'File')
+  assert.equal(partialSourceNode.children.nodes[0]?.icon, 'music')
+  assert.equal(partialSourceNode.children.nodes[1]?.badgeLabel, 'More')
+  assert.equal(partialSourceNode.children.nodes[1]?.icon, 'more')
+  assert.equal(partialSourceNode.children.nodes[1]?.children.kind, 'none')
+  assert.equal(partialSourceNode.children.nodes[1]?.action?.kind, 'loadMore')
+  assert.equal(partialSourceNode.children.nodes[1]?.action?.state.kind, 'idle')
   assert.equal(
-    partialSourceNode.children.children[1]?.action?.state.detail,
+    partialSourceNode.children.nodes[1]?.action?.state.detail,
     'Rows 2-2 of 2 are available.'
   )
   assert.deepEqual(
@@ -782,7 +782,7 @@ function loadedBranchRootNode(): BrowserTreeNode {
     badgeLabel: 'Branch',
     children: {
       kind: 'loaded',
-      children: [
+      nodes: [
         {
           id: 'loaded-child',
           label: 'Loaded child',
@@ -801,7 +801,7 @@ function loadedEmptyBranchRootNode(): BrowserTreeNode {
     badgeLabel: 'Branch',
     children: {
       kind: 'loaded',
-      children: []
+      nodes: []
     }
   }
 }
