@@ -25,9 +25,11 @@ const {
   hierarchyReadRequestError,
   hierarchyReadIsLoading,
   browserProjection,
+  readFirstAvailableSourceHierarchy: refreshHierarchy,
   requestDirectoryChildren
 } = useLibraryHierarchyRead()
 const {
+  scanStatus,
   registeredRootPath,
   rootChoiceButtonLabel,
   rootChoiceFeedback,
@@ -165,6 +167,16 @@ function requestChildren(nodeId: BrowserTreeNodeId): void {
   void requestDirectoryChildren(nodeId)
 }
 
+async function scanRoot(): Promise<void> {
+  const scanWasRequested = await runRegisteredRootScan()
+
+  if (!scanWasRequested || scanStatus.value !== 'scanned') {
+    return
+  }
+
+  await refreshHierarchy()
+}
+
 function findNodeById(
   nodes: readonly BrowserTreeNode[],
   nodeId: BrowserTreeNodeId
@@ -235,7 +247,7 @@ function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
             type="button"
             class="inline-flex min-h-9 min-w-[126px] items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!canRunRegisteredRootScan"
-            @click="runRegisteredRootScan"
+            @click="scanRoot"
           >
             <Icon :icon="ScanIcon" size="md" :decorative="true" />
             <span>{{ scanButtonLabel }}</span>

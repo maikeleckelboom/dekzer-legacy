@@ -262,11 +262,11 @@ function scanSummaryFromResult(
 
 function scanSummaryText(summary: LocalRootScanSummary | undefined): string {
   if (summary === undefined) {
-    return 'Scan complete. Refresh is not wired yet.'
+    return 'Scan complete. Library view refresh requested.'
   }
 
   return [
-    'Scan complete. Refresh is not wired yet.',
+    'Scan complete. Library view refresh requested.',
     `${formatCount(summary.discoveredFileCount, 'file')} discovered.`,
     `${formatCount(summary.queuedSourceWorkItems, 'source work item')} queued.`
   ].join(' ')

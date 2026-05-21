@@ -86,7 +86,10 @@ async function validatesScanUsesRegisteredRootId(): Promise<void> {
     discoveredFileCount: 42,
     queuedSourceWorkItems: 8
   })
-  assert.match(controller.scanFeedback.value ?? '', /Scan complete\. Refresh is not wired yet\./)
+  assert.match(
+    controller.scanFeedback.value ?? '',
+    /Scan complete\. Library view refresh requested\./
+  )
   assert.match(controller.scanFeedback.value ?? '', /42 files discovered/)
   assert.match(controller.scanFeedback.value ?? '', /8 source work items queued/)
   assert.equal(choiceAttempts, 1)
@@ -383,8 +386,12 @@ function validatesRendererScanBoundaryOwnership(): void {
   assert.doesNotMatch(actionSource, /\bclearRegisteredRoot\b/)
   assert.doesNotMatch(panelSource, /\.runScan\(/)
   assert.doesNotMatch(panelSource, /\brootId\b/)
+  assert.match(panelSource, /readFirstAvailableSourceHierarchy: refreshHierarchy/)
+  assert.match(panelSource, /const scanWasRequested = await runRegisteredRootScan\(\)/)
+  assert.match(panelSource, /scanStatus\.value !== 'scanned'/)
+  assert.match(panelSource, /await refreshHierarchy\(\)/)
   assert.match(panelSource, /v-if="registeredRootPath !== undefined"/)
-  assert.match(panelSource, /@click="runRegisteredRootScan"/)
+  assert.match(panelSource, /@click="scanRoot"/)
 }
 
 function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRootActionsApi {
