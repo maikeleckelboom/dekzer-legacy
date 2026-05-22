@@ -2,9 +2,7 @@ import { strict as assert } from 'node:assert'
 
 import {
   classifyLibraryEntryName,
-  isDefaultVisibleLibraryEntry,
-  type BrowserEntryPresentation,
-  type LibraryEntryRole
+  isDefaultVisibleLibraryEntry
 } from '../src/renderer/libraryBrowser/browserEntryPresentation'
 
 void main()
@@ -32,7 +30,7 @@ function validatesFolderClassification(): void {
 
   assert.equal(result.role, 'folder')
   assert.equal(result.visibility, 'defaultVisible')
-  assert.equal(result.badgeLabel, 'Folder')
+  assert.deepEqual(result.badge, { value: 'Folder', tone: 'muted' })
   assert.equal(isDefaultVisibleLibraryEntry('My Music', { isDirectory: true }), true)
 }
 
@@ -56,7 +54,11 @@ function validatesAudioClassification(): void {
 
     assert.equal(result.role, 'audio', `Expected ${name} to be audio, got ${result.role}`)
     assert.equal(result.visibility, 'defaultVisible', `Expected ${name} to be defaultVisible`)
-    assert.equal(result.badgeLabel, expectedBadge, `Expected ${name} badgeLabel to be ${expectedBadge}`)
+    assert.deepEqual(
+      result.badge,
+      { value: expectedBadge, tone: 'muted' },
+      `Expected ${name} badge to be ${expectedBadge}`
+    )
     assert.equal(isDefaultVisibleLibraryEntry(name), true, `Expected ${name} to be default visible`)
   }
 }
@@ -76,7 +78,11 @@ function validatesVideoClassification(): void {
 
     assert.equal(result.role, 'video', `Expected ${name} to be video, got ${result.role}`)
     assert.equal(result.visibility, 'defaultVisible', `Expected ${name} to be defaultVisible`)
-    assert.equal(result.badgeLabel, expectedBadge, `Expected ${name} badgeLabel to be ${expectedBadge}`)
+    assert.deepEqual(
+      result.badge,
+      { value: expectedBadge, tone: 'muted' },
+      `Expected ${name} badge to be ${expectedBadge}`
+    )
     assert.equal(isDefaultVisibleLibraryEntry(name), true, `Expected ${name} to be default visible`)
   }
 }
@@ -86,7 +92,7 @@ function validatesCueSheetClassification(): void {
 
   assert.equal(result.role, 'cueSheet')
   assert.equal(result.visibility, 'defaultVisible')
-  assert.equal(result.badgeLabel, 'Cue')
+  assert.deepEqual(result.badge, { value: 'Cue', tone: 'muted' })
   assert.equal(isDefaultVisibleLibraryEntry('album.cue'), true)
 }
 
@@ -102,7 +108,7 @@ function validatesPlaylistClassification(): void {
 
     assert.equal(result.role, 'playlist', `Expected ${name} to be playlist, got ${result.role}`)
     assert.equal(result.visibility, 'companionVisible', `Expected ${name} to be companionVisible`)
-    assert.equal(result.badgeLabel, expectedBadge)
+    assert.deepEqual(result.badge, { value: expectedBadge, tone: 'muted' })
   }
 }
 
@@ -119,7 +125,7 @@ function validatesArtworkClassification(): void {
 
     assert.equal(result.role, 'artwork', `Expected ${name} to be artwork, got ${result.role}`)
     assert.equal(result.visibility, 'companionVisible', `Expected ${name} to be companionVisible`)
-    assert.equal(result.badgeLabel, expectedBadge)
+    assert.deepEqual(result.badge, { value: expectedBadge, tone: 'muted' })
   }
 }
 
@@ -128,7 +134,7 @@ function validatesMetadataClassification(): void {
 
   assert.equal(result.role, 'metadata')
   assert.equal(result.visibility, 'companionVisible')
-  assert.equal(result.badgeLabel, 'Metadata')
+  assert.deepEqual(result.badge, { value: 'Metadata', tone: 'muted' })
 }
 
 function validatesHiddenSystemFiles(): void {

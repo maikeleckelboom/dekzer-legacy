@@ -335,10 +335,7 @@ function validatesExpansionIndependence(): void {
   assert.equal(deferredItem.isBranch, true)
   assert.equal(deferredItem.canRevealChildren, false)
   assert.equal(deferredItem.isExpanded, true)
-  assert.equal(
-    getFirstChildVisibleNodeId(expandedDeferredItems, deferredItem.id),
-    undefined
-  )
+  assert.equal(getFirstChildVisibleNodeId(expandedDeferredItems, deferredItem.id), undefined)
 
   const collapsedDeferredItems = flattenVisibleTree({
     nodes: [unloadedBranchNode()],
@@ -355,10 +352,7 @@ function validatesExpansionIndependence(): void {
   assert.equal(loadingItem.isExpanded, true)
   assert.equal(loadingItem.canRevealChildren, false)
   assert.equal(loadingItem.isActionLoading, true)
-  assert.equal(
-    getFirstChildVisibleNodeId(expandedLoadingItems, loadingItem.id),
-    undefined
-  )
+  assert.equal(getFirstChildVisibleNodeId(expandedLoadingItems, loadingItem.id), undefined)
 
   const expandedFailedItems = flattenVisibleTree({
     nodes: [failedBranchNode()],
@@ -369,10 +363,7 @@ function validatesExpansionIndependence(): void {
   assert.equal(failedItem.isExpanded, true)
   assert.equal(failedItem.canRevealChildren, false)
   assert.equal(failedItem.canActivateAction, true)
-  assert.equal(
-    getFirstChildVisibleNodeId(expandedFailedItems, failedItem.id),
-    undefined
-  )
+  assert.equal(getFirstChildVisibleNodeId(expandedFailedItems, failedItem.id), undefined)
 }
 
 function validatesMoreActionNotExpandable(): void {

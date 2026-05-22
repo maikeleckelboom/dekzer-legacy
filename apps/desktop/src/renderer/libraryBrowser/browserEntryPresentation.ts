@@ -1,3 +1,5 @@
+import type { BrowserTreeBadge } from './tree/types'
+
 export type LibraryEntryRole =
   | 'folder'
   | 'audio'
@@ -14,7 +16,7 @@ export type BrowserEntryVisibility = 'defaultVisible' | 'companionVisible' | 'hi
 export interface BrowserEntryPresentation {
   readonly role: LibraryEntryRole
   readonly visibility: BrowserEntryVisibility
-  readonly badgeLabel: string
+  readonly badge: BrowserTreeBadge
 }
 
 const audioExtensions = new Set([
@@ -80,14 +82,22 @@ export function classifyLibraryEntryName(
   options?: { readonly isDirectory?: boolean }
 ): BrowserEntryPresentation {
   if (options?.isDirectory) {
-    return { role: 'folder', visibility: 'defaultVisible', badgeLabel: 'Folder' }
+    return {
+      role: 'folder',
+      visibility: 'defaultVisible',
+      badge: { value: 'Folder', tone: 'muted' }
+    }
   }
 
   const normalized = name.trim()
   const lower = normalized.toLowerCase()
 
   if (hiddenSystemFullNames.has(lower)) {
-    return { role: 'nonMedia', visibility: 'hiddenNonMedia', badgeLabel: 'System' }
+    return {
+      role: 'nonMedia',
+      visibility: 'hiddenNonMedia',
+      badge: { value: 'System', tone: 'muted' }
+    }
   }
 
   const lastDotIndex = normalized.lastIndexOf('.')
@@ -95,40 +105,60 @@ export function classifyLibraryEntryName(
   if (lastDotIndex <= 0 || lastDotIndex === normalized.length - 1) {
     const role = lastDotIndex === 0 ? 'nonMedia' : 'unknown'
 
-    return { role, visibility: 'hiddenNonMedia', badgeLabel: 'File' }
+    return { role, visibility: 'hiddenNonMedia', badge: { value: 'File', tone: 'muted' } }
   }
 
   const ext = normalized.slice(lastDotIndex).toLowerCase()
 
   if (audioExtensions.has(ext)) {
-    return { role: 'audio', visibility: 'defaultVisible', badgeLabel: 'Audio' }
+    return { role: 'audio', visibility: 'defaultVisible', badge: { value: 'Audio', tone: 'muted' } }
   }
 
   if (videoExtensions.has(ext)) {
-    return { role: 'video', visibility: 'defaultVisible', badgeLabel: 'Video' }
+    return { role: 'video', visibility: 'defaultVisible', badge: { value: 'Video', tone: 'muted' } }
   }
 
   if (cueSheetExtensions.has(ext)) {
-    return { role: 'cueSheet', visibility: 'defaultVisible', badgeLabel: 'Cue' }
+    return {
+      role: 'cueSheet',
+      visibility: 'defaultVisible',
+      badge: { value: 'Cue', tone: 'muted' }
+    }
   }
 
   if (playlistExtensions.has(ext)) {
-    return { role: 'playlist', visibility: 'companionVisible', badgeLabel: 'Playlist' }
+    return {
+      role: 'playlist',
+      visibility: 'companionVisible',
+      badge: { value: 'Playlist', tone: 'muted' }
+    }
   }
 
   if (artworkExtensions.has(ext)) {
-    return { role: 'artwork', visibility: 'companionVisible', badgeLabel: 'Artwork' }
+    return {
+      role: 'artwork',
+      visibility: 'companionVisible',
+      badge: { value: 'Artwork', tone: 'muted' }
+    }
   }
 
   if (metadataExtensions.has(ext)) {
-    return { role: 'metadata', visibility: 'companionVisible', badgeLabel: 'Metadata' }
+    return {
+      role: 'metadata',
+      visibility: 'companionVisible',
+      badge: { value: 'Metadata', tone: 'muted' }
+    }
   }
 
   if (hiddenSystemExtensions.has(ext)) {
-    return { role: 'nonMedia', visibility: 'hiddenNonMedia', badgeLabel: 'System' }
+    return {
+      role: 'nonMedia',
+      visibility: 'hiddenNonMedia',
+      badge: { value: 'System', tone: 'muted' }
+    }
   }
 
-  return { role: 'unknown', visibility: 'hiddenNonMedia', badgeLabel: 'File' }
+  return { role: 'unknown', visibility: 'hiddenNonMedia', badge: { value: 'File', tone: 'muted' } }
 }
 
 export function isDefaultVisibleLibraryEntry(

@@ -354,14 +354,16 @@ function projectLiteralNode(options: {
   return {
     id: node.id,
     label: node.label,
-    badge: { value: presentation.badgeLabel, tone: 'muted' },
+    badge: presentation.badge,
     icon: browserTreeIconForEntryRole(presentation.role),
     detail: formatFileDetail(node.presence),
     children: { kind: 'none' }
   }
 }
 
-function browserTreeIconForEntryRole(role: LibraryEntryRole): import('./tree/types').BrowserTreeIcon {
+function browserTreeIconForEntryRole(
+  role: LibraryEntryRole
+): import('./tree/types').BrowserTreeIcon {
   switch (role) {
     case 'folder':
       return 'folder'
@@ -635,7 +637,9 @@ function moreIcon(more: LoadedChildren['more']): BrowserTreeIcon {
   }
 }
 
-function readStateBadgeTone(state: 'loading' | 'empty' | 'unavailable' | 'error'): BrowserTreeBadgeTone {
+function readStateBadgeTone(
+  state: 'loading' | 'empty' | 'unavailable' | 'error'
+): BrowserTreeBadgeTone {
   switch (state) {
     case 'loading':
       return 'neutral'
