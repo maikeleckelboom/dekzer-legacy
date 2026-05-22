@@ -51,7 +51,6 @@ function validatesLoadedSourceContents(): void {
       kind: 'directory',
       label: 'Album',
       presence: 'present',
-      updatedAtMs: 100,
       state: null,
       actionKind: null,
       actionNodeId: null
@@ -61,7 +60,6 @@ function validatesLoadedSourceContents(): void {
       kind: 'file',
       label: 'track.wav',
       presence: 'present',
-      updatedAtMs: 101,
       state: null,
       actionKind: null,
       actionNodeId: null
@@ -98,7 +96,6 @@ function validatesLoadedDirectoryContents(): void {
       kind: 'file',
       label: 'inside.wav',
       presence: 'present',
-      updatedAtMs: 102,
       state: null,
       actionKind: null,
       actionNodeId: null
@@ -108,7 +105,6 @@ function validatesLoadedDirectoryContents(): void {
       kind: 'directory',
       label: 'Nested',
       presence: 'present',
-      updatedAtMs: 100,
       state: null,
       actionKind: null,
       actionNodeId: null
@@ -183,7 +179,6 @@ function validatesEmptyLoadedContents(): void {
       kind: 'state',
       label: 'Empty folder',
       presence: null,
-      updatedAtMs: null,
       state: 'empty',
       actionKind: null,
       actionNodeId: null
@@ -331,7 +326,6 @@ function validatesLiteralFileSelection(): void {
       kind: 'state',
       label: 'File selected',
       presence: null,
-      updatedAtMs: null,
       state: 'file',
       actionKind: null,
       actionNodeId: null
@@ -484,7 +478,6 @@ function rowSummary(row: ContentRow): {
   readonly kind: ContentRow['kind']
   readonly label: string
   readonly presence: ContentRow['presence'] | null
-  readonly updatedAtMs: ContentRow['updatedAtMs'] | null
   readonly state: ContentRow['state'] | null
   readonly actionKind: NonNullable<ContentRow['action']>['kind'] | null
   readonly actionNodeId: NonNullable<ContentRow['action']>['nodeId'] | null
@@ -494,7 +487,6 @@ function rowSummary(row: ContentRow): {
     kind: row.kind,
     label: row.label,
     presence: row.presence ?? null,
-    updatedAtMs: row.updatedAtMs ?? null,
     state: row.state ?? null,
     actionKind: row.action?.kind ?? null,
     actionNodeId: row.action?.nodeId ?? null

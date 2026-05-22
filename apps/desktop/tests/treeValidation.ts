@@ -627,7 +627,7 @@ function validatesLibraryHierarchyReadProjection(): void {
       label: 'Source Fixture',
       badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
-      detail: 'Navigation source row. Updated 100.',
+      detail: 'Navigation source row. Updated 1970-01-01.',
       children: {
         kind: 'loaded',
         nodes: [
@@ -669,7 +669,7 @@ function validatesLibraryHierarchyReadProjection(): void {
       label: 'Source Fixture',
       badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
-      detail: 'Navigation source row. Updated 100.',
+      detail: 'Navigation source row. Updated 1970-01-01.',
       children: {
         kind: 'loaded',
         nodes: [

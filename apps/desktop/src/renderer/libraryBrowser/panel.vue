@@ -83,7 +83,7 @@ const modeEyebrow = computed(() => {
 })
 
 const modeBadge = computed(() =>
-  navigationReadResult.value?.state === 'ready' ? 'Local store' : 'Read state'
+  navigationReadResult.value?.state === 'ready' ? 'Active' : 'Unavailable'
 )
 
 const operationFeedback = computed(() =>
@@ -130,13 +130,13 @@ const selectedSummaryDetail = computed(() => {
 
   switch (row.kind) {
     case 'navigation':
-      return `${formatNavigationKind(row.navigationRow.rowKind)} navigation row.`
+      return 'Persisted library navigation row.'
     case 'source':
-      return 'Source entry point backed by a maintained navigation row.'
+      return 'Library source entry point.'
     case 'directory':
-      return 'Literal directory backed by source_directory_id.'
+      return 'Directory entry from the library hierarchy.'
     case 'file':
-      return 'Literal file backed by source_file_id.'
+      return 'File entry from the library hierarchy.'
     case 'readState':
       return row.detail
     case 'more':
@@ -203,6 +203,7 @@ watch(
 function selectNode(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
   selectedNodeId.value = nodeId
+  expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
   void requestNodeChildren(nodeId)
 }
 
@@ -275,21 +276,6 @@ function formatSelectedRowKind(kind: RowBinding['kind']): string {
       return 'More row'
   }
 }
-
-function formatNavigationKind(kind: string): string {
-  switch (kind) {
-    case 'collectionGroup':
-      return 'collection group'
-    case 'prepPolicyGroup':
-      return 'preparation group'
-    case 'prepPolicyScope':
-      return 'preparation scope'
-    case 'locationGroup':
-      return 'location group'
-    default:
-      return kind
-  }
-}
 </script>
 
 <template>
@@ -351,12 +337,6 @@ function formatNavigationKind(kind: string): string {
           class="mt-1 max-w-2xl text-xs leading-5 text-(--color-text-muted)"
         >
           {{ operationFeedback.detail }}
-        </p>
-        <p
-          v-if="registeredRootPath !== undefined"
-          class="mt-1 wrap-anywhere font-mono text-xs text-(--color-text-muted)"
-        >
-          {{ registeredRootPath }}
         </p>
       </div>
     </header>

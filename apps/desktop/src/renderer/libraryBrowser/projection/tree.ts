@@ -151,7 +151,7 @@ function projectNavigationRow(options: {
             ownerId: nodeId,
             state: 'unavailable',
             label: 'Unavailable',
-            detail: 'This navigation row does not expose a literal hierarchy entry point yet.'
+            detail: 'No media folders are available for this navigation row yet.'
           },
           options.bindingsById
         )
@@ -245,7 +245,7 @@ function projectLoadedHierarchyChildren(options: {
           ownerId: options.ownerId,
           state: 'empty',
           label: 'Empty folder',
-          detail: 'No literal hierarchy rows are available here.'
+          detail: 'No media entries are available in this folder.'
         },
         options.bindingsById
       )
@@ -267,7 +267,7 @@ function projectLoadedHierarchyChildren(options: {
           ownerId: options.ownerId,
           state: 'empty',
           label: 'No media entries',
-          detail: 'No default-visible media rows in this location.'
+          detail: 'No media found in this location.'
         },
         options.bindingsById
       )
@@ -704,11 +704,11 @@ function isPositiveOpaqueId(value: unknown): value is string {
 }
 
 function formatNavigationSourceDetail(row: NavigationRow): string {
-  return `Navigation source row. ${formatRowFreshness(row)}`
+  return `Navigation source row. Updated ${formatRowFreshness(row)}.`
 }
 
 function formatNavigationDetail(row: NavigationRow): string {
-  return `Navigation ${formatNavigationRowKind(row.rowKind)} row. ${formatRowFreshness(row)}`
+  return `Navigation ${formatNavigationRowKind(row.rowKind)} row. Updated ${formatRowFreshness(row)}.`
 }
 
 function formatNavigationRowKind(rowKind: NavigationRow['rowKind']): string {
@@ -733,7 +733,7 @@ function formatNavigationRowKind(rowKind: NavigationRow['rowKind']): string {
 }
 
 function formatRowFreshness(row: NavigationRow): string {
-  return `Updated ${row.updatedAtMs}.`
+  return new Date(row.updatedAtMs).toISOString().slice(0, 10)
 }
 
 function formatMoreDetail(offset: number, limit: number, totalRows: number): string {

@@ -19,6 +19,7 @@ function main(): void {
   validatesSuccessAndTerminal()
   validatesNoFakeProgress()
   validatesErrorDetailPassthrough()
+  validatesPersistedNavigationWithoutSessionRoot()
 }
 
 function validatesHostNotReady(): void {
@@ -263,6 +264,34 @@ function validatesErrorDetailPassthrough(): void {
   assert.match(hierarchyErr.detail ?? '', /Safe hierarchy error text/)
 }
 
+function validatesPersistedNavigationWithoutSessionRoot(): void {
+  const base = startedInputs({
+    registeredRootPath: undefined,
+    navigationReadResult: readyNavigation([makeNavRow()])
+  })
+
+  const readyFromPersistence = deriveOperationFeedback(base)
+  assertKindAndTone(readyFromPersistence, 'ready', 'success')
+
+  const noSourcesFromPersistence = deriveOperationFeedback(
+    startedInputs({
+      registeredRootPath: undefined,
+      navigationReadResult: readyNavigation([])
+    })
+  )
+  assertKindAndTone(noSourcesFromPersistence, 'noSources', 'warning')
+
+  const stillChooseRoot = deriveOperationFeedback(noRootInputs({ navigationReadResult: undefined }))
+  assertKindAndTone(stillChooseRoot, 'chooseRoot', 'idle')
+
+  const hostStillWins = deriveOperationFeedback({
+    ...base,
+    hostStatus: failedHost('host failure reason')
+  })
+  assert.equal(hostStillWins.kind, 'hostUnavailable')
+  assert.equal(hostStillWins.tone, 'error')
+}
+
 function assertKindAndTone(
   actual: LibraryOperationFeedback,
   expectedKind: LibraryOperationFeedbackKind,
@@ -293,7 +322,7 @@ function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): Operat
   }
 }
 
-function noRootInputs(): OperationFeedbackInputs {
+function noRootInputs(overrides: Partial<OperationFeedbackInputs> = {}): OperationFeedbackInputs {
   return {
     hostStatus: hostWithState('started'),
     rootChoiceStatus: 'idle',
@@ -305,7 +334,8 @@ function noRootInputs(): OperationFeedbackInputs {
     hierarchyReadIsLoading: false,
     navigationReadRequestError: undefined,
     hierarchyReadRequestError: undefined,
-    navigationReadResult: undefined
+    navigationReadResult: undefined,
+    ...overrides
   }
 }
 

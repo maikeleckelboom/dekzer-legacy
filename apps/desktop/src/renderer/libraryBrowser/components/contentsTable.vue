@@ -55,8 +55,8 @@ function formatContentPresence(presence: ContentRow['presence']): string {
   }
 }
 
-function formatContentUpdated(updatedAtMs: ContentRow['updatedAtMs']): string {
-  return updatedAtMs === undefined ? '-' : String(updatedAtMs)
+function formatContentUpdated(): string {
+  return '-'
 }
 
 function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconComponent | undefined {
@@ -166,7 +166,7 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
               {{ formatContentPresence(row.presence) }}
             </td>
             <td class="px-3 py-2 align-middle font-mono text-xs">
-              {{ formatContentUpdated(row.updatedAtMs) }}
+              {{ formatContentUpdated() }}
             </td>
             <td class="px-3 py-2 align-middle text-xs leading-5">
               {{ row.detail ?? '-' }}

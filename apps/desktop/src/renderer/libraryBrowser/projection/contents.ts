@@ -39,7 +39,6 @@ export type ContentRow = {
   readonly kind: ContentRowKind
   readonly label: string
   readonly presence?: Presence
-  readonly updatedAtMs?: number
   readonly detail?: string
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
@@ -268,8 +267,8 @@ function projectFileContents(options: {
   const title = fileRow?.label ?? 'Selected file'
   const detail =
     fileRow === undefined
-      ? 'This literal file row does not expose hierarchy children.'
-      : `${formatPresenceDetail(fileRow)} Updated ${fileRow.updatedAtMs}.`
+      ? 'File details are not available for this entry.'
+      : formatPresenceDetail(fileRow)
 
   return stateProjection({
     kind: 'ready',
@@ -301,7 +300,7 @@ function projectLoadedContents(options: {
         ownerId: options.ownerNodeId,
         state: 'empty',
         label: 'Empty folder',
-        detail: 'No literal hierarchy rows are available here.'
+        detail: 'No media entries are available here.'
       })
     )
   }
@@ -322,7 +321,6 @@ function contentChildRow(row: ChildRow): ContentRow {
     kind: row.kind,
     label: row.label,
     presence: row.presence,
-    updatedAtMs: row.updatedAtMs,
     detail: formatPresenceDetail(row),
     icon
   }
@@ -386,7 +384,7 @@ function contentMoreRowForLoadedChildren(options: {
       ownerId: options.ownerNodeId,
       state: 'unsupported',
       label: 'More rows unavailable',
-      detail: 'More rows are available, but no projected more action is available.'
+      detail: 'Additional rows are available.'
     })
   }
 

@@ -154,7 +154,7 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
     return hostNotReadyFeedback(host)
   }
 
-  if (inputs.registeredRootPath === undefined) {
+  if (inputs.registeredRootPath === undefined && inputs.navigationReadResult?.state !== 'ready') {
     return noRootFeedback(inputs.rootChoiceStatus)
   }
 
