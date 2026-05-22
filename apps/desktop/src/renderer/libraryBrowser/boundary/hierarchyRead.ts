@@ -263,10 +263,13 @@ export function createLibraryHierarchyReadController(
       return false
     }
 
+    if (currentState?.kind === 'loaded') {
+      return false
+    }
+
     const sequence = ++sourceReadSequence
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
-    directoryReadStates.value = new Map()
     setSourceReadState(nodeId, {
       kind: 'loading',
       requestKey,
@@ -331,6 +334,10 @@ export function createLibraryHierarchyReadController(
     const currentState = directoryReadStates.value.get(target.directoryId)
 
     if (currentState?.kind === 'loading' && currentState.requestKey === requestKey) {
+      return false
+    }
+
+    if (currentState?.kind === 'loaded') {
       return false
     }
 

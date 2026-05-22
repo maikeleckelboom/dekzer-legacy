@@ -477,11 +477,12 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
     'read-state:source-directory:13:empty'
   ])
 
+  assert.equal(await controller.loadFirstSource(), false)
+
   const staleDirectoryRequest = controller.requestDirectoryChildren('source-directory:14')
-  await controller.loadFirstSource()
   directory14Read.resolve(loadedDirectoryReadResult('14'))
-  assert.equal(await staleDirectoryRequest, false)
-  assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
+  assert.equal(await staleDirectoryRequest, true)
+  assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'loaded')
 }
 
 async function validatesRendererWindowedMore(): Promise<void> {
@@ -705,10 +706,10 @@ async function validatesRendererWindowedMore(): Promise<void> {
     findProjectedNode(projection.nodes, 'more:source-directory:14:1')?.action?.state.kind,
     'loading'
   )
-  await controller.loadFirstSource()
+  assert.equal(await controller.loadFirstSource(), false)
   directory14More.resolve(directoryMoreReadResult('14'))
-  assert.equal(await staleMore, false)
-  assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'unloaded')
+  assert.equal(await staleMore, true)
+  assert.equal(controller.directoryReadStates.value.get('14')?.kind, 'loaded')
 }
 
 async function validatesEntryPointRejection(): Promise<void> {
