@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import type { LocationSourceIcon, LocationSourceIconBadge } from '../projection/sourcePresentation'
 import { Icon } from '../../icons'
-import { resolveSourceIcon, resolveSourceIconBadge } from '../../icons'
+import { resolveSourceIcon, resolveSourceIconBadge } from './sourceIconResolver'
 
 defineOptions({
   name: 'SourceIcon'

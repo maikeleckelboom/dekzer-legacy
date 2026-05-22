@@ -1,8 +1,5 @@
-import type {
-  LocationSourceIcon,
-  LocationSourceIconBadge
-} from '../libraryBrowser/projection/sourcePresentation'
-import type { IconComponent } from './types'
+import type { LocationSourceIcon, LocationSourceIconBadge } from '../projection/sourcePresentation'
+import type { IconComponent } from '../../icons/types'
 import {
   ArchiveIcon,
   CircleCheckIcon,
@@ -23,8 +20,8 @@ import {
   SourceIcon,
   TriangleAlertIcon,
   UsbIcon
-} from './lucide'
-import { SdCardIcon } from './custom'
+} from '../../icons/lucide'
+import { SdCardIcon } from '../../icons/custom'
 
 export function resolveSourceIcon(icon: LocationSourceIcon): IconComponent {
   switch (icon) {

@@ -41,4 +41,3 @@ export {
   WarningIcon
 } from './lucide'
 export { SdCardIcon } from './custom'
-export { resolveSourceIcon, resolveSourceIconBadge } from './sourceIconResolver'
