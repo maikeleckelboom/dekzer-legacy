@@ -24,13 +24,9 @@ export type LocalRootActionsController = {
   readonly registeredRoot: Ref<LocalRootRegistrationRoot | undefined>
   readonly registeredRootPath: ComputedRef<string | undefined>
   readonly rootChoiceButtonLabel: ComputedRef<string>
-  readonly rootChoiceFeedback: ComputedRef<string>
-  readonly rootChoiceFeedbackClass: ComputedRef<string>
   readonly canChooseLocalRoot: ComputedRef<boolean>
   readonly scanStatus: Ref<LocalRootScanStatus>
   readonly scanSummary: Ref<LocalRootScanSummary | undefined>
-  readonly scanFeedback: ComputedRef<string | undefined>
-  readonly scanFeedbackClass: ComputedRef<string>
   readonly scanButtonLabel: ComputedRef<string>
   readonly canRunRegisteredRootScan: ComputedRef<boolean>
   readonly chooseAndRegisterLocalRoot: () => Promise<boolean>
@@ -79,66 +75,6 @@ export function createLocalRootActionsController(
     }
 
     return 'Scan folder'
-  })
-
-  const rootChoiceFeedback = computed(() => {
-    switch (rootChoiceStatus.value) {
-      case 'idle':
-        return 'Choose a music folder to add it to your library.'
-      case 'choosing':
-        return 'Opening folder picker...'
-      case 'canceled':
-        return 'Folder selection canceled.'
-      case 'registered':
-        return 'Folder added.'
-      case 'failed':
-        return rootChoiceFailureMessage.value ?? safeRootChoiceFailure
-    }
-
-    return safeRootChoiceFailure
-  })
-
-  const rootChoiceFeedbackClass = computed(() => {
-    switch (rootChoiceStatus.value) {
-      case 'registered':
-        return 'text-(--color-accent)'
-      case 'failed':
-        return 'text-(--color-danger)'
-      case 'canceled':
-        return 'text-(--color-warning)'
-      default:
-        return 'text-(--color-text-muted)'
-    }
-  })
-
-  const scanFeedback = computed(() => {
-    if (registeredRoot.value === undefined) {
-      return undefined
-    }
-
-    switch (scanStatus.value) {
-      case 'idle':
-        return 'Ready to scan this folder.'
-      case 'scanning':
-        return 'Scanning folder...'
-      case 'scanned':
-        return scanSummaryText(scanSummary.value)
-      case 'failed':
-        return scanFailureMessage.value ?? safeRootScanFailure
-    }
-
-    return safeRootScanFailure
-  })
-
-  const scanFeedbackClass = computed(() => {
-    switch (scanStatus.value) {
-      case 'scanned':
-        return 'text-(--color-accent)'
-      case 'failed':
-        return 'text-(--color-danger)'
-      default:
-        return 'text-(--color-text-muted)'
-    }
   })
 
   async function chooseAndRegisterLocalRoot(): Promise<boolean> {
@@ -217,13 +153,9 @@ export function createLocalRootActionsController(
     registeredRoot,
     registeredRootPath,
     rootChoiceButtonLabel,
-    rootChoiceFeedback,
-    rootChoiceFeedbackClass,
     canChooseLocalRoot,
     scanStatus,
     scanSummary,
-    scanFeedback,
-    scanFeedbackClass,
     scanButtonLabel,
     canRunRegisteredRootScan,
     chooseAndRegisterLocalRoot,
@@ -267,20 +199,4 @@ function scanSummaryFromResult(
     discoveredFileCount: result.discoveredFileCount,
     queuedSourceWorkItems: result.queuedSourceWorkItems
   }
-}
-
-function scanSummaryText(summary: LocalRootScanSummary | undefined): string {
-  if (summary === undefined) {
-    return 'Scan complete.'
-  }
-
-  return [
-    'Scan complete.',
-    `${formatCount(summary.discoveredFileCount, 'file')} discovered.`,
-    `${formatCount(summary.queuedSourceWorkItems, 'source work item')} queued.`
-  ].join(' ')
-}
-
-function formatCount(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? '' : 's'}`
 }

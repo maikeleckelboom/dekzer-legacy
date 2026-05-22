@@ -8,8 +8,6 @@ export type RootLifecycleRefreshStatus = 'idle' | 'refreshing' | 'refreshed' | '
 
 export type RootLifecycleController = {
   readonly refreshStatus: Ref<RootLifecycleRefreshStatus>
-  readonly refreshFeedback: ComputedRef<string | undefined>
-  readonly refreshFeedbackClass: ComputedRef<string>
   readonly canAddMusicFolder: ComputedRef<boolean>
   readonly canScanRoot: ComputedRef<boolean>
   readonly addMusicFolder: () => Promise<boolean>
@@ -20,8 +18,6 @@ export type RootLifecycleDependencies = {
   readonly rootActions: LocalRootActionsController
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
 }
-
-const safeRefreshFailure = 'Scan complete, but the library view could not refresh.'
 
 export function useRootLifecycle(dependencies: RootLifecycleDependencies): RootLifecycleController {
   return createRootLifecycleController(dependencies)
@@ -41,32 +37,6 @@ export function createRootLifecycleController(
       dependencies.rootActions.canRunRegisteredRootScan.value &&
       refreshStatus.value !== 'refreshing'
   )
-
-  const refreshFeedback = computed(() => {
-    switch (refreshStatus.value) {
-      case 'idle':
-        return undefined
-      case 'refreshing':
-        return 'Refreshing library view...'
-      case 'refreshed':
-        return 'Library view refreshed.'
-      case 'failed':
-        return safeRefreshFailure
-    }
-
-    return safeRefreshFailure
-  })
-
-  const refreshFeedbackClass = computed(() => {
-    switch (refreshStatus.value) {
-      case 'refreshed':
-        return 'text-(--color-accent)'
-      case 'failed':
-        return 'text-(--color-danger)'
-      default:
-        return 'text-(--color-text-muted)'
-    }
-  })
 
   async function addMusicFolder(): Promise<boolean> {
     if (!canAddMusicFolder.value) {
@@ -125,8 +95,6 @@ export function createRootLifecycleController(
 
   return {
     refreshStatus,
-    refreshFeedback,
-    refreshFeedbackClass,
     canAddMusicFolder,
     canScanRoot,
     addMusicFolder,

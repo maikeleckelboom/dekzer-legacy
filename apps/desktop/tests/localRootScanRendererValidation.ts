@@ -55,7 +55,6 @@ async function validatesScanUnavailableBeforeRegistration(): Promise<void> {
   assert.equal(await controller.runRegisteredRootScan(), false)
   assert.equal(scanAttempts, 0)
   assert.equal(controller.scanStatus.value, 'idle')
-  assert.equal(controller.scanFeedback.value, undefined)
 }
 
 async function validatesScanUsesRegisteredRootId(): Promise<void> {
@@ -84,7 +83,7 @@ async function validatesScanUsesRegisteredRootId(): Promise<void> {
 
   assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
   assert.equal(controller.registeredRootPath.value, 'C:/Music/root-from-main-is-not-parsed')
-  assert.equal(controller.rootChoiceFeedback.value, 'Folder added.')
+  assert.equal(controller.rootChoiceStatus.value, 'registered')
   assert.equal(controller.canRunRegisteredRootScan.value, true)
 
   assert.equal(await controller.runRegisteredRootScan(), true)
@@ -97,9 +96,7 @@ async function validatesScanUsesRegisteredRootId(): Promise<void> {
     discoveredFileCount: 42,
     queuedSourceWorkItems: 8
   })
-  assert.match(controller.scanFeedback.value ?? '', /Scan complete\./)
-  assert.match(controller.scanFeedback.value ?? '', /42 files discovered/)
-  assert.match(controller.scanFeedback.value ?? '', /8 source work items queued/)
+  assert.equal(controller.scanStatus.value, 'scanned')
   assert.equal(choiceAttempts, 1)
 }
 
@@ -140,7 +137,6 @@ async function validatesAddMusicFolderScansRegisteredRootAndRefreshesHierarchy()
   assert.equal(rootActions.registeredRootPath.value, 'C:/Music/root-from-main-is-not-parsed')
   assert.equal(rootActions.scanStatus.value, 'scanned')
   assert.equal(lifecycle.refreshStatus.value, 'refreshed')
-  assert.equal(lifecycle.refreshFeedback.value, 'Library view refreshed.')
   assert.equal(rootActions.scanButtonLabel.value, 'Rescan folder')
 }
 
@@ -187,11 +183,6 @@ async function validatesRefreshFailureDoesNotOverwriteScanSuccess(): Promise<voi
     queuedSourceWorkItems: 8
   })
   assert.equal(lifecycle.refreshStatus.value, 'failed')
-  assert.match(rootActions.scanFeedback.value ?? '', /Scan complete\./)
-  assert.equal(
-    lifecycle.refreshFeedback.value,
-    'Scan complete, but the library view could not refresh.'
-  )
 }
 
 async function validatesDuplicateScanRequestsArePrevented(): Promise<void> {
@@ -237,7 +228,6 @@ async function validatesScanFailureUsesSafeCopy(): Promise<void> {
   assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
   assert.equal(await controller.runRegisteredRootScan(), true)
   assert.equal(controller.scanStatus.value, 'failed')
-  assert.equal(controller.scanFeedback.value, 'Unable to scan folder.')
 }
 
 async function validatesThrownScanErrorUsesSafeCopy(): Promise<void> {
@@ -253,7 +243,6 @@ async function validatesThrownScanErrorUsesSafeCopy(): Promise<void> {
   assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
   assert.equal(await controller.runRegisteredRootScan(), true)
   assert.equal(controller.scanStatus.value, 'failed')
-  assert.equal(controller.scanFeedback.value, 'Unable to scan folder.')
 }
 
 async function validatesCanceledRegistrationDoesNotEnableScan(): Promise<void> {
@@ -294,7 +283,7 @@ async function validatesFailedRegistrationDoesNotEnableScan(): Promise<void> {
   assert.equal(controller.rootChoiceStatus.value, 'failed')
   assert.equal(controller.registeredRoot.value, undefined)
   assert.equal(controller.canRunRegisteredRootScan.value, false)
-  assert.equal(controller.scanFeedback.value, undefined)
+  assert.equal(controller.scanStatus.value, 'idle')
   assert.equal(await controller.runRegisteredRootScan(), false)
   assert.equal(scanAttempts, 0)
 }
@@ -351,7 +340,6 @@ async function validatesCanceledSecondRegistrationPreservesRegisteredRootAndScan
     discoveredFileCount: 12,
     queuedSourceWorkItems: 8
   })
-  assert.match(controller.scanFeedback.value ?? '', /12 files discovered/)
 }
 
 async function validatesFailedSecondRegistrationPreservesRegisteredRootAndScanState(): Promise<void> {
@@ -380,7 +368,6 @@ async function validatesFailedSecondRegistrationPreservesRegisteredRootAndScanSt
 
   assert.equal(await controller.chooseAndRegisterLocalRoot(), false)
   assert.equal(controller.rootChoiceStatus.value, 'failed')
-  assert.equal(controller.rootChoiceFeedback.value, 'Unable to add music folder.')
   assert.equal(controller.registeredRootPath.value, 'C:/Music/One')
   assert.equal(controller.scanStatus.value, 'scanned')
   assert.deepEqual(controller.scanSummary.value, {
@@ -424,7 +411,6 @@ async function validatesSuccessfulSecondRegistrationReplacesRootAndResetsScanSta
   assert.equal(controller.registeredRootPath.value, 'C:/Music/Two')
   assert.equal(controller.scanStatus.value, 'idle')
   assert.equal(controller.scanSummary.value, undefined)
-  assert.equal(controller.rootChoiceFeedback.value, 'Folder added.')
 }
 
 async function validatesComposedCanceledSecondChoicePreservesRegisteredRootAndScanState(): Promise<void> {
@@ -503,7 +489,6 @@ async function validatesComposedFailedSecondChoicePreservesRegisteredRootAndScan
   assert.equal(await lifecycle.addMusicFolder(), true)
   assert.equal(await lifecycle.addMusicFolder(), false)
   assert.equal(rootActions.rootChoiceStatus.value, 'failed')
-  assert.equal(rootActions.rootChoiceFeedback.value, 'Unable to add music folder.')
   assert.equal(rootActions.registeredRootPath.value, 'C:/Music/One')
   assert.equal(rootActions.scanStatus.value, 'scanned')
   assert.deepEqual(rootActions.scanSummary.value, {
