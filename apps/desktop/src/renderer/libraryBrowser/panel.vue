@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
 import { FolderPlusIcon, Icon, ScanIcon } from '../icons'
 import { projectContents, type ContentRow } from './projection/contents'
 import ContentsTable from './components/contentsTable.vue'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import { useRootLifecycle } from './runtime/rootLifecycle'
+import { deriveOperationFeedback } from './projection/operationFeedback'
 import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
@@ -101,36 +101,32 @@ const modeBadge = computed(() =>
   navigationReadResult.value?.state === 'ready' ? 'Local store' : 'Read state'
 )
 
-const panelDetail = computed(() => {
-  if (navigationReadResult.value?.state === 'ready') {
-    return 'Showing maintained navigation rows from the local library store.'
-  }
+const operationFeedback = computed(() =>
+  deriveOperationFeedback({
+    hostStatus: hostStatus.value,
+    rootChoiceStatus: rootActions.rootChoiceStatus.value,
+    registeredRootPath: registeredRootPath.value,
+    scanStatus: rootActions.scanStatus.value,
+    refreshStatus: rootLifecycle.refreshStatus.value,
+    navigationReadIsLoading: navigationReadIsLoading.value,
+    hierarchyReadIsLoading: hierarchyReadIsLoading.value,
+    navigationReadRequestError: navigationReadRequestError.value,
+    hierarchyReadRequestError: hierarchyReadRequestError.value,
+    navigationReadResult: navigationReadResult.value
+  })
+)
 
-  if (navigationReadRequestError.value !== undefined) {
-    return navigationReadRequestError.value
+const operationFeedbackToneClass = computed(() => {
+  switch (operationFeedback.value.tone) {
+    case 'success':
+      return 'text-(--color-accent)'
+    case 'error':
+      return 'text-(--color-danger)'
+    case 'warning':
+      return 'text-(--color-warning)'
+    default:
+      return 'text-(--color-text)'
   }
-
-  if (hierarchyReadRequestError.value !== undefined) {
-    return hierarchyReadRequestError.value
-  }
-
-  if (navigationReadIsLoading.value) {
-    return 'Loading maintained navigation rows.'
-  }
-
-  if (hierarchyReadIsLoading.value) {
-    return 'Loading literal hierarchy rows.'
-  }
-
-  if (hostStatus.value === undefined) {
-    return 'Checking library boundary host status.'
-  }
-
-  if (hostStatus.value.state !== 'started') {
-    return `Library boundary host is ${formatHostState(hostStatus.value.state).toLowerCase()}.`
-  }
-
-  return 'No maintained navigation read has completed yet.'
 })
 
 const selectedSummaryLabel = computed(() =>
@@ -277,23 +273,6 @@ function findNodeById(
   return undefined
 }
 
-function formatHostState(state: LibraryBoundaryHostStatus['state']): string {
-  switch (state) {
-    case 'idle':
-      return 'Idle'
-    case 'starting':
-      return 'Starting'
-    case 'started':
-      return 'Started'
-    case 'stopping':
-      return 'Stopping'
-    case 'stopped':
-      return 'Stopped'
-    case 'failed':
-      return 'Failed'
-  }
-}
-
 function formatSelectedRowKind(kind: RowBinding['kind']): string {
   switch (kind) {
     case 'navigation':
@@ -377,8 +356,14 @@ function formatNavigationKind(kind: string): string {
           </span>
         </div>
       </div>
-      <p class="mt-3 max-w-2xl text-sm leading-6 text-(--color-text-muted)">
-        {{ panelDetail }}
+      <p class="mt-3 text-sm font-semibold leading-6" :class="operationFeedbackToneClass">
+        {{ operationFeedback.title }}
+      </p>
+      <p
+        v-if="operationFeedback.detail !== undefined"
+        class="mt-1 max-w-2xl text-xs leading-5 text-(--color-text-muted)"
+      >
+        {{ operationFeedback.detail }}
       </p>
       <div
         class="mt-3 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2"

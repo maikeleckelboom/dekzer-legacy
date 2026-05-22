@@ -15,6 +15,7 @@ const validations = [
   'tests/localRootRegistrationValidation.ts',
   'tests/localRootScanValidation.ts',
   'tests/localRootScanRendererValidation.ts',
+  'tests/operationFeedbackValidation.ts',
   'tests/locationSourcesValidation.ts',
   'tests/preloadValidation.ts',
   'tests/treeValidation.ts'
