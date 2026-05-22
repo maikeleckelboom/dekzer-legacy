@@ -19,6 +19,7 @@ import type {
 } from './tree/types'
 import { copyEntryPoint } from './entryPoint'
 import { adaptLocationSourceDescriptor, getLocationSourcePresentation } from './locationSources'
+import { classifyLibraryEntryName, type LibraryEntryRole } from './browserEntryPresentation'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -255,6 +256,20 @@ function projectLoadedHierarchyChildren(options: {
     bindingsById: options.bindingsById
   })
 
+  if (projectedNodes.length === 0 && options.children.nextOffset === undefined) {
+    return [
+      trackedReadStateNode(
+        {
+          ownerId: options.ownerId,
+          state: 'empty',
+          label: 'No media entries',
+          detail: 'No default-visible media rows in this location.'
+        },
+        options.bindingsById
+      )
+    ]
+  }
+
   if (options.children.nextOffset === undefined) {
     return projectedNodes
   }
@@ -278,15 +293,17 @@ function projectLiteralNodes(options: {
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
-  return options.nodes.map((node) =>
-    projectLiteralNode({
-      node,
-      entryPoint: options.entryPoint,
-      ...(options.label === undefined ? {} : { label: options.label }),
-      directoryReadStates: options.directoryReadStates,
-      bindingsById: options.bindingsById
-    })
-  )
+  return options.nodes
+    .filter((node) => isVisibleLiteralNode(node))
+    .map((node) =>
+      projectLiteralNode({
+        node,
+        entryPoint: options.entryPoint,
+        ...(options.label === undefined ? {} : { label: options.label }),
+        directoryReadStates: options.directoryReadStates,
+        bindingsById: options.bindingsById
+      })
+    )
 }
 
 function projectLiteralNode(options: {
@@ -324,6 +341,8 @@ function projectLiteralNode(options: {
     }
   }
 
+  const presentation = classifyLibraryEntryName(node.label)
+
   options.bindingsById.set(node.id, {
     kind: 'file',
     fileId: node.fileId,
@@ -334,11 +353,43 @@ function projectLiteralNode(options: {
   return {
     id: node.id,
     label: node.label,
-    badgeLabel: 'File',
-    icon: 'music',
+    badgeLabel: presentation.badgeLabel,
+    icon: browserTreeIconForEntryRole(presentation.role),
     detail: formatFileDetail(node.presence),
     children: { kind: 'none' }
   }
+}
+
+function browserTreeIconForEntryRole(role: LibraryEntryRole): import('./tree/types').BrowserTreeIcon {
+  switch (role) {
+    case 'folder':
+      return 'folder'
+    case 'audio':
+      return 'music'
+    case 'video':
+      return 'video'
+    case 'cueSheet':
+      return 'cueSheet'
+    case 'playlist':
+      return 'playlist'
+    case 'artwork':
+      return 'image'
+    case 'metadata':
+      return 'metadata'
+    case 'unknown':
+    case 'nonMedia':
+      return 'file'
+  }
+}
+
+function isVisibleLiteralNode(node: ChildRow): boolean {
+  if (node.kind === 'directory') {
+    return true
+  }
+
+  const presentation = classifyLibraryEntryName(node.label)
+
+  return presentation.visibility !== 'hiddenNonMedia'
 }
 
 function projectDirectoryChildren(options: {

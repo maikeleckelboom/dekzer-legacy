@@ -3,6 +3,7 @@ import type { BrowserProjection } from './hierarchyProjection'
 import type { BrowserState, LoadedChildren, RowBinding } from './hierarchyState'
 import type { BrowserTreeNodeId } from './tree/types'
 import { sameEntryPoint } from './entryPoint'
+import { classifyLibraryEntryName, type LibraryEntryRole } from './browserEntryPresentation'
 
 export type ContentProjectionKind =
   | 'emptySelection'
@@ -14,7 +15,18 @@ export type ContentProjectionKind =
 
 export type ContentRowKind = 'directory' | 'file' | 'state' | 'more'
 
-export type ContentRowIcon = 'folder' | 'music' | 'more' | 'loading' | 'warning' | 'state'
+export type ContentRowIcon =
+  | 'folder'
+  | 'music'
+  | 'video'
+  | 'image'
+  | 'cueSheet'
+  | 'playlist'
+  | 'metadata'
+  | 'more'
+  | 'loading'
+  | 'warning'
+  | 'state'
 
 export type ContentRowAction = {
   readonly kind: 'loadChildren' | 'loadMore'
@@ -275,7 +287,9 @@ function projectLoadedContents(options: {
   readonly children: LoadedChildren
   readonly bindingsById: BrowserProjection['bindingsById'] | undefined
 }): ContentProjection {
-  const rows: ContentRow[] = options.children.rows.map((row) => contentChildRow(row))
+  const rows: ContentRow[] = options.children.rows
+    .filter((row) => isVisibleContentRow(row))
+    .map((row) => contentChildRow(row))
 
   if (options.children.nextOffset !== undefined) {
     rows.push(contentMoreRowForLoadedChildren(options))
@@ -301,6 +315,8 @@ function projectLoadedContents(options: {
 }
 
 function contentChildRow(row: ChildRow): ContentRow {
+  const icon = contentChildRowIcon(row)
+
   return {
     id: row.id,
     kind: row.kind,
@@ -308,8 +324,50 @@ function contentChildRow(row: ChildRow): ContentRow {
     presence: row.presence,
     updatedAtMs: row.updatedAtMs,
     detail: formatPresenceDetail(row),
-    icon: row.kind === 'directory' ? 'folder' : 'music'
+    icon
   }
+}
+
+function contentChildRowIcon(row: ChildRow): ContentRowIcon {
+  if (row.kind === 'directory') {
+    return 'folder'
+  }
+
+  const presentation = classifyLibraryEntryName(row.label)
+
+  return presentationRoleToContentRowIcon(presentation.role)
+}
+
+function presentationRoleToContentRowIcon(role: LibraryEntryRole): ContentRowIcon {
+  switch (role) {
+    case 'folder':
+      return 'folder'
+    case 'audio':
+      return 'music'
+    case 'video':
+      return 'video'
+    case 'cueSheet':
+      return 'cueSheet'
+    case 'playlist':
+      return 'playlist'
+    case 'artwork':
+      return 'image'
+    case 'metadata':
+      return 'metadata'
+    case 'unknown':
+    case 'nonMedia':
+      return 'music'
+  }
+}
+
+function isVisibleContentRow(row: ChildRow): boolean {
+  if (row.kind === 'directory') {
+    return true
+  }
+
+  const presentation = classifyLibraryEntryName(row.label)
+
+  return presentation.visibility !== 'hiddenNonMedia'
 }
 
 function contentMoreRowForLoadedChildren(options: {

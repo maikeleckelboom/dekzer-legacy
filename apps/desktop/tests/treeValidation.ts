@@ -534,7 +534,7 @@ function validatesLibraryHierarchyReadProjection(): void {
           {
             id: 'source-file:11',
             label: 'track.wav',
-            badgeLabel: 'File',
+            badgeLabel: 'Audio',
             icon: 'music',
             detail: 'Present file.',
             children: { kind: 'none' }
@@ -653,7 +653,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     partialSourceNode.children.nodes.map((node) => node.id),
     ['source-file:11', 'more:navigation-row:7:1']
   )
-  assert.equal(partialSourceNode.children.nodes[0]?.badgeLabel, 'File')
+  assert.equal(partialSourceNode.children.nodes[0]?.badgeLabel, 'Audio')
   assert.equal(partialSourceNode.children.nodes[0]?.icon, 'music')
   assert.equal(partialSourceNode.children.nodes[1]?.badgeLabel, 'More')
   assert.equal(partialSourceNode.children.nodes[1]?.icon, 'more')

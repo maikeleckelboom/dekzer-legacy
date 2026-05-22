@@ -6,15 +6,19 @@ import {
   DisclosureClosedIcon,
   DisclosureOpenIcon,
   FileIcon,
+  FileTextIcon,
   FolderIcon,
   FolderOpenIcon,
   Icon,
+  ImageIcon,
+  ListMusicIcon,
   LoadingIcon,
   MoreIcon,
   MusicIcon,
   NavigationIcon,
   SourceIcon,
   StateIcon,
+  VideoIcon,
   WarningIcon
 } from '../../icons'
 import type { IconComponent } from '../../icons'
@@ -81,6 +85,16 @@ function resolveRowIcon(item: BrowserTreeVisibleItem): IconComponent | undefined
       return FileIcon
     case 'music':
       return MusicIcon
+    case 'video':
+      return VideoIcon
+    case 'image':
+      return ImageIcon
+    case 'cueSheet':
+      return FileTextIcon
+    case 'playlist':
+      return ListMusicIcon
+    case 'metadata':
+      return FileTextIcon
     case 'more':
       return MoreIcon
     case 'loading':

@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import {
+  FileTextIcon,
   FolderIcon,
   FolderOpenIcon,
   Icon,
+  ImageIcon,
+  ListMusicIcon,
   LoadingIcon,
   MoreIcon,
   MusicIcon,
   StateIcon,
+  VideoIcon,
   WarningIcon
 } from '../icons'
 import type { IconComponent } from '../icons'
@@ -57,6 +61,16 @@ function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconComponent 
       return FolderIcon
     case 'music':
       return MusicIcon
+    case 'video':
+      return VideoIcon
+    case 'image':
+      return ImageIcon
+    case 'cueSheet':
+      return FileTextIcon
+    case 'playlist':
+      return ListMusicIcon
+    case 'metadata':
+      return FileTextIcon
     case 'more':
       return MoreIcon
     case 'loading':

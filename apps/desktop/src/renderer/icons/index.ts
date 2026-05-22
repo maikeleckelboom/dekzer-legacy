@@ -14,10 +14,13 @@ export {
   DisclosureClosedIcon,
   DiscIcon,
   FileIcon,
+  FileTextIcon,
   FolderIcon,
   FolderOpenIcon,
   FolderPlusIcon,
   HardDriveIcon,
+  ImageIcon,
+  ListMusicIcon,
   LoadingIcon,
   LockIcon,
   MoreIcon,
@@ -34,6 +37,7 @@ export {
   StateIcon,
   TriangleAlertIcon,
   UsbIcon,
+  VideoIcon,
   WarningIcon
 } from './lucide'
 export { SdCardIcon } from './custom'
