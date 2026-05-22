@@ -13,6 +13,7 @@ import {
 } from '../src/shared/libraryNavigation/readRows'
 import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
+import type { ReadRegisteredLocalRootsOutcome } from '../src/shared/libraryRoots/readRegisteredRoots'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { emitStatus, testStatus } from './support/libraryBoundary'
 
@@ -71,6 +72,15 @@ async function validatesPreloadApiSurface(): Promise<void> {
     discoveredFileCount: 12,
     queuedSourceWorkItems: 8
   }
+  const readRegisteredRootsResult: ReadRegisteredLocalRootsOutcome = {
+    state: 'read',
+    roots: [
+      {
+        rootId: '7',
+        canonicalPath: 'C:/Music'
+      }
+    ]
+  }
   let receivedNavigationRequest: unknown = null
   let receivedHierarchyRequest: unknown = null
   let receivedChoiceArgs: readonly unknown[] | undefined
@@ -109,6 +119,11 @@ async function validatesPreloadApiSurface(): Promise<void> {
         return scanResult
       }
 
+      if (channel === rootChannels.readRegisteredRoots) {
+        assert.deepEqual(args, [])
+        return readRegisteredRootsResult
+      }
+
       throw new Error(`unexpected preload invoke channel ${channel}`)
     },
     on: (channel, listener) => {
@@ -142,7 +157,11 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(Object.keys(api.library.host).sort(), ['getStatus', 'onStatusChanged'])
   assert.deepEqual(Object.keys(api.library.hierarchy), ['readChildren'])
   assert.deepEqual(Object.keys(api.library.navigation), ['readRows'])
-  assert.deepEqual(Object.keys(api.library.roots).sort(), ['chooseAndRegisterLocal', 'runScan'])
+  assert.deepEqual(Object.keys(api.library.roots).sort(), [
+    'chooseAndRegisterLocal',
+    'readRegisteredLocalRoots',
+    'runScan'
+  ])
   assert.equal('ipcRenderer' in api, false)
   assert.equal('libraryBoundary' in api, false)
   assert.equal('client' in api, false)
@@ -183,6 +202,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(receivedChoiceArgs, [])
   assert.equal(await api.library.roots.runScan(scanRequest), scanResult)
   assert.equal(receivedScanRequest, scanRequest)
+  assert.equal(await api.library.roots.readRegisteredLocalRoots(), readRegisteredRootsResult)
   assert.equal(await api.library.navigation.readRows(navigationRequest), navigationResult)
   assert.equal(receivedNavigationRequest, navigationRequest)
   assert.equal(await api.library.hierarchy.readChildren(hierarchyRequest), hierarchyResult)

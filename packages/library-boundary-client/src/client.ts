@@ -17,6 +17,8 @@ import type {
   ReadNavigationNodeLibraryBrowserWindowRequest,
   ReadNavigationRowsReply,
   ReadNavigationRowsRequest,
+  ReadRegisteredLocalRootsReply,
+  ReadRegisteredLocalRootsRequest,
   RegisterLocalRootReply,
   RegisterLocalRootRequest,
   RenamePlaylistReply,
@@ -67,6 +69,19 @@ export class LibraryBoundaryClient {
       },
       "libraryRoots",
       "runRootScan"
+    );
+  }
+
+  readRegisteredLocalRoots(
+    request: ReadRegisteredLocalRootsRequest
+  ): Promise<ReadRegisteredLocalRootsReply> {
+    return this.sendAndExpect(
+      {
+        type: "libraryRoots",
+        payload: { type: "readRegisteredLocalRoots", payload: request }
+      },
+      "libraryRoots",
+      "readRegisteredLocalRoots"
     );
   }
 

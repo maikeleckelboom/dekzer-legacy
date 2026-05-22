@@ -33,6 +33,11 @@ pub struct RegisteredLocalRoot {
     pub canonical_path: PathBuf,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadRegisteredLocalRootsResult {
+    pub roots: Vec<RegisteredLocalRoot>,
+}
+
 impl SqliteDurableStore {
     pub fn upsert_source(&self, input: UpsertSourceInput) -> LibrarySqliteResult<i64> {
         self.with_write(|write| {
@@ -142,6 +147,28 @@ impl SqliteDurableStore {
             root_id: resolved_root.root_id,
             canonical_path: resolved_root.canonical_path,
         })
+    }
+
+    pub fn read_registered_local_roots(&self) -> LibrarySqliteResult<ReadRegisteredLocalRootsResult> {
+        let connection = open_connection(&self.path)?;
+        let mut statement = connection.prepare(
+            "SELECT sl.source_id, sl.absolute_path
+             FROM source_locators sl
+             JOIN source_state lss
+               ON lss.source_id = sl.source_id
+             WHERE sl.locator_kind = 'absolute_path'
+               AND lss.resolution_status = 'resolved'
+             ORDER BY sl.source_id ASC",
+        )?;
+        let roots = statement
+            .query_map([], |row| {
+                Ok(RegisteredLocalRoot {
+                    root_id: row.get(0)?,
+                    canonical_path: PathBuf::from(row.get::<_, String>(1)?),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(ReadRegisteredLocalRootsResult { roots })
     }
 
     #[allow(dead_code)]

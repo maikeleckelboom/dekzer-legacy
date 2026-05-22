@@ -69,7 +69,7 @@ pub use read_models::literal_hierarchy::{
 pub use read_models::navigation::NavigationRow;
 pub use store::{
     DurableStoreBootstrapStatus, LibraryStoreContext, MaintainedReadModelRevision,
-    MaintainedReadModelScope, RegisterLocalRootInput, RegisteredLocalRoot,
-    RootScanMaterializationResult, SqliteDurableStore, SqliteDurableStoreAppOwnedState,
-    StoreEnvironment, durable_store_path,
+    MaintainedReadModelScope, ReadRegisteredLocalRootsResult, RegisterLocalRootInput,
+    RegisteredLocalRoot, RootScanMaterializationResult, SqliteDurableStore,
+    SqliteDurableStoreAppOwnedState, StoreEnvironment, durable_store_path,
 };

@@ -92,11 +92,62 @@ pub struct RunRootScanReply {
     schemars::JsonSchema,
     ts_rs::TS,
 )]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadRegisteredLocalRootsRequest;
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadRegisteredLocalRootsReply {
+    pub roots: Vec<RegisteredLocalRootRecord>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct RegisteredLocalRootRecord {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub root_id: i64,
+    pub canonical_path: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum LibraryRootCommand {
     RegisterLocalRoot(RegisterLocalRootRequest),
     RunRootScan(RunRootScanRequest),
+    ReadRegisteredLocalRoots(ReadRegisteredLocalRootsRequest),
 }
 
 #[derive(
@@ -114,13 +165,15 @@ pub enum LibraryRootCommand {
 pub enum LibraryRootReply {
     RegisterLocalRoot(RegisterLocalRootReply),
     RunRootScan(RunRootScanReply),
+    ReadRegisteredLocalRoots(ReadRegisteredLocalRootsReply),
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        LibraryRootCommand, LibraryRootReply, RegisterLocalRootReply, RegisterLocalRootRequest,
-        RunRootScanReply, RunRootScanRequest,
+        LibraryRootCommand, LibraryRootReply, ReadRegisteredLocalRootsReply,
+        ReadRegisteredLocalRootsRequest, RegisteredLocalRootRecord, RegisterLocalRootReply,
+        RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest,
     };
     use serde_json::json;
 
@@ -130,6 +183,9 @@ mod tests {
             absolute_path: "C:/Music".to_string(),
         });
         let scan = LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 7 });
+        let read_registered = LibraryRootCommand::ReadRegisteredLocalRoots(
+            ReadRegisteredLocalRootsRequest,
+        );
 
         assert_eq!(
             serde_json::to_value(&register).expect("serialize register command"),
@@ -147,6 +203,13 @@ mod tests {
                 "payload": {
                     "rootId": "7"
                 }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&read_registered).expect("serialize read registered command"),
+            json!({
+                "type": "readRegisteredLocalRoots",
+                "payload": null
             })
         );
         assert_eq!(
@@ -170,6 +233,14 @@ mod tests {
             discovered_file_count: 2,
             queued_source_work_items: 1,
         });
+        let read_registered = LibraryRootReply::ReadRegisteredLocalRoots(
+            ReadRegisteredLocalRootsReply {
+                roots: vec![RegisteredLocalRootRecord {
+                    root_id: 3,
+                    canonical_path: "C:/Music".to_string(),
+                }],
+            },
+        );
 
         assert_eq!(
             serde_json::to_value(&registered).expect("serialize register reply"),
@@ -190,6 +261,18 @@ mod tests {
                     "scanRunId": "1000",
                     "discoveredFileCount": 2,
                     "queuedSourceWorkItems": 1
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&read_registered).expect("serialize read registered reply"),
+            json!({
+                "type": "readRegisteredLocalRoots",
+                "payload": {
+                    "roots": [{
+                        "rootId": "3",
+                        "canonicalPath": "C:/Music"
+                    }]
                 }
             })
         );

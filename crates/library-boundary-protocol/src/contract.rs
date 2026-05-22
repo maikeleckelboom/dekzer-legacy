@@ -30,6 +30,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LibraryRootCommand>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::RunRootScanRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadRegisteredLocalRootsRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::RegisteredLocalRootRecord>(&cfg, &mut output);
     push_ts_decl::<crate::PlaylistWriteCommand>(&cfg, &mut output);
     push_ts_decl::<crate::CreatePlaylistRequest>(&cfg, &mut output);
     push_ts_decl::<crate::RenamePlaylistRequest>(&cfg, &mut output);
@@ -52,6 +54,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LibraryRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RunRootScanReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadRegisteredLocalRootsReply>(&cfg, &mut output);
     push_ts_decl::<crate::PlaylistWriteReply>(&cfg, &mut output);
     push_ts_decl::<crate::CreatePlaylistReply>(&cfg, &mut output);
     push_ts_decl::<crate::RenamePlaylistReply>(&cfg, &mut output);

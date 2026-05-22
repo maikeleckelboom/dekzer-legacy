@@ -6,8 +6,9 @@ use library_boundary_protocol as protocol;
 use library_domain::{LibraryAssetId, PlaylistId};
 use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
-    LibraryStoreContext, MovePlaylistEntryInput, RegisterLocalRootInput,
-    RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput, SqliteDurableStore,
+    LibraryStoreContext, MovePlaylistEntryInput, ReadRegisteredLocalRootsResult,
+    RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
+    SqliteDurableStore,
 };
 
 use crate::session_events::LibraryBoundaryEventStream;
@@ -374,6 +375,24 @@ impl LibraryBoundaryService {
         }
     }
 
+    pub fn read_registered_local_roots(
+        &self,
+    ) -> protocol::ProtocolResult<protocol::ReadRegisteredLocalRootsReply> {
+        let ReadRegisteredLocalRootsResult { roots } = self
+            .durable_store
+            .read_registered_local_roots()
+            .map_err(map_store_error)?;
+        Ok(protocol::ReadRegisteredLocalRootsReply {
+            roots: roots
+                .into_iter()
+                .map(|root| protocol::RegisteredLocalRootRecord {
+                    root_id: root.root_id,
+                    canonical_path: root.canonical_path.to_string_lossy().into_owned(),
+                })
+                .collect(),
+        })
+    }
+
     fn handle_library_root_command(
         &self,
         command: protocol::LibraryRootCommand,
@@ -385,6 +404,9 @@ impl LibraryBoundaryService {
             protocol::LibraryRootCommand::RunRootScan(request) => self
                 .run_root_scan(request)
                 .map(protocol::LibraryRootReply::RunRootScan),
+            protocol::LibraryRootCommand::ReadRegisteredLocalRoots(_) => self
+                .read_registered_local_roots()
+                .map(protocol::LibraryRootReply::ReadRegisteredLocalRoots),
         }
     }
 
@@ -576,6 +598,15 @@ mod tests {
         match reply {
             CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(reply)) => reply,
             other => panic!("expected register local root reply, got {other:?}"),
+        }
+    }
+
+    fn expect_read_registered_local_roots_reply(
+        reply: CommandReply,
+    ) -> library_boundary_protocol::ReadRegisteredLocalRootsReply {
+        match reply {
+            CommandReply::LibraryRoots(LibraryRootReply::ReadRegisteredLocalRoots(reply)) => reply,
+            other => panic!("expected read registered local roots reply, got {other:?}"),
         }
     }
 
@@ -967,5 +998,40 @@ mod tests {
                 panic!("expected error outcome, got {:?}", envelope.reply);
             }
         }
+    }
+
+    #[test]
+    fn read_registered_local_roots_returns_empty_before_registration() {
+        let (_tempdir, _context, service) = open_service_with_context();
+        let reply = expect_read_registered_local_roots_reply(expect_success(
+            service.handle_command(CommandRequest::LibraryRoots(
+                LibraryRootCommand::ReadRegisteredLocalRoots(
+                    library_boundary_protocol::ReadRegisteredLocalRootsRequest,
+                ),
+            )),
+        ));
+        assert!(reply.roots.is_empty());
+    }
+
+    #[test]
+    fn read_registered_local_roots_returns_registered_root_after_registration() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("music-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        assert!(registered.root_id > 0);
+
+        let reply = expect_read_registered_local_roots_reply(expect_success(
+            service.handle_command(CommandRequest::LibraryRoots(
+                LibraryRootCommand::ReadRegisteredLocalRoots(
+                    library_boundary_protocol::ReadRegisteredLocalRootsRequest,
+                ),
+            )),
+        ));
+        assert_eq!(reply.roots.len(), 1);
+        assert_eq!(reply.roots[0].root_id, registered.root_id);
+        assert_eq!(reply.roots[0].canonical_path, registered.canonical_path);
     }
 }

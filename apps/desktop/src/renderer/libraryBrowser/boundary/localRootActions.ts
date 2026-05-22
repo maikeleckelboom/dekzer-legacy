@@ -3,6 +3,10 @@ import type { ComputedRef, Ref } from 'vue'
 
 import type { LocalRootChoiceResult } from '../../../shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootRegistrationRoot } from '../../../shared/libraryRoots/registerLocalRoot'
+import type {
+  ReadRegisteredLocalRootsOutcome,
+  RegisteredLocalRoot
+} from '../../../shared/libraryRoots/readRegisteredRoots'
 import type { LocalRootScanResult } from '../../../shared/libraryRoots/runScan'
 import type { RendererApi } from '../../../shared/rendererApi'
 
@@ -31,6 +35,7 @@ export type LocalRootActionsController = {
   readonly canRunRegisteredRootScan: ComputedRef<boolean>
   readonly chooseAndRegisterLocalRoot: () => Promise<boolean>
   readonly runRegisteredRootScan: () => Promise<boolean>
+  readonly hydrateFromRegisteredLocalRoots: () => Promise<boolean>
 }
 
 const safeRootChoiceFailure = 'Unable to add music folder.'
@@ -148,6 +153,36 @@ export function createLocalRootActionsController(
     scanFailureMessage.value = undefined
   }
 
+  async function hydrateFromRegisteredLocalRoots(): Promise<boolean> {
+    if (rootChoiceStatus.value !== 'idle' || registeredRoot.value !== undefined) {
+      return false
+    }
+
+    let result: ReadRegisteredLocalRootsOutcome
+    try {
+      result = await rootApi.readRegisteredLocalRoots()
+    } catch {
+      return false
+    }
+
+    if (result.state !== 'read') {
+      return false
+    }
+
+    if (result.roots.length === 0) {
+      return false
+    }
+
+    const firstRoot = result.roots[0]
+    if (firstRoot === undefined) {
+      return false
+    }
+
+    registeredRoot.value = registeredRootFromRecord(firstRoot)
+    rootChoiceStatus.value = 'registered'
+    return true
+  }
+
   return {
     rootChoiceStatus,
     registeredRoot,
@@ -159,7 +194,15 @@ export function createLocalRootActionsController(
     scanButtonLabel,
     canRunRegisteredRootScan,
     chooseAndRegisterLocalRoot,
-    runRegisteredRootScan
+    runRegisteredRootScan,
+    hydrateFromRegisteredLocalRoots
+  }
+}
+
+function registeredRootFromRecord(record: RegisteredLocalRoot): LocalRootRegistrationRoot {
+  return {
+    rootId: record.rootId,
+    canonicalPath: record.canonicalPath
   }
 }
 
