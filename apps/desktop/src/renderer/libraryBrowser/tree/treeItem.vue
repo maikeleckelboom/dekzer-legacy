@@ -33,6 +33,11 @@ function handleClick(event: MouseEvent): void {
   tree.focusNode(props.item.id)
 
   if (isBranchAffordanceEvent(event)) {
+    if (props.item.isExpanded) {
+      tree.toggleNode(props.item.id)
+      return
+    }
+
     if (props.item.canRevealChildren) {
       tree.toggleNode(props.item.id)
       return
@@ -102,7 +107,7 @@ function isBranchAffordanceEvent(event: MouseEvent): boolean {
     :aria-selected="getTreeItemAriaSelected(props.item)"
     :aria-setsize="props.item.ariaSetSize"
     :data-active="props.item.isActive ? 'true' : undefined"
-    :data-expanded="props.item.canRevealChildren ? String(props.item.isExpanded) : undefined"
+    :data-expanded="props.item.isBranch ? String(props.item.isExpanded) : undefined"
     :data-selected="props.item.isSelected ? 'true' : undefined"
     :tabindex="tree.getItemTabIndex(props.item.id)"
     @click="handleClick"

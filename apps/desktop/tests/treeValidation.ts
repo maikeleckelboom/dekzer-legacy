@@ -40,7 +40,7 @@ const libraryHierarchyFixtureTree = {
     {
       id: 'fixture-root',
       label: 'Fixture Library Root',
-      badgeLabel: 'Root',
+      badge: { value: 'Root', tone: 'muted' },
       detail: 'Demo root for renderer tree behavior.',
       children: {
         kind: 'loaded',
@@ -48,21 +48,21 @@ const libraryHierarchyFixtureTree = {
           {
             id: 'fixture-artists',
             label: 'Artists',
-            badgeLabel: 'Leaf',
+            badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
             children: { kind: 'none' }
           },
           {
             id: 'fixture-albums',
             label: 'Albums',
-            badgeLabel: 'Leaf',
+            badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
             children: { kind: 'none' }
           },
           {
             id: 'fixture-tracks',
             label: 'Tracks',
-            badgeLabel: 'Branch',
+            badge: { value: 'Branch', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
             children: {
               kind: 'loaded',
@@ -70,7 +70,7 @@ const libraryHierarchyFixtureTree = {
                 {
                   id: 'fixture-tracks-group',
                   label: 'Fixture Track Group',
-                  badgeLabel: 'Branch',
+                  badge: { value: 'Branch', tone: 'muted' },
                   detail: 'Demo child row for nested hierarchy rendering.',
                   children: { kind: 'none' }
                 }
@@ -80,7 +80,7 @@ const libraryHierarchyFixtureTree = {
           {
             id: 'fixture-playlists',
             label: 'Nested Branch',
-            badgeLabel: 'Branch',
+            badge: { value: 'Branch', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
             children: {
               kind: 'loaded',
@@ -88,7 +88,7 @@ const libraryHierarchyFixtureTree = {
                 {
                   id: 'fixture-playlist-group',
                   label: 'Fixture Nested Group',
-                  badgeLabel: 'Branch',
+                  badge: { value: 'Branch', tone: 'muted' },
                   detail: 'Demo child row for nested hierarchy rendering.',
                   children: { kind: 'none' }
                 }
@@ -98,14 +98,14 @@ const libraryHierarchyFixtureTree = {
           {
             id: 'fixture-preparation',
             label: 'Preparation',
-            badgeLabel: 'Leaf',
+            badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture workflow placeholder.',
             children: { kind: 'none' }
           },
           {
             id: 'fixture-history',
             label: 'History',
-            badgeLabel: 'Leaf',
+            badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture history placeholder.',
             children: { kind: 'none' }
           }
@@ -133,6 +133,9 @@ function main(): void {
   validatesVisibleProjection()
   validatesVisibleHelpers()
   validatesDeferredActionProjection()
+  validatesExpansionIndependence()
+  validatesMoreActionNotExpandable()
+  validatesLoadedBranchExpansion()
   validatesKeyboardNavigation()
   validatesKeyboardExpansion()
   validatesKeyboardSelection()
@@ -304,7 +307,7 @@ function validatesDeferredActionProjection(): void {
   for (const item of items.filter((candidate) => candidate.id !== 'more-root')) {
     assert.equal(item.isBranch, true)
     assert.equal(item.canRevealChildren, false)
-    assert.equal(item.isExpanded, false)
+    assert.equal(item.isExpanded, true)
     assert.equal(getFirstChildVisibleNodeId(items, item.id), undefined)
   }
 
@@ -319,6 +322,97 @@ function validatesDeferredActionProjection(): void {
   assert.equal(getItem(items, 'more-root').canActivateAction, true)
   assert.equal(getItem(items, 'more-root').isActionLoading, false)
   assert.equal(getItem(items, 'more-root').isActionItem, true)
+  assert.equal(getItem(items, 'more-root').isExpanded, false)
+}
+
+function validatesExpansionIndependence(): void {
+  const expandedDeferredItems = flattenVisibleTree({
+    nodes: [unloadedBranchNode()],
+    expandedNodeIds: new Set(['unloaded-root'])
+  })
+  const deferredItem = getItem(expandedDeferredItems, 'unloaded-root')
+
+  assert.equal(deferredItem.isBranch, true)
+  assert.equal(deferredItem.canRevealChildren, false)
+  assert.equal(deferredItem.isExpanded, true)
+  assert.equal(
+    getFirstChildVisibleNodeId(expandedDeferredItems, deferredItem.id),
+    undefined
+  )
+
+  const collapsedDeferredItems = flattenVisibleTree({
+    nodes: [unloadedBranchNode()],
+    expandedNodeIds: new Set()
+  })
+  assert.equal(getItem(collapsedDeferredItems, 'unloaded-root').isExpanded, false)
+
+  const expandedLoadingItems = flattenVisibleTree({
+    nodes: [loadingBranchNode()],
+    expandedNodeIds: new Set(['loading-root'])
+  })
+  const loadingItem = getItem(expandedLoadingItems, 'loading-root')
+
+  assert.equal(loadingItem.isExpanded, true)
+  assert.equal(loadingItem.canRevealChildren, false)
+  assert.equal(loadingItem.isActionLoading, true)
+  assert.equal(
+    getFirstChildVisibleNodeId(expandedLoadingItems, loadingItem.id),
+    undefined
+  )
+
+  const expandedFailedItems = flattenVisibleTree({
+    nodes: [failedBranchNode()],
+    expandedNodeIds: new Set(['failed-root'])
+  })
+  const failedItem = getItem(expandedFailedItems, 'failed-root')
+
+  assert.equal(failedItem.isExpanded, true)
+  assert.equal(failedItem.canRevealChildren, false)
+  assert.equal(failedItem.canActivateAction, true)
+  assert.equal(
+    getFirstChildVisibleNodeId(expandedFailedItems, failedItem.id),
+    undefined
+  )
+}
+
+function validatesMoreActionNotExpandable(): void {
+  const items = flattenVisibleTree({
+    nodes: [moreActionNode()],
+    expandedNodeIds: new Set(['more-root'])
+  })
+  const moreItem = getItem(items, 'more-root')
+
+  assert.equal(moreItem.isActionItem, true)
+  assert.equal(moreItem.isBranch, false)
+  assert.equal(moreItem.isExpanded, false)
+  assert.equal(moreItem.canRevealChildren, false)
+  assert.equal(moreItem.canActivateAction, true)
+}
+
+function validatesLoadedBranchExpansion(): void {
+  const expandedLoadedItems = flattenVisibleTree({
+    nodes: [loadedBranchRootNode()],
+    expandedNodeIds: new Set(['loaded-root'])
+  })
+
+  assert.deepEqual(
+    expandedLoadedItems.map((item) => item.id),
+    ['loaded-root', 'loaded-child']
+  )
+  const expandedItem = getItem(expandedLoadedItems, 'loaded-root')
+  assert.equal(expandedItem.isExpanded, true)
+  assert.equal(expandedItem.canRevealChildren, true)
+
+  const collapsedLoadedItems = flattenVisibleTree({
+    nodes: [loadedBranchRootNode()],
+    expandedNodeIds: new Set()
+  })
+
+  assert.deepEqual(
+    collapsedLoadedItems.map((item) => item.id),
+    ['loaded-root']
+  )
+  assert.equal(getItem(collapsedLoadedItems, 'loaded-root').isExpanded, false)
 }
 
 function validatesKeyboardNavigation(): void {
@@ -525,7 +619,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     {
       id: 'navigation-row:7',
       label: 'Source Fixture',
-      badgeLabel: 'Local Library',
+      badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
       detail: 'Navigation source row. Updated 100.',
       children: {
@@ -534,7 +628,7 @@ function validatesLibraryHierarchyReadProjection(): void {
           {
             id: 'source-file:11',
             label: 'track.wav',
-            badgeLabel: 'Audio',
+            badge: { value: 'Audio', tone: 'muted' },
             icon: 'music',
             detail: 'Present file.',
             children: { kind: 'none' }
@@ -565,7 +659,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     {
       id: 'navigation-row:7',
       label: 'Source Fixture',
-      badgeLabel: 'Local Library',
+      badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
       detail: 'Navigation source row. Updated 100.',
       children: {
@@ -574,7 +668,7 @@ function validatesLibraryHierarchyReadProjection(): void {
           {
             id: 'source-directory:12',
             label: 'Album',
-            badgeLabel: 'Folder',
+            badge: { value: 'Folder', tone: 'muted' },
             icon: 'folder',
             detail: 'Present directory.',
             children: {
@@ -653,9 +747,9 @@ function validatesLibraryHierarchyReadProjection(): void {
     partialSourceNode.children.nodes.map((node) => node.id),
     ['source-file:11', 'more:navigation-row:7:1']
   )
-  assert.equal(partialSourceNode.children.nodes[0]?.badgeLabel, 'Audio')
+  assert.deepEqual(partialSourceNode.children.nodes[0]?.badge, { value: 'Audio', tone: 'muted' })
   assert.equal(partialSourceNode.children.nodes[0]?.icon, 'music')
-  assert.equal(partialSourceNode.children.nodes[1]?.badgeLabel, 'More')
+  assert.deepEqual(partialSourceNode.children.nodes[1]?.badge, { value: 'More', tone: 'muted' })
   assert.equal(partialSourceNode.children.nodes[1]?.icon, 'more')
   assert.equal(partialSourceNode.children.nodes[1]?.children.kind, 'none')
   assert.equal(partialSourceNode.children.nodes[1]?.action?.kind, 'loadMore')
@@ -686,7 +780,7 @@ function validatesLibraryHierarchyReadProjection(): void {
 function validatesFixtureFallbackRemainsExplicit(): void {
   assert.equal(libraryHierarchyFixtureTree.name, 'Tree validation fixture')
   assert.match(libraryHierarchyFixtureTree.detail, /Test-owned fixture input/)
-  assert.equal(libraryHierarchyFixtureTree.nodes[0]?.badgeLabel, 'Root')
+  assert.deepEqual(libraryHierarchyFixtureTree.nodes[0]?.badge, { value: 'Root', tone: 'muted' })
   assert.equal(libraryHierarchyFixtureTree.nodes[0]?.children.kind, 'loaded')
   assert.doesNotMatch(JSON.stringify(libraryHierarchyFixtureTree), /Loaded from literal hierarchy/)
   assert.doesNotMatch(JSON.stringify(libraryHierarchyFixtureTree), /Children not loaded yet/)
@@ -770,7 +864,7 @@ function leafRootNode(): BrowserTreeNode {
   return {
     id: 'leaf-root',
     label: 'Leaf root',
-    badgeLabel: 'Branch',
+    badge: { value: 'Branch', tone: 'muted' },
     children: { kind: 'none' }
   }
 }
@@ -779,14 +873,14 @@ function loadedBranchRootNode(): BrowserTreeNode {
   return {
     id: 'loaded-root',
     label: 'Loaded root',
-    badgeLabel: 'Branch',
+    badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'loaded',
       nodes: [
         {
           id: 'loaded-child',
           label: 'Loaded child',
-          badgeLabel: 'Leaf',
+          badge: { value: 'Leaf', tone: 'muted' },
           children: { kind: 'none' }
         }
       ]
@@ -798,7 +892,7 @@ function loadedEmptyBranchRootNode(): BrowserTreeNode {
   return {
     id: 'loaded-empty-root',
     label: 'Loaded empty root',
-    badgeLabel: 'Branch',
+    badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'loaded',
       nodes: []
@@ -812,7 +906,7 @@ function unloadedBranchNode(): BrowserTreeNode {
   return {
     id: 'unloaded-root',
     label: 'Unloaded root',
-    badgeLabel: 'Branch',
+    badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'deferred',
       detail
@@ -833,7 +927,7 @@ function loadingBranchNode(): BrowserTreeNode {
   return {
     id: 'loading-root',
     label: 'Loading root',
-    badgeLabel: 'Branch',
+    badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'deferred',
       detail
@@ -854,7 +948,7 @@ function failedBranchNode(): BrowserTreeNode {
   return {
     id: 'failed-root',
     label: 'Failed root',
-    badgeLabel: 'Branch',
+    badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'deferred',
       detail
@@ -873,7 +967,7 @@ function moreActionNode(): BrowserTreeNode {
   return {
     id: 'more-root',
     label: 'Load more rows',
-    badgeLabel: 'More',
+    badge: { value: 'More', tone: 'muted' },
     icon: 'more',
     children: {
       kind: 'none'

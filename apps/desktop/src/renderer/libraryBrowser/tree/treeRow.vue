@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { BrowserTreeActionState, BrowserTreeIcon, BrowserTreeVisibleItem } from './types'
+import type {
+  BrowserTreeActionState,
+  BrowserTreeBadgeTone,
+  BrowserTreeBadgeEmphasis,
+  BrowserTreeVisibleItem
+} from './types'
 import {
   DisclosureClosedIcon,
   DisclosureOpenIcon,
@@ -54,6 +59,16 @@ const actionStateDetail = computed(() => formatActionStateDetail(props.item.node
 
 const rowIcon = computed<IconComponent | undefined>(() => resolveRowIcon(props.item))
 
+const badgeClass = computed(() => {
+  const badge = props.item.node.badge
+
+  if (badge === undefined) {
+    return undefined
+  }
+
+  return badgeCssClasses(badge.tone, badge.emphasis)
+})
+
 function formatActionStateDetail(state: BrowserTreeActionState | undefined): string | undefined {
   if (state === undefined) {
     return undefined
@@ -70,17 +85,17 @@ function formatActionStateDetail(state: BrowserTreeActionState | undefined): str
 }
 
 function resolveRowIcon(item: BrowserTreeVisibleItem): IconComponent | undefined {
-  const iconKind = resolveExpandedIconKind(item)
+  const iconKind = item.node.icon
+
+  if (iconKind === 'folder') {
+    return item.isExpanded ? FolderOpenIcon : FolderIcon
+  }
 
   switch (iconKind) {
     case 'source':
       return SourceIcon
     case 'navigation':
       return NavigationIcon
-    case 'folder':
-      return FolderIcon
-    case 'folderOpen':
-      return FolderOpenIcon
     case 'file':
       return FileIcon
     case 'music':
@@ -108,12 +123,50 @@ function resolveRowIcon(item: BrowserTreeVisibleItem): IconComponent | undefined
   }
 }
 
-function resolveExpandedIconKind(item: BrowserTreeVisibleItem): BrowserTreeIcon | undefined {
-  if (item.node.icon === 'folder' && item.isExpanded) {
-    return 'folderOpen'
-  }
+function badgeCssClasses(
+  tone: BrowserTreeBadgeTone | undefined,
+  emphasis: BrowserTreeBadgeEmphasis | undefined
+): string {
+  const toneClass = badgeToneCssClass(tone)
+  const emphasisClass = badgeEmphasisCssClass(emphasis)
 
-  return item.node.icon
+  return [
+    'shrink-0 rounded-sm px-2 py-0.5 text-[11px] font-semibold uppercase leading-4',
+    toneClass,
+    emphasisClass
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function badgeToneCssClass(tone: BrowserTreeBadgeTone | undefined): string {
+  switch (tone) {
+    case 'neutral':
+      return 'border border-(--color-border) text-(--color-text-muted)'
+    case 'accent':
+      return 'border border-(--color-accent) text-(--color-accent)'
+    case 'success':
+      return 'border border-(--color-status-success) text-(--color-status-success)'
+    case 'warning':
+      return 'border border-(--color-status-warning) text-(--color-status-warning)'
+    case 'danger':
+      return 'border border-(--color-status-danger) text-(--color-status-danger)'
+    case 'muted':
+    default:
+      return 'border border-(--color-border) text-(--color-text-muted)'
+  }
+}
+
+function badgeEmphasisCssClass(emphasis: BrowserTreeBadgeEmphasis | undefined): string {
+  switch (emphasis) {
+    case 'soft':
+      return 'border-transparent bg-(--color-surface-strong)'
+    case 'solid':
+      return 'border-transparent bg-(--color-accent) text-(--color-text-on-accent)'
+    case 'outline':
+    default:
+      return 'border border-(--color-border) text-(--color-text-muted)'
+  }
 }
 </script>
 
@@ -157,10 +210,12 @@ function resolveExpandedIconKind(item: BrowserTreeVisibleItem): BrowserTreeIcon 
     </span>
 
     <span
-      v-if="item.node.badgeLabel"
-      class="shrink-0 rounded-sm border border-(--color-border) px-2 py-0.5 text-[11px] font-semibold uppercase leading-4 text-(--color-text-muted)"
+      v-if="item.node.badge"
+      :class="badgeClass"
+      :title="item.node.badge.title"
+      :aria-label="item.node.badge.ariaLabel"
     >
-      {{ item.node.badgeLabel }}
+      {{ item.node.badge.value }}
     </span>
   </div>
 </template>

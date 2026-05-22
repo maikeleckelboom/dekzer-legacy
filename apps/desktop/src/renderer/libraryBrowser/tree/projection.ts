@@ -127,7 +127,7 @@ function appendVisibleNodes(options: {
     const canReveal = canRevealBrowserTreeChildren(node)
     const canActivate = canActivateBrowserTreeAction(node)
     const isActionLoading = isBrowserTreeActionLoading(node)
-    const isExpanded = canReveal && options.expandedNodeIds.has(node.id)
+    const isExpanded = isBranch && options.expandedNodeIds.has(node.id)
     const isActionItem = node.action !== undefined && !isBranch
 
     options.visibleItems.push({

@@ -54,6 +54,8 @@ const {
 } = rootLifecycle
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const hasUserInteractedWithTree = ref(false)
+const hasAppliedInitialPreferredNode = ref(false)
 
 const liveTreeNodes = computed(() => {
   return browserProjection.value?.nodes
@@ -199,9 +201,14 @@ const contentsProjection = computed(() =>
 watch(
   preferredLiveNodeId,
   (preferredNodeId) => {
+    if (hasUserInteractedWithTree.value || hasAppliedInitialPreferredNode.value) {
+      return
+    }
+
     if (preferredNodeId !== undefined) {
       selectedNodeId.value = preferredNodeId
       expandedNodeIds.value = new Set([preferredNodeId])
+      hasAppliedInitialPreferredNode.value = true
       return
     }
 
@@ -212,11 +219,13 @@ watch(
 )
 
 function selectNode(nodeId: BrowserTreeNodeId): void {
+  hasUserInteractedWithTree.value = true
   selectedNodeId.value = nodeId
   void requestNodeChildren(nodeId)
 }
 
 function toggleNode(nodeId: BrowserTreeNodeId): void {
+  hasUserInteractedWithTree.value = true
   const nextExpandedNodeIds = new Set(expandedNodeIds.value)
 
   if (nextExpandedNodeIds.has(nodeId)) {
@@ -229,11 +238,13 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
 }
 
 function activateNodeAction(nodeId: BrowserTreeNodeId): void {
+  hasUserInteractedWithTree.value = true
   expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
   void requestNodeChildren(nodeId)
 }
 
 function activateContentRowAction(row: ContentRow): void {
+  hasUserInteractedWithTree.value = true
   const action = row.action
 
   if (action === undefined) {

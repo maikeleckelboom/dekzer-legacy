@@ -12,6 +12,7 @@ import type {
 import type {
   BrowserTreeAction,
   BrowserTreeActionState,
+  BrowserTreeBadgeTone,
   BrowserTreeChildren,
   BrowserTreeIcon,
   BrowserTreeNode,
@@ -115,7 +116,7 @@ function projectNavigationRow(options: {
     return {
       id: nodeId,
       label: options.row.displayName,
-      badgeLabel: presentation.label,
+      badge: { value: presentation.label, tone: 'muted' },
       icon: 'source',
       detail: formatNavigationSourceDetail(options.row),
       ...projectSourceChildren({
@@ -136,7 +137,7 @@ function projectNavigationRow(options: {
   return {
     id: nodeId,
     label: options.row.displayName,
-    badgeLabel: 'Navigation',
+    badge: { value: 'Navigation', tone: 'muted' },
     icon: 'navigation',
     detail: formatNavigationDetail(options.row),
     children: {
@@ -329,7 +330,7 @@ function projectLiteralNode(options: {
     return {
       id: node.id,
       label: node.label,
-      badgeLabel: 'Folder',
+      badge: { value: 'Folder', tone: 'muted' },
       icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
       ...projectDirectoryChildren({
@@ -353,7 +354,7 @@ function projectLiteralNode(options: {
   return {
     id: node.id,
     label: node.label,
-    badgeLabel: presentation.badgeLabel,
+    badge: { value: presentation.badgeLabel, tone: 'muted' },
     icon: browserTreeIconForEntryRole(presentation.role),
     detail: formatFileDetail(node.presence),
     children: { kind: 'none' }
@@ -488,7 +489,7 @@ function readStateNode(options: {
   return {
     id: `read-state:${options.ownerId}:${options.state}`,
     label: options.label,
-    badgeLabel: 'State',
+    badge: { value: 'State', tone: readStateBadgeTone(options.state) },
     detail: options.detail,
     icon: readStateIcon(options.state),
     children: { kind: 'none' }
@@ -580,7 +581,7 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
           : more?.kind === 'loading'
             ? 'Loading more rows'
             : 'Load more rows',
-      badgeLabel: 'More',
+      badge: { value: 'More', tone: moreBadgeTone(more) },
       icon: moreIcon(more),
       children: { kind: 'none' },
       action: { kind: 'loadMore', state: actionState }
@@ -631,6 +632,29 @@ function moreIcon(more: LoadedChildren['more']): BrowserTreeIcon {
       return 'warning'
     default:
       return 'more'
+  }
+}
+
+function readStateBadgeTone(state: 'loading' | 'empty' | 'unavailable' | 'error'): BrowserTreeBadgeTone {
+  switch (state) {
+    case 'loading':
+      return 'neutral'
+    case 'error':
+    case 'unavailable':
+      return 'warning'
+    case 'empty':
+      return 'muted'
+  }
+}
+
+function moreBadgeTone(more: LoadedChildren['more']): BrowserTreeBadgeTone {
+  switch (more?.kind) {
+    case 'loading':
+      return 'neutral'
+    case 'failed':
+      return 'warning'
+    default:
+      return 'muted'
   }
 }
 

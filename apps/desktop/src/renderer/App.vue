@@ -91,26 +91,9 @@ function formatEnvironment(environment: LibraryBoundaryHostStatus['environment']
 
 <template>
   <main
-    class="grid min-h-screen max-h-screen gap-8 overflow-auto bg-(--color-background) p-8 text-(--color-text) max-[1060px]:max-h-none min-[861px]:p-14 min-[1061px]:grid-cols-[minmax(280px,0.8fr)_minmax(480px,1.2fr)]"
+    class="grid h-svh overflow-y-hidden gap-8 overflow-auto bg-(--color-background) p-8 text-(--color-text)"
     aria-labelledby="dekzer-title"
   >
-    <section class="self-center">
-      <p class="mb-3 text-[13px] font-bold uppercase tracking-normal text-(--color-accent)">
-        Dekzer Desktop
-      </p>
-      <h1
-        id="dekzer-title"
-        class="mb-[18px] text-5xl font-extrabold leading-none min-[861px]:text-[64px]"
-      >
-        Dekzer
-      </h1>
-      <p
-        class="inline-flex max-w-[460px] rounded-sm border border-white/10 px-3 py-2 text-lg text-(--color-text-muted)"
-      >
-        Desktop app ready. Local library navigation is active.
-      </p>
-    </section>
-
     <div class="grid gap-5 self-center">
       <section
         class="border border-(--color-border) bg-(--color-surface)"

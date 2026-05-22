@@ -41,7 +41,6 @@ export type BrowserTreeIcon =
   | 'source'
   | 'navigation'
   | 'folder'
-  | 'folderOpen'
   | 'file'
   | 'music'
   | 'video'
@@ -54,10 +53,31 @@ export type BrowserTreeIcon =
   | 'warning'
   | 'state'
 
+export type BrowserTreeBadgeTone =
+  | 'neutral'
+  | 'accent'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'muted'
+
+export type BrowserTreeBadgeEmphasis =
+  | 'soft'
+  | 'solid'
+  | 'outline'
+
+export interface BrowserTreeBadge {
+  readonly value: string
+  readonly tone?: BrowserTreeBadgeTone
+  readonly emphasis?: BrowserTreeBadgeEmphasis
+  readonly title?: string
+  readonly ariaLabel?: string
+}
+
 export type BrowserTreeNode = {
   readonly id: BrowserTreeNodeId
   readonly label: string
-  readonly badgeLabel?: string
+  readonly badge?: BrowserTreeBadge
   readonly detail?: string
   readonly icon?: BrowserTreeIcon
   readonly children: BrowserTreeChildren
