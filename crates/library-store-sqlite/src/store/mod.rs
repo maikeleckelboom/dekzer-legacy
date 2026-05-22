@@ -32,7 +32,7 @@ pub use context::{
 pub use discovery::RootScanMaterializationResult;
 pub use revisions::{MaintainedReadModelRevision, MaintainedReadModelScope};
 pub use sources::{
-    ReadRegisteredLocalRootsResult, RegisterLocalRootInput, RegisteredLocalRoot,
+    LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
 };
 
 #[cfg(test)]

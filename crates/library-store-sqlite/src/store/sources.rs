@@ -28,14 +28,21 @@ pub struct RegisterLocalRootInput {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RegisteredLocalRoot {
+pub struct LocalRoot {
     pub root_id: i64,
     pub canonical_path: PathBuf,
+    pub availability: LocalRootAvailability,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocalRootAvailability {
+    Available,
+    Unavailable,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReadRegisteredLocalRootsResult {
-    pub roots: Vec<RegisteredLocalRoot>,
+pub struct ReadLocalRootsResult {
+    pub roots: Vec<LocalRoot>,
 }
 
 impl SqliteDurableStore {
@@ -141,34 +148,40 @@ impl SqliteDurableStore {
     pub fn register_local_root(
         &self,
         input: RegisterLocalRootInput,
-    ) -> LibrarySqliteResult<RegisteredLocalRoot> {
+    ) -> LibrarySqliteResult<LocalRoot> {
         let resolved_root = self.bootstrap_root(&input.absolute_path)?;
-        Ok(RegisteredLocalRoot {
+        Ok(LocalRoot {
             root_id: resolved_root.root_id,
             canonical_path: resolved_root.canonical_path,
+            availability: LocalRootAvailability::Available,
         })
     }
 
-    pub fn read_registered_local_roots(&self) -> LibrarySqliteResult<ReadRegisteredLocalRootsResult> {
+    pub fn read_local_roots(&self) -> LibrarySqliteResult<ReadLocalRootsResult> {
         let connection = open_connection(&self.path)?;
         let mut statement = connection.prepare(
-            "SELECT sl.source_id, sl.absolute_path
+            "SELECT sl.source_id, sl.absolute_path, lss.resolution_status
              FROM source_locators sl
-             JOIN source_state lss
+             LEFT JOIN source_state lss
                ON lss.source_id = sl.source_id
              WHERE sl.locator_kind = 'absolute_path'
-               AND lss.resolution_status = 'resolved'
              ORDER BY sl.source_id ASC",
         )?;
         let roots = statement
             .query_map([], |row| {
-                Ok(RegisteredLocalRoot {
+                let resolution_status: Option<String> = row.get(2)?;
+                let availability = match resolution_status.as_deref() {
+                    Some("resolved") => LocalRootAvailability::Available,
+                    _ => LocalRootAvailability::Unavailable,
+                };
+                Ok(LocalRoot {
                     root_id: row.get(0)?,
                     canonical_path: PathBuf::from(row.get::<_, String>(1)?),
+                    availability,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(ReadRegisteredLocalRootsResult { roots })
+        Ok(ReadLocalRootsResult { roots })
     }
 
     #[allow(dead_code)]

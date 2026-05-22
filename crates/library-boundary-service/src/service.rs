@@ -6,7 +6,7 @@ use library_boundary_protocol as protocol;
 use library_domain::{LibraryAssetId, PlaylistId};
 use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
-    LibraryStoreContext, MovePlaylistEntryInput, ReadRegisteredLocalRootsResult,
+    LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
     RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
     SqliteDurableStore,
 };
@@ -375,19 +375,27 @@ impl LibraryBoundaryService {
         }
     }
 
-    pub fn read_registered_local_roots(
+    pub fn read_local_roots(
         &self,
-    ) -> protocol::ProtocolResult<protocol::ReadRegisteredLocalRootsReply> {
-        let ReadRegisteredLocalRootsResult { roots } = self
+    ) -> protocol::ProtocolResult<protocol::ReadLocalRootsReply> {
+        let ReadLocalRootsResult { roots } = self
             .durable_store
-            .read_registered_local_roots()
+            .read_local_roots()
             .map_err(map_store_error)?;
-        Ok(protocol::ReadRegisteredLocalRootsReply {
+        Ok(protocol::ReadLocalRootsReply {
             roots: roots
                 .into_iter()
-                .map(|root| protocol::RegisteredLocalRootRecord {
+                .map(|root| protocol::LocalRoot {
                     root_id: root.root_id,
                     canonical_path: root.canonical_path.to_string_lossy().into_owned(),
+                    availability: match root.availability {
+                        LocalRootAvailability::Available => {
+                            protocol::LocalRootAvailability::Available
+                        }
+                        LocalRootAvailability::Unavailable => {
+                            protocol::LocalRootAvailability::Unavailable
+                        }
+                    },
                 })
                 .collect(),
         })
@@ -404,9 +412,9 @@ impl LibraryBoundaryService {
             protocol::LibraryRootCommand::RunRootScan(request) => self
                 .run_root_scan(request)
                 .map(protocol::LibraryRootReply::RunRootScan),
-            protocol::LibraryRootCommand::ReadRegisteredLocalRoots(_) => self
-                .read_registered_local_roots()
-                .map(protocol::LibraryRootReply::ReadRegisteredLocalRoots),
+            protocol::LibraryRootCommand::ReadLocalRoots(_) => self
+                .read_local_roots()
+                .map(protocol::LibraryRootReply::ReadLocalRoots),
         }
     }
 
@@ -601,12 +609,12 @@ mod tests {
         }
     }
 
-    fn expect_read_registered_local_roots_reply(
+    fn expect_read_local_roots_reply(
         reply: CommandReply,
-    ) -> library_boundary_protocol::ReadRegisteredLocalRootsReply {
+    ) -> library_boundary_protocol::ReadLocalRootsReply {
         match reply {
-            CommandReply::LibraryRoots(LibraryRootReply::ReadRegisteredLocalRoots(reply)) => reply,
-            other => panic!("expected read registered local roots reply, got {other:?}"),
+            CommandReply::LibraryRoots(LibraryRootReply::ReadLocalRoots(reply)) => reply,
+            other => panic!("expected read local roots reply, got {other:?}"),
         }
     }
 
@@ -1001,12 +1009,12 @@ mod tests {
     }
 
     #[test]
-    fn read_registered_local_roots_returns_empty_before_registration() {
+    fn read_local_roots_returns_empty_before_registration() {
         let (_tempdir, _context, service) = open_service_with_context();
-        let reply = expect_read_registered_local_roots_reply(expect_success(
+        let reply = expect_read_local_roots_reply(expect_success(
             service.handle_command(CommandRequest::LibraryRoots(
-                LibraryRootCommand::ReadRegisteredLocalRoots(
-                    library_boundary_protocol::ReadRegisteredLocalRootsRequest,
+                LibraryRootCommand::ReadLocalRoots(
+                    library_boundary_protocol::ReadLocalRootsRequest,
                 ),
             )),
         ));
@@ -1014,7 +1022,7 @@ mod tests {
     }
 
     #[test]
-    fn read_registered_local_roots_returns_registered_root_after_registration() {
+    fn read_local_roots_returns_registered_root_after_registration() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("music-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -1023,15 +1031,22 @@ mod tests {
             register_local_root(&service, source_root.to_string_lossy().into_owned());
         assert!(registered.root_id > 0);
 
-        let reply = expect_read_registered_local_roots_reply(expect_success(
+        let reply = expect_read_local_roots_reply(expect_success(
             service.handle_command(CommandRequest::LibraryRoots(
-                LibraryRootCommand::ReadRegisteredLocalRoots(
-                    library_boundary_protocol::ReadRegisteredLocalRootsRequest,
+                LibraryRootCommand::ReadLocalRoots(
+                    library_boundary_protocol::ReadLocalRootsRequest,
                 ),
             )),
         ));
         assert_eq!(reply.roots.len(), 1);
         assert_eq!(reply.roots[0].root_id, registered.root_id);
         assert_eq!(reply.roots[0].canonical_path, registered.canonical_path);
+        assert!(
+            matches!(
+                reply.roots[0].availability,
+                library_boundary_protocol::LocalRootAvailability::Available
+            ),
+            "registered root must be available"
+        );
     }
 }

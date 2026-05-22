@@ -94,7 +94,7 @@ pub struct RunRootScanReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadRegisteredLocalRootsRequest;
+pub struct ReadLocalRootsRequest;
 
 #[derive(
     Debug,
@@ -108,8 +108,8 @@ pub struct ReadRegisteredLocalRootsRequest;
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadRegisteredLocalRootsReply {
-    pub roots: Vec<RegisteredLocalRootRecord>,
+pub struct ReadLocalRootsReply {
+    pub roots: Vec<LocalRoot>,
 }
 
 #[derive(
@@ -124,12 +124,30 @@ pub struct ReadRegisteredLocalRootsReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RegisteredLocalRootRecord {
+pub enum LocalRootAvailability {
+    Available,
+    Unavailable,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalRoot {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
     #[ts(as = "String")]
     pub root_id: i64,
     pub canonical_path: String,
+    pub availability: LocalRootAvailability,
 }
 
 #[derive(
@@ -147,7 +165,7 @@ pub struct RegisteredLocalRootRecord {
 pub enum LibraryRootCommand {
     RegisterLocalRoot(RegisterLocalRootRequest),
     RunRootScan(RunRootScanRequest),
-    ReadRegisteredLocalRoots(ReadRegisteredLocalRootsRequest),
+    ReadLocalRoots(ReadLocalRootsRequest),
 }
 
 #[derive(
@@ -165,14 +183,14 @@ pub enum LibraryRootCommand {
 pub enum LibraryRootReply {
     RegisterLocalRoot(RegisterLocalRootReply),
     RunRootScan(RunRootScanReply),
-    ReadRegisteredLocalRoots(ReadRegisteredLocalRootsReply),
+    ReadLocalRoots(ReadLocalRootsReply),
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        LibraryRootCommand, LibraryRootReply, ReadRegisteredLocalRootsReply,
-        ReadRegisteredLocalRootsRequest, RegisteredLocalRootRecord, RegisterLocalRootReply,
+        LibraryRootCommand, LibraryRootReply, LocalRoot, LocalRootAvailability,
+        ReadLocalRootsReply, ReadLocalRootsRequest, RegisterLocalRootReply,
         RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest,
     };
     use serde_json::json;
@@ -183,9 +201,7 @@ mod tests {
             absolute_path: "C:/Music".to_string(),
         });
         let scan = LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 7 });
-        let read_registered = LibraryRootCommand::ReadRegisteredLocalRoots(
-            ReadRegisteredLocalRootsRequest,
-        );
+        let read_local = LibraryRootCommand::ReadLocalRoots(ReadLocalRootsRequest);
 
         assert_eq!(
             serde_json::to_value(&register).expect("serialize register command"),
@@ -206,9 +222,9 @@ mod tests {
             })
         );
         assert_eq!(
-            serde_json::to_value(&read_registered).expect("serialize read registered command"),
+            serde_json::to_value(&read_local).expect("serialize read local roots command"),
             json!({
-                "type": "readRegisteredLocalRoots",
+                "type": "readLocalRoots",
                 "payload": null
             })
         );
@@ -233,14 +249,13 @@ mod tests {
             discovered_file_count: 2,
             queued_source_work_items: 1,
         });
-        let read_registered = LibraryRootReply::ReadRegisteredLocalRoots(
-            ReadRegisteredLocalRootsReply {
-                roots: vec![RegisteredLocalRootRecord {
-                    root_id: 3,
-                    canonical_path: "C:/Music".to_string(),
-                }],
-            },
-        );
+        let read_local = LibraryRootReply::ReadLocalRoots(ReadLocalRootsReply {
+            roots: vec![LocalRoot {
+                root_id: 3,
+                canonical_path: "C:/Music".to_string(),
+                availability: LocalRootAvailability::Available,
+            }],
+        });
 
         assert_eq!(
             serde_json::to_value(&registered).expect("serialize register reply"),
@@ -265,13 +280,14 @@ mod tests {
             })
         );
         assert_eq!(
-            serde_json::to_value(&read_registered).expect("serialize read registered reply"),
+            serde_json::to_value(&read_local).expect("serialize read local roots reply"),
             json!({
-                "type": "readRegisteredLocalRoots",
+                "type": "readLocalRoots",
                 "payload": {
                     "roots": [{
                         "rootId": "3",
-                        "canonicalPath": "C:/Music"
+                        "canonicalPath": "C:/Music",
+                        "availability": "available"
                     }]
                 }
             })

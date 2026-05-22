@@ -8,7 +8,7 @@ import type {
   NavigationReadRowsResult
 } from './libraryNavigation/readRows'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
-import type { ReadRegisteredLocalRootsOutcome } from './libraryRoots/readRegisteredRoots'
+import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
 
 export type RendererApi = {
@@ -38,5 +38,5 @@ export type LibraryNavigationApi = {
 export type LibraryRootsApi = {
   chooseAndRegisterLocal(): Promise<LocalRootChoiceResult>
   runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult>
-  readRegisteredLocalRoots(): Promise<ReadRegisteredLocalRootsOutcome>
+  readLocalRoots(): Promise<ReadLocalRootsOutcome>
 }

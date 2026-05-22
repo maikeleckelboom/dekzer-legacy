@@ -36,11 +36,13 @@ const {
   requestNodeChildren
 } = hierarchyRead
 const { registeredRootPath, rootChoiceButtonLabel, scanSummary, scanButtonLabel } = rootActions
-const { canAddMusicFolder, canScanRoot, addMusicFolder, scanRoot } = rootLifecycle
+const { canAddMusicFolder, canScanRoot, addMusicFolder, scanRoot, hydrateLocalRoots } =
+  rootLifecycle
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const hasUserInteractedWithTree = ref(false)
 const hasAppliedInitialPreferredNode = ref(false)
+let hydrationAttempted = false
 
 const liveTreeNodes = computed(() => {
   return browserProjection.value?.nodes
@@ -199,6 +201,15 @@ watch(
   },
   { immediate: true }
 )
+
+watch(hostStatus, (status) => {
+  if (hydrationAttempted || status?.state !== 'started') {
+    return
+  }
+
+  hydrationAttempted = true
+  void hydrateLocalRoots()
+})
 
 function selectNode(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true

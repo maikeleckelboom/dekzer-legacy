@@ -12,7 +12,7 @@ export type RootLifecycleController = {
   readonly canScanRoot: ComputedRef<boolean>
   readonly addMusicFolder: () => Promise<boolean>
   readonly scanRoot: () => Promise<boolean>
-  readonly hydrateRootIdentity: () => Promise<boolean>
+  readonly hydrateLocalRoots: () => Promise<boolean>
 }
 
 export type RootLifecycleDependencies = {
@@ -100,6 +100,6 @@ export function createRootLifecycleController(
     canScanRoot,
     addMusicFolder,
     scanRoot,
-    hydrateRootIdentity: dependencies.rootActions.hydrateFromRegisteredLocalRoots
+    hydrateLocalRoots: dependencies.rootActions.hydrateLocalRoots
   }
 }

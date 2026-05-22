@@ -1,64 +1,60 @@
-import type { ReadRegisteredLocalRootsRequest } from '@dekzer/library-boundary-contract'
+import type { ReadLocalRootsRequest } from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import { rootChannels } from '../../shared/libraryRoots/channels'
 import type {
-  ReadRegisteredLocalRootsErrorCode,
-  ReadRegisteredLocalRootsErrorState,
-  ReadRegisteredLocalRootsOutcome,
-  RegisteredLocalRoot
-} from '../../shared/libraryRoots/readRegisteredRoots'
+  ReadLocalRootsErrorCode,
+  ReadLocalRootsErrorState,
+  ReadLocalRootsOutcome,
+  LocalRoot
+} from '../../shared/libraryRoots/readLocalRoots'
 
-export type ReadRegisteredLocalRootsIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown) => Promise<ReadRegisteredLocalRootsOutcome>
-  ): void
+export type ReadLocalRootsIpcMain = {
+  handle(channel: string, listener: (event: unknown) => Promise<ReadLocalRootsOutcome>): void
 }
 
-export function registerReadRegisteredLocalRootsIpc(
-  ipcMain: ReadRegisteredLocalRootsIpcMain,
+export function registerReadLocalRootsIpc(
+  ipcMain: ReadLocalRootsIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(rootChannels.readRegisteredRoots, () => readRegisteredLocalRootsThroughHost(host))
+  ipcMain.handle(rootChannels.readLocalRoots, () => readLocalRootsThroughHost(host))
 }
 
-export async function readRegisteredLocalRootsThroughHost(
+export async function readLocalRootsThroughHost(
   host: LibraryBoundaryHost
-): Promise<ReadRegisteredLocalRootsOutcome> {
+): Promise<ReadLocalRootsOutcome> {
   const client = getStartedClient(host)
 
-  if (isReadRegisteredLocalRootsOutcome(client)) {
+  if (isReadLocalRootsOutcome(client)) {
     return client
   }
 
   try {
-    const reply = await client.readRegisteredLocalRoots(
-      null satisfies ReadRegisteredLocalRootsRequest
-    )
+    const reply = await client.readLocalRoots(null satisfies ReadLocalRootsRequest)
 
     return {
       state: 'read',
       roots: reply.roots.map(
-        (root): RegisteredLocalRoot => ({
+        (root): LocalRoot => ({
           rootId: root.rootId,
-          canonicalPath: root.canonicalPath
+          canonicalPath: root.canonicalPath,
+          availability: root.availability as LocalRoot['availability']
         })
       )
     }
   } catch {
-    return createReadRegisteredLocalRootsErrorResult(
+    return createReadLocalRootsErrorResult(
       'readFailed',
       'readFailed',
-      'Unable to read registered local roots.'
+      'Unable to read local roots.'
     )
   }
 }
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | ReadRegisteredLocalRootsOutcome {
+): LibraryBoundaryHostClient | ReadLocalRootsOutcome {
   try {
     return host.client
   } catch (error: unknown) {
@@ -66,7 +62,7 @@ function getStartedClient(
       return hostUnavailableResult(host, error)
     }
 
-    return createReadRegisteredLocalRootsErrorResult(
+    return createReadLocalRootsErrorResult(
       'hostUnavailable',
       'hostFailed',
       'The library boundary host is unavailable.'
@@ -77,8 +73,8 @@ function getStartedClient(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): ReadRegisteredLocalRootsOutcome {
-  return createReadRegisteredLocalRootsErrorResult(
+): ReadLocalRootsOutcome {
+  return createReadLocalRootsErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
     hostErrorMessage(host, error)
@@ -88,7 +84,7 @@ function hostUnavailableResult(
 function hostErrorCode(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): ReadRegisteredLocalRootsErrorCode {
+): ReadLocalRootsErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }
@@ -123,11 +119,11 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
   }
 }
 
-function createReadRegisteredLocalRootsErrorResult(
-  state: ReadRegisteredLocalRootsErrorState,
-  code: ReadRegisteredLocalRootsErrorCode,
+function createReadLocalRootsErrorResult(
+  state: ReadLocalRootsErrorState,
+  code: ReadLocalRootsErrorCode,
   message: string
-): ReadRegisteredLocalRootsOutcome {
+): ReadLocalRootsOutcome {
   return {
     state,
     error: {
@@ -137,8 +133,6 @@ function createReadRegisteredLocalRootsErrorResult(
   }
 }
 
-function isReadRegisteredLocalRootsOutcome(
-  value: unknown
-): value is ReadRegisteredLocalRootsOutcome {
+function isReadLocalRootsOutcome(value: unknown): value is ReadLocalRootsOutcome {
   return typeof value === 'object' && value !== null && 'state' in value
 }

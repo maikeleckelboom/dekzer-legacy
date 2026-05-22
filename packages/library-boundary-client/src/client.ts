@@ -13,12 +13,12 @@ import type {
   ReadLibraryBoundaryEventsRequest,
   ReadLiteralHierarchyChildrenReply,
   ReadLiteralHierarchyChildrenRequest,
+  ReadLocalRootsReply,
+  ReadLocalRootsRequest,
   ReadNavigationNodeLibraryBrowserWindowReply,
   ReadNavigationNodeLibraryBrowserWindowRequest,
   ReadNavigationRowsReply,
   ReadNavigationRowsRequest,
-  ReadRegisteredLocalRootsReply,
-  ReadRegisteredLocalRootsRequest,
   RegisterLocalRootReply,
   RegisterLocalRootRequest,
   RenamePlaylistReply,
@@ -72,16 +72,16 @@ export class LibraryBoundaryClient {
     );
   }
 
-  readRegisteredLocalRoots(
-    request: ReadRegisteredLocalRootsRequest
-  ): Promise<ReadRegisteredLocalRootsReply> {
+  readLocalRoots(
+    request: ReadLocalRootsRequest
+  ): Promise<ReadLocalRootsReply> {
     return this.sendAndExpect(
       {
         type: "libraryRoots",
-        payload: { type: "readRegisteredLocalRoots", payload: request }
+        payload: { type: "readLocalRoots", payload: request }
       },
       "libraryRoots",
-      "readRegisteredLocalRoots"
+      "readLocalRoots"
     );
   }
 

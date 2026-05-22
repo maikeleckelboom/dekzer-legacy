@@ -13,7 +13,7 @@ import {
 } from '../src/shared/libraryNavigation/readRows'
 import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
-import type { ReadRegisteredLocalRootsOutcome } from '../src/shared/libraryRoots/readRegisteredRoots'
+import type { ReadLocalRootsOutcome } from '../src/shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { emitStatus, testStatus } from './support/libraryBoundary'
 
@@ -72,12 +72,13 @@ async function validatesPreloadApiSurface(): Promise<void> {
     discoveredFileCount: 12,
     queuedSourceWorkItems: 8
   }
-  const readRegisteredRootsResult: ReadRegisteredLocalRootsOutcome = {
+  const readLocalRootsResult: ReadLocalRootsOutcome = {
     state: 'read',
     roots: [
       {
         rootId: '7',
-        canonicalPath: 'C:/Music'
+        canonicalPath: 'C:/Music',
+        availability: 'available'
       }
     ]
   }
@@ -119,9 +120,9 @@ async function validatesPreloadApiSurface(): Promise<void> {
         return scanResult
       }
 
-      if (channel === rootChannels.readRegisteredRoots) {
+      if (channel === rootChannels.readLocalRoots) {
         assert.deepEqual(args, [])
-        return readRegisteredRootsResult
+        return readLocalRootsResult
       }
 
       throw new Error(`unexpected preload invoke channel ${channel}`)
@@ -159,7 +160,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(Object.keys(api.library.navigation), ['readRows'])
   assert.deepEqual(Object.keys(api.library.roots).sort(), [
     'chooseAndRegisterLocal',
-    'readRegisteredLocalRoots',
+    'readLocalRoots',
     'runScan'
   ])
   assert.equal('ipcRenderer' in api, false)
@@ -183,6 +184,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.equal('ipcRenderer' in api.library.navigation, false)
   assert.equal('readLiteralHierarchyChildren' in api.library.navigation, false)
   assert.equal('registerLocalRoot' in api.library.navigation, false)
+  assert.equal('readRegisteredLocalRoots' in api.library.roots, false)
   assert.equal('registerLocalRoot' in api.library.roots, false)
   assert.equal('runRootScan' in api.library.roots, false)
   assert.equal('client' in api.library.roots, false)
@@ -202,7 +204,7 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(receivedChoiceArgs, [])
   assert.equal(await api.library.roots.runScan(scanRequest), scanResult)
   assert.equal(receivedScanRequest, scanRequest)
-  assert.equal(await api.library.roots.readRegisteredLocalRoots(), readRegisteredRootsResult)
+  assert.equal(await api.library.roots.readLocalRoots(), readLocalRootsResult)
   assert.equal(await api.library.navigation.readRows(navigationRequest), navigationResult)
   assert.equal(receivedNavigationRequest, navigationRequest)
   assert.equal(await api.library.hierarchy.readChildren(hierarchyRequest), hierarchyResult)

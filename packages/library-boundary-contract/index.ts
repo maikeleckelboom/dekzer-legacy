@@ -8,15 +8,17 @@ export type LibraryBoundaryEventStreamCommand = { "type": "readPending", "payloa
 
 export type ReadLibraryBoundaryEventsRequest = { maxEvents: number, };
 
-export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "runRootScan", "payload": RunRootScanRequest } | { "type": "readRegisteredLocalRoots", "payload": ReadRegisteredLocalRootsRequest };
+export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "runRootScan", "payload": RunRootScanRequest } | { "type": "readLocalRoots", "payload": ReadLocalRootsRequest };
 
 export type RegisterLocalRootRequest = { absolutePath: string, };
 
 export type RunRootScanRequest = { rootId: string, };
 
-export type ReadRegisteredLocalRootsRequest = null;
+export type ReadLocalRootsRequest = null;
 
-export type RegisteredLocalRootRecord = { rootId: string, canonicalPath: string, };
+export type LocalRootAvailability = "available" | "unavailable";
+
+export type LocalRoot = { rootId: string, canonicalPath: string, availability: LocalRootAvailability, };
 
 export type PlaylistWriteCommand = { "type": "createPlaylist", "payload": CreatePlaylistRequest } | { "type": "renamePlaylist", "payload": RenamePlaylistRequest } | { "type": "deletePlaylist", "payload": DeletePlaylistRequest } | { "type": "appendLibraryAssetToPlaylist", "payload": AppendLibraryAssetToPlaylistRequest } | { "type": "removeLibraryAssetFromPlaylist", "payload": RemoveLibraryAssetFromPlaylistRequest } | { "type": "movePlaylistEntry", "payload": MovePlaylistEntryRequest };
 
@@ -56,13 +58,13 @@ export type LibraryBoundaryEventStreamReply = { "type": "readPending", "payload"
 
 export type ReadLibraryBoundaryEventsReply = { events: Array<LibraryBoundaryEvent>, };
 
-export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "runRootScan", "payload": RunRootScanReply } | { "type": "readRegisteredLocalRoots", "payload": ReadRegisteredLocalRootsReply };
+export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "runRootScan", "payload": RunRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply };
 
 export type RegisterLocalRootReply = { rootId: string, canonicalPath: string, };
 
 export type RunRootScanReply = { rootId: string, scanRunId: string, discoveredFileCount: number, queuedSourceWorkItems: number, };
 
-export type ReadRegisteredLocalRootsReply = { roots: Array<RegisteredLocalRootRecord>, };
+export type ReadLocalRootsReply = { roots: Array<LocalRoot>, };
 
 export type PlaylistWriteReply = { "type": "createPlaylist", "payload": CreatePlaylistReply } | { "type": "renamePlaylist", "payload": RenamePlaylistReply } | { "type": "deletePlaylist", "payload": DeletePlaylistReply } | { "type": "appendLibraryAssetToPlaylist", "payload": AppendLibraryAssetToPlaylistReply } | { "type": "removeLibraryAssetFromPlaylist", "payload": RemoveLibraryAssetFromPlaylistReply } | { "type": "movePlaylistEntry", "payload": MovePlaylistEntryReply };
 

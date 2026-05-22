@@ -920,11 +920,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadRegisteredLocalRootsRequest"
+              "$ref": "#/$defs/ReadLocalRootsRequest"
             },
             "type": {
               "type": "string",
-              "const": "readRegisteredLocalRoots"
+              "const": "readLocalRoots"
             }
           },
           "required": [
@@ -972,11 +972,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadRegisteredLocalRootsReply"
+              "$ref": "#/$defs/ReadLocalRootsReply"
             },
             "type": {
               "type": "string",
-              "const": "readRegisteredLocalRoots"
+              "const": "readLocalRoots"
             }
           },
           "required": [
@@ -1209,6 +1209,32 @@
       },
       "required": [
         "navigationRowId"
+      ]
+    },
+    "LocalRoot": {
+      "type": "object",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/LocalRootAvailability"
+        },
+        "canonicalPath": {
+          "type": "string"
+        },
+        "rootId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rootId",
+        "canonicalPath",
+        "availability"
+      ]
+    },
+    "LocalRootAvailability": {
+      "type": "string",
+      "enum": [
+        "available",
+        "unavailable"
       ]
     },
     "MaintainedSnapshotInvalidation": {
@@ -1782,6 +1808,23 @@
         "limit"
       ]
     },
+    "ReadLocalRootsReply": {
+      "type": "object",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LocalRoot"
+          }
+        }
+      },
+      "required": [
+        "roots"
+      ]
+    },
+    "ReadLocalRootsRequest": {
+      "type": "null"
+    },
     "ReadNavigationNodeLibraryBrowserWindowReply": {
       "type": "object",
       "properties": {
@@ -1845,23 +1888,6 @@
         }
       }
     },
-    "ReadRegisteredLocalRootsReply": {
-      "type": "object",
-      "properties": {
-        "roots": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/RegisteredLocalRootRecord"
-          }
-        }
-      },
-      "required": [
-        "roots"
-      ]
-    },
-    "ReadRegisteredLocalRootsRequest": {
-      "type": "null"
-    },
     "RegisterLocalRootReply": {
       "type": "object",
       "properties": {
@@ -1886,21 +1912,6 @@
       },
       "required": [
         "absolutePath"
-      ]
-    },
-    "RegisteredLocalRootRecord": {
-      "type": "object",
-      "properties": {
-        "canonicalPath": {
-          "type": "string"
-        },
-        "rootId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "rootId",
-        "canonicalPath"
       ]
     },
     "RemoveLibraryAssetFromPlaylistReply": {
