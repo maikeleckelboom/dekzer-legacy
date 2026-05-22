@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { LocationSourceIcon, LocationSourceIconBadge } from './locationSources'
-import { Icon } from '../icons'
-import { resolveSourceIcon, resolveSourceIconBadge } from '../icons'
+import type { LocationSourceIcon, LocationSourceIconBadge } from '../projection/sourcePresentation'
+import { Icon } from '../../icons'
+import { resolveSourceIcon, resolveSourceIconBadge } from '../../icons'
 
 defineOptions({
   name: 'SourceIcon'

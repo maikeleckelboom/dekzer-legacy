@@ -1,4 +1,4 @@
-import type { BrowserTreeBadge } from './tree/types'
+import type { BrowserTreeBadge } from '../tree/types'
 
 export type LibraryEntryRole =
   | 'folder'

@@ -11,7 +11,7 @@ import {
   type LocationSourceIcon,
   type LocationSourceIconBadge,
   type LocationSourcePresentation
-} from '../src/renderer/libraryBrowser/locationSources'
+} from '../src/renderer/libraryBrowser/projection/sourcePresentation'
 
 const allKinds: readonly LocationSourceKind[] = [
   'localLibrary',

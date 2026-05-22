@@ -1,5 +1,5 @@
-import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
-import type { NavigationRow } from '../../shared/libraryNavigation/readRows'
+import type { EntryPoint, ChildRow } from '../../../shared/libraryHierarchy/readChildren'
+import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
 import type {
   DirectoryState,
   LoadedChildren,
@@ -8,7 +8,7 @@ import type {
   BrowserState,
   SourceState,
   SourceTarget
-} from './hierarchyState'
+} from '../runtime/state'
 import type {
   BrowserTreeAction,
   BrowserTreeActionState,
@@ -16,12 +16,12 @@ import type {
   BrowserTreeChildren,
   BrowserTreeIcon,
   BrowserTreeNode,
-  BrowserTreeNodeId,
-  BrowserTreeRowRole
-} from './tree/types'
-import { copyEntryPoint } from './entryPoint'
-import { adaptLocationSourceDescriptor, getLocationSourcePresentation } from './locationSources'
-import { classifyLibraryEntryName, type LibraryEntryRole } from './browserEntryPresentation'
+  BrowserTreeNodeId
+} from '../tree/types'
+import { copyEntryPoint } from '../runtime/entryPoint'
+import { adaptLocationSourceDescriptor, getLocationSourcePresentation } from './sourcePresentation'
+import { classifyLibraryEntryName, type LibraryEntryRole } from './entryPresentation'
+import { browserRowRoleForNavigationRow } from './rowRoles'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -89,26 +89,6 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
   }
 }
 
-function navigationRowRole(row: NavigationRow): BrowserTreeRowRole {
-  switch (row.rowKind) {
-    case 'view':
-      return 'collectionView'
-    case 'collectionGroup':
-      return 'collectionView'
-    case 'playlist':
-      return 'playlistSurface'
-    case 'prepPolicyGroup':
-    case 'prepPolicyScope':
-      return 'preparationSurface'
-    case 'source':
-      return 'source'
-    case 'locationGroup':
-      return 'locationGroup'
-    case 'location':
-      return 'sourceLocation'
-  }
-}
-
 function projectNavigationRow(options: {
   readonly row: NavigationRow
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
@@ -136,7 +116,7 @@ function projectNavigationRow(options: {
 
     return {
       id: nodeId,
-      role: navigationRowRole(options.row),
+      role: browserRowRoleForNavigationRow(options.row),
       label: options.row.displayName,
       badge: { value: presentation.label, tone: 'muted' },
       icon: 'source',
@@ -158,7 +138,7 @@ function projectNavigationRow(options: {
 
   return {
     id: nodeId,
-    role: navigationRowRole(options.row),
+    role: browserRowRoleForNavigationRow(options.row),
     label: options.row.displayName,
     badge: { value: 'Navigation', tone: 'muted' },
     icon: 'navigation',
@@ -388,7 +368,7 @@ function projectLiteralNode(options: {
 
 function browserTreeIconForEntryRole(
   role: LibraryEntryRole
-): import('./tree/types').BrowserTreeIcon {
+): import('../tree/types').BrowserTreeIcon {
   switch (role) {
     case 'folder':
       return 'folder'

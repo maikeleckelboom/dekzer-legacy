@@ -1,4 +1,4 @@
-import type { EntryPoint } from '../../shared/libraryHierarchy/readChildren'
+import type { EntryPoint } from '../../../shared/libraryHierarchy/readChildren'
 
 export function sameEntryPoint(left: EntryPoint, right: EntryPoint): boolean {
   if (left.kind !== right.kind) {

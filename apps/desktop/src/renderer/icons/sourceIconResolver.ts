@@ -1,4 +1,7 @@
-import type { LocationSourceIcon, LocationSourceIconBadge } from '../libraryBrowser/locationSources'
+import type {
+  LocationSourceIcon,
+  LocationSourceIconBadge
+} from '../libraryBrowser/projection/sourcePresentation'
 import type { IconComponent } from './types'
 import {
   ArchiveIcon,

@@ -47,9 +47,7 @@ export function resolveBrowserTreeRowIcon(
   }
 }
 
-function resolveLiteralFileIcon(
-  icon: BrowserTreeNode['icon']
-): IconComponent {
+function resolveLiteralFileIcon(icon: BrowserTreeNode['icon']): IconComponent {
   switch (icon) {
     case 'music':
       return MusicIcon
@@ -69,9 +67,7 @@ function resolveLiteralFileIcon(
   }
 }
 
-function resolveStateIcon(
-  icon: BrowserTreeNode['icon']
-): IconComponent {
+function resolveStateIcon(icon: BrowserTreeNode['icon']): IconComponent {
   switch (icon) {
     case 'loading':
       return LoadingIcon
@@ -82,9 +78,7 @@ function resolveStateIcon(
   }
 }
 
-function resolveActionIcon(
-  icon: BrowserTreeNode['icon']
-): IconComponent {
+function resolveActionIcon(icon: BrowserTreeNode['icon']): IconComponent {
   switch (icon) {
     case 'loading':
       return LoadingIcon

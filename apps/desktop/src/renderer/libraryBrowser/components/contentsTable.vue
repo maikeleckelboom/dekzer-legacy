@@ -12,9 +12,13 @@ import {
   StateIcon,
   VideoIcon,
   WarningIcon
-} from '../icons'
-import type { IconComponent } from '../icons'
-import { type ContentProjection, type ContentRow, type ContentRowIcon } from './contentsProjection'
+} from '../../icons'
+import type { IconComponent } from '../../icons'
+import {
+  type ContentProjection,
+  type ContentRow,
+  type ContentRowIcon
+} from '../projection/contents'
 
 defineOptions({
   name: 'ContentsTable'

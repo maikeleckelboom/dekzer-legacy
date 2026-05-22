@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 
-import type { LibraryHierarchyReadController } from './hierarchyRead'
-import type { LocalRootActionsController } from './localRootActions'
+import type { LibraryHierarchyReadController } from '../boundary/hierarchyRead'
+import type { LocalRootActionsController } from '../boundary/localRootActions'
 
 export type RootLifecycleRefreshStatus = 'idle' | 'refreshing' | 'refreshed' | 'failed'
 

@@ -7,11 +7,7 @@ import type {
   BrowserTreeBadgeEmphasis,
   BrowserTreeVisibleItem
 } from './types'
-import {
-  DisclosureClosedIcon,
-  DisclosureOpenIcon,
-  Icon
-} from '../../icons'
+import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
 import type { IconComponent } from '../../icons'
 import { resolveBrowserTreeRowIcon } from './presentation'
 

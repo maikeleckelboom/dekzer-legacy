@@ -1,7 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 
-import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
+import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundary/status'
 import type {
   EntryPoint,
   ChildRow,
@@ -9,13 +9,13 @@ import type {
   ReadResult,
   ReadRoot,
   ChildWindow
-} from '../../shared/libraryHierarchy/readChildren'
+} from '../../../shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow
-} from '../../shared/libraryNavigation/readRows'
-import type { RendererApi } from '../../shared/rendererApi'
-import { projectState, type BrowserProjection } from './hierarchyProjection'
+} from '../../../shared/libraryNavigation/readRows'
+import type { RendererApi } from '../../../shared/rendererApi'
+import { projectState, type BrowserProjection } from '../projection/tree'
 import type {
   MoreTarget,
   DirectoryState,
@@ -24,9 +24,9 @@ import type {
   LoadedChildren,
   SourceState,
   SourceTarget
-} from './hierarchyState'
-import type { BrowserTreeNodeId } from './tree/types'
-import { copyEntryPoint, sameEntryPoint } from './entryPoint'
+} from '../runtime/state'
+import type { BrowserTreeNodeId } from '../tree/types'
+import { copyEntryPoint, sameEntryPoint } from '../runtime/entryPoint'
 
 const readLimit = 50
 const safeNavigationReadRequestFailure = 'Unable to request library navigation rows.'

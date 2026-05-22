@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 
-import { projectState } from '../src/renderer/libraryBrowser/hierarchyProjection'
+import { projectState } from '../src/renderer/libraryBrowser/projection/tree'
 import {
   getTreeItemAriaExpanded,
   getTreeItemAriaSelected
@@ -24,7 +24,7 @@ import {
   isBrowserTreeBranch,
   isBrowserTreeLeaf
 } from '../src/renderer/libraryBrowser/tree/projection'
-import type { LoadedChildren } from '../src/renderer/libraryBrowser/hierarchyState'
+import type { LoadedChildren } from '../src/renderer/libraryBrowser/runtime/state'
 import type {
   BrowserTreeNode,
   BrowserTreeNodeId,

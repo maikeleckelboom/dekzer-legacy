@@ -1,10 +1,10 @@
 import { computed, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 
-import type { LocalRootChoiceResult } from '../../shared/libraryRoots/chooseAndRegisterLocal'
-import type { LocalRootRegistrationRoot } from '../../shared/libraryRoots/registerLocalRoot'
-import type { LocalRootScanResult } from '../../shared/libraryRoots/runScan'
-import type { RendererApi } from '../../shared/rendererApi'
+import type { LocalRootChoiceResult } from '../../../shared/libraryRoots/chooseAndRegisterLocal'
+import type { LocalRootRegistrationRoot } from '../../../shared/libraryRoots/registerLocalRoot'
+import type { LocalRootScanResult } from '../../../shared/libraryRoots/runScan'
+import type { RendererApi } from '../../../shared/rendererApi'
 
 export type LibraryRootActionsApi = RendererApi['library']['roots']
 
