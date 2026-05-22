@@ -28,6 +28,7 @@ import type { LoadedChildren } from '../src/renderer/libraryBrowser/hierarchySta
 import type {
   BrowserTreeNode,
   BrowserTreeNodeId,
+  BrowserTreeRowRole,
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
 import type { ReadResult, ChildWindow } from '../src/shared/libraryHierarchy/readChildren'
@@ -39,6 +40,7 @@ const libraryHierarchyFixtureTree = {
   nodes: [
     {
       id: 'fixture-root',
+      role: 'source',
       label: 'Fixture Library Root',
       badge: { value: 'Root', tone: 'muted' },
       detail: 'Demo root for renderer tree behavior.',
@@ -47,6 +49,7 @@ const libraryHierarchyFixtureTree = {
         nodes: [
           {
             id: 'fixture-artists',
+            role: 'collectionView',
             label: 'Artists',
             badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
@@ -54,6 +57,7 @@ const libraryHierarchyFixtureTree = {
           },
           {
             id: 'fixture-albums',
+            role: 'collectionView',
             label: 'Albums',
             badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
@@ -61,6 +65,7 @@ const libraryHierarchyFixtureTree = {
           },
           {
             id: 'fixture-tracks',
+            role: 'collectionView',
             label: 'Tracks',
             badge: { value: 'Branch', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
@@ -69,6 +74,7 @@ const libraryHierarchyFixtureTree = {
               nodes: [
                 {
                   id: 'fixture-tracks-group',
+                  role: 'literalDirectory',
                   label: 'Fixture Track Group',
                   badge: { value: 'Branch', tone: 'muted' },
                   detail: 'Demo child row for nested hierarchy rendering.',
@@ -79,6 +85,7 @@ const libraryHierarchyFixtureTree = {
           },
           {
             id: 'fixture-playlists',
+            role: 'playlistSurface',
             label: 'Nested Branch',
             badge: { value: 'Branch', tone: 'muted' },
             detail: 'Fixture grouping placeholder.',
@@ -87,6 +94,7 @@ const libraryHierarchyFixtureTree = {
               nodes: [
                 {
                   id: 'fixture-playlist-group',
+                  role: 'literalDirectory',
                   label: 'Fixture Nested Group',
                   badge: { value: 'Branch', tone: 'muted' },
                   detail: 'Demo child row for nested hierarchy rendering.',
@@ -97,6 +105,7 @@ const libraryHierarchyFixtureTree = {
           },
           {
             id: 'fixture-preparation',
+            role: 'preparationSurface',
             label: 'Preparation',
             badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture workflow placeholder.',
@@ -104,6 +113,7 @@ const libraryHierarchyFixtureTree = {
           },
           {
             id: 'fixture-history',
+            role: 'collectionView',
             label: 'History',
             badge: { value: 'Leaf', tone: 'muted' },
             detail: 'Fixture history placeholder.',
@@ -144,6 +154,10 @@ function main(): void {
   validatesCollapseKeepsLoadedChildren()
   validatesLibraryHierarchyReadProjection()
   validatesFixtureFallbackRemainsExplicit()
+  validatesRowRoleDistinctions()
+  validatesFolderOpenClosedFromExpansion()
+  validatesFileRoleIcons()
+  validatesStateAndActionRoleIcons()
 }
 
 function validatesExplicitChildrenAndActionModel(): void {
@@ -609,6 +623,7 @@ function validatesLibraryHierarchyReadProjection(): void {
   assert.deepEqual(projected.nodes, [
     {
       id: 'navigation-row:7',
+      role: 'source',
       label: 'Source Fixture',
       badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
@@ -618,6 +633,7 @@ function validatesLibraryHierarchyReadProjection(): void {
         nodes: [
           {
             id: 'source-file:11',
+            role: 'literalFile',
             label: 'track.wav',
             badge: { value: 'Audio', tone: 'muted' },
             icon: 'music',
@@ -649,6 +665,7 @@ function validatesLibraryHierarchyReadProjection(): void {
   assert.deepEqual(directoryProjection.nodes, [
     {
       id: 'navigation-row:7',
+      role: 'source',
       label: 'Source Fixture',
       badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
@@ -658,6 +675,7 @@ function validatesLibraryHierarchyReadProjection(): void {
         nodes: [
           {
             id: 'source-directory:12',
+            role: 'literalDirectory',
             label: 'Album',
             badge: { value: 'Folder', tone: 'muted' },
             icon: 'folder',
@@ -854,6 +872,7 @@ function getItem(
 function leafRootNode(): BrowserTreeNode {
   return {
     id: 'leaf-root',
+    role: 'state',
     label: 'Leaf root',
     badge: { value: 'Branch', tone: 'muted' },
     children: { kind: 'none' }
@@ -863,6 +882,7 @@ function leafRootNode(): BrowserTreeNode {
 function loadedBranchRootNode(): BrowserTreeNode {
   return {
     id: 'loaded-root',
+    role: 'source',
     label: 'Loaded root',
     badge: { value: 'Branch', tone: 'muted' },
     children: {
@@ -870,6 +890,7 @@ function loadedBranchRootNode(): BrowserTreeNode {
       nodes: [
         {
           id: 'loaded-child',
+          role: 'literalFile',
           label: 'Loaded child',
           badge: { value: 'Leaf', tone: 'muted' },
           children: { kind: 'none' }
@@ -882,6 +903,7 @@ function loadedBranchRootNode(): BrowserTreeNode {
 function loadedEmptyBranchRootNode(): BrowserTreeNode {
   return {
     id: 'loaded-empty-root',
+    role: 'source',
     label: 'Loaded empty root',
     badge: { value: 'Branch', tone: 'muted' },
     children: {
@@ -896,17 +918,18 @@ function unloadedBranchNode(): BrowserTreeNode {
 
   return {
     id: 'unloaded-root',
+    role: 'source',
     label: 'Unloaded root',
     badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'deferred',
-      detail
+      detail: detail
     },
     action: {
       kind: 'loadChildren',
       state: {
         kind: 'idle',
-        detail
+        detail: detail
       }
     }
   }
@@ -917,17 +940,18 @@ function loadingBranchNode(): BrowserTreeNode {
 
   return {
     id: 'loading-root',
+    role: 'source',
     label: 'Loading root',
     badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'deferred',
-      detail
+      detail: detail
     },
     action: {
       kind: 'loadChildren',
       state: {
         kind: 'loading',
-        detail
+        detail: detail
       }
     }
   }
@@ -938,17 +962,18 @@ function failedBranchNode(): BrowserTreeNode {
 
   return {
     id: 'failed-root',
+    role: 'source',
     label: 'Failed root',
     badge: { value: 'Branch', tone: 'muted' },
     children: {
       kind: 'deferred',
-      detail
+      detail: detail
     },
     action: {
       kind: 'loadChildren',
       state: {
         kind: 'failed',
-        detail
+        detail: detail
       }
     }
   }
@@ -957,6 +982,7 @@ function failedBranchNode(): BrowserTreeNode {
 function moreActionNode(): BrowserTreeNode {
   return {
     id: 'more-root',
+    role: 'action',
     label: 'Load more rows',
     badge: { value: 'More', tone: 'muted' },
     icon: 'more',
@@ -1067,4 +1093,149 @@ function loadedChildrenFromWindow(window: ChildWindow): LoadedChildren {
     ...(nextOffset === undefined ? {} : { nextOffset }),
     limit: window.limit
   }
+}
+
+function nodeWithRole(role: BrowserTreeRowRole, icon?: BrowserTreeNode['icon']): BrowserTreeNode {
+  return {
+    id: `role-test:${role}`,
+    role,
+    label: `Test ${role}`,
+    ...(icon === undefined ? {} : { icon }),
+    children: { kind: 'none' }
+  }
+}
+
+function resolvesToDifferentCategory(
+  roleA: BrowserTreeRowRole,
+  roleB: BrowserTreeRowRole
+): boolean {
+  return roleA !== roleB
+}
+
+function validatesRowRoleDistinctions(): void {
+  const everyRole: readonly BrowserTreeRowRole[] = [
+    'collectionView',
+    'locationGroup',
+    'source',
+    'sourceLocation',
+    'literalDirectory',
+    'literalFile',
+    'preparationSurface',
+    'playlistSurface',
+    'smartView',
+    'state',
+    'action'
+  ]
+
+  for (const role of everyRole) {
+    const node = nodeWithRole(role)
+    assert.equal(node.role, role, `node must carry role ${role}`)
+  }
+
+  assert.ok(
+    resolvesToDifferentCategory('locationGroup', 'source'),
+    'locationGroup must not share category with source'
+  )
+  assert.ok(
+    resolvesToDifferentCategory('locationGroup', 'sourceLocation'),
+    'locationGroup must not share category with sourceLocation'
+  )
+  assert.ok(
+    resolvesToDifferentCategory('collectionView', 'source'),
+    'collectionView must differ from source'
+  )
+
+  const sourceNode = nodeWithRole('source')
+  assert.equal(sourceNode.role, 'source', 'source role must be explicit')
+
+  const locationGroupNode = nodeWithRole('locationGroup')
+  assert.equal(locationGroupNode.role, 'locationGroup', 'locationGroup role must be explicit')
+
+  assert.notEqual(
+    locationGroupNode.role,
+    sourceNode.role,
+    'locationGroup and source must resolve to different roles'
+  )
+}
+
+function validatesFolderOpenClosedFromExpansion(): void {
+  const dir = nodeWithRole('literalDirectory', 'folder')
+  const sourceLocation = nodeWithRole('sourceLocation')
+  const locationGroup = nodeWithRole('locationGroup')
+
+  assert.equal(typeof dir.role, 'string', 'literalDirectory must have role')
+  assert.equal(typeof sourceLocation.role, 'string', 'sourceLocation must have role')
+  assert.equal(typeof locationGroup.role, 'string', 'locationGroup must have role')
+
+  const expandedDir: BrowserTreeVisibleItem = {
+    id: dir.id,
+    node: dir,
+    level: 1,
+    visibleIndex: 0,
+    isBranch: true,
+    canRevealChildren: true,
+    canActivateAction: false,
+    isActionLoading: false,
+    isActionItem: false,
+    isExpanded: true,
+    isSelected: false,
+    isActive: false,
+    ariaSetSize: 1,
+    ariaPosInSet: 1
+  }
+
+  const closedDir: BrowserTreeVisibleItem = {
+    ...expandedDir,
+    isExpanded: false
+  }
+
+  assert.ok(expandedDir.isExpanded, 'expanded state must be true')
+  assert.ok(!closedDir.isExpanded, 'closed state must be false')
+  assert.notEqual(
+    expandedDir.isExpanded,
+    closedDir.isExpanded,
+    'folder open/closed must derive from expansion state, not baked into role'
+  )
+}
+
+function validatesFileRoleIcons(): void {
+  const fileRoles: readonly BrowserTreeNode['icon'][] = [
+    'music',
+    'video',
+    'image',
+    'cueSheet',
+    'playlist',
+    'metadata',
+    'file'
+  ]
+
+  for (const icon of fileRoles) {
+    const node = nodeWithRole('literalFile', icon)
+    assert.equal(node.role, 'literalFile', `file with icon ${icon} must be literalFile`)
+    assert.equal(node.icon, icon, `file must carry icon hint ${icon}`)
+  }
+}
+
+function validatesStateAndActionRoleIcons(): void {
+  const stateLoading = nodeWithRole('state', 'loading')
+  const stateWarning = nodeWithRole('state', 'warning')
+  const stateDefault = nodeWithRole('state')
+
+  assert.equal(stateLoading.role, 'state', 'state loading must have state role')
+  assert.equal(stateWarning.role, 'state', 'state warning must have state role')
+  assert.equal(stateDefault.role, 'state', 'state default must have state role')
+
+  const actionLoading = nodeWithRole('action', 'loading')
+  const actionWarning = nodeWithRole('action', 'warning')
+  const actionDefault = nodeWithRole('action', 'more')
+
+  assert.equal(actionLoading.role, 'action', 'action loading must have action role')
+  assert.equal(actionWarning.role, 'action', 'action warning must have action role')
+  assert.equal(actionDefault.role, 'action', 'action default must have action role')
+
+  assert.notEqual(
+    stateLoading.role,
+    actionLoading.role,
+    'state and action must have distinct roles'
+  )
 }

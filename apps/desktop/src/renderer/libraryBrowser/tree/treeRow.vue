@@ -10,23 +10,10 @@ import type {
 import {
   DisclosureClosedIcon,
   DisclosureOpenIcon,
-  FileIcon,
-  FileTextIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  Icon,
-  ImageIcon,
-  ListMusicIcon,
-  LoadingIcon,
-  MoreIcon,
-  MusicIcon,
-  NavigationIcon,
-  SourceIcon,
-  StateIcon,
-  VideoIcon,
-  WarningIcon
+  Icon
 } from '../../icons'
 import type { IconComponent } from '../../icons'
+import { resolveBrowserTreeRowIcon } from './presentation'
 
 defineOptions({
   name: 'TreeRow'
@@ -57,7 +44,9 @@ const hasAffordance = computed(
 
 const actionStateDetail = computed(() => formatActionStateDetail(props.item.node.action?.state))
 
-const rowIcon = computed<IconComponent | undefined>(() => resolveRowIcon(props.item))
+const rowIcon = computed<IconComponent | undefined>(() =>
+  resolveBrowserTreeRowIcon(props.item.node, props.item.isExpanded)
+)
 
 const badgeClass = computed(() => {
   const badge = props.item.node.badge
@@ -81,45 +70,6 @@ function formatActionStateDetail(state: BrowserTreeActionState | undefined): str
       return state.detail ?? 'Loading.'
     case 'failed':
       return state.detail
-  }
-}
-
-function resolveRowIcon(item: BrowserTreeVisibleItem): IconComponent | undefined {
-  const iconKind = item.node.icon
-
-  if (iconKind === 'folder') {
-    return item.isExpanded ? FolderOpenIcon : FolderIcon
-  }
-
-  switch (iconKind) {
-    case 'source':
-      return SourceIcon
-    case 'navigation':
-      return NavigationIcon
-    case 'file':
-      return FileIcon
-    case 'music':
-      return MusicIcon
-    case 'video':
-      return VideoIcon
-    case 'image':
-      return ImageIcon
-    case 'cueSheet':
-      return FileTextIcon
-    case 'playlist':
-      return ListMusicIcon
-    case 'metadata':
-      return FileTextIcon
-    case 'more':
-      return MoreIcon
-    case 'loading':
-      return LoadingIcon
-    case 'warning':
-      return WarningIcon
-    case 'state':
-      return StateIcon
-    default:
-      return undefined
   }
 }
 

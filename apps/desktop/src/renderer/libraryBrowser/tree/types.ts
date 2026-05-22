@@ -37,6 +37,19 @@ export type BrowserTreeAction =
       readonly state: BrowserTreeActionState
     }
 
+export type BrowserTreeRowRole =
+  | 'collectionView'
+  | 'locationGroup'
+  | 'source'
+  | 'sourceLocation'
+  | 'literalDirectory'
+  | 'literalFile'
+  | 'preparationSurface'
+  | 'playlistSurface'
+  | 'smartView'
+  | 'state'
+  | 'action'
+
 export type BrowserTreeIcon =
   | 'source'
   | 'navigation'
@@ -68,6 +81,7 @@ export interface BrowserTreeBadge {
 export type BrowserTreeNode = {
   readonly id: BrowserTreeNodeId
   readonly label: string
+  readonly role: BrowserTreeRowRole
   readonly badge?: BrowserTreeBadge
   readonly detail?: string
   readonly icon?: BrowserTreeIcon

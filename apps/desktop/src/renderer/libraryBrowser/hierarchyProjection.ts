@@ -16,7 +16,8 @@ import type {
   BrowserTreeChildren,
   BrowserTreeIcon,
   BrowserTreeNode,
-  BrowserTreeNodeId
+  BrowserTreeNodeId,
+  BrowserTreeRowRole
 } from './tree/types'
 import { copyEntryPoint } from './entryPoint'
 import { adaptLocationSourceDescriptor, getLocationSourcePresentation } from './locationSources'
@@ -88,6 +89,26 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
   }
 }
 
+function navigationRowRole(row: NavigationRow): BrowserTreeRowRole {
+  switch (row.rowKind) {
+    case 'view':
+      return 'collectionView'
+    case 'collectionGroup':
+      return 'collectionView'
+    case 'playlist':
+      return 'playlistSurface'
+    case 'prepPolicyGroup':
+    case 'prepPolicyScope':
+      return 'preparationSurface'
+    case 'source':
+      return 'source'
+    case 'locationGroup':
+      return 'locationGroup'
+    case 'location':
+      return 'sourceLocation'
+  }
+}
+
 function projectNavigationRow(options: {
   readonly row: NavigationRow
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
@@ -115,6 +136,7 @@ function projectNavigationRow(options: {
 
     return {
       id: nodeId,
+      role: navigationRowRole(options.row),
       label: options.row.displayName,
       badge: { value: presentation.label, tone: 'muted' },
       icon: 'source',
@@ -136,6 +158,7 @@ function projectNavigationRow(options: {
 
   return {
     id: nodeId,
+    role: navigationRowRole(options.row),
     label: options.row.displayName,
     badge: { value: 'Navigation', tone: 'muted' },
     icon: 'navigation',
@@ -329,6 +352,7 @@ function projectLiteralNode(options: {
 
     return {
       id: node.id,
+      role: 'literalDirectory',
       label: node.label,
       badge: { value: 'Folder', tone: 'muted' },
       icon: 'folder',
@@ -353,6 +377,7 @@ function projectLiteralNode(options: {
 
   return {
     id: node.id,
+    role: 'literalFile',
     label: node.label,
     badge: presentation.badge,
     icon: browserTreeIconForEntryRole(presentation.role),
@@ -490,6 +515,7 @@ function readStateNode(options: {
 }): BrowserTreeNode {
   return {
     id: `read-state:${options.ownerId}:${options.state}`,
+    role: 'state',
     label: options.label,
     badge: { value: 'State', tone: readStateBadgeTone(options.state) },
     detail: options.detail,
@@ -577,6 +603,7 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
   return {
     node: {
       id: `more:${options.ownerId}:${offset}`,
+      role: 'action',
       label:
         more?.kind === 'failed'
           ? 'Retry loading more rows'
