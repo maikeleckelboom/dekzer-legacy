@@ -375,9 +375,7 @@ impl LibraryBoundaryService {
         }
     }
 
-    pub fn read_local_roots(
-        &self,
-    ) -> protocol::ProtocolResult<protocol::ReadLocalRootsReply> {
+    pub fn read_local_roots(&self) -> protocol::ProtocolResult<protocol::ReadLocalRootsReply> {
         let ReadLocalRootsResult { roots } = self
             .durable_store
             .read_local_roots()
@@ -1011,13 +1009,11 @@ mod tests {
     #[test]
     fn read_local_roots_returns_empty_before_registration() {
         let (_tempdir, _context, service) = open_service_with_context();
-        let reply = expect_read_local_roots_reply(expect_success(
-            service.handle_command(CommandRequest::LibraryRoots(
-                LibraryRootCommand::ReadLocalRoots(
-                    library_boundary_protocol::ReadLocalRootsRequest,
-                ),
+        let reply = expect_read_local_roots_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::ReadLocalRoots(
+                library_boundary_protocol::ReadLocalRootsRequest,
             )),
-        ));
+        )));
         assert!(reply.roots.is_empty());
     }
 
@@ -1031,13 +1027,11 @@ mod tests {
             register_local_root(&service, source_root.to_string_lossy().into_owned());
         assert!(registered.root_id > 0);
 
-        let reply = expect_read_local_roots_reply(expect_success(
-            service.handle_command(CommandRequest::LibraryRoots(
-                LibraryRootCommand::ReadLocalRoots(
-                    library_boundary_protocol::ReadLocalRootsRequest,
-                ),
+        let reply = expect_read_local_roots_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::ReadLocalRoots(
+                library_boundary_protocol::ReadLocalRootsRequest,
             )),
-        ));
+        )));
         assert_eq!(reply.roots.len(), 1);
         assert_eq!(reply.roots[0].root_id, registered.root_id);
         assert_eq!(reply.roots[0].canonical_path, registered.canonical_path);

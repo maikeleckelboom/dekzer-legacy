@@ -1,4 +1,7 @@
-import type { ReadLocalRootsRequest } from '@dekzer/library-boundary-contract'
+import type {
+  LocalRootAvailability,
+  ReadLocalRootsRequest
+} from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
@@ -39,7 +42,7 @@ export async function readLocalRootsThroughHost(
         (root): LocalRoot => ({
           rootId: root.rootId,
           canonicalPath: root.canonicalPath,
-          availability: root.availability as LocalRoot['availability']
+          availability: mapContractAvailability(root.availability)
         })
       )
     }
@@ -135,4 +138,13 @@ function createReadLocalRootsErrorResult(
 
 function isReadLocalRootsOutcome(value: unknown): value is ReadLocalRootsOutcome {
   return typeof value === 'object' && value !== null && 'state' in value
+}
+
+function mapContractAvailability(availability: LocalRootAvailability): LocalRoot['availability'] {
+  switch (availability) {
+    case 'available':
+      return 'available'
+    case 'unavailable':
+      return 'unavailable'
+  }
 }

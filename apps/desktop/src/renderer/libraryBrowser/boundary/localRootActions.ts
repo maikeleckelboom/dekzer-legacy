@@ -1,9 +1,9 @@
-import { computed, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import type { LocalRootChoiceResult } from '../../../shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootRegistrationRoot } from '../../../shared/libraryRoots/registerLocalRoot'
-import type { ReadLocalRootsOutcome, LocalRoot } from '../../../shared/libraryRoots/readLocalRoots'
+import type { LocalRoot, ReadLocalRootsOutcome } from '../../../shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../../../shared/libraryRoots/runScan'
 import type { RendererApi } from '../../../shared/rendererApi'
 
@@ -12,6 +12,14 @@ export type LibraryRootActionsApi = RendererApi['library']['roots']
 export type LocalRootChoiceStatus = 'idle' | 'choosing' | 'canceled' | 'registered' | 'failed'
 
 export type LocalRootScanStatus = 'idle' | 'scanning' | 'scanned' | 'failed'
+
+export type HydrationStatus =
+  | 'idle'
+  | 'hydrated'
+  | 'unavailable-root'
+  | 'empty'
+  | 'multiple'
+  | 'host-error'
 
 export type LocalRootScanSummary = {
   readonly rootId: string
@@ -30,6 +38,7 @@ export type LocalRootActionsController = {
   readonly scanSummary: Ref<LocalRootScanSummary | undefined>
   readonly scanButtonLabel: ComputedRef<string>
   readonly canRunRegisteredRootScan: ComputedRef<boolean>
+  readonly hydrationStatus: Ref<HydrationStatus>
   readonly chooseAndRegisterLocalRoot: () => Promise<boolean>
   readonly runRegisteredRootScan: () => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
@@ -53,6 +62,7 @@ export function createLocalRootActionsController(
   const scanStatus = ref<LocalRootScanStatus>('idle')
   const scanSummary = ref<LocalRootScanSummary>()
   const scanFailureMessage = ref<string>()
+  const hydrationStatus = ref<HydrationStatus>('idle')
 
   const registeredRootPath = computed(() => registeredRoot.value?.canonicalPath)
   const canChooseLocalRoot = computed(
@@ -62,7 +72,10 @@ export function createLocalRootActionsController(
     rootChoiceStatus.value === 'choosing' ? 'Adding folder' : 'Add music folder'
   )
   const canRunRegisteredRootScan = computed(
-    () => registeredRoot.value !== undefined && scanStatus.value !== 'scanning'
+    () =>
+      registeredRoot.value !== undefined &&
+      scanStatus.value !== 'scanning' &&
+      hydrationStatus.value !== 'unavailable-root'
   )
   const scanButtonLabel = computed(() => {
     switch (scanStatus.value) {
@@ -93,6 +106,7 @@ export function createLocalRootActionsController(
       if (result.state === 'registered') {
         rootChoiceStatus.value = 'registered'
         registeredRoot.value = result.root
+        hydrationStatus.value = 'idle'
         resetScanState()
         return true
       }
@@ -159,29 +173,34 @@ export function createLocalRootActionsController(
     try {
       result = await rootApi.readLocalRoots()
     } catch {
+      hydrationStatus.value = 'host-error'
       return false
     }
 
     if (result.state !== 'read') {
+      hydrationStatus.value = 'host-error'
       return false
     }
 
     if (result.roots.length === 0) {
+      hydrationStatus.value = 'empty'
       return false
     }
 
     if (result.roots.length > 1) {
-      rootChoiceStatus.value = 'failed'
+      hydrationStatus.value = 'multiple'
       return false
     }
 
     const firstRoot = result.roots[0]
     if (firstRoot === undefined) {
+      hydrationStatus.value = 'empty'
       return false
     }
 
     registeredRoot.value = registeredRootFromRecord(firstRoot)
     rootChoiceStatus.value = 'registered'
+    hydrationStatus.value = firstRoot.availability === 'available' ? 'hydrated' : 'unavailable-root'
     return true
   }
 
@@ -195,6 +214,7 @@ export function createLocalRootActionsController(
     scanSummary,
     scanButtonLabel,
     canRunRegisteredRootScan,
+    hydrationStatus,
     chooseAndRegisterLocalRoot,
     runRegisteredRootScan,
     hydrateLocalRoots

@@ -12,6 +12,7 @@ import {
   type RootLifecycleController
 } from '../src/renderer/libraryBrowser/runtime/rootLifecycle'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
+import type { ReadLocalRootsOutcome } from '../src/shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { desktopRoot, listSourceFiles, normalizePath, rendererSourceRoot } from './support/files'
 import { deferred } from './support/libraryBoundary'
@@ -37,6 +38,12 @@ async function main(): Promise<void> {
   await validatesComposedCanceledSecondChoicePreservesRegisteredRootAndScanState()
   await validatesComposedFailedSecondChoicePreservesRegisteredRootAndScanState()
   await validatesComposedSuccessfulSecondChoiceReplacesRootAndResetsScanStateBeforeScanning()
+  await validatesHydrationWithZeroRootsDisablesScan()
+  await validatesHydrationWithOneAvailableRootEnablesScan()
+  await validatesHydrationWithOneUnavailableRootDisablesScan()
+  await validatesHydrationWithMultipleRootsDoesNotSilentlyPickFirst()
+  await validatesHydrationWithHostErrorDoesNotEnableScan()
+  await validatesExplicitChoiceAfterHydrationResetsHydrationStatus()
   validatesRendererScanBoundaryOwnership()
 }
 
@@ -566,6 +573,159 @@ async function validatesComposedSuccessfulSecondChoiceReplacesRootAndResetsScanS
   })
 }
 
+async function validatesHydrationWithZeroRootsDisablesScan(): Promise<void> {
+  let readCallCount = 0
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async (): Promise<ReadLocalRootsOutcome> => {
+        readCallCount += 1
+        return {
+          state: 'read',
+          roots: []
+        }
+      }
+    })
+  )
+
+  assert.equal(controller.rootChoiceStatus.value, 'idle')
+  assert.equal(controller.hydrationStatus.value, 'idle')
+  assert.equal(await controller.hydrateLocalRoots(), false)
+  assert.equal(readCallCount, 1)
+  assert.equal(controller.hydrationStatus.value, 'empty')
+  assert.equal(controller.rootChoiceStatus.value, 'idle')
+  assert.equal(controller.registeredRoot.value, undefined)
+  assert.equal(controller.canRunRegisteredRootScan.value, false)
+}
+
+async function validatesHydrationWithOneAvailableRootEnablesScan(): Promise<void> {
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async (): Promise<ReadLocalRootsOutcome> => ({
+        state: 'read',
+        roots: [
+          {
+            rootId: 'root-7',
+            canonicalPath: 'C:/Music',
+            availability: 'available'
+          }
+        ]
+      })
+    })
+  )
+
+  assert.equal(await controller.hydrateLocalRoots(), true)
+  assert.equal(controller.hydrationStatus.value, 'hydrated')
+  assert.equal(controller.rootChoiceStatus.value, 'registered')
+  assert.equal(controller.registeredRootPath.value, 'C:/Music')
+  assert.equal(controller.registeredRoot.value?.rootId, 'root-7')
+  assert.equal(controller.canRunRegisteredRootScan.value, true)
+}
+
+async function validatesHydrationWithOneUnavailableRootDisablesScan(): Promise<void> {
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async (): Promise<ReadLocalRootsOutcome> => ({
+        state: 'read',
+        roots: [
+          {
+            rootId: 'root-7',
+            canonicalPath: 'Z:/Missing',
+            availability: 'unavailable'
+          }
+        ]
+      })
+    })
+  )
+
+  assert.equal(await controller.hydrateLocalRoots(), true)
+  assert.equal(controller.hydrationStatus.value, 'unavailable-root')
+  assert.equal(controller.rootChoiceStatus.value, 'registered')
+  assert.equal(controller.registeredRootPath.value, 'Z:/Missing')
+  assert.equal(controller.registeredRoot.value?.rootId, 'root-7')
+  assert.equal(controller.canRunRegisteredRootScan.value, false)
+}
+
+async function validatesHydrationWithMultipleRootsDoesNotSilentlyPickFirst(): Promise<void> {
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async (): Promise<ReadLocalRootsOutcome> => ({
+        state: 'read',
+        roots: [
+          {
+            rootId: 'root-1',
+            canonicalPath: 'C:/Music/One',
+            availability: 'available'
+          },
+          {
+            rootId: 'root-2',
+            canonicalPath: 'C:/Music/Two',
+            availability: 'available'
+          }
+        ]
+      })
+    })
+  )
+
+  assert.equal(await controller.hydrateLocalRoots(), false)
+  assert.equal(controller.hydrationStatus.value, 'multiple')
+  assert.equal(controller.rootChoiceStatus.value, 'idle')
+  assert.equal(controller.registeredRoot.value, undefined)
+  assert.equal(controller.canRunRegisteredRootScan.value, false)
+}
+
+async function validatesHydrationWithHostErrorDoesNotEnableScan(): Promise<void> {
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async (): Promise<ReadLocalRootsOutcome> => ({
+        state: 'hostFailed',
+        error: {
+          code: 'hostFailed',
+          message: 'Host failed for testing.'
+        }
+      })
+    })
+  )
+
+  assert.equal(await controller.hydrateLocalRoots(), false)
+  assert.equal(controller.hydrationStatus.value, 'host-error')
+  assert.equal(controller.registeredRoot.value, undefined)
+  assert.equal(controller.canRunRegisteredRootScan.value, false)
+}
+
+async function validatesExplicitChoiceAfterHydrationResetsHydrationStatus(): Promise<void> {
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async (): Promise<ReadLocalRootsOutcome> => ({
+        state: 'read',
+        roots: [
+          {
+            rootId: 'root-hydrated',
+            canonicalPath: 'C:/Music/Hydrated',
+            availability: 'unavailable'
+          }
+        ]
+      }),
+      chooseAndRegisterLocal: async () => ({
+        state: 'registered',
+        root: {
+          rootId: 'root-explicit',
+          canonicalPath: 'C:/Music/Explicit'
+        }
+      })
+    })
+  )
+
+  assert.equal(await controller.hydrateLocalRoots(), true)
+  assert.equal(controller.hydrationStatus.value, 'unavailable-root')
+  assert.equal(controller.registeredRootPath.value, 'C:/Music/Hydrated')
+  assert.equal(controller.canRunRegisteredRootScan.value, false)
+
+  assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
+  assert.equal(controller.hydrationStatus.value, 'idle')
+  assert.equal(controller.registeredRootPath.value, 'C:/Music/Explicit')
+  assert.equal(controller.canRunRegisteredRootScan.value, true)
+}
+
 function validatesRendererScanBoundaryOwnership(): void {
   const violations: string[] = []
   const forbiddenPatterns = [
@@ -612,6 +772,13 @@ function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRoo
       error: {
         code: 'scanFailed',
         message: 'Local root scan should not be called by this validation.'
+      }
+    }),
+    readLocalRoots: async () => ({
+      state: 'hostFailed',
+      error: {
+        code: 'hostFailed',
+        message: 'Local root read should not be called by this validation.'
       }
     }),
     ...overrides
