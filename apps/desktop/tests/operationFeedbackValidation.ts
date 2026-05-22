@@ -3,275 +3,277 @@ import { strict as assert } from 'node:assert'
 import {
   deriveOperationFeedback,
   type LibraryOperationFeedback,
+  type LibraryOperationFeedbackKind,
   type OperationFeedbackInputs
 } from '../src/renderer/libraryBrowser/projection/operationFeedback'
 import type { LibraryBoundaryHostStatus } from '../src/shared/libraryBoundary/status'
+import type { NavigationRow } from '../src/shared/libraryNavigation/readRows'
 
 void main()
 
 function main(): void {
-  validatesHostStatusChecks()
-  validatesNoRootRegistered()
-  validatesActiveOperations()
+  validatesHostNotReady()
+  validatesNoRoot()
+  validatesActiveOperationsBeatIdle()
   validatesErrorStates()
-  validatesSuccessStates()
+  validatesSuccessAndTerminal()
   validatesNoFakeProgress()
+  validatesErrorDetailPassthrough()
 }
 
-function validatesHostStatusChecks(): void {
+function validatesHostNotReady(): void {
   const base = noRootInputs()
 
-  assertFeedback(deriveOperationFeedback({ ...base, hostStatus: undefined }), {
-    tone: 'loading',
-    title: 'Checking library host'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, hostStatus: idleHost() }), {
-    tone: 'warning',
-    title: 'Library host idle'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, hostStatus: hostWithState('starting') }), {
-    tone: 'loading',
-    title: 'Library host starting'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, hostStatus: hostWithState('stopping') }), {
-    tone: 'warning',
-    title: 'Library host stopping'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, hostStatus: hostWithState('stopped') }), {
-    tone: 'warning',
-    title: 'Library host stopped'
-  })
-
-  assertFeedback(
-    deriveOperationFeedback({ ...base, hostStatus: failedHost('host failed detail') }),
-    {
-      tone: 'error',
-      title: 'Library host failed'
-    }
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, hostStatus: undefined }),
+    'checkingHost',
+    'loading'
   )
 
-  assertFeedback(
-    deriveOperationFeedback({
-      ...base,
-      hostStatus: failedHost('host failed detail'),
-      navigationReadRequestError: 'ignored error'
-    }),
-    {
-      tone: 'error',
-      title: 'Library host failed'
-    }
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, hostStatus: hostWithState('starting') }),
+    'checkingHost',
+    'loading'
   )
+
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, hostStatus: hostWithState('idle') }),
+    'hostUnavailable',
+    'warning'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, hostStatus: hostWithState('stopping') }),
+    'hostUnavailable',
+    'warning'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, hostStatus: hostWithState('stopped') }),
+    'hostUnavailable',
+    'warning'
+  )
+
+  const failed = deriveOperationFeedback({ ...base, hostStatus: failedHost('host failure reason') })
+  assertKindAndTone(failed, 'hostUnavailable', 'error')
+  assert.match(failed.detail ?? '', /host failure reason/)
+
+  const failedNavIgnored = deriveOperationFeedback({
+    ...base,
+    hostStatus: failedHost('host failure reason'),
+    navigationReadRequestError: 'ignored error'
+  })
+  assert.equal(failedNavIgnored.kind, 'hostUnavailable')
 }
 
-function validatesNoRootRegistered(): void {
+function validatesNoRoot(): void {
   const base = startedInputs({ registeredRootPath: undefined })
 
-  assertFeedback(deriveOperationFeedback({ ...base, rootChoiceStatus: 'idle' }), {
-    tone: 'idle',
-    title: 'Choose a music folder'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, rootChoiceStatus: 'choosing' }), {
-    tone: 'loading',
-    title: 'Choosing music folder'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, rootChoiceStatus: 'failed' }), {
-    tone: 'error',
-    title: 'Unable to add music folder'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, rootChoiceStatus: 'canceled' }), {
-    tone: 'warning',
-    title: 'Folder selection canceled'
-  })
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, rootChoiceStatus: 'idle' }),
+    'chooseRoot',
+    'idle'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, rootChoiceStatus: 'choosing' }),
+    'choosingRoot',
+    'loading'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, rootChoiceStatus: 'failed' }),
+    'rootChoiceFailed',
+    'error'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, rootChoiceStatus: 'canceled' }),
+    'rootChoiceCanceled',
+    'warning'
+  )
 }
 
-function validatesActiveOperations(): void {
+function validatesActiveOperationsBeatIdle(): void {
   const base = startedInputs({})
 
-  assertFeedback(deriveOperationFeedback({ ...base, rootChoiceStatus: 'choosing' }), {
-    tone: 'loading',
-    title: 'Choosing music folder'
-  })
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, rootChoiceStatus: 'choosing' }),
+    'choosingRoot',
+    'loading'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, scanStatus: 'scanning' }),
+    'scanningRoot',
+    'loading'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, refreshStatus: 'refreshing' }),
+    'refreshingView',
+    'loading'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, navigationReadIsLoading: true }),
+    'navigationLoading',
+    'loading'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, hierarchyReadIsLoading: true }),
+    'hierarchyLoading',
+    'loading'
+  )
 
-  assertFeedback(deriveOperationFeedback({ ...base, scanStatus: 'scanning' }), {
-    tone: 'loading',
-    title: 'Scanning local root'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, refreshStatus: 'refreshing' }), {
-    tone: 'loading',
-    title: 'Refreshing library view'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, navigationReadIsLoading: true }), {
-    tone: 'loading',
-    title: 'Loading navigation'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, hierarchyReadIsLoading: true }), {
-    tone: 'loading',
-    title: 'Loading hierarchy'
-  })
-
-  assertFeedback(
+  assert.equal(
     deriveOperationFeedback({
       ...base,
       scanStatus: 'scanning',
       navigationReadIsLoading: true,
       hierarchyReadIsLoading: true
-    }),
-    { tone: 'loading', title: 'Scanning local root' }
+    }).kind,
+    'scanningRoot'
   )
 
-  assertFeedback(
+  assert.equal(
     deriveOperationFeedback({
       ...base,
       refreshStatus: 'refreshing',
       navigationReadIsLoading: true
-    }),
-    { tone: 'loading', title: 'Refreshing library view' }
+    }).kind,
+    'refreshingView'
   )
 }
 
 function validatesErrorStates(): void {
   const base = startedInputs({})
 
-  assertFeedback(deriveOperationFeedback({ ...base, rootChoiceStatus: 'failed' }), {
-    tone: 'error',
-    title: 'Unable to add music folder'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, scanStatus: 'failed' }), {
-    tone: 'error',
-    title: 'Scan failed'
-  })
-
-  assertFeedback(deriveOperationFeedback({ ...base, refreshStatus: 'failed' }), {
-    tone: 'warning',
-    title: 'Refresh incomplete'
-  })
-
-  assertFeedback(
-    deriveOperationFeedback({
-      ...base,
-      navigationReadRequestError: 'Safe navigation read error.'
-    }),
-    { tone: 'error', title: 'Navigation read failed' }
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, rootChoiceStatus: 'failed' }),
+    'rootChoiceFailed',
+    'error'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, scanStatus: 'failed' }),
+    'scanFailed',
+    'error'
+  )
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, refreshStatus: 'failed' }),
+    'refreshFailed',
+    'warning'
   )
 
-  assertFeedback(
-    deriveOperationFeedback({
-      ...base,
-      hierarchyReadRequestError: 'Safe hierarchy read error.'
-    }),
-    { tone: 'error', title: 'Hierarchy read failed' }
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, navigationReadRequestError: 'nav error detail' }),
+    'navigationFailed',
+    'error'
   )
 
-  assertFeedback(
-    deriveOperationFeedback({
-      ...base,
-      navigationReadRequestError: 'Safe detail must be shown.',
-      hierarchyReadRequestError: 'Safe hierarchy detail.'
-    }),
-    { tone: 'error', title: 'Navigation read failed', detail: 'Safe detail must be shown.' }
+  assertKindAndTone(
+    deriveOperationFeedback({ ...base, hierarchyReadRequestError: 'hierarchy error detail' }),
+    'hierarchyFailed',
+    'error'
   )
+
+  const navPri = deriveOperationFeedback({
+    ...base,
+    navigationReadRequestError: 'nav wins',
+    hierarchyReadRequestError: 'hierarchy loses'
+  })
+  assertKindAndTone(navPri, 'navigationFailed', 'error')
 }
 
-function validatesSuccessStates(): void {
+function validatesSuccessAndTerminal(): void {
   const base = startedInputs({})
 
-  assertFeedback(deriveOperationFeedback({ ...base, scanStatus: 'scanned' }), {
-    tone: 'success',
-    title: 'Scan complete'
-  })
+  const scanned = deriveOperationFeedback({ ...base, scanStatus: 'scanned' })
+  assertKindAndTone(scanned, 'scanComplete', 'success')
 
-  assertFeedback(deriveOperationFeedback({ ...base, refreshStatus: 'refreshed' }), {
-    tone: 'success',
-    title: 'Library view refreshed'
+  const readyNav = deriveOperationFeedback({
+    ...base,
+    navigationReadResult: readyNavigation([makeNavRow()])
   })
+  assertKindAndTone(readyNav, 'ready', 'success')
 
-  assertFeedback(deriveOperationFeedback({ ...base, rootChoiceStatus: 'registered' }), {
-    tone: 'success',
-    title: 'Folder added'
+  const noSources = deriveOperationFeedback({
+    ...base,
+    navigationReadResult: readyNavigation([])
   })
+  assertKindAndTone(noSources, 'noSources', 'warning')
 
-  assertFeedback(
+  assert.equal(
     deriveOperationFeedback({
       ...base,
-      rootChoiceStatus: 'registered',
-      refreshStatus: 'refreshed',
-      navigationReadResult: readyNavigation([])
-    }),
-    { tone: 'success', title: 'Library view refreshed' }
+      scanStatus: 'scanned',
+      navigationReadResult: readyNavigation([makeNavRow()])
+    }).kind,
+    'ready'
   )
 
-  assertFeedback(
-    deriveOperationFeedback({
-      ...base,
-      navigationReadResult: readyNavigation([
-        {
-          navigationRowId: '1',
-          stableKey: 'source:1',
-          parentNavigationRowId: null,
-          family: 'sources',
-          rowKind: 'source',
-          displayName: 'Source',
-          siblingPosition: 0,
-          selectable: true,
-          selectorKind: 'source',
-          selectorPayload: '1',
-          updatedAtMs: 100,
-          rowVersion: '1'
-        }
-      ])
-    }),
-    { tone: 'success', title: 'Library ready' }
-  )
-
-  assertFeedback(
+  assert.equal(
     deriveOperationFeedback({
       ...base,
       navigationReadResult: readyNavigation([])
-    }),
-    { tone: 'warning', title: 'No library sources' }
+    }).kind,
+    'noSources'
   )
 }
 
 function validatesNoFakeProgress(): void {
-  const feedback = deriveOperationFeedback(startedInputs({ scanStatus: 'scanning' }))
+  const scanning = deriveOperationFeedback(startedInputs({ scanStatus: 'scanning' }))
 
-  assert.equal(feedback.tone, 'loading')
-  assert.equal(feedback.title, 'Scanning local root')
-  assert.doesNotMatch(feedback.title, /%/g)
-  assert.doesNotMatch(feedback.detail ?? '', /%/g)
-  assert.doesNotMatch(feedback.title, /file\s+\d+/i)
-  assert.doesNotMatch(feedback.detail ?? '', /file\s+\d+/i)
+  assert.equal(scanning.kind, 'scanningRoot')
+  assert.doesNotMatch(scanning.title, /%/g)
+  assert.doesNotMatch(scanning.detail ?? '', /%/g)
+  assert.doesNotMatch(scanning.title, /file\s+\d+/i)
+  assert.doesNotMatch(scanning.detail ?? '', /file\s+\d+/i)
+  assert.doesNotMatch(scanning.title, /\d+\s+files?/i)
 
   const scanComplete = deriveOperationFeedback(startedInputs({ scanStatus: 'scanned' }))
-  assert.equal(scanComplete.tone, 'success')
+  assert.equal(scanComplete.kind, 'scanComplete')
   assert.doesNotMatch(scanComplete.title, /%/g)
   assert.doesNotMatch(scanComplete.title, /\d+\s+files?/i)
+  assert.doesNotMatch(scanComplete.detail ?? '', /%/g)
+
+  const scanWithSummary = deriveOperationFeedback(
+    startedInputs({
+      scanStatus: 'scanned',
+      scanSummary: {
+        rootId: 'r1',
+        scanRunId: 's1',
+        discoveredFileCount: 42,
+        queuedSourceWorkItems: 3
+      }
+    })
+  )
+  assert.match(scanWithSummary.detail ?? '', /42 files/)
+  assert.match(scanWithSummary.detail ?? '', /3 source work items/)
+
+  const refreshFeedback = deriveOperationFeedback(startedInputs({ refreshStatus: 'refreshing' }))
+  assert.doesNotMatch(refreshFeedback.title, /%/g)
+  assert.doesNotMatch(refreshFeedback.title, /file\s+\d+/i)
 }
 
-function assertFeedback(
+function validatesErrorDetailPassthrough(): void {
+  const navErr = deriveOperationFeedback(
+    startedInputs({ navigationReadRequestError: 'Safe nav error text.' })
+  )
+  assert.equal(navErr.kind, 'navigationFailed')
+  assert.equal(navErr.tone, 'error')
+  assert.match(navErr.detail ?? '', /Safe nav error text/)
+
+  const hierarchyErr = deriveOperationFeedback(
+    startedInputs({ hierarchyReadRequestError: 'Safe hierarchy error text.' })
+  )
+  assert.equal(hierarchyErr.kind, 'hierarchyFailed')
+  assert.match(hierarchyErr.detail ?? '', /Safe hierarchy error text/)
+}
+
+function assertKindAndTone(
   actual: LibraryOperationFeedback,
-  expected: {
-    readonly tone: LibraryOperationFeedback['tone']
-    readonly title: string
-    readonly detail?: string
-  }
+  expectedKind: LibraryOperationFeedbackKind,
+  expectedTone: LibraryOperationFeedback['tone']
 ): void {
-  assert.equal(actual.tone, expected.tone, `tone mismatch for "${expected.title}"`)
-  assert.equal(actual.title, expected.title, `title mismatch`)
-  if (expected.detail !== undefined) {
-    assert.equal(actual.detail, expected.detail, `detail mismatch for "${expected.title}"`)
-  }
+  assert.equal(
+    actual.kind,
+    expectedKind,
+    `kind mismatch: expected "${expectedKind}", got "${actual.kind}"`
+  )
+  assert.equal(actual.tone, expectedTone, `tone mismatch for "${expectedKind}"`)
 }
 
 function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): OperationFeedbackInputs {
@@ -280,6 +282,7 @@ function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): Operat
     rootChoiceStatus: 'idle',
     registeredRootPath: '/Music',
     scanStatus: 'idle',
+    scanSummary: undefined,
     refreshStatus: 'idle',
     navigationReadIsLoading: false,
     hierarchyReadIsLoading: false,
@@ -296,6 +299,7 @@ function noRootInputs(): OperationFeedbackInputs {
     rootChoiceStatus: 'idle',
     registeredRootPath: undefined,
     scanStatus: 'idle',
+    scanSummary: undefined,
     refreshStatus: 'idle',
     navigationReadIsLoading: false,
     hierarchyReadIsLoading: false,
@@ -303,10 +307,6 @@ function noRootInputs(): OperationFeedbackInputs {
     hierarchyReadRequestError: undefined,
     navigationReadResult: undefined
   }
-}
-
-function idleHost(): LibraryBoundaryHostStatus {
-  return hostWithState('idle')
 }
 
 function hostWithState(state: LibraryBoundaryHostStatus['state']): LibraryBoundaryHostStatus {
@@ -324,6 +324,23 @@ function failedHost(message: string): LibraryBoundaryHostStatus {
     environment: 'development',
     binaryPolicy: { kind: 'developmentBinary', source: 'environmentOverride' },
     lastError: { code: 'unknown', message }
+  }
+}
+
+function makeNavRow(): NavigationRow {
+  return {
+    navigationRowId: '1',
+    stableKey: 'source:1',
+    parentNavigationRowId: null,
+    family: 'sources' as const,
+    rowKind: 'source' as const,
+    displayName: 'Source',
+    siblingPosition: 0,
+    selectable: true,
+    selectorKind: 'source',
+    selectorPayload: '1',
+    updatedAtMs: 100,
+    rowVersion: '1'
   }
 }
 

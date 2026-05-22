@@ -35,23 +35,8 @@ const {
   browserProjection,
   requestNodeChildren
 } = hierarchyRead
-const {
-  registeredRootPath,
-  rootChoiceButtonLabel,
-  rootChoiceFeedback,
-  rootChoiceFeedbackClass,
-  scanFeedback,
-  scanFeedbackClass,
-  scanButtonLabel
-} = rootActions
-const {
-  refreshFeedback,
-  refreshFeedbackClass,
-  canAddMusicFolder,
-  canScanRoot,
-  addMusicFolder,
-  scanRoot
-} = rootLifecycle
+const { registeredRootPath, rootChoiceButtonLabel, scanSummary, scanButtonLabel } = rootActions
+const { canAddMusicFolder, canScanRoot, addMusicFolder, scanRoot } = rootLifecycle
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const hasUserInteractedWithTree = ref(false)
@@ -107,6 +92,7 @@ const operationFeedback = computed(() =>
     rootChoiceStatus: rootActions.rootChoiceStatus.value,
     registeredRootPath: registeredRootPath.value,
     scanStatus: rootActions.scanStatus.value,
+    scanSummary: scanSummary.value,
     refreshStatus: rootLifecycle.refreshStatus.value,
     navigationReadIsLoading: navigationReadIsLoading.value,
     hierarchyReadIsLoading: hierarchyReadIsLoading.value,
@@ -356,27 +342,15 @@ function formatNavigationKind(kind: string): string {
           </span>
         </div>
       </div>
-      <p class="mt-3 text-sm font-semibold leading-6" :class="operationFeedbackToneClass">
-        {{ operationFeedback.title }}
-      </p>
-      <p
-        v-if="operationFeedback.detail !== undefined"
-        class="mt-1 max-w-2xl text-xs leading-5 text-(--color-text-muted)"
-      >
-        {{ operationFeedback.detail }}
-      </p>
-      <div
-        class="mt-3 rounded-sm border border-(--color-border) bg-(--color-background) px-3 py-2"
-        aria-live="polite"
-      >
-        <p class="text-sm font-semibold" :class="rootChoiceFeedbackClass">
-          {{ rootChoiceFeedback }}
+      <div class="mt-3" aria-live="polite">
+        <p class="text-sm font-semibold leading-6" :class="operationFeedbackToneClass">
+          {{ operationFeedback.title }}
         </p>
-        <p v-if="scanFeedback !== undefined" class="mt-1 text-sm" :class="scanFeedbackClass">
-          {{ scanFeedback }}
-        </p>
-        <p v-if="refreshFeedback !== undefined" class="mt-1 text-sm" :class="refreshFeedbackClass">
-          {{ refreshFeedback }}
+        <p
+          v-if="operationFeedback.detail !== undefined"
+          class="mt-1 max-w-2xl text-xs leading-5 text-(--color-text-muted)"
+        >
+          {{ operationFeedback.detail }}
         </p>
         <p
           v-if="registeredRootPath !== undefined"
