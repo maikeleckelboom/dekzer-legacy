@@ -8,10 +8,9 @@ import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveOperationFeedback } from './projection/operationFeedback'
-import { getLoadedBrowserTreeChildren } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
-import type { BrowserTreeNode, BrowserTreeNodeId } from './tree/types'
-import type { BrowserState, RowBinding } from './runtime/state'
+import type { BrowserTreeNodeId } from './tree/types'
+import type { BrowserState } from './runtime/state'
 
 defineOptions({
   name: 'LibraryBrowserPanel'
@@ -88,22 +87,6 @@ const treeRootProps = computed(() => ({
   ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
 }))
 
-const modeEyebrow = computed(() => {
-  if (navigationReadResult.value?.state === 'ready') {
-    return 'Persisted navigation'
-  }
-
-  if (navigationReadIsLoading.value) {
-    return 'Loading navigation'
-  }
-
-  return 'Navigation unavailable'
-})
-
-const modeBadge = computed(() =>
-  navigationReadResult.value?.state === 'ready' ? 'Active' : 'Unavailable'
-)
-
 const operationFeedback = computed(() =>
   deriveOperationFeedback({
     hostStatus: hostStatus.value,
@@ -132,53 +115,6 @@ const operationFeedbackToneClass = computed(() => {
     default:
       return 'text-(--color-text)'
   }
-})
-
-const selectedSummaryLabel = computed(() =>
-  selectedProjectionRow.value === undefined
-    ? 'Selected row'
-    : formatSelectedRowKind(selectedProjectionRow.value.kind)
-)
-
-const selectedSummaryDetail = computed(() => {
-  const row = selectedProjectionRow.value
-
-  if (row === undefined) {
-    return 'Select a persisted navigation or hierarchy row.'
-  }
-
-  switch (row.kind) {
-    case 'navigation':
-      return 'Persisted library navigation row.'
-    case 'source':
-      return 'Library source entry point.'
-    case 'directory':
-      return 'Directory entry from the library hierarchy.'
-    case 'file':
-      return 'File entry from the library hierarchy.'
-    case 'readState':
-      return row.detail
-    case 'more':
-      return row.detail
-  }
-
-  return 'Selected library browser row.'
-})
-
-const selectedNode = computed(() => {
-  if (selectedNodeId.value === undefined) {
-    return undefined
-  }
-
-  return findNodeById(currentTreeNodes.value, selectedNodeId.value)
-})
-
-const selectedProjectionRow = computed(() => {
-  if (selectedNodeId.value === undefined) {
-    return undefined
-  }
-
-  return browserProjection.value?.bindingsById.get(selectedNodeId.value)
 })
 
 const browserState = computed<BrowserState>(() => ({
@@ -275,42 +211,6 @@ function activateContentRowAction(row: ContentRow): void {
 
   void requestNodeChildren(action.nodeId)
 }
-
-function findNodeById(
-  nodes: readonly BrowserTreeNode[],
-  nodeId: BrowserTreeNodeId
-): BrowserTreeNode | undefined {
-  for (const node of nodes) {
-    if (node.id === nodeId) {
-      return node
-    }
-
-    const childMatch = findNodeById(getLoadedBrowserTreeChildren(node), nodeId)
-
-    if (childMatch !== undefined) {
-      return childMatch
-    }
-  }
-
-  return undefined
-}
-
-function formatSelectedRowKind(kind: RowBinding['kind']): string {
-  switch (kind) {
-    case 'navigation':
-      return 'Navigation row'
-    case 'source':
-      return 'Source entry row'
-    case 'directory':
-      return 'Literal directory row'
-    case 'file':
-      return 'Literal file row'
-    case 'readState':
-      return 'Read state row'
-    case 'more':
-      return 'More row'
-  }
-}
 </script>
 
 <template>
@@ -321,13 +221,7 @@ function formatSelectedRowKind(kind: RowBinding['kind']): string {
     <header class="border-b border-(--color-border) px-5 py-4">
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p class="text-xs font-bold uppercase tracking-normal text-(--color-accent)">
-            {{ modeEyebrow }}
-          </p>
-          <h2
-            id="library-hierarchy-title"
-            class="mt-1 text-xl font-bold leading-7 text-(--color-text)"
-          >
+          <h2 id="library-hierarchy-title" class="text-xl font-bold leading-7 text-(--color-text)">
             Library hierarchy foundation
           </h2>
         </div>
@@ -361,16 +255,6 @@ function formatSelectedRowKind(kind: RowBinding['kind']): string {
             <Icon :icon="CircleXIcon" size="md" :decorative="true" />
             <span>{{ removeSourceButtonLabel }}</span>
           </button>
-          <span
-            class="rounded-sm border px-2.5 py-1 text-xs font-semibold"
-            :class="
-              navigationReadResult?.state === 'ready'
-                ? 'border-(--color-accent) text-(--color-accent)'
-                : 'border-(--color-warning) text-(--color-warning)'
-            "
-          >
-            {{ modeBadge }}
-          </span>
         </div>
       </div>
       <div class="mt-3" aria-live="polite">
@@ -394,21 +278,6 @@ function formatSelectedRowKind(kind: RowBinding['kind']): string {
           @toggle="toggleNode"
           @activate-action="activateNodeAction"
         />
-
-        <aside
-          class="rounded-sm border border-(--color-border) bg-(--color-background) px-4 py-3"
-          aria-live="polite"
-        >
-          <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
-            {{ selectedSummaryLabel }}
-          </p>
-          <p class="mt-1 text-sm font-semibold text-(--color-text)">
-            {{ selectedNode?.label ?? 'None selected' }}
-          </p>
-          <p class="mt-1 text-xs leading-5 text-(--color-text-muted)">
-            {{ selectedNode?.detail ?? selectedSummaryDetail }}
-          </p>
-        </aside>
       </div>
 
       <ContentsTable
