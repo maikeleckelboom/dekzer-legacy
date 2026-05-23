@@ -13,13 +13,10 @@ export type LocalRootChoiceStatus = 'idle' | 'choosing' | 'canceled' | 'register
 
 export type LocalRootScanStatus = 'idle' | 'scanning' | 'scanned' | 'failed'
 
-export type HydrationStatus =
-  | 'idle'
-  | 'hydrated'
-  | 'unavailable-root'
-  | 'empty'
-  | 'multiple'
-  | 'host-error'
+export type LocalRootsReadState =
+  | { readonly kind: 'unread' }
+  | { readonly kind: 'ready'; readonly roots: readonly LocalRoot[] }
+  | { readonly kind: 'failed'; readonly message: string }
 
 export type LocalRootScanSummary = {
   readonly rootId: string
@@ -38,7 +35,7 @@ export type LocalRootActionsController = {
   readonly scanSummary: Ref<LocalRootScanSummary | undefined>
   readonly scanButtonLabel: ComputedRef<string>
   readonly canRunRegisteredRootScan: ComputedRef<boolean>
-  readonly hydrationStatus: Ref<HydrationStatus>
+  readonly localRootsReadState: Ref<LocalRootsReadState>
   readonly chooseAndRegisterLocalRoot: () => Promise<boolean>
   readonly runRegisteredRootScan: () => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
@@ -62,7 +59,7 @@ export function createLocalRootActionsController(
   const scanStatus = ref<LocalRootScanStatus>('idle')
   const scanSummary = ref<LocalRootScanSummary>()
   const scanFailureMessage = ref<string>()
-  const hydrationStatus = ref<HydrationStatus>('idle')
+  const localRootsReadState = ref<LocalRootsReadState>({ kind: 'unread' })
 
   const registeredRootPath = computed(() => registeredRoot.value?.canonicalPath)
   const canChooseLocalRoot = computed(
@@ -71,11 +68,18 @@ export function createLocalRootActionsController(
   const rootChoiceButtonLabel = computed(() =>
     rootChoiceStatus.value === 'choosing' ? 'Adding folder' : 'Add music folder'
   )
+  const selectedRootAvailability = computed<LocalRoot['availability'] | undefined>(() => {
+    const root = registeredRoot.value
+    if (root === undefined) return undefined
+    const readState = localRootsReadState.value
+    if (readState.kind !== 'ready') return undefined
+    return readState.roots.find((r) => r.rootId === root.rootId)?.availability
+  })
   const canRunRegisteredRootScan = computed(
     () =>
       registeredRoot.value !== undefined &&
       scanStatus.value !== 'scanning' &&
-      hydrationStatus.value !== 'unavailable-root'
+      selectedRootAvailability.value !== 'unavailable'
   )
   const scanButtonLabel = computed(() => {
     switch (scanStatus.value) {
@@ -106,7 +110,7 @@ export function createLocalRootActionsController(
       if (result.state === 'registered') {
         rootChoiceStatus.value = 'registered'
         registeredRoot.value = result.root
-        hydrationStatus.value = 'idle'
+        localRootsReadState.value = { kind: 'unread' }
         resetScanState()
         return true
       }
@@ -173,34 +177,28 @@ export function createLocalRootActionsController(
     try {
       result = await rootApi.readLocalRoots()
     } catch {
-      hydrationStatus.value = 'host-error'
+      localRootsReadState.value = { kind: 'failed', message: 'Unable to read local roots.' }
       return false
     }
 
     if (result.state !== 'read') {
-      hydrationStatus.value = 'host-error'
+      localRootsReadState.value = { kind: 'failed', message: result.error.message }
       return false
     }
 
-    if (result.roots.length === 0) {
-      hydrationStatus.value = 'empty'
-      return false
-    }
+    localRootsReadState.value = { kind: 'ready', roots: result.roots }
 
-    if (result.roots.length > 1) {
-      hydrationStatus.value = 'multiple'
+    if (result.roots.length !== 1) {
       return false
     }
 
     const firstRoot = result.roots[0]
     if (firstRoot === undefined) {
-      hydrationStatus.value = 'empty'
       return false
     }
 
     registeredRoot.value = registeredRootFromRecord(firstRoot)
     rootChoiceStatus.value = 'registered'
-    hydrationStatus.value = firstRoot.availability === 'available' ? 'hydrated' : 'unavailable-root'
     return true
   }
 
@@ -214,7 +212,7 @@ export function createLocalRootActionsController(
     scanSummary,
     scanButtonLabel,
     canRunRegisteredRootScan,
-    hydrationStatus,
+    localRootsReadState,
     chooseAndRegisterLocalRoot,
     runRegisteredRootScan,
     hydrateLocalRoots
