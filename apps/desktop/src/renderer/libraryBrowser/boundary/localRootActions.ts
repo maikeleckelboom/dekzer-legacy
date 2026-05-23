@@ -5,6 +5,7 @@ import type { LocalRootChoiceResult } from '../../../shared/libraryRoots/chooseA
 import type { LocalRootRegistrationRoot } from '../../../shared/libraryRoots/registerLocalRoot'
 import type { LocalRoot, ReadLocalRootsOutcome } from '../../../shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../../../shared/libraryRoots/runScan'
+import type { UnregisterLocalRootResult } from '../../../shared/libraryRoots/unregisterLocalRoot'
 import type { RendererApi } from '../../../shared/rendererApi'
 
 export type LibraryRootActionsApi = RendererApi['library']['roots']
@@ -12,6 +13,8 @@ export type LibraryRootActionsApi = RendererApi['library']['roots']
 export type LocalRootChoiceStatus = 'idle' | 'choosing' | 'canceled' | 'registered' | 'failed'
 
 export type LocalRootScanStatus = 'idle' | 'scanning' | 'scanned' | 'failed'
+
+export type RemoveSourceStatus = 'idle' | 'removing' | 'removed' | 'failed'
 
 export type LocalRootsReadState =
   | { readonly kind: 'unread' }
@@ -36,13 +39,18 @@ export type LocalRootActionsController = {
   readonly scanButtonLabel: ComputedRef<string>
   readonly canRunRegisteredRootScan: ComputedRef<boolean>
   readonly localRootsReadState: Ref<LocalRootsReadState>
+  readonly removeSourceStatus: Ref<RemoveSourceStatus>
+  readonly removeSourceButtonLabel: ComputedRef<string>
+  readonly canUnregisterLocalRoot: ComputedRef<boolean>
   readonly chooseAndRegisterLocalRoot: () => Promise<boolean>
   readonly runRegisteredRootScan: () => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
+  readonly unregisterLocalRoot: () => Promise<boolean>
 }
 
 const safeRootChoiceFailure = 'Unable to add music folder.'
 const safeRootScanFailure = 'Unable to scan folder.'
+const safeRootRemoveFailure = 'Unable to remove source.'
 
 export function useLocalRootActions(
   rootApi: LibraryRootActionsApi = getRendererApi().library.roots
@@ -60,6 +68,8 @@ export function createLocalRootActionsController(
   const scanSummary = ref<LocalRootScanSummary>()
   const scanFailureMessage = ref<string>()
   const localRootsReadState = ref<LocalRootsReadState>({ kind: 'unread' })
+  const removeSourceStatus = ref<RemoveSourceStatus>('idle')
+  const removeFailureMessage = ref<string>()
 
   const registeredRootPath = computed(() => registeredRoot.value?.canonicalPath)
   const canChooseLocalRoot = computed(
@@ -94,6 +104,15 @@ export function createLocalRootActionsController(
     }
 
     return 'Scan folder'
+  })
+
+  const canUnregisterLocalRoot = computed(
+    () => registeredRoot.value !== undefined && removeSourceStatus.value !== 'removing'
+  )
+
+  const removeSourceButtonLabel = computed(() => {
+    if (removeSourceStatus.value === 'removing') return 'Removing source'
+    return 'Remove source'
   })
 
   async function chooseAndRegisterLocalRoot(): Promise<boolean> {
@@ -202,6 +221,38 @@ export function createLocalRootActionsController(
     return true
   }
 
+  async function unregisterLocalRoot(): Promise<boolean> {
+    const root = registeredRoot.value
+
+    if (root === undefined || removeSourceStatus.value === 'removing') {
+      return false
+    }
+
+    removeSourceStatus.value = 'removing'
+    removeFailureMessage.value = undefined
+
+    try {
+      const result = await rootApi.unregisterLocalRoot({ rootId: root.rootId })
+
+      if (result.state === 'unregistered' && result.unregistered) {
+        removeSourceStatus.value = 'removed'
+        registeredRoot.value = undefined
+        resetScanState()
+        localRootsReadState.value = { kind: 'unread' }
+        rootChoiceStatus.value = 'idle'
+        return true
+      }
+
+      removeSourceStatus.value = 'failed'
+      removeFailureMessage.value = removeFailureFor(result)
+      return false
+    } catch {
+      removeSourceStatus.value = 'failed'
+      removeFailureMessage.value = safeRootRemoveFailure
+      return false
+    }
+  }
+
   return {
     rootChoiceStatus,
     registeredRoot,
@@ -213,9 +264,13 @@ export function createLocalRootActionsController(
     scanButtonLabel,
     canRunRegisteredRootScan,
     localRootsReadState,
+    removeSourceStatus,
+    removeSourceButtonLabel,
+    canUnregisterLocalRoot,
     chooseAndRegisterLocalRoot,
     runRegisteredRootScan,
-    hydrateLocalRoots
+    hydrateLocalRoots,
+    unregisterLocalRoot
   }
 }
 
@@ -261,5 +316,18 @@ function scanSummaryFromResult(
     scanRunId: result.scanRunId,
     discoveredFileCount: result.discoveredFileCount,
     queuedSourceWorkItems: result.queuedSourceWorkItems
+  }
+}
+
+function removeFailureFor(result: UnregisterLocalRootResult): string {
+  if (result.state === 'unregistered') {
+    return 'The source was not found or has already been removed.'
+  }
+
+  switch (result.state) {
+    case 'hostUnavailable':
+      return 'Library service is not ready. Try again when it has started.'
+    case 'invalidRequest':
+      return safeRootRemoveFailure
   }
 }

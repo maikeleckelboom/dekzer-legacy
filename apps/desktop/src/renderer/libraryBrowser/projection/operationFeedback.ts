@@ -3,7 +3,8 @@ import type { NavigationReadRowsResult } from '../../../shared/libraryNavigation
 import type {
   LocalRootChoiceStatus,
   LocalRootScanStatus,
-  LocalRootScanSummary
+  LocalRootScanSummary,
+  RemoveSourceStatus
 } from '../boundary/localRootActions'
 import type { RootLifecycleRefreshStatus } from '../runtime/rootLifecycle'
 
@@ -24,6 +25,8 @@ export type LibraryOperationFeedbackKind =
   | 'hierarchyLoading'
   | 'hierarchyFailed'
   | 'noSources'
+  | 'removingSource'
+  | 'removeFailed'
   | 'ready'
 
 export type LibraryOperationFeedbackTone = 'idle' | 'loading' | 'success' | 'warning' | 'error'
@@ -47,6 +50,7 @@ export type OperationFeedbackInputs = {
   readonly navigationReadRequestError: string | undefined
   readonly hierarchyReadRequestError: string | undefined
   readonly navigationReadResult: NavigationReadRowsResult | undefined
+  readonly removeSourceStatus: RemoveSourceStatus
 }
 
 type FeedbackMeta = {
@@ -136,6 +140,16 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
     title: 'No library sources',
     detail: 'No persisted library navigation rows are available.'
   },
+  removingSource: {
+    tone: 'loading',
+    title: 'Removing source',
+    detail: 'Dekzer is removing the current source. Your files stay on disk.'
+  },
+  removeFailed: {
+    tone: 'error',
+    title: 'Unable to remove source',
+    detail: 'The source could not be removed. Try again.'
+  },
   ready: {
     tone: 'success',
     title: 'Library ready',
@@ -166,6 +180,10 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
     return build('scanningRoot')
   }
 
+  if (inputs.removeSourceStatus === 'removing') {
+    return build('removingSource')
+  }
+
   if (inputs.refreshStatus === 'refreshing') {
     return build('refreshingView')
   }
@@ -184,6 +202,10 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
 
   if (inputs.scanStatus === 'failed') {
     return build('scanFailed')
+  }
+
+  if (inputs.removeSourceStatus === 'failed') {
+    return build('removeFailed')
   }
 
   if (inputs.refreshStatus === 'failed') {

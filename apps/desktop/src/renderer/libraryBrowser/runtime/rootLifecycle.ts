@@ -10,14 +10,17 @@ export type RootLifecycleController = {
   readonly refreshStatus: Ref<RootLifecycleRefreshStatus>
   readonly canAddMusicFolder: ComputedRef<boolean>
   readonly canScanRoot: ComputedRef<boolean>
+  readonly canRemoveSource: ComputedRef<boolean>
   readonly addMusicFolder: () => Promise<boolean>
   readonly scanRoot: () => Promise<boolean>
+  readonly removeSource: () => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
 }
 
 export type RootLifecycleDependencies = {
   readonly rootActions: LocalRootActionsController
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
+  readonly confirmRemoveSource?: () => boolean
 }
 
 export function useRootLifecycle(dependencies: RootLifecycleDependencies): RootLifecycleController {
@@ -37,6 +40,10 @@ export function createRootLifecycleController(
     () =>
       dependencies.rootActions.canRunRegisteredRootScan.value &&
       refreshStatus.value !== 'refreshing'
+  )
+  const canRemoveSource = computed(
+    () =>
+      dependencies.rootActions.canUnregisterLocalRoot.value && refreshStatus.value !== 'refreshing'
   )
 
   async function addMusicFolder(): Promise<boolean> {
@@ -66,10 +73,31 @@ export function createRootLifecycleController(
       return false
     }
 
-    return refreshAfterScan()
+    return runRefresh()
   }
 
-  async function refreshAfterScan(): Promise<boolean> {
+  async function removeSource(): Promise<boolean> {
+    if (!canRemoveSource.value) {
+      return false
+    }
+
+    const confirmed = dependencies.confirmRemoveSource?.() ?? false
+
+    if (!confirmed) {
+      return false
+    }
+
+    const unregistered = await dependencies.rootActions.unregisterLocalRoot()
+
+    if (!unregistered) {
+      return false
+    }
+
+    resetRefreshState()
+    return runRefresh()
+  }
+
+  async function runRefresh(): Promise<boolean> {
     const sequence = ++refreshSequence
     refreshStatus.value = 'refreshing'
 
@@ -98,8 +126,10 @@ export function createRootLifecycleController(
     refreshStatus,
     canAddMusicFolder,
     canScanRoot,
+    canRemoveSource,
     addMusicFolder,
     scanRoot,
+    removeSource,
     hydrateLocalRoots: dependencies.rootActions.hydrateLocalRoots
   }
 }

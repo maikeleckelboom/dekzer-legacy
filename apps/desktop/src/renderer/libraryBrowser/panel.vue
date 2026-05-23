@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { FolderPlusIcon, Icon, ScanIcon } from '../icons'
+import { CircleXIcon, FolderPlusIcon, Icon, ScanIcon } from '../icons'
 import { projectContents, type ContentRow } from './projection/contents'
 import ContentsTable from './components/contentsTable.vue'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
@@ -21,7 +21,9 @@ const hierarchyRead = useLibraryHierarchyRead()
 const rootActions = useLocalRootActions()
 const rootLifecycle = useRootLifecycle({
   rootActions,
-  hierarchyRead: { refresh: hierarchyRead.refresh }
+  hierarchyRead: { refresh: hierarchyRead.refresh },
+  confirmRemoveSource: () =>
+    window.confirm('Remove this source from Dekzer? Your files stay on disk.')
 })
 const {
   hostStatus,
@@ -35,9 +37,23 @@ const {
   browserProjection,
   requestNodeChildren
 } = hierarchyRead
-const { registeredRootPath, rootChoiceButtonLabel, scanSummary, scanButtonLabel } = rootActions
-const { canAddMusicFolder, canScanRoot, addMusicFolder, scanRoot, hydrateLocalRoots } =
-  rootLifecycle
+const {
+  registeredRootPath,
+  rootChoiceButtonLabel,
+  scanSummary,
+  scanButtonLabel,
+  removeSourceButtonLabel,
+  removeSourceStatus
+} = rootActions
+const {
+  canAddMusicFolder,
+  canScanRoot,
+  canRemoveSource,
+  addMusicFolder,
+  scanRoot,
+  removeSource,
+  hydrateLocalRoots
+} = rootLifecycle
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const hasUserInteractedWithTree = ref(false)
@@ -100,7 +116,8 @@ const operationFeedback = computed(() =>
     hierarchyReadIsLoading: hierarchyReadIsLoading.value,
     navigationReadRequestError: navigationReadRequestError.value,
     hierarchyReadRequestError: hierarchyReadRequestError.value,
-    navigationReadResult: navigationReadResult.value
+    navigationReadResult: navigationReadResult.value,
+    removeSourceStatus: removeSourceStatus.value
   })
 )
 
@@ -324,6 +341,16 @@ function formatSelectedRowKind(kind: RowBinding['kind']): string {
           >
             <Icon :icon="ScanIcon" size="md" :decorative="true" />
             <span>{{ scanButtonLabel }}</span>
+          </button>
+          <button
+            v-if="registeredRootPath !== undefined"
+            type="button"
+            class="inline-flex min-h-9 items-center justify-center gap-2 rounded-sm border border-(--color-danger) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-danger) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-danger) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+            :disabled="!canRemoveSource"
+            @click="removeSource"
+          >
+            <Icon :icon="CircleXIcon" size="md" :decorative="true" />
+            <span>{{ removeSourceButtonLabel }}</span>
           </button>
           <span
             class="rounded-sm border px-2.5 py-1 text-xs font-semibold"
