@@ -140,7 +140,6 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     }
 
     if (item.canActivateAction) {
-      options.toggleNode(nodeId)
       options.activateAction(nodeId)
       return
     }

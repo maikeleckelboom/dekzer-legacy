@@ -24,7 +24,7 @@ import {
   isBrowserTreeBranch,
   isBrowserTreeLeaf
 } from '../src/renderer/libraryBrowser/tree/projection'
-import type { LoadedChildren } from '../src/renderer/libraryBrowser/runtime/state'
+import type { LoadedChildren, BrowserState } from '../src/renderer/libraryBrowser/runtime/state'
 import type {
   BrowserTreeNode,
   BrowserTreeNodeId,
@@ -32,7 +32,10 @@ import type {
   BrowserTreeVisibleItem
 } from '../src/renderer/libraryBrowser/tree/types'
 import type { ReadResult, ChildWindow } from '../src/shared/libraryHierarchy/readChildren'
-import type { NavigationReadRowsResult } from '../src/shared/libraryNavigation/readRows'
+import type {
+  NavigationReadRowsResult,
+  NavigationRow
+} from '../src/shared/libraryNavigation/readRows'
 import { computed } from 'vue'
 import { useTreeController } from '../src/renderer/libraryBrowser/tree/controller'
 
@@ -162,6 +165,8 @@ function main(): void {
   validatesStateAndActionRoleIcons()
   validatesPrimaryActivation()
   validatesLoadedEmptyTreeProjection()
+  validatesNonSourceNavigationRowProjectedAsLeaf()
+  validatesDisclosureAffordanceHints()
 }
 
 function validatesExplicitChildrenAndActionModel(): void {
@@ -1261,15 +1266,15 @@ function validatesPrimaryActivation(): void {
   const deferredPrimary = invokePrimaryActivation(unloadedBranchNode(), false)
   assert.deepEqual(
     deferredPrimary,
-    ['select', 'toggle', 'activateAction'],
-    'deferred branch primary activation must select, expand, and activate load'
+    ['select', 'activateAction'],
+    'deferred branch primary activation must select and activate load, without toggle'
   )
 
   const failedPrimary = invokePrimaryActivation(failedBranchNode(), false)
   assert.deepEqual(
     failedPrimary,
-    ['select', 'toggle', 'activateAction'],
-    'failed branch primary activation must select, expand, and activate retry'
+    ['select', 'activateAction'],
+    'failed branch primary activation must select and activate retry, without toggle'
   )
 
   const loadingPrimary = invokePrimaryActivation(loadingBranchNode(), false)
@@ -1424,4 +1429,103 @@ function invokePrimaryActivation(node: BrowserTreeNode, isExpanded: boolean): re
   }).activatePrimary(node.id)
 
   return actions
+}
+
+function validatesNonSourceNavigationRowProjectedAsLeaf(): void {
+  const state: BrowserState = {
+    navigationReadResult: {
+      state: 'ready',
+      rows: [allAudioNavigationRow()]
+    },
+    sourceReadStates: new Map(),
+    directoryReadStates: new Map()
+  }
+  const projection = projectState(state)
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected non-source navigation to project to browser tree')
+  }
+  const node = projection.nodes[0]
+  assert.equal(node?.children.kind, 'none', 'non-source navigation must be leaf')
+  assert.equal(node?.action, undefined, 'non-source navigation must not have action')
+  if (node?.children.kind === 'loaded') {
+    const loadedChildren = node.children.nodes.map((n) => n.label)
+    assert.ok(
+      !loadedChildren.includes('Unavailable'),
+      'non-source navigation must not create Unavailable child'
+    )
+  }
+  assert.notEqual(node?.role, undefined, 'non-source navigation must have a role')
+
+  const visibleItems = flattenVisibleTree({
+    nodes: projection.nodes,
+    expandedNodeIds: new Set()
+  })
+  const item = visibleItems[0]
+  assert.equal(item?.isBranch, false)
+  assert.equal(item?.canRevealChildren, false)
+  assert.equal(item?.canActivateAction, false)
+}
+
+function validatesDisclosureAffordanceHints(): void {
+  const loadedBranchItems = flattenVisibleTree({
+    nodes: [loadedBranchRootNode()],
+    expandedNodeIds: new Set()
+  })
+  const loadedBranchItem = loadedBranchItems[0]
+  assert.equal(loadedBranchItem?.canRevealChildren, true)
+  assert.equal(loadedBranchItem?.isExpanded, false)
+
+  const unloadedItems = flattenVisibleTree({
+    nodes: [unloadedBranchNode()],
+    expandedNodeIds: new Set()
+  })
+  const unloadedItem = unloadedItems[0]
+  assert.equal(unloadedItem?.canRevealChildren, false)
+  assert.equal(unloadedItem?.canActivateAction, true)
+  assert.equal(unloadedItem?.isExpanded, false)
+
+  const failedItems = flattenVisibleTree({
+    nodes: [failedBranchNode()],
+    expandedNodeIds: new Set()
+  })
+  const failedItem = failedItems[0]
+  assert.equal(failedItem?.canRevealChildren, false)
+  assert.equal(failedItem?.canActivateAction, true)
+  assert.equal(failedItem?.isExpanded, false)
+
+  const loadingItems = flattenVisibleTree({
+    nodes: [loadingBranchNode()],
+    expandedNodeIds: new Set()
+  })
+  const loadingItem = loadingItems[0]
+  assert.equal(loadingItem?.canRevealChildren, false)
+  assert.equal(loadingItem?.isActionLoading, true)
+  assert.equal(loadingItem?.isExpanded, false)
+
+  const leafItems = flattenVisibleTree({
+    nodes: [leafRootNode()],
+    expandedNodeIds: new Set()
+  })
+  const leafItem = leafItems[0]
+  assert.equal(leafItem?.canRevealChildren, false)
+  assert.equal(leafItem?.canActivateAction, false)
+  assert.equal(leafItem?.isExpanded, false)
+}
+
+function allAudioNavigationRow(): NavigationRow {
+  return {
+    navigationRowId: '8',
+    stableKey: 'view:all-audio',
+    parentNavigationRowId: null,
+    family: 'collections',
+    rowKind: 'view',
+    displayName: 'All audio',
+    siblingPosition: 0,
+    selectable: true,
+    selectorKind: 'allAudio',
+    selectorPayload: null,
+    updatedAtMs: 100,
+    rowVersion: '1'
+  }
 }

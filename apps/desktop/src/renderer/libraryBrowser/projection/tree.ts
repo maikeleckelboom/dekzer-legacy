@@ -143,20 +143,7 @@ function projectNavigationRow(options: {
     badge: { value: 'Navigation', tone: 'muted' },
     icon: 'navigation',
     detail: formatNavigationDetail(options.row),
-    children: {
-      kind: 'loaded',
-      nodes: [
-        trackedReadStateNode(
-          {
-            ownerId: nodeId,
-            state: 'unavailable',
-            label: 'Unavailable',
-            detail: 'No folders available here yet.'
-          },
-          options.bindingsById
-        )
-      ]
-    }
+    children: { kind: 'none' }
   }
 }
 
