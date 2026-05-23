@@ -472,10 +472,8 @@ async function validatesRendererHierarchyReadController(): Promise<void> {
   if (projection?.kind !== 'tree') {
     assert.fail('expected empty directory projection')
   }
-  assert.equal(firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:13'), 'loaded')
-  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:13'), [
-    'read-state:source-directory:13:empty'
-  ])
+  assert.equal(firstProjectedDirectoryStateKind(projection.nodes, 'source-directory:13'), 'none')
+  assert.deepEqual(firstLoadedChildIds(projection.nodes, 'source-directory:13'), [])
 
   assert.equal(await controller.loadFirstSource(), false)
 

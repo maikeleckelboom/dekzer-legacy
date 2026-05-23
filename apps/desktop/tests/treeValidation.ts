@@ -161,6 +161,7 @@ function main(): void {
   validatesFileRoleIcons()
   validatesStateAndActionRoleIcons()
   validatesPrimaryActivation()
+  validatesLoadedEmptyTreeProjection()
 }
 
 function validatesExplicitChildrenAndActionModel(): void {
@@ -189,8 +190,8 @@ function validatesExplicitChildrenAndActionModel(): void {
   )
 
   const loadedEmptyBranch = loadedEmptyBranchRootNode()
-  assert.equal(isBrowserTreeLeaf(loadedEmptyBranch), false)
-  assert.equal(isBrowserTreeBranch(loadedEmptyBranch), true)
+  assert.equal(isBrowserTreeLeaf(loadedEmptyBranch), true)
+  assert.equal(isBrowserTreeBranch(loadedEmptyBranch), false)
   assert.equal(canRevealBrowserTreeChildren(loadedEmptyBranch), false)
   assert.equal(canActivateBrowserTreeAction(loadedEmptyBranch), false)
   assert.equal(isBrowserTreeActionLoading(loadedEmptyBranch), false)
@@ -910,8 +911,7 @@ function loadedEmptyBranchRootNode(): BrowserTreeNode {
     label: 'Loaded empty root',
     badge: { value: 'Branch', tone: 'muted' },
     children: {
-      kind: 'loaded',
-      nodes: []
+      kind: 'none'
     }
   }
 }
@@ -1288,6 +1288,119 @@ function validatesPrimaryActivation(): void {
     ['activateAction'],
     'action row primary activation must activate action only'
   )
+}
+
+function validatesLoadedEmptyTreeProjection(): void {
+  const emptySourceProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          children: loadedChildrenFromWindow({
+            root: {
+              id: 'source:7',
+              label: 'Source Fixture',
+              entryPoint: { kind: 'source', sourceId: '7' }
+            },
+            offset: 0,
+            limit: 50,
+            totalRows: 0,
+            nodes: []
+          })
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
+  assert.equal(emptySourceProjection?.kind, 'tree')
+  if (emptySourceProjection?.kind !== 'tree') {
+    assert.fail('expected empty source to project to browser tree')
+  }
+  const emptySourceNode = emptySourceProjection.nodes[0]
+  assert.equal(emptySourceNode?.children.kind, 'none')
+
+  const hiddenOnlyProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          children: loadedChildrenFromWindow({
+            root: {
+              id: 'source:7',
+              label: 'Source Fixture',
+              entryPoint: { kind: 'source', sourceId: '7' }
+            },
+            offset: 0,
+            limit: 50,
+            totalRows: 1,
+            nodes: [
+              {
+                id: 'source-file:99',
+                kind: 'file',
+                label: 'desktop.ini',
+                fileId: '99',
+                presence: 'present',
+                updatedAtMs: 100
+              }
+            ]
+          })
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
+  assert.equal(hiddenOnlyProjection?.kind, 'tree')
+  if (hiddenOnlyProjection?.kind !== 'tree') {
+    assert.fail('expected hidden-only source to project to browser tree')
+  }
+  const hiddenSourceNode = hiddenOnlyProjection.nodes[0]
+  assert.equal(hiddenSourceNode?.children.kind, 'none')
+
+  const visibleChildProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          children: loadedChildrenFromWindow({
+            root: {
+              id: 'source:7',
+              label: 'Source Fixture',
+              entryPoint: { kind: 'source', sourceId: '7' }
+            },
+            offset: 0,
+            limit: 50,
+            totalRows: 1,
+            nodes: [
+              {
+                id: 'source-file:11',
+                kind: 'file',
+                label: 'track.wav',
+                fileId: '11',
+                presence: 'present',
+                updatedAtMs: 100
+              }
+            ]
+          })
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
+  assert.equal(visibleChildProjection?.kind, 'tree')
+  if (visibleChildProjection?.kind !== 'tree') {
+    assert.fail('expected source with visible children to project to browser tree')
+  }
+  const visibleChildNode = visibleChildProjection.nodes[0]
+  assert.equal(visibleChildNode?.children.kind, 'loaded')
+  if (visibleChildNode?.children.kind === 'loaded') {
+    assert.notEqual(visibleChildNode.children.nodes.length, 0)
+  }
 }
 
 function invokePrimaryActivation(node: BrowserTreeNode, isExpanded: boolean): readonly string[] {

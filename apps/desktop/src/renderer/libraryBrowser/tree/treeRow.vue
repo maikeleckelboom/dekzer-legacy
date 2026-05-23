@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 
 import type {
-  BrowserTreeActionState,
   BrowserTreeBadgeTone,
   BrowserTreeBadgeEmphasis,
   BrowserTreeVisibleItem
@@ -38,8 +37,6 @@ const hasAffordance = computed(
     (props.item.canRevealChildren || props.item.canActivateAction || props.item.isActionLoading)
 )
 
-const actionStateDetail = computed(() => formatActionStateDetail(props.item.node.action?.state))
-
 const rowIcon = computed<IconComponent | undefined>(() =>
   resolveBrowserTreeRowIcon(props.item.node, props.item.isExpanded)
 )
@@ -53,21 +50,6 @@ const badgeClass = computed(() => {
 
   return badgeCssClasses(badge.tone, badge.emphasis)
 })
-
-function formatActionStateDetail(state: BrowserTreeActionState | undefined): string | undefined {
-  if (state === undefined) {
-    return undefined
-  }
-
-  switch (state.kind) {
-    case 'idle':
-      return state.detail
-    case 'loading':
-      return state.detail ?? 'Loading.'
-    case 'failed':
-      return state.detail
-  }
-}
 
 function badgeCssClasses(
   tone: BrowserTreeBadgeTone | undefined,
@@ -137,18 +119,6 @@ function badgeEmphasisCssClass(emphasis: BrowserTreeBadgeEmphasis | undefined): 
 
     <span class="min-w-0 flex-1">
       <span class="block truncate text-sm font-semibold leading-5">{{ item.node.label }}</span>
-      <span
-        v-if="item.node.detail"
-        class="block truncate text-xs leading-5 text-(--color-text-muted)"
-      >
-        {{ item.node.detail }}
-      </span>
-      <span
-        v-if="actionStateDetail"
-        class="block truncate text-xs leading-5 text-(--color-text-muted)"
-      >
-        {{ actionStateDetail }}
-      </span>
     </span>
 
     <span

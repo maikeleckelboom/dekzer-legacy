@@ -220,15 +220,14 @@ function projectSourceChildren(options: {
   }
 
   return {
-    children: {
-      kind: 'loaded',
-      nodes: projectLoadedHierarchyChildren({
+    children: childrenForProjectedNodes(
+      projectLoadedHierarchyChildren({
         ownerId: options.ownerId,
         children: state.children,
         directoryReadStates: options.directoryReadStates,
         bindingsById: options.bindingsById
       })
-    }
+    )
   }
 }
 
@@ -239,17 +238,7 @@ function projectLoadedHierarchyChildren(options: {
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
   if (options.children.rows.length === 0 && options.children.nextOffset === undefined) {
-    return [
-      trackedReadStateNode(
-        {
-          ownerId: options.ownerId,
-          state: 'empty',
-          label: 'Empty folder',
-          detail: 'No media entries are available in this folder.'
-        },
-        options.bindingsById
-      )
-    ]
+    return []
   }
 
   const projectedNodes = projectLiteralNodes({
@@ -261,17 +250,7 @@ function projectLoadedHierarchyChildren(options: {
   })
 
   if (projectedNodes.length === 0 && options.children.nextOffset === undefined) {
-    return [
-      trackedReadStateNode(
-        {
-          ownerId: options.ownerId,
-          state: 'empty',
-          label: 'No media entries',
-          detail: 'No media found in this location.'
-        },
-        options.bindingsById
-      )
-    ]
+    return []
   }
 
   if (options.children.nextOffset === undefined) {
@@ -400,6 +379,10 @@ function isVisibleLiteralNode(node: ChildRow): boolean {
   return presentation.visibility !== 'hiddenNonMedia'
 }
 
+function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTreeChildren {
+  return nodes.length === 0 ? { kind: 'none' } : { kind: 'loaded', nodes }
+}
+
 function projectDirectoryChildren(options: {
   readonly ownerId: string
   readonly state: DirectoryState | undefined
@@ -459,15 +442,14 @@ function projectDirectoryChildren(options: {
   }
 
   return {
-    children: {
-      kind: 'loaded',
-      nodes: projectLoadedHierarchyChildren({
+    children: childrenForProjectedNodes(
+      projectLoadedHierarchyChildren({
         ownerId: options.ownerId,
         children: state.children,
         directoryReadStates: options.directoryReadStates,
         bindingsById: options.bindingsById
       })
-    }
+    )
   }
 }
 
