@@ -1,3 +1,4 @@
+import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundary/status'
 import type { EntryPoint, ChildRow } from '../../../shared/libraryHierarchy/readChildren'
 import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
 import type {
@@ -36,12 +37,47 @@ type ProjectedNodeState = {
   readonly action?: BrowserTreeAction
 }
 
-export function projectState(state: BrowserState): BrowserProjection | undefined {
+export function projectState(
+  state: BrowserState,
+  hostStatus?: LibraryBoundaryHostStatus
+): BrowserProjection | undefined {
   if (state.navigationReadResult === undefined) {
+    if (hostStatus !== undefined) {
+      if (hostStatus.state === 'failed') {
+        return projectHostFailed(hostStatus)
+      }
+
+      if (hostStatus.state === 'stopping' || hostStatus.state === 'stopped') {
+        return emptyProjection({
+          ownerId: 'host',
+          state: 'unavailable',
+          label: 'Library engine unavailable',
+          detail: 'The library engine is not running.'
+        })
+      }
+    }
+
     return undefined
   }
 
   return projectNavigationResult(state)
+}
+
+function projectHostFailed(
+  hostStatus: LibraryBoundaryHostStatus
+): BrowserProjection {
+  const lastError = hostStatus.lastError
+  const detail =
+    lastError?.detail !== undefined
+      ? lastError.detail
+      : lastError?.message ?? 'No additional detail available.'
+
+  return emptyProjection({
+    ownerId: 'host',
+    state: 'error',
+    label: 'Library engine failed to start',
+    detail
+  })
 }
 
 function isRendererVisibleNavigationRow(row: NavigationRow): boolean {

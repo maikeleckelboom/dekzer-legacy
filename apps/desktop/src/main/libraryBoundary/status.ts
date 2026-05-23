@@ -143,16 +143,44 @@ function projectBinaryPolicy(
 
 function createLibraryBoundaryHostStatusError(error: unknown): LibraryBoundaryHostStatusError {
   if (error instanceof LibraryBoundaryHostError) {
+    const detail = extractHostErrorCauseDetail(error)
     return {
       code: error.code,
-      message: statusMessageForHostError(error.code)
+      message: statusMessageForHostError(error.code),
+      ...(detail === undefined ? {} : { detail })
     }
   }
 
+  const detail = error instanceof Error ? truncateFirstLine(error.message) : undefined
   return {
     code: 'unknown',
-    message: 'The library boundary host failed unexpectedly.'
+    message: 'The library boundary host failed unexpectedly.',
+    ...(detail === undefined ? {} : { detail })
   }
+}
+
+function extractHostErrorCauseDetail(error: LibraryBoundaryHostError): string | undefined {
+  const cause = error.cause
+
+  if (cause instanceof Error) {
+    return truncateFirstLine(cause.message)
+  }
+
+  if (typeof cause === 'string') {
+    return truncateFirstLine(cause)
+  }
+
+  return undefined
+}
+
+function truncateFirstLine(text: string): string | undefined {
+  const firstLine = text.split('\n')[0]?.trim()
+
+  if (firstLine === undefined || firstLine.length === 0) {
+    return undefined
+  }
+
+  return firstLine.length <= 200 ? firstLine : `${firstLine.slice(0, 197)}...`
 }
 
 function statusMessageForHostError(code: LibraryBoundaryHostErrorCode): string {

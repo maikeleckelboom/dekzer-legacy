@@ -1,3 +1,4 @@
+import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundary/status'
 import type { EntryPoint, ChildRow } from '../../../shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
@@ -126,6 +127,7 @@ export type RowBinding =
     }
 
 export type BrowserState = {
+  readonly hostStatus?: LibraryBoundaryHostStatus
   readonly navigationReadResult?: NavigationReadRowsResult
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>

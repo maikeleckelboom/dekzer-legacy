@@ -81,6 +81,9 @@ const treeRootProps = computed(() => ({
 const browserState = computed<BrowserState>(() => ({
   sourceReadStates: hierarchyRead.sourceReadStates.value,
   directoryReadStates: hierarchyRead.directoryReadStates.value,
+  ...(hierarchyRead.hostStatus.value === undefined
+    ? {}
+    : { hostStatus: hierarchyRead.hostStatus.value }),
   ...(hierarchyRead.navigationReadResult.value === undefined
     ? {}
     : { navigationReadResult: hierarchyRead.navigationReadResult.value })

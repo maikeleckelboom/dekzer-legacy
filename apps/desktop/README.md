@@ -15,3 +15,7 @@ pnpm run build:desktop
 ```
 
 This package intentionally contains the bootable desktop shell plus the lazy main-process library boundary host owner. The renderer API exposes narrow host status, hierarchy read, and local-root commands; storage path selection remains in main.
+
+## Developer docs
+
+- [Dev database reset](./docs/dev-database-reset.md) — how to reset development storage after a baseline change.

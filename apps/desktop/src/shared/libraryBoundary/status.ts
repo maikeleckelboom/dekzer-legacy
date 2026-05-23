@@ -35,6 +35,7 @@ export type LibraryBoundaryHostStatusError = {
     | 'stopped'
     | 'unknown'
   readonly message: string
+  readonly detail?: string
 }
 
 export type LibraryBoundaryHostStatus = {
