@@ -19,9 +19,11 @@ The current visible desktop app must remain honest:
 
 ### Exclave
 
-Exclave owns reusable boundary and runtime primitives with no Dekzer product semantics. It may own generic control, warm, resource, session, hot, publication, schema, conformance, host-contract, ABI, and codec primitives.
+Exclave owns reusable boundary and runtime primitives with no Dekzer product semantics. It may own generic control,
+warm, resource, session, hot, publication, schema, conformance, host-contract, ABI, and codec primitives.
 
-Exclave must not own Dekzer library concepts, workspace product shell composition, music semantics, local source registration, scan policy, playlist meaning, preparation meaning, or desktop product assembly.
+Exclave must not own Dekzer library concepts, workspace product shell composition, music semantics, local source
+registration, scan policy, playlist meaning, preparation meaning, or desktop product assembly.
 
 ### Dekzer
 
@@ -37,13 +39,18 @@ Dekzer owns the product monorepo:
 
 ## Why `music-library-core` Moves Into Dekzer
 
-`music-library-core` contains Dekzer product semantics: local roots, source locations, literal hierarchy, library assets, preparation, playlists, scan state, maintained read models, and library boundary protocol. Those are not reusable runtime substrate concepts. They are the product's durable music authority and must live in Dekzer.
+`music-library-core` contains Dekzer product semantics: local roots, source locations, literal hierarchy, library
+assets, preparation, playlists, scan state, maintained read models, and library boundary protocol. Those are not
+reusable runtime substrate concepts. They are the product's durable music authority and must live in Dekzer.
 
-The move must happen through controlled slices. The current code is valuable, but the repo identity, package scope, and `surface` vocabulary are not the long-term product shape. The target is a Dekzer library substrate with explicit boundary layers, not a renamed external product.
+The move must happen through controlled slices. The current code is valuable, but the repo identity, package scope, and
+`surface` vocabulary are not the long-term product shape. The target is a Dekzer library substrate with explicit
+boundary layers, not a renamed external product.
 
 ## Why `workspace-host` Does Not Remain The Product Root
 
-`workspace-host` was useful exploration history for workspace topology and runtime behavior. It is not the Dekzer product root because:
+`workspace-host` was useful exploration history for workspace topology and runtime behavior. It is not the Dekzer
+product root because:
 
 - the desktop app in Dekzer already owns the active product scaffold
 - `workspace-host` mixes reusable runtime work with draft desktop composition
@@ -53,7 +60,9 @@ The move must happen through controlled slices. The current code is valuable, bu
 
 ## Why The `workspace-host` Demo Code Is Rejected
 
-The `workspace-host` demo proves interaction ideas, but it is not product design. It must not be copied because it would import fake ownership, draft shell assumptions, demo library composition, old package links to `music-library-core`, and visual/product decisions that are no longer authoritative.
+The `workspace-host` demo proves interaction ideas, but it is not product design. It must not be copied because it would
+import fake ownership, draft shell assumptions, demo library composition, old package links to `music-library-core`, and
+visual/product decisions that are no longer authoritative.
 
 The only legal use of `workspace-host` in this migration is inspection for:
 
@@ -83,7 +92,8 @@ Move means "port or rewrite under the correct owner," not copy. Candidates:
 - compiler/runtime realization invariants, if product-neutral, to Exclave
 - layout solver laws and resize-session invariants, if product-neutral, to Exclave
 - Vue adapter patterns only after product shell ownership is rewritten in Dekzer
-- tests around deterministic layout, resize sessions, projection legality, and public package surfaces, recreated cleanly
+- tests around deterministic layout, resize sessions, projection legality, and public package surfaces, recreated
+  cleanly
 
 ## What Must Not Move From `workspace-host`
 
@@ -91,7 +101,8 @@ These are rejected:
 
 - `apps/desktop--draft`
 - demo app shell
-- demo routes, sample layouts, playgrounds, labs, experiments, screenshots, fixtures, generated artifacts, `dist`, and `node_modules`
+- demo routes, sample layouts, playgrounds, labs, experiments, screenshots, fixtures, generated artifacts, `dist`, and
+  `node_modules`
 - prototype `NavigationTreeHost`, `LibraryBrowserHost`, `DetailsInspectorHost`, and related demo hosts
 - draft desktop library surface wiring
 - fake or sample content rows
@@ -112,7 +123,8 @@ Controlled migration candidates:
 - library boundary protocol and service
 - generated TypeScript boundary contract
 - handwritten TypeScript boundary client and session tests
-- tests for register root, scan, literal hierarchy, service reopen integrity, event pump behavior, and generated contract freshness
+- tests for register root, scan, literal hierarchy, service reopen integrity, event pump behavior, and generated
+  contract freshness
 
 ## What Gets Deleted Instead Of Moved
 
@@ -126,20 +138,20 @@ Controlled migration candidates:
 
 ## Target Package And Crate Paths
 
-| Owner | Target path | Source direction | Notes |
-| --- | --- | --- | --- |
-| Dekzer | `apps/desktop` | Already present | Electron app and Vue renderer edge. |
-| Dekzer | `packages/workspace-shell` | Future rewrite | Product shell composition only, no reusable runtime authority. |
-| Dekzer | `packages/library-boundary-contract` | Regenerate from Rust protocol | Replaces `@music-library-core/library-surface-contract`; generated-only. |
-| Dekzer | `packages/library-boundary-client` | Controlled port and rename | Replaces `@music-library-core/library-surface-client`; no DTO copies. |
-| Dekzer | `crates/library-domain` | Controlled move | Product vocabulary and typed ids. |
-| Dekzer | `crates/library-store-sqlite` | Controlled move and rename | Durable SQLite substrate. |
-| Dekzer | None for `library-read-kernel` | Rejected after audit | Store-owned rows/windows stay in `crates/library-store-sqlite`; future boundary service maps them directly to protocol DTOs. |
-| Dekzer | `crates/library-authority` | Future explicit layer | Product operations such as register root and scan. |
-| Dekzer | `crates/library-boundary-protocol` | Controlled move and rename | Rust source for generated boundary contract. |
-| Dekzer | `crates/library-boundary-service` | Controlled move and rename | Maps boundary requests to product owners. |
-| Dekzer | `crates/library-boundary-stdio` | Future rewrite | Host adapter if still needed; do not copy the `workspace-host` draft. |
-| Exclave | external packages and crates | External dependency | Boundary/runtime primitives only, not vendored into Dekzer. |
+| Owner   | Target path                          | Source direction              | Notes                                                                                                                        |
+|---------|--------------------------------------|-------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| Dekzer  | `apps/desktop`                       | Already present               | Electron app and Vue renderer edge.                                                                                          |
+| Dekzer  | `packages/workspace-shell`           | Future rewrite                | Product shell composition only, no reusable runtime authority.                                                               |
+| Dekzer  | `packages/library-boundary-contract` | Regenerate from Rust protocol | Replaces `@music-library-core/library-surface-contract`; generated-only.                                                     |
+| Dekzer  | `packages/library-boundary-client`   | Controlled port and rename    | Replaces `@music-library-core/library-surface-client`; no DTO copies.                                                        |
+| Dekzer  | `crates/library-domain`              | Controlled move               | Product vocabulary and typed ids.                                                                                            |
+| Dekzer  | `crates/library-store-sqlite`        | Controlled move and rename    | Durable SQLite substrate.                                                                                                    |
+| Dekzer  | None for `library-read-kernel`       | Rejected after audit          | Store-owned rows/windows stay in `crates/library-store-sqlite`; future boundary service maps them directly to protocol DTOs. |
+| Dekzer  | `crates/library-authority`           | Future explicit layer         | Product operations such as register root and scan.                                                                           |
+| Dekzer  | `crates/library-boundary-protocol`   | Controlled move and rename    | Rust source for generated boundary contract.                                                                                 |
+| Dekzer  | `crates/library-boundary-service`    | Controlled move and rename    | Maps boundary requests to product owners.                                                                                    |
+| Dekzer  | `crates/library-boundary-stdio`      | Future rewrite                | Host adapter if still needed; do not copy the `workspace-host` draft.                                                        |
+| Exclave | external packages and crates         | External dependency           | Boundary/runtime primitives only, not vendored into Dekzer.                                                                  |
 
 ## Dependency Direction Rules
 
@@ -147,7 +159,8 @@ Controlled migration candidates:
 - Exclave must not depend on Dekzer product packages or crates.
 - Renderer and desktop composition may depend on generated clients and presentation adapters.
 - Renderer must not depend on SQLite, Rust store internals, or durable product authority crates.
-- Library store, read model, domain, and authority crates must not depend on Electron, Vue, renderer packages, or desktop composition.
+- Library store, read model, domain, and authority crates must not depend on Electron, Vue, renderer packages, or
+  desktop composition.
 - Boundary service may depend on product authorities and boundary protocol.
 - Generated TypeScript contract is downstream of Rust protocol.
 - No aliases, compatibility wrappers, dual paths, or legacy package scopes.
@@ -168,7 +181,8 @@ No slice is accepted if validation passes only through fake data, mock product w
 
 1. Establish Dekzer root docs, root workspace metadata, and honest boot status.
 2. Decide target names and delete old naming from future docs.
-3. Move library substrate slices from `music-library-core` into Dekzer in dependency order: domain, store, protocol, service, generated contract, client.
+3. Move library substrate slices from `music-library-core` into Dekzer in dependency order: domain, store, protocol,
+   service, generated contract, client.
 4. Introduce explicit `library-authority` only where it removes hidden ownership.
 5. Recreate required tests in Dekzer and keep behavior unchanged before broad renames.
 6. Connect the desktop app to real library boundary imports.
@@ -195,4 +209,5 @@ The first real product slice is:
 
 `register local music root -> scan literal hierarchy -> persist substrate state -> restart app -> browse persisted hierarchy immediately from local authority`
 
-This slice proves the important things: durable local ownership, literal hierarchy as first-class substrate, renderer as projection, desktop composition over real contracts, and restart integrity.
+This slice proves the important things: durable local ownership, literal hierarchy as first-class substrate, renderer as
+projection, desktop composition over real contracts, and restart integrity.

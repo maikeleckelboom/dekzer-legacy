@@ -119,7 +119,7 @@ const badgeToneClass = computed(() => {
 
     <span
       v-if="item.node.badge"
-      class="shrink-0 rounded-sm border px-1.5 text-[11px] leading-5"
+      class="shrink-0 rounded-sm border px-1.5 text-xs leading-5"
       :class="badgeToneClass"
       :title="item.node.badge.title"
       :aria-label="item.node.badge.ariaLabel"

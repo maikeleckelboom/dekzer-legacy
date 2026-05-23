@@ -15,7 +15,7 @@ const props = defineProps<{
 }>()
 
 const tree = useTreeContext()
-const itemElement = ref<HTMLElement | null>(null)
+const itemElement = ref<HTMLElement>()
 
 watch(
   itemElement,
@@ -26,19 +26,30 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  tree.registerItemElement(props.item.id, null)
+  tree.registerItemElement(props.item.id, undefined)
 })
 
-function handleClick(): void {
+function focusItem(): void {
   tree.focusNode(props.item.id)
+}
+
+function activatePrimaryAction(): void {
+  focusItem()
   tree.activatePrimary(props.item.id)
+}
+
+function handleClick(): void {
+  activatePrimaryAction()
+}
+
+function handleFocus(): void {
+  tree.setActiveNode(props.item.id)
 }
 
 function handleKeydown(event: KeyboardEvent): void {
   if (isPrimaryActivationKey(event.key)) {
     event.preventDefault()
-    tree.focusNode(props.item.id)
-    tree.activatePrimary(props.item.id)
+    activatePrimaryAction()
     return
   }
 
@@ -48,17 +59,24 @@ function handleKeydown(event: KeyboardEvent): void {
     event.preventDefault()
   }
 
+  applyKeyboardIntent(intent)
+}
+
+function applyKeyboardIntent(intent: ReturnType<typeof tree.resolveKeyboardIntent>): void {
   switch (intent.kind) {
     case 'focus':
       tree.focusNode(intent.nodeId)
       return
+
     case 'expand':
     case 'collapse':
       tree.toggleNode(intent.nodeId)
       return
+
     case 'activateAction':
       tree.activateAction(intent.nodeId)
       return
+
     case 'select':
     case 'none':
       return
@@ -73,21 +91,21 @@ function isPrimaryActivationKey(key: string): boolean {
 <template>
   <div
     ref="itemElement"
-    class="group outline-none select-none"
+    class="group select-none outline-none"
     role="treeitem"
-    :aria-expanded="getTreeItemAriaExpanded(props.item)"
-    :aria-level="props.item.level"
-    :aria-posinset="props.item.ariaPosInSet"
-    :aria-selected="getTreeItemAriaSelected(props.item)"
-    :aria-setsize="props.item.ariaSetSize"
-    :data-active="props.item.isActive ? 'true' : undefined"
-    :data-expanded="props.item.isBranch ? String(props.item.isExpanded) : undefined"
-    :data-selected="props.item.isSelected ? 'true' : undefined"
-    :tabindex="tree.getItemTabIndex(props.item.id)"
+    :aria-expanded="getTreeItemAriaExpanded(item)"
+    :aria-level="item.level"
+    :aria-posinset="item.ariaPosInSet"
+    :aria-selected="getTreeItemAriaSelected(item)"
+    :aria-setsize="item.ariaSetSize"
+    :data-active="item.isActive ? 'true' : undefined"
+    :data-expanded="item.isBranch ? String(item.isExpanded) : undefined"
+    :data-selected="item.isSelected ? 'true' : undefined"
+    :tabindex="tree.getItemTabIndex(item.id)"
     @click="handleClick"
-    @focus="tree.setActiveNode(props.item.id)"
+    @focus="handleFocus"
     @keydown="handleKeydown"
   >
-    <TreeRow :item="props.item" />
+    <TreeRow :item="item" />
   </div>
 </template>
