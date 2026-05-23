@@ -33,6 +33,8 @@ import type {
 } from '../src/renderer/libraryBrowser/tree/types'
 import type { ReadResult, ChildWindow } from '../src/shared/libraryHierarchy/readChildren'
 import type { NavigationReadRowsResult } from '../src/shared/libraryNavigation/readRows'
+import { computed } from 'vue'
+import { useTreeController } from '../src/renderer/libraryBrowser/tree/controller'
 
 const libraryHierarchyFixtureTree = {
   name: 'Tree validation fixture',
@@ -1242,45 +1244,45 @@ function validatesStateAndActionRoleIcons(): void {
 }
 
 function validatesPrimaryActivation(): void {
-  const primaryActivationActions = recordPrimaryActivationActions(loadedBranchRootNode(), false)
+  const collapsedPrimary = invokePrimaryActivation(loadedBranchRootNode(), false)
   assert.deepEqual(
-    primaryActivationActions,
+    collapsedPrimary,
     ['select', 'toggle'],
     'loaded collapsed branch primary activation must select and expand'
   )
 
-  const expandedPrimary = recordPrimaryActivationActions(loadedBranchRootNode(), true)
+  const expandedPrimary = invokePrimaryActivation(loadedBranchRootNode(), true)
   assert.deepEqual(
     expandedPrimary,
     ['select', 'toggle'],
     'loaded expanded branch primary activation must select and collapse'
   )
 
-  const deferredPrimary = recordPrimaryActivationActions(unloadedBranchNode(), false)
+  const deferredPrimary = invokePrimaryActivation(unloadedBranchNode(), false)
   assert.deepEqual(
     deferredPrimary,
     ['select', 'toggle', 'activateAction'],
     'deferred branch primary activation must select, expand, and activate load'
   )
 
-  const failedPrimary = recordPrimaryActivationActions(failedBranchNode(), false)
+  const failedPrimary = invokePrimaryActivation(failedBranchNode(), false)
   assert.deepEqual(
     failedPrimary,
     ['select', 'toggle', 'activateAction'],
     'failed branch primary activation must select, expand, and activate retry'
   )
 
-  const loadingPrimary = recordPrimaryActivationActions(loadingBranchNode(), false)
+  const loadingPrimary = invokePrimaryActivation(loadingBranchNode(), false)
   assert.deepEqual(
     loadingPrimary,
     ['select'],
     'loading branch primary activation must select without duplicate load'
   )
 
-  const leafPrimary = recordPrimaryActivationActions(leafRootNode(), false)
+  const leafPrimary = invokePrimaryActivation(leafRootNode(), false)
   assert.deepEqual(leafPrimary, ['select'], 'leaf primary activation must select only')
 
-  const actionPrimary = recordPrimaryActivationActions(moreActionNode(), false)
+  const actionPrimary = invokePrimaryActivation(moreActionNode(), false)
   assert.deepEqual(
     actionPrimary,
     ['activateAction'],
@@ -1288,63 +1290,25 @@ function validatesPrimaryActivation(): void {
   )
 }
 
-function recordPrimaryActivationActions(
-  node: BrowserTreeNode,
-  isExpanded: boolean
-): readonly string[] {
-  const item = visibleItemFromNode(node, isExpanded)
+function invokePrimaryActivation(node: BrowserTreeNode, isExpanded: boolean): readonly string[] {
   const actions: string[] = []
 
-  if (item.isActionItem) {
-    if (item.canActivateAction) {
+  useTreeController({
+    nodes: computed<readonly BrowserTreeNode[]>(() => [node]),
+    selectedNodeId: computed<BrowserTreeNodeId | undefined>(() => undefined),
+    expandedNodeIds: computed<ReadonlySet<BrowserTreeNodeId>>(
+      () => new Set(isExpanded ? [node.id] : [])
+    ),
+    selectNode: () => {
+      actions.push('select')
+    },
+    toggleNode: () => {
+      actions.push('toggle')
+    },
+    activateAction: () => {
       actions.push('activateAction')
     }
-
-    return actions
-  }
-
-  actions.push('select')
-
-  if (!item.isBranch) {
-    return actions
-  }
-
-  if (item.isExpanded) {
-    actions.push('toggle')
-    return actions
-  }
-
-  if (item.canRevealChildren) {
-    actions.push('toggle')
-    return actions
-  }
-
-  if (item.canActivateAction) {
-    actions.push('toggle')
-    actions.push('activateAction')
-    return actions
-  }
+  }).activatePrimary(node.id)
 
   return actions
-}
-
-function visibleItemFromNode(node: BrowserTreeNode, isExpanded: boolean): BrowserTreeVisibleItem {
-  const isBranch = isBrowserTreeBranch(node)
-
-  return {
-    id: node.id,
-    node,
-    level: 1,
-    visibleIndex: 0,
-    isBranch,
-    canRevealChildren: canRevealBrowserTreeChildren(node),
-    canActivateAction: canActivateBrowserTreeAction(node),
-    isActionLoading: isBrowserTreeActionLoading(node),
-    isActionItem: node.action !== undefined && !isBranch,
-    isExpanded: isBranch && isExpanded,
-    isSelected: false,
-    isActive: false,
-    ariaSetSize: 1,
-    ariaPosInSet: 1
-  }
 }
