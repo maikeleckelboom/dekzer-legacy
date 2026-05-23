@@ -302,10 +302,24 @@ function validatesUnsupportedNavigationContents(): void {
       rows: [unsupportedNavigationRow()]
     }
   })
-  const contents = projectForSelection(state, 'navigation-row:8')
+  const projection = browserProjection(state)
+  const navigationLabels = projection.nodes
+    .filter((node) => node.role !== 'state')
+    .map((node) => node.label)
+
+  assert.ok(
+    !navigationLabels.includes('All audio'),
+    'unsupported navigation row must not appear in visible tree'
+  )
+  assert.equal(navigationLabels.length, 0, 'only state placeholder should remain when no supported rows exist')
+
+  const contents = projectContents({
+    state,
+    selectedNodeId: 'navigation-row:8',
+    bindingsById: projection.bindingsById
+  })
 
   assert.equal(contents.kind, 'unsupported')
-  assert.equal(contents.title, 'All audio')
   assert.equal(contents.rows[0]?.state, 'unsupported')
 }
 

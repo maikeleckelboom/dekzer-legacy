@@ -44,6 +44,10 @@ export function projectState(state: BrowserState): BrowserProjection | undefined
   return projectNavigationResult(state)
 }
 
+function isRendererVisibleNavigationRow(row: NavigationRow): boolean {
+  return row.selectorKind === 'source' || row.selectorKind === 'sourceLocation'
+}
+
 function projectNavigationResult(state: BrowserState): BrowserProjection {
   const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
   const result = state.navigationReadResult
@@ -66,7 +70,9 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
     })
   }
 
-  if (result.rows.length === 0) {
+  const visibleRows = result.rows.filter(isRendererVisibleNavigationRow)
+
+  if (visibleRows.length === 0) {
     return emptyProjection({
       ownerId: 'navigation',
       state: 'empty',
@@ -77,7 +83,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
 
   return {
     kind: 'tree',
-    nodes: result.rows.map((row) =>
+    nodes: visibleRows.map((row) =>
       projectNavigationRow({
         row,
         sourceReadStates: state.sourceReadStates,

@@ -1152,7 +1152,10 @@ mod tests {
             &mut connection,
             source_id,
             &["nested".to_string()],
-            &["nested/track.wma".to_string(), "nested/track.alac".to_string()],
+            &[
+                "nested/track.wma".to_string(),
+                "nested/track.alac".to_string(),
+            ],
         );
 
         assert_eq!(

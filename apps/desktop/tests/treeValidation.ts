@@ -34,7 +34,8 @@ import type {
 import type { ReadResult, ChildWindow } from '../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
-  NavigationRow
+  NavigationRow,
+  NavigationRowSelectorKind
 } from '../src/shared/libraryNavigation/readRows'
 import { computed } from 'vue'
 import { useTreeController } from '../src/renderer/libraryBrowser/tree/controller'
@@ -165,7 +166,7 @@ function main(): void {
   validatesStateAndActionRoleIcons()
   validatesPrimaryActivation()
   validatesLoadedEmptyTreeProjection()
-  validatesNonSourceNavigationRowProjectedAsLeaf()
+  validatesUnsupportedNavigationRowsHiddenFromTree()
   validatesDisclosureAffordanceHints()
 }
 
@@ -1432,40 +1433,151 @@ function invokePrimaryActivation(node: BrowserTreeNode, isExpanded: boolean): re
   return actions
 }
 
-function validatesNonSourceNavigationRowProjectedAsLeaf(): void {
-  const state: BrowserState = {
+function validatesUnsupportedNavigationRowsHiddenFromTree(): void {
+  const unsupportedKinds: readonly NavigationRowSelectorKind[] = [
+    'allMedia',
+    'allAudio',
+    'allVideos',
+    'recentlyAdded',
+    'needsPreparation',
+    'playlistGroup',
+    'playlist',
+    'prepPolicyScope'
+  ]
+
+  const allUnsupportedRows = unsupportedKinds.map((selectorKind, index) =>
+    navigationRowWithSelectorKind(selectorKind, String(index + 100))
+  )
+
+  const mixedState: BrowserState = {
     navigationReadResult: {
       state: 'ready',
-      rows: [allAudioNavigationRow()]
+      rows: [sourceNavigationRow(), ...allUnsupportedRows]
+    },
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          children: loadedChildrenFromWindow(fileOnlyHierarchyReadResult().window)
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  }
+
+  const mixedProjection = projectState(mixedState)
+  assert.equal(mixedProjection?.kind, 'tree')
+  if (mixedProjection?.kind !== 'tree') {
+    assert.fail('expected mixed navigation to project to browser tree')
+  }
+
+  const mixedLabels = mixedProjection.nodes.map((node) => node.label)
+  assert.deepEqual(
+    mixedLabels,
+    ['Source Fixture'],
+    'renderer tree must expose only currently implemented source/location navigation rows'
+  )
+
+  assert.ok(
+    !mixedLabels.includes('All Audio'),
+    'renderer tree must not expose unwired aggregate navigation views'
+  )
+  assert.ok(
+    !mixedLabels.includes('All Media'),
+    'renderer tree must not expose unwired aggregate navigation views'
+  )
+  assert.ok(
+    !mixedLabels.includes('All Videos'),
+    'renderer tree must not expose unwired aggregate navigation views'
+  )
+  assert.ok(
+    !mixedLabels.includes('Recently Added'),
+    'renderer tree must not expose unwired aggregate navigation views'
+  )
+  assert.ok(
+    !mixedLabels.includes('Needs Preparation'),
+    'renderer tree must not expose unwired aggregate navigation views'
+  )
+  assert.ok(
+    !mixedLabels.includes('Playlists'),
+    'renderer tree must not expose unwired aggregate navigation views'
+  )
+
+  for (const row of allUnsupportedRows) {
+    const unsupportedState: BrowserState = {
+      navigationReadResult: {
+        state: 'ready',
+        rows: [row]
+      },
+      sourceReadStates: new Map(),
+      directoryReadStates: new Map()
+    }
+    const unsupportedProjection = projectState(unsupportedState)
+    assert.equal(unsupportedProjection?.kind, 'tree')
+    if (unsupportedProjection?.kind !== 'tree') {
+      assert.fail('expected unsupported-only navigation to project to tree')
+    }
+    const unsupportedNavigationLabels = unsupportedProjection.nodes
+      .filter((node) => node.role !== 'state')
+      .map((node) => node.label)
+    assert.ok(
+      !unsupportedNavigationLabels.includes(row.displayName),
+      `renderer tree must not expose ${row.selectorKind} navigation row`
+    )
+    assert.equal(
+      unsupportedNavigationLabels.length,
+      0,
+      `renderer tree must have no navigation nodes when only ${row.selectorKind} is present`
+    )
+  }
+
+  const nullSelectorRow = navigationRowWithNullSelector()
+  const nullSelectorState: BrowserState = {
+    navigationReadResult: {
+      state: 'ready',
+      rows: [nullSelectorRow]
     },
     sourceReadStates: new Map(),
     directoryReadStates: new Map()
   }
-  const projection = projectState(state)
-  assert.equal(projection?.kind, 'tree')
-  if (projection?.kind !== 'tree') {
-    assert.fail('expected non-source navigation to project to browser tree')
+  const nullSelectorProjection = projectState(nullSelectorState)
+  assert.equal(nullSelectorProjection?.kind, 'tree')
+  if (nullSelectorProjection?.kind !== 'tree') {
+    assert.fail('expected null-selector navigation to project to tree')
   }
-  const node = projection.nodes[0]
-  assert.equal(node?.children.kind, 'none', 'non-source navigation must be leaf')
-  assert.equal(node?.action, undefined, 'non-source navigation must not have action')
-  if (node?.children.kind === 'loaded') {
-    const loadedChildren = node.children.nodes.map((n) => n.label)
-    assert.ok(
-      !loadedChildren.includes('Unavailable'),
-      'non-source navigation must not create Unavailable child'
-    )
-  }
-  assert.notEqual(node?.role, undefined, 'non-source navigation must have a role')
+  const nullNavigationLabels = nullSelectorProjection.nodes
+    .filter((node) => node.role !== 'state')
+    .map((node) => node.label)
+  assert.ok(
+    !nullNavigationLabels.includes(nullSelectorRow.displayName),
+    'renderer tree must not expose null-selector structural navigation row'
+  )
+  assert.deepEqual(
+    nullNavigationLabels,
+    [],
+    'renderer tree must have no navigation nodes when only null-selector rows exist'
+  )
 
-  const visibleItems = flattenVisibleTree({
-    nodes: projection.nodes,
-    expandedNodeIds: new Set()
-  })
-  const item = visibleItems[0]
-  assert.equal(item?.isBranch, false)
-  assert.equal(item?.canRevealChildren, false)
-  assert.equal(item?.canActivateAction, false)
+  const sourceOnlyState: BrowserState = {
+    navigationReadResult: {
+      state: 'ready',
+      rows: [sourceNavigationRow()]
+    },
+    sourceReadStates: new Map(),
+    directoryReadStates: new Map()
+  }
+  const sourceOnlyProjection = projectState(sourceOnlyState)
+  assert.equal(sourceOnlyProjection?.kind, 'tree')
+  if (sourceOnlyProjection?.kind !== 'tree') {
+    assert.fail('expected source-only navigation to project to browser tree')
+  }
+  const sourceLabels = sourceOnlyProjection.nodes.map((node) => node.label)
+  assert.deepEqual(
+    sourceLabels,
+    ['Source Fixture'],
+    'renderer tree must expose source navigation rows'
+  )
 }
 
 function validatesDisclosureAffordanceHints(): void {
@@ -1514,17 +1626,67 @@ function validatesDisclosureAffordanceHints(): void {
   assert.equal(leafItem?.isExpanded, false)
 }
 
-function allAudioNavigationRow(): NavigationRow {
+function navigationRowWithSelectorKind(
+  selectorKind: NavigationRowSelectorKind,
+  navigationRowId: string
+): NavigationRow {
+  const displayNameByKind: Record<NavigationRowSelectorKind, string> = {
+    allMedia: 'All Media',
+    allAudio: 'All Audio',
+    allVideos: 'All Videos',
+    recentlyAdded: 'Recently Added',
+    needsPreparation: 'Needs Preparation',
+    playlistGroup: 'Playlists',
+    source: 'Source',
+    sourceLocation: 'Location',
+    playlist: 'Playlist',
+    prepPolicyScope: 'Prep Scope'
+  }
+
   return {
-    navigationRowId: '8',
-    stableKey: 'view:all-audio',
+    navigationRowId,
+    stableKey: `view:${selectorKind}`,
     parentNavigationRowId: null,
-    family: 'collections',
-    rowKind: 'view',
-    displayName: 'All audio',
+    family: selectorKind === 'source' ? 'sources' : 'views',
+    rowKind: selectorKind === 'source' ? 'source' : 'view',
+    displayName: displayNameByKind[selectorKind] ?? selectorKind,
     siblingPosition: 0,
     selectable: true,
-    selectorKind: 'allAudio',
+    selectorKind,
+    selectorPayload: selectorKind === 'source' || selectorKind === 'sourceLocation' ? navigationRowId : null,
+    updatedAtMs: 100,
+    rowVersion: '1'
+  }
+}
+
+function sourceNavigationRow(): NavigationRow {
+  return {
+    navigationRowId: '7',
+    stableKey: 'source:7',
+    parentNavigationRowId: null,
+    family: 'sources',
+    rowKind: 'source',
+    displayName: 'Source Fixture',
+    siblingPosition: 0,
+    selectable: true,
+    selectorKind: 'source',
+    selectorPayload: '7',
+    updatedAtMs: 100,
+    rowVersion: '1'
+  }
+}
+
+function navigationRowWithNullSelector(): NavigationRow {
+  return {
+    navigationRowId: '99',
+    stableKey: 'group:structural',
+    parentNavigationRowId: null,
+    family: null,
+    rowKind: 'collectionGroup',
+    displayName: 'Structural Group',
+    siblingPosition: 0,
+    selectable: true,
+    selectorKind: null,
     selectorPayload: null,
     updatedAtMs: 100,
     rowVersion: '1'
