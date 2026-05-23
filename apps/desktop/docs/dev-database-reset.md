@@ -15,9 +15,17 @@ canonical baseline has changed and the engine refuses to open a database that do
 The fix is to point the desktop host at a fresh user data directory so a new database is created from
 the current baseline on first launch.
 
-In development mode, the desktop host now defaults to `<repo>/.dev-user-data/default` for its library
+In development mode, the desktop host defaults to `<repo>/.dev-user-data/default` for its library
 storage root. This path is deterministic and repo-local, unaffected by Electron's own user data
 directory. To reset it, use the dedicated storage commands.
+
+The storage commands resolve the user data path in the following order of priority:
+
+1.  `--user-data <absolutePath>` -- overrides for a single command invocation.
+2.  `DESKTOP_LIBRARY_USER_DATA_PATH` environment variable -- applies for the shell session.
+3.  `<repo>/.dev-user-data/default` -- the development default.
+
+The wrapper prints both the resolved path and its source before delegating to Rust.
 
 ## Using the dedicated storage commands
 
@@ -39,7 +47,8 @@ target `<repo>/.dev-user-data/default` by default.
 Reset is development-only and requires explicit confirmation via `--confirm-delete`. The command
 will not run without it.
 
-The resolved user data root is printed before the Rust command runs.
+The resolved user data root and its source (`argument`, `environmentOverride`, or `developmentDefault`)
+are printed before the Rust command runs.
 
 ## Targeting a custom path with the storage commands
 
