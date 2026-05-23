@@ -3,6 +3,12 @@ import {
   type LibraryBoundaryHostStatus
 } from '../shared/libraryBoundary/status'
 import {
+  libraryBrowserChannels,
+  type LibraryBrowserViewStateReadResult,
+  type LibraryBrowserViewStateWriteResult,
+  type PersistedLibraryBrowserViewState
+} from '../shared/libraryBrowser/viewState'
+import {
   hierarchyReadChannels,
   type ReadRequest,
   type ReadResult
@@ -106,6 +112,23 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             rootChannels.unregisterLocalRoot,
             request
           )) as UnregisterLocalRootResult
+        }
+      },
+      browser: {
+        viewState: {
+          async readViewState(): Promise<LibraryBrowserViewStateReadResult> {
+            return (await ipcRenderer.invoke(
+              libraryBrowserChannels.readViewState
+            )) as LibraryBrowserViewStateReadResult
+          },
+          async writeViewState(
+            viewState: PersistedLibraryBrowserViewState
+          ): Promise<LibraryBrowserViewStateWriteResult> {
+            return (await ipcRenderer.invoke(
+              libraryBrowserChannels.writeViewState,
+              viewState
+            )) as LibraryBrowserViewStateWriteResult
+          }
         }
       }
     }

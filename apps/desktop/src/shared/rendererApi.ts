@@ -2,6 +2,11 @@ import type {
   LibraryBoundaryHostStatus,
   LibraryBoundaryHostStatusChangedCallback
 } from './libraryBoundary/status'
+import type {
+  LibraryBrowserViewStateReadResult,
+  LibraryBrowserViewStateWriteResult,
+  PersistedLibraryBrowserViewState
+} from './libraryBrowser/viewState'
 import type { ReadRequest, ReadResult } from './libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsRequest,
@@ -24,6 +29,7 @@ export type LibraryApi = {
   readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
   readonly roots: LibraryRootsApi
+  readonly browser: LibraryBrowserApi
 }
 
 export type LibraryHostApi = {
@@ -44,4 +50,13 @@ export type LibraryRootsApi = {
   runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult>
   readLocalRoots(): Promise<ReadLocalRootsOutcome>
   unregisterLocalRoot(request: UnregisterLocalRootRequest): Promise<UnregisterLocalRootResult>
+}
+
+export type LibraryBrowserApi = {
+  readonly viewState: {
+    readViewState(): Promise<LibraryBrowserViewStateReadResult>
+    writeViewState(
+      viewState: PersistedLibraryBrowserViewState
+    ): Promise<LibraryBrowserViewStateWriteResult>
+  }
 }

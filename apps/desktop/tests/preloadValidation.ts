@@ -16,6 +16,12 @@ import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAnd
 import type { ReadLocalRootsOutcome } from '../src/shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import type { UnregisterLocalRootResult } from '../src/shared/libraryRoots/unregisterLocalRoot'
+import {
+  libraryBrowserChannels,
+  type LibraryBrowserViewStateReadResult,
+  type LibraryBrowserViewStateWriteResult,
+  type PersistedLibraryBrowserViewState
+} from '../src/shared/libraryBrowser/viewState'
 import { emitStatus, testStatus } from './support/libraryBoundary'
 
 void main()
@@ -87,6 +93,23 @@ async function validatesPreloadApiSurface(): Promise<void> {
     state: 'unregistered',
     unregistered: true
   }
+  const viewStateReadResult: LibraryBrowserViewStateReadResult = {
+    state: 'ready',
+    viewState: {
+      version: 1,
+      selectedNodeId: 'navigation-row:1',
+      expandedNodeIds: ['navigation-row:1', 'source-directory:2']
+    }
+  }
+  const viewStateWriteResult: LibraryBrowserViewStateWriteResult = {
+    state: 'written'
+  }
+  const persistedViewState: PersistedLibraryBrowserViewState = {
+    version: 1,
+    selectedNodeId: 'navigation-row:1',
+    expandedNodeIds: ['navigation-row:1']
+  }
+  let receivedViewStatePayload: unknown = null
   let receivedNavigationRequest: unknown = null
   let receivedHierarchyRequest: unknown = null
   let receivedChoiceArgs: readonly unknown[] | undefined
@@ -135,6 +158,17 @@ async function validatesPreloadApiSurface(): Promise<void> {
         return unregisterLocalRootResult
       }
 
+      if (channel === libraryBrowserChannels.readViewState) {
+        assert.deepEqual(args, [])
+        return viewStateReadResult
+      }
+
+      if (channel === libraryBrowserChannels.writeViewState) {
+        assert.equal(args.length, 1)
+        receivedViewStatePayload = args[0]
+        return viewStateWriteResult
+      }
+
       throw new Error(`unexpected preload invoke channel ${channel}`)
     },
     on: (channel, listener) => {
@@ -164,7 +198,13 @@ async function validatesPreloadApiSurface(): Promise<void> {
 
   assert.deepEqual(Object.keys(api), ['library'])
   assert.equal('libraryBoundary' in api, false)
-  assert.deepEqual(Object.keys(api.library).sort(), ['hierarchy', 'host', 'navigation', 'roots'])
+  assert.deepEqual(Object.keys(api.library).sort(), [
+    'browser',
+    'hierarchy',
+    'host',
+    'navigation',
+    'roots'
+  ])
   assert.deepEqual(Object.keys(api.library.host).sort(), ['getStatus', 'onStatusChanged'])
   assert.deepEqual(Object.keys(api.library.hierarchy), ['readChildren'])
   assert.deepEqual(Object.keys(api.library.navigation), ['readRows'])
@@ -224,6 +264,20 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.equal(receivedNavigationRequest, navigationRequest)
   assert.equal(await api.library.hierarchy.readChildren(hierarchyRequest), hierarchyResult)
   assert.equal(receivedHierarchyRequest, hierarchyRequest)
+
+  assert.deepEqual(Object.keys(api.library.browser), ['viewState'])
+  assert.deepEqual(Object.keys(api.library.browser.viewState).sort(), [
+    'readViewState',
+    'writeViewState'
+  ])
+
+  assert.equal(await api.library.browser.viewState.readViewState(), viewStateReadResult)
+
+  assert.equal(
+    await api.library.browser.viewState.writeViewState(persistedViewState),
+    viewStateWriteResult
+  )
+  assert.deepEqual(receivedViewStatePayload, persistedViewState)
 
   let receivedStatus: LibraryBoundaryHostStatus | null = null
   const unsubscribe = api.library.host.onStatusChanged((changedStatus) => {

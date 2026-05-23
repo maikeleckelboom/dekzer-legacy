@@ -11,6 +11,7 @@ import { deriveOperationFeedback } from './projection/operationFeedback'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
 import type { BrowserState } from './runtime/state'
+import type { RendererApi } from '../../shared/rendererApi'
 
 defineOptions({
   name: 'LibraryBrowserPanel'
@@ -58,6 +59,19 @@ const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const hasUserInteractedWithTree = ref(false)
 const hasAppliedInitialPreferredNode = ref(false)
 let hydrationAttempted = false
+let restoredViewState = false
+
+function getApi(): RendererApi {
+  return (window as unknown as { readonly dekzer: RendererApi }).dekzer
+}
+
+function persistCurrentViewState(): void {
+  void getApi().library.browser.viewState.writeViewState({
+    version: 1,
+    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
+    expandedNodeIds: [...expandedNodeIds.value]
+  })
+}
 
 const liveTreeNodes = computed(() => {
   return browserProjection.value?.nodes
@@ -155,6 +169,53 @@ watch(
   { immediate: true }
 )
 
+watch(liveTreeNodes, (nodes) => {
+  if (restoredViewState || nodes === undefined) {
+    return
+  }
+
+  restoredViewState = true
+
+  void restoreViewStateIfValid()
+})
+
+async function restoreViewStateIfValid(): Promise<void> {
+  const projection = browserProjection.value
+
+  if (projection?.kind !== 'tree') {
+    return
+  }
+
+  try {
+    const result = await getApi().library.browser.viewState.readViewState()
+
+    if (result.state !== 'ready') {
+      return
+    }
+
+    if (hasUserInteractedWithTree.value) {
+      return
+    }
+
+    const { viewState } = result
+    const bindingsById = projection.bindingsById
+
+    if (viewState.selectedNodeId !== undefined && bindingsById.has(viewState.selectedNodeId)) {
+      selectedNodeId.value = viewState.selectedNodeId
+      hasAppliedInitialPreferredNode.value = true
+    }
+
+    const validExpandedIds = viewState.expandedNodeIds.filter((id) => bindingsById.has(id))
+
+    if (validExpandedIds.length > 0) {
+      expandedNodeIds.value = new Set(validExpandedIds)
+      hasAppliedInitialPreferredNode.value = true
+    }
+  } catch {
+    return
+  }
+}
+
 watch(hostStatus, (status) => {
   if (hydrationAttempted || status?.state !== 'started') {
     return
@@ -167,6 +228,7 @@ watch(hostStatus, (status) => {
 function selectNode(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
   selectedNodeId.value = nodeId
+  persistCurrentViewState()
 }
 
 function toggleNode(nodeId: BrowserTreeNodeId): void {
@@ -180,11 +242,13 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
   }
 
   expandedNodeIds.value = nextExpandedNodeIds
+  persistCurrentViewState()
 }
 
 function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
   expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
+  persistCurrentViewState()
   void requestNodeChildren(nodeId)
 }
 
@@ -194,6 +258,7 @@ async function handleRemoveSource(): Promise<void> {
     selectedNodeId.value = undefined
     expandedNodeIds.value = new Set()
     hasUserInteractedWithTree.value = false
+    persistCurrentViewState()
   }
 }
 
@@ -207,6 +272,7 @@ function activateContentRowAction(row: ContentRow): void {
 
   if (action.kind === 'loadChildren') {
     expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
+    persistCurrentViewState()
   }
 
   void requestNodeChildren(action.nodeId)

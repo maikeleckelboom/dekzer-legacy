@@ -9,6 +9,7 @@ const validations = [
   'tests/contentsProjectionValidation.ts',
   'tests/hierarchyReadValidation.ts',
   'tests/hostValidation.ts',
+  'tests/libraryBrowserViewStateValidation.ts',
   'tests/libraryStorageEnvironmentValidation.ts',
   'tests/localRootChoiceValidation.ts',
   'tests/localLibraryRestartValidation.ts',
