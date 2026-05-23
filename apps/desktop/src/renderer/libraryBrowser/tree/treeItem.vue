@@ -29,40 +29,19 @@ onBeforeUnmount(() => {
   tree.registerItemElement(props.item.id, null)
 })
 
-function handleClick(event: MouseEvent): void {
+function handleClick(): void {
   tree.focusNode(props.item.id)
-
-  if (isBranchAffordanceEvent(event)) {
-    if (props.item.isExpanded) {
-      tree.toggleNode(props.item.id)
-      return
-    }
-
-    if (props.item.canRevealChildren) {
-      tree.toggleNode(props.item.id)
-      return
-    }
-
-    if (props.item.canActivateAction) {
-      tree.activateAction(props.item.id)
-      return
-    }
-
-    return
-  }
-
-  if (props.item.isActionItem) {
-    if (props.item.canActivateAction) {
-      tree.activateAction(props.item.id)
-    }
-
-    return
-  }
-
-  tree.selectNode(props.item.id)
+  tree.activatePrimary(props.item.id)
 }
 
 function handleKeydown(event: KeyboardEvent): void {
+  if (isPrimaryActivationKey(event.key)) {
+    event.preventDefault()
+    tree.focusNode(props.item.id)
+    tree.activatePrimary(props.item.id)
+    return
+  }
+
   const intent = tree.resolveKeyboardIntent(props.item, event.key)
 
   if (intent.shouldPreventDefault) {
@@ -81,18 +60,13 @@ function handleKeydown(event: KeyboardEvent): void {
       tree.activateAction(intent.nodeId)
       return
     case 'select':
-      tree.selectNode(intent.nodeId)
-      return
     case 'none':
       return
   }
 }
 
-function isBranchAffordanceEvent(event: MouseEvent): boolean {
-  return (
-    event.target instanceof HTMLElement &&
-    event.target.closest('[data-tree-affordance="true"]') !== null
-  )
+function isPrimaryActivationKey(key: string): boolean {
+  return key === 'Enter' || key === ' ' || key === 'Space' || key === 'Spacebar'
 }
 </script>
 

@@ -122,11 +122,7 @@ function badgeEmphasisCssClass(emphasis: BrowserTreeBadgeEmphasis | undefined): 
     :class="rowClass"
     :style="rowStyle"
   >
-    <span
-      class="grid h-7 w-7 shrink-0 place-items-center"
-      :data-tree-affordance="hasAffordance ? 'true' : undefined"
-      aria-hidden="true"
-    >
+    <span class="grid h-7 w-7 shrink-0 place-items-center" aria-hidden="true">
       <Icon
         v-if="hasAffordance"
         :icon="item.isExpanded ? DisclosureOpenIcon : DisclosureClosedIcon"

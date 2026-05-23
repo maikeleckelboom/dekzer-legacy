@@ -214,8 +214,6 @@ watch(hostStatus, (status) => {
 function selectNode(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
   selectedNodeId.value = nodeId
-  expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
-  void requestNodeChildren(nodeId)
 }
 
 function toggleNode(nodeId: BrowserTreeNodeId): void {

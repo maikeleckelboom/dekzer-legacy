@@ -108,6 +108,44 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     options.activateAction(nodeId)
   }
 
+  function activatePrimary(nodeId: BrowserTreeNodeId): void {
+    const item = visibleItems.value.find((visibleItem) => visibleItem.id === nodeId)
+
+    if (item === undefined) {
+      return
+    }
+
+    if (item.isActionItem) {
+      if (item.canActivateAction) {
+        options.activateAction(nodeId)
+      }
+
+      return
+    }
+
+    options.selectNode(nodeId)
+
+    if (!item.isBranch) {
+      return
+    }
+
+    if (item.isExpanded) {
+      options.toggleNode(nodeId)
+      return
+    }
+
+    if (item.canRevealChildren) {
+      options.toggleNode(nodeId)
+      return
+    }
+
+    if (item.canActivateAction) {
+      options.toggleNode(nodeId)
+      options.activateAction(nodeId)
+      return
+    }
+  }
+
   return {
     visibleItems,
     activeNodeId,
@@ -118,6 +156,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     selectNode: options.selectNode,
     toggleNode,
     activateAction,
+    activatePrimary,
     resolveKeyboardIntent
   }
 }

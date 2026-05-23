@@ -158,6 +158,7 @@ function main(): void {
   validatesFolderOpenClosedFromExpansion()
   validatesFileRoleIcons()
   validatesStateAndActionRoleIcons()
+  validatesPrimaryActivation()
 }
 
 function validatesExplicitChildrenAndActionModel(): void {
@@ -1238,4 +1239,112 @@ function validatesStateAndActionRoleIcons(): void {
     actionLoading.role,
     'state and action must have distinct roles'
   )
+}
+
+function validatesPrimaryActivation(): void {
+  const primaryActivationActions = recordPrimaryActivationActions(loadedBranchRootNode(), false)
+  assert.deepEqual(
+    primaryActivationActions,
+    ['select', 'toggle'],
+    'loaded collapsed branch primary activation must select and expand'
+  )
+
+  const expandedPrimary = recordPrimaryActivationActions(loadedBranchRootNode(), true)
+  assert.deepEqual(
+    expandedPrimary,
+    ['select', 'toggle'],
+    'loaded expanded branch primary activation must select and collapse'
+  )
+
+  const deferredPrimary = recordPrimaryActivationActions(unloadedBranchNode(), false)
+  assert.deepEqual(
+    deferredPrimary,
+    ['select', 'toggle', 'activateAction'],
+    'deferred branch primary activation must select, expand, and activate load'
+  )
+
+  const failedPrimary = recordPrimaryActivationActions(failedBranchNode(), false)
+  assert.deepEqual(
+    failedPrimary,
+    ['select', 'toggle', 'activateAction'],
+    'failed branch primary activation must select, expand, and activate retry'
+  )
+
+  const loadingPrimary = recordPrimaryActivationActions(loadingBranchNode(), false)
+  assert.deepEqual(
+    loadingPrimary,
+    ['select'],
+    'loading branch primary activation must select without duplicate load'
+  )
+
+  const leafPrimary = recordPrimaryActivationActions(leafRootNode(), false)
+  assert.deepEqual(leafPrimary, ['select'], 'leaf primary activation must select only')
+
+  const actionPrimary = recordPrimaryActivationActions(moreActionNode(), false)
+  assert.deepEqual(
+    actionPrimary,
+    ['activateAction'],
+    'action row primary activation must activate action only'
+  )
+}
+
+function recordPrimaryActivationActions(
+  node: BrowserTreeNode,
+  isExpanded: boolean
+): readonly string[] {
+  const item = visibleItemFromNode(node, isExpanded)
+  const actions: string[] = []
+
+  if (item.isActionItem) {
+    if (item.canActivateAction) {
+      actions.push('activateAction')
+    }
+
+    return actions
+  }
+
+  actions.push('select')
+
+  if (!item.isBranch) {
+    return actions
+  }
+
+  if (item.isExpanded) {
+    actions.push('toggle')
+    return actions
+  }
+
+  if (item.canRevealChildren) {
+    actions.push('toggle')
+    return actions
+  }
+
+  if (item.canActivateAction) {
+    actions.push('toggle')
+    actions.push('activateAction')
+    return actions
+  }
+
+  return actions
+}
+
+function visibleItemFromNode(node: BrowserTreeNode, isExpanded: boolean): BrowserTreeVisibleItem {
+  const isBranch = isBrowserTreeBranch(node)
+
+  return {
+    id: node.id,
+    node,
+    level: 1,
+    visibleIndex: 0,
+    isBranch,
+    canRevealChildren: canRevealBrowserTreeChildren(node),
+    canActivateAction: canActivateBrowserTreeAction(node),
+    isActionLoading: isBrowserTreeActionLoading(node),
+    isActionItem: node.action !== undefined && !isBranch,
+    isExpanded: isBranch && isExpanded,
+    isSelected: false,
+    isActive: false,
+    ariaSetSize: 1,
+    ariaPosInSet: 1
+  }
 }
