@@ -73,7 +73,7 @@ function isPrimaryActivationKey(key: string): boolean {
 <template>
   <div
     ref="itemElement"
-    class="group outline-none"
+    class="group outline-none select-none"
     role="treeitem"
     :aria-expanded="getTreeItemAriaExpanded(props.item)"
     :aria-level="props.item.level"

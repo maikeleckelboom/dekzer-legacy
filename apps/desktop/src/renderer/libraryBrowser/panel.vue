@@ -427,8 +427,10 @@ function activateContentRowAction(row: ContentRow): void {
       </div>
     </header>
 
-    <div class="grid gap-4 p-5 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
-      <div class="min-w-0 space-y-4">
+    <div
+      class="grid gap-4 p-5 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] grid-rows-1 h-[80svh]"
+    >
+      <div class="min-w-0 overflow-y-auto space-y-4">
         <TreeRoot
           v-bind="treeRootProps"
           @select="selectNode"

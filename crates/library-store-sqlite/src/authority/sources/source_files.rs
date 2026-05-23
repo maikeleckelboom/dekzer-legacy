@@ -2,6 +2,7 @@ use rusqlite::{OptionalExtension, params};
 
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
+use crate::browse_media::media_class_str_from_path;
 use library_domain::SourcePresenceState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +40,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
         &self,
         input: &RecordSourceFileObservationInput,
     ) -> LibrarySqliteResult<i64> {
+        let media_class = media_class_str_from_path(&input.relative_path);
         let existing = self.load_existing_row(input)?;
         if let Some(existing) = existing {
             let observed_at = input.observed_at.or(Some(input.updated_at));
@@ -57,6 +59,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                      size_bytes = ?6,
                      mtime_ns = ?7,
                      presence_state = ?8,
+                     media_class = ?12,
                      last_observed_at = COALESCE(?9, last_observed_at),
                      last_presence_change_at = COALESCE(?10, last_presence_change_at),
                      updated_at = ?11
@@ -73,6 +76,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                     observed_at,
                     last_presence_change_at,
                     input.updated_at,
+                    media_class,
                 ],
             )?;
             return Ok(existing.source_file_id);
@@ -92,13 +96,14 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          size_bytes,
                          mtime_ns,
                          presence_state,
+                         media_class,
                          first_discovered_at,
                          last_observed_at,
                          last_presence_change_at,
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
                     params![
                         source_file_id,
                         input.source_id,
@@ -108,6 +113,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.size_bytes,
                         input.mtime_ns,
                         input.presence_state.as_str(),
+                        media_class,
                         first_discovered_at,
                         last_observed_at,
                         input.presence_changed_at,
@@ -126,13 +132,14 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          size_bytes,
                          mtime_ns,
                          presence_state,
+                         media_class,
                          first_discovered_at,
                          last_observed_at,
                          last_presence_change_at,
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)",
                     params![
                         input.source_id,
                         input.parent_source_directory_id,
@@ -141,6 +148,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.size_bytes,
                         input.mtime_ns,
                         input.presence_state.as_str(),
+                        media_class,
                         first_discovered_at,
                         last_observed_at,
                         input.presence_changed_at,

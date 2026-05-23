@@ -312,6 +312,25 @@ mod tests {
             ]
         );
         assert_eq!(
+            table_column_names(&connection, "source_files"),
+            vec![
+                "source_file_id",
+                "source_id",
+                "parent_source_directory_id",
+                "name",
+                "relative_path",
+                "size_bytes",
+                "mtime_ns",
+                "presence_state",
+                "media_class",
+                "first_discovered_at",
+                "last_observed_at",
+                "last_presence_change_at",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert_eq!(
             table_column_names(&connection, "navigation_rows"),
             vec![
                 "navigation_row_id",

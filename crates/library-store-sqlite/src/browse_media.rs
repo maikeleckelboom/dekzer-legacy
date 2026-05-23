@@ -11,6 +11,16 @@ pub(crate) enum BrowseMediaClass {
     Unsupported,
 }
 
+impl BrowseMediaClass {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            BrowseMediaClass::Audio => "audio",
+            BrowseMediaClass::Video => "video",
+            BrowseMediaClass::Unsupported => "unsupported",
+        }
+    }
+}
+
 pub(crate) fn canonical_media_class_from_file_kind(
     file_kind: Option<&str>,
 ) -> Option<BrowseMediaClass> {
@@ -37,6 +47,13 @@ pub(crate) fn canonical_media_class_from_media_kind(
 
 pub(crate) fn provisional_media_class_from_path(path: &str) -> Option<BrowseMediaClass> {
     canonical_media_class_from_file_kind(Some(classify_relative_path_file_kind(path)))
+}
+
+pub(crate) fn media_class_str_from_path(relative_path: &str) -> &'static str {
+    match provisional_media_class_from_path(relative_path) {
+        Some(media_class) => media_class.as_str(),
+        None => "none",
+    }
 }
 
 pub(crate) fn classify_relative_path_file_kind(relative_path: &str) -> &'static str {
@@ -67,7 +84,8 @@ pub(crate) fn classify_relative_path_file_kind(relative_path: &str) -> &'static 
 mod tests {
     use super::{
         BrowseMediaClass, canonical_media_class_from_file_kind,
-        canonical_media_class_from_media_kind, provisional_media_class_from_path,
+        canonical_media_class_from_media_kind, media_class_str_from_path,
+        provisional_media_class_from_path,
     };
 
     #[test]
@@ -115,5 +133,22 @@ mod tests {
             Some(BrowseMediaClass::Unsupported)
         );
         assert_eq!(provisional_media_class_from_path("crate/mystery"), None);
+    }
+
+    #[test]
+    fn media_class_str_from_path_classifies_wma_and_alac_as_audio() {
+        assert_eq!(media_class_str_from_path("lib/track.wma"), "audio");
+        assert_eq!(media_class_str_from_path("lib/track.alac"), "audio");
+        assert_eq!(media_class_str_from_path("lib/track.mp3"), "audio");
+        assert_eq!(media_class_str_from_path("lib/clip.mkv"), "video");
+        assert_eq!(media_class_str_from_path("lib/cover.png"), "unsupported");
+        assert_eq!(media_class_str_from_path("lib/readme"), "none");
+    }
+
+    #[test]
+    fn browse_media_class_as_str_round_trips_through_database_domain() {
+        assert_eq!(BrowseMediaClass::Audio.as_str(), "audio");
+        assert_eq!(BrowseMediaClass::Video.as_str(), "video");
+        assert_eq!(BrowseMediaClass::Unsupported.as_str(), "unsupported");
     }
 }

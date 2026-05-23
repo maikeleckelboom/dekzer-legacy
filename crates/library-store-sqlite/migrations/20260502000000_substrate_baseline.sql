@@ -219,6 +219,8 @@ CREATE TABLE source_files
     relative_path               TEXT    NOT NULL CHECK (length(relative_path) > 0),
     size_bytes                  INTEGER CHECK (size_bytes IS NULL OR size_bytes >= 0),
     mtime_ns                    INTEGER CHECK (mtime_ns IS NULL OR mtime_ns >= 0),
+    media_class                 TEXT    NOT NULL DEFAULT 'none'
+        CHECK (media_class IN ('audio', 'video', 'unsupported', 'none')),
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
     first_discovered_at         INTEGER NOT NULL,
@@ -234,6 +236,11 @@ CREATE TABLE source_files
 
 CREATE INDEX source_files_source_presence
     ON source_files (source_id, presence_state);
+
+CREATE INDEX source_files_browseable_media
+    ON source_files (source_id, presence_state, media_class, parent_source_directory_id)
+    WHERE media_class IN ('audio', 'video')
+      AND parent_source_directory_id IS NOT NULL;
 
 CREATE INDEX source_files_parent_source_directory
     ON source_files (parent_source_directory_id);

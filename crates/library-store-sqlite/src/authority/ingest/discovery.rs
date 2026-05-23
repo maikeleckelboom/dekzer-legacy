@@ -681,27 +681,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                    WHERE f.source_id = ?1
                      AND f.presence_state = 'present'
                      AND f.parent_source_directory_id IS NOT NULL
-                     AND (
-                         lower(f.name) LIKE '%.mp3'
-                         OR lower(f.name) LIKE '%.wav'
-                         OR lower(f.name) LIKE '%.flac'
-                         OR lower(f.name) LIKE '%.aiff'
-                         OR lower(f.name) LIKE '%.aif'
-                         OR lower(f.name) LIKE '%.aifc'
-                         OR lower(f.name) LIKE '%.m4a'
-                         OR lower(f.name) LIKE '%.aac'
-                         OR lower(f.name) LIKE '%.ogg'
-                         OR lower(f.name) LIKE '%.oga'
-                         OR lower(f.name) LIKE '%.opus'
-                         OR lower(f.name) LIKE '%.wma'
-                         OR lower(f.name) LIKE '%.alac'
-                         OR lower(f.name) LIKE '%.mp4'
-                         OR lower(f.name) LIKE '%.mov'
-                         OR lower(f.name) LIKE '%.m4v'
-                         OR lower(f.name) LIKE '%.webm'
-                         OR lower(f.name) LIKE '%.mkv'
-                         OR lower(f.name) LIKE '%.avi'
-                     )
+                     AND f.media_class IN ('audio', 'video')
                )",
             [root_id],
         )?;
@@ -713,27 +693,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  WHERE f.source_id = ?1
                    AND f.presence_state = 'present'
                    AND f.parent_source_directory_id IS NOT NULL
-                   AND (
-                       lower(f.name) LIKE '%.mp3'
-                       OR lower(f.name) LIKE '%.wav'
-                       OR lower(f.name) LIKE '%.flac'
-                       OR lower(f.name) LIKE '%.aiff'
-                       OR lower(f.name) LIKE '%.aif'
-                       OR lower(f.name) LIKE '%.aifc'
-                       OR lower(f.name) LIKE '%.m4a'
-                       OR lower(f.name) LIKE '%.aac'
-                       OR lower(f.name) LIKE '%.ogg'
-                       OR lower(f.name) LIKE '%.oga'
-                       OR lower(f.name) LIKE '%.opus'
-                       OR lower(f.name) LIKE '%.wma'
-                       OR lower(f.name) LIKE '%.alac'
-                       OR lower(f.name) LIKE '%.mp4'
-                       OR lower(f.name) LIKE '%.mov'
-                       OR lower(f.name) LIKE '%.m4v'
-                       OR lower(f.name) LIKE '%.webm'
-                       OR lower(f.name) LIKE '%.mkv'
-                       OR lower(f.name) LIKE '%.avi'
-                   )
+                   AND f.media_class IN ('audio', 'video')
                  UNION
                  SELECT d.parent_source_directory_id
                  FROM source_directories d
@@ -910,4 +870,420 @@ fn observation_basis_fingerprint(
     format!(
         "source-observation:file:{source_file_id}:path:{relative_path}:size:{size_fragment}:mtime:{mtime_fragment}:updated:{updated_at}"
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::authority::ingest::DiscoveryTx;
+    use crate::authority::sources::{
+        RecordSourceFileObservationInput, SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx,
+        SourceLocatorsAuthorityTx, SourceStateAuthorityTx, SourcesAuthorityTx,
+        UpsertSourceDirectoryInput, UpsertSourceLocatorInput, UpsertSourceScanStateInput,
+        UpsertSourceStateInput,
+    };
+    use crate::authority::write_lane::admit_write;
+    use crate::schema::install_baseline_schema_for_test;
+    use library_domain::{SourcePresenceState, SourceResolutionStatus, SourceScanPhase};
+
+    fn setup_source_with_directory(connection: &mut rusqlite::Connection) -> (i64, i64) {
+        let source_id = admit_write(connection, |write| {
+            let source_id = SourcesAuthorityTx::new(write)
+                .upsert_source(&crate::authority::sources::UpsertSourceInput {
+                    source_id: Some(1),
+                    source_class: "internal".to_string(),
+                    authority: "system".to_string(),
+                    identity_kind: "filesystem_uuid".to_string(),
+                    identity_value: "media-class-test".to_string(),
+                    display_name: "Test Source".to_string(),
+                    medium_label: None,
+                    is_user_visible: true,
+                    browser_order_ordinal: Some(0),
+                    changed_at: 10,
+                })
+                .expect("upsert source");
+            SourceLocatorsAuthorityTx::new(write)
+                .upsert_source_locator(&UpsertSourceLocatorInput {
+                    source_id,
+                    locator: crate::authority::sources::SourceLocatorInput::AbsolutePath {
+                        absolute_path: "/test/music".to_string(),
+                    },
+                })
+                .expect("upsert source locator");
+            SourceStateAuthorityTx::new(write)
+                .upsert_source_state(&UpsertSourceStateInput {
+                    source_id,
+                    mount_status: "mounted".to_string(),
+                    mount_epoch: 0,
+                    resolution_status: SourceResolutionStatus::Resolved,
+                    mount_root: Some("/test/music".to_string()),
+                    effective_path: Some("/test/music".to_string()),
+                    observed_volume_label: None,
+                    filesystem_type: None,
+                    last_seen_at: Some(10),
+                    updated_at: 10,
+                })
+                .expect("upsert source state");
+            SourceStateAuthorityTx::new(write)
+                .upsert_source_scan_state(&UpsertSourceScanStateInput {
+                    source_id,
+                    scan_phase: SourceScanPhase::Idle,
+                    last_scan_started_at: Some(10),
+                    last_scan_finished_at: Some(11),
+                    last_successful_scan_at: Some(11),
+                    blocked_reason: None,
+                    error_detail: None,
+                    updated_at: 11,
+                })
+                .expect("upsert scan state");
+            Ok(source_id)
+        })
+        .expect("write source");
+
+        let parent_dir_id = admit_write(connection, |write| {
+            let dir_id = SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(10),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "albums".to_string(),
+                    relative_path: "albums".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    first_created_at: Some(12),
+                    changed_at: 12,
+                })
+                .expect("upsert parent directory");
+            Ok(dir_id)
+        })
+        .expect("write directory");
+
+        (source_id, parent_dir_id)
+    }
+
+    fn insert_file(
+        connection: &mut rusqlite::Connection,
+        source_id: i64,
+        parent_dir_id: Option<i64>,
+        name: &str,
+        relative_path: &str,
+    ) -> i64 {
+        admit_write(connection, |write| {
+            let file_id = SourceFilesAuthorityTx::new(write)
+                .record_source_file_observation(&RecordSourceFileObservationInput {
+                    source_file_id: None,
+                    source_id,
+                    parent_source_directory_id: parent_dir_id,
+                    name: name.to_string(),
+                    relative_path: relative_path.to_string(),
+                    size_bytes: Some(1000),
+                    mtime_ns: Some(500),
+                    presence_state: SourcePresenceState::Present,
+                    first_discovered_at: Some(15),
+                    observed_at: Some(15),
+                    presence_changed_at: 15,
+                    updated_at: 15,
+                })
+                .expect("record source file observation");
+            Ok(file_id)
+        })
+        .expect("write file")
+    }
+
+    fn read_media_class(connection: &rusqlite::Connection, relative_path: &str) -> String {
+        connection
+            .query_row(
+                "SELECT media_class FROM source_files WHERE relative_path = ?1",
+                [relative_path],
+                |row| row.get::<_, String>(0),
+            )
+            .expect("read media_class")
+    }
+
+    fn read_browseability(
+        connection: &rusqlite::Connection,
+        relative_path: &str,
+    ) -> Option<String> {
+        connection
+            .query_row(
+                "SELECT media_browseability FROM source_directories WHERE relative_path = ?1",
+                [relative_path],
+                |row| row.get::<_, String>(0),
+            )
+            .ok()
+    }
+
+    fn run_browseability_recompute(
+        connection: &mut rusqlite::Connection,
+        root_id: i64,
+        observed_directory_paths: &[String],
+        observed_file_paths: &[String],
+    ) {
+        admit_write(connection, |write| {
+            DiscoveryTx::new(write)
+                .finalize_scan(root_id, observed_file_paths, observed_directory_paths)
+                .expect("finalize scan to recompute browseability");
+            Ok(())
+        })
+        .expect("write browseability");
+    }
+
+    #[test]
+    fn wma_file_stores_audio_media_class() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, parent_dir_id) = setup_source_with_directory(&mut connection);
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(parent_dir_id),
+            "track.wma",
+            "albums/track.wma",
+        );
+        assert_eq!(read_media_class(&connection, "albums/track.wma"), "audio");
+    }
+
+    #[test]
+    fn alac_file_stores_audio_media_class() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, parent_dir_id) = setup_source_with_directory(&mut connection);
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(parent_dir_id),
+            "track.alac",
+            "albums/track.alac",
+        );
+        assert_eq!(read_media_class(&connection, "albums/track.alac"), "audio");
+    }
+
+    #[test]
+    fn mp4_file_stores_video_media_class() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, parent_dir_id) = setup_source_with_directory(&mut connection);
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(parent_dir_id),
+            "clip.mp4",
+            "albums/clip.mp4",
+        );
+        assert_eq!(read_media_class(&connection, "albums/clip.mp4"), "video");
+    }
+
+    #[test]
+    fn png_file_stores_unsupported_media_class() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, parent_dir_id) = setup_source_with_directory(&mut connection);
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(parent_dir_id),
+            "cover.png",
+            "albums/cover.png",
+        );
+        assert_eq!(
+            read_media_class(&connection, "albums/cover.png"),
+            "unsupported"
+        );
+    }
+
+    #[test]
+    fn unknown_extension_stores_none_media_class() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, parent_dir_id) = setup_source_with_directory(&mut connection);
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(parent_dir_id),
+            "data.xyz",
+            "albums/data.xyz",
+        );
+        assert_eq!(read_media_class(&connection, "albums/data.xyz"), "none");
+    }
+
+    #[test]
+    fn directory_with_wma_and_alac_files_marks_ancestors_browseable() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _root_dir_id) = setup_source_with_directory(&mut connection);
+
+        let nested_dir_id = admit_write(&mut connection, |write| {
+            let dir_id = SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(20),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "nested".to_string(),
+                    relative_path: "nested".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    first_created_at: Some(12),
+                    changed_at: 12,
+                })
+                .expect("upsert nested directory");
+            Ok(dir_id)
+        })
+        .expect("write nested directory");
+
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(nested_dir_id),
+            "track.wma",
+            "nested/track.wma",
+        );
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(nested_dir_id),
+            "track.alac",
+            "nested/track.alac",
+        );
+
+        run_browseability_recompute(
+            &mut connection,
+            source_id,
+            &["nested".to_string()],
+            &["nested/track.wma".to_string(), "nested/track.alac".to_string()],
+        );
+
+        assert_eq!(
+            read_browseability(&connection, "nested"),
+            Some("browseable".to_string()),
+            "directory with .wma and .alac should be browseable"
+        );
+    }
+
+    #[test]
+    fn directory_with_only_unsupported_files_is_empty() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _root_dir_id) = setup_source_with_directory(&mut connection);
+
+        let docs_dir_id = admit_write(&mut connection, |write| {
+            let dir_id = SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(30),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "docs".to_string(),
+                    relative_path: "docs".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    first_created_at: Some(12),
+                    changed_at: 12,
+                })
+                .expect("upsert docs directory");
+            Ok(dir_id)
+        })
+        .expect("write docs directory");
+
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(docs_dir_id),
+            "readme.txt",
+            "docs/readme.txt",
+        );
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(docs_dir_id),
+            "cover.png",
+            "docs/cover.png",
+        );
+
+        run_browseability_recompute(
+            &mut connection,
+            source_id,
+            &["docs".to_string()],
+            &["docs/readme.txt".to_string(), "docs/cover.png".to_string()],
+        );
+
+        assert_eq!(
+            read_browseability(&connection, "docs"),
+            Some("empty".to_string()),
+            "directory with only unsupported files should be empty"
+        );
+    }
+
+    #[test]
+    fn nested_audio_files_propagate_browseability_to_ancestors() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, root_dir_id) = setup_source_with_directory(&mut connection);
+
+        let deep_dir_id = admit_write(&mut connection, |write| {
+            let mid_dir_id = SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(40),
+                    source_id,
+                    parent_source_directory_id: Some(root_dir_id),
+                    name: "mid".to_string(),
+                    relative_path: "albums/mid".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    first_created_at: Some(12),
+                    changed_at: 12,
+                })
+                .expect("upsert mid directory");
+            let deep_id = SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(41),
+                    source_id,
+                    parent_source_directory_id: Some(mid_dir_id),
+                    name: "deep".to_string(),
+                    relative_path: "albums/mid/deep".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    first_created_at: Some(12),
+                    changed_at: 12,
+                })
+                .expect("upsert deep directory");
+            Ok(deep_id)
+        })
+        .expect("write directories");
+
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(deep_dir_id),
+            "song.flac",
+            "albums/mid/deep/song.flac",
+        );
+
+        run_browseability_recompute(
+            &mut connection,
+            source_id,
+            &[
+                "albums".to_string(),
+                "albums/mid".to_string(),
+                "albums/mid/deep".to_string(),
+            ],
+            &["albums/mid/deep/song.flac".to_string()],
+        );
+
+        assert_eq!(
+            read_browseability(&connection, "albums/mid/deep"),
+            Some("browseable".to_string()),
+            "deep directory with audio file should be browseable"
+        );
+        assert_eq!(
+            read_browseability(&connection, "albums/mid"),
+            Some("browseable".to_string()),
+            "mid directory should inherit browseability from deep child"
+        );
+        assert_eq!(
+            read_browseability(&connection, "albums"),
+            Some("browseable".to_string()),
+            "root directory should inherit browseability through nested children"
+        );
+    }
 }
