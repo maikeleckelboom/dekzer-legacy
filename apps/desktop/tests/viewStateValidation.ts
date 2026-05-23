@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert'
 
-import { createViewStatePersistence } from '../src/renderer/libraryBrowser/runtime/viewStatePersistence'
+import { createViewStateStore } from '../src/renderer/libraryBrowser/runtime/viewState'
+import type { ViewStateApi } from '../src/renderer/libraryBrowser/runtime/viewState'
 import type { PersistedLibraryBrowserViewState } from '../src/shared/libraryBrowser/viewState'
 
 void main()
@@ -8,9 +9,10 @@ void main()
 async function main(): Promise<void> {
   await validatesWriteQueueIsLastStateWins()
   await validatesRapidSelectToggleDoesNotPersistStaleState()
-  await validatesReadDelegatesToApi()
+  await validatesLoadDelegatesToApi()
   await validatesClearedStatePersisted()
   await validatesWriteFailureDoesNotThrowAndDoesNotBlockSubsequentWrites()
+  await validatesSaveCopiesAndNormalizesInput()
 }
 
 type RecordedWrite = {
@@ -19,18 +21,7 @@ type RecordedWrite = {
 }
 
 function createFakeApi(): {
-  readonly api: {
-    readonly library: {
-      readonly browser: {
-        readonly viewState: {
-          readonly readViewState: () => Promise<{ state: 'empty' }>
-          readonly writeViewState: (
-            state: PersistedLibraryBrowserViewState
-          ) => Promise<{ state: 'written' }>
-        }
-      }
-    }
-  }
+  readonly api: ViewStateApi
   readonly writes: RecordedWrite[]
   readonly resolveAll: () => Promise<void>
 } {
@@ -38,26 +29,28 @@ function createFakeApi(): {
   let writeSequence = 0
   const pendingResolvers: (() => void)[] = []
 
-  return {
-    api: {
-      library: {
-        browser: {
-          viewState: {
-            async readViewState() {
-              return { state: 'empty' as const }
-            },
-            writeViewState(state: PersistedLibraryBrowserViewState): Promise<{ state: 'written' }> {
-              const sequence = writeSequence++
-              writes.push({ state, sequence })
+  const api: ViewStateApi = {
+    library: {
+      browser: {
+        viewState: {
+          async readViewState() {
+            return { state: 'empty' as const }
+          },
+          writeViewState(state: PersistedLibraryBrowserViewState): Promise<{ state: 'written' }> {
+            const sequence = writeSequence++
+            writes.push({ state, sequence })
 
-              return new Promise((resolve) => {
-                pendingResolvers.push(() => resolve({ state: 'written' }))
-              })
-            }
+            return new Promise((resolve) => {
+              pendingResolvers.push(() => resolve({ state: 'written' }))
+            })
           }
         }
       }
-    },
+    }
+  }
+
+  return {
+    api,
     writes,
     async resolveAll(): Promise<void> {
       while (pendingResolvers.length > 0) {
@@ -73,7 +66,7 @@ function createFakeApi(): {
 
 async function validatesWriteQueueIsLastStateWins(): Promise<void> {
   const { api, writes, resolveAll } = createFakeApi()
-  const persistence = createViewStatePersistence(api as never)
+  const store = createViewStateStore(api)
 
   const state1: PersistedLibraryBrowserViewState = {
     version: 1,
@@ -88,9 +81,9 @@ async function validatesWriteQueueIsLastStateWins(): Promise<void> {
     expandedNodeIds: ['node-3']
   }
 
-  persistence.schedulePersist(state1)
-  persistence.schedulePersist(state2)
-  persistence.schedulePersist(state3)
+  store.save(state1)
+  store.save(state2)
+  store.save(state3)
 
   await resolveAll()
 
@@ -111,7 +104,7 @@ async function validatesWriteQueueIsLastStateWins(): Promise<void> {
 
 async function validatesRapidSelectToggleDoesNotPersistStaleState(): Promise<void> {
   const { api, writes, resolveAll } = createFakeApi()
-  const persistence = createViewStatePersistence(api as never)
+  const store = createViewStateStore(api)
 
   const selectState: PersistedLibraryBrowserViewState = {
     version: 1,
@@ -124,8 +117,8 @@ async function validatesRapidSelectToggleDoesNotPersistStaleState(): Promise<voi
     expandedNodeIds: ['node-A', 'node-B']
   }
 
-  persistence.schedulePersist(selectState)
-  persistence.schedulePersist(toggleState)
+  store.save(selectState)
+  store.save(toggleState)
 
   await resolveAll()
 
@@ -139,7 +132,7 @@ async function validatesRapidSelectToggleDoesNotPersistStaleState(): Promise<voi
   )
 }
 
-async function validatesReadDelegatesToApi(): Promise<void> {
+async function validatesLoadDelegatesToApi(): Promise<void> {
   let readCount = 0
   const api = {
     library: {
@@ -155,10 +148,10 @@ async function validatesReadDelegatesToApi(): Promise<void> {
         }
       }
     }
-  }
+  } satisfies ViewStateApi
 
-  const persistence = createViewStatePersistence(api as never)
-  const result = await persistence.read()
+  const store = createViewStateStore(api)
+  const result = await store.load()
 
   assert.equal(readCount, 1)
   assert.equal(result.state, 'empty')
@@ -166,9 +159,9 @@ async function validatesReadDelegatesToApi(): Promise<void> {
 
 async function validatesClearedStatePersisted(): Promise<void> {
   const { api, writes, resolveAll } = createFakeApi()
-  const persistence = createViewStatePersistence(api as never)
+  const store = createViewStateStore(api)
 
-  persistence.schedulePersist({
+  store.save({
     version: 1,
     expandedNodeIds: []
   })
@@ -204,11 +197,11 @@ async function validatesWriteFailureDoesNotThrowAndDoesNotBlockSubsequentWrites(
         }
       }
     }
-  }
+  } satisfies ViewStateApi
 
-  const persistence = createViewStatePersistence(api as never)
+  const store = createViewStateStore(api)
 
-  persistence.schedulePersist({
+  store.save({
     version: 1,
     selectedNodeId: 'will-fail',
     expandedNodeIds: ['will-fail']
@@ -216,7 +209,7 @@ async function validatesWriteFailureDoesNotThrowAndDoesNotBlockSubsequentWrites(
 
   await new Promise((resolve) => setTimeout(resolve, 0))
 
-  persistence.schedulePersist({
+  store.save({
     version: 1,
     selectedNodeId: 'will-succeed',
     expandedNodeIds: ['will-succeed']
@@ -227,4 +220,24 @@ async function validatesWriteFailureDoesNotThrowAndDoesNotBlockSubsequentWrites(
   assert.equal(callCount, 2, 'should retry after failure')
   assert.equal(writes.length, 1, 'only the successful write should be recorded')
   assert.deepEqual(writes[0]!.selectedNodeId, 'will-succeed')
+}
+
+async function validatesSaveCopiesAndNormalizesInput(): Promise<void> {
+  const { api, writes, resolveAll } = createFakeApi()
+  const store = createViewStateStore(api)
+
+  const expandedNodeIds = ['node-a', 'node-a']
+  store.save({
+    version: 1,
+    selectedNodeId: 'node-a',
+    expandedNodeIds
+  })
+  expandedNodeIds.push('node-b')
+  await resolveAll()
+
+  assert.deepEqual(writes[0]!.state, {
+    version: 1,
+    selectedNodeId: 'node-a',
+    expandedNodeIds: ['node-a']
+  })
 }

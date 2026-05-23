@@ -11,13 +11,13 @@ import { deriveOperationFeedback } from './projection/operationFeedback'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
 import type { BrowserState, RowBinding } from './runtime/state'
-import { createViewStatePersistence } from './runtime/viewStatePersistence'
+import { createViewStateStore } from './runtime/viewState'
 
 defineOptions({
   name: 'LibraryBrowserPanel'
 })
 
-const viewStatePersistence = createViewStatePersistence()
+const viewStateStore = createViewStateStore()
 const hierarchyRead = useLibraryHierarchyRead()
 const rootActions = useLocalRootActions()
 const rootLifecycle = useRootLifecycle({
@@ -67,8 +67,8 @@ let projectionRestorationAttempts = 0
 
 const maxProjectionRestorationAttempts = 10
 
-function schedulePersistCurrentViewState(): void {
-  viewStatePersistence.schedulePersist({
+function saveCurrentViewState(): void {
+  viewStateStore.save({
     version: 1,
     ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
     expandedNodeIds: [...expandedNodeIds.value]
@@ -200,7 +200,7 @@ async function restoreViewStateIfValid(): Promise<void> {
   }
 
   try {
-    const result = await viewStatePersistence.read()
+    const result = await viewStateStore.load()
 
     restoreReadCompleted = true
 
@@ -312,7 +312,7 @@ function selectNode(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
   pendingExpandedRestoreIds.value = new Set()
   selectedNodeId.value = nodeId
-  schedulePersistCurrentViewState()
+  saveCurrentViewState()
 }
 
 function toggleNode(nodeId: BrowserTreeNodeId): void {
@@ -327,14 +327,14 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
   }
 
   expandedNodeIds.value = nextExpandedNodeIds
-  schedulePersistCurrentViewState()
+  saveCurrentViewState()
 }
 
 function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
   pendingExpandedRestoreIds.value = new Set()
   expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
-  schedulePersistCurrentViewState()
+  saveCurrentViewState()
   void requestNodeChildren(nodeId)
 }
 
@@ -345,7 +345,7 @@ async function handleRemoveSource(): Promise<void> {
     expandedNodeIds.value = new Set()
     hasUserInteractedWithTree.value = false
     pendingExpandedRestoreIds.value = new Set()
-    viewStatePersistence.schedulePersist({
+    viewStateStore.save({
       version: 1,
       expandedNodeIds: []
     })
@@ -363,7 +363,7 @@ function activateContentRowAction(row: ContentRow): void {
 
   if (action.kind === 'loadChildren') {
     expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
-    schedulePersistCurrentViewState()
+    saveCurrentViewState()
   }
 
   void requestNodeChildren(action.nodeId)
