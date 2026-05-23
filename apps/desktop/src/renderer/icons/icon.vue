@@ -6,7 +6,7 @@ import type { IconProps } from './types'
 
 const props = withDefaults(defineProps<IconProps>(), {
   accessibility: 'hidden',
-  frame: 'none',
+  frame: 'none'
 })
 
 const resolvedSize = computed(() => props.size ?? 'md')

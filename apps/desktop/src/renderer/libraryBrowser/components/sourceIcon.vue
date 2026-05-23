@@ -20,7 +20,10 @@ const badgeComponent = computed(() => resolveSourceIconBadge(props.badge))
 </script>
 
 <template>
-  <span class="relative inline-grid h-7 w-7 shrink-0 place-items-center" :aria-hidden="label === undefined">
+  <span
+    class="relative inline-grid h-7 w-7 shrink-0 place-items-center"
+    :aria-hidden="label === undefined"
+  >
     <Icon :icon="baseComponent" size="sm" />
     <Icon
       v-if="badgeComponent"
