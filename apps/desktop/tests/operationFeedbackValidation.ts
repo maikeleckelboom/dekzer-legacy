@@ -242,7 +242,7 @@ function validatesNoFakeProgress(): void {
     })
   )
   assert.match(scanWithSummary.detail ?? '', /42 files/)
-  assert.match(scanWithSummary.detail ?? '', /3 source work items/)
+  assert.match(scanWithSummary.detail ?? '', /3 items/)
 
   const refreshFeedback = deriveOperationFeedback(startedInputs({ refreshStatus: 'refreshing' }))
   assert.doesNotMatch(refreshFeedback.title, /%/g)

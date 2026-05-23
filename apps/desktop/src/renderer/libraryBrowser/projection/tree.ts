@@ -52,8 +52,8 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
     return emptyProjection({
       ownerId: 'navigation',
       state: 'loading',
-      label: 'Loading navigation',
-      detail: 'Loading library navigation rows.'
+      label: 'Loading library',
+      detail: 'Loading your library.'
     })
   }
 
@@ -61,7 +61,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
     return emptyProjection({
       ownerId: 'navigation',
       state: 'error',
-      label: 'Navigation unavailable',
+      label: 'Library unavailable',
       detail: result.error.message
     })
   }
@@ -71,7 +71,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
       ownerId: 'navigation',
       state: 'empty',
       label: 'No library sources',
-      detail: 'No persisted library navigation rows are available.'
+      detail: 'Add a music folder to start building your library.'
     })
   }
 
@@ -151,7 +151,7 @@ function projectNavigationRow(options: {
             ownerId: nodeId,
             state: 'unavailable',
             label: 'Unavailable',
-            detail: 'No media folders are available for this navigation row yet.'
+            detail: 'No folders available here yet.'
           },
           options.bindingsById
         )
@@ -170,7 +170,7 @@ function projectSourceChildren(options: {
   const state = options.state
 
   if (state === undefined || state.kind === 'unloaded') {
-    const detail = state?.detail ?? 'Literal hierarchy not loaded yet.'
+    const detail = state?.detail ?? 'Contents not loaded yet.'
 
     return {
       children: {
@@ -190,8 +190,8 @@ function projectSourceChildren(options: {
             {
               ownerId: options.ownerId,
               state: 'loading',
-              label: 'Loading hierarchy',
-              detail: state.detail ?? 'Loading literal hierarchy children.'
+              label: 'Loading folder contents',
+              detail: state.detail ?? 'Loading folder contents.'
             },
             options.bindingsById
           )
@@ -209,7 +209,7 @@ function projectSourceChildren(options: {
             {
               ownerId: options.ownerId,
               state: 'error',
-              label: 'Hierarchy unavailable',
+              label: 'Folder contents unavailable',
               detail: state.detail
             },
             options.bindingsById
@@ -409,7 +409,7 @@ function projectDirectoryChildren(options: {
   const state = options.state
 
   if (state === undefined || state.kind === 'unloaded') {
-    const detail = state?.detail ?? 'Children not loaded yet.'
+    const detail = state?.detail ?? 'Contents not loaded yet.'
 
     return {
       children: {
@@ -429,8 +429,8 @@ function projectDirectoryChildren(options: {
             {
               ownerId: options.ownerId,
               state: 'loading',
-              label: 'Loading children',
-              detail: state.detail ?? 'Loading children.'
+              label: 'Loading contents',
+              detail: state.detail ?? 'Loading contents.'
             },
             options.bindingsById
           )
@@ -448,7 +448,7 @@ function projectDirectoryChildren(options: {
             {
               ownerId: options.ownerId,
               state: 'error',
-              label: 'Children unavailable',
+              label: 'Contents unavailable',
               detail: state.detail
             },
             options.bindingsById
@@ -497,7 +497,7 @@ function readStateNode(options: {
     id: `read-state:${options.ownerId}:${options.state}`,
     role: 'state',
     label: options.label,
-    badge: { value: 'State', tone: readStateBadgeTone(options.state) },
+    badge: { value: 'Status', tone: readStateBadgeTone(options.state) },
     detail: options.detail,
     icon: readStateIcon(options.state),
     children: { kind: 'none' }
@@ -571,7 +571,7 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
     more?.kind === 'failed'
       ? more.detail
       : more?.kind === 'loading'
-        ? (more.detail ?? 'Loading more literal hierarchy rows.')
+        ? (more.detail ?? 'Loading more items.')
         : formatMoreDetail(offset, options.children.limit, options.children.totalRows)
   const actionState: BrowserTreeActionState =
     more?.kind === 'failed'
@@ -586,10 +586,10 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
       role: 'action',
       label:
         more?.kind === 'failed'
-          ? 'Retry loading more rows'
+          ? 'Retry loading more'
           : more?.kind === 'loading'
-            ? 'Loading more rows'
-            : 'Load more rows',
+            ? 'Loading more'
+            : 'Load more',
       badge: { value: 'More', tone: moreBadgeTone(more) },
       icon: moreIcon(more),
       children: { kind: 'none' },
@@ -704,31 +704,31 @@ function isPositiveOpaqueId(value: unknown): value is string {
 }
 
 function formatNavigationSourceDetail(row: NavigationRow): string {
-  return `Navigation source row. Updated ${formatRowFreshness(row)}.`
+  return `Library source. Updated ${formatRowFreshness(row)}.`
 }
 
 function formatNavigationDetail(row: NavigationRow): string {
-  return `Navigation ${formatNavigationRowKind(row.rowKind)} row. Updated ${formatRowFreshness(row)}.`
+  return `${formatNavigationRowKind(row.rowKind)}. Updated ${formatRowFreshness(row)}.`
 }
 
 function formatNavigationRowKind(rowKind: NavigationRow['rowKind']): string {
   switch (rowKind) {
     case 'view':
-      return 'view'
+      return 'View'
     case 'collectionGroup':
-      return 'collection group'
+      return 'Collection group'
     case 'playlist':
-      return 'playlist'
+      return 'Playlist'
     case 'prepPolicyGroup':
-      return 'preparation group'
+      return 'Preparation group'
     case 'prepPolicyScope':
-      return 'preparation scope'
+      return 'Preparation scope'
     case 'source':
-      return 'source'
+      return 'Source'
     case 'locationGroup':
-      return 'location group'
+      return 'Location group'
     case 'location':
-      return 'location'
+      return 'Location'
   }
 }
 
@@ -737,27 +737,27 @@ function formatRowFreshness(row: NavigationRow): string {
 }
 
 function formatMoreDetail(offset: number, limit: number, totalRows: number): string {
-  return `Rows ${offset + 1}-${Math.min(offset + limit, totalRows)} of ${totalRows} are available.`
+  return `Items ${offset + 1}-${Math.min(offset + limit, totalRows)} of ${totalRows} are available.`
 }
 
 function formatFileDetail(presence: ChildRow['presence']): string {
   switch (presence) {
     case 'present':
-      return 'Present file.'
+      return 'File available.'
     case 'missing':
-      return 'Missing file.'
+      return 'File missing.'
     case 'removed':
-      return 'Removed file.'
+      return 'File removed.'
   }
 }
 
 function formatDirectoryDetail(presence: ChildRow['presence']): string {
   switch (presence) {
     case 'present':
-      return 'Present directory.'
+      return 'Folder available.'
     case 'missing':
-      return 'Missing directory.'
+      return 'Folder missing.'
     case 'removed':
-      return 'Removed directory.'
+      return 'Folder removed.'
   }
 }

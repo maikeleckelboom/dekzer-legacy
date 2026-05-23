@@ -67,8 +67,8 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
       ownerId: 'selection',
       title: 'Library contents',
       state: 'empty',
-      label: 'No row selected',
-      detail: 'Select a source or folder to show its immediate persisted contents.'
+      label: 'Nothing selected',
+      detail: 'Select a source or folder to see its contents.'
     })
   }
 
@@ -81,7 +81,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
       title: 'Selection unavailable',
       state: 'unsupported',
       label: 'Selection unavailable',
-      detail: 'The selected row is not available in the current browser projection.'
+      detail: 'This item is not available right now.'
     })
   }
 
@@ -111,15 +111,15 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         ownerId: selectedNodeId,
         title: binding.navigationRow.displayName,
         state: 'unsupported',
-        label: 'Hierarchy unavailable',
-        detail: 'This navigation row does not expose a literal hierarchy entry point yet.'
+        label: 'Contents unavailable',
+        detail: 'Contents for this item are not available yet.'
       })
     case 'readState':
       return stateProjection({
         kind:
           binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'failed' : 'ready',
         ownerId: selectedNodeId,
-        title: 'Browser row state',
+        title: 'Status',
         state: contentStateFromReadState(binding.state),
         label: formatReadStateLabel(binding.state),
         detail: binding.detail
@@ -127,7 +127,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
     case 'more':
       return {
         kind: 'ready',
-        title: 'More rows',
+        title: 'More items',
         detail: binding.detail,
         rows: [contentMoreRow(selectedNodeId, binding)]
       }
@@ -144,7 +144,7 @@ function projectSourceContents(options: {
   const title = options.binding.target.label
 
   if (sourceState === undefined || sourceState.kind === 'unloaded') {
-    const detail = sourceState?.detail ?? 'Literal hierarchy not loaded yet.'
+    const detail = sourceState?.detail ?? 'Contents not loaded yet.'
 
     return loadableStateProjection({
       kind: 'notLoaded',
@@ -168,7 +168,7 @@ function projectSourceContents(options: {
       title,
       state: 'loading',
       label: 'Loading contents',
-      detail: sourceState.detail ?? 'Loading literal hierarchy children.'
+      detail: sourceState.detail ?? 'Loading folder contents.'
     })
   }
 
@@ -207,7 +207,7 @@ function projectDirectoryContents(options: {
   const title = directoryRow?.label ?? 'Selected folder'
 
   if (directoryState === undefined || directoryState.kind === 'unloaded') {
-    const detail = directoryState?.detail ?? 'Children not loaded yet.'
+    const detail = directoryState?.detail ?? 'Contents not loaded yet.'
 
     return loadableStateProjection({
       kind: 'notLoaded',
@@ -231,7 +231,7 @@ function projectDirectoryContents(options: {
       title,
       state: 'loading',
       label: 'Loading contents',
-      detail: directoryState.detail ?? 'Loading children.'
+      detail: directoryState.detail ?? 'Loading contents.'
     })
   }
 
@@ -266,9 +266,7 @@ function projectFileContents(options: {
   const fileRow = findLoadedChildRow(options.state, options.selectedNodeId)
   const title = fileRow?.label ?? 'Selected file'
   const detail =
-    fileRow === undefined
-      ? 'File details are not available for this entry.'
-      : formatPresenceDetail(fileRow)
+    fileRow === undefined ? 'File details are not available.' : formatPresenceDetail(fileRow)
 
   return stateProjection({
     kind: 'ready',
@@ -300,7 +298,7 @@ function projectLoadedContents(options: {
         ownerId: options.ownerNodeId,
         state: 'empty',
         label: 'Empty folder',
-        detail: 'No media entries are available here.'
+        detail: 'No items are available here.'
       })
     )
   }
@@ -383,8 +381,8 @@ function contentMoreRowForLoadedChildren(options: {
     return stateRow({
       ownerId: options.ownerNodeId,
       state: 'unsupported',
-      label: 'More rows unavailable',
-      detail: 'Additional rows are available.'
+      label: 'More items unavailable',
+      detail: 'More items are available.'
     })
   }
 
@@ -409,10 +407,10 @@ function contentMoreRow(
     kind: 'more',
     label:
       binding.state === 'error'
-        ? 'Retry loading more rows'
+        ? 'Retry loading more'
         : binding.state === 'loading'
-          ? 'Loading more rows'
-          : 'Load more rows',
+          ? 'Loading more'
+          : 'Load more',
     detail: binding.detail,
     icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more',
     ...(action === undefined ? {} : { action })
@@ -562,26 +560,22 @@ function findLoadedChildRow(state: BrowserState, nodeId: BrowserTreeNodeId): Chi
 
 function formatLoadedDetail(children: LoadedChildren): string {
   if (children.nextOffset === undefined) {
-    return `${children.rows.length} ${formatRowsNoun(children.rows.length)} loaded.`
+    return `${children.rows.length} ${children.rows.length === 1 ? 'item' : 'items'} loaded.`
   }
 
-  return `${children.rows.length} of ${children.totalRows} rows loaded.`
-}
-
-function formatRowsNoun(count: number): string {
-  return count === 1 ? 'row' : 'rows'
+  return `${children.rows.length} of ${children.totalRows} items loaded.`
 }
 
 function formatPresenceDetail(row: ChildRow): string {
-  const subject = row.kind === 'directory' ? 'directory' : 'file'
+  const subject = row.kind === 'directory' ? 'Folder' : 'File'
 
   switch (row.presence) {
     case 'present':
-      return `Present ${subject}.`
+      return `${subject} available.`
     case 'missing':
-      return `Missing ${subject}.`
+      return `${subject} missing.`
     case 'removed':
-      return `Removed ${subject}.`
+      return `${subject} removed.`
   }
 }
 

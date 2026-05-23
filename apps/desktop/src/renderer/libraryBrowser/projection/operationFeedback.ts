@@ -62,13 +62,13 @@ type FeedbackMeta = {
 const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
   checkingHost: {
     tone: 'loading',
-    title: 'Checking library host',
-    detail: 'Waiting for library boundary host status.'
+    title: 'Starting library',
+    detail: 'Setting up the library.'
   },
   hostUnavailable: {
     tone: 'warning',
-    title: 'Library host unavailable',
-    detail: 'The library boundary host is not in a usable state.'
+    title: 'Library unavailable',
+    detail: 'The library is not available right now.'
   },
   chooseRoot: {
     tone: 'idle',
@@ -92,8 +92,8 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
   },
   scanningRoot: {
     tone: 'loading',
-    title: 'Scanning local root',
-    detail: 'Dekzer is scanning the registered library root.'
+    title: 'Scanning music folder',
+    detail: 'Scanning your music folder for files.'
   },
   scanFailed: {
     tone: 'error',
@@ -103,12 +103,12 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
   scanComplete: {
     tone: 'success',
     title: 'Scan complete',
-    detail: 'The registered root was scanned successfully.'
+    detail: 'Music folder scanned successfully.'
   },
   refreshingView: {
     tone: 'loading',
-    title: 'Refreshing library view',
-    detail: 'Reading maintained navigation rows and hierarchy children.'
+    title: 'Refreshing library',
+    detail: 'Updating your library contents.'
   },
   refreshFailed: {
     tone: 'warning',
@@ -117,28 +117,28 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
   },
   navigationLoading: {
     tone: 'loading',
-    title: 'Loading navigation',
-    detail: 'Reading persisted library navigation rows.'
+    title: 'Loading library',
+    detail: 'Loading your library.'
   },
   navigationFailed: {
     tone: 'error',
-    title: 'Navigation read failed',
-    detail: 'Unable to request library navigation rows.'
+    title: 'Library load failed',
+    detail: 'Could not load your library.'
   },
   hierarchyLoading: {
     tone: 'loading',
-    title: 'Loading hierarchy',
-    detail: 'Reading literal hierarchy children.'
+    title: 'Loading folder contents',
+    detail: 'Loading folder contents.'
   },
   hierarchyFailed: {
     tone: 'error',
-    title: 'Hierarchy read failed',
-    detail: 'Unable to request library hierarchy children.'
+    title: 'Folder contents failed to load',
+    detail: 'Could not load folder contents.'
   },
   noSources: {
     tone: 'warning',
     title: 'No library sources',
-    detail: 'No persisted library navigation rows are available.'
+    detail: 'Add a music folder to start building your library.'
   },
   removingSource: {
     tone: 'loading',
@@ -153,7 +153,7 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
   ready: {
     tone: 'success',
     title: 'Library ready',
-    detail: 'Showing persisted local library rows.'
+    detail: 'Your music library is ready.'
   }
 }
 
@@ -241,7 +241,7 @@ function hostNotReadyFeedback(host: LibraryBoundaryHostStatus): LibraryOperation
   if (host.state === 'failed') {
     return build('hostUnavailable', {
       tone: 'error',
-      detail: host.lastError?.message ?? 'The library boundary host encountered a failure.'
+      detail: host.lastError?.message ?? 'The library encountered an error.'
     })
   }
 
@@ -274,12 +274,12 @@ function build(
 
 function scanDetail(summary: LocalRootScanSummary | undefined): string {
   if (summary === undefined) {
-    return 'The registered root was scanned successfully.'
+    return 'Music folder scanned successfully.'
   }
 
   return [
     'Scan complete.',
     `${summary.discoveredFileCount} ${summary.discoveredFileCount === 1 ? 'file' : 'files'} discovered.`,
-    `${summary.queuedSourceWorkItems} source work ${summary.queuedSourceWorkItems === 1 ? 'item' : 'items'} queued.`
+    `${summary.queuedSourceWorkItems} ${summary.queuedSourceWorkItems === 1 ? 'item' : 'items'} queued.`
   ].join(' ')
 }

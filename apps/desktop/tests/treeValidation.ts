@@ -630,7 +630,7 @@ function validatesLibraryHierarchyReadProjection(): void {
       label: 'Source Fixture',
       badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
-      detail: 'Navigation source row. Updated 1970-01-01.',
+      detail: 'Library source. Updated 1970-01-01.',
       children: {
         kind: 'loaded',
         nodes: [
@@ -640,7 +640,7 @@ function validatesLibraryHierarchyReadProjection(): void {
             label: 'track.wav',
             badge: { value: 'Audio', tone: 'muted' },
             icon: 'music',
-            detail: 'Present file.',
+            detail: 'File available.',
             children: { kind: 'none' }
           }
         ]
@@ -672,7 +672,7 @@ function validatesLibraryHierarchyReadProjection(): void {
       label: 'Source Fixture',
       badge: { value: 'Local Library', tone: 'muted' },
       icon: 'source',
-      detail: 'Navigation source row. Updated 1970-01-01.',
+      detail: 'Library source. Updated 1970-01-01.',
       children: {
         kind: 'loaded',
         nodes: [
@@ -682,16 +682,16 @@ function validatesLibraryHierarchyReadProjection(): void {
             label: 'Album',
             badge: { value: 'Folder', tone: 'muted' },
             icon: 'folder',
-            detail: 'Present directory.',
+            detail: 'Folder available.',
             children: {
               kind: 'deferred',
-              detail: 'Children not loaded yet.'
+              detail: 'Contents not loaded yet.'
             },
             action: {
               kind: 'loadChildren',
               state: {
                 kind: 'idle',
-                detail: 'Children not loaded yet.'
+                detail: 'Contents not loaded yet.'
               }
             }
           }
@@ -768,7 +768,7 @@ function validatesLibraryHierarchyReadProjection(): void {
   assert.equal(partialSourceNode.children.nodes[1]?.action?.state.kind, 'idle')
   assert.equal(
     partialSourceNode.children.nodes[1]?.action?.state.detail,
-    'Rows 2-2 of 2 are available.'
+    'Items 2-2 of 2 are available.'
   )
   assert.deepEqual(
     (

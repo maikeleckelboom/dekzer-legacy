@@ -253,7 +253,7 @@ function validatesUnloadedContents(): void {
   const unloadedSourceState = browserState({
     sourceState: {
       kind: 'unloaded',
-      detail: 'Literal hierarchy not loaded yet.'
+      detail: 'Contents not loaded yet.'
     }
   })
   const unloadedSourceContents = projectForSelection(unloadedSourceState, 'navigation-row:7')
@@ -276,7 +276,7 @@ function validatesUnloadedContents(): void {
         '12',
         {
           kind: 'unloaded',
-          detail: 'Children not loaded yet.'
+          detail: 'Contents not loaded yet.'
         }
       ]
     ])
@@ -331,7 +331,7 @@ function validatesLiteralFileSelection(): void {
       actionNodeId: null
     }
   ])
-  assert.match(contents.rows[0]?.detail ?? '', /Present file/)
+  assert.match(contents.rows[0]?.detail ?? '', /File available/)
 }
 
 function projectForSelection(state: BrowserState, selectedNodeId: string): ContentProjection {

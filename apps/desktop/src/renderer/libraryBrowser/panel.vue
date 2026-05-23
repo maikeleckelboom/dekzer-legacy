@@ -97,7 +97,7 @@ const preferredLiveNodeId = computed(() => {
 const currentTreeNodes = computed(() => liveTreeNodes.value ?? [])
 const treeRootProps = computed(() => ({
   expandedNodeIds: expandedNodeIds.value,
-  emptyLabel: 'No persisted library navigation rows to display.',
+  emptyLabel: 'Add a music folder to start building your library.',
   labelledBy: 'library-hierarchy-title',
   nodes: currentTreeNodes.value,
   ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
@@ -379,7 +379,7 @@ function activateContentRowAction(row: ContentRow): void {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="library-hierarchy-title" class="text-xl font-bold leading-7 text-(--color-text)">
-            Library hierarchy foundation
+            Music Library
           </h2>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2">
