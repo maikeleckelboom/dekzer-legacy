@@ -15,6 +15,7 @@ import { rootChannels } from '../src/shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../src/shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
+import type { UnregisterLocalRootResult } from '../src/shared/libraryRoots/unregisterLocalRoot'
 import { emitStatus, testStatus } from './support/libraryBoundary'
 
 void main()
@@ -82,6 +83,10 @@ async function validatesPreloadApiSurface(): Promise<void> {
       }
     ]
   }
+  const unregisterLocalRootResult: UnregisterLocalRootResult = {
+    state: 'unregistered',
+    unregistered: true
+  }
   let receivedNavigationRequest: unknown = null
   let receivedHierarchyRequest: unknown = null
   let receivedChoiceArgs: readonly unknown[] | undefined
@@ -125,6 +130,11 @@ async function validatesPreloadApiSurface(): Promise<void> {
         return readLocalRootsResult
       }
 
+      if (channel === rootChannels.unregisterLocalRoot) {
+        assert.equal(args.length, 1)
+        return unregisterLocalRootResult
+      }
+
       throw new Error(`unexpected preload invoke channel ${channel}`)
     },
     on: (channel, listener) => {
@@ -161,7 +171,8 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.deepEqual(Object.keys(api.library.roots).sort(), [
     'chooseAndRegisterLocal',
     'readLocalRoots',
-    'runScan'
+    'runScan',
+    'unregisterLocalRoot'
   ])
   assert.equal('ipcRenderer' in api, false)
   assert.equal('libraryBoundary' in api, false)
@@ -205,6 +216,10 @@ async function validatesPreloadApiSurface(): Promise<void> {
   assert.equal(await api.library.roots.runScan(scanRequest), scanResult)
   assert.equal(receivedScanRequest, scanRequest)
   assert.equal(await api.library.roots.readLocalRoots(), readLocalRootsResult)
+  assert.equal(
+    await api.library.roots.unregisterLocalRoot({ rootId: '7' }),
+    unregisterLocalRootResult
+  )
   assert.equal(await api.library.navigation.readRows(navigationRequest), navigationResult)
   assert.equal(receivedNavigationRequest, navigationRequest)
   assert.equal(await api.library.hierarchy.readChildren(hierarchyRequest), hierarchyResult)

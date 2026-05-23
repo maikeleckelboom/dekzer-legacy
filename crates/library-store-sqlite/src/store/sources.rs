@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use rusqlite::OptionalExtension;
+
 use crate::authority::roots::{
     ApplyRootChangedInput, ApplyRootEjectCancelledInput, ApplyRootMountedInput,
     ApplyRootUnmountPendingInput, ApplyRootUnmountRequestedInput, ApplyRootUnmountedInput,
@@ -43,6 +45,16 @@ pub enum LocalRootAvailability {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReadLocalRootsResult {
     pub roots: Vec<LocalRoot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnregisterLocalRootInput {
+    pub root_id: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnregisterLocalRootResult {
+    pub unregistered: bool,
 }
 
 impl SqliteDurableStore {
@@ -162,9 +174,11 @@ impl SqliteDurableStore {
         let mut statement = connection.prepare(
             "SELECT sl.source_id, sl.absolute_path, lss.resolution_status
              FROM source_locators sl
+             JOIN sources s ON s.source_id = sl.source_id
              LEFT JOIN source_state lss
                ON lss.source_id = sl.source_id
              WHERE sl.locator_kind = 'absolute_path'
+               AND s.is_user_visible = 1
              ORDER BY sl.source_id ASC",
         )?;
         let roots = statement
@@ -182,6 +196,43 @@ impl SqliteDurableStore {
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(ReadLocalRootsResult { roots })
+    }
+
+    pub fn unregister_local_root(
+        &self,
+        input: UnregisterLocalRootInput,
+    ) -> LibrarySqliteResult<UnregisterLocalRootResult> {
+        if input.root_id <= 0 {
+            return Ok(UnregisterLocalRootResult {
+                unregistered: false,
+            });
+        }
+        self.with_write(|write| {
+            let locator_kind: Option<String> = write
+                .query_row(
+                    "SELECT sl.locator_kind
+                     FROM source_locators sl
+                     JOIN sources s ON s.source_id = sl.source_id
+                     WHERE sl.source_id = ?1",
+                    [input.root_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            let locator_kind = match locator_kind {
+                Some(kind) => kind,
+                None => return Ok(UnregisterLocalRootResult { unregistered: false }),
+            };
+            if locator_kind != "absolute_path" {
+                return Ok(UnregisterLocalRootResult { unregistered: false });
+            }
+            let changed_at = unix_time_ms()?;
+            write.execute(
+                "UPDATE sources SET is_user_visible = 0, updated_at = ?2 WHERE source_id = ?1 AND is_user_visible = 1",
+                rusqlite::params![input.root_id, changed_at],
+            )?;
+            publication::reseed_projection_domains(write, &[ProjectionDomain::Navigation])?;
+            Ok(UnregisterLocalRootResult { unregistered: true })
+        })
     }
 
     #[allow(dead_code)]

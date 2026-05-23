@@ -8,7 +8,7 @@ use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
     LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
     RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
-    SqliteDurableStore,
+    SqliteDurableStore, UnregisterLocalRootInput,
 };
 
 use crate::session_events::LibraryBoundaryEventStream;
@@ -399,6 +399,21 @@ impl LibraryBoundaryService {
         })
     }
 
+    pub fn unregister_local_root(
+        &self,
+        request: protocol::UnregisterLocalRootRequest,
+    ) -> protocol::ProtocolResult<protocol::UnregisterLocalRootReply> {
+        let root_id = require_positive_i64(request.root_id, "rootId")?;
+        let result = self
+            .durable_store
+            .unregister_local_root(UnregisterLocalRootInput { root_id })
+            .map_err(map_store_error)?;
+        self.publish_maintained_snapshot_invalidations()?;
+        Ok(protocol::UnregisterLocalRootReply {
+            unregistered: result.unregistered,
+        })
+    }
+
     fn handle_library_root_command(
         &self,
         command: protocol::LibraryRootCommand,
@@ -413,6 +428,9 @@ impl LibraryBoundaryService {
             protocol::LibraryRootCommand::ReadLocalRoots(_) => self
                 .read_local_roots()
                 .map(protocol::LibraryRootReply::ReadLocalRoots),
+            protocol::LibraryRootCommand::UnregisterLocalRoot(request) => self
+                .unregister_local_root(request)
+                .map(protocol::LibraryRootReply::UnregisterLocalRoot),
         }
     }
 
@@ -541,7 +559,7 @@ mod tests {
         ReadLibraryBoundaryEventsRequest, ReadLiteralHierarchyChildrenRequest,
         RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
         RenamePlaylistRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
-        SnapshotReadReply,
+        SnapshotReadReply, UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use serde_json::json;
     use tempfile::TempDir;
@@ -620,6 +638,13 @@ mod tests {
         match reply {
             CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(reply)) => reply,
             other => panic!("expected run root scan reply, got {other:?}"),
+        }
+    }
+
+    fn expect_unregister_local_root_reply(reply: CommandReply) -> UnregisterLocalRootReply {
+        match reply {
+            CommandReply::LibraryRoots(LibraryRootReply::UnregisterLocalRoot(reply)) => reply,
+            other => panic!("expected unregister local root reply, got {other:?}"),
         }
     }
 
@@ -1042,5 +1067,121 @@ mod tests {
             ),
             "registered root must be available"
         );
+    }
+
+    #[test]
+    fn unregister_local_root_removes_from_read_local_roots() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("music-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        assert!(registered.root_id > 0);
+
+        let roots_after_register =
+            expect_read_local_roots_reply(expect_success(service.handle_command(
+                CommandRequest::LibraryRoots(LibraryRootCommand::ReadLocalRoots(
+                    library_boundary_protocol::ReadLocalRootsRequest,
+                )),
+            )));
+        assert_eq!(roots_after_register.roots.len(), 1);
+
+        let unregistered = expect_unregister_local_root_reply(expect_success(
+            service.handle_command(CommandRequest::LibraryRoots(
+                LibraryRootCommand::UnregisterLocalRoot(UnregisterLocalRootRequest {
+                    root_id: registered.root_id,
+                }),
+            )),
+        ));
+        assert!(unregistered.unregistered);
+
+        let roots_after_unregister =
+            expect_read_local_roots_reply(expect_success(service.handle_command(
+                CommandRequest::LibraryRoots(LibraryRootCommand::ReadLocalRoots(
+                    library_boundary_protocol::ReadLocalRootsRequest,
+                )),
+            )));
+        assert!(
+            roots_after_unregister.roots.is_empty(),
+            "unregistered root must not appear in readLocalRoots"
+        );
+    }
+
+    #[test]
+    fn unregister_nonexistent_root_returns_unregistered_false() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let unregistered =
+            expect_unregister_local_root_reply(expect_success(service.handle_command(
+                CommandRequest::LibraryRoots(LibraryRootCommand::UnregisterLocalRoot(
+                    UnregisterLocalRootRequest { root_id: 99999 },
+                )),
+            )));
+        assert!(!unregistered.unregistered);
+    }
+
+    #[test]
+    fn unregister_already_unregistered_root_is_idempotent() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("music-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+
+        let first = expect_unregister_local_root_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::UnregisterLocalRoot(
+                UnregisterLocalRootRequest {
+                    root_id: registered.root_id,
+                },
+            )),
+        )));
+        assert!(first.unregistered);
+
+        let second = expect_unregister_local_root_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::UnregisterLocalRoot(
+                UnregisterLocalRootRequest {
+                    root_id: registered.root_id,
+                },
+            )),
+        )));
+        assert!(
+            second.unregistered,
+            "unregistering already-unregistered root must return unregistered true"
+        );
+    }
+
+    #[test]
+    fn re_register_same_path_after_unregister_restores_visibility() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("music-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, first_registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+
+        let _unregistered = expect_unregister_local_root_reply(expect_success(
+            service.handle_command(CommandRequest::LibraryRoots(
+                LibraryRootCommand::UnregisterLocalRoot(UnregisterLocalRootRequest {
+                    root_id: first_registered.root_id,
+                }),
+            )),
+        ));
+
+        let (_json, re_registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        assert_eq!(
+            re_registered.root_id, first_registered.root_id,
+            "re-registering same path must return same root_id"
+        );
+
+        let roots = expect_read_local_roots_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::ReadLocalRoots(
+                library_boundary_protocol::ReadLocalRootsRequest,
+            )),
+        )));
+        assert_eq!(roots.roots.len(), 1);
+        assert_eq!(roots.roots[0].root_id, first_registered.root_id);
     }
 }

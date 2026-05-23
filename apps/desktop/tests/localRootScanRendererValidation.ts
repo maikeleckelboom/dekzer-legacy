@@ -807,6 +807,10 @@ function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRoo
         message: 'Local root read should not be called by this validation.'
       }
     }),
+    unregisterLocalRoot: async () => ({
+      state: 'unregistered',
+      unregistered: true
+    }),
     ...overrides
   }
 }

@@ -1,5 +1,6 @@
 export const rootChannels = {
   chooseAndRegisterLocal: 'desktop:library-roots:choose-and-register-local',
   runScan: 'desktop:library-roots:run-scan',
-  readLocalRoots: 'desktop:library-roots:read-local-roots'
+  readLocalRoots: 'desktop:library-roots:read-local-roots',
+  unregisterLocalRoot: 'desktop:library-roots:unregister-local-root'
 } as const

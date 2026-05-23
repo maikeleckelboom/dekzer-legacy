@@ -717,6 +717,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  SET source_class = ?2,
                      authority = ?3,
                      display_name = ?4,
+                     is_user_visible = 1,
                      updated_at = ?5
                  WHERE source_id = ?1",
                 params![

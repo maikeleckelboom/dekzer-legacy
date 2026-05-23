@@ -931,6 +931,22 @@
             "type",
             "payload"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/UnregisterLocalRootRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "unregisterLocalRoot"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
         }
       ]
     },
@@ -977,6 +993,22 @@
             "type": {
               "type": "string",
               "const": "readLocalRoots"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/UnregisterLocalRootReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "unregisterLocalRoot"
             }
           },
           "required": [
@@ -2309,6 +2341,28 @@
             "payload"
           ]
         }
+      ]
+    },
+    "UnregisterLocalRootReply": {
+      "type": "object",
+      "properties": {
+        "unregistered": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "unregistered"
+      ]
+    },
+    "UnregisterLocalRootRequest": {
+      "type": "object",
+      "properties": {
+        "rootId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rootId"
       ]
     }
   }

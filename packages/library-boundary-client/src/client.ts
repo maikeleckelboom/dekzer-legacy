@@ -26,7 +26,9 @@ import type {
   RunRootScanReply,
   RunRootScanRequest,
   SearchNavigationNodeLibraryBrowserWindowReply,
-  SearchNavigationNodeLibraryBrowserWindowRequest
+  SearchNavigationNodeLibraryBrowserWindowRequest,
+  UnregisterLocalRootReply,
+  UnregisterLocalRootRequest
 } from "@dekzer/library-boundary-contract";
 
 import {
@@ -82,6 +84,19 @@ export class LibraryBoundaryClient {
       },
       "libraryRoots",
       "readLocalRoots"
+    );
+  }
+
+  unregisterLocalRoot(
+    request: UnregisterLocalRootRequest
+  ): Promise<UnregisterLocalRootReply> {
+    return this.sendAndExpect(
+      {
+        type: "libraryRoots",
+        payload: { type: "unregisterLocalRoot", payload: request }
+      },
+      "libraryRoots",
+      "unregisterLocalRoot"
     );
   }
 

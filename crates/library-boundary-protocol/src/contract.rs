@@ -31,6 +31,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::RegisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::RunRootScanRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalRootsRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::UnregisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LocalRootAvailability>(&cfg, &mut output);
     push_ts_decl::<crate::LocalRoot>(&cfg, &mut output);
     push_ts_decl::<crate::PlaylistWriteCommand>(&cfg, &mut output);
@@ -56,6 +57,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::RegisterLocalRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RunRootScanReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalRootsReply>(&cfg, &mut output);
+    push_ts_decl::<crate::UnregisterLocalRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::PlaylistWriteReply>(&cfg, &mut output);
     push_ts_decl::<crate::CreatePlaylistReply>(&cfg, &mut output);
     push_ts_decl::<crate::RenamePlaylistReply>(&cfg, &mut output);
@@ -155,6 +157,7 @@ mod tests {
         assert!(ts.contains("registerLocalRoot"));
         assert!(ts.contains("runRootScan"));
         assert!(ts.contains("readLocalRoots"));
+        assert!(ts.contains("unregisterLocalRoot"));
         assert!(ts.contains("readLiteralHierarchyChildren"));
         assert!(ts.contains("LiteralHierarchyNode"));
         assert!(ts.contains("readNavigationNodeLibraryBrowserWindow"));

@@ -71,5 +71,6 @@ pub use store::{
     DurableStoreBootstrapStatus, LibraryStoreContext, LocalRoot, LocalRootAvailability,
     MaintainedReadModelRevision, MaintainedReadModelScope, ReadLocalRootsResult,
     RegisterLocalRootInput, RootScanMaterializationResult, SqliteDurableStore,
-    SqliteDurableStoreAppOwnedState, StoreEnvironment, durable_store_path,
+    SqliteDurableStoreAppOwnedState, StoreEnvironment, UnregisterLocalRootInput,
+    UnregisterLocalRootResult, durable_store_path,
 };

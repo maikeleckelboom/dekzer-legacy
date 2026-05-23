@@ -10,6 +10,10 @@ import type {
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
+import type {
+  UnregisterLocalRootRequest,
+  UnregisterLocalRootResult
+} from './libraryRoots/unregisterLocalRoot'
 
 export type RendererApi = {
   readonly library: LibraryApi
@@ -39,4 +43,5 @@ export type LibraryRootsApi = {
   chooseAndRegisterLocal(): Promise<LocalRootChoiceResult>
   runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult>
   readLocalRoots(): Promise<ReadLocalRootsOutcome>
+  unregisterLocalRoot(request: UnregisterLocalRootRequest): Promise<UnregisterLocalRootResult>
 }

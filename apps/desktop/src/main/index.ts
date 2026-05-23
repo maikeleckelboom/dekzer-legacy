@@ -8,6 +8,7 @@ import { registerReadNavigationRowsIpc } from './libraryNavigation/readRows'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
+import { registerUnregisterLocalRootIpc } from './libraryRoots/unregisterLocalRoot'
 import {
   LibraryBoundaryHostStatusController,
   registerLibraryBoundaryHostStatusIpc
@@ -69,6 +70,7 @@ app.whenReady().then(() => {
   })
   registerLocalRootScanIpc(ipcMain, host)
   registerReadLocalRootsIpc(ipcMain, host)
+  registerUnregisterLocalRootIpc(ipcMain, host)
   libraryBoundaryHostStatusController.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(hostStatusChannels.statusChanged, status)

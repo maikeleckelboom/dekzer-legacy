@@ -31,7 +31,10 @@ pub use context::{
 };
 pub use discovery::RootScanMaterializationResult;
 pub use revisions::{MaintainedReadModelRevision, MaintainedReadModelScope};
-pub use sources::{LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput};
+pub use sources::{
+    LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
+    UnregisterLocalRootInput, UnregisterLocalRootResult,
+};
 
 #[cfg(test)]
 mod tests;

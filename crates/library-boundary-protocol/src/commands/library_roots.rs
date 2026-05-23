@@ -115,6 +115,43 @@ pub struct ReadLocalRootsReply {
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct UnregisterLocalRootRequest {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub root_id: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct UnregisterLocalRootReply {
+    pub unregistered: bool,
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -166,6 +203,7 @@ pub enum LibraryRootCommand {
     RegisterLocalRoot(RegisterLocalRootRequest),
     RunRootScan(RunRootScanRequest),
     ReadLocalRoots(ReadLocalRootsRequest),
+    UnregisterLocalRoot(UnregisterLocalRootRequest),
 }
 
 #[derive(
@@ -184,6 +222,7 @@ pub enum LibraryRootReply {
     RegisterLocalRoot(RegisterLocalRootReply),
     RunRootScan(RunRootScanReply),
     ReadLocalRoots(ReadLocalRootsReply),
+    UnregisterLocalRoot(UnregisterLocalRootReply),
 }
 
 #[cfg(test)]
@@ -191,7 +230,8 @@ mod tests {
     use super::{
         LibraryRootCommand, LibraryRootReply, LocalRoot, LocalRootAvailability,
         ReadLocalRootsReply, ReadLocalRootsRequest, RegisterLocalRootReply,
-        RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest,
+        RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest, UnregisterLocalRootReply,
+        UnregisterLocalRootRequest,
     };
     use serde_json::json;
 
@@ -202,6 +242,8 @@ mod tests {
         });
         let scan = LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 7 });
         let read_local = LibraryRootCommand::ReadLocalRoots(ReadLocalRootsRequest);
+        let unregister =
+            LibraryRootCommand::UnregisterLocalRoot(UnregisterLocalRootRequest { root_id: 42 });
 
         assert_eq!(
             serde_json::to_value(&register).expect("serialize register command"),
@@ -229,11 +271,27 @@ mod tests {
             })
         );
         assert_eq!(
+            serde_json::to_value(&unregister).expect("serialize unregister command"),
+            json!({
+                "type": "unregisterLocalRoot",
+                "payload": {
+                    "rootId": "42"
+                }
+            })
+        );
+        assert_eq!(
             serde_json::from_value::<LibraryRootCommand>(
                 serde_json::to_value(register.clone()).expect("serialize register")
             )
             .expect("deserialize register"),
             register
+        );
+        assert_eq!(
+            serde_json::from_value::<LibraryRootCommand>(
+                serde_json::to_value(unregister.clone()).expect("serialize unregister")
+            )
+            .expect("deserialize unregister"),
+            unregister
         );
     }
 
@@ -256,6 +314,8 @@ mod tests {
                 availability: LocalRootAvailability::Available,
             }],
         });
+        let unregistered =
+            LibraryRootReply::UnregisterLocalRoot(UnregisterLocalRootReply { unregistered: true });
 
         assert_eq!(
             serde_json::to_value(&registered).expect("serialize register reply"),
@@ -289,6 +349,15 @@ mod tests {
                         "canonicalPath": "C:/Music",
                         "availability": "available"
                     }]
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&unregistered).expect("serialize unregister reply"),
+            json!({
+                "type": "unregisterLocalRoot",
+                "payload": {
+                    "unregistered": true
                 }
             })
         );
