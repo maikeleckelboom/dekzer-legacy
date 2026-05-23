@@ -349,7 +349,7 @@ function validatesLiteralFileSelection(): void {
       actionNodeId: null
     }
   ])
-  assert.match(contents.rows[0]?.detail ?? '', /File available/)
+  assert.equal(contents.rows[0]?.detail, 'File')
 }
 
 function projectForSelection(state: BrowserState, selectedNodeId: string): ContentProjection {
@@ -463,6 +463,7 @@ function directoryNode(
     directoryId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
+    browseability: 'browseable',
     updatedAtMs: 100
   }
 }

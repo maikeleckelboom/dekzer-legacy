@@ -4,6 +4,7 @@ import type { BrowserState, LoadedChildren, RowBinding } from '../runtime/state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { sameEntryPoint } from '../runtime/entryPoint'
 import { classifyLibraryEntryName, type LibraryEntryRole } from './entryPresentation'
+import { formatSourceDisplayName } from './sourcePresentation'
 
 export type ContentProjectionKind =
   | 'emptySelection'
@@ -141,7 +142,7 @@ function projectSourceContents(options: {
   readonly bindingsById: BrowserProjection['bindingsById'] | undefined
 }): ContentProjection {
   const sourceState = options.state.sourceReadStates.get(options.selectedNodeId)
-  const title = options.binding.target.label
+  const title = formatSourceDisplayName(options.binding.target.label)
 
   if (sourceState === undefined || sourceState.kind === 'unloaded') {
     const detail = sourceState?.detail ?? 'Contents not loaded yet.'
@@ -571,11 +572,11 @@ function formatPresenceDetail(row: ChildRow): string {
 
   switch (row.presence) {
     case 'present':
-      return `${subject} available.`
+      return subject
     case 'missing':
-      return `${subject} missing.`
+      return `${subject} missing`
     case 'removed':
-      return `${subject} removed.`
+      return `${subject} removed`
   }
 }
 

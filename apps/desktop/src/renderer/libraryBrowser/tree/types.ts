@@ -66,14 +66,11 @@ export type BrowserTreeIcon =
   | 'warning'
   | 'state'
 
-export type BrowserTreeBadgeTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'muted'
-
-export type BrowserTreeBadgeEmphasis = 'soft' | 'solid' | 'outline'
+export type BrowserTreeBadgeTone = 'neutral' | 'accent' | 'warning' | 'danger' | 'muted'
 
 export interface BrowserTreeBadge {
   readonly value: string
   readonly tone?: BrowserTreeBadgeTone
-  readonly emphasis?: BrowserTreeBadgeEmphasis
   readonly title?: string
   readonly ariaLabel?: string
 }

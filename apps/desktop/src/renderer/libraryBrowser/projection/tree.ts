@@ -12,18 +12,14 @@ import type {
 import type {
   BrowserTreeAction,
   BrowserTreeActionState,
-  BrowserTreeBadgeTone,
+  BrowserTreeBadge,
   BrowserTreeChildren,
   BrowserTreeIcon,
   BrowserTreeNode,
   BrowserTreeNodeId
 } from '../tree/types'
 import { copyEntryPoint } from '../runtime/entryPoint'
-import {
-  adaptLocationSourceDescriptor,
-  formatSourceDisplayName,
-  getLocationSourcePresentation
-} from './sourcePresentation'
+import { formatSourceDisplayName } from './sourcePresentation'
 import { classifyLibraryEntryName, type LibraryEntryRole } from './entryPresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
 
@@ -110,13 +106,7 @@ function projectNavigationRow(options: {
 
   if (sourceTarget !== undefined) {
     const sourceState = options.sourceReadStates.get(nodeId)
-    const descriptor = adaptLocationSourceDescriptor({
-      rowKind: options.row.rowKind,
-      selectorKind: options.row.selectorKind,
-      sourceStateKind: sourceState?.kind,
-      sourceStateFailed: sourceState?.kind === 'failed'
-    })
-    const presentation = getLocationSourcePresentation(descriptor)
+    const sourceFailed = sourceState?.kind === 'failed'
 
     options.bindingsById.set(nodeId, {
       kind: 'source',
@@ -128,7 +118,9 @@ function projectNavigationRow(options: {
       id: nodeId,
       role: browserRowRoleForNavigationRow(options.row),
       label: formatSourceDisplayName(options.row.displayName),
-      badge: { value: presentation.label, tone: 'muted' },
+      ...(sourceFailed
+        ? { badge: { value: 'Unavailable', tone: 'warning' } as BrowserTreeBadge }
+        : {}),
       icon: 'source',
       detail: formatNavigationSourceDetail(options.row),
       ...projectSourceChildren({
@@ -150,7 +142,6 @@ function projectNavigationRow(options: {
     id: nodeId,
     role: browserRowRoleForNavigationRow(options.row),
     label: formatSourceDisplayName(options.row.displayName),
-    badge: { value: 'Navigation', tone: 'muted' },
     icon: 'navigation',
     detail: formatNavigationDetail(options.row),
     children: { kind: 'none' }
@@ -309,12 +300,14 @@ function projectLiteralNode(options: {
     const directoryState = options.directoryReadStates.get(node.directoryId)
     const isUnloaded = directoryState === undefined || directoryState.kind === 'unloaded'
 
+    const dirBadge = presenceBadge(node.presence)
+
     if (isUnloaded && node.browseability === 'empty') {
       return {
         id: node.id,
         role: 'literalDirectory',
         label: node.label,
-        badge: { value: 'Folder', tone: 'muted' },
+        ...(dirBadge === undefined ? {} : { badge: dirBadge }),
         icon: 'folder',
         detail: formatDirectoryDetail(node.presence),
         children: { kind: 'none' }
@@ -325,7 +318,7 @@ function projectLiteralNode(options: {
       id: node.id,
       role: 'literalDirectory',
       label: node.label,
-      badge: { value: 'Folder', tone: 'muted' },
+      ...(dirBadge === undefined ? {} : { badge: dirBadge }),
       icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
       ...projectDirectoryChildren({
@@ -338,6 +331,7 @@ function projectLiteralNode(options: {
   }
 
   const presentation = classifyLibraryEntryName(node.label)
+  const fileBadge = presenceBadge(node.presence)
 
   options.bindingsById.set(node.id, {
     kind: 'file',
@@ -350,7 +344,7 @@ function projectLiteralNode(options: {
     id: node.id,
     role: 'literalFile',
     label: node.label,
-    badge: presentation.badge,
+    ...(fileBadge === undefined ? {} : { badge: fileBadge }),
     icon: browserTreeIconForEntryRole(presentation.role),
     detail: formatFileDetail(node.presence),
     children: { kind: 'none' }
@@ -491,7 +485,6 @@ function readStateNode(options: {
     id: `read-state:${options.ownerId}:${options.state}`,
     role: 'state',
     label: options.label,
-    badge: { value: 'Status', tone: readStateBadgeTone(options.state) },
     detail: options.detail,
     icon: readStateIcon(options.state),
     children: { kind: 'none' }
@@ -584,7 +577,6 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
           : more?.kind === 'loading'
             ? 'Loading more'
             : 'Load more',
-      badge: { value: 'More', tone: moreBadgeTone(more) },
       icon: moreIcon(more),
       children: { kind: 'none' },
       action: { kind: 'loadMore', state: actionState }
@@ -638,28 +630,14 @@ function moreIcon(more: LoadedChildren['more']): BrowserTreeIcon {
   }
 }
 
-function readStateBadgeTone(
-  state: 'loading' | 'empty' | 'unavailable' | 'error'
-): BrowserTreeBadgeTone {
-  switch (state) {
-    case 'loading':
-      return 'neutral'
-    case 'error':
-    case 'unavailable':
-      return 'warning'
-    case 'empty':
-      return 'muted'
-  }
-}
-
-function moreBadgeTone(more: LoadedChildren['more']): BrowserTreeBadgeTone {
-  switch (more?.kind) {
-    case 'loading':
-      return 'neutral'
-    case 'failed':
-      return 'warning'
-    default:
-      return 'muted'
+function presenceBadge(presence: ChildRow['presence']): BrowserTreeBadge | undefined {
+  switch (presence) {
+    case 'present':
+      return undefined
+    case 'missing':
+      return { value: 'Missing', tone: 'warning', ariaLabel: 'Missing item' }
+    case 'removed':
+      return { value: 'Removed', tone: 'danger', ariaLabel: 'Removed item' }
   }
 }
 
@@ -737,21 +715,21 @@ function formatMoreDetail(offset: number, limit: number, totalRows: number): str
 function formatFileDetail(presence: ChildRow['presence']): string {
   switch (presence) {
     case 'present':
-      return 'File available.'
+      return 'File'
     case 'missing':
-      return 'File missing.'
+      return 'File missing'
     case 'removed':
-      return 'File removed.'
+      return 'File removed'
   }
 }
 
 function formatDirectoryDetail(presence: ChildRow['presence']): string {
   switch (presence) {
     case 'present':
-      return 'Folder available.'
+      return 'Folder'
     case 'missing':
-      return 'Folder missing.'
+      return 'Folder missing'
     case 'removed':
-      return 'Folder removed.'
+      return 'Folder removed'
   }
 }

@@ -1,5 +1,3 @@
-import type { BrowserTreeBadge } from '../tree/types'
-
 export type LibraryEntryRole =
   | 'folder'
   | 'audio'
@@ -16,7 +14,6 @@ export type BrowserEntryVisibility = 'defaultVisible' | 'companionVisible' | 'hi
 export interface BrowserEntryPresentation {
   readonly role: LibraryEntryRole
   readonly visibility: BrowserEntryVisibility
-  readonly badge: BrowserTreeBadge
 }
 
 const audioExtensions = new Set([
@@ -84,8 +81,7 @@ export function classifyLibraryEntryName(
   if (options?.isDirectory) {
     return {
       role: 'folder',
-      visibility: 'defaultVisible',
-      badge: { value: 'Folder', tone: 'muted' }
+      visibility: 'defaultVisible'
     }
   }
 
@@ -95,8 +91,7 @@ export function classifyLibraryEntryName(
   if (hiddenSystemFullNames.has(lower)) {
     return {
       role: 'nonMedia',
-      visibility: 'hiddenNonMedia',
-      badge: { value: 'System', tone: 'muted' }
+      visibility: 'hiddenNonMedia'
     }
   }
 
@@ -105,60 +100,55 @@ export function classifyLibraryEntryName(
   if (lastDotIndex <= 0 || lastDotIndex === normalized.length - 1) {
     const role = lastDotIndex === 0 ? 'nonMedia' : 'unknown'
 
-    return { role, visibility: 'hiddenNonMedia', badge: { value: 'File', tone: 'muted' } }
+    return { role, visibility: 'hiddenNonMedia' }
   }
 
   const ext = normalized.slice(lastDotIndex).toLowerCase()
 
   if (audioExtensions.has(ext)) {
-    return { role: 'audio', visibility: 'defaultVisible', badge: { value: 'Audio', tone: 'muted' } }
+    return { role: 'audio', visibility: 'defaultVisible' }
   }
 
   if (videoExtensions.has(ext)) {
-    return { role: 'video', visibility: 'defaultVisible', badge: { value: 'Video', tone: 'muted' } }
+    return { role: 'video', visibility: 'defaultVisible' }
   }
 
   if (cueSheetExtensions.has(ext)) {
     return {
       role: 'cueSheet',
-      visibility: 'defaultVisible',
-      badge: { value: 'Cue', tone: 'muted' }
+      visibility: 'defaultVisible'
     }
   }
 
   if (playlistExtensions.has(ext)) {
     return {
       role: 'playlist',
-      visibility: 'companionVisible',
-      badge: { value: 'Playlist', tone: 'muted' }
+      visibility: 'companionVisible'
     }
   }
 
   if (artworkExtensions.has(ext)) {
     return {
       role: 'artwork',
-      visibility: 'companionVisible',
-      badge: { value: 'Artwork', tone: 'muted' }
+      visibility: 'companionVisible'
     }
   }
 
   if (metadataExtensions.has(ext)) {
     return {
       role: 'metadata',
-      visibility: 'companionVisible',
-      badge: { value: 'Metadata', tone: 'muted' }
+      visibility: 'companionVisible'
     }
   }
 
   if (hiddenSystemExtensions.has(ext)) {
     return {
       role: 'nonMedia',
-      visibility: 'hiddenNonMedia',
-      badge: { value: 'System', tone: 'muted' }
+      visibility: 'hiddenNonMedia'
     }
   }
 
-  return { role: 'unknown', visibility: 'hiddenNonMedia', badge: { value: 'File', tone: 'muted' } }
+  return { role: 'unknown', visibility: 'hiddenNonMedia' }
 }
 
 export function isDefaultVisibleLibraryEntry(

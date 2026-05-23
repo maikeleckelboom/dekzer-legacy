@@ -13,7 +13,7 @@ import {
   VideoIcon,
   WarningIcon
 } from '../../icons'
-import type { IconComponent } from '../../icons'
+import type { IconComponent, IconTone } from '../../icons'
 import {
   type ContentProjection,
   type ContentRow,
@@ -29,34 +29,47 @@ defineProps<{
   activateRowAction: (row: ContentRow) => void
 }>()
 
-function formatContentRowKind(kind: ContentRow['kind']): string {
-  switch (kind) {
-    case 'directory':
-      return 'Directory'
-    case 'file':
-      return 'File'
-    case 'state':
-      return 'State'
-    case 'more':
-      return 'More'
-  }
-}
+function formatContentDetail(row: ContentRow): string {
+  if (row.state === 'empty') return 'Empty folder'
+  if (row.state === 'notLoaded') return 'Not loaded'
+  if (row.state === 'loading') return 'Loading'
+  if (row.state === 'failed') return 'Unavailable'
+  if (row.state === 'unsupported') return 'Unsupported'
+  if (row.state === 'file' && row.kind === 'state') return row.detail ?? ''
 
-function formatContentPresence(presence: ContentRow['presence']): string {
-  switch (presence) {
-    case 'present':
-      return 'Present'
-    case 'missing':
-      return 'Missing'
-    case 'removed':
-      return 'Removed'
-    default:
-      return '-'
-  }
-}
+  if (row.kind === 'state') return row.detail ?? ''
+  if (row.kind === 'more') return ''
 
-function formatContentUpdated(): string {
-  return '-'
+  if (row.kind === 'directory') {
+    if (row.presence === 'missing') return 'Missing'
+    if (row.presence === 'removed') return 'Removed'
+    return 'Folder'
+  }
+
+  if (row.kind === 'file') {
+    const icon = row.icon
+    switch (icon) {
+      case 'music':
+        return 'Audio'
+      case 'video':
+        return 'Video'
+      case 'cueSheet':
+        return 'Cue sheet'
+      case 'image':
+        return 'Artwork'
+      case 'playlist':
+        return 'Playlist'
+      case 'metadata':
+        return 'Metadata'
+      default:
+        break
+    }
+    if (row.presence === 'missing') return 'Missing'
+    if (row.presence === 'removed') return 'Removed'
+    return 'File'
+  }
+
+  return ''
 }
 
 function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconComponent | undefined {
@@ -85,6 +98,48 @@ function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconComponent 
       return StateIcon
     default:
       return undefined
+  }
+}
+
+function iconToneForRow(row: ContentRow): IconTone {
+  if (row.kind === 'state') {
+    if (row.state === 'empty' || row.state === 'notLoaded') return 'muted'
+    if (row.state === 'failed' || row.state === 'unsupported') return 'warning'
+    return 'muted'
+  }
+
+  const icon = row.icon
+  switch (icon) {
+    case 'music':
+    case 'video':
+      return 'primary'
+    case 'image':
+    case 'cueSheet':
+    case 'playlist':
+    case 'metadata':
+      return 'muted'
+    case 'warning':
+      return 'warning'
+    default:
+      return 'inherit'
+  }
+}
+
+function labelClassForRow(row: ContentRow): string {
+  if (row.kind === 'state') return 'text-(--color-text-muted)'
+
+  const icon = row.icon
+  switch (icon) {
+    case 'music':
+    case 'video':
+      return 'text-(--color-text)'
+    case 'image':
+    case 'cueSheet':
+    case 'playlist':
+    case 'metadata':
+      return 'text-(--color-text-muted)'
+    default:
+      return 'text-(--color-text)'
   }
 }
 
@@ -118,21 +173,20 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
     </header>
 
     <div class="overflow-x-auto">
-      <table class="min-w-[44rem] w-full table-fixed border-collapse text-left text-sm">
+      <table class="min-w-full w-full table-fixed border-collapse text-left text-sm">
         <thead class="border-b border-(--color-border) text-xs uppercase text-(--color-text-muted)">
           <tr>
-            <th class="w-[42%] px-4 py-2 font-bold">Name</th>
-            <th class="w-[13%] px-3 py-2 font-bold">Kind</th>
-            <th class="w-[13%] px-3 py-2 font-bold">Presence</th>
-            <th class="w-[12%] px-3 py-2 font-bold">Updated</th>
-            <th class="w-[20%] px-3 py-2 font-bold">Status</th>
+            <th class="w-[70%] px-4 py-2 font-bold">Name</th>
+            <th class="w-[30%] px-4 py-2 font-bold">Details</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-(--color-border)">
           <tr
             v-for="row in projection.rows"
             :key="row.id"
-            class="text-(--color-text-muted)"
+            :class="
+              row.state === 'failed' || row.state === 'unsupported' ? 'text-(--color-warning)' : ''
+            "
             :data-content-row-kind="row.kind"
           >
             <td class="px-4 py-2 align-middle">
@@ -142,9 +196,10 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
                     v-if="row.icon !== undefined"
                     :icon="resolveContentRowIcon(row.icon) ?? StateIcon"
                     size="sm"
+                    :tone="iconToneForRow(row)"
                   />
                 </span>
-                <span class="min-w-0 flex-1 truncate font-semibold text-(--color-text)">
+                <span class="min-w-0 flex-1 truncate font-semibold" :class="labelClassForRow(row)">
                   {{ row.label }}
                 </span>
                 <button
@@ -158,17 +213,8 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
                 </button>
               </div>
             </td>
-            <td class="px-3 py-2 align-middle">
-              {{ formatContentRowKind(row.kind) }}
-            </td>
-            <td class="px-3 py-2 align-middle">
-              {{ formatContentPresence(row.presence) }}
-            </td>
-            <td class="px-3 py-2 align-middle font-mono text-xs">
-              {{ formatContentUpdated() }}
-            </td>
-            <td class="px-3 py-2 align-middle text-xs leading-5">
-              {{ row.detail ?? '-' }}
+            <td class="px-4 py-2 align-middle text-xs leading-5 text-(--color-text-muted)">
+              {{ formatContentDetail(row) }}
             </td>
           </tr>
         </tbody>

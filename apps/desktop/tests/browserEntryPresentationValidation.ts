@@ -30,59 +30,48 @@ function validatesFolderClassification(): void {
 
   assert.equal(result.role, 'folder')
   assert.equal(result.visibility, 'defaultVisible')
-  assert.deepEqual(result.badge, { value: 'Folder', tone: 'muted' })
   assert.equal(isDefaultVisibleLibraryEntry('My Music', { isDirectory: true }), true)
 }
 
 function validatesAudioClassification(): void {
   const audioFiles = [
-    ['track.mp3', 'Audio'],
-    ['song.flac', 'Audio'],
-    ['recording.wav', 'Audio'],
-    ['master.aiff', 'Audio'],
-    ['sample.aif', 'Audio'],
-    ['podcast.m4a', 'Audio'],
-    ['voice.aac', 'Audio'],
-    ['live.ogg', 'Audio'],
-    ['ambient.opus', 'Audio'],
-    ['old.wma', 'Audio'],
-    ['lossless.alac', 'Audio']
+    'track.mp3',
+    'song.flac',
+    'recording.wav',
+    'master.aiff',
+    'sample.aif',
+    'podcast.m4a',
+    'voice.aac',
+    'live.ogg',
+    'ambient.opus',
+    'old.wma',
+    'lossless.alac'
   ] as const
 
-  for (const [name, expectedBadge] of audioFiles) {
+  for (const name of audioFiles) {
     const result = classifyLibraryEntryName(name)
 
     assert.equal(result.role, 'audio', `Expected ${name} to be audio, got ${result.role}`)
     assert.equal(result.visibility, 'defaultVisible', `Expected ${name} to be defaultVisible`)
-    assert.deepEqual(
-      result.badge,
-      { value: expectedBadge, tone: 'muted' },
-      `Expected ${name} badge to be ${expectedBadge}`
-    )
     assert.equal(isDefaultVisibleLibraryEntry(name), true, `Expected ${name} to be default visible`)
   }
 }
 
 function validatesVideoClassification(): void {
   const videoFiles = [
-    ['movie.mp4', 'Video'],
-    ['clip.mov', 'Video'],
-    ['video.mkv', 'Video'],
-    ['old.avi', 'Video'],
-    ['stream.webm', 'Video'],
-    ['itunes.m4v', 'Video']
+    'movie.mp4',
+    'clip.mov',
+    'video.mkv',
+    'old.avi',
+    'stream.webm',
+    'itunes.m4v'
   ] as const
 
-  for (const [name, expectedBadge] of videoFiles) {
+  for (const name of videoFiles) {
     const result = classifyLibraryEntryName(name)
 
     assert.equal(result.role, 'video', `Expected ${name} to be video, got ${result.role}`)
     assert.equal(result.visibility, 'defaultVisible', `Expected ${name} to be defaultVisible`)
-    assert.deepEqual(
-      result.badge,
-      { value: expectedBadge, tone: 'muted' },
-      `Expected ${name} badge to be ${expectedBadge}`
-    )
     assert.equal(isDefaultVisibleLibraryEntry(name), true, `Expected ${name} to be default visible`)
   }
 }
@@ -92,40 +81,28 @@ function validatesCueSheetClassification(): void {
 
   assert.equal(result.role, 'cueSheet')
   assert.equal(result.visibility, 'defaultVisible')
-  assert.deepEqual(result.badge, { value: 'Cue', tone: 'muted' })
   assert.equal(isDefaultVisibleLibraryEntry('album.cue'), true)
 }
 
 function validatesPlaylistClassification(): void {
-  const playlistFiles = [
-    ['mix.m3u', 'Playlist'],
-    ['set.m3u8', 'Playlist'],
-    ['radio.pls', 'Playlist']
-  ] as const
+  const playlistFiles = ['mix.m3u', 'set.m3u8', 'radio.pls'] as const
 
-  for (const [name, expectedBadge] of playlistFiles) {
+  for (const name of playlistFiles) {
     const result = classifyLibraryEntryName(name)
 
     assert.equal(result.role, 'playlist', `Expected ${name} to be playlist, got ${result.role}`)
     assert.equal(result.visibility, 'companionVisible', `Expected ${name} to be companionVisible`)
-    assert.deepEqual(result.badge, { value: expectedBadge, tone: 'muted' })
   }
 }
 
 function validatesArtworkClassification(): void {
-  const artworkFiles = [
-    ['cover.jpg', 'Artwork'],
-    ['folder.png', 'Artwork'],
-    ['artwork.webp', 'Artwork'],
-    ['albumart.jpeg', 'Artwork']
-  ] as const
+  const artworkFiles = ['cover.jpg', 'folder.png', 'artwork.webp', 'albumart.jpeg'] as const
 
-  for (const [name, expectedBadge] of artworkFiles) {
+  for (const name of artworkFiles) {
     const result = classifyLibraryEntryName(name)
 
     assert.equal(result.role, 'artwork', `Expected ${name} to be artwork, got ${result.role}`)
     assert.equal(result.visibility, 'companionVisible', `Expected ${name} to be companionVisible`)
-    assert.deepEqual(result.badge, { value: expectedBadge, tone: 'muted' })
   }
 }
 
@@ -134,7 +111,6 @@ function validatesMetadataClassification(): void {
 
   assert.equal(result.role, 'metadata')
   assert.equal(result.visibility, 'companionVisible')
-  assert.deepEqual(result.badge, { value: 'Metadata', tone: 'muted' })
 }
 
 function validatesHiddenSystemFiles(): void {
