@@ -134,13 +134,13 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
       return
     }
 
-    if (item.canRevealChildren) {
-      options.toggleNode(nodeId)
+    if (item.canActivateAction) {
+      options.activateAction(nodeId)
       return
     }
 
-    if (item.canActivateAction) {
-      options.activateAction(nodeId)
+    if (item.canRevealChildren) {
+      options.toggleNode(nodeId)
       return
     }
   }

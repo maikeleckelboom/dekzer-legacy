@@ -158,6 +158,7 @@ function main(): void {
   validatesPrimaryActivation()
   validatesLoadedEmptyTreeProjection()
   validatesUnsupportedNavigationRowsHiddenFromTree()
+  validatesDirectoryCoverageFactProjection()
   validatesDisclosureAffordanceHints()
   validatesSourcePathHumanizedAsLabel()
 }
@@ -678,6 +679,7 @@ function validatesLibraryHierarchyReadProjection(): void {
             label: 'Album',
             icon: 'folder',
             detail: 'Folder',
+            hasDirectoryDisclosureHint: true,
             children: {
               kind: 'deferred',
               detail: 'Contents not loaded yet.'
@@ -703,7 +705,7 @@ function validatesLibraryHierarchyReadProjection(): void {
     ['navigation-row:7', 'source-directory:12']
   )
   assert.equal(getItem(directoryItems, 'source-directory:12').isBranch, true)
-  assert.equal(getItem(directoryItems, 'source-directory:12').canRevealChildren, false)
+  assert.equal(getItem(directoryItems, 'source-directory:12').canRevealChildren, true)
   assert.equal(getItem(directoryItems, 'source-directory:12').canActivateAction, true)
   assert.deepEqual(
     [...directoryProjection.bindingsById.entries()].filter(
@@ -814,6 +816,24 @@ function assertFixtureNodesHaveExplicitChildrenState(nodes: readonly BrowserTree
     assert.equal(typeof node.children.kind, 'string')
     assertFixtureNodesHaveExplicitChildrenState(getLoadedBrowserTreeChildren(node))
   }
+}
+
+function findProjectedNode(
+  nodes: readonly BrowserTreeNode[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeNode | undefined {
+  for (const node of nodes) {
+    if (node.id === nodeId) {
+      return node
+    }
+
+    const childMatch = findProjectedNode(getLoadedBrowserTreeChildren(node), nodeId)
+    if (childMatch !== undefined) {
+      return childMatch
+    }
+  }
+
+  return undefined
 }
 
 function resolveIntent(
@@ -1040,6 +1060,19 @@ function navigationSourceReadRowsResult(): NavigationReadRowsResult {
 }
 
 function directoryHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> {
+  return directoryHierarchyReadResultWithFacts({
+    hasChildDirectories: true,
+    directoryMediaState: { kind: 'hasMediaDescendants' },
+    directoryScanState: 'scanning'
+  })
+}
+
+function directoryHierarchyReadResultWithFacts(
+  facts: Pick<
+    Extract<ChildWindow['nodes'][number], { readonly kind: 'directory' }>,
+    'hasChildDirectories' | 'directoryMediaState' | 'directoryScanState'
+  >
+): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
     window: {
@@ -1061,7 +1094,7 @@ function directoryHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }>
           label: 'Album',
           directoryId: '12',
           presence: 'present',
-          browseability: 'browseable',
+          ...facts,
           updatedAtMs: 100
         }
       ]
@@ -1598,12 +1631,115 @@ function validatesDisclosureAffordanceHints(): void {
 
   const leafItems = flattenVisibleTree({
     nodes: [leafRootNode()],
-    expandedNodeIds: new Set()
+    expandedNodeIds: new Set(['leaf-root'])
   })
   const leafItem = leafItems[0]
   assert.equal(leafItem?.canRevealChildren, false)
   assert.equal(leafItem?.canActivateAction, false)
   assert.equal(leafItem?.isExpanded, false)
+
+  const loadingStateOnlyItems = flattenVisibleTree({
+    nodes: [
+      {
+        id: 'state-only-root',
+        role: 'source',
+        label: 'State only',
+        children: {
+          kind: 'loaded',
+          nodes: [
+            {
+              id: 'state-only-child',
+              role: 'state',
+              label: 'Loading',
+              children: { kind: 'none' }
+            }
+          ]
+        }
+      }
+    ],
+    expandedNodeIds: new Set(['state-only-root'])
+  })
+  const stateOnlyItem = loadingStateOnlyItems[0]
+  assert.equal(stateOnlyItem?.canRevealChildren, false)
+  assert.equal(stateOnlyItem?.isExpanded, false)
+}
+
+function validatesDirectoryCoverageFactProjection(): void {
+  const positiveMediaProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          children: loadedChildrenFromWindow(
+            directoryHierarchyReadResultWithFacts({
+              hasChildDirectories: false,
+              directoryMediaState: { kind: 'hasMediaDescendants' },
+              directoryScanState: 'scanning'
+            }).window
+          )
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
+  const positiveMediaNode = findProjectedNode(
+    positiveMediaProjection?.kind === 'tree' ? positiveMediaProjection.nodes : [],
+    'source-directory:12'
+  )
+  assert.equal(positiveMediaNode?.hasDirectoryDisclosureHint, true)
+
+  const confirmedNoMediaProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          children: loadedChildrenFromWindow(
+            directoryHierarchyReadResultWithFacts({
+              hasChildDirectories: false,
+              directoryMediaState: { kind: 'noMediaDescendants' },
+              directoryScanState: 'complete'
+            }).window
+          )
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
+  const confirmedNoMediaNode = findProjectedNode(
+    confirmedNoMediaProjection?.kind === 'tree' ? confirmedNoMediaProjection.nodes : [],
+    'source-directory:12'
+  )
+  assert.equal(confirmedNoMediaNode?.children.kind, 'none')
+
+  const unknownMediaProjection = projectState({
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'loaded',
+          children: loadedChildrenFromWindow(
+            directoryHierarchyReadResultWithFacts({
+              hasChildDirectories: false,
+              directoryMediaState: { kind: 'unknown' },
+              directoryScanState: 'pending'
+            }).window
+          )
+        }
+      ]
+    ]),
+    directoryReadStates: new Map()
+  })
+  const unknownMediaNode = findProjectedNode(
+    unknownMediaProjection?.kind === 'tree' ? unknownMediaProjection.nodes : [],
+    'source-directory:12'
+  )
+  assert.equal(unknownMediaNode?.children.kind, 'deferred')
+  assert.equal(unknownMediaNode?.hasDirectoryDisclosureHint, undefined)
 }
 
 function navigationRowWithSelectorKind(

@@ -24,7 +24,7 @@ const rowStyle = computed(() => ({
   paddingLeft: `${0.75 + (props.item.level - 1) * 1.25}rem`
 }))
 
-const hasAffordance = computed(() => props.item.canRevealChildren || props.item.isExpanded)
+const hasAffordance = computed(() => props.item.canRevealChildren)
 
 const rowIcon = computed<IconComponent | undefined>(() =>
   resolveBrowserTreeRowIcon(props.item.node, props.item.isExpanded)

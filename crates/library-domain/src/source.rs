@@ -57,6 +57,7 @@ impl SourceResolutionStatus {
 pub enum SourceScanPhase {
     Idle,
     Scanning,
+    Complete,
     Blocked,
     Failed,
 }
@@ -66,6 +67,7 @@ impl SourceScanPhase {
         match self {
             Self::Idle => "idle",
             Self::Scanning => "scanning",
+            Self::Complete => "complete",
             Self::Blocked => "blocked",
             Self::Failed => "failed",
         }
@@ -75,6 +77,7 @@ impl SourceScanPhase {
         match value {
             "idle" => Some(Self::Idle),
             "scanning" => Some(Self::Scanning),
+            "complete" => Some(Self::Complete),
             "blocked" => Some(Self::Blocked),
             "failed" => Some(Self::Failed),
             _ => None,

@@ -31,7 +31,9 @@ pub struct StoreLiteralHierarchyNode {
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
     pub updated_at: i64,
-    pub media_browseability: Option<String>,
+    pub has_child_directories: Option<bool>,
+    pub has_media_descendant: Option<bool>,
+    pub dir_scan_state: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -324,7 +326,9 @@ fn read_child_rows(
                 size_bytes,
                 modified_at_ns,
                 updated_at,
-                media_browseability
+                has_child_directories,
+                has_media_descendant,
+                dir_scan_state
          FROM (
              SELECT 0 AS sort_kind,
                     'directory' AS node_kind,
@@ -338,7 +342,9 @@ fn read_child_rows(
                     NULL AS size_bytes,
                     NULL AS modified_at_ns,
                     updated_at,
-                    media_browseability
+                    has_child_directories,
+                    has_media_descendant,
+                    dir_scan_state
              FROM source_directories
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -359,7 +365,9 @@ fn read_child_rows(
                     size_bytes,
                     mtime_ns AS modified_at_ns,
                     updated_at,
-                    NULL AS media_browseability
+                    NULL AS has_child_directories,
+                    NULL AS has_media_descendant,
+                    NULL AS dir_scan_state
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -391,7 +399,9 @@ fn read_child_rows(
                     size_bytes: row.get(8)?,
                     modified_at_ns: row.get(9)?,
                     updated_at: row.get(10)?,
-                    media_browseability: row.get(11)?,
+                    has_child_directories: row.get(11)?,
+                    has_media_descendant: row.get(12)?,
+                    dir_scan_state: row.get(13)?,
                 })
             },
         )?

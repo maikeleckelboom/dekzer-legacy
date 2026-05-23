@@ -75,36 +75,25 @@ const treeRootProps = computed(() => ({
   emptyLabel: emptyTreeLabel,
   labelledBy: 'library-hierarchy-title',
   nodes: liveTreeNodes.value,
-  selectedNodeId: selectedNodeId.value
+  ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
 }))
 
-const browserState = computed<BrowserState>(() => {
-  const state: BrowserState = {
-    sourceReadStates: hierarchyRead.sourceReadStates.value,
-    directoryReadStates: hierarchyRead.directoryReadStates.value
-  }
-
-  if (hierarchyRead.navigationReadResult.value !== undefined) {
-    state.navigationReadResult = hierarchyRead.navigationReadResult.value
-  }
-
-  return state
-})
+const browserState = computed<BrowserState>(() => ({
+  sourceReadStates: hierarchyRead.sourceReadStates.value,
+  directoryReadStates: hierarchyRead.directoryReadStates.value,
+  ...(hierarchyRead.navigationReadResult.value === undefined
+    ? {}
+    : { navigationReadResult: hierarchyRead.navigationReadResult.value })
+}))
 
 const contentsProjection = computed(() => {
-  const input: Parameters<typeof projectContents>[0] = {
-    state: browserState.value
-  }
+  const projection = hierarchyRead.browserProjection.value
 
-  if (selectedNodeId.value !== undefined) {
-    input.selectedNodeId = selectedNodeId.value
-  }
-
-  if (hierarchyRead.browserProjection.value !== undefined) {
-    input.bindingsById = hierarchyRead.browserProjection.value.bindingsById
-  }
-
-  return projectContents(input)
+  return projectContents({
+    state: browserState.value,
+    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
+    ...(projection === undefined ? {} : { bindingsById: projection.bindingsById })
+  })
 })
 
 watch(
@@ -155,8 +144,8 @@ watch(hierarchyRead.hostStatus, (status) => {
 function saveViewState(): void {
   viewStateStore.save({
     version: 1,
-    selectedNodeId: selectedNodeId.value,
-    expandedNodeIds: [...expandedNodeIds.value]
+    expandedNodeIds: [...expandedNodeIds.value],
+    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
   })
 }
 

@@ -84,6 +84,7 @@ export type BrowserTreeNode = {
   readonly icon?: BrowserTreeIcon
   readonly children: BrowserTreeChildren
   readonly action?: BrowserTreeAction
+  readonly hasDirectoryDisclosureHint?: boolean
 }
 
 export type BrowserTreeVisibleItem = {

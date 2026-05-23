@@ -126,6 +126,7 @@ impl RootResolutionStatus {
 pub enum RootScanPhase {
     Idle,
     Scanning,
+    Complete,
     BlockedUnavailable,
     InterruptedUnavailable,
     Failed,
@@ -355,7 +356,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             return Err(LibrarySqliteError::MissingRoot(root_id));
         };
         let mut next = record.state.clone();
-        next.scan_phase = RootScanPhase::Idle;
+        next.scan_phase = RootScanPhase::Complete;
         next.last_scan_finished_at = Some(
             next.last_scan_finished_at
                 .unwrap_or(completed_at_ms)
@@ -1229,6 +1230,7 @@ fn parse_scan_phase(
     match value {
         "idle" => Ok(RootScanPhase::Idle),
         "scanning" => Ok(RootScanPhase::Scanning),
+        "complete" => Ok(RootScanPhase::Complete),
         "blocked" => Ok(if blocked_reason == Some(BLOCKED_REASON_SCAN_INTERRUPTED) {
             RootScanPhase::InterruptedUnavailable
         } else {
@@ -1243,6 +1245,7 @@ fn source_scan_phase_value(phase: RootScanPhase) -> &'static str {
     match phase {
         RootScanPhase::Idle => "idle",
         RootScanPhase::Scanning => "scanning",
+        RootScanPhase::Complete => "complete",
         RootScanPhase::BlockedUnavailable | RootScanPhase::InterruptedUnavailable => "blocked",
         RootScanPhase::Failed => "failed",
     }

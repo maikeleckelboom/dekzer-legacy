@@ -114,13 +114,15 @@ export type LiteralHierarchyEntryPoint = { "type": "source", "payload": { source
 
 export type LiteralHierarchyWindow = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LiteralHierarchyNode>, };
 
-export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, mediaBrowseability: LiteralHierarchyBrowseability | null, };
+export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryMediaState?: DirectoryMediaState, directoryScanState?: DirectoryScanState, };
 
 export type LiteralHierarchyNodeKind = "directory" | "file";
 
 export type LiteralHierarchyPresenceState = "present" | "missing" | "removed";
 
-export type LiteralHierarchyBrowseability = "unknown" | "browseable" | "empty";
+export type DirectoryMediaState = { "kind": "unknown" } | { "kind": "hasMediaDescendants" } | { "kind": "noMediaDescendants" };
+
+export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
 
 export type LibraryBrowserWindow = { offset: number, limit: number, totalRows: number, rows: Array<LibraryAssetBrowserRow>, };
 

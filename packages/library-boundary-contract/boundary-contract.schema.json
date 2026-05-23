@@ -287,6 +287,56 @@
         "playlistId"
       ]
     },
+    "DirectoryMediaState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "unknown"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "hasMediaDescendants"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "noMediaDescendants"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "DirectoryScanState": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "scanning",
+        "complete",
+        "failed",
+        "blocked"
+      ]
+    },
     "LibraryAssetAvailabilityState": {
       "type": "string",
       "enum": [
@@ -1018,14 +1068,6 @@
         }
       ]
     },
-    "LiteralHierarchyBrowseability": {
-      "type": "string",
-      "enum": [
-        "unknown",
-        "browseable",
-        "empty"
-      ]
-    },
     "LiteralHierarchyEntryPoint": {
       "oneOf": [
         {
@@ -1081,17 +1123,33 @@
     "LiteralHierarchyNode": {
       "type": "object",
       "properties": {
-        "displayName": {
-          "type": "string"
-        },
-        "mediaBrowseability": {
+        "directoryMediaState": {
           "anyOf": [
             {
-              "$ref": "#/$defs/LiteralHierarchyBrowseability"
+              "$ref": "#/$defs/DirectoryMediaState"
             },
             {
               "type": "null"
             }
+          ]
+        },
+        "directoryScanState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DirectoryScanState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "hasChildDirectories": {
+          "type": [
+            "boolean",
+            "null"
           ]
         },
         "modifiedAtNs": {

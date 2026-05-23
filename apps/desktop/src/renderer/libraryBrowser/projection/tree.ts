@@ -302,7 +302,14 @@ function projectLiteralNode(options: {
 
     const dirBadge = presenceBadge(node.presence)
 
-    if (isUnloaded && node.browseability === 'empty') {
+    const hasDirectoryDisclosureHint =
+      node.hasChildDirectories || node.directoryMediaState.kind === 'hasMediaDescendants'
+
+    if (
+      isUnloaded &&
+      !node.hasChildDirectories &&
+      node.directoryMediaState.kind === 'noMediaDescendants'
+    ) {
       return {
         id: node.id,
         role: 'literalDirectory',
@@ -321,6 +328,7 @@ function projectLiteralNode(options: {
       ...(dirBadge === undefined ? {} : { badge: dirBadge }),
       icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
+      ...(hasDirectoryDisclosureHint ? { hasDirectoryDisclosureHint: true } : {}),
       ...projectDirectoryChildren({
         ownerId: node.id,
         state: directoryState,

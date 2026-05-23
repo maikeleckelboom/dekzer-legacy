@@ -550,9 +550,9 @@ fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol:
 mod tests {
     use library_boundary_protocol::{
         CommandOutcome, CommandReply, CommandRequest, CreatePlaylistReply, CreatePlaylistRequest,
-        DeletePlaylistReply, DeletePlaylistRequest, LibraryBoundaryEvent,
-        LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
-        LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
+        DeletePlaylistReply, DeletePlaylistRequest, DirectoryMediaState, DirectoryScanState,
+        LibraryBoundaryEvent, LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
+        LibraryRootCommand, LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
         LiteralHierarchyPresenceState, LoadNavigationRowByStableKeyReply,
         LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
         PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsReply,
@@ -857,6 +857,15 @@ mod tests {
             crate_row.presence_state,
             LiteralHierarchyPresenceState::Present
         );
+        assert_eq!(crate_row.has_child_directories, Some(false));
+        assert_eq!(
+            crate_row.directory_media_state,
+            Some(DirectoryMediaState::HasMediaDescendants)
+        );
+        assert_eq!(
+            crate_row.directory_scan_state,
+            Some(DirectoryScanState::Complete)
+        );
         let crate_directory_id = crate_row
             .source_directory_id
             .expect("directory rows carry durable ids");
@@ -877,6 +886,9 @@ mod tests {
         assert_eq!(file_row.display_name, "amen.wav");
         assert_eq!(file_row.relative_path, "Crate/amen.wav");
         assert!(file_row.source_file_id.is_some());
+        assert_eq!(file_row.has_child_directories, None);
+        assert_eq!(file_row.directory_media_state, None);
+        assert_eq!(file_row.directory_scan_state, None);
 
         drop(service);
         let reopened = LibraryBoundaryService::open(context).expect("reopen boundary service");

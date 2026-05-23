@@ -64,7 +64,18 @@ export type NodeKind = 'directory' | 'file'
 
 export type Presence = 'present' | 'missing' | 'removed'
 
-export type DirectoryBrowseability = 'unknown' | 'browseable' | 'empty'
+export type DirectoryMediaState =
+  | {
+      readonly kind: 'unknown'
+    }
+  | {
+      readonly kind: 'hasMediaDescendants'
+    }
+  | {
+      readonly kind: 'noMediaDescendants'
+    }
+
+export type DirectoryScanState = 'pending' | 'scanning' | 'complete' | 'failed' | 'blocked'
 
 export type ChildRow =
   | {
@@ -74,7 +85,9 @@ export type ChildRow =
       readonly directoryId: string
       readonly parentDirectoryId?: string
       readonly presence: Presence
-      readonly browseability: DirectoryBrowseability
+      readonly hasChildDirectories: boolean
+      readonly directoryMediaState: DirectoryMediaState
+      readonly directoryScanState: DirectoryScanState
       readonly updatedAtMs: number
     }
   | {

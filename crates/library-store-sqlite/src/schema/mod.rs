@@ -192,6 +192,25 @@ mod tests {
             .expect("collect table indexes")
     }
 
+    fn insert_schema_test_source(connection: &Connection) {
+        connection
+            .execute(
+                "INSERT INTO sources (
+                     source_id,
+                     source_class,
+                     authority,
+                     identity_key,
+                     display_name,
+                     is_user_visible,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (1, 'internal', 'system', 'schema:test', 'Schema Test', 1, 1, 1)",
+                [],
+            )
+            .expect("insert schema test source");
+    }
+
     #[test]
     fn ensure_baseline_schema_installs_the_canonical_schema_into_an_empty_database() {
         let mut connection = Connection::open_in_memory().expect("open in-memory database");
@@ -306,11 +325,38 @@ mod tests {
                 "name",
                 "relative_path",
                 "presence_state",
-                "media_browseability",
+                "has_child_directories",
+                "has_media_descendant",
+                "dir_scan_state",
+                "dir_scan_error_kind",
+                "dir_scan_error_detail",
+                "dir_scan_updated_at",
+                "scanned_at",
+                "mtime_ns",
                 "created_at",
                 "updated_at",
             ]
         );
+        assert!(
+            table_index_names(&connection, "source_directories")
+                .contains(&"source_directories_source_relative_path_binary".to_string())
+        );
+        assert!(
+            table_index_names(&connection, "source_files")
+                .contains(&"source_files_source_relative_path_binary".to_string())
+        );
+        assert!(
+            table_foreign_keys(&connection, "source_directories").contains(&(
+                "source_directories".to_string(),
+                "parent_source_directory_id".to_string(),
+                "CASCADE".to_string(),
+            ))
+        );
+        assert!(table_foreign_keys(&connection, "source_files").contains(&(
+            "source_directories".to_string(),
+            "parent_source_directory_id".to_string(),
+            "CASCADE".to_string(),
+        )));
         assert_eq!(
             table_column_names(&connection, "source_files"),
             vec![
@@ -347,6 +393,158 @@ mod tests {
                 "row_version",
             ]
         );
+    }
+
+    #[test]
+    fn source_directory_coverage_facts_accept_pending_positive_and_confirmed_negative_states() {
+        let connection = install_test_baseline();
+        insert_schema_test_source(&connection);
+
+        connection
+            .execute(
+                "INSERT INTO source_directories (
+                     source_directory_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     presence_state,
+                     has_child_directories,
+                     has_media_descendant,
+                     dir_scan_state,
+                     dir_scan_updated_at,
+                     scanned_at,
+                     mtime_ns,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (10, 1, NULL, 'pending', 'pending', 'present', 0, 0, 'pending', 100, NULL, NULL, 100, 100)",
+                [],
+            )
+            .expect("pending directory coverage facts are accepted");
+
+        connection
+            .execute(
+                "INSERT INTO source_directories (
+                     source_directory_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     presence_state,
+                     has_media_descendant,
+                     dir_scan_state,
+                     dir_scan_updated_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (11, 1, NULL, 'scanning-media', 'scanning-media', 'present', 1, 'scanning', 101, 101, 101)",
+                [],
+            )
+            .expect("positive media knowledge before coverage completion is accepted");
+
+        connection
+            .execute(
+                "INSERT INTO source_directories (
+                     source_directory_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     presence_state,
+                     has_media_descendant,
+                     dir_scan_state,
+                     dir_scan_updated_at,
+                     scanned_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (12, 1, NULL, 'complete-empty', 'complete-empty', 'present', 0, 'complete', 102, 102, 102, 102)",
+                [],
+            )
+            .expect("confirmed no-media directory coverage facts are accepted");
+    }
+
+    #[test]
+    fn source_directory_parent_deletion_cascades_to_child_directories_and_files() {
+        let connection = install_test_baseline();
+        connection
+            .execute_batch("PRAGMA foreign_keys = ON;")
+            .expect("enable foreign keys");
+        insert_schema_test_source(&connection);
+
+        connection
+            .execute(
+                "INSERT INTO source_directories (
+                     source_directory_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     presence_state,
+                     dir_scan_updated_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (20, 1, NULL, 'parent', 'parent', 'present', 100, 100, 100)",
+                [],
+            )
+            .expect("insert parent directory");
+        connection
+            .execute(
+                "INSERT INTO source_directories (
+                     source_directory_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     presence_state,
+                     dir_scan_updated_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (21, 1, 20, 'child', 'parent/child', 'present', 101, 101, 101)",
+                [],
+            )
+            .expect("insert child directory");
+        connection
+            .execute(
+                "INSERT INTO source_files (
+                     source_file_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     presence_state,
+                     first_discovered_at,
+                     last_observed_at,
+                     last_presence_change_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (30, 1, 21, 'track.flac', 'parent/child/track.flac', 'present', 102, 102, 102, 102, 102)",
+                [],
+            )
+            .expect("insert child file");
+
+        connection
+            .execute(
+                "DELETE FROM source_directories WHERE source_directory_id = 20",
+                [],
+            )
+            .expect("delete parent directory");
+
+        let directory_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM source_directories", [], |row| {
+                row.get(0)
+            })
+            .expect("count directories after cascade");
+        let file_count: i64 = connection
+            .query_row("SELECT COUNT(*) FROM source_files", [], |row| row.get(0))
+            .expect("count files after cascade");
+
+        assert_eq!(directory_count, 0);
+        assert_eq!(file_count, 0);
     }
 
     #[test]

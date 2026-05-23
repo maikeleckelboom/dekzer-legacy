@@ -831,6 +831,9 @@ mod tests {
                 name: "album".to_string(),
                 relative_path: "album".to_string(),
                 presence_state: SourcePresenceState::Present,
+                dir_scan_state: None,
+                scanned_at: None,
+                mtime_ns: None,
                 first_created_at: Some(changed_at),
                 changed_at,
             })?;

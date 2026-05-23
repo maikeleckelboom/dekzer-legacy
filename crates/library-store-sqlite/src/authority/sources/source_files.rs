@@ -79,12 +79,13 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                     media_class,
                 ],
             )?;
+            self.propagate_media_descendant_fact(existing.source_file_id, input.updated_at)?;
             return Ok(existing.source_file_id);
         }
 
         let first_discovered_at = input.first_discovered_at.unwrap_or(input.updated_at);
         let last_observed_at = input.observed_at.or(Some(input.updated_at));
-        match input.source_file_id {
+        let source_file_id = match input.source_file_id {
             Some(source_file_id) => {
                 self.tx.execute(
                     "INSERT INTO source_files (
@@ -120,7 +121,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.updated_at,
                     ],
                 )?;
-                Ok(source_file_id)
+                source_file_id
             }
             None => {
                 self.tx.execute(
@@ -155,9 +156,11 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.updated_at,
                     ],
                 )?;
-                Ok(self.tx.last_insert_rowid())
+                self.tx.last_insert_rowid()
             }
-        }
+        };
+        self.propagate_media_descendant_fact(source_file_id, input.updated_at)?;
+        Ok(source_file_id)
     }
 
     fn load_existing_row(
@@ -198,5 +201,60 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                 .optional()?,
         };
         Ok(query)
+    }
+
+    fn propagate_media_descendant_fact(
+        &self,
+        source_file_id: i64,
+        updated_at: i64,
+    ) -> LibrarySqliteResult<()> {
+        let media_parent = self
+            .tx
+            .query_row(
+                "SELECT parent_source_directory_id
+                 FROM source_files
+                 WHERE source_file_id = ?1
+                   AND presence_state = 'present'
+                   AND media_class IN ('audio', 'video')",
+                [source_file_id],
+                |row| row.get::<_, Option<i64>>(0),
+            )
+            .optional()?
+            .flatten();
+
+        let Some(parent_source_directory_id) = media_parent else {
+            return Ok(());
+        };
+
+        self.tx.execute(
+            "WITH RECURSIVE media_up(source_directory_id) AS (
+                 SELECT ?1
+                 WHERE EXISTS (
+                     SELECT 1
+                     FROM source_directories
+                     WHERE source_directory_id = ?1
+                       AND has_media_descendant = 0
+                 )
+                 UNION ALL
+                 SELECT parent.source_directory_id
+                 FROM source_directories child
+                 JOIN media_up current
+                   ON current.source_directory_id = child.source_directory_id
+                 JOIN source_directories parent
+                   ON parent.source_directory_id = child.parent_source_directory_id
+                 WHERE child.parent_source_directory_id IS NOT NULL
+                   AND parent.has_media_descendant = 0
+             )
+             UPDATE source_directories
+             SET has_media_descendant = 1,
+                 dir_scan_updated_at = ?2,
+                 updated_at = ?2
+             WHERE source_directory_id IN (
+                 SELECT source_directory_id
+                 FROM media_up
+             )",
+            params![parent_source_directory_id, updated_at],
+        )?;
+        Ok(())
     }
 }

@@ -191,6 +191,16 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         if rows_changed == 0 {
             return Err(LibrarySqliteError::MissingRoot(root_id));
         }
+        self.tx().execute(
+            "UPDATE source_directories
+             SET dir_scan_state = 'pending',
+                 dir_scan_error_kind = NULL,
+                 dir_scan_error_detail = NULL,
+                 dir_scan_updated_at = ?2,
+                 updated_at = ?2
+             WHERE source_id = ?1",
+            params![root_id, started_at_ms],
+        )?;
 
         Ok(started_at_ms.max(1))
     }
@@ -201,7 +211,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         root_id: i64,
         locations: &[DiscoveredLocationInput],
     ) -> LibrarySqliteResult<DiscoveryChunkCommitResult> {
-        self.commit_chunk(root_id, locations)
+        self.commit_chunk(root_id, locations, Some("scanning"))
     }
 
     pub(crate) fn commit_import_chunk(
@@ -209,13 +219,14 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         root_id: i64,
         locations: &[DiscoveredLocationInput],
     ) -> LibrarySqliteResult<DiscoveryChunkCommitResult> {
-        self.commit_chunk(root_id, locations)
+        self.commit_chunk(root_id, locations, None)
     }
 
     fn commit_chunk(
         &mut self,
         root_id: i64,
         locations: &[DiscoveredLocationInput],
+        directory_scan_state: Option<&str>,
     ) -> LibrarySqliteResult<DiscoveryChunkCommitResult> {
         self.require_root(root_id)?;
         if locations.is_empty() {
@@ -245,12 +256,15 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                     self.upsert_directory_presence(
                         root_id,
                         &location.canonical_path,
+                        location.modified_at_ns,
                         location.observed_at_ms,
+                        directory_scan_state,
                     )?;
                     observed_directory_paths.push(location.canonical_path.clone());
                 }
                 DiscoveredLocationKind::File => {
-                    let processed = self.process_discovered_file(root_id, location)?;
+                    let processed =
+                        self.process_discovered_file(root_id, location, directory_scan_state)?;
                     observed_file_paths.push(location.canonical_path.clone());
                     if processed.is_new_file {
                         files_new += 1;
@@ -286,7 +300,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         let now_ms = unix_time_ms()?;
         self.mark_missing_directories(root_id, observed_directory_paths, now_ms)?;
         let missing_file_ids = self.mark_missing_files(root_id, observed_file_paths, now_ms)?;
-        self.recompute_directory_browseability(root_id)?;
+        self.reconcile_directory_coverage_facts(root_id, now_ms)?;
 
         let state_rows_changed = self.tx().execute(
             "UPDATE source_state
@@ -300,7 +314,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         )?;
         let scan_rows_changed = self.tx().execute(
             "UPDATE source_scan_state
-             SET scan_phase = 'idle',
+             SET scan_phase = 'complete',
                  last_scan_finished_at = ?2,
                  last_successful_scan_at = ?2,
                  blocked_reason = NULL,
@@ -428,12 +442,15 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         &self,
         root_id: i64,
         location: &DiscoveredLocationInput,
+        directory_scan_state: Option<&str>,
     ) -> LibrarySqliteResult<ProcessedFile> {
         let existing = self.lookup_source_file(root_id, &location.canonical_path)?;
         let parent_source_directory_id = self.ensure_source_directory_chain(
             root_id,
             parent_relative_path(&location.canonical_path),
+            None,
             location.observed_at_ms,
+            directory_scan_state,
         )?;
         let needs_probe = self.file_needs_inspection(
             existing.as_ref(),
@@ -488,7 +505,9 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         &self,
         root_id: i64,
         relative_path: &str,
+        directory_mtime_ns: Option<i64>,
         changed_at: i64,
+        directory_scan_state: Option<&str>,
     ) -> LibrarySqliteResult<Option<i64>> {
         if relative_path.is_empty() {
             return Ok(None);
@@ -512,6 +531,13 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                         name: segment.to_string(),
                         relative_path: running_relative_path.clone(),
                         presence_state: SourcePresenceState::Present,
+                        dir_scan_state: directory_scan_state.map(str::to_string),
+                        scanned_at: None,
+                        mtime_ns: if running_relative_path == relative_path {
+                            directory_mtime_ns
+                        } else {
+                            None
+                        },
                         first_created_at: Some(changed_at),
                         changed_at,
                     },
@@ -526,9 +552,17 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         &self,
         root_id: i64,
         relative_path: &str,
+        modified_at_ns: Option<i64>,
         changed_at: i64,
+        directory_scan_state: Option<&str>,
     ) -> LibrarySqliteResult<()> {
-        let _ = self.ensure_source_directory_chain(root_id, relative_path, changed_at)?;
+        let _ = self.ensure_source_directory_chain(
+            root_id,
+            relative_path,
+            modified_at_ns,
+            changed_at,
+            directory_scan_state,
+        )?;
         Ok(())
     }
 
@@ -563,6 +597,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             self.tx().execute(
                 "UPDATE source_directories
                  SET presence_state = 'missing',
+                     dir_scan_updated_at = ?2,
                      updated_at = ?2
                  WHERE source_directory_id = ?1",
                 params![source_directory_id, now_ms],
@@ -662,32 +697,35 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         Ok(())
     }
 
-    fn recompute_directory_browseability(&self, root_id: i64) -> LibrarySqliteResult<()> {
+    fn reconcile_directory_coverage_facts(
+        &self,
+        root_id: i64,
+        completed_at_ms: i64,
+    ) -> LibrarySqliteResult<()> {
         self.tx().execute(
             "UPDATE source_directories
-             SET media_browseability = 'unknown'
+             SET has_child_directories = 0,
+                 has_media_descendant = 0
              WHERE source_id = ?1",
             [root_id],
         )?;
 
         self.tx().execute(
             "UPDATE source_directories
-             SET media_browseability = 'browseable'
+             SET has_child_directories = 1
              WHERE source_id = ?1
-               AND presence_state = 'present'
                AND source_directory_id IN (
-                   SELECT DISTINCT f.parent_source_directory_id
-                   FROM source_files f
-                   WHERE f.source_id = ?1
-                     AND f.presence_state = 'present'
-                     AND f.parent_source_directory_id IS NOT NULL
-                     AND f.media_class IN ('audio', 'video')
+                   SELECT DISTINCT child.parent_source_directory_id
+                   FROM source_directories child
+                   WHERE child.source_id = ?1
+                     AND child.presence_state = 'present'
+                     AND child.parent_source_directory_id IS NOT NULL
                )",
             [root_id],
         )?;
 
         self.tx().execute(
-            "WITH RECURSIVE browseable_up(source_directory_id) AS (
+            "WITH RECURSIVE media_up(source_directory_id) AS (
                  SELECT DISTINCT f.parent_source_directory_id
                  FROM source_files f
                  WHERE f.source_id = ?1
@@ -697,26 +735,29 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  UNION
                  SELECT d.parent_source_directory_id
                  FROM source_directories d
-                 JOIN browseable_up b ON d.source_directory_id = b.source_directory_id
+                 JOIN media_up b ON d.source_directory_id = b.source_directory_id
                  WHERE d.source_id = ?1
                    AND d.presence_state = 'present'
                    AND d.parent_source_directory_id IS NOT NULL
              )
              UPDATE source_directories
-             SET media_browseability = 'browseable'
+             SET has_media_descendant = 1
              WHERE source_id = ?1
                AND presence_state = 'present'
-               AND source_directory_id IN browseable_up",
+               AND source_directory_id IN media_up",
             [root_id],
         )?;
 
         self.tx().execute(
             "UPDATE source_directories
-             SET media_browseability = 'empty'
-             WHERE source_id = ?1
-               AND presence_state = 'present'
-               AND media_browseability = 'unknown'",
-            [root_id],
+             SET dir_scan_state = 'complete',
+                 dir_scan_error_kind = NULL,
+                 dir_scan_error_detail = NULL,
+                 dir_scan_updated_at = ?2,
+                 scanned_at = ?2,
+                 updated_at = ?2
+             WHERE source_id = ?1",
+            params![root_id, completed_at_ms],
         )?;
 
         Ok(())
@@ -948,6 +989,9 @@ mod tests {
                     name: "albums".to_string(),
                     relative_path: "albums".to_string(),
                     presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    scanned_at: None,
+                    mtime_ns: None,
                     first_created_at: Some(12),
                     changed_at: 12,
                 })
@@ -998,20 +1042,40 @@ mod tests {
             .expect("read media_class")
     }
 
-    fn read_browseability(
-        connection: &rusqlite::Connection,
-        relative_path: &str,
-    ) -> Option<String> {
-        connection
-            .query_row(
-                "SELECT media_browseability FROM source_directories WHERE relative_path = ?1",
-                [relative_path],
-                |row| row.get::<_, String>(0),
-            )
-            .ok()
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct DirectoryFacts {
+        has_child_directories: bool,
+        has_media_descendant: bool,
+        dir_scan_state: String,
+        scanned_at: Option<i64>,
     }
 
-    fn run_browseability_recompute(
+    fn read_directory_facts(
+        connection: &rusqlite::Connection,
+        relative_path: &str,
+    ) -> DirectoryFacts {
+        connection
+            .query_row(
+                "SELECT has_child_directories,
+                        has_media_descendant,
+                        dir_scan_state,
+                        scanned_at
+                 FROM source_directories
+                 WHERE relative_path = ?1",
+                [relative_path],
+                |row| {
+                    Ok(DirectoryFacts {
+                        has_child_directories: row.get(0)?,
+                        has_media_descendant: row.get(1)?,
+                        dir_scan_state: row.get(2)?,
+                        scanned_at: row.get(3)?,
+                    })
+                },
+            )
+            .expect("read directory facts")
+    }
+
+    fn run_coverage_finalization(
         connection: &mut rusqlite::Connection,
         root_id: i64,
         observed_directory_paths: &[String],
@@ -1020,10 +1084,10 @@ mod tests {
         admit_write(connection, |write| {
             DiscoveryTx::new(write)
                 .finalize_scan(root_id, observed_file_paths, observed_directory_paths)
-                .expect("finalize scan to recompute browseability");
+                .expect("finalize scan to reconcile directory coverage facts");
             Ok(())
         })
-        .expect("write browseability");
+        .expect("write directory coverage facts");
     }
 
     #[test]
@@ -1110,7 +1174,7 @@ mod tests {
     }
 
     #[test]
-    fn directory_with_wma_and_alac_files_marks_ancestors_browseable() {
+    fn wma_and_alac_media_policy_marks_directory_as_having_media_descendants() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1125,6 +1189,9 @@ mod tests {
                     name: "nested".to_string(),
                     relative_path: "nested".to_string(),
                     presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    scanned_at: None,
+                    mtime_ns: None,
                     first_created_at: Some(12),
                     changed_at: 12,
                 })
@@ -1148,7 +1215,14 @@ mod tests {
             "nested/track.alac",
         );
 
-        run_browseability_recompute(
+        assert_eq!(read_media_class(&connection, "nested/track.wma"), "audio");
+        assert_eq!(read_media_class(&connection, "nested/track.alac"), "audio");
+        assert!(
+            read_directory_facts(&connection, "nested").has_media_descendant,
+            ".wma and .alac media_class values must feed descendant media facts"
+        );
+
+        run_coverage_finalization(
             &mut connection,
             source_id,
             &["nested".to_string()],
@@ -1158,15 +1232,14 @@ mod tests {
             ],
         );
 
-        assert_eq!(
-            read_browseability(&connection, "nested"),
-            Some("browseable".to_string()),
-            "directory with .wma and .alac should be browseable"
-        );
+        let facts = read_directory_facts(&connection, "nested");
+        assert!(facts.has_media_descendant);
+        assert_eq!(facts.dir_scan_state, "complete");
+        assert!(facts.scanned_at.is_some());
     }
 
     #[test]
-    fn directory_with_only_unsupported_files_is_empty() {
+    fn sibling_folder_without_media_is_unknown_until_coverage_is_complete() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1181,6 +1254,9 @@ mod tests {
                     name: "docs".to_string(),
                     relative_path: "docs".to_string(),
                     presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    scanned_at: None,
+                    mtime_ns: None,
                     first_created_at: Some(12),
                     changed_at: 12,
                 })
@@ -1204,22 +1280,26 @@ mod tests {
             "docs/cover.png",
         );
 
-        run_browseability_recompute(
+        let before_finalization = read_directory_facts(&connection, "docs");
+        assert!(!before_finalization.has_media_descendant);
+        assert_eq!(before_finalization.dir_scan_state, "pending");
+        assert_eq!(before_finalization.scanned_at, None);
+
+        run_coverage_finalization(
             &mut connection,
             source_id,
             &["docs".to_string()],
             &["docs/readme.txt".to_string(), "docs/cover.png".to_string()],
         );
 
-        assert_eq!(
-            read_browseability(&connection, "docs"),
-            Some("empty".to_string()),
-            "directory with only unsupported files should be empty"
-        );
+        let after_finalization = read_directory_facts(&connection, "docs");
+        assert!(!after_finalization.has_media_descendant);
+        assert_eq!(after_finalization.dir_scan_state, "complete");
+        assert!(after_finalization.scanned_at.is_some());
     }
 
     #[test]
-    fn nested_audio_files_propagate_browseability_to_ancestors() {
+    fn nested_audio_files_propagate_media_descendant_facts_to_ancestors() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1234,6 +1314,9 @@ mod tests {
                     name: "mid".to_string(),
                     relative_path: "albums/mid".to_string(),
                     presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    scanned_at: None,
+                    mtime_ns: None,
                     first_created_at: Some(12),
                     changed_at: 12,
                 })
@@ -1246,6 +1329,9 @@ mod tests {
                     name: "deep".to_string(),
                     relative_path: "albums/mid/deep".to_string(),
                     presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    scanned_at: None,
+                    mtime_ns: None,
                     first_created_at: Some(12),
                     changed_at: 12,
                 })
@@ -1262,7 +1348,11 @@ mod tests {
             "albums/mid/deep/song.flac",
         );
 
-        run_browseability_recompute(
+        assert!(read_directory_facts(&connection, "albums").has_media_descendant);
+        assert!(read_directory_facts(&connection, "albums/mid").has_media_descendant);
+        assert!(read_directory_facts(&connection, "albums/mid/deep").has_media_descendant);
+
+        run_coverage_finalization(
             &mut connection,
             source_id,
             &[
@@ -1274,19 +1364,49 @@ mod tests {
         );
 
         assert_eq!(
-            read_browseability(&connection, "albums/mid/deep"),
-            Some("browseable".to_string()),
-            "deep directory with audio file should be browseable"
+            read_directory_facts(&connection, "albums/mid/deep").dir_scan_state,
+            "complete"
         );
         assert_eq!(
-            read_browseability(&connection, "albums/mid"),
-            Some("browseable".to_string()),
-            "mid directory should inherit browseability from deep child"
+            read_directory_facts(&connection, "albums/mid").dir_scan_state,
+            "complete"
         );
         assert_eq!(
-            read_browseability(&connection, "albums"),
-            Some("browseable".to_string()),
-            "root directory should inherit browseability through nested children"
+            read_directory_facts(&connection, "albums").dir_scan_state,
+            "complete"
+        );
+    }
+
+    #[test]
+    fn child_directory_observation_marks_immediate_parent_child_directory_fact() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, root_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(50),
+                    source_id,
+                    parent_source_directory_id: Some(root_dir_id),
+                    name: "1998".to_string(),
+                    relative_path: "albums/1998".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    scanned_at: None,
+                    mtime_ns: None,
+                    first_created_at: Some(20),
+                    changed_at: 20,
+                })
+                .expect("upsert child directory");
+            Ok(())
+        })
+        .expect("write child directory");
+
+        assert!(
+            read_directory_facts(&connection, "albums").has_child_directories,
+            "observing albums/1998 must mark albums as having immediate child directories"
         );
     }
 }

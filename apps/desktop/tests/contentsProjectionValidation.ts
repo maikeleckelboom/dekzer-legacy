@@ -463,7 +463,9 @@ function directoryNode(
     directoryId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
-    browseability: 'browseable',
+    hasChildDirectories: true,
+    directoryMediaState: { kind: 'hasMediaDescendants' },
+    directoryScanState: 'scanning',
     updatedAtMs: 100
   }
 }

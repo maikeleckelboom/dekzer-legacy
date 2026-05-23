@@ -31,11 +31,11 @@ export function getFirstVisibleNodeId(
 }
 
 export function isBrowserTreeLeaf(node: BrowserTreeNode): boolean {
-  return node.children.kind === 'none'
+  return !isBrowserTreeBranch(node)
 }
 
 export function isBrowserTreeBranch(node: BrowserTreeNode): boolean {
-  return node.children.kind !== 'none'
+  return node.children.kind === 'deferred' || canRevealBrowserTreeChildren(node)
 }
 
 export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly BrowserTreeNode[] {
@@ -47,7 +47,11 @@ export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly Br
 }
 
 export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
-  return getLoadedBrowserTreeChildren(node).length > 0
+  if (node.hasDirectoryDisclosureHint === true) {
+    return true
+  }
+
+  return getLoadedBrowserTreeChildren(node).some((child) => child.role !== 'state')
 }
 
 export function canActivateBrowserTreeAction(node: BrowserTreeNode): boolean {

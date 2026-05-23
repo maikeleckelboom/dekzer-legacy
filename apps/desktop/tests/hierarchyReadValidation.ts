@@ -127,8 +127,24 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
             parentSourceDirectoryId: null,
             offset: request.offset,
             limit: request.limit,
-            totalRows: 1,
+            totalRows: 2,
             rows: [
+              {
+                nodeKind: 'directory',
+                sourceId: '7',
+                sourceDirectoryId: '12',
+                sourceFileId: null,
+                parentSourceDirectoryId: null,
+                relativePath: 'Album',
+                displayName: 'Album',
+                presenceState: 'present',
+                sizeBytes: null,
+                modifiedAtNs: null,
+                updatedAtMs: 100,
+                hasChildDirectories: true,
+                directoryMediaState: { kind: 'hasMediaDescendants' },
+                directoryScanState: 'scanning'
+              },
               {
                 nodeKind: 'file',
                 sourceId: '7',
@@ -157,6 +173,17 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
   assert.equal(success.window.root.id, 'source:7')
   assert.equal(success.window.root.label, 'Source Fixture')
   assert.deepEqual(success.window.nodes, [
+    {
+      id: 'source-directory:12',
+      kind: 'directory',
+      label: 'Album',
+      directoryId: '12',
+      presence: 'present',
+      hasChildDirectories: true,
+      directoryMediaState: { kind: 'hasMediaDescendants' },
+      directoryScanState: 'scanning',
+      updatedAtMs: 100
+    },
     {
       id: 'source-file:11',
       kind: 'file',
@@ -1272,7 +1299,9 @@ function directoryNode(
     directoryId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
-    browseability: 'browseable',
+    hasChildDirectories: true,
+    directoryMediaState: { kind: 'hasMediaDescendants' },
+    directoryScanState: 'scanning',
     updatedAtMs: 100
   }
 }

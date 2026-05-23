@@ -18,7 +18,7 @@ No remove/unregister/deactivate command exists.
 |---------------------------|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
 | `SourceAvailabilityState` | `Available`, `Unavailable`, `Degraded`           | Not persisted; derived from mount/resolution                                                                                                |
 | `SourceResolutionStatus`  | `Resolved`, `Missing`, `Inaccessible`, `Unknown` | Persisted in `source_state.resolution_status`                                                                                               |
-| `SourceScanPhase`         | `Idle`, `Scanning`, `Blocked`, `Failed`          | Persisted in `source_scan_state.scan_phase`                                                                                                 |
+| `SourceScanPhase`         | `Idle`, `Scanning`, `Complete`, `Blocked`, `Failed` | Persisted in `source_scan_state.scan_phase`; `Idle` means no active worker, not complete coverage                                        |
 | `SourcePresenceState`     | `Present`, `Missing`, `Removed`                  | Persisted in `source_files.presence_state` and `source_directories.presence_state` — per-file observation state, not source-level lifecycle |
 
 `SourcePresenceState::Removed` is for file-level observations, not source registration removal.

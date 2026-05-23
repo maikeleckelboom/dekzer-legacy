@@ -984,10 +984,32 @@ pub enum LiteralHierarchyPresenceState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LiteralHierarchyBrowseability {
+pub enum DirectoryScanState {
+    Pending,
+    Scanning,
+    Complete,
+    Failed,
+    Blocked,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind", rename_all = "camelCase")]
+pub enum DirectoryMediaState {
     Unknown,
-    Browseable,
-    Empty,
+    HasMediaDescendants,
+    NoMediaDescendants,
 }
 
 #[derive(
@@ -1026,7 +1048,15 @@ pub struct LiteralHierarchyNode {
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
     pub updated_at_ms: i64,
-    pub media_browseability: Option<LiteralHierarchyBrowseability>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub has_child_directories: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub directory_media_state: Option<DirectoryMediaState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub directory_scan_state: Option<DirectoryScanState>,
 }
 
 #[derive(
@@ -1071,7 +1101,8 @@ pub enum SnapshotReadReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        LibraryAssetAvailabilityState, LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
+        DirectoryMediaState, DirectoryScanState, LibraryAssetAvailabilityState,
+        LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
         LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
         LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
         LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
@@ -1080,14 +1111,14 @@ mod tests {
         LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
         LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
         LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LiteralHierarchyBrowseability, LiteralHierarchyEntryPoint, LiteralHierarchyNode,
-        LiteralHierarchyNodeKind, LiteralHierarchyPresenceState, LiteralHierarchyWindow,
-        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigationRow,
-        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
-        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLiteralHierarchyChildrenReply, ReadLiteralHierarchyChildrenRequest,
-        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        LiteralHierarchyEntryPoint, LiteralHierarchyNode, LiteralHierarchyNodeKind,
+        LiteralHierarchyPresenceState, LiteralHierarchyWindow, LoadNavigationRowByStableKeyRequest,
+        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
+        NavigationRowSelectorKind, ReadLibraryAssetPreparationDetailRequest,
+        ReadLibraryAssetWaveformOverviewRequest, ReadLiteralHierarchyChildrenReply,
+        ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
+        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
+        SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
     };
     use serde_json::json;
@@ -1274,7 +1305,9 @@ mod tests {
                         size_bytes: None,
                         modified_at_ns: None,
                         updated_at_ms: 100,
-                        media_browseability: Some(LiteralHierarchyBrowseability::Browseable),
+                        has_child_directories: Some(true),
+                        directory_media_state: Some(DirectoryMediaState::HasMediaDescendants),
+                        directory_scan_state: Some(DirectoryScanState::Scanning),
                     }],
                 }),
             });
@@ -1308,7 +1341,11 @@ mod tests {
                             "sizeBytes": null,
                             "modifiedAtNs": null,
                             "updatedAtMs": 100,
-                            "mediaBrowseability": "browseable"
+                            "hasChildDirectories": true,
+                            "directoryMediaState": {
+                                "kind": "hasMediaDescendants"
+                            },
+                            "directoryScanState": "scanning"
                         }]
                     }
                 }

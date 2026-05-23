@@ -92,20 +92,24 @@ impl Iterator for FilesystemWalkEntries {
                         Err(error) => return Some(Err(error)),
                     };
 
-                    let (file_size_bytes, modified_at_ns) = if file_type.is_file() {
+                    let modified_at_ns = if file_type.is_file() {
                         match source_media_metadata(self.source_media_write_policy, entry_path) {
-                            Ok(metadata) => (
-                                i64::try_from(metadata.len()).ok(),
-                                metadata
-                                    .modified()
-                                    .ok()
-                                    .and_then(|timestamp| timestamp.duration_since(UNIX_EPOCH).ok())
-                                    .and_then(|duration| i64::try_from(duration.as_nanos()).ok()),
-                            ),
+                            Ok(metadata) => modified_at_ns_from_metadata(&metadata),
                             Err(error) => return Some(Err(error)),
                         }
                     } else {
-                        (None, None)
+                        entry
+                            .metadata()
+                            .ok()
+                            .and_then(|metadata| modified_at_ns_from_metadata(&metadata))
+                    };
+                    let file_size_bytes = if file_type.is_file() {
+                        match source_media_metadata(self.source_media_write_policy, entry_path) {
+                            Ok(metadata) => i64::try_from(metadata.len()).ok(),
+                            Err(error) => return Some(Err(error)),
+                        }
+                    } else {
+                        None
                     };
 
                     return Some(Ok(FilesystemWalkEntry {
@@ -225,6 +229,14 @@ fn unix_time_ms_now() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as i64)
         .unwrap_or(0)
+}
+
+fn modified_at_ns_from_metadata(metadata: &std::fs::Metadata) -> Option<i64> {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|timestamp| timestamp.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| i64::try_from(duration.as_nanos()).ok())
 }
 
 #[cfg(test)]

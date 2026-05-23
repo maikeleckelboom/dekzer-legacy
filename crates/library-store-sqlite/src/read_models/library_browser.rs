@@ -1632,10 +1632,11 @@ mod tests {
                      name,
                      relative_path,
                      presence_state,
+                     dir_scan_updated_at,
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, 'present', 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, 'present', 1, 1, 1)",
                 params![
                     source_directory_id,
                     source_id,

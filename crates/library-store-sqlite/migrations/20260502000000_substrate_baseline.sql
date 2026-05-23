@@ -86,7 +86,7 @@ CREATE TABLE source_scan_state
 (
     source_id                  INTEGER PRIMARY KEY REFERENCES sources (source_id) ON DELETE CASCADE,
     scan_phase                 TEXT    NOT NULL
-        CHECK (scan_phase IN ('idle', 'scanning', 'blocked', 'failed')),
+        CHECK (scan_phase IN ('idle', 'scanning', 'complete', 'blocked', 'failed')),
     last_scan_started_at       INTEGER,
     last_scan_finished_at      INTEGER,
     last_successful_scan_at    INTEGER,
@@ -193,13 +193,22 @@ CREATE TABLE source_directories
 (
     source_directory_id         INTEGER PRIMARY KEY,
     source_id                   INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
-    parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE SET NULL,
+    parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                        TEXT    NOT NULL,
     relative_path               TEXT    NOT NULL,
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
-    media_browseability         TEXT    NOT NULL DEFAULT 'unknown'
-        CHECK (media_browseability IN ('unknown', 'browseable', 'empty')),
+    has_child_directories       INTEGER NOT NULL DEFAULT 0
+        CHECK (has_child_directories IN (0, 1)),
+    has_media_descendant        INTEGER NOT NULL DEFAULT 0
+        CHECK (has_media_descendant IN (0, 1)),
+    dir_scan_state              TEXT    NOT NULL DEFAULT 'pending'
+        CHECK (dir_scan_state IN ('pending', 'scanning', 'complete', 'failed', 'blocked')),
+    dir_scan_error_kind         TEXT,
+    dir_scan_error_detail       TEXT,
+    dir_scan_updated_at         INTEGER NOT NULL,
+    scanned_at                  INTEGER,
+    mtime_ns                    INTEGER CHECK (mtime_ns IS NULL OR mtime_ns >= 0),
     created_at                  INTEGER NOT NULL,
     updated_at                  INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
@@ -210,11 +219,14 @@ CREATE TABLE source_directories
 CREATE INDEX source_directories_parent
     ON source_directories (parent_source_directory_id);
 
+CREATE INDEX source_directories_source_relative_path_binary
+    ON source_directories (source_id, relative_path COLLATE BINARY);
+
 CREATE TABLE source_files
 (
     source_file_id              INTEGER PRIMARY KEY,
     source_id                   INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
-    parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE SET NULL,
+    parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                        TEXT    NOT NULL CHECK (length(name) > 0),
     relative_path               TEXT    NOT NULL CHECK (length(relative_path) > 0),
     size_bytes                  INTEGER CHECK (size_bytes IS NULL OR size_bytes >= 0),
@@ -237,13 +249,16 @@ CREATE TABLE source_files
 CREATE INDEX source_files_source_presence
     ON source_files (source_id, presence_state);
 
-CREATE INDEX source_files_browseable_media
+CREATE INDEX source_files_media_class_parent
     ON source_files (source_id, presence_state, media_class, parent_source_directory_id)
     WHERE media_class IN ('audio', 'video')
       AND parent_source_directory_id IS NOT NULL;
 
 CREATE INDEX source_files_parent_source_directory
     ON source_files (parent_source_directory_id);
+
+CREATE INDEX source_files_source_relative_path_binary
+    ON source_files (source_id, relative_path COLLATE BINARY);
 
 CREATE TABLE LibraryAssets
 (

@@ -896,6 +896,9 @@ fn source_directory_writes_do_not_reseed_navigation_projection() {
             name: "inventory".to_string(),
             relative_path: "inventory".to_string(),
             presence_state: SourcePresenceState::Present,
+            dir_scan_state: None,
+            scanned_at: None,
+            mtime_ns: None,
             first_created_at: Some(20),
             changed_at: 20,
         })
@@ -1135,11 +1138,32 @@ fn root_scan_materialization_records_files_and_queues_source_work() {
             |row| row.get(0),
         )
         .expect("count inspection work");
+    let scan_phase: String = connection
+        .query_row(
+            "SELECT scan_phase
+             FROM source_scan_state
+             WHERE source_id = ?1",
+            [root.root_id],
+            |row| row.get(0),
+        )
+        .expect("read scan phase");
+    let incomplete_directory_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM source_directories
+             WHERE source_id = ?1
+               AND dir_scan_state <> 'complete'",
+            [root.root_id],
+            |row| row.get(0),
+        )
+        .expect("count incomplete directories");
 
     assert_eq!(result.discovered_file_count, 2);
     assert_eq!(result.queued_source_work_items, 2);
     assert_eq!(source_file_count, 2);
     assert_eq!(inspection_work_count, 2);
+    assert_eq!(scan_phase, SourceScanPhase::Complete.as_str());
+    assert_eq!(incomplete_directory_count, 0);
     assert!(observations.iter().any(|observation| matches!(
         observation,
         RootScanObservation::HierarchyPublished {
@@ -1298,6 +1322,9 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
             name: "album".to_string(),
             relative_path: "album".to_string(),
             presence_state: SourcePresenceState::Present,
+            dir_scan_state: None,
+            scanned_at: None,
+            mtime_ns: None,
             first_created_at: Some(14),
             changed_at: 14,
         })
