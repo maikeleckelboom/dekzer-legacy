@@ -1,15 +1,16 @@
 import { strict as assert } from 'node:assert'
 
 import {
-  getLocationSourceKindLabel,
+  adaptLocationSourceDescriptor,
+  formatSourceDisplayName,
   getLocationSourceIcon,
   getLocationSourceIconBadge,
+  getLocationSourceKindLabel,
   getLocationSourcePresentation,
-  adaptLocationSourceDescriptor,
-  type LocationSourceKind,
   type LocationSourceDescriptor,
   type LocationSourceIcon,
   type LocationSourceIconBadge,
+  type LocationSourceKind,
   type LocationSourcePresentation
 } from '../src/renderer/libraryBrowser/projection/sourcePresentation'
 
@@ -36,6 +37,7 @@ function main(): void {
   validatesPresentationStability()
   validatesKindNamesDoNotEncodeCombinations()
   validatesAdapter()
+  validatesSourceDisplayName()
 }
 
 function validatesEveryKindHasLabel(): void {
@@ -303,3 +305,72 @@ function validatesAdapter(): void {
 }
 
 console.log('Location sources validation passed.')
+
+function validatesSourceDisplayName(): void {
+  assert.equal(
+    formatSourceDisplayName('\\\\?\\C:\\Users\\Maikel\\Music'),
+    'Music',
+    'Windows extended-length local path should show final segment'
+  )
+  assert.equal(
+    formatSourceDisplayName('C:\\Users\\Maikel\\Music'),
+    'Music',
+    'Windows local path should show final segment'
+  )
+  assert.equal(
+    formatSourceDisplayName('/Users/maikel/Music'),
+    'Music',
+    'Unix path should show final segment'
+  )
+  assert.equal(
+    formatSourceDisplayName('/home/maikel/Music'),
+    'Music',
+    'Unix home path should show final segment'
+  )
+  assert.equal(
+    formatSourceDisplayName('Music'),
+    'Music',
+    'Plain name should pass through unchanged'
+  )
+  assert.equal(
+    formatSourceDisplayName('\\\\?\\C:\\'),
+    'C:',
+    'Windows extended-length drive root should show drive letter'
+  )
+  assert.equal(formatSourceDisplayName('C:\\'), 'C:', 'Windows drive root should show drive letter')
+  assert.equal(
+    formatSourceDisplayName('\\\\?\\UNC\\server\\share\\Music'),
+    'Music',
+    'Windows extended-length UNC path should show final segment'
+  )
+  assert.equal(
+    formatSourceDisplayName('\\\\?\\UNC\\server\\share'),
+    'share',
+    'Windows extended-length UNC share root should show share name'
+  )
+  assert.equal(
+    formatSourceDisplayName('\\\\server\\share\\Music'),
+    'Music',
+    'Windows UNC path should show final segment'
+  )
+  assert.equal(
+    formatSourceDisplayName('\\\\server\\share'),
+    'share',
+    'Windows UNC share root should show share name'
+  )
+  assert.equal(
+    formatSourceDisplayName(''),
+    '',
+    'Empty string should return empty string without error'
+  )
+  assert.equal(
+    formatSourceDisplayName('\\\\?\\'),
+    '\\\\?\\',
+    'Bare extended-length prefix with no path should fall back to raw label'
+  )
+  assert.equal(
+    formatSourceDisplayName('\\\\?\\C:'),
+    'C:',
+    'Windows extended-length drive letter without trailing slash should show drive letter'
+  )
+}

@@ -19,7 +19,11 @@ import type {
   BrowserTreeNodeId
 } from '../tree/types'
 import { copyEntryPoint } from '../runtime/entryPoint'
-import { adaptLocationSourceDescriptor, getLocationSourcePresentation } from './sourcePresentation'
+import {
+  adaptLocationSourceDescriptor,
+  formatSourceDisplayName,
+  getLocationSourcePresentation
+} from './sourcePresentation'
 import { classifyLibraryEntryName, type LibraryEntryRole } from './entryPresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
 
@@ -123,7 +127,7 @@ function projectNavigationRow(options: {
     return {
       id: nodeId,
       role: browserRowRoleForNavigationRow(options.row),
-      label: options.row.displayName,
+      label: formatSourceDisplayName(options.row.displayName),
       badge: { value: presentation.label, tone: 'muted' },
       icon: 'source',
       detail: formatNavigationSourceDetail(options.row),
@@ -145,7 +149,7 @@ function projectNavigationRow(options: {
   return {
     id: nodeId,
     role: browserRowRoleForNavigationRow(options.row),
-    label: options.row.displayName,
+    label: formatSourceDisplayName(options.row.displayName),
     badge: { value: 'Navigation', tone: 'muted' },
     icon: 'navigation',
     detail: formatNavigationDetail(options.row),

@@ -168,6 +168,7 @@ function main(): void {
   validatesLoadedEmptyTreeProjection()
   validatesUnsupportedNavigationRowsHiddenFromTree()
   validatesDisclosureAffordanceHints()
+  validatesSourcePathHumanizedAsLabel()
 }
 
 function validatesExplicitChildrenAndActionModel(): void {
@@ -1653,7 +1654,8 @@ function navigationRowWithSelectorKind(
     siblingPosition: 0,
     selectable: true,
     selectorKind,
-    selectorPayload: selectorKind === 'source' || selectorKind === 'sourceLocation' ? navigationRowId : null,
+    selectorPayload:
+      selectorKind === 'source' || selectorKind === 'sourceLocation' ? navigationRowId : null,
     updatedAtMs: 100,
     rowVersion: '1'
   }
@@ -1674,6 +1676,102 @@ function sourceNavigationRow(): NavigationRow {
     updatedAtMs: 100,
     rowVersion: '1'
   }
+}
+
+function sourceNavigationRowWithDisplayName(displayName: string): NavigationRow {
+  return {
+    navigationRowId: '7',
+    stableKey: 'source:7',
+    parentNavigationRowId: null,
+    family: 'sources',
+    rowKind: 'source',
+    displayName,
+    siblingPosition: 0,
+    selectable: true,
+    selectorKind: 'source',
+    selectorPayload: '7',
+    updatedAtMs: 100,
+    rowVersion: '1'
+  }
+}
+
+function validatesSourcePathHumanizedAsLabel(): void {
+  const canonicalPathRow = sourceNavigationRowWithDisplayName('\\\\?\\C:\\Users\\Maikel\\Music')
+
+  const state: BrowserState = {
+    navigationReadResult: {
+      state: 'ready',
+      rows: [canonicalPathRow]
+    },
+    sourceReadStates: new Map(),
+    directoryReadStates: new Map()
+  }
+
+  const projection = projectState(state)
+  assert.equal(projection?.kind, 'tree')
+  if (projection?.kind !== 'tree') {
+    assert.fail('expected canonical path source navigation to project to browser tree')
+  }
+
+  assert.equal(projection.nodes.length, 1)
+  assert.equal(
+    projection.nodes[0]?.label,
+    'Music',
+    'source tree row using canonical extended-length path must render final folder name'
+  )
+
+  assert.equal(
+    projection.bindingsById.get('navigation-row:7')?.kind,
+    'source',
+    'binding must be source for source row with valid selector'
+  )
+
+  const plainNameRow = sourceNavigationRowWithDisplayName('Music')
+
+  const plainState: BrowserState = {
+    navigationReadResult: {
+      state: 'ready',
+      rows: [plainNameRow]
+    },
+    sourceReadStates: new Map(),
+    directoryReadStates: new Map()
+  }
+
+  const plainProjection = projectState(plainState)
+  assert.equal(plainProjection?.kind, 'tree')
+  if (plainProjection?.kind !== 'tree') {
+    assert.fail('expected plain name source navigation to project to browser tree')
+  }
+
+  assert.equal(
+    plainProjection.nodes[0]?.label,
+    'Music',
+    'source tree row with plain display name must pass through unchanged'
+  )
+
+  const structRow = navigationRowWithNullSelector()
+
+  const structState: BrowserState = {
+    navigationReadResult: {
+      state: 'ready',
+      rows: [structRow]
+    },
+    sourceReadStates: new Map(),
+    directoryReadStates: new Map()
+  }
+
+  const structProjection = projectState(structState)
+  assert.equal(structProjection?.kind, 'tree')
+  if (structProjection?.kind !== 'tree') {
+    assert.fail('expected structural navigation to project to empty tree')
+  }
+
+  const nonStateNodes = structProjection.nodes.filter((node) => node.role !== 'state')
+  assert.equal(
+    nonStateNodes.length,
+    0,
+    'non-source navigation rows must not appear in tree even with humanized labels'
+  )
 }
 
 function navigationRowWithNullSelector(): NavigationRow {

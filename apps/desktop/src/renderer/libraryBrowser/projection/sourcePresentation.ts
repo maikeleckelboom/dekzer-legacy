@@ -283,3 +283,31 @@ function resolveRoleFromRowKind(rowKind: string): LocationSourceRole {
 
   return 'watchedRoot'
 }
+
+const windowsExtendedPrefix = '\\\\?\\'
+const windowsExtendedUncPrefix = '\\\\?\\UNC\\'
+
+export function formatSourceDisplayName(rawLabel: string): string {
+  if (rawLabel === '') {
+    return rawLabel
+  }
+
+  let parseInput = rawLabel
+
+  if (parseInput.startsWith(windowsExtendedUncPrefix)) {
+    parseInput = '\\\\' + parseInput.slice(windowsExtendedUncPrefix.length)
+  } else if (parseInput.startsWith(windowsExtendedPrefix)) {
+    parseInput = parseInput.slice(windowsExtendedPrefix.length)
+  }
+
+  const segments = parseInput.split(/[/\\]/)
+
+  for (let i = segments.length - 1; i >= 0; --i) {
+    const segment = segments[i]
+    if (segment !== '' && segment !== undefined) {
+      return segment
+    }
+  }
+
+  return rawLabel
+}

@@ -311,7 +311,11 @@ function validatesUnsupportedNavigationContents(): void {
     !navigationLabels.includes('All audio'),
     'unsupported navigation row must not appear in visible tree'
   )
-  assert.equal(navigationLabels.length, 0, 'only state placeholder should remain when no supported rows exist')
+  assert.equal(
+    navigationLabels.length,
+    0,
+    'only state placeholder should remain when no supported rows exist'
+  )
 
   const contents = projectContents({
     state,
