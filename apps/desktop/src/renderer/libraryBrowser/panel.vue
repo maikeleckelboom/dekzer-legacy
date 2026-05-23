@@ -10,13 +10,14 @@ import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveOperationFeedback } from './projection/operationFeedback'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
-import type { BrowserState } from './runtime/state'
-import type { RendererApi } from '../../shared/rendererApi'
+import type { BrowserState, RowBinding } from './runtime/state'
+import { createViewStatePersistence } from './runtime/viewStatePersistence'
 
 defineOptions({
   name: 'LibraryBrowserPanel'
 })
 
+const viewStatePersistence = createViewStatePersistence()
 const hierarchyRead = useLibraryHierarchyRead()
 const rootActions = useLocalRootActions()
 const rootLifecycle = useRootLifecycle({
@@ -58,15 +59,16 @@ const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const hasUserInteractedWithTree = ref(false)
 const hasAppliedInitialPreferredNode = ref(false)
+const pendingExpandedRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 let hydrationAttempted = false
-let restoredViewState = false
+let restoreReadStarted = false
+let restoreReadCompleted = false
+let projectionRestorationAttempts = 0
 
-function getApi(): RendererApi {
-  return (window as unknown as { readonly dekzer: RendererApi }).dekzer
-}
+const maxProjectionRestorationAttempts = 10
 
-function persistCurrentViewState(): void {
-  void getApi().library.browser.viewState.writeViewState({
+function schedulePersistCurrentViewState(): void {
+  viewStatePersistence.schedulePersist({
     version: 1,
     ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
     expandedNodeIds: [...expandedNodeIds.value]
@@ -170,24 +172,37 @@ watch(
 )
 
 watch(liveTreeNodes, (nodes) => {
-  if (restoredViewState || nodes === undefined) {
+  if (nodes === undefined) {
     return
   }
 
-  restoredViewState = true
+  if (!restoreReadStarted) {
+    restoreReadStarted = true
+    void restoreViewStateIfValid()
+    return
+  }
 
-  void restoreViewStateIfValid()
+  if (
+    restoreReadCompleted &&
+    pendingExpandedRestoreIds.value.size > 0 &&
+    !hasUserInteractedWithTree.value
+  ) {
+    applyPendingRestoredIds()
+  }
 })
 
 async function restoreViewStateIfValid(): Promise<void> {
   const projection = browserProjection.value
 
   if (projection?.kind !== 'tree') {
+    restoreReadStarted = false
     return
   }
 
   try {
-    const result = await getApi().library.browser.viewState.readViewState()
+    const result = await viewStatePersistence.read()
+
+    restoreReadCompleted = true
 
     if (result.state !== 'ready') {
       return
@@ -205,14 +220,82 @@ async function restoreViewStateIfValid(): Promise<void> {
       hasAppliedInitialPreferredNode.value = true
     }
 
-    const validExpandedIds = viewState.expandedNodeIds.filter((id) => bindingsById.has(id))
+    const projectableExpandedIds: BrowserTreeNodeId[] = []
+    const unprojectableExpandedIds: BrowserTreeNodeId[] = []
 
-    if (validExpandedIds.length > 0) {
-      expandedNodeIds.value = new Set(validExpandedIds)
+    for (const id of viewState.expandedNodeIds) {
+      if (bindingsById.has(id)) {
+        projectableExpandedIds.push(id)
+      } else {
+        unprojectableExpandedIds.push(id)
+      }
+    }
+
+    if (projectableExpandedIds.length > 0) {
+      expandedNodeIds.value = new Set(projectableExpandedIds)
       hasAppliedInitialPreferredNode.value = true
+
+      for (const id of projectableExpandedIds) {
+        requestNodeChildrenIfExpandable(id, bindingsById)
+      }
+    }
+
+    if (unprojectableExpandedIds.length > 0) {
+      pendingExpandedRestoreIds.value = new Set(unprojectableExpandedIds)
     }
   } catch {
+    restoreReadCompleted = true
+  }
+}
+
+function applyPendingRestoredIds(): void {
+  const projection = browserProjection.value
+
+  if (projection?.kind !== 'tree') {
     return
+  }
+
+  projectionRestorationAttempts++
+
+  if (projectionRestorationAttempts > maxProjectionRestorationAttempts) {
+    pendingExpandedRestoreIds.value = new Set()
+    return
+  }
+
+  const bindingsById = projection.bindingsById
+  const appliedIds: BrowserTreeNodeId[] = []
+  const nextPending = new Set<BrowserTreeNodeId>()
+
+  for (const id of pendingExpandedRestoreIds.value) {
+    if (bindingsById.has(id)) {
+      appliedIds.push(id)
+    } else {
+      nextPending.add(id)
+    }
+  }
+
+  if (appliedIds.length === 0) {
+    return
+  }
+
+  pendingExpandedRestoreIds.value = nextPending
+  const nextExpanded = new Set([...expandedNodeIds.value, ...appliedIds])
+  expandedNodeIds.value = nextExpanded
+  hasAppliedInitialPreferredNode.value = true
+
+  for (const id of appliedIds) {
+    requestNodeChildrenIfExpandable(id, bindingsById)
+  }
+}
+
+function requestNodeChildrenIfExpandable(
+  nodeId: BrowserTreeNodeId,
+  bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>
+): void {
+  const binding = bindingsById.get(nodeId)
+
+  if (binding?.kind === 'source' || binding?.kind === 'directory') {
+    void requestNodeChildren(nodeId)
   }
 }
 
@@ -227,12 +310,14 @@ watch(hostStatus, (status) => {
 
 function selectNode(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
+  pendingExpandedRestoreIds.value = new Set()
   selectedNodeId.value = nodeId
-  persistCurrentViewState()
+  schedulePersistCurrentViewState()
 }
 
 function toggleNode(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
+  pendingExpandedRestoreIds.value = new Set()
   const nextExpandedNodeIds = new Set(expandedNodeIds.value)
 
   if (nextExpandedNodeIds.has(nodeId)) {
@@ -242,13 +327,14 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
   }
 
   expandedNodeIds.value = nextExpandedNodeIds
-  persistCurrentViewState()
+  schedulePersistCurrentViewState()
 }
 
 function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   hasUserInteractedWithTree.value = true
+  pendingExpandedRestoreIds.value = new Set()
   expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
-  persistCurrentViewState()
+  schedulePersistCurrentViewState()
   void requestNodeChildren(nodeId)
 }
 
@@ -258,12 +344,17 @@ async function handleRemoveSource(): Promise<void> {
     selectedNodeId.value = undefined
     expandedNodeIds.value = new Set()
     hasUserInteractedWithTree.value = false
-    persistCurrentViewState()
+    pendingExpandedRestoreIds.value = new Set()
+    viewStatePersistence.schedulePersist({
+      version: 1,
+      expandedNodeIds: []
+    })
   }
 }
 
 function activateContentRowAction(row: ContentRow): void {
   hasUserInteractedWithTree.value = true
+  pendingExpandedRestoreIds.value = new Set()
   const action = row.action
 
   if (action === undefined) {
@@ -272,7 +363,7 @@ function activateContentRowAction(row: ContentRow): void {
 
   if (action.kind === 'loadChildren') {
     expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
-    persistCurrentViewState()
+    schedulePersistCurrentViewState()
   }
 
   void requestNodeChildren(action.nodeId)
