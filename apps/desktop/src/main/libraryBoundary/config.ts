@@ -32,7 +32,7 @@ export type LibraryBoundaryHostBinaryPolicy =
   | LibraryBoundaryHostDevelopmentBinaryPolicy
   | LibraryBoundaryHostPackagedBinaryPolicy
 
-export type LibraryBoundaryHostStorageSource = 'electronUserData' | 'environmentOverride'
+export type LibraryBoundaryHostStorageSource = 'electronUserData' | 'environmentOverride' | 'developmentDefault'
 
 export type LibraryBoundaryHostStorageEnvironment = {
   readonly kind: 'userDataRoot'
@@ -67,12 +67,18 @@ type BinaryExists = (binaryPath: string) => boolean
 export function resolveLibraryBoundaryHostConfig(
   options: ResolveLibraryBoundaryHostConfigOptions
 ): LibraryBoundaryHostConfig {
+  const desktopAppPath = options.app.getAppPath()
   return {
-    storageEnvironment: resolveLibraryBoundaryStorageEnvironment(options.app, options.env),
+    storageEnvironment: resolveLibraryBoundaryStorageEnvironment(
+      options.app,
+      options.env,
+      options.isDev,
+      desktopAppPath
+    ),
     environment: selectLibraryBoundaryHostEnvironment(options.isDev),
     binaryPolicy: resolveLibraryBoundaryStdioBinaryPolicy({
       isDev: options.isDev,
-      desktopAppPath: options.app.getAppPath(),
+      desktopAppPath,
       ...(options.env === undefined ? {} : { env: options.env }),
       ...(options.platform === undefined ? {} : { platform: options.platform }),
       ...(options.resourcesPath === undefined ? {} : { resourcesPath: options.resourcesPath })
@@ -82,12 +88,22 @@ export function resolveLibraryBoundaryHostConfig(
 
 export function resolveLibraryBoundaryStorageEnvironment(
   app: LibraryBoundaryHostApp,
-  env: NodeJS.ProcessEnv = process.env
+  env: NodeJS.ProcessEnv = process.env,
+  isDev?: boolean,
+  desktopAppPath?: string
 ): LibraryBoundaryHostStorageEnvironment {
   const overridePath = env[desktopLibraryUserDataEnvironmentVariable]?.trim()
 
   if (overridePath !== undefined && overridePath.length > 0) {
     return normalizeStorageEnvironmentPath(overridePath, 'environmentOverride')
+  }
+
+  if (isDev === true && desktopAppPath !== undefined) {
+    const workspaceRoot = resolve(desktopAppPath, '..', '..')
+    return normalizeStorageEnvironmentPath(
+      join(workspaceRoot, '.dev-user-data', 'default'),
+      'developmentDefault'
+    )
   }
 
   return normalizeStorageEnvironmentPath(app.getPath('userData'), 'electronUserData')

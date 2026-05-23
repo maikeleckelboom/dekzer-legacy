@@ -59,11 +59,15 @@ function validatesProductionAndDevelopmentStorageRootsAreExplicit(): void {
   assert.equal(developmentConfig.environment, 'development')
   assert.deepEqual(developmentConfig.storageEnvironment, {
     kind: 'userDataRoot',
+    userDataPath: join(tempRoot, '.dev-user-data', 'default'),
+    source: 'developmentDefault'
+  })
+  assert.equal(productionConfig.environment, 'production')
+  assert.deepEqual(productionConfig.storageEnvironment, {
+    kind: 'userDataRoot',
     userDataPath: join(tempRoot, 'user-data'),
     source: 'electronUserData'
   })
-  assert.equal(productionConfig.environment, 'production')
-  assert.deepEqual(productionConfig.storageEnvironment, developmentConfig.storageEnvironment)
 }
 
 function validatesUserDataEnvironmentOverride(): void {
@@ -108,7 +112,7 @@ function validatesInvalidUserDataRootsAreRejected(): void {
           getPath: () => '',
           getAppPath: () => appPath
         },
-        isDev: true,
+        isDev: false,
         env: {},
         platform: 'linux'
       }),

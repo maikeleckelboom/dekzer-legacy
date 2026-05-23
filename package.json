@@ -21,6 +21,8 @@
     "library:stdio:typecheck": "pnpm --filter @dekzer/library-boundary-stdio-transport run typecheck",
     "library:stdio:build": "pnpm run library:client:build && pnpm --filter @dekzer/library-boundary-stdio-transport run build",
     "library:stdio:test": "cargo build -p library-boundary-stdio && pnpm --filter @dekzer/library-boundary-stdio-transport run test",
+    "desktop:storage:status": "pnpm --filter @dekzer/desktop run storage:status",
+    "desktop:storage:reset": "pnpm --filter @dekzer/desktop run storage:reset",
     "desktop:lint": "pnpm --filter @dekzer/desktop run lint",
     "desktop:validate": "pnpm --filter @dekzer/desktop run validate",
     "typecheck": "pnpm --filter @dekzer/library-boundary-contract run typecheck && pnpm run library:client:typecheck && pnpm run library:stdio:typecheck && pnpm --filter @dekzer/desktop run typecheck",
