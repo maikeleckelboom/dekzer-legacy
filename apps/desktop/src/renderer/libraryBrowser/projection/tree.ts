@@ -296,6 +296,21 @@ function projectLiteralNode(options: {
       ...(options.label === undefined ? {} : { label: options.label })
     })
 
+    const directoryState = options.directoryReadStates.get(node.directoryId)
+    const isUnloaded = directoryState === undefined || directoryState.kind === 'unloaded'
+
+    if (isUnloaded && node.browseability === 'empty') {
+      return {
+        id: node.id,
+        role: 'literalDirectory',
+        label: node.label,
+        badge: { value: 'Folder', tone: 'muted' },
+        icon: 'folder',
+        detail: formatDirectoryDetail(node.presence),
+        children: { kind: 'none' }
+      }
+    }
+
     return {
       id: node.id,
       role: 'literalDirectory',
@@ -305,7 +320,7 @@ function projectLiteralNode(options: {
       detail: formatDirectoryDetail(node.presence),
       ...projectDirectoryChildren({
         ownerId: node.id,
-        state: options.directoryReadStates.get(node.directoryId),
+        state: directoryState,
         directoryReadStates: options.directoryReadStates,
         bindingsById: options.bindingsById
       })

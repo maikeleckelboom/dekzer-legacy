@@ -306,6 +306,7 @@ mod tests {
                 "name",
                 "relative_path",
                 "presence_state",
+                "media_browseability",
                 "created_at",
                 "updated_at",
             ]

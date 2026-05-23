@@ -286,6 +286,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         let now_ms = unix_time_ms()?;
         self.mark_missing_directories(root_id, observed_directory_paths, now_ms)?;
         let missing_file_ids = self.mark_missing_files(root_id, observed_file_paths, now_ms)?;
+        self.recompute_directory_browseability(root_id)?;
 
         let state_rows_changed = self.tx().execute(
             "UPDATE source_state
@@ -658,6 +659,106 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             },
         )?;
         let _ = result;
+        Ok(())
+    }
+
+    fn recompute_directory_browseability(&self, root_id: i64) -> LibrarySqliteResult<()> {
+        self.tx().execute(
+            "UPDATE source_directories
+             SET media_browseability = 'unknown'
+             WHERE source_id = ?1",
+            [root_id],
+        )?;
+
+        self.tx().execute(
+            "UPDATE source_directories
+             SET media_browseability = 'browseable'
+             WHERE source_id = ?1
+               AND presence_state = 'present'
+               AND source_directory_id IN (
+                   SELECT DISTINCT f.parent_source_directory_id
+                   FROM source_files f
+                   WHERE f.source_id = ?1
+                     AND f.presence_state = 'present'
+                     AND f.parent_source_directory_id IS NOT NULL
+                     AND (
+                         lower(f.name) LIKE '%.mp3'
+                         OR lower(f.name) LIKE '%.wav'
+                         OR lower(f.name) LIKE '%.flac'
+                         OR lower(f.name) LIKE '%.aiff'
+                         OR lower(f.name) LIKE '%.aif'
+                         OR lower(f.name) LIKE '%.aifc'
+                         OR lower(f.name) LIKE '%.m4a'
+                         OR lower(f.name) LIKE '%.aac'
+                         OR lower(f.name) LIKE '%.ogg'
+                         OR lower(f.name) LIKE '%.oga'
+                         OR lower(f.name) LIKE '%.opus'
+                         OR lower(f.name) LIKE '%.wma'
+                         OR lower(f.name) LIKE '%.alac'
+                         OR lower(f.name) LIKE '%.mp4'
+                         OR lower(f.name) LIKE '%.mov'
+                         OR lower(f.name) LIKE '%.m4v'
+                         OR lower(f.name) LIKE '%.webm'
+                         OR lower(f.name) LIKE '%.mkv'
+                         OR lower(f.name) LIKE '%.avi'
+                     )
+               )",
+            [root_id],
+        )?;
+
+        self.tx().execute(
+            "WITH RECURSIVE browseable_up(source_directory_id) AS (
+                 SELECT DISTINCT f.parent_source_directory_id
+                 FROM source_files f
+                 WHERE f.source_id = ?1
+                   AND f.presence_state = 'present'
+                   AND f.parent_source_directory_id IS NOT NULL
+                   AND (
+                       lower(f.name) LIKE '%.mp3'
+                       OR lower(f.name) LIKE '%.wav'
+                       OR lower(f.name) LIKE '%.flac'
+                       OR lower(f.name) LIKE '%.aiff'
+                       OR lower(f.name) LIKE '%.aif'
+                       OR lower(f.name) LIKE '%.aifc'
+                       OR lower(f.name) LIKE '%.m4a'
+                       OR lower(f.name) LIKE '%.aac'
+                       OR lower(f.name) LIKE '%.ogg'
+                       OR lower(f.name) LIKE '%.oga'
+                       OR lower(f.name) LIKE '%.opus'
+                       OR lower(f.name) LIKE '%.wma'
+                       OR lower(f.name) LIKE '%.alac'
+                       OR lower(f.name) LIKE '%.mp4'
+                       OR lower(f.name) LIKE '%.mov'
+                       OR lower(f.name) LIKE '%.m4v'
+                       OR lower(f.name) LIKE '%.webm'
+                       OR lower(f.name) LIKE '%.mkv'
+                       OR lower(f.name) LIKE '%.avi'
+                   )
+                 UNION
+                 SELECT d.parent_source_directory_id
+                 FROM source_directories d
+                 JOIN browseable_up b ON d.source_directory_id = b.source_directory_id
+                 WHERE d.source_id = ?1
+                   AND d.presence_state = 'present'
+                   AND d.parent_source_directory_id IS NOT NULL
+             )
+             UPDATE source_directories
+             SET media_browseability = 'browseable'
+             WHERE source_id = ?1
+               AND presence_state = 'present'
+               AND source_directory_id IN browseable_up",
+            [root_id],
+        )?;
+
+        self.tx().execute(
+            "UPDATE source_directories
+             SET media_browseability = 'empty'
+             WHERE source_id = ?1
+               AND presence_state = 'present'
+               AND media_browseability = 'unknown'",
+            [root_id],
+        )?;
+
         Ok(())
     }
 }

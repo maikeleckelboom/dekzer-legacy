@@ -277,6 +277,11 @@ fn map_literal_hierarchy_node(
         size_bytes: node.size_bytes,
         modified_at_ns: node.modified_at_ns,
         updated_at_ms: node.updated_at,
+        media_browseability: node
+            .media_browseability
+            .as_deref()
+            .map(map_literal_hierarchy_browseability)
+            .transpose()?,
     })
 }
 
@@ -301,6 +306,19 @@ fn map_literal_hierarchy_presence_state(
         "removed" => Ok(protocol::LiteralHierarchyPresenceState::Removed),
         other => Err(malformed_store_state(format!(
             "literal hierarchy node has unsupported presence_state {other:?}"
+        ))),
+    }
+}
+
+fn map_literal_hierarchy_browseability(
+    value: &str,
+) -> store::LibrarySqliteResult<protocol::LiteralHierarchyBrowseability> {
+    match value {
+        "unknown" => Ok(protocol::LiteralHierarchyBrowseability::Unknown),
+        "browseable" => Ok(protocol::LiteralHierarchyBrowseability::Browseable),
+        "empty" => Ok(protocol::LiteralHierarchyBrowseability::Empty),
+        other => Err(malformed_store_state(format!(
+            "literal hierarchy node has unsupported media_browseability {other:?}"
         ))),
     }
 }

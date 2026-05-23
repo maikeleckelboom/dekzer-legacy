@@ -198,6 +198,8 @@ CREATE TABLE source_directories
     relative_path               TEXT    NOT NULL,
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
+    media_browseability         TEXT    NOT NULL DEFAULT 'unknown'
+        CHECK (media_browseability IN ('unknown', 'browseable', 'empty')),
     created_at                  INTEGER NOT NULL,
     updated_at                  INTEGER NOT NULL,
     CHECK (updated_at >= created_at),

@@ -64,6 +64,8 @@ export type NodeKind = 'directory' | 'file'
 
 export type Presence = 'present' | 'missing' | 'removed'
 
+export type DirectoryBrowseability = 'unknown' | 'browseable' | 'empty'
+
 export type ChildRow =
   | {
       readonly id: string
@@ -72,6 +74,7 @@ export type ChildRow =
       readonly directoryId: string
       readonly parentDirectoryId?: string
       readonly presence: Presence
+      readonly browseability: DirectoryBrowseability
       readonly updatedAtMs: number
     }
   | {

@@ -973,6 +973,26 @@ pub enum LiteralHierarchyPresenceState {
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LiteralHierarchyBrowseability {
+    Unknown,
+    Browseable,
+    Empty,
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -1006,6 +1026,7 @@ pub struct LiteralHierarchyNode {
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
     pub updated_at_ms: i64,
+    pub media_browseability: Option<LiteralHierarchyBrowseability>,
 }
 
 #[derive(
@@ -1059,14 +1080,14 @@ mod tests {
         LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
         LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
         LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LiteralHierarchyEntryPoint, LiteralHierarchyNode, LiteralHierarchyNodeKind,
-        LiteralHierarchyPresenceState, LiteralHierarchyWindow, LoadNavigationRowByStableKeyRequest,
-        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
-        NavigationRowSelectorKind, ReadLibraryAssetPreparationDetailRequest,
-        ReadLibraryAssetWaveformOverviewRequest, ReadLiteralHierarchyChildrenReply,
-        ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
-        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
-        SearchNavigationNodeLibraryBrowserWindowReply,
+        LiteralHierarchyBrowseability, LiteralHierarchyEntryPoint, LiteralHierarchyNode,
+        LiteralHierarchyNodeKind, LiteralHierarchyPresenceState, LiteralHierarchyWindow,
+        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigationRow,
+        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
+        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
+        ReadLiteralHierarchyChildrenReply, ReadLiteralHierarchyChildrenRequest,
+        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
     };
     use serde_json::json;
@@ -1253,6 +1274,7 @@ mod tests {
                         size_bytes: None,
                         modified_at_ns: None,
                         updated_at_ms: 100,
+                        media_browseability: Some(LiteralHierarchyBrowseability::Browseable),
                     }],
                 }),
             });
@@ -1285,7 +1307,8 @@ mod tests {
                             "presenceState": "present",
                             "sizeBytes": null,
                             "modifiedAtNs": null,
-                            "updatedAtMs": 100
+                            "updatedAtMs": 100,
+                            "mediaBrowseability": "browseable"
                         }]
                     }
                 }

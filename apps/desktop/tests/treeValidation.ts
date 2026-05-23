@@ -1080,6 +1080,7 @@ function directoryHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }>
           label: 'Album',
           directoryId: '12',
           presence: 'present',
+          browseability: 'browseable',
           updatedAtMs: 100
         }
       ]

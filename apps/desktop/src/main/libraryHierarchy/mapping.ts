@@ -58,6 +58,7 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
         ? {}
         : { parentDirectoryId: row.parentSourceDirectoryId }),
       presence: row.presenceState,
+      browseability: row.mediaBrowseability ?? 'unknown',
       updatedAtMs: row.updatedAtMs
     }
   }

@@ -31,6 +31,7 @@ pub struct StoreLiteralHierarchyNode {
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
     pub updated_at: i64,
+    pub media_browseability: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -322,7 +323,8 @@ fn read_child_rows(
                 presence_state,
                 size_bytes,
                 modified_at_ns,
-                updated_at
+                updated_at,
+                media_browseability
          FROM (
              SELECT 0 AS sort_kind,
                     'directory' AS node_kind,
@@ -335,7 +337,8 @@ fn read_child_rows(
                     presence_state,
                     NULL AS size_bytes,
                     NULL AS modified_at_ns,
-                    updated_at
+                    updated_at,
+                    media_browseability
              FROM source_directories
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -355,7 +358,8 @@ fn read_child_rows(
                     presence_state,
                     size_bytes,
                     mtime_ns AS modified_at_ns,
-                    updated_at
+                    updated_at,
+                    NULL AS media_browseability
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -387,6 +391,7 @@ fn read_child_rows(
                     size_bytes: row.get(8)?,
                     modified_at_ns: row.get(9)?,
                     updated_at: row.get(10)?,
+                    media_browseability: row.get(11)?,
                 })
             },
         )?

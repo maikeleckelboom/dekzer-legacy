@@ -1018,6 +1018,14 @@
         }
       ]
     },
+    "LiteralHierarchyBrowseability": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "browseable",
+        "empty"
+      ]
+    },
     "LiteralHierarchyEntryPoint": {
       "oneOf": [
         {
@@ -1075,6 +1083,16 @@
       "properties": {
         "displayName": {
           "type": "string"
+        },
+        "mediaBrowseability": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralHierarchyBrowseability"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "modifiedAtNs": {
           "type": [

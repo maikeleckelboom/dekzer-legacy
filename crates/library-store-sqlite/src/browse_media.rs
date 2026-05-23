@@ -50,7 +50,7 @@ pub(crate) fn classify_relative_path_file_kind(relative_path: &str) -> &'static 
 
     match extension.as_str() {
         "mp3" | "wav" | "flac" | "aiff" | "aif" | "aifc" | "m4a" | "aac" | "ogg" | "oga"
-        | "opus" => "audio",
+        | "opus" | "wma" | "alac" => "audio",
         "cue" => "cue_sheet",
         "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp" | "tif" | "tiff" => "image",
         "mp4" | "mov" | "m4v" | "webm" | "mkv" | "avi" => "video",

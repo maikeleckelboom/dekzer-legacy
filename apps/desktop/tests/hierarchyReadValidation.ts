@@ -1272,6 +1272,7 @@ function directoryNode(
     directoryId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
+    browseability: 'browseable',
     updatedAtMs: 100
   }
 }
