@@ -12,7 +12,6 @@ defineOptions({
 const props = defineProps<{
   icon: LocationSourceIcon
   badge?: LocationSourceIconBadge
-  decorative?: boolean
   label?: string
 }>()
 
@@ -21,13 +20,12 @@ const badgeComponent = computed(() => resolveSourceIconBadge(props.badge))
 </script>
 
 <template>
-  <span class="relative inline-grid h-7 w-7 shrink-0 place-items-center" aria-hidden="true">
-    <Icon :icon="baseComponent" size="sm" :decorative="true" />
+  <span class="relative inline-grid h-7 w-7 shrink-0 place-items-center" :aria-hidden="label === undefined">
+    <Icon :icon="baseComponent" size="sm" />
     <Icon
       v-if="badgeComponent"
       :icon="badgeComponent"
       size="xs"
-      :decorative="true"
       tone="muted"
       class="absolute bottom-0 right-0"
     />

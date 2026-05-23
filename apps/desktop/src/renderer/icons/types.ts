@@ -7,11 +7,14 @@ export type IconSize = 'xs' | 'sm' | 'md' | 'lg'
 
 export type IconTone = 'inherit' | 'muted' | 'primary' | 'warning' | 'danger'
 
-type DecorativeIconProps = {
+export type IconFrame = 'none' | 'square'
+
+type HiddenIconProps = {
   icon: IconComponent
   size?: IconSize
   tone?: IconTone
-  decorative?: true
+  frame?: IconFrame
+  accessibility?: 'hidden'
   label?: never
 }
 
@@ -19,8 +22,9 @@ type LabeledIconProps = {
   icon: IconComponent
   size?: IconSize
   tone?: IconTone
-  decorative: false
+  frame?: IconFrame
+  accessibility: 'labelled'
   label: string
 }
 
-export type IconProps = DecorativeIconProps | LabeledIconProps
+export type IconProps = HiddenIconProps | LabeledIconProps

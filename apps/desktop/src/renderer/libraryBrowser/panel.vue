@@ -125,9 +125,9 @@ const operationFeedbackToneClass = computed(() => {
     case 'success':
       return 'text-(--color-accent)'
     case 'error':
-      return 'text-(--color-danger)'
+      return 'text-(--color-accent)'
     case 'warning':
-      return 'text-(--color-warning)'
+      return 'text-(--color-text-muted)'
     default:
       return 'text-(--color-text)'
   }
@@ -379,7 +379,7 @@ function activateContentRowAction(row: ContentRow): void {
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="library-hierarchy-title" class="text-xl font-bold leading-7 text-(--color-text)">
-            Music Library
+            Local Files
           </h2>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2">
@@ -389,7 +389,7 @@ function activateContentRowAction(row: ContentRow): void {
             :disabled="!canAddMusicFolder"
             @click="addMusicFolder"
           >
-            <Icon :icon="FolderPlusIcon" size="md" :decorative="true" />
+            <Icon :icon="FolderPlusIcon" size="md" />
             <span>{{ rootChoiceButtonLabel }}</span>
           </button>
           <button
@@ -399,17 +399,17 @@ function activateContentRowAction(row: ContentRow): void {
             :disabled="!canScanRoot"
             @click="scanRoot"
           >
-            <Icon :icon="ScanIcon" size="md" :decorative="true" />
+            <Icon :icon="ScanIcon" size="md" />
             <span>{{ scanButtonLabel }}</span>
           </button>
           <button
             v-if="registeredRootPath !== undefined"
             type="button"
-            class="inline-flex min-h-9 items-center justify-center gap-2 rounded-sm border border-(--color-danger) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-danger) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-danger) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+            class="inline-flex min-h-9 items-center justify-center gap-2 rounded-sm border border-(--color-accent) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-accent) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!canRemoveSource"
             @click="handleRemoveSource"
           >
-            <Icon :icon="CircleXIcon" size="md" :decorative="true" />
+            <Icon :icon="CircleXIcon" size="md" />
             <span>{{ removeSourceButtonLabel }}</span>
           </button>
         </div>
@@ -430,7 +430,9 @@ function activateContentRowAction(row: ContentRow): void {
     <div
       class="grid gap-4 p-5 xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] grid-rows-1 h-[80svh]"
     >
-      <div class="min-w-0 overflow-y-auto space-y-4">
+      <div
+        class="min-w-0 overflow-y-auto space-y-4 scrollbar-gutter-stable scrollbar-track-transparent scrollbar-thumb-gray-200"
+      >
         <TreeRoot
           v-bind="treeRootProps"
           @select="selectNode"

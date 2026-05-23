@@ -142,7 +142,6 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
                     v-if="row.icon !== undefined"
                     :icon="resolveContentRowIcon(row.icon) ?? StateIcon"
                     size="sm"
-                    :decorative="true"
                   />
                 </span>
                 <span class="min-w-0 flex-1 truncate font-semibold text-(--color-text)">
@@ -154,7 +153,7 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
                   class="inline-flex min-h-8 shrink-0 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-surface) px-2.5 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
                   @click="activateRowAction(row)"
                 >
-                  <Icon :icon="resolveContentActionIcon(row)" size="xs" :decorative="true" />
+                  <Icon :icon="resolveContentActionIcon(row)" size="xs" />
                   <span>{{ row.action.label }}</span>
                 </button>
               </div>

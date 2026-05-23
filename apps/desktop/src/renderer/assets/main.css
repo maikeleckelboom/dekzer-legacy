@@ -36,9 +36,9 @@
     color: var(--color-accent);
   }
   .app-icon--warning {
-    color: var(--color-warning);
+    color: var(--color-text-muted);
   }
   .app-icon--danger {
-    color: var(--color-danger);
+    color: var(--color-accent);
   }
 }
