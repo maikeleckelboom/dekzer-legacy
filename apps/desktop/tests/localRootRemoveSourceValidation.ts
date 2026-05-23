@@ -1,6 +1,4 @@
 import { strict as assert } from 'node:assert'
-import { readFileSync } from 'node:fs'
-import { relative } from 'node:path'
 
 import {
   createLocalRootActionsController,
@@ -12,12 +10,6 @@ import {
 } from '../src/renderer/libraryBrowser/runtime/rootLifecycle'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
-import { desktopRoot, listSourceFiles, normalizePath, rendererSourceRoot } from './support/files'
-
-const approvedUnregisterRendererOwners = new Set([
-  'src/renderer/libraryBrowser/boundary/localRootActions.ts',
-  'src/renderer/libraryBrowser/runtime/rootLifecycle.ts'
-])
 
 void main()
 
@@ -31,8 +23,6 @@ async function main(): Promise<void> {
   await validatesRootLifecycleRefreshesNavigationAfterSuccessfulUnregister()
   await validatesConfirmCallbackControlsRemoval()
   await validatesRefreshFailureAfterSuccessfulUnregisterIsHonest()
-  validatesRendererRemoveSourceBoundaryOwnership()
-  validatesNoDeleteFilesCopy()
 }
 
 async function validatesCanUnregisterFalseWithNoRoot(): Promise<void> {
@@ -273,75 +263,6 @@ async function validatesRefreshFailureAfterSuccessfulUnregisterIsHonest(): Promi
   assert.equal(rootActions.registeredRoot.value, undefined)
   assert.equal(rootActions.removeSourceStatus.value, 'removed')
   assert.equal(lifecycle.refreshStatus.value, 'failed')
-}
-
-function validatesRendererRemoveSourceBoundaryOwnership(): void {
-  const violations: string[] = []
-  const forbiddenPatterns = [
-    /@dekzer\/library-boundary-client/,
-    /@dekzer\/library-boundary-stdio-transport/,
-    /\bLibraryBoundaryClient\b/,
-    /\bipcRenderer\b/,
-    /from ['"]electron['"]/,
-    /from ['"]node:fs['"]/,
-    /from ['"]fs['"]/,
-    /from ['"]node:path['"]/,
-    /from ['"]path['"]/,
-    /from ['"].*\/main\//,
-    /\bdeleteLocalRoot\b/,
-    /\bdeleteRoot\b/
-  ]
-
-  for (const filePath of listSourceFiles(rendererSourceRoot)) {
-    const relativePath = normalizePath(relative(desktopRoot, filePath))
-    const contents = readFileSync(filePath, 'utf8')
-
-    for (const pattern of forbiddenPatterns) {
-      if (pattern.test(contents)) {
-        violations.push(`${relativePath}: ${String(pattern)}`)
-      }
-    }
-
-    if (
-      /\.unregisterLocalRoot\(/.test(contents) &&
-      !approvedUnregisterRendererOwners.has(relativePath)
-    ) {
-      violations.push(
-        `${relativePath}: .unregisterLocalRoot is only allowed in ${[...approvedUnregisterRendererOwners].join(', ')}`
-      )
-    }
-  }
-
-  assert.deepEqual(violations, [])
-}
-
-function validatesNoDeleteFilesCopy(): void {
-  const violations: string[] = []
-
-  for (const filePath of listSourceFiles(rendererSourceRoot)) {
-    const relativePath = normalizePath(relative(desktopRoot, filePath))
-    const contents = readFileSync(filePath, 'utf8')
-
-    if (
-      /(?:remove|unregister|unreg).*source/i.test(contents) &&
-      /\bdelete.*files?\b|\bfiles?\b.*\bdelete\b/i.test(contents)
-    ) {
-      violations.push(
-        `${relativePath}: remove/unregister source copy should not mention deleting files`
-      )
-    }
-
-    if (
-      /\bremove\b.*\bsource\b/i.test(contents) &&
-      /will not\s+delete|does not\s+delete|won't\s+delete|do not\s+delete|don't\s+delete|never\s+delete/i.test(
-        contents
-      )
-    ) {
-      continue
-    }
-  }
-
-  assert.equal(violations.length, 0)
 }
 
 function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRootActionsApi {

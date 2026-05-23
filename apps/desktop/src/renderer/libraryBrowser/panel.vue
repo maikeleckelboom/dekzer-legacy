@@ -252,6 +252,15 @@ function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   void requestNodeChildren(nodeId)
 }
 
+async function handleRemoveSource(): Promise<void> {
+  const removed = await removeSource()
+  if (removed) {
+    selectedNodeId.value = undefined
+    expandedNodeIds.value = new Set()
+    hasUserInteractedWithTree.value = false
+  }
+}
+
 function activateContentRowAction(row: ContentRow): void {
   hasUserInteractedWithTree.value = true
   const action = row.action
@@ -347,7 +356,7 @@ function formatSelectedRowKind(kind: RowBinding['kind']): string {
             type="button"
             class="inline-flex min-h-9 items-center justify-center gap-2 rounded-sm border border-(--color-danger) bg-(--color-background) px-3 py-2 text-sm font-bold text-(--color-danger) transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-(--color-danger) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="!canRemoveSource"
-            @click="removeSource"
+            @click="handleRemoveSource"
           >
             <Icon :icon="CircleXIcon" size="md" :decorative="true" />
             <span>{{ removeSourceButtonLabel }}</span>

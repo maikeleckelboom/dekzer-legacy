@@ -20,7 +20,7 @@ export type RootLifecycleController = {
 export type RootLifecycleDependencies = {
   readonly rootActions: LocalRootActionsController
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
-  readonly confirmRemoveSource?: () => boolean
+  readonly confirmRemoveSource: () => boolean
 }
 
 export function useRootLifecycle(dependencies: RootLifecycleDependencies): RootLifecycleController {
@@ -81,7 +81,7 @@ export function createRootLifecycleController(
       return false
     }
 
-    const confirmed = dependencies.confirmRemoveSource?.() ?? false
+    const confirmed = dependencies.confirmRemoveSource()
 
     if (!confirmed) {
       return false

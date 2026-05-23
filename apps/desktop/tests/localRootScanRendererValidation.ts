@@ -827,7 +827,8 @@ function testRootLifecycle(
     rootActions,
     hierarchyRead: {
       refresh
-    }
+    },
+    confirmRemoveSource: () => true
   })
 
   return {
