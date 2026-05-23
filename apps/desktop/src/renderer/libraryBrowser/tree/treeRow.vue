@@ -31,6 +31,11 @@ const rowIcon = computed<IconComponent | undefined>(() =>
 )
 
 const iconTone = computed<IconTone>(() => {
+  const badgeTone = props.item.node.badge?.tone
+
+  if (badgeTone === 'warning') return 'warning'
+  if (badgeTone === 'danger') return 'danger'
+
   const icon = props.item.node.icon
   const role = props.item.node.role
 
@@ -54,6 +59,11 @@ const iconTone = computed<IconTone>(() => {
 })
 
 const labelClass = computed(() => {
+  const badgeTone = props.item.node.badge?.tone
+
+  if (badgeTone === 'warning') return 'text-(--color-warning)'
+  if (badgeTone === 'danger') return 'text-(--color-danger)'
+
   const icon = props.item.node.icon
 
   switch (icon) {
