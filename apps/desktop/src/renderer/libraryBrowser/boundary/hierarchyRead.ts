@@ -158,7 +158,8 @@ export function createLibraryHierarchyReadController(
       return false
     }
 
-    return loadFirstSource()
+    await loadFirstSource()
+    return true
   }
 
   async function refreshNavigationRows(): Promise<boolean> {

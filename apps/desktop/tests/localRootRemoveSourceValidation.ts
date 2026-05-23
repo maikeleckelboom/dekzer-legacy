@@ -18,11 +18,12 @@ async function main(): Promise<void> {
   await validatesCanUnregisterTrueWithOneActiveRoot()
   await validatesUnregisterCallsRendererApiWithRootIdFromBackendState()
   await validatesUnregisterSuccessClearsRegisteredRootAndScanState()
-  await validatesUnregisterFalseLeavesStateHonest()
+  await validatesAlreadyRemovedUnregisterStillReturnsTrue()
   await validatesUnregisterFailureLeavesStateHonest()
   await validatesRootLifecycleRefreshesNavigationAfterSuccessfulUnregister()
   await validatesConfirmCallbackControlsRemoval()
   await validatesRefreshFailureAfterSuccessfulUnregisterIsHonest()
+  await validatesRemoveSourceWithAlreadyRemovedUnregister()
 }
 
 async function validatesCanUnregisterFalseWithNoRoot(): Promise<void> {
@@ -109,7 +110,7 @@ async function validatesUnregisterSuccessClearsRegisteredRootAndScanState(): Pro
   assert.equal(controller.localRootsReadState.value.kind, 'unread')
 }
 
-async function validatesUnregisterFalseLeavesStateHonest(): Promise<void> {
+async function validatesAlreadyRemovedUnregisterStillReturnsTrue(): Promise<void> {
   const controller = createLocalRootActionsController(
     testRootApi({
       chooseAndRegisterLocal: async () =>
@@ -127,10 +128,11 @@ async function validatesUnregisterFalseLeavesStateHonest(): Promise<void> {
   assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
   assert.equal(controller.registeredRootPath.value, 'C:/Music')
 
-  assert.equal(await controller.unregisterLocalRoot(), false)
-  assert.equal(controller.removeSourceStatus.value, 'failed')
-  assert.equal(controller.registeredRoot.value?.rootId, 'root-1')
-  assert.equal(controller.registeredRootPath.value, 'C:/Music')
+  assert.equal(await controller.unregisterLocalRoot(), true)
+  assert.equal(controller.removeSourceStatus.value, 'removed')
+  assert.equal(controller.registeredRoot.value, undefined)
+  assert.equal(controller.registeredRootPath.value, undefined)
+  assert.equal(controller.rootChoiceStatus.value, 'idle')
 }
 
 async function validatesUnregisterFailureLeavesStateHonest(): Promise<void> {
@@ -313,6 +315,50 @@ function testRootLifecycle(
     rootActions,
     lifecycle
   }
+}
+
+async function validatesRemoveSourceWithAlreadyRemovedUnregister(): Promise<void> {
+  const events: string[] = []
+  const { rootActions, lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () => {
+        events.push('choose')
+        return registeredChoice({
+          rootId: 'root-1',
+          canonicalPath: 'C:/Music'
+        })
+      },
+      runScan: async () =>
+        scannedRootResult({
+          rootId: 'root-1',
+          scanRunId: 'scan-1',
+          discoveredFileCount: 12,
+          queuedSourceWorkItems: 8
+        }),
+      unregisterLocalRoot: async () => {
+        events.push('unregister')
+        return {
+          state: 'unregistered',
+          unregistered: false
+        }
+      }
+    }),
+    async () => {
+      events.push('refresh')
+      return true
+    },
+    () => true
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), true)
+  events.length = 0
+
+  assert.equal(await lifecycle.removeSource(), true)
+  assert.deepEqual(events, ['unregister', 'refresh'])
+  assert.equal(rootActions.registeredRoot.value, undefined)
+  assert.equal(rootActions.removeSourceStatus.value, 'removed')
+  assert.equal(rootActions.rootChoiceStatus.value, 'idle')
+  assert.equal(lifecycle.refreshStatus.value, 'refreshed')
 }
 
 function registeredChoice(

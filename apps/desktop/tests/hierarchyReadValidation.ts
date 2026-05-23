@@ -64,6 +64,7 @@ async function main(): Promise<void> {
   validatesHierarchyReadIpcRegistration(config)
   await validatesNavigationReadHandler(config)
   validatesNavigationReadIpcRegistration(config)
+  await validatesRefreshReturnsTrueWithZeroSources()
   await validatesRendererHierarchyReadController()
   await validatesRendererWindowedMore()
   await validatesEntryPointRejection()
@@ -361,6 +362,31 @@ function validatesNavigationReadIpcRegistration(config: LibraryBoundaryHostConfi
 
   assert.equal(registration.channel, navigationReadChannels.readRows)
   assert.equal(typeof registration.handler, 'function')
+}
+
+async function validatesRefreshReturnsTrueWithZeroSources(): Promise<void> {
+  let readRowsCalled = false
+  const controller = createLibraryHierarchyReadController(
+    testLibraryApi({
+      readRows: async () => {
+        readRowsCalled = true
+        return {
+          state: 'ready',
+          rows: []
+        }
+      },
+      readChildren: async () => {
+        throw new Error('readChildren should not be called with zero sources')
+      }
+    })
+  )
+
+  const result = await controller.refresh()
+
+  assert.equal(readRowsCalled, true)
+  assert.equal(result, true)
+  assert.equal(controller.navigationReadResult.value?.state, 'ready')
+  assert.equal(controller.navigationReadResult.value?.rows.length, 0)
 }
 
 async function validatesRendererHierarchyReadController(): Promise<void> {

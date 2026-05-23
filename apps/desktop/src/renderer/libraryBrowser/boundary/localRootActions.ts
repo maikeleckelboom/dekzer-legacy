@@ -234,7 +234,7 @@ export function createLocalRootActionsController(
     try {
       const result = await rootApi.unregisterLocalRoot({ rootId: root.rootId })
 
-      if (result.state === 'unregistered' && result.unregistered) {
+      if (result.state === 'unregistered') {
         removeSourceStatus.value = 'removed'
         registeredRoot.value = undefined
         resetScanState()
