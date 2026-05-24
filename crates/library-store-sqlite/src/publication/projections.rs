@@ -20,7 +20,6 @@ const PLAYLISTS_FAMILY_ROW_ID: i64 = -7;
 const PREP_POLICIES_FAMILY_ROW_ID: i64 = -8;
 const PLAYLIST_NAVIGATION_ROW_ID_BASE: i64 = 2_000_000_000_000;
 const PREP_POLICY_NAVIGATION_ROW_ID_BASE: i64 = 3_000_000_000_000;
-const SOURCE_LOCATION_GROUP_NAVIGATION_ROW_ID_BASE: i64 = 1_500_000_000_000;
 const SOURCE_LOCATION_NAVIGATION_ROW_ID_BASE: i64 = 1_000_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -756,112 +755,53 @@ fn insert_source_location_navigation_rows(
     rows: &mut BTreeMap<String, NavigationProjectionRow>,
 ) -> LibrarySqliteResult<()> {
     let mut statement = connection.prepare(
-        "WITH location_counts AS (
-             SELECT source_id,
-                    COUNT(*) AS location_count,
-                    MAX(updated_at) AS updated_at
-             FROM source_locations
-             WHERE authority = 'user'
-               AND location_kind = 'registered_subpath'
-               AND is_user_visible = 1
-             GROUP BY source_id
-         ),
-         ordered_locations AS (
-             SELECT sl.source_location_id,
-                    sl.source_id,
-                    COALESCE(NULLIF(trim(sl.display_name), ''), sl.relative_path) AS display_name,
-                    relative_path,
-                    sl.updated_at,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY sl.source_id
-                        ORDER BY
-                            COALESCE(buo.ordinal, 9223372036854775807),
-                            lower(COALESCE(NULLIF(trim(sl.display_name), ''), sl.relative_path)),
-                            lower(sl.relative_path),
-                            sl.source_location_id
-                    ) - 1 AS sibling_position
-             FROM source_locations sl
-             LEFT JOIN browser_user_order buo
-               ON buo.node_domain = 'source_location'
-             AND buo.node_id = CAST(sl.source_location_id AS TEXT)
-             AND buo.parent_scope = CAST(sl.source_id AS TEXT)
-             WHERE sl.authority = 'user'
-               AND sl.location_kind = 'registered_subpath'
-               AND sl.is_user_visible = 1
-         )
-         SELECT 'group' AS row_type,
-                NULL,
-                source_id,
-                'Locations',
-                '',
-                updated_at,
-                0
-         FROM location_counts
-         WHERE location_count > 0
-         UNION ALL
-         SELECT 'location' AS row_type,
-                source_location_id,
-                source_id,
-                display_name,
-                relative_path,
-                updated_at,
-                sibling_position
-         FROM ordered_locations
-         ORDER BY source_id ASC, row_type ASC, sibling_position ASC",
+        "SELECT sl.source_location_id,
+                sl.source_id,
+                COALESCE(NULLIF(trim(sl.display_name), ''), sl.relative_path) AS display_name,
+                sl.updated_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY sl.source_id
+                    ORDER BY
+                        COALESCE(buo.ordinal, 9223372036854775807),
+                        lower(COALESCE(NULLIF(trim(sl.display_name), ''), sl.relative_path)),
+                        lower(sl.relative_path),
+                        sl.source_location_id
+                ) - 1 AS sibling_position
+         FROM source_locations sl
+         LEFT JOIN browser_user_order buo
+           ON buo.node_domain = 'source_location'
+          AND buo.node_id = CAST(sl.source_location_id AS TEXT)
+          AND buo.parent_scope = CAST(sl.source_id AS TEXT)
+         WHERE sl.authority = 'user'
+           AND sl.location_kind = 'registered_subpath'
+           AND sl.is_user_visible = 1
+         ORDER BY sl.source_id ASC, sibling_position ASC",
     )?;
     let mut query = statement.query([])?;
     while let Some(row) = query.next()? {
-        let row_type: String = row.get(0)?;
-        let source_location_id: Option<i64> = row.get(1)?;
-        let source_id: i64 = row.get(2)?;
-        let display_name: String = row.get(3)?;
-        let relative_path: String = row.get(4)?;
-        let updated_at: i64 = row.get(5)?;
-        let sibling_position: i64 = row.get(6)?;
-        if row_type == "group" {
-            let stable_key = format!("source:{source_id}:locations");
-            rows.insert(
-                stable_key.clone(),
-                NavigationProjectionRow {
-                    navigation_row_id: source_location_group_navigation_row_id(source_id),
-                    stable_key,
-                    parent_navigation_row_id: Some(source_id),
-                    family: None,
-                    row_kind: "location-group".to_string(),
-                    display_name,
-                    sibling_position: 0,
-                    selectable: false,
-                    selector_kind: None,
-                    selector_payload: None,
-                    updated_at,
-                },
-            );
-        } else if let Some(source_location_id) = source_location_id {
-            let selector = encode_source_location_navigation_selector(source_location_id)?;
-            let stable_key = format!("source_location:{source_location_id}");
-            rows.insert(
-                stable_key.clone(),
-                NavigationProjectionRow {
-                    navigation_row_id: source_location_navigation_row_id(source_location_id),
-                    stable_key,
-                    parent_navigation_row_id: Some(source_location_group_navigation_row_id(
-                        source_id,
-                    )),
-                    family: None,
-                    row_kind: "location".to_string(),
-                    display_name: if display_name.trim().is_empty() {
-                        relative_path
-                    } else {
-                        display_name
-                    },
-                    sibling_position,
-                    selectable: true,
-                    selector_kind: Some(selector.kind.to_string()),
-                    selector_payload: Some(selector.payload),
-                    updated_at,
-                },
-            );
-        }
+        let source_location_id: i64 = row.get(0)?;
+        let source_id: i64 = row.get(1)?;
+        let display_name: String = row.get(2)?;
+        let updated_at: i64 = row.get(3)?;
+        let sibling_position: i64 = row.get(4)?;
+        let selector = encode_source_location_navigation_selector(source_location_id)?;
+        let stable_key = format!("source_location:{source_location_id}");
+        rows.insert(
+            stable_key.clone(),
+            NavigationProjectionRow {
+                navigation_row_id: source_location_navigation_row_id(source_location_id),
+                stable_key,
+                parent_navigation_row_id: Some(source_id),
+                family: None,
+                row_kind: "location".to_string(),
+                display_name,
+                sibling_position,
+                selectable: true,
+                selector_kind: Some(selector.kind.to_string()),
+                selector_payload: Some(selector.payload),
+                updated_at,
+            },
+        );
     }
     Ok(())
 }
@@ -920,10 +860,6 @@ fn playlist_navigation_row_id(playlist_id: i64) -> i64 {
 
 fn prep_policy_navigation_row_id(prep_policy_id: i64) -> i64 {
     -(PREP_POLICY_NAVIGATION_ROW_ID_BASE + prep_policy_id)
-}
-
-fn source_location_group_navigation_row_id(source_id: i64) -> i64 {
-    -(SOURCE_LOCATION_GROUP_NAVIGATION_ROW_ID_BASE + source_id)
 }
 
 fn source_location_navigation_row_id(source_location_id: i64) -> i64 {

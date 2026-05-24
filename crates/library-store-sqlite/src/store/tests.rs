@@ -1676,7 +1676,7 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
         source_children.is_empty(),
         "observed source locations must not project as accepted navigation rows"
     );
-    let source_location_id = durable_store
+    let album_location_id = durable_store
         .upsert_source_location(UpsertSourceLocationInput {
             source_location_id: None,
             source_id,
@@ -1685,29 +1685,53 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
             relative_path: "album".to_string(),
             display_name: Some("Album".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            browser_order_ordinal: Some(1),
             first_created_at: Some(41),
             changed_at: 41,
         })
         .expect("upsert explicit source location");
+    let crates_location_id = durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "user".to_string(),
+            location_kind: "registered_subpath".to_string(),
+            relative_path: "crates".to_string(),
+            display_name: Some("Crates".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(0),
+            first_created_at: Some(42),
+            changed_at: 42,
+        })
+        .expect("upsert ordered source location");
     let source_children = durable_store
         .read_navigation_rows(Some(source_row.navigation_row_id))
         .expect("read source children with source location");
-    let location_group = source_children
-        .iter()
-        .find(|row| row.row_kind == "location-group")
-        .expect("location group is projected for explicit source locations");
-    let location_rows = durable_store
-        .read_navigation_rows(Some(location_group.navigation_row_id))
-        .expect("read source location rows");
-    assert_eq!(location_rows.len(), 1);
-    assert_eq!(location_rows[0].row_kind, "location");
-    assert_eq!(
-        location_rows[0].stable_key,
-        format!("source_location:{source_location_id}")
+    assert!(
+        source_children
+            .iter()
+            .all(|row| row.row_kind != "location-group"),
+        "accepted source locations must project directly under the source"
     );
+    assert_eq!(source_children.len(), 2);
+    assert_eq!(source_children[0].row_kind, "location");
     assert_eq!(
-        location_rows[0].selector_kind.as_deref(),
+        source_children[0].stable_key,
+        format!("source_location:{crates_location_id}")
+    );
+    assert_eq!(source_children[0].sibling_position, 0);
+    assert_eq!(
+        source_children[0].selector_kind.as_deref(),
+        Some("source_location")
+    );
+    assert_eq!(source_children[1].row_kind, "location");
+    assert_eq!(
+        source_children[1].stable_key,
+        format!("source_location:{album_location_id}")
+    );
+    assert_eq!(source_children[1].sibling_position, 1);
+    assert_eq!(
+        source_children[1].selector_kind.as_deref(),
         Some("source_location")
     );
     assert_eq!(library_browser.total_rows, 1);
