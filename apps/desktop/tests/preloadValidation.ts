@@ -203,11 +203,13 @@ async function validatesPreloadApiSurface(): Promise<void> {
     'hierarchy',
     'host',
     'navigation',
-    'roots'
+    'roots',
+    'selectedContents'
   ])
   assert.deepEqual(Object.keys(api.library.host).sort(), ['getStatus', 'onStatusChanged'])
   assert.deepEqual(Object.keys(api.library.hierarchy), ['readChildren'])
   assert.deepEqual(Object.keys(api.library.navigation), ['readRows'])
+  assert.deepEqual(Object.keys(api.library.selectedContents), ['read'])
   assert.deepEqual(Object.keys(api.library.roots).sort(), [
     'chooseAndRegisterLocal',
     'readLocalRoots',

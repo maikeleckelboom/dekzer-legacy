@@ -12,6 +12,8 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck:tooling": "tsc --noEmit -p tsconfig.tooling.json --composite false",
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web && pnpm run typecheck:tooling",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:unit:watch": "vitest --config vitest.config.ts",
     "validate": "tsx scripts/validate.mts",
     "storage:status": "tsx tooling/storage.mts status",
     "storage:reset": "tsx tooling/storage.mts reset",
@@ -48,6 +50,7 @@
     "tsx": "^4.19.4",
     "typescript": "^5.9.3",
     "vite": "^7.0.0",
+    "vitest": "^4.1.7",
     "vue": "^3.5.25",
     "vue-eslint-parser": "^10.2.0",
     "vue-tsc": "^3.1.6"

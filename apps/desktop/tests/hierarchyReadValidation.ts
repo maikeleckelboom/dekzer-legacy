@@ -178,6 +178,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       id: 'source-directory:12',
       kind: 'directory',
       label: 'Album',
+      sourceId: '7',
       directoryId: '12',
       presence: 'present',
       hasChildDirectories: true,
@@ -189,6 +190,7 @@ async function validatesHierarchyReadHandler(config: LibraryBoundaryHostConfig):
       id: 'source-file:11',
       kind: 'file',
       label: 'track.wav',
+      sourceId: '7',
       fileId: '11',
       presence: 'present',
       updatedAtMs: 101
@@ -784,6 +786,7 @@ async function validatesEntryPointRejection(): Promise<void> {
                 id: 'source-file:999',
                 kind: 'file' as const,
                 label: 'intruder.wav',
+                sourceId: '999',
                 fileId: '999',
                 presence: 'present' as const,
                 updatedAtMs: 100
@@ -832,6 +835,7 @@ async function validatesEntryPointRejection(): Promise<void> {
                   id: 'source-file:999',
                   kind: 'file' as const,
                   label: 'intruder.wav',
+                  sourceId: '999',
                   fileId: '999',
                   parentDirectoryId: '12',
                   presence: 'present' as const,
@@ -882,6 +886,7 @@ async function validatesEntryPointRejection(): Promise<void> {
                   id: 'source-file:999',
                   kind: 'file' as const,
                   label: 'intruder.wav',
+                  sourceId: '999',
                   fileId: '999',
                   presence: 'present' as const,
                   updatedAtMs: 100
@@ -955,6 +960,7 @@ async function validatesEntryPointRejection(): Promise<void> {
                   id: 'source-file:12-b',
                   kind: 'file' as const,
                   label: 'b.wav',
+                  sourceId: '999',
                   fileId: '12-b',
                   parentDirectoryId: '12',
                   presence: 'present' as const,
@@ -1036,6 +1042,15 @@ function testLibraryApi(options: {
     },
     hierarchy: {
       readChildren: options.readChildren
+    },
+    selectedContents: {
+      read: async () => ({
+        state: 'readFailed',
+        error: {
+          code: 'readFailed',
+          message: 'Selected contents should not be called by hierarchy read validation.'
+        }
+      })
     },
     roots: {
       chooseAndRegisterLocal: async () => ({
@@ -1168,6 +1183,7 @@ function sourceMoreReadResult(): Extract<ReadResult, { state: 'ready' }> {
           id: 'source-file:99',
           kind: 'file',
           label: 'root-track.wav',
+          sourceId: '7',
           fileId: '99',
           presence: 'present',
           updatedAtMs: 101
@@ -1220,6 +1236,7 @@ function loadedDirectoryReadResult(
           id: `source-file:${parentDirectoryId}-track`,
           kind: 'file',
           label: 'track.wav',
+          sourceId: '7',
           fileId: `${parentDirectoryId}11`,
           parentDirectoryId,
           presence: 'present',
@@ -1254,6 +1271,7 @@ function partialDirectoryHierarchyReadResult(
           id: `source-file:${parentDirectoryId}-a`,
           kind: 'file',
           label: 'a.wav',
+          sourceId: '7',
           fileId: `${parentDirectoryId}-a`,
           parentDirectoryId,
           presence: 'present',
@@ -1287,6 +1305,7 @@ function directoryMoreReadResult(
           id: `source-file:${parentDirectoryId}-b`,
           kind: 'file',
           label: 'b.wav',
+          sourceId: '7',
           fileId: `${parentDirectoryId}-b`,
           parentDirectoryId,
           presence: 'present',
@@ -1346,6 +1365,7 @@ function directoryNode(
     id: `source-directory:${directoryId}`,
     kind: 'directory',
     label,
+    sourceId: '7',
     directoryId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',

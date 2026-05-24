@@ -6,7 +6,6 @@ const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const validations = [
   'tests/browserEntryPresentationValidation.ts',
-  'tests/contentsProjectionValidation.ts',
   'tests/hierarchyReadValidation.ts',
   'tests/hostValidation.ts',
   'tests/libraryBrowserViewStateValidation.ts',
@@ -17,8 +16,6 @@ const validations = [
   'tests/localRootRegistrationValidation.ts',
   'tests/localRootScanValidation.ts',
   'tests/localRootScanRendererValidation.ts',
-  'tests/localRootRemoveSourceValidation.ts',
-  'tests/operationFeedbackValidation.ts',
   'tests/locationSourcesValidation.ts',
   'tests/preloadValidation.ts',
   'tests/treeValidation.ts'

@@ -1,10 +1,7 @@
 import { strict as assert } from 'node:assert'
 
 import { projectState } from '../src/renderer/library/tree/projection'
-import {
-  getTreeItemAriaExpanded,
-  getTreeItemAriaSelected
-} from '../src/renderer/library/tree/aria'
+import { getTreeItemAriaExpanded, getTreeItemAriaSelected } from '../src/renderer/library/tree/aria'
 import {
   resolveTreeKeyboardIntent,
   type TreeKeyboardIntent
@@ -717,6 +714,7 @@ function validatesLibraryHierarchyReadProjection(): void {
         'source-directory:12',
         {
           kind: 'directory',
+          sourceId: '7',
           directoryId: '12',
           entryPoint: {
             kind: 'source',
@@ -1029,6 +1027,7 @@ function fileOnlyHierarchyReadResult(): Extract<ReadResult, { state: 'ready' }> 
           id: 'source-file:11',
           kind: 'file',
           label: 'track.wav',
+          sourceId: '7',
           fileId: '11',
           presence: 'present',
           updatedAtMs: 100
@@ -1093,6 +1092,7 @@ function directoryHierarchyReadResultWithFacts(
           id: 'source-directory:12',
           kind: 'directory',
           label: 'Album',
+          sourceId: '7',
           directoryId: '12',
           presence: 'present',
           ...facts,
@@ -1343,6 +1343,7 @@ function validatesLoadedEmptyTreeProjection(): void {
                 id: 'source-file:99',
                 kind: 'file',
                 label: 'desktop.ini',
+                sourceId: '7',
                 fileId: '99',
                 presence: 'present',
                 updatedAtMs: 100
@@ -1382,6 +1383,7 @@ function validatesLoadedEmptyTreeProjection(): void {
                 id: 'source-file:11',
                 kind: 'file',
                 label: 'track.wav',
+                sourceId: '7',
                 fileId: '11',
                 presence: 'present',
                 updatedAtMs: 100
