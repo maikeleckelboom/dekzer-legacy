@@ -3,6 +3,11 @@ use rusqlite::{OptionalExtension, params};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
+const ACCEPTED_SOURCE_LOCATION_AUTHORITY: &str = "user";
+const REGISTERED_SUBPATH_LOCATION_KIND: &str = "registered_subpath";
+const OBSERVED_SOURCE_LOCATION_AUTHORITY: &str = "device";
+const OBSERVED_PATH_LOCATION_KIND: &str = "observed_path";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpsertSourceLocationInput {
     pub source_location_id: Option<i64>,
@@ -26,6 +31,12 @@ pub struct SourceLocationsAuthorityTx<'write, 'conn> {
     tx: &'write AdmittedWrite<'conn>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceLocationLifecycle {
+    authority: String,
+    location_kind: String,
+}
+
 impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
     pub(crate) fn new(tx: &'write AdmittedWrite<'conn>) -> Self {
         Self { tx }
@@ -38,6 +49,32 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
         validate_source_location_shape(&input.authority, &input.location_kind)?;
         let relative_path = canonicalize_source_location_relative_path(&input.relative_path)?;
         let existing_id = self.resolve_existing_id(input, &relative_path)?;
+        if let Some(source_location_id) = existing_id
+            && is_observed_source_location(&input.authority, &input.location_kind)
+            && self
+                .load_source_location_lifecycle(source_location_id)?
+                .is_some_and(|existing| {
+                    is_user_registered_source_location(&existing.authority, &existing.location_kind)
+                })
+        {
+            if input.source_location_id == Some(source_location_id) {
+                return Err(LibrarySqliteError::WriteInvariant(format!(
+                    "observed source location writes cannot replace user-registered source location {source_location_id}"
+                )));
+            }
+            return Ok(source_location_id);
+        }
+        if is_accepted_source_location(
+            &input.authority,
+            &input.location_kind,
+            input.is_user_visible,
+        ) {
+            self.reject_nested_accepted_source_location(
+                input.source_id,
+                existing_id,
+                &relative_path,
+            )?;
+        }
 
         if let Some(source_location_id) = existing_id {
             self.tx.execute(
@@ -224,6 +261,61 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
         }
         Ok(())
     }
+
+    fn load_source_location_lifecycle(
+        &self,
+        source_location_id: i64,
+    ) -> LibrarySqliteResult<Option<SourceLocationLifecycle>> {
+        self.tx
+            .query_row(
+                "SELECT authority,
+                        location_kind
+                 FROM source_locations
+                 WHERE source_location_id = ?1",
+                [source_location_id],
+                |row| {
+                    Ok(SourceLocationLifecycle {
+                        authority: row.get(0)?,
+                        location_kind: row.get(1)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    fn reject_nested_accepted_source_location(
+        &self,
+        source_id: i64,
+        current_source_location_id: Option<i64>,
+        relative_path: &str,
+    ) -> LibrarySqliteResult<()> {
+        let mut statement = self.tx.prepare(
+            "SELECT source_location_id,
+                    relative_path
+             FROM source_locations
+             WHERE source_id = ?1
+               AND authority = 'user'
+               AND location_kind = 'registered_subpath'
+               AND is_user_visible = 1
+               AND (?2 IS NULL OR source_location_id <> ?2)
+             ORDER BY relative_path ASC, source_location_id ASC",
+        )?;
+        let mut rows = statement.query(params![source_id, current_source_location_id])?;
+        while let Some(row) = rows.next()? {
+            let existing_source_location_id: i64 = row.get(0)?;
+            let existing_relative_path: String = row.get(1)?;
+            if source_location_paths_overlap(relative_path, &existing_relative_path) {
+                return Err(source_location_path_overlap(
+                    source_id,
+                    relative_path,
+                    existing_source_location_id,
+                    &existing_relative_path,
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 pub fn canonicalize_source_location_relative_path(raw: &str) -> LibrarySqliteResult<String> {
@@ -243,17 +335,30 @@ pub fn canonicalize_source_location_relative_path(raw: &str) -> LibrarySqliteRes
             "path contains a drive prefix",
         ));
     }
-
-    let slash_normalized = trimmed.replace('\\', "/");
-    if slash_normalized.starts_with('/') {
+    if trimmed.contains('\\') {
+        return Err(invalid_source_location_path(
+            raw,
+            "path contains backslashes",
+        ));
+    }
+    if trimmed.starts_with('/') {
         return Err(invalid_source_location_path(raw, "path is absolute"));
+    }
+    if trimmed.ends_with('/') {
+        return Err(invalid_source_location_path(
+            raw,
+            "path has a trailing slash",
+        ));
+    }
+    if trimmed.contains("//") {
+        return Err(invalid_source_location_path(
+            raw,
+            "path contains an empty segment",
+        ));
     }
 
     let mut segments = Vec::new();
-    for segment in slash_normalized.split('/') {
-        if segment.is_empty() {
-            continue;
-        }
+    for segment in trimmed.split('/') {
         if segment == "." || segment == ".." {
             return Err(invalid_source_location_path(
                 raw,
@@ -275,11 +380,41 @@ pub fn canonicalize_source_location_relative_path(raw: &str) -> LibrarySqliteRes
 
 fn validate_source_location_shape(authority: &str, location_kind: &str) -> LibrarySqliteResult<()> {
     match (authority, location_kind) {
-        ("device", "observed_path") | ("user", "registered_subpath") => Ok(()),
+        (OBSERVED_SOURCE_LOCATION_AUTHORITY, OBSERVED_PATH_LOCATION_KIND)
+        | (ACCEPTED_SOURCE_LOCATION_AUTHORITY, REGISTERED_SUBPATH_LOCATION_KIND) => Ok(()),
         _ => Err(LibrarySqliteError::WriteInvariant(format!(
             "invalid source_location authority/kind pair: authority={authority:?}, location_kind={location_kind:?}"
         ))),
     }
+}
+
+fn is_accepted_source_location(
+    authority: &str,
+    location_kind: &str,
+    is_user_visible: bool,
+) -> bool {
+    is_user_registered_source_location(authority, location_kind) && is_user_visible
+}
+
+fn is_user_registered_source_location(authority: &str, location_kind: &str) -> bool {
+    authority == ACCEPTED_SOURCE_LOCATION_AUTHORITY
+        && location_kind == REGISTERED_SUBPATH_LOCATION_KIND
+}
+
+fn is_observed_source_location(authority: &str, location_kind: &str) -> bool {
+    authority == OBSERVED_SOURCE_LOCATION_AUTHORITY && location_kind == OBSERVED_PATH_LOCATION_KIND
+}
+
+fn source_location_paths_overlap(left: &str, right: &str) -> bool {
+    left == right
+        || source_location_path_contains(left, right)
+        || source_location_path_contains(right, left)
+}
+
+fn source_location_path_contains(parent: &str, child: &str) -> bool {
+    child
+        .strip_prefix(parent)
+        .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
 fn has_drive_prefix(path: &str) -> bool {
@@ -293,6 +428,17 @@ fn invalid_source_location_path(raw: &str, reason: &str) -> LibrarySqliteError {
     ))
 }
 
+fn source_location_path_overlap(
+    source_id: i64,
+    relative_path: &str,
+    existing_source_location_id: i64,
+    existing_relative_path: &str,
+) -> LibrarySqliteError {
+    LibrarySqliteError::WriteInvariant(format!(
+        "accepted source location {relative_path:?} overlaps existing accepted source location {existing_relative_path:?} ({existing_source_location_id}) for source {source_id}"
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::canonicalize_source_location_relative_path;
@@ -300,12 +446,11 @@ mod tests {
     #[test]
     fn canonicalize_source_location_relative_path_normalizes_lawful_paths() {
         assert_eq!(
-            canonicalize_source_location_relative_path(r" Music\\DJ Pool// ")
-                .expect("canonical path"),
+            canonicalize_source_location_relative_path(" Music/DJ Pool ").expect("canonical path"),
             "Music/DJ Pool"
         );
         assert_eq!(
-            canonicalize_source_location_relative_path("Music///Tracks/").expect("canonical path"),
+            canonicalize_source_location_relative_path("Music/Tracks").expect("canonical path"),
             "Music/Tracks"
         );
     }
@@ -317,6 +462,7 @@ mod tests {
             "   ",
             "/Music",
             r"\\server\\Music",
+            r"Music\\Tracks",
             "C:/Music",
             "C:Music",
             ".",
@@ -326,6 +472,8 @@ mod tests {
             "../Music",
             "Music/../Tracks",
             "file://Music",
+            "Music/",
+            "Music//Tracks",
         ] {
             canonicalize_source_location_relative_path(path).expect_err("path should be rejected");
         }

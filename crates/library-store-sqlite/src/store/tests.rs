@@ -751,7 +751,7 @@ fn needs_preparation_view_is_projected_and_node_scoped_browser_reads_use_readine
 }
 
 #[test]
-fn source_locations_write_side_canonicalizes_and_enforces_uniqueness() {
+fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
     let tempdir = TempDir::new().expect("create tempdir");
     let db_path = tempdir.path().join("library.sqlite3");
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
@@ -776,7 +776,7 @@ fn source_locations_write_side_canonicalizes_and_enforces_uniqueness() {
             source_id,
             authority: "user".to_string(),
             location_kind: "registered_subpath".to_string(),
-            relative_path: r"Music\\DJ Pool//".to_string(),
+            relative_path: "Music/DJ Pool".to_string(),
             display_name: Some("DJ Pool".to_string()),
             is_user_visible: true,
             browser_order_ordinal: Some(3),
@@ -790,7 +790,7 @@ fn source_locations_write_side_canonicalizes_and_enforces_uniqueness() {
             source_id,
             authority: "user".to_string(),
             location_kind: "registered_subpath".to_string(),
-            relative_path: "Music/DJ Pool/".to_string(),
+            relative_path: "Music/DJ Pool".to_string(),
             display_name: Some("DJ Pool Renamed".to_string()),
             is_user_visible: true,
             browser_order_ordinal: Some(4),
@@ -800,7 +800,16 @@ fn source_locations_write_side_canonicalizes_and_enforces_uniqueness() {
         .expect("upsert same canonical source location");
     assert_eq!(source_location_id, same_source_location_id);
 
-    for invalid_path in ["/Music", "C:/Music", ".", "Music/../Pool", "   "] {
+    for invalid_path in [
+        "/Music",
+        "C:/Music",
+        ".",
+        "Music/../Pool",
+        r"Music\Pool",
+        "Music/Pool/",
+        "Music//Pool",
+        "   ",
+    ] {
         durable_store
             .upsert_source_location(UpsertSourceLocationInput {
                 source_location_id: None,
@@ -860,6 +869,132 @@ fn source_locations_write_side_canonicalizes_and_enforces_uniqueness() {
         )
         .expect("count source-location rows after delete");
     assert_eq!(remaining_rows, (0, 0));
+}
+
+#[test]
+fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_observed_paths() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let source_id = durable_store
+        .upsert_source(UpsertSourceInput {
+            source_id: None,
+            source_class: "internal".to_string(),
+            authority: "system".to_string(),
+            identity_kind: "filesystem_uuid".to_string(),
+            identity_value: "nested-location-source".to_string(),
+            display_name: "Nested Location Source".to_string(),
+            medium_label: None,
+            is_user_visible: true,
+            browser_order_ordinal: Some(0),
+            changed_at: 10,
+        })
+        .expect("insert source");
+
+    let albums_location_id = durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "user".to_string(),
+            location_kind: "registered_subpath".to_string(),
+            relative_path: "Albums".to_string(),
+            display_name: Some("Albums".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(0),
+            first_created_at: Some(20),
+            changed_at: 20,
+        })
+        .expect("insert accepted source location");
+    let observed_same_path_id = durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "device".to_string(),
+            location_kind: "observed_path".to_string(),
+            relative_path: "Albums".to_string(),
+            display_name: Some("Observed Albums".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: None,
+            first_created_at: Some(21),
+            changed_at: 21,
+        })
+        .expect("observed write over accepted path is ignored");
+    assert_eq!(observed_same_path_id, albums_location_id);
+
+    durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "user".to_string(),
+            location_kind: "registered_subpath".to_string(),
+            relative_path: "Albums/1998".to_string(),
+            display_name: Some("Albums 1998".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(1),
+            first_created_at: Some(22),
+            changed_at: 22,
+        })
+        .expect_err("accepted descendant source location is rejected");
+
+    durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "user".to_string(),
+            location_kind: "registered_subpath".to_string(),
+            relative_path: "Compilations".to_string(),
+            display_name: Some("Compilations".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(1),
+            first_created_at: Some(23),
+            changed_at: 23,
+        })
+        .expect("accepted sibling source location is allowed");
+
+    durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "device".to_string(),
+            location_kind: "observed_path".to_string(),
+            relative_path: "Albums/1998".to_string(),
+            display_name: Some("Observed Albums 1998".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: None,
+            first_created_at: Some(24),
+            changed_at: 24,
+        })
+        .expect("observed paths do not participate in accepted-location nesting");
+
+    durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "user".to_string(),
+            location_kind: "registered_subpath".to_string(),
+            relative_path: "Singles/1998".to_string(),
+            display_name: Some("Singles 1998".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(2),
+            first_created_at: Some(25),
+            changed_at: 25,
+        })
+        .expect("accepted source location in unrelated subtree is allowed");
+
+    durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "user".to_string(),
+            location_kind: "registered_subpath".to_string(),
+            relative_path: "Singles".to_string(),
+            display_name: Some("Singles".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(3),
+            first_created_at: Some(26),
+            changed_at: 26,
+        })
+        .expect_err("accepted ancestor source location is rejected");
 }
 
 #[test]
@@ -1519,6 +1654,27 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
     assert!(
         source_children.is_empty(),
         "source directories must remain inventory substrate and not project as browser locations"
+    );
+    durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id,
+            authority: "device".to_string(),
+            location_kind: "observed_path".to_string(),
+            relative_path: "observed-album".to_string(),
+            display_name: Some("Observed Album".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(0),
+            first_created_at: Some(40),
+            changed_at: 40,
+        })
+        .expect("upsert observed source location");
+    let source_children = durable_store
+        .read_navigation_rows(Some(source_row.navigation_row_id))
+        .expect("read source children with observed location");
+    assert!(
+        source_children.is_empty(),
+        "observed source locations must not project as accepted navigation rows"
     );
     let source_location_id = durable_store
         .upsert_source_location(UpsertSourceLocationInput {

@@ -184,7 +184,10 @@ fn load_source_location(
             "SELECT source_id,
                     relative_path
              FROM source_locations
-             WHERE source_location_id = ?1",
+             WHERE source_location_id = ?1
+               AND authority = 'user'
+               AND location_kind = 'registered_subpath'
+               AND is_user_visible = 1",
             [source_location_id],
             |row| {
                 Ok(SourceLocationAnchor {

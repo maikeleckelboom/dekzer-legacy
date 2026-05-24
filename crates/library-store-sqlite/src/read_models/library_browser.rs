@@ -188,45 +188,35 @@ fn read_window_internal(
             offset_i64,
             upper_bound_i64,
         )?,
-        BrowserReadScope::Source(source_id) => read_scoped_window_rows(
-            connection,
-            scoped_read_cte_prefix(None),
-            "sf.source_id = ?1",
-            source_id,
-            offset_i64,
-            upper_bound_i64,
-        )?,
-        BrowserReadScope::SourceLocation(source_location_id) => read_scoped_window_rows(
-            connection,
-            scoped_read_cte_prefix(Some(
-                "location_scope(source_id, relative_path) AS (
-                         SELECT source_id, relative_path
-                         FROM source_locations
-                         WHERE source_location_id = ?1
-                     )",
-            )),
-            "EXISTS (
-                     SELECT 1
-                     FROM location_scope
-                     WHERE sf.source_id = location_scope.source_id
-                       AND (
-                           lower(sf.relative_path) = lower(location_scope.relative_path)
-                           OR lower(sf.relative_path) LIKE lower(location_scope.relative_path) || '/%'
-                       )
-                 )",
-            source_location_id,
-            offset_i64,
-            upper_bound_i64,
-        )?,
+        BrowserReadScope::Source(source_id) => {
+            let location_scope_cte = accepted_source_locations_cte("?1");
+            let source_scope_predicate = source_aggregate_scope_predicate("?1");
+            read_scoped_window_rows(
+                connection,
+                scoped_read_cte_prefix(Some(&location_scope_cte)),
+                &source_scope_predicate,
+                source_id,
+                offset_i64,
+                upper_bound_i64,
+            )?
+        }
+        BrowserReadScope::SourceLocation(source_location_id) => {
+            let location_scope_cte = accepted_source_location_cte("?1");
+            read_scoped_window_rows(
+                connection,
+                scoped_read_cte_prefix(Some(&location_scope_cte)),
+                SOURCE_LOCATION_FILE_SCOPE_PREDICATE,
+                source_location_id,
+                offset_i64,
+                upper_bound_i64,
+            )?
+        }
         BrowserReadScope::Playlist(playlist_id) => {
             read_playlist_window_rows(connection, playlist_id, offset_i64, upper_bound_i64)?
         }
-        BrowserReadScope::PrepPolicy(prep_policy_id) => read_prep_policy_window_rows(
-            connection,
-            prep_policy_id,
-            offset_i64,
-            upper_bound_i64,
-        )?,
+        BrowserReadScope::PrepPolicy(prep_policy_id) => {
+            read_prep_policy_window_rows(connection, prep_policy_id, offset_i64, upper_bound_i64)?
+        }
     };
 
     Ok(StoreLibraryBrowserWindow {
@@ -246,6 +236,18 @@ const AGGREGATE_RECENT_ORDER: &str = "pbr.updated_at DESC,
                                     pbr.library_asset_id DESC";
 const NEEDS_PREPARATION_PREDICATE: &str =
     "pbr.prep_readiness_summary IN ('preparing', 'underprepared', 'blocked', 'failed')";
+const SOURCE_LOCATION_FILE_SCOPE_PREDICATE: &str = "EXISTS (
+    SELECT 1
+    FROM location_scope
+    WHERE sf.source_id = location_scope.source_id
+      AND (
+          sf.relative_path COLLATE BINARY = location_scope.relative_path COLLATE BINARY
+          OR (
+              sf.relative_path COLLATE BINARY >= location_scope.relative_path || '/'
+              AND sf.relative_path COLLATE BINARY < location_scope.relative_path || char(48)
+          )
+      )
+)";
 
 fn read_aggregate_window_rows(
     connection: &Connection,
@@ -706,38 +708,31 @@ fn search_window_internal(
             offset_i64,
             upper_bound_i64,
         )?,
-        BrowserReadScope::Source(source_id) => search_scoped_window_rows(
-            connection,
-            scoped_read_cte_prefix(None),
-            "sf.source_id = ?2",
-            match_query,
-            source_id,
-            offset_i64,
-            upper_bound_i64,
-        )?,
-        BrowserReadScope::SourceLocation(source_location_id) => search_scoped_window_rows(
-            connection,
-            scoped_read_cte_prefix(Some(
-                "location_scope(source_id, relative_path) AS (
-                         SELECT source_id, relative_path
-                         FROM source_locations
-                         WHERE source_location_id = ?2
-                     )",
-            )),
-            "EXISTS (
-                     SELECT 1
-                     FROM location_scope
-                     WHERE sf.source_id = location_scope.source_id
-                       AND (
-                           lower(sf.relative_path) = lower(location_scope.relative_path)
-                           OR lower(sf.relative_path) LIKE lower(location_scope.relative_path) || '/%'
-                       )
-                 )",
-            match_query,
-            source_location_id,
-            offset_i64,
-            upper_bound_i64,
-        )?,
+        BrowserReadScope::Source(source_id) => {
+            let location_scope_cte = accepted_source_locations_cte("?2");
+            let source_scope_predicate = source_aggregate_scope_predicate("?2");
+            search_scoped_window_rows(
+                connection,
+                scoped_read_cte_prefix(Some(&location_scope_cte)),
+                &source_scope_predicate,
+                match_query,
+                source_id,
+                offset_i64,
+                upper_bound_i64,
+            )?
+        }
+        BrowserReadScope::SourceLocation(source_location_id) => {
+            let location_scope_cte = accepted_source_location_cte("?2");
+            search_scoped_window_rows(
+                connection,
+                scoped_read_cte_prefix(Some(&location_scope_cte)),
+                SOURCE_LOCATION_FILE_SCOPE_PREDICATE,
+                match_query,
+                source_location_id,
+                offset_i64,
+                upper_bound_i64,
+            )?
+        }
         BrowserReadScope::Playlist(playlist_id) => search_playlist_window_rows(
             connection,
             match_query,
@@ -1206,49 +1201,25 @@ fn load_total_rows(connection: &Connection, scope: BrowserReadScope) -> LibraryS
                  )",
             ),
         )?,
-        BrowserReadScope::Source(source_id) => connection.query_row(
-            "SELECT COUNT(DISTINCT pbr.library_asset_id)
-             FROM LibraryBrowserRows pbr
-             JOIN LibraryAssetAttachments pia
-               ON pia.library_asset_id = pbr.library_asset_id
-             JOIN SourceSegments ss
-               ON ss.source_segment_id = pia.source_segment_id
-             JOIN SourceSegmentSets sss
-               ON sss.source_segment_set_id = ss.source_segment_set_id
-             JOIN source_files sf
-               ON sf.source_file_id = sss.source_file_id
-             WHERE sf.source_id = ?1",
-            [source_id],
-            |row| row.get::<_, i64>(0),
-        )?,
-        BrowserReadScope::SourceLocation(source_location_id) => connection.query_row(
-            "WITH location_scope(source_id, relative_path) AS (
-                 SELECT source_id, relative_path
-                 FROM source_locations
-                 WHERE source_location_id = ?1
-             )
-             SELECT COUNT(DISTINCT pbr.library_asset_id)
-             FROM LibraryBrowserRows pbr
-             JOIN LibraryAssetAttachments pia
-               ON pia.library_asset_id = pbr.library_asset_id
-             JOIN SourceSegments ss
-               ON ss.source_segment_id = pia.source_segment_id
-             JOIN SourceSegmentSets sss
-               ON sss.source_segment_set_id = ss.source_segment_set_id
-             JOIN source_files sf
-               ON sf.source_file_id = sss.source_file_id
-             WHERE EXISTS (
-                 SELECT 1
-                 FROM location_scope
-                 WHERE sf.source_id = location_scope.source_id
-                   AND (
-                       lower(sf.relative_path) = lower(location_scope.relative_path)
-                       OR lower(sf.relative_path) LIKE lower(location_scope.relative_path) || '/%'
-                   )
-             )",
-            [source_location_id],
-            |row| row.get::<_, i64>(0),
-        )?,
+        BrowserReadScope::Source(source_id) => {
+            let location_scope_cte = accepted_source_locations_cte("?1");
+            let source_scope_predicate = source_aggregate_scope_predicate("?1");
+            load_total_scoped_rows(
+                connection,
+                scoped_single_cte_prefix(&location_scope_cte),
+                &source_scope_predicate,
+                source_id,
+            )?
+        }
+        BrowserReadScope::SourceLocation(source_location_id) => {
+            let location_scope_cte = accepted_source_location_cte("?1");
+            load_total_scoped_rows(
+                connection,
+                scoped_single_cte_prefix(&location_scope_cte),
+                SOURCE_LOCATION_FILE_SCOPE_PREDICATE,
+                source_location_id,
+            )?
+        }
         BrowserReadScope::Playlist(playlist_id) => connection.query_row(
             "SELECT COUNT(*)
              FROM PlaylistEntries pe
@@ -1317,34 +1288,27 @@ fn load_total_search_rows(
             ),
             match_query,
         )?,
-        BrowserReadScope::Source(source_id) => load_total_scoped_search_rows(
-            connection,
-            scoped_read_cte_prefix(None),
-            "sf.source_id = ?2",
-            match_query,
-            source_id,
-        )?,
-        BrowserReadScope::SourceLocation(source_location_id) => load_total_scoped_search_rows(
-            connection,
-            scoped_read_cte_prefix(Some(
-                "location_scope(source_id, relative_path) AS (
-                     SELECT source_id, relative_path
-                     FROM source_locations
-                     WHERE source_location_id = ?2
-                 )",
-            )),
-            "EXISTS (
-                 SELECT 1
-                 FROM location_scope
-                 WHERE sf.source_id = location_scope.source_id
-                   AND (
-                       lower(sf.relative_path) = lower(location_scope.relative_path)
-                       OR lower(sf.relative_path) LIKE lower(location_scope.relative_path) || '/%'
-                   )
-             )",
-            match_query,
-            source_location_id,
-        )?,
+        BrowserReadScope::Source(source_id) => {
+            let location_scope_cte = accepted_source_locations_cte("?2");
+            let source_scope_predicate = source_aggregate_scope_predicate("?2");
+            load_total_scoped_search_rows(
+                connection,
+                scoped_read_cte_prefix(Some(&location_scope_cte)),
+                &source_scope_predicate,
+                match_query,
+                source_id,
+            )?
+        }
+        BrowserReadScope::SourceLocation(source_location_id) => {
+            let location_scope_cte = accepted_source_location_cte("?2");
+            load_total_scoped_search_rows(
+                connection,
+                scoped_read_cte_prefix(Some(&location_scope_cte)),
+                SOURCE_LOCATION_FILE_SCOPE_PREDICATE,
+                match_query,
+                source_location_id,
+            )?
+        }
         BrowserReadScope::Playlist(playlist_id) => connection.query_row(
             "WITH matched AS (
                  SELECT rowid AS library_asset_id
@@ -1439,6 +1403,31 @@ fn load_total_aggregate_search_rows(
         .map_err(Into::into)
 }
 
+fn load_total_scoped_rows(
+    connection: &Connection,
+    cte_prefix: String,
+    scope_predicate: &str,
+    scope_id: i64,
+) -> LibrarySqliteResult<i64> {
+    let sql = format!(
+        "{cte_prefix}
+         SELECT COUNT(DISTINCT pbr.library_asset_id)
+         FROM LibraryBrowserRows pbr
+         JOIN LibraryAssetAttachments pia
+           ON pia.library_asset_id = pbr.library_asset_id
+         JOIN SourceSegments ss
+           ON ss.source_segment_id = pia.source_segment_id
+         JOIN SourceSegmentSets sss
+           ON sss.source_segment_set_id = ss.source_segment_set_id
+         JOIN source_files sf
+           ON sf.source_file_id = sss.source_file_id
+         WHERE {scope_predicate}"
+    );
+    connection
+        .query_row(&sql, [scope_id], |row| row.get(0))
+        .map_err(Into::into)
+}
+
 fn load_total_scoped_search_rows(
     connection: &Connection,
     cte_prefix: String,
@@ -1472,11 +1461,51 @@ fn load_total_scoped_search_rows(
         .map_err(Into::into)
 }
 
+fn accepted_source_locations_cte(scope_id_parameter: &str) -> String {
+    format!(
+        "location_scope(source_id, relative_path) AS (
+             SELECT source_id, relative_path
+             FROM source_locations
+             WHERE source_id = {scope_id_parameter}
+               AND authority = 'user'
+               AND location_kind = 'registered_subpath'
+               AND is_user_visible = 1
+         )"
+    )
+}
+
+fn accepted_source_location_cte(scope_id_parameter: &str) -> String {
+    format!(
+        "location_scope(source_id, relative_path) AS (
+             SELECT source_id, relative_path
+             FROM source_locations
+             WHERE source_location_id = {scope_id_parameter}
+               AND authority = 'user'
+               AND location_kind = 'registered_subpath'
+               AND is_user_visible = 1
+         )"
+    )
+}
+
+fn source_aggregate_scope_predicate(scope_id_parameter: &str) -> String {
+    format!(
+        "sf.source_id = {scope_id_parameter}
+         AND (
+             NOT EXISTS (SELECT 1 FROM location_scope)
+             OR {SOURCE_LOCATION_FILE_SCOPE_PREDICATE}
+         )"
+    )
+}
+
 fn scoped_read_cte_prefix(recursive_scope: Option<&str>) -> String {
     match recursive_scope {
         Some(recursive_scope) => format!("WITH RECURSIVE {recursive_scope},"),
         None => "WITH".to_string(),
     }
+}
+
+fn scoped_single_cte_prefix(scope: &str) -> String {
+    format!("WITH {scope}")
 }
 
 fn usize_to_i64(value: usize, label: &str) -> LibrarySqliteResult<i64> {
@@ -2025,7 +2054,7 @@ mod tests {
     }
 
     #[test]
-    fn browser_scope_reads_source_and_source_location_subtrees() {
+    fn browser_scope_uses_accepted_source_locations_for_source_aggregate_scope() {
         let connection = open_browser_scope_test_connection();
         populate_scope_fixture(&connection);
 
@@ -2056,6 +2085,49 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1, 2, 3]
         );
+        assert_eq!(source_window.total_rows, 1);
+        assert_eq!(
+            source_window
+                .rows
+                .iter()
+                .map(|row| row.library_asset_id)
+                .collect::<Vec<_>>(),
+            vec![1]
+        );
+        assert_eq!(location_window.total_rows, 1);
+        assert_eq!(location_window.rows[0].library_asset_id, 1);
+        assert_eq!(location_window.rows[0].scoped_source_file_id, Some(100));
+    }
+
+    #[test]
+    fn browser_source_scope_ignores_observed_locations_until_acceptance() {
+        let connection = open_browser_scope_test_connection();
+        populate_scope_fixture(&connection);
+        connection
+            .execute(
+                "UPDATE source_locations
+                 SET authority = 'device',
+                     location_kind = 'observed_path'
+                 WHERE source_location_id = 30",
+                [],
+            )
+            .expect("convert fixture source location to observed path");
+
+        let source_window = read_window_for_scope(
+            &connection,
+            LibraryBrowseScope::Source(SourceId::new(1).expect("positive id")),
+            0,
+            10,
+        )
+        .expect("read source scope");
+        let location_window = read_window_for_scope(
+            &connection,
+            LibraryBrowseScope::SourceLocation(SourceLocationId::new(30).expect("positive id")),
+            0,
+            10,
+        )
+        .expect("read observed source-location scope");
+
         assert_eq!(source_window.total_rows, 2);
         assert_eq!(
             source_window
@@ -2065,9 +2137,34 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![1, 2]
         );
-        assert_eq!(location_window.total_rows, 1);
-        assert_eq!(location_window.rows[0].library_asset_id, 1);
-        assert_eq!(location_window.rows[0].scoped_source_file_id, Some(100));
+        assert_eq!(location_window.total_rows, 0);
+        assert!(location_window.rows.is_empty());
+    }
+
+    #[test]
+    fn browser_source_scope_does_not_fallback_when_accepted_locations_are_missing() {
+        let connection = open_browser_scope_test_connection();
+        populate_scope_fixture(&connection);
+        connection
+            .execute(
+                "UPDATE source_locations
+                 SET relative_path = 'Missing',
+                     display_name = 'Missing'
+                 WHERE source_location_id = 30",
+                [],
+            )
+            .expect("move fixture source location to missing path");
+
+        let source_window = read_window_for_scope(
+            &connection,
+            LibraryBrowseScope::Source(SourceId::new(1).expect("positive id")),
+            0,
+            10,
+        )
+        .expect("read source scope");
+
+        assert_eq!(source_window.total_rows, 0);
+        assert!(source_window.rows.is_empty());
     }
 
     #[test]
@@ -2381,7 +2478,7 @@ mod tests {
         .expect("empty playlist search falls back to playlist browse");
 
         assert_eq!(all_media_window.total_rows, 3);
-        assert_eq!(source_window.total_rows, 2);
+        assert_eq!(source_window.total_rows, 1);
         assert_eq!(location_window.total_rows, 1);
         assert_eq!(location_window.rows[0].library_asset_id, 1);
         assert_eq!(

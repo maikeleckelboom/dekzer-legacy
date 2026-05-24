@@ -761,7 +761,9 @@ fn insert_source_location_navigation_rows(
                     COUNT(*) AS location_count,
                     MAX(updated_at) AS updated_at
              FROM source_locations
-             WHERE is_user_visible = 1
+             WHERE authority = 'user'
+               AND location_kind = 'registered_subpath'
+               AND is_user_visible = 1
              GROUP BY source_id
          ),
          ordered_locations AS (
@@ -781,9 +783,11 @@ fn insert_source_location_navigation_rows(
              FROM source_locations sl
              LEFT JOIN browser_user_order buo
                ON buo.node_domain = 'source_location'
-              AND buo.node_id = CAST(sl.source_location_id AS TEXT)
-              AND buo.parent_scope = CAST(sl.source_id AS TEXT)
-             WHERE sl.is_user_visible = 1
+             AND buo.node_id = CAST(sl.source_location_id AS TEXT)
+             AND buo.parent_scope = CAST(sl.source_id AS TEXT)
+             WHERE sl.authority = 'user'
+               AND sl.location_kind = 'registered_subpath'
+               AND sl.is_user_visible = 1
          )
          SELECT 'group' AS row_type,
                 NULL,
