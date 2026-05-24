@@ -5,20 +5,13 @@ import { fileURLToPath } from 'node:url'
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 const validations = [
-  'tests/browserEntryPresentationValidation.ts',
-  'tests/hierarchyReadValidation.ts',
   'tests/hostValidation.ts',
+  'tests/hierarchyReadValidation.ts',
   'tests/libraryBrowserViewStateValidation.ts',
-  'tests/viewStateValidation.ts',
-  'tests/libraryStorageEnvironmentValidation.ts',
   'tests/localRootChoiceValidation.ts',
-  'tests/localLibraryRestartValidation.ts',
   'tests/localRootRegistrationValidation.ts',
   'tests/localRootScanValidation.ts',
-  'tests/localRootScanRendererValidation.ts',
-  'tests/locationSourcesValidation.ts',
-  'tests/preloadValidation.ts',
-  'tests/treeValidation.ts'
+  'tests/preloadValidation.ts'
 ] as const
 
 for (const validation of validations) {

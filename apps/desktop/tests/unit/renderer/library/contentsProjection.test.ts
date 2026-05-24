@@ -1,18 +1,30 @@
 import { describe, expect, it } from 'vitest'
 
-import type { SelectedContentsBoundaryState } from '../boundary/selectedContentsRead'
-import type { BrowserState, DirectoryState, LoadedChildren, SourceState } from '../state'
-import { projectState, type BrowserProjection } from '../tree/projection'
-import { projectContents, type ContentProjection, type ContentRow } from './projection'
-import type { ChildRow, EntryPoint } from '../../../shared/libraryHierarchy/readChildren'
+import type { SelectedContentsBoundaryState } from '../../../../src/renderer/library/boundary/selectedContentsRead'
+import type {
+  BrowserState,
+  DirectoryState,
+  LoadedChildren,
+  SourceState
+} from '../../../../src/renderer/library/state'
+import {
+  projectState,
+  type BrowserProjection
+} from '../../../../src/renderer/library/tree/projection'
+import {
+  projectContents,
+  type ContentProjection,
+  type ContentRow
+} from '../../../../src/renderer/library/contents/projection'
+import type { ChildRow, EntryPoint } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow
-} from '../../../shared/libraryNavigation/readRows'
+} from '../../../../src/shared/libraryNavigation/readRows'
 import type {
   SelectedContentsResult,
   SelectedContentsRow
-} from '../../../shared/librarySelectedContents/read'
+} from '../../../../src/shared/librarySelectedContents/read'
 
 describe('projectContents', () => {
   it('projects selected source contents from selected contents state', () => {

@@ -4,11 +4,14 @@ import {
   createLocalRootActionsController,
   type LibraryRootActionsApi,
   type LocalRootActionsController
-} from '../boundary/localRootActions'
-import { createRootLifecycleController, type RootLifecycleController } from './rootLifecycle'
-import type { LocalRootChoiceResult } from '../../../shared/libraryRoots/chooseAndRegisterLocal'
-import type { ReadLocalRootsOutcome } from '../../../shared/libraryRoots/readLocalRoots'
-import type { LocalRootScanResult } from '../../../shared/libraryRoots/runScan'
+} from '../../../../src/renderer/library/boundary/localRootActions'
+import {
+  createRootLifecycleController,
+  type RootLifecycleController
+} from '../../../../src/renderer/library/runtime/rootLifecycle'
+import type { LocalRootChoiceResult } from '../../../../src/shared/libraryRoots/chooseAndRegisterLocal'
+import type { ReadLocalRootsOutcome } from '../../../../src/shared/libraryRoots/readLocalRoots'
+import type { LocalRootScanResult } from '../../../../src/shared/libraryRoots/runScan'
 
 describe('local root scan lifecycle', () => {
   it('keeps scan unavailable before registration', async () => {

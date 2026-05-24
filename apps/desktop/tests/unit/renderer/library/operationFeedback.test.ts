@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { deriveOperationFeedback, type OperationFeedbackInputs } from './operationFeedback'
-import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
+import {
+  deriveOperationFeedback,
+  type OperationFeedbackInputs
+} from '../../../../src/renderer/library/operationFeedback'
+import type { LibraryBoundaryHostStatus } from '../../../../src/shared/libraryBoundary/status'
 import type {
   NavigationReadRowsResult,
   NavigationRow
-} from '../../shared/libraryNavigation/readRows'
+} from '../../../../src/shared/libraryNavigation/readRows'
 
 describe('deriveOperationFeedback', () => {
   it('reports host startup and unavailable states before library state', () => {

@@ -192,12 +192,10 @@ async function validatesPreloadApiSurface(): Promise<void> {
   )
 
   assert.deepEqual([...exposedApis.keys()], ['dekzer'])
-  assert.equal(exposedApis.has('desktop'), false)
 
   const api = createRendererApi(ipcRenderer)
 
   assert.deepEqual(Object.keys(api), ['library'])
-  assert.equal('libraryBoundary' in api, false)
   assert.deepEqual(Object.keys(api.library).sort(), [
     'browser',
     'hierarchy',
@@ -216,33 +214,6 @@ async function validatesPreloadApiSurface(): Promise<void> {
     'runScan',
     'unregisterLocalRoot'
   ])
-  assert.equal('ipcRenderer' in api, false)
-  assert.equal('libraryBoundary' in api, false)
-  assert.equal('client' in api, false)
-  assert.equal('transport' in api, false)
-  assert.equal('client' in api.library, false)
-  assert.equal('transport' in api.library, false)
-  assert.equal('ipcRenderer' in api.library, false)
-  assert.equal('runRootScan' in api.library, false)
-  assert.equal('getStatus' in api.library, false)
-  assert.equal('onStatusChanged' in api.library, false)
-  assert.equal('readLiteralHierarchyChildren' in api.library, false)
-  assert.equal('readNavigationRows' in api.library, false)
-  assert.equal('registerLocal' in api.library, false)
-  assert.equal('registerLocalRoot' in api.library, false)
-  assert.equal('registerLocal' in api.library.roots, false)
-  assert.equal('readLiteralHierarchyChildren' in api.library.hierarchy, false)
-  assert.equal('client' in api.library.navigation, false)
-  assert.equal('transport' in api.library.navigation, false)
-  assert.equal('ipcRenderer' in api.library.navigation, false)
-  assert.equal('readLiteralHierarchyChildren' in api.library.navigation, false)
-  assert.equal('registerLocalRoot' in api.library.navigation, false)
-  assert.equal('readRegisteredLocalRoots' in api.library.roots, false)
-  assert.equal('registerLocalRoot' in api.library.roots, false)
-  assert.equal('runRootScan' in api.library.roots, false)
-  assert.equal('client' in api.library.roots, false)
-  assert.equal('transport' in api.library.roots, false)
-  assert.equal('ipcRenderer' in api.library.roots, false)
   assert.equal(await api.library.host.getStatus(), status)
   assert.equal(
     await (

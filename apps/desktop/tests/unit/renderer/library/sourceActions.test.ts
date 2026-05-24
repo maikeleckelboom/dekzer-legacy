@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import type { LocalRootsReadState } from '../boundary/localRootActions'
-import type { BrowserProjection } from '../tree/projection'
-import type { BrowserTreeNode } from '../tree/types'
-import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './sourceActions'
+import type { LocalRootsReadState } from '../../../../src/renderer/library/boundary/localRootActions'
+import type { BrowserProjection } from '../../../../src/renderer/library/tree/projection'
+import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
+import {
+  deriveSourceActionModel,
+  hasVisibleSourceRootBinding
+} from '../../../../src/renderer/library/runtime/sourceActions'
 
 describe('deriveSourceActionModel', () => {
   it('finds visible removable source rows from source bindings and local roots', () => {
