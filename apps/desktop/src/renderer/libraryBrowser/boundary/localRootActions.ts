@@ -40,6 +40,7 @@ export type LocalRootActionsController = {
   readonly canRunRegisteredRootScan: ComputedRef<boolean>
   readonly localRootsReadState: Ref<LocalRootsReadState>
   readonly removeSourceStatus: Ref<RemoveSourceStatus>
+  readonly removeSourceFailureMessage: Ref<string | undefined>
   readonly removeSourceButtonLabel: ComputedRef<string>
   readonly canUnregisterLocalRoot: ComputedRef<boolean>
   readonly isKnownLocalRootId: (rootId: string | undefined) => rootId is string
@@ -48,6 +49,8 @@ export type LocalRootActionsController = {
   readonly runRegisteredRootScan: () => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
   readonly unregisterLocalRoot: (rootId?: string) => Promise<boolean>
+  readonly completeRemoveSource: (rootId: string) => void
+  readonly failRemoveSource: (message?: string) => void
 }
 
 const safeRootChoiceFailure = 'Unable to add music folder.'
@@ -72,6 +75,7 @@ export function createLocalRootActionsController(
   const localRootsReadState = ref<LocalRootsReadState>({ kind: 'unread' })
   const removeSourceStatus = ref<RemoveSourceStatus>('idle')
   const removeFailureMessage = ref<string>()
+  let localRootsReadSequence = 0
 
   const registeredRootPath = computed(() => registeredRoot.value?.canonicalPath)
   const canChooseLocalRoot = computed(
@@ -132,6 +136,7 @@ export function createLocalRootActionsController(
         rootChoiceStatus.value = 'registered'
         registeredRoot.value = result.root
         localRootsReadState.value = { kind: 'unread' }
+        resetRemoveState()
         resetScanState()
         return true
       }
@@ -190,15 +195,23 @@ export function createLocalRootActionsController(
   }
 
   async function hydrateLocalRoots(): Promise<boolean> {
-    if (rootChoiceStatus.value !== 'idle' || registeredRoot.value !== undefined) {
+    if (rootChoiceStatus.value === 'choosing') {
       return false
     }
 
+    const sequence = ++localRootsReadSequence
     let result: ReadLocalRootsOutcome
+
     try {
       result = await rootApi.readLocalRoots()
     } catch {
-      localRootsReadState.value = { kind: 'failed', message: 'Unable to read local roots.' }
+      if (sequence === localRootsReadSequence) {
+        localRootsReadState.value = { kind: 'failed', message: 'Unable to read local roots.' }
+      }
+      return false
+    }
+
+    if (sequence !== localRootsReadSequence) {
       return false
     }
 
@@ -208,12 +221,32 @@ export function createLocalRootActionsController(
     }
 
     localRootsReadState.value = { kind: 'ready', roots: result.roots }
+    return syncRegisteredRootFromReadRoots(result.roots)
+  }
 
-    if (result.roots.length !== 1) {
+  function syncRegisteredRootFromReadRoots(roots: readonly LocalRoot[]): boolean {
+    const currentRoot = registeredRoot.value
+
+    if (currentRoot !== undefined) {
+      const refreshedRoot = roots.find((root) => root.rootId === currentRoot.rootId)
+
+      if (refreshedRoot !== undefined) {
+        registeredRoot.value = registeredRootFromRecord(refreshedRoot)
+        rootChoiceStatus.value = 'registered'
+        return true
+      }
+
+      registeredRoot.value = undefined
+      rootChoiceStatus.value = 'idle'
+      resetScanState()
       return false
     }
 
-    const firstRoot = result.roots[0]
+    if (roots.length !== 1) {
+      return false
+    }
+
+    const firstRoot = roots[0]
     if (firstRoot === undefined) {
       return false
     }
@@ -236,7 +269,17 @@ export function createLocalRootActionsController(
   ): Promise<boolean> {
     const rootIdToRemove = rootId
 
-    if (!canUnregisterLocalRootId(rootIdToRemove)) {
+    if (removeSourceStatus.value === 'removing') {
+      return false
+    }
+
+    if (rootIdToRemove === undefined) {
+      failRemoveSource('Select a removable local source to remove.')
+      return false
+    }
+
+    if (!isKnownLocalRootId(rootIdToRemove)) {
+      failRemoveSource('The selected source is not a removable local root.')
       return false
     }
 
@@ -246,25 +289,37 @@ export function createLocalRootActionsController(
     try {
       const result = await rootApi.unregisterLocalRoot({ rootId: rootIdToRemove })
 
-      if (result.state === 'unregistered') {
-        removeSourceStatus.value = 'removed'
-        const removedRegisteredRoot = clearRegisteredRoot(rootIdToRemove)
-        if (removedRegisteredRoot || registeredRoot.value === undefined) {
-          resetScanState()
-        }
-        removeReadLocalRoot(rootIdToRemove)
-        rootChoiceStatus.value = registeredRoot.value === undefined ? 'idle' : 'registered'
+      if (result.state === 'unregistered' && result.unregistered) {
         return true
       }
 
-      removeSourceStatus.value = 'failed'
-      removeFailureMessage.value = removeFailureFor(result)
+      failRemoveSource(removeFailureFor(result))
       return false
     } catch {
-      removeSourceStatus.value = 'failed'
-      removeFailureMessage.value = safeRootRemoveFailure
+      failRemoveSource(safeRootRemoveFailure)
       return false
     }
+  }
+
+  function completeRemoveSource(rootId: string): void {
+    removeSourceStatus.value = 'removed'
+    removeFailureMessage.value = undefined
+    const removedRegisteredRoot = clearRegisteredRoot(rootId)
+    if (removedRegisteredRoot || registeredRoot.value === undefined) {
+      resetScanState()
+    }
+    removeReadLocalRoot(rootId)
+    rootChoiceStatus.value = registeredRoot.value === undefined ? 'idle' : 'registered'
+  }
+
+  function failRemoveSource(message: string = safeRootRemoveFailure): void {
+    removeSourceStatus.value = 'failed'
+    removeFailureMessage.value = message
+  }
+
+  function resetRemoveState(): void {
+    removeSourceStatus.value = 'idle'
+    removeFailureMessage.value = undefined
   }
 
   function clearRegisteredRoot(rootId: string): boolean {
@@ -316,6 +371,7 @@ export function createLocalRootActionsController(
     canRunRegisteredRootScan,
     localRootsReadState,
     removeSourceStatus,
+    removeSourceFailureMessage: removeFailureMessage,
     removeSourceButtonLabel,
     canUnregisterLocalRoot,
     isKnownLocalRootId,
@@ -323,7 +379,9 @@ export function createLocalRootActionsController(
     chooseAndRegisterLocalRoot,
     runRegisteredRootScan,
     hydrateLocalRoots,
-    unregisterLocalRoot
+    unregisterLocalRoot,
+    completeRemoveSource,
+    failRemoveSource
   }
 }
 
@@ -374,7 +432,9 @@ function scanSummaryFromResult(
 
 function removeFailureFor(result: UnregisterLocalRootResult): string {
   if (result.state === 'unregistered') {
-    return 'The source was not found or has already been removed.'
+    return result.unregistered
+      ? safeRootRemoveFailure
+      : 'The source was not found or has already been removed.'
   }
 
   switch (result.state) {

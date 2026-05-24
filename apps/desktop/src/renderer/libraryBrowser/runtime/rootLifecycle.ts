@@ -22,6 +22,7 @@ export type RootLifecycleDependencies = {
   readonly rootActions: LocalRootActionsController
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
   readonly confirmRemoveSource: () => boolean
+  readonly isSourceRootVisible: (rootId: string) => boolean
 }
 
 export function useRootLifecycle(dependencies: RootLifecycleDependencies): RootLifecycleController {
@@ -65,6 +66,7 @@ export function createRootLifecycleController(
       return false
     }
 
+    void dependencies.rootActions.hydrateLocalRoots()
     return scanRoot()
   }
 
@@ -95,14 +97,37 @@ export function createRootLifecycleController(
       return false
     }
 
-    const unregistered = await dependencies.rootActions.unregisterLocalRoot(rootId)
+    const rootIdToRemove = rootId ?? dependencies.rootActions.registeredRoot.value?.rootId
+
+    if (rootIdToRemove === undefined) {
+      return false
+    }
+
+    const unregistered = await dependencies.rootActions.unregisterLocalRoot(rootIdToRemove)
 
     if (!unregistered) {
       return false
     }
 
     resetRefreshState()
-    return runRefresh()
+    const refreshed = await runRefresh()
+
+    if (!refreshed) {
+      dependencies.rootActions.failRemoveSource(
+        'The source removal was requested, but the library view did not refresh.'
+      )
+      return false
+    }
+
+    if (dependencies.isSourceRootVisible(rootIdToRemove)) {
+      dependencies.rootActions.failRemoveSource(
+        'The source is still visible after refresh, so removal did not complete.'
+      )
+      return false
+    }
+
+    dependencies.rootActions.completeRemoveSource(rootIdToRemove)
+    return true
   }
 
   async function runRefresh(): Promise<boolean> {

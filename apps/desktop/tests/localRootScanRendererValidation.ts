@@ -829,7 +829,8 @@ function testRootLifecycle(
     hierarchyRead: {
       refresh
     },
-    confirmRemoveSource: () => true
+    confirmRemoveSource: () => true,
+    isSourceRootVisible: () => false
   })
 
   return {

@@ -160,6 +160,13 @@ function validatesErrorStates(): void {
     'refreshFailed',
     'warning'
   )
+  const removeFailed = deriveOperationFeedback({
+    ...base,
+    removeSourceStatus: 'failed',
+    removeSourceFailureMessage: 'The source is still visible after refresh.'
+  })
+  assertKindAndTone(removeFailed, 'removeFailed', 'error')
+  assert.equal(removeFailed.detail, 'The source is still visible after refresh.')
 
   assertKindAndTone(
     deriveOperationFeedback({ ...base, navigationReadRequestError: 'nav error detail' }),

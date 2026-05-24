@@ -25,6 +25,7 @@ async function main(): Promise<void> {
   await validatesRootLifecycleRefreshesNavigationAfterSuccessfulUnregister()
   await validatesConfirmCallbackControlsRemoval()
   await validatesRefreshFailureAfterSuccessfulUnregisterIsHonest()
+  await validatesVisibleSourceAfterRefreshFailsRemovalPostcondition()
   await validatesRemoveSourceWithAlreadyRemovedUnregister()
 }
 
@@ -33,7 +34,7 @@ async function validatesCanUnregisterFalseWithNoRoot(): Promise<void> {
 
   assert.equal(controller.canUnregisterLocalRoot.value, false)
   assert.equal(await controller.unregisterLocalRoot(), false)
-  assert.equal(controller.removeSourceStatus.value, 'idle')
+  assert.equal(controller.removeSourceStatus.value, 'failed')
 }
 
 async function validatesCanUnregisterTrueWithOneActiveRoot(): Promise<void> {
@@ -117,6 +118,17 @@ async function validatesUnregisterSelectedHydratedRootWithoutPickingFirst(): Pro
   assert.deepEqual(receivedRequest, {
     rootId: 'root-2'
   })
+  assert.equal(controller.removeSourceStatus.value, 'removing')
+  const staleReadState = controller.localRootsReadState.value
+  assert.equal(staleReadState.kind, 'ready')
+  if (staleReadState.kind === 'ready') {
+    assert.deepEqual(
+      staleReadState.roots.map((root) => root.rootId),
+      ['root-1', 'root-2']
+    )
+  }
+
+  controller.completeRemoveSource('root-2')
   assert.equal(controller.removeSourceStatus.value, 'removed')
   const readState = controller.localRootsReadState.value
   assert.equal(readState.kind, 'ready')
@@ -183,6 +195,10 @@ async function validatesUnregisterSuccessClearsRegisteredRootAndScanState(): Pro
   assert.equal(controller.rootChoiceStatus.value, 'registered')
 
   assert.equal(await controller.unregisterLocalRoot(), true)
+  assert.equal(controller.removeSourceStatus.value, 'removing')
+  assert.equal(controller.registeredRoot.value?.rootId, 'root-1')
+
+  controller.completeRemoveSource('root-1')
   assert.equal(controller.removeSourceStatus.value, 'removed')
   assert.equal(controller.registeredRoot.value, undefined)
   assert.equal(controller.registeredRootPath.value, undefined)
@@ -210,11 +226,11 @@ async function validatesAlreadyRemovedUnregisterStillReturnsTrue(): Promise<void
   assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
   assert.equal(controller.registeredRootPath.value, 'C:/Music')
 
-  assert.equal(await controller.unregisterLocalRoot(), true)
-  assert.equal(controller.removeSourceStatus.value, 'removed')
-  assert.equal(controller.registeredRoot.value, undefined)
-  assert.equal(controller.registeredRootPath.value, undefined)
-  assert.equal(controller.rootChoiceStatus.value, 'idle')
+  assert.equal(await controller.unregisterLocalRoot(), false)
+  assert.equal(controller.removeSourceStatus.value, 'failed')
+  assert.equal(controller.registeredRoot.value?.rootId, 'root-1')
+  assert.equal(controller.registeredRootPath.value, 'C:/Music')
+  assert.equal(controller.rootChoiceStatus.value, 'registered')
 }
 
 async function validatesUnregisterFailureLeavesStateHonest(): Promise<void> {
@@ -344,9 +360,49 @@ async function validatesRefreshFailureAfterSuccessfulUnregisterIsHonest(): Promi
   assert.equal(rootActions.registeredRoot.value?.rootId, 'root-1')
 
   assert.equal(await lifecycle.removeSource(), false)
-  assert.equal(rootActions.registeredRoot.value, undefined)
-  assert.equal(rootActions.removeSourceStatus.value, 'removed')
+  assert.equal(rootActions.registeredRoot.value?.rootId, 'root-1')
+  assert.equal(rootActions.removeSourceStatus.value, 'failed')
   assert.equal(lifecycle.refreshStatus.value, 'failed')
+}
+
+async function validatesVisibleSourceAfterRefreshFailsRemovalPostcondition(): Promise<void> {
+  const events: string[] = []
+  const { rootActions, lifecycle } = testRootLifecycle(
+    testRootApi({
+      chooseAndRegisterLocal: async () =>
+        registeredChoice({
+          rootId: 'root-1',
+          canonicalPath: 'C:/Music'
+        }),
+      runScan: async () => scannedRootResult(),
+      unregisterLocalRoot: async () => {
+        events.push('unregister')
+        return {
+          state: 'unregistered',
+          unregistered: true
+        }
+      }
+    }),
+    async () => {
+      events.push('refresh')
+      return true
+    },
+    () => true,
+    () => true
+  )
+
+  assert.equal(await lifecycle.addMusicFolder(), true)
+  events.length = 0
+
+  assert.equal(await lifecycle.removeSource(), false)
+  assert.deepEqual(events, ['unregister', 'refresh'])
+  assert.equal(rootActions.registeredRoot.value?.rootId, 'root-1')
+  assert.equal(rootActions.removeSourceStatus.value, 'failed')
+  assert.equal(
+    rootActions.removeSourceFailureMessage.value,
+    'The source is still visible after refresh, so removal did not complete.'
+  )
+  assert.equal(lifecycle.refreshStatus.value, 'refreshed')
 }
 
 function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRootActionsApi {
@@ -379,7 +435,8 @@ function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRoo
 function testRootLifecycle(
   rootApi: LibraryRootActionsApi,
   refresh: () => Promise<boolean> = async () => true,
-  confirmRemoveSource: () => boolean = () => true
+  confirmRemoveSource: () => boolean = () => true,
+  isSourceRootVisible: (rootId: string) => boolean = () => false
 ): {
   readonly rootActions: ReturnType<typeof createLocalRootActionsController>
   readonly lifecycle: RootLifecycleController
@@ -390,7 +447,8 @@ function testRootLifecycle(
     hierarchyRead: {
       refresh
     },
-    confirmRemoveSource
+    confirmRemoveSource,
+    isSourceRootVisible
   })
 
   return {
@@ -435,11 +493,11 @@ async function validatesRemoveSourceWithAlreadyRemovedUnregister(): Promise<void
   assert.equal(await lifecycle.addMusicFolder(), true)
   events.length = 0
 
-  assert.equal(await lifecycle.removeSource(), true)
-  assert.deepEqual(events, ['unregister', 'refresh'])
-  assert.equal(rootActions.registeredRoot.value, undefined)
-  assert.equal(rootActions.removeSourceStatus.value, 'removed')
-  assert.equal(rootActions.rootChoiceStatus.value, 'idle')
+  assert.equal(await lifecycle.removeSource(), false)
+  assert.deepEqual(events, ['unregister'])
+  assert.equal(rootActions.registeredRoot.value?.rootId, 'root-1')
+  assert.equal(rootActions.removeSourceStatus.value, 'failed')
+  assert.equal(rootActions.rootChoiceStatus.value, 'registered')
   assert.equal(lifecycle.refreshStatus.value, 'refreshed')
 }
 

@@ -51,6 +51,7 @@ export type OperationFeedbackInputs = {
   readonly hierarchyReadRequestError: string | undefined
   readonly navigationReadResult: NavigationReadRowsResult | undefined
   readonly removeSourceStatus: RemoveSourceStatus
+  readonly removeSourceFailureMessage?: string
 }
 
 type FeedbackMeta = {
@@ -205,7 +206,12 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
   }
 
   if (inputs.removeSourceStatus === 'failed') {
-    return build('removeFailed')
+    return build(
+      'removeFailed',
+      inputs.removeSourceFailureMessage === undefined
+        ? undefined
+        : { detail: inputs.removeSourceFailureMessage }
+    )
   }
 
   if (inputs.refreshStatus === 'failed') {

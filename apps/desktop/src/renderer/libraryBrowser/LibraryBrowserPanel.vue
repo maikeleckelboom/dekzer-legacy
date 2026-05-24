@@ -6,7 +6,15 @@ import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import ContentsTable from './components/contentsTable.vue'
 import { projectContents, type ContentRow } from './projection/contents'
+import {
+  deriveOperationFeedback,
+  type LibraryOperationFeedbackTone
+} from './projection/operationFeedback'
 import { useRootLifecycle } from './runtime/rootLifecycle'
+import {
+  deriveSourceActionModel,
+  hasVisibleSourceRootBinding
+} from './runtime/sourceActions'
 import type { BrowserState, RowBinding } from './runtime/state'
 import { createViewStateStore } from './runtime/viewState'
 import TreeRoot from './tree/TreeRoot.vue'
@@ -36,7 +44,9 @@ const rootLifecycle = useRootLifecycle({
   hierarchyRead: {
     refresh: hierarchyRead.refresh
   },
-  confirmRemoveSource: () => window.confirm(removeSourceMessage)
+  confirmRemoveSource: () => window.confirm(removeSourceMessage),
+  isSourceRootVisible: (rootId) =>
+    hasVisibleSourceRootBinding(hierarchyRead.browserProjection.value, rootId)
 })
 
 const selectedNodeId = ref<BrowserTreeNodeId>()
@@ -44,7 +54,6 @@ const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 
 const restoreState = {
-  hydrationAttempted: false,
   readStarted: false,
   readCompleted: false,
   projectionAttempts: 0,
@@ -99,35 +108,45 @@ const contentsProjection = computed(() => {
   })
 })
 
-const selectedBinding = computed<RowBinding | undefined>(() => {
-  const nodeId = selectedNodeId.value
-  const projection = hierarchyRead.browserProjection.value
-
-  if (nodeId === undefined || projection === undefined) {
-    return undefined
-  }
-
-  return projection.bindingsById.get(nodeId)
-})
-
-const removeSourceRootId = computed(() => {
-  const selectedRootId = localRootIdForBinding(selectedBinding.value)
-
-  if (rootActions.isKnownLocalRootId(selectedRootId)) {
-    return selectedRootId
-  }
-
-  if (selectedNodeId.value !== undefined) {
-    return undefined
-  }
-
-  return singleVisibleRemovableSourceRootId()
-})
-
-const showRemoveSourceAction = computed(() => removeSourceRootId.value !== undefined)
-const canRemoveSourceRoot = computed(() =>
-  rootLifecycle.canRemoveSourceRoot(removeSourceRootId.value)
+const sourceActionModel = computed(() =>
+  deriveSourceActionModel({
+    projection: hierarchyRead.browserProjection.value,
+    selectedNodeId: selectedNodeId.value,
+    localRootsReadState: rootActions.localRootsReadState.value,
+    removeSourceStatus: rootActions.removeSourceStatus.value,
+    refreshStatus: rootLifecycle.refreshStatus.value
+  })
 )
+
+const removeSourceRootId = computed(() => sourceActionModel.value.selectedRemovableSourceRootId)
+
+const operationFeedback = computed(() =>
+  deriveOperationFeedback({
+    hostStatus: hierarchyRead.hostStatus.value,
+    rootChoiceStatus: rootActions.rootChoiceStatus.value,
+    registeredRootPath: rootActions.registeredRootPath.value,
+    scanStatus: rootActions.scanStatus.value,
+    scanSummary: rootActions.scanSummary.value,
+    refreshStatus: rootLifecycle.refreshStatus.value,
+    navigationReadIsLoading: hierarchyRead.navigationReadIsLoading.value,
+    hierarchyReadIsLoading: hierarchyRead.hierarchyReadIsLoading.value,
+    navigationReadRequestError: hierarchyRead.navigationReadRequestError.value,
+    hierarchyReadRequestError: hierarchyRead.hierarchyReadRequestError.value,
+    navigationReadResult: hierarchyRead.navigationReadResult.value,
+    removeSourceStatus: rootActions.removeSourceStatus.value,
+    ...(rootActions.removeSourceFailureMessage.value === undefined
+      ? {}
+      : { removeSourceFailureMessage: rootActions.removeSourceFailureMessage.value })
+  })
+)
+
+const showOperationFeedback = computed(
+  () =>
+    rootActions.removeSourceStatus.value === 'removing' ||
+    rootActions.removeSourceStatus.value === 'failed'
+)
+
+const operationFeedbackClass = computed(() => operationFeedbackToneClass(operationFeedback.value.tone))
 
 watch(
   preferredNodeId,
@@ -165,14 +184,32 @@ watch(liveTreeNodes, () => {
   }
 })
 
-watch(hierarchyRead.hostStatus, (status) => {
-  if (restoreState.hydrationAttempted || status?.state !== 'started') {
-    return
-  }
+watch(
+  () => hierarchyRead.hostStatus.value?.state,
+  (state) => {
+    if (state !== 'started') {
+      return
+    }
 
-  restoreState.hydrationAttempted = true
-  void rootLifecycle.hydrateLocalRoots()
-})
+    void rootLifecycle.hydrateLocalRoots()
+  },
+  { immediate: true }
+)
+
+function operationFeedbackToneClass(tone: LibraryOperationFeedbackTone): string {
+  switch (tone) {
+    case 'error':
+      return 'border-(--color-danger) bg-(--color-danger)/10 text-(--color-danger)'
+    case 'warning':
+      return 'border-(--color-warning) bg-(--color-warning)/10 text-(--color-warning)'
+    case 'loading':
+      return 'border-(--color-accent) bg-(--color-accent)/10 text-(--color-accent)'
+    case 'success':
+      return 'border-(--color-accent) bg-(--color-accent)/10 text-(--color-text)'
+    case 'idle':
+      return 'border-(--color-border) bg-(--color-background) text-(--color-text-muted)'
+  }
+}
 
 function saveViewState(): void {
   viewStateStore.save({
@@ -377,54 +414,6 @@ function activateContentRowAction(row: ContentRow): void {
   void hierarchyRead.requestNodeChildren(action.nodeId)
 }
 
-function localRootIdForBinding(binding: RowBinding | undefined): string | undefined {
-  if (binding === undefined) {
-    return undefined
-  }
-
-  switch (binding.kind) {
-    case 'source':
-      return localRootIdForEntryPoint(binding.target.entryPoint)
-    case 'directory':
-    case 'file':
-      return localRootIdForEntryPoint(binding.entryPoint)
-    case 'more':
-      return localRootIdForEntryPoint(binding.target.entryPoint)
-    case 'navigation':
-    case 'readState':
-      return undefined
-  }
-}
-
-function localRootIdForEntryPoint(
-  entryPoint: Extract<RowBinding, { readonly kind: 'source' }>['target']['entryPoint']
-): string | undefined {
-  return entryPoint.kind === 'source' ? entryPoint.sourceId : undefined
-}
-
-function singleVisibleRemovableSourceRootId(): string | undefined {
-  const projection = hierarchyRead.browserProjection.value
-
-  if (projection === undefined) {
-    return undefined
-  }
-
-  const rootIds = new Set<string>()
-
-  for (const binding of projection.bindingsById.values()) {
-    if (binding.kind !== 'source') {
-      continue
-    }
-
-    const rootId = localRootIdForBinding(binding)
-
-    if (rootActions.isKnownLocalRootId(rootId)) {
-      rootIds.add(rootId)
-    }
-  }
-
-  return rootIds.size === 1 ? [...rootIds][0] : undefined
-}
 </script>
 
 <template>
@@ -459,10 +448,11 @@ function singleVisibleRemovableSourceRootId(): string | undefined {
         </button>
 
         <button
-          v-if="showRemoveSourceAction"
+          v-if="sourceActionModel.removeVisible"
           type="button"
           :class="dangerButtonClass"
-          :disabled="!canRemoveSourceRoot"
+          :disabled="!sourceActionModel.removeEnabled"
+          :title="sourceActionModel.reasonUnavailable"
           @click="handleRemoveSource"
         >
           <Icon :icon="CircleXIcon" size="md" />
@@ -470,6 +460,19 @@ function singleVisibleRemovableSourceRootId(): string | undefined {
         </button>
       </div>
     </header>
+
+    <div
+      v-if="showOperationFeedback"
+      class="mx-4 mb-3 rounded-sm border px-3 py-2 text-sm"
+      :class="operationFeedbackClass"
+      :role="operationFeedback.tone === 'error' ? 'alert' : 'status'"
+      aria-live="polite"
+    >
+      <p class="font-bold leading-5">{{ operationFeedback.title }}</p>
+      <p v-if="operationFeedback.detail !== undefined" class="mt-0.5 leading-5">
+        {{ operationFeedback.detail }}
+      </p>
+    </div>
 
     <div class="grid min-h-0 flex-1 grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
       <aside
