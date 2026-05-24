@@ -99,6 +99,36 @@ const contentsProjection = computed(() => {
   })
 })
 
+const selectedBinding = computed<RowBinding | undefined>(() => {
+  const nodeId = selectedNodeId.value
+  const projection = hierarchyRead.browserProjection.value
+
+  if (nodeId === undefined || projection === undefined) {
+    return undefined
+  }
+
+  return projection.bindingsById.get(nodeId)
+})
+
+const removeSourceRootId = computed(() => {
+  const selectedRootId = localRootIdForBinding(selectedBinding.value)
+
+  if (rootActions.isKnownLocalRootId(selectedRootId)) {
+    return selectedRootId
+  }
+
+  if (selectedNodeId.value !== undefined) {
+    return undefined
+  }
+
+  return singleVisibleRemovableSourceRootId()
+})
+
+const showRemoveSourceAction = computed(() => removeSourceRootId.value !== undefined)
+const canRemoveSourceRoot = computed(() =>
+  rootLifecycle.canRemoveSourceRoot(removeSourceRootId.value)
+)
+
 watch(
   preferredNodeId,
   (nodeId) => {
@@ -305,7 +335,13 @@ function activateNodeAction(nodeId: BrowserTreeNodeId): void {
 }
 
 async function handleRemoveSource(): Promise<void> {
-  const removed = await rootLifecycle.removeSource()
+  const rootId = removeSourceRootId.value
+
+  if (rootId === undefined) {
+    return
+  }
+
+  const removed = await rootLifecycle.removeSource(rootId)
 
   if (!removed) {
     return
@@ -339,6 +375,55 @@ function activateContentRowAction(row: ContentRow): void {
   }
 
   void hierarchyRead.requestNodeChildren(action.nodeId)
+}
+
+function localRootIdForBinding(binding: RowBinding | undefined): string | undefined {
+  if (binding === undefined) {
+    return undefined
+  }
+
+  switch (binding.kind) {
+    case 'source':
+      return localRootIdForEntryPoint(binding.target.entryPoint)
+    case 'directory':
+    case 'file':
+      return localRootIdForEntryPoint(binding.entryPoint)
+    case 'more':
+      return localRootIdForEntryPoint(binding.target.entryPoint)
+    case 'navigation':
+    case 'readState':
+      return undefined
+  }
+}
+
+function localRootIdForEntryPoint(
+  entryPoint: Extract<RowBinding, { readonly kind: 'source' }>['target']['entryPoint']
+): string | undefined {
+  return entryPoint.kind === 'source' ? entryPoint.sourceId : undefined
+}
+
+function singleVisibleRemovableSourceRootId(): string | undefined {
+  const projection = hierarchyRead.browserProjection.value
+
+  if (projection === undefined) {
+    return undefined
+  }
+
+  const rootIds = new Set<string>()
+
+  for (const binding of projection.bindingsById.values()) {
+    if (binding.kind !== 'source') {
+      continue
+    }
+
+    const rootId = localRootIdForBinding(binding)
+
+    if (rootActions.isKnownLocalRootId(rootId)) {
+      rootIds.add(rootId)
+    }
+  }
+
+  return rootIds.size === 1 ? [...rootIds][0] : undefined
 }
 </script>
 
@@ -374,10 +459,10 @@ function activateContentRowAction(row: ContentRow): void {
         </button>
 
         <button
-          v-if="rootActions.registeredRootPath.value !== undefined"
+          v-if="showRemoveSourceAction"
           type="button"
           :class="dangerButtonClass"
-          :disabled="!rootLifecycle.canRemoveSource.value"
+          :disabled="!canRemoveSourceRoot"
           @click="handleRemoveSource"
         >
           <Icon :icon="CircleXIcon" size="md" />

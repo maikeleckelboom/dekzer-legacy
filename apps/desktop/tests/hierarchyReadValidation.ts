@@ -1051,7 +1051,31 @@ function testLibraryApi(options: {
           code: 'scanFailed',
           message: 'Local root scan should not be called by hierarchy read validation.'
         }
+      }),
+      readLocalRoots: async () => ({
+        state: 'hostFailed',
+        error: {
+          code: 'hostFailed',
+          message: 'Local root read should not be called by hierarchy read validation.'
+        }
+      }),
+      unregisterLocalRoot: async () => ({
+        state: 'invalidRequest',
+        error: {
+          code: 'invalidRequest',
+          message: 'Local root unregister should not be called by hierarchy read validation.'
+        }
       })
+    },
+    browser: {
+      viewState: {
+        readViewState: async () => ({
+          state: 'empty'
+        }),
+        writeViewState: async () => ({
+          state: 'written'
+        })
+      }
     }
   }
 }

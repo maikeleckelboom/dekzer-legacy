@@ -588,7 +588,8 @@ async function validatesHydrationWithZeroRootsDisablesScan(): Promise<void> {
   )
 
   assert.equal(controller.rootChoiceStatus.value, 'idle')
-  assert.equal(controller.localRootsReadState.value.kind, 'unread')
+  const initialReadState = controller.localRootsReadState.value
+  assert.equal(initialReadState.kind, 'unread')
   assert.equal(await controller.hydrateLocalRoots(), false)
   assert.equal(readCallCount, 1)
   assert.equal(controller.localRootsReadState.value.kind, 'ready')

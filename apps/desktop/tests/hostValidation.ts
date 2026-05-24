@@ -64,8 +64,8 @@ async function main(): Promise<void> {
   assert.equal(devConfig.environment, 'development')
   assert.deepEqual(devConfig.storageEnvironment, {
     kind: 'userDataRoot',
-    userDataPath: join(tempRoot, 'user-data'),
-    source: 'electronUserData'
+    userDataPath: join(tempRoot, '.dev-user-data', 'default'),
+    source: 'developmentDefault'
   })
   assert.deepEqual(devConfig.binaryPolicy, {
     kind: 'developmentBinary',

@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path'
 import { createLibraryBoundaryClient } from '../../../packages/library-boundary-client/src/index.js'
 import { createLibraryBoundaryStdioTransport } from '../../../packages/library-boundary-stdio-transport/src/index.js'
 import {
+  desktopLibraryUserDataEnvironmentVariable,
   libraryBoundaryStdioBinaryEnvironmentVariable,
   resolveLibraryBoundaryHostConfig,
   type LibraryBoundaryHostConfig
@@ -34,8 +35,10 @@ void main()
 async function main(): Promise<void> {
   const musicRoot = join(tempRoot, 'music-root')
   const crateDirectory = join(musicRoot, 'Crate')
-  mkdirSync(crateDirectory, { recursive: true })
+  const breaksDirectory = join(crateDirectory, 'Breaks')
+  mkdirSync(breaksDirectory, { recursive: true })
   writeFileSync(join(crateDirectory, 'amen.wav'), Buffer.from('not-real-audio'))
+  writeFileSync(join(breaksDirectory, 'think.wav'), Buffer.from('not-real-audio'))
   const boundaryBinaryPath = resolveBoundaryBinaryPath()
   const expectedUserDataPath = join(tempRoot, 'user-data')
 
@@ -43,6 +46,7 @@ async function main(): Promise<void> {
     app: testApp(tempRoot, { appPath: desktopRoot }),
     isDev: true,
     env: {
+      [desktopLibraryUserDataEnvironmentVariable]: expectedUserDataPath,
       [libraryBoundaryStdioBinaryEnvironmentVariable]: boundaryBinaryPath
     },
     platform: process.platform
@@ -53,7 +57,7 @@ async function main(): Promise<void> {
   assert.deepEqual(config.storageEnvironment, {
     kind: 'userDataRoot',
     userDataPath: expectedUserDataPath,
-    source: 'electronUserData'
+    source: 'environmentOverride'
   })
   assert.equal(existsSync(userDataPath), false)
   assertStorageStatus(readStorageStatus(boundaryBinaryPath, userDataPath), {
@@ -83,7 +87,7 @@ async function main(): Promise<void> {
       assert.fail('expected local root scan to succeed')
     }
     assert.equal(scan.rootId, registered.root.rootId)
-    assert.equal(scan.discoveredFileCount, 1)
+    assert.equal(scan.discoveredFileCount, 2)
 
     firstRead = await readPersistedCrateWindow(firstHost)
     assert.equal(firstRead.crateFile.label, 'amen.wav')
@@ -169,6 +173,10 @@ async function readPersistedCrateWindow(host: LibraryBoundaryHost): Promise<{
   if (crateDirectory?.kind !== 'directory') {
     assert.fail('expected scanned Crate directory to be available')
   }
+  assert.equal(crateDirectory.hasChildDirectories, true)
+  assert.deepEqual(crateDirectory.directoryMediaState, {
+    kind: 'hasMediaDescendants'
+  })
 
   const crateRead = await readThroughHost(host, {
     target: {

@@ -11,9 +11,10 @@ export type RootLifecycleController = {
   readonly canAddMusicFolder: ComputedRef<boolean>
   readonly canScanRoot: ComputedRef<boolean>
   readonly canRemoveSource: ComputedRef<boolean>
+  readonly canRemoveSourceRoot: (rootId: string | undefined) => boolean
   readonly addMusicFolder: () => Promise<boolean>
   readonly scanRoot: () => Promise<boolean>
-  readonly removeSource: () => Promise<boolean>
+  readonly removeSource: (rootId?: string) => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
 }
 
@@ -46,6 +47,13 @@ export function createRootLifecycleController(
       dependencies.rootActions.canUnregisterLocalRoot.value && refreshStatus.value !== 'refreshing'
   )
 
+  function canRemoveSourceRoot(rootId: string | undefined): boolean {
+    return (
+      dependencies.rootActions.canUnregisterLocalRootId(rootId) &&
+      refreshStatus.value !== 'refreshing'
+    )
+  }
+
   async function addMusicFolder(): Promise<boolean> {
     if (!canAddMusicFolder.value) {
       return false
@@ -76,8 +84,8 @@ export function createRootLifecycleController(
     return runRefresh()
   }
 
-  async function removeSource(): Promise<boolean> {
-    if (!canRemoveSource.value) {
+  async function removeSource(rootId?: string): Promise<boolean> {
+    if (rootId === undefined ? !canRemoveSource.value : !canRemoveSourceRoot(rootId)) {
       return false
     }
 
@@ -87,7 +95,7 @@ export function createRootLifecycleController(
       return false
     }
 
-    const unregistered = await dependencies.rootActions.unregisterLocalRoot()
+    const unregistered = await dependencies.rootActions.unregisterLocalRoot(rootId)
 
     if (!unregistered) {
       return false
@@ -127,6 +135,7 @@ export function createRootLifecycleController(
     canAddMusicFolder,
     canScanRoot,
     canRemoveSource,
+    canRemoveSourceRoot,
     addMusicFolder,
     scanRoot,
     removeSource,

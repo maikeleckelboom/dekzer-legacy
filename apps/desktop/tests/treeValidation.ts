@@ -158,6 +158,7 @@ function main(): void {
   validatesPrimaryActivation()
   validatesLoadedEmptyTreeProjection()
   validatesUnsupportedNavigationRowsHiddenFromTree()
+  validatesHostStatusOverridesStaleNavigationProjection()
   validatesDirectoryCoverageFactProjection()
   validatesDisclosureAffordanceHints()
   validatesSourcePathHumanizedAsLabel()
@@ -1662,6 +1663,62 @@ function validatesDisclosureAffordanceHints(): void {
   const stateOnlyItem = loadingStateOnlyItems[0]
   assert.equal(stateOnlyItem?.canRevealChildren, false)
   assert.equal(stateOnlyItem?.isExpanded, false)
+}
+
+function validatesHostStatusOverridesStaleNavigationProjection(): void {
+  const staleState: BrowserState = {
+    navigationReadResult: navigationSourceReadRowsResult(),
+    sourceReadStates: new Map(),
+    directoryReadStates: new Map()
+  }
+  const failedProjection = projectState({
+    ...staleState,
+    hostStatus: {
+      state: 'failed',
+      environment: 'development',
+      binaryPolicy: {
+        kind: 'developmentBinary',
+        source: 'repoDebugTarget'
+      },
+      lastError: {
+        code: 'stdioTransportStartupFailure',
+        message: 'Host failed'
+      }
+    }
+  })
+
+  assert.equal(failedProjection?.kind, 'tree')
+  if (failedProjection?.kind !== 'tree') {
+    assert.fail('expected failed host status to project to tree state')
+  }
+  assert.equal(failedProjection.nodes[0]?.label, 'Library engine failed to start')
+  assert.ok(
+    !failedProjection.nodes.some((node) => node.label === 'Source Fixture'),
+    'failed host status must override stale source navigation'
+  )
+
+  const stoppedProjection = projectState({
+    ...staleState,
+    hostStatus: {
+      state: 'stopped',
+      environment: 'development',
+      binaryPolicy: {
+        kind: 'developmentBinary',
+        source: 'repoDebugTarget'
+      },
+      lastError: null
+    }
+  })
+
+  assert.equal(stoppedProjection?.kind, 'tree')
+  if (stoppedProjection?.kind !== 'tree') {
+    assert.fail('expected stopped host status to project to tree state')
+  }
+  assert.equal(stoppedProjection.nodes[0]?.label, 'Library engine unavailable')
+  assert.ok(
+    !stoppedProjection.nodes.some((node) => node.label === 'Source Fixture'),
+    'stopped host status must override stale source navigation'
+  )
 }
 
 function validatesDirectoryCoverageFactProjection(): void {

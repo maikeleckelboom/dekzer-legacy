@@ -1,4 +1,4 @@
-import type { IconComponent } from '../../icons'
+import type { IconComponent } from '../../icons/types'
 import {
   FileIcon,
   FileTextIcon,
@@ -14,7 +14,7 @@ import {
   StateIcon,
   VideoIcon,
   WarningIcon
-} from '../../icons'
+} from '../../icons/lucide'
 import type { BrowserTreeNode } from './types'
 
 export function resolveBrowserTreeRowIcon(

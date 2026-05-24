@@ -101,19 +101,14 @@ export function createLibraryHierarchyReadController(
   })
 
   const browserProjection = computed(() =>
-    projectState(
-      {
-        sourceReadStates: sourceReadStates.value,
-        directoryReadStates: directoryReadStates.value,
-        ...(hostStatus.value === undefined
-          ? {}
-          : { hostStatus: hostStatus.value }),
-        ...(navigationReadResult.value === undefined
-          ? {}
-          : { navigationReadResult: navigationReadResult.value })
-      },
-      hostStatus.value
-    )
+    projectState({
+      sourceReadStates: sourceReadStates.value,
+      directoryReadStates: directoryReadStates.value,
+      ...(hostStatus.value === undefined ? {} : { hostStatus: hostStatus.value }),
+      ...(navigationReadResult.value === undefined
+        ? {}
+        : { navigationReadResult: navigationReadResult.value })
+    })
   )
 
   function start(): void {

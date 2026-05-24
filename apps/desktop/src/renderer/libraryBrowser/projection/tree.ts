@@ -1,4 +1,3 @@
-import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundary/status'
 import type { EntryPoint, ChildRow } from '../../../shared/libraryHierarchy/readChildren'
 import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
 import type {
@@ -38,45 +37,50 @@ type ProjectedNodeState = {
 }
 
 export function projectState(
-  state: BrowserState,
-  hostStatus?: LibraryBoundaryHostStatus
+  state: BrowserState
 ): BrowserProjection | undefined {
+  const hostProjection = projectHostStatus(state.hostStatus)
+
+  if (hostProjection !== undefined) {
+    return hostProjection
+  }
+
   if (state.navigationReadResult === undefined) {
-    if (hostStatus !== undefined) {
-      if (hostStatus.state === 'failed') {
-        return projectHostFailed(hostStatus)
-      }
-
-      if (hostStatus.state === 'stopping' || hostStatus.state === 'stopped') {
-        return emptyProjection({
-          ownerId: 'host',
-          state: 'unavailable',
-          label: 'Library engine unavailable',
-          detail: 'The library engine is not running.'
-        })
-      }
-    }
-
     return undefined
   }
 
   return projectNavigationResult(state)
 }
 
-function projectHostFailed(
-  hostStatus: LibraryBoundaryHostStatus
-): BrowserProjection {
+function projectHostStatus(hostStatus: BrowserState['hostStatus']): BrowserProjection | undefined {
+  if (hostStatus === undefined) {
+    return undefined
+  }
+
+  if (hostStatus.state === 'failed') {
+    return projectHostFailed(hostStatus)
+  }
+
+  if (hostStatus.state === 'stopping' || hostStatus.state === 'stopped') {
+    return emptyProjection({
+      ownerId: 'host',
+      state: 'unavailable',
+      label: 'Library engine unavailable',
+      detail: 'The library engine is not running.'
+    })
+  }
+
+  return undefined
+}
+
+function projectHostFailed(hostStatus: NonNullable<BrowserState['hostStatus']>): BrowserProjection {
   const lastError = hostStatus.lastError
-  const detail =
-    lastError?.detail !== undefined
-      ? lastError.detail
-      : lastError?.message ?? 'No additional detail available.'
 
   return emptyProjection({
     ownerId: 'host',
     state: 'error',
     label: 'Library engine failed to start',
-    detail
+    detail: lastError?.message ?? 'No additional detail available.'
   })
 }
 

@@ -60,6 +60,12 @@ export type ProjectContentsOptions = {
 }
 
 export function projectContents(options: ProjectContentsOptions): ContentProjection {
+  const hostProjection = projectHostContents(options.state.hostStatus)
+
+  if (hostProjection !== undefined) {
+    return hostProjection
+  }
+
   const selectedNodeId = options.selectedNodeId
 
   if (selectedNodeId === undefined) {
@@ -133,6 +139,38 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         rows: [contentMoreRow(selectedNodeId, binding)]
       }
   }
+}
+
+function projectHostContents(
+  hostStatus: BrowserState['hostStatus']
+): ContentProjection | undefined {
+  if (hostStatus === undefined) {
+    return undefined
+  }
+
+  if (hostStatus.state === 'failed') {
+    return stateProjection({
+      kind: 'failed',
+      ownerId: 'host',
+      title: 'Library engine unavailable',
+      state: 'failed',
+      label: 'Library engine failed to start',
+      detail: hostStatus.lastError?.message ?? 'The library engine is unavailable.'
+    })
+  }
+
+  if (hostStatus.state === 'stopping' || hostStatus.state === 'stopped') {
+    return stateProjection({
+      kind: 'unsupported',
+      ownerId: 'host',
+      title: 'Library engine unavailable',
+      state: 'unsupported',
+      label: 'Library engine unavailable',
+      detail: 'The library engine is not running.'
+    })
+  }
+
+  return undefined
 }
 
 function projectSourceContents(options: {

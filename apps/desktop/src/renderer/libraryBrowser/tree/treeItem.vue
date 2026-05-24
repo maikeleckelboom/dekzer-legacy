@@ -15,18 +15,21 @@ const props = defineProps<{
 }>()
 
 const tree = useTreeContext()
-const itemElement = ref<HTMLElement | null>(null)
+const itemElement = ref<HTMLElement>()
 
 watch(
   itemElement,
   (element) => {
-    tree.registerItemElement(props.item.id, element)
+    tree.registerItemElement(
+      props.item.id,
+      element instanceof HTMLElement ? element : undefined
+    )
   },
   { immediate: true }
 )
 
 onBeforeUnmount(() => {
-  tree.registerItemElement(props.item.id, null)
+  tree.registerItemElement(props.item.id)
 })
 
 function focusItem(): void {

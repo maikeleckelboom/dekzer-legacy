@@ -29,6 +29,7 @@ function main(): void {
   validatesPartialWindowsExposeMoreActions()
   validatesEmptyLoadedContents()
   validatesFailedContents()
+  validatesHostStatusOverridesEmptySelectionContents()
   validatesUnloadedContents()
   validatesUnsupportedNavigationContents()
   validatesLiteralFileSelection()
@@ -247,6 +248,59 @@ function validatesFailedContents(): void {
     nodeId: 'source-directory:12',
     label: 'Retry'
   })
+}
+
+function validatesHostStatusOverridesEmptySelectionContents(): void {
+  const state = browserState({
+    sourceState: {
+      kind: 'loaded',
+      children: loadedChildren([directoryNode('12', 'Album')])
+    }
+  })
+  const projection = browserProjection(state)
+
+  const failedContents = projectContents({
+    state: {
+      ...state,
+      hostStatus: {
+        state: 'failed',
+        environment: 'development',
+        binaryPolicy: {
+          kind: 'developmentBinary',
+          source: 'repoDebugTarget'
+        },
+        lastError: {
+          code: 'stdioTransportStartupFailure',
+          message: 'Host failed'
+        }
+      }
+    },
+    bindingsById: projection.bindingsById
+  })
+
+  assert.equal(failedContents.kind, 'failed')
+  assert.equal(failedContents.rows[0]?.state, 'failed')
+  assert.equal(failedContents.rows[0]?.label, 'Library engine failed to start')
+
+  const stoppedContents = projectContents({
+    state: {
+      ...state,
+      hostStatus: {
+        state: 'stopped',
+        environment: 'development',
+        binaryPolicy: {
+          kind: 'developmentBinary',
+          source: 'repoDebugTarget'
+        },
+        lastError: null
+      }
+    },
+    bindingsById: projection.bindingsById
+  })
+
+  assert.equal(stoppedContents.kind, 'unsupported')
+  assert.equal(stoppedContents.rows[0]?.state, 'unsupported')
+  assert.equal(stoppedContents.rows[0]?.label, 'Library engine unavailable')
 }
 
 function validatesUnloadedContents(): void {

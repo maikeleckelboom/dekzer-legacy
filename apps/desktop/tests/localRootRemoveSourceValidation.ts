@@ -17,6 +17,8 @@ async function main(): Promise<void> {
   await validatesCanUnregisterFalseWithNoRoot()
   await validatesCanUnregisterTrueWithOneActiveRoot()
   await validatesUnregisterCallsRendererApiWithRootIdFromBackendState()
+  await validatesUnregisterSelectedHydratedRootWithoutPickingFirst()
+  await validatesUnknownRootIdCannotUnregister()
   await validatesUnregisterSuccessClearsRegisteredRootAndScanState()
   await validatesAlreadyRemovedUnregisterStillReturnsTrue()
   await validatesUnregisterFailureLeavesStateHonest()
@@ -74,6 +76,86 @@ async function validatesUnregisterCallsRendererApiWithRootIdFromBackendState(): 
   assert.deepEqual(receivedRequest, {
     rootId: 'root-from-backend'
   })
+}
+
+async function validatesUnregisterSelectedHydratedRootWithoutPickingFirst(): Promise<void> {
+  let receivedRequest: unknown = null
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async () => ({
+        state: 'read',
+        roots: [
+          {
+            rootId: 'root-1',
+            canonicalPath: 'C:/Music/One',
+            availability: 'available'
+          },
+          {
+            rootId: 'root-2',
+            canonicalPath: 'C:/Music/Two',
+            availability: 'available'
+          }
+        ]
+      }),
+      unregisterLocalRoot: async (request) => {
+        receivedRequest = request
+        return {
+          state: 'unregistered',
+          unregistered: true
+        }
+      }
+    })
+  )
+
+  assert.equal(await controller.hydrateLocalRoots(), false)
+  assert.equal(controller.registeredRoot.value, undefined)
+  assert.equal(controller.canUnregisterLocalRoot.value, false)
+  assert.equal(controller.isKnownLocalRootId('root-2'), true)
+  assert.equal(controller.canUnregisterLocalRootId('root-2'), true)
+
+  assert.equal(await controller.unregisterLocalRoot('root-2'), true)
+  assert.deepEqual(receivedRequest, {
+    rootId: 'root-2'
+  })
+  assert.equal(controller.removeSourceStatus.value, 'removed')
+  const readState = controller.localRootsReadState.value
+  assert.equal(readState.kind, 'ready')
+  if (readState.kind === 'ready') {
+    assert.deepEqual(
+      readState.roots.map((root) => root.rootId),
+      ['root-1']
+    )
+  }
+}
+
+async function validatesUnknownRootIdCannotUnregister(): Promise<void> {
+  let unregisterAttempts = 0
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      readLocalRoots: async () => ({
+        state: 'read',
+        roots: [
+          {
+            rootId: 'root-1',
+            canonicalPath: 'C:/Music/One',
+            availability: 'available'
+          }
+        ]
+      }),
+      unregisterLocalRoot: async () => {
+        unregisterAttempts += 1
+        return {
+          state: 'unregistered',
+          unregistered: true
+        }
+      }
+    })
+  )
+
+  assert.equal(await controller.hydrateLocalRoots(), true)
+  assert.equal(controller.canUnregisterLocalRootId('root-2'), false)
+  assert.equal(await controller.unregisterLocalRoot('root-2'), false)
+  assert.equal(unregisterAttempts, 0)
 }
 
 async function validatesUnregisterSuccessClearsRegisteredRootAndScanState(): Promise<void> {

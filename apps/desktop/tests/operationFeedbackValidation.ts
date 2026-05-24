@@ -7,7 +7,10 @@ import {
   type OperationFeedbackInputs
 } from '../src/renderer/libraryBrowser/projection/operationFeedback'
 import type { LibraryBoundaryHostStatus } from '../src/shared/libraryBoundary/status'
-import type { NavigationRow } from '../src/shared/libraryNavigation/readRows'
+import type {
+  NavigationReadRowsResult,
+  NavigationRow
+} from '../src/shared/libraryNavigation/readRows'
 
 void main()
 
@@ -318,6 +321,7 @@ function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): Operat
     navigationReadRequestError: undefined,
     hierarchyReadRequestError: undefined,
     navigationReadResult: undefined,
+    removeSourceStatus: 'idle',
     ...overrides
   }
 }
@@ -335,6 +339,7 @@ function noRootInputs(overrides: Partial<OperationFeedbackInputs> = {}): Operati
     navigationReadRequestError: undefined,
     hierarchyReadRequestError: undefined,
     navigationReadResult: undefined,
+    removeSourceStatus: 'idle',
     ...overrides
   }
 }
@@ -374,14 +379,7 @@ function makeNavRow(): NavigationRow {
   }
 }
 
-function readyNavigation(
-  rows: OperationFeedbackInputs['navigationReadResult'] extends {
-    state: 'ready'
-    rows: infer R
-  }
-    ? R
-    : never
-): OperationFeedbackInputs['navigationReadResult'] {
+function readyNavigation(rows: readonly NavigationRow[]): NavigationReadRowsResult {
   return {
     state: 'ready',
     rows

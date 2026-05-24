@@ -63,13 +63,13 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     }
   }
 
-  function registerItemElement(nodeId: BrowserTreeNodeId, element: HTMLElement | null): void {
-    if (element !== null) {
-      itemElements.set(nodeId, element)
+  function registerItemElement(nodeId: BrowserTreeNodeId, element?: HTMLElement): void {
+    if (element === undefined) {
+      itemElements.delete(nodeId)
       return
     }
 
-    itemElements.delete(nodeId)
+    itemElements.set(nodeId, element)
   }
 
   function focusNode(nodeId: BrowserTreeNodeId): void {
