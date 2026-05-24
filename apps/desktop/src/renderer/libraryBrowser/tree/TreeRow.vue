@@ -21,7 +21,7 @@ const rowClass = computed(() =>
 )
 
 const rowStyle = computed(() => ({
-  paddingLeft: `${0.75 + (props.item.level - 1) * 1.25}rem`
+  paddingLeft: `${0.75 + (props.item.level - 1) * 0.75}em`
 }))
 
 const hasAffordance = computed(() => props.item.canRevealChildren)
@@ -33,14 +33,22 @@ const rowIcon = computed<IconComponent | undefined>(() =>
 const iconTone = computed<IconTone>(() => {
   const badgeTone = props.item.node.badge?.tone
 
-  if (badgeTone === 'warning') return 'warning'
-  if (badgeTone === 'danger') return 'danger'
+  if (badgeTone === 'warning') {
+    return 'warning'
+  }
+  if (badgeTone === 'danger') {
+    return 'danger'
+  }
 
   const icon = props.item.node.icon
   const role = props.item.node.role
 
-  if (role === 'state' && icon === 'warning') return 'warning'
-  if (role === 'action' && icon === 'warning') return 'warning'
+  if (role === 'state' && icon === 'warning') {
+    return 'warning'
+  }
+  if (role === 'action' && icon === 'warning') {
+    return 'warning'
+  }
 
   switch (icon) {
     case 'music':
@@ -61,8 +69,12 @@ const iconTone = computed<IconTone>(() => {
 const labelClass = computed(() => {
   const badgeTone = props.item.node.badge?.tone
 
-  if (badgeTone === 'warning') return 'text-(--color-warning)'
-  if (badgeTone === 'danger') return 'text-(--color-danger)'
+  if (badgeTone === 'warning') {
+    return 'text-(--color-warning)'
+  }
+  if (badgeTone === 'danger') {
+    return 'text-(--color-danger)'
+  }
 
   const icon = props.item.node.icon
 
@@ -79,25 +91,11 @@ const labelClass = computed(() => {
       return ''
   }
 })
-
-const badgeToneClass = computed(() => {
-  const tone = props.item.node.badge?.tone
-  switch (tone) {
-    case 'warning':
-      return 'border-(--color-warning) text-(--color-warning)'
-    case 'danger':
-      return 'border-(--color-danger) text-(--color-danger)'
-    case 'accent':
-      return 'border-(--color-accent) text-(--color-accent)'
-    default:
-      return 'border-(--color-border) text-(--color-text-muted)'
-  }
-})
 </script>
 
 <template>
   <div
-    class="flex min-w-0 items-center gap-2 rounded-sm border-l-2 px-3 py-2 text-left group-focus-visible:ring-2 group-focus-visible:ring-(--color-accent)"
+    class="flex min-w-0 items-center gap-2 rounded-sm border-l-2 py-1.5 text-left group-focus-visible:ring-2 group-focus-visible:ring-(--color-accent)"
     :class="rowClass"
     :style="rowStyle"
   >
@@ -120,7 +118,6 @@ const badgeToneClass = computed(() => {
     <span
       v-if="item.node.badge"
       class="shrink-0 rounded-sm border px-1.5 text-xs leading-5"
-      :class="badgeToneClass"
       :title="item.node.badge.title"
       :aria-label="item.node.badge.ariaLabel"
     >

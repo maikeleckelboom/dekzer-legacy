@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import { provideTreeContext } from './context'
 import { useTreeController } from './controller'
-import TreeItem from './treeItem.vue'
+import TreeItem from './TreeItem.vue'
 import type { BrowserTreeNode, BrowserTreeNodeId } from './types'
 
 defineOptions({

@@ -9,7 +9,7 @@ import { projectContents, type ContentRow } from './projection/contents'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import type { BrowserState, RowBinding } from './runtime/state'
 import { createViewStateStore } from './runtime/viewState'
-import TreeRoot from './tree/treeRoot.vue'
+import TreeRoot from './tree/TreeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
 
 defineOptions({
@@ -432,7 +432,7 @@ function singleVisibleRemovableSourceRootId(): string | undefined {
     class="flex h-[80svh] flex-col border border-(--color-border) bg-(--color-surface)"
     aria-labelledby="library-hierarchy-title"
   >
-    <header class="flex items-center justify-between gap-4 p-2">
+    <header class="flex items-center justify-between gap-4">
       <h2 id="library-hierarchy-title" class="text-xl font-bold leading-none text-(--color-text)">
         Library
       </h2>

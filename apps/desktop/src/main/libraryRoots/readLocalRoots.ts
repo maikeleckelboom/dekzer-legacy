@@ -109,16 +109,16 @@ function hostErrorCode(
 
 function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostError): string {
   if (host.state === 'failed') {
-    return 'The library boundary host is unavailable after startup failure.'
+    return 'The library boundary host is unavailable after startup failure'
   }
 
   switch (error.code) {
     case 'stopping':
-      return 'The library boundary host is stopping.'
+      return 'The library boundary host is stopping'
     case 'stopped':
-      return 'The library boundary host is stopped.'
+      return 'The library boundary host is stopped'
     default:
-      return 'The library boundary host has not started yet.'
+      return 'The library boundary host has not started yet'
   }
 }
 

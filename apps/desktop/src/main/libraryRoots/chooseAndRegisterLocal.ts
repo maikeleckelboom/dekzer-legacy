@@ -105,7 +105,7 @@ function selectedDirectoryPath(pickerResult: OpenDialogReturnValue): string | un
 
   const selectedPath = pickerResult.filePaths[0]
 
-  if (typeof selectedPath !== 'string' || selectedPath.trim().length === 0) {
+  if (selectedPath?.trim().length === 0) {
     return undefined
   }
 

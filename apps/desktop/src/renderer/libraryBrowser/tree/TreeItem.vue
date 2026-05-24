@@ -3,7 +3,7 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 
 import { getTreeItemAriaExpanded, getTreeItemAriaSelected } from './aria'
 import { useTreeContext } from './context'
-import TreeRow from './treeRow.vue'
+import TreeRow from './TreeRow.vue'
 import type { BrowserTreeVisibleItem } from './types'
 
 defineOptions({
@@ -20,10 +20,7 @@ const itemElement = ref<HTMLElement>()
 watch(
   itemElement,
   (element) => {
-    tree.registerItemElement(
-      props.item.id,
-      element instanceof HTMLElement ? element : undefined
-    )
+    tree.registerItemElement(props.item.id, element instanceof HTMLElement ? element : undefined)
   },
   { immediate: true }
 )
