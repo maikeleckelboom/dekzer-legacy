@@ -78,8 +78,8 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
   },
   choosingRoot: {
     tone: 'loading',
-    title: 'Choosing music folder',
-    detail: 'Opening folder picker.'
+    title: 'Adding music folder',
+    detail: 'Choose a folder, then Dekzer will register it.'
   },
   rootChoiceFailed: {
     tone: 'error',
@@ -108,13 +108,13 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
   },
   refreshingView: {
     tone: 'loading',
-    title: 'Refreshing library',
-    detail: 'Updating your library contents.'
+    title: 'Refreshing registered source',
+    detail: 'Reading the durable source registration.'
   },
   refreshFailed: {
     tone: 'warning',
     title: 'Refresh incomplete',
-    detail: 'Scan complete, but the library view could not refresh.'
+    detail: 'The folder is registered, but the library view could not refresh.'
   },
   navigationLoading: {
     tone: 'loading',
@@ -230,14 +230,14 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
     return build('rootChoiceCanceled')
   }
 
-  if (inputs.navigationReadResult?.state === 'ready') {
-    return inputs.navigationReadResult.rows.length > 0 ? build('ready') : build('noSources')
-  }
-
   if (inputs.scanStatus === 'scanned') {
     return build('scanComplete', {
       detail: scanDetail(inputs.scanSummary)
     })
+  }
+
+  if (inputs.navigationReadResult?.state === 'ready') {
+    return inputs.navigationReadResult.rows.length > 0 ? build('ready') : build('noSources')
   }
 
   return build('chooseRoot')

@@ -1,6 +1,10 @@
 import type { LocalRoot } from '../../../shared/libraryRoots/readLocalRoots'
 import type { EntryPoint } from '../../../shared/libraryHierarchy/readChildren'
-import type { LocalRootsReadState, RemoveSourceStatus } from '../boundary/localRootActions'
+import type {
+  LocalRootScanStatus,
+  LocalRootsReadState,
+  RemoveSourceStatus
+} from '../boundary/localRootActions'
 import type { BrowserProjection } from '../tree/projection'
 import type { RootLifecycleRefreshStatus } from './rootLifecycle'
 import type { RowBinding } from '../state'
@@ -24,6 +28,7 @@ export type SourceActionModelInput = {
   readonly projection: BrowserProjection | undefined
   readonly selectedNodeId: BrowserTreeNodeId | undefined
   readonly localRootsReadState: LocalRootsReadState
+  readonly scanStatus: LocalRootScanStatus
   readonly removeSourceStatus: RemoveSourceStatus
   readonly refreshStatus: RootLifecycleRefreshStatus
 }
@@ -57,6 +62,7 @@ export function deriveSourceActionModel(input: SourceActionModelInput): SourceAc
     removeVisible,
     removeEnabled:
       removeVisible &&
+      input.scanStatus !== 'scanning' &&
       input.removeSourceStatus !== 'removing' &&
       input.refreshStatus !== 'refreshing',
     ...(reasonUnavailable === undefined ? {} : { reasonUnavailable })
@@ -133,6 +139,10 @@ function removeUnavailableReason(input: SourceActionModelInput & {
   if (input.removeVisible) {
     if (input.removeSourceStatus === 'removing') {
       return 'A source removal is already in progress.'
+    }
+
+    if (input.scanStatus === 'scanning') {
+      return 'A source scan is still running.'
     }
 
     if (input.refreshStatus === 'refreshing') {

@@ -13,7 +13,6 @@ import {
   type SelectedContentsReadErrorCode,
   type SelectedContentsReadErrorState,
   type SelectedContentsReadResult,
-  type SelectedContentsRequest,
   type SelectedContentsResult,
   type SelectedContentsRow,
   type SelectedContentsScope

@@ -212,7 +212,7 @@ function validatesSuccessAndTerminal(): void {
       scanStatus: 'scanned',
       navigationReadResult: readyNavigation([makeNavRow()])
     }).kind,
-    'ready'
+    'scanComplete'
   )
 
   assert.equal(

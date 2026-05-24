@@ -28,6 +28,7 @@ async function main(): Promise<void> {
   await validatesRescanRefreshesHierarchy()
   await validatesRefreshFailureDoesNotOverwriteScanSuccess()
   await validatesDuplicateScanRequestsArePrevented()
+  await validatesStaleScanCompletionDoesNotOverwriteHydratedRootState()
   await validatesScanFailureUsesSafeCopy()
   await validatesThrownScanErrorUsesSafeCopy()
   await validatesCanceledRegistrationDoesNotEnableScan()
@@ -137,7 +138,7 @@ async function validatesAddMusicFolderScansRegisteredRootAndRefreshesHierarchy()
   )
 
   assert.equal(await lifecycle.addMusicFolder(), true)
-  assert.deepEqual(events, ['choose', 'scan', 'refresh'])
+  assert.deepEqual(events, ['choose', 'refresh', 'scan', 'refresh'])
   assert.deepEqual(receivedScanRequest, {
     rootId: 'root-from-main'
   })
@@ -162,7 +163,7 @@ async function validatesRescanRefreshesHierarchy(): Promise<void> {
 
   assert.equal(await lifecycle.addMusicFolder(), true)
   assert.equal(await lifecycle.scanRoot(), true)
-  assert.deepEqual(refreshes, ['refresh', 'refresh'])
+  assert.deepEqual(refreshes, ['refresh', 'refresh', 'refresh'])
 }
 
 async function validatesRefreshFailureDoesNotOverwriteScanSuccess(): Promise<void> {
@@ -216,6 +217,33 @@ async function validatesDuplicateScanRequestsArePrevented(): Promise<void> {
   pendingScan.resolve(scannedRootResult())
   assert.equal(await firstScan, true)
   assert.equal(controller.scanStatus.value, 'scanned')
+}
+
+async function validatesStaleScanCompletionDoesNotOverwriteHydratedRootState(): Promise<void> {
+  const pendingScan = deferred<LocalRootScanResult>()
+  const controller = createLocalRootActionsController(
+    testRootApi({
+      chooseAndRegisterLocal: async () => registeredChoice(),
+      runScan: async () => pendingScan.promise,
+      readLocalRoots: async (): Promise<ReadLocalRootsOutcome> => ({
+        state: 'read',
+        roots: []
+      })
+    })
+  )
+
+  assert.equal(await controller.chooseAndRegisterLocalRoot(), true)
+  const scan = controller.runRegisteredRootScan()
+  assert.equal(controller.scanStatus.value, 'scanning')
+
+  assert.equal(await controller.hydrateLocalRoots(), false)
+  assert.equal(controller.registeredRoot.value, undefined)
+  assert.equal(controller.scanStatus.value, 'idle')
+
+  pendingScan.resolve(scannedRootResult())
+  assert.equal(await scan, false)
+  assert.equal(controller.scanStatus.value, 'idle')
+  assert.equal(controller.scanSummary.value, undefined)
 }
 
 async function validatesScanFailureUsesSafeCopy(): Promise<void> {
@@ -464,7 +492,7 @@ async function validatesComposedCanceledSecondChoicePreservesRegisteredRootAndSc
     queuedSourceWorkItems: 8
   })
   assert.equal(lifecycle.refreshStatus.value, 'refreshed')
-  assert.equal(refreshAttempts, 1)
+  assert.equal(refreshAttempts, 2)
 }
 
 async function validatesComposedFailedSecondChoicePreservesRegisteredRootAndScanState(): Promise<void> {
@@ -504,7 +532,7 @@ async function validatesComposedFailedSecondChoicePreservesRegisteredRootAndScan
     discoveredFileCount: 12,
     queuedSourceWorkItems: 8
   })
-  assert.equal(refreshAttempts, 1)
+  assert.equal(refreshAttempts, 2)
 }
 
 async function validatesComposedSuccessfulSecondChoiceReplacesRootAndResetsScanStateBeforeScanning(): Promise<void> {
@@ -840,8 +868,9 @@ function testRootLifecycle(
 }
 
 async function flushPromises(): Promise<void> {
-  await Promise.resolve()
-  await Promise.resolve()
+  for (let i = 0; i < 6; i++) {
+    await Promise.resolve()
+  }
 }
 
 function registeredChoice(

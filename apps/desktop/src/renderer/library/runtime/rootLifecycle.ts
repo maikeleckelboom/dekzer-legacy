@@ -66,8 +66,12 @@ export function createRootLifecycleController(
       return false
     }
 
-    void dependencies.rootActions.hydrateLocalRoots()
-    return scanRoot()
+    const localRootsHydrated = dependencies.rootActions.hydrateLocalRoots().catch(() => false)
+    const registrationRefreshed = await runRefresh()
+    const scanned = await scanRoot()
+    await localRootsHydrated
+
+    return registrationRefreshed && scanned
   }
 
   async function scanRoot(): Promise<boolean> {

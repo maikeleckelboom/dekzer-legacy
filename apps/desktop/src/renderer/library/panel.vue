@@ -9,6 +9,7 @@ import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import {
   deriveOperationFeedback,
+  type LibraryOperationFeedbackKind,
   type LibraryOperationFeedbackTone
 } from './operationFeedback'
 import { useRootLifecycle } from './runtime/rootLifecycle'
@@ -35,6 +36,18 @@ const buttonBaseClass =
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
 const secondaryButtonClass = `${buttonBaseClass} min-w-31.5 border border-(--color-border) bg-(--color-background) text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 const dangerButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-(--color-background) text-(--color-accent) hover:brightness-110`
+const visibleOperationFeedbackKinds = new Set<LibraryOperationFeedbackKind>([
+  'choosingRoot',
+  'rootChoiceFailed',
+  'rootChoiceCanceled',
+  'refreshingView',
+  'refreshFailed',
+  'scanningRoot',
+  'scanFailed',
+  'scanComplete',
+  'removingSource',
+  'removeFailed'
+])
 
 const viewStateStore = createViewStateStore()
 const hierarchyRead = useLibraryHierarchyRead()
@@ -116,6 +129,7 @@ const sourceActionModel = computed(() =>
     projection: hierarchyRead.browserProjection.value,
     selectedNodeId: selectedNodeId.value,
     localRootsReadState: rootActions.localRootsReadState.value,
+    scanStatus: rootActions.scanStatus.value,
     removeSourceStatus: rootActions.removeSourceStatus.value,
     refreshStatus: rootLifecycle.refreshStatus.value
   })
@@ -144,9 +158,7 @@ const operationFeedback = computed(() =>
 )
 
 const showOperationFeedback = computed(
-  () =>
-    rootActions.removeSourceStatus.value === 'removing' ||
-    rootActions.removeSourceStatus.value === 'failed'
+  () => visibleOperationFeedbackKinds.has(operationFeedback.value.kind)
 )
 
 const operationFeedbackClass = computed(() => operationFeedbackToneClass(operationFeedback.value.tone))

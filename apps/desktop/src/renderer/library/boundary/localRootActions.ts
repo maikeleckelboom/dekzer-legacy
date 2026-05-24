@@ -76,6 +76,7 @@ export function createLocalRootActionsController(
   const removeSourceStatus = ref<RemoveSourceStatus>('idle')
   const removeFailureMessage = ref<string>()
   let localRootsReadSequence = 0
+  let scanSequence = 0
 
   const registeredRootPath = computed(() => registeredRoot.value?.canonicalPath)
   const canChooseLocalRoot = computed(
@@ -113,7 +114,10 @@ export function createLocalRootActionsController(
   })
 
   const canUnregisterLocalRoot = computed(
-    () => registeredRoot.value !== undefined && removeSourceStatus.value !== 'removing'
+    () =>
+      registeredRoot.value !== undefined &&
+      removeSourceStatus.value !== 'removing' &&
+      scanStatus.value !== 'scanning'
   )
 
   const removeSourceButtonLabel = computed(() => {
@@ -163,14 +167,20 @@ export function createLocalRootActionsController(
       return false
     }
 
+    const sequence = ++scanSequence
+    const rootId = root.rootId
     scanStatus.value = 'scanning'
     scanSummary.value = undefined
     scanFailureMessage.value = undefined
 
     try {
       const result = await rootApi.runScan({
-        rootId: root.rootId
+        rootId
       })
+
+      if (!isCurrentScan(rootId, sequence)) {
+        return false
+      }
 
       if (result.state === 'scanned') {
         scanStatus.value = 'scanned'
@@ -182,6 +192,10 @@ export function createLocalRootActionsController(
       scanFailureMessage.value = scanFailureFor(result.state)
       return true
     } catch {
+      if (!isCurrentScan(rootId, sequence)) {
+        return false
+      }
+
       scanStatus.value = 'failed'
       scanFailureMessage.value = safeRootScanFailure
       return true
@@ -189,9 +203,14 @@ export function createLocalRootActionsController(
   }
 
   function resetScanState(): void {
+    scanSequence += 1
     scanStatus.value = 'idle'
     scanSummary.value = undefined
     scanFailureMessage.value = undefined
+  }
+
+  function isCurrentScan(rootId: string, sequence: number): boolean {
+    return registeredRoot.value?.rootId === rootId && scanSequence === sequence
   }
 
   async function hydrateLocalRoots(): Promise<boolean> {
@@ -260,6 +279,7 @@ export function createLocalRootActionsController(
     return (
       rootId !== undefined &&
       removeSourceStatus.value !== 'removing' &&
+      scanStatus.value !== 'scanning' &&
       isKnownLocalRootId(rootId)
     )
   }
@@ -270,6 +290,11 @@ export function createLocalRootActionsController(
     const rootIdToRemove = rootId
 
     if (removeSourceStatus.value === 'removing') {
+      return false
+    }
+
+    if (scanStatus.value === 'scanning') {
+      failRemoveSource('Wait for the current scan to finish before removing this source.')
       return false
     }
 
