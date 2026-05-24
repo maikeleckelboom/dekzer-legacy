@@ -1,9 +1,9 @@
 import type { LocalRoot } from '../../../shared/libraryRoots/readLocalRoots'
 import type { EntryPoint } from '../../../shared/libraryHierarchy/readChildren'
 import type { LocalRootsReadState, RemoveSourceStatus } from '../boundary/localRootActions'
-import type { BrowserProjection } from '../projection/tree'
+import type { BrowserProjection } from '../tree/projection'
 import type { RootLifecycleRefreshStatus } from './rootLifecycle'
-import type { RowBinding } from './state'
+import type { RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 
 export type VisibleSourceRow = {

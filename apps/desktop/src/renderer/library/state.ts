@@ -1,9 +1,9 @@
-import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundary/status'
-import type { EntryPoint, ChildRow } from '../../../shared/libraryHierarchy/readChildren'
+import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
+import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow
-} from '../../../shared/libraryNavigation/readRows'
+} from '../../shared/libraryNavigation/readRows'
 
 export type DirectoryTarget = {
   readonly entryPoint: EntryPoint

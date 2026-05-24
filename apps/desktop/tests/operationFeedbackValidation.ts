@@ -5,7 +5,7 @@ import {
   type LibraryOperationFeedback,
   type LibraryOperationFeedbackKind,
   type OperationFeedbackInputs
-} from '../src/renderer/libraryBrowser/projection/operationFeedback'
+} from '../src/renderer/library/operationFeedback'
 import type { LibraryBoundaryHostStatus } from '../src/shared/libraryBoundary/status'
 import type {
   NavigationReadRowsResult,

@@ -3,11 +3,11 @@ import { strict as assert } from 'node:assert'
 import {
   createLocalRootActionsController,
   type LibraryRootActionsApi
-} from '../src/renderer/libraryBrowser/boundary/localRootActions'
+} from '../src/renderer/library/boundary/localRootActions'
 import {
   createRootLifecycleController,
   type RootLifecycleController
-} from '../src/renderer/libraryBrowser/runtime/rootLifecycle'
+} from '../src/renderer/library/runtime/rootLifecycle'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 

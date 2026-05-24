@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert'
 import {
   classifyLibraryEntryName,
   isDefaultVisibleLibraryEntry
-} from '../src/renderer/libraryBrowser/projection/entryPresentation'
+} from '../src/renderer/library/tree/entryPresentation'
 
 void main()
 

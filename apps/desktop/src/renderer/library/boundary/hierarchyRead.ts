@@ -15,7 +15,7 @@ import type {
   NavigationRow
 } from '../../../shared/libraryNavigation/readRows'
 import type { RendererApi } from '../../../shared/rendererApi'
-import { projectState, type BrowserProjection } from '../projection/tree'
+import { projectState, type BrowserProjection } from '../tree/projection'
 import type {
   MoreTarget,
   DirectoryState,
@@ -24,7 +24,7 @@ import type {
   LoadedChildren,
   SourceState,
   SourceTarget
-} from '../runtime/state'
+} from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { copyEntryPoint, sameEntryPoint } from '../runtime/entryPoint'
 

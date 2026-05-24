@@ -4,24 +4,24 @@ import { computed, ref, watch } from 'vue'
 import { CircleXIcon, Icon, ScanIcon } from '../icons'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useLocalRootActions } from './boundary/localRootActions'
-import ContentsTable from './components/contentsTable.vue'
-import { projectContents, type ContentRow } from './projection/contents'
+import ContentsTable from './contents/table.vue'
+import { projectContents, type ContentRow } from './contents/projection'
 import {
   deriveOperationFeedback,
   type LibraryOperationFeedbackTone
-} from './projection/operationFeedback'
+} from './operationFeedback'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import {
   deriveSourceActionModel,
   hasVisibleSourceRootBinding
 } from './runtime/sourceActions'
-import type { BrowserState, RowBinding } from './runtime/state'
+import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
-import TreeRoot from './tree/TreeRoot.vue'
+import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
 
 defineOptions({
-  name: 'LibraryBrowserPanel'
+  name: 'LibraryPanel'
 })
 
 const emptyTreeLabel = 'Add a music folder to start building your library.'

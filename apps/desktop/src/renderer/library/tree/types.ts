@@ -39,7 +39,6 @@ export type BrowserTreeAction =
 
 export type BrowserTreeRowRole =
   | 'collectionView'
-  | 'locationGroup'
   | 'source'
   | 'sourceLocation'
   | 'literalDirectory'

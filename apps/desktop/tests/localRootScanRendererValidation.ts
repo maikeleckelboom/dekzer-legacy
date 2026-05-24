@@ -6,18 +6,18 @@ import {
   createLocalRootActionsController,
   type LocalRootActionsController,
   type LibraryRootActionsApi
-} from '../src/renderer/libraryBrowser/boundary/localRootActions'
+} from '../src/renderer/library/boundary/localRootActions'
 import {
   createRootLifecycleController,
   type RootLifecycleController
-} from '../src/renderer/libraryBrowser/runtime/rootLifecycle'
+} from '../src/renderer/library/runtime/rootLifecycle'
 import type { LocalRootChoiceResult } from '../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../src/shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../src/shared/libraryRoots/runScan'
 import { desktopRoot, listSourceFiles, normalizePath, rendererSourceRoot } from './support/files'
 import { deferred } from './support/libraryBoundary'
 
-const approvedRunScanRendererOwner = 'src/renderer/libraryBrowser/boundary/localRootActions.ts'
+const approvedRunScanRendererOwner = 'src/renderer/library/boundary/localRootActions.ts'
 
 void main()
 

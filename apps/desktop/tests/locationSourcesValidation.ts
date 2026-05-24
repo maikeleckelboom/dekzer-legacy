@@ -12,7 +12,7 @@ import {
   type LocationSourceIconBadge,
   type LocationSourceKind,
   type LocationSourcePresentation
-} from '../src/renderer/libraryBrowser/projection/sourcePresentation'
+} from '../src/renderer/library/tree/sourcePresentation'
 
 const allKinds: readonly LocationSourceKind[] = [
   'localLibrary',
@@ -291,17 +291,6 @@ function validatesAdapter(): void {
   assert.equal(failedRowResult.availability, 'missing')
   assert.equal(failedRowResult.health, 'warning')
 
-  const locationGroupResult = adaptLocationSourceDescriptor({
-    rowKind: 'locationGroup',
-    selectorKind: 'sourceLocation',
-    sourceStateKind: 'loading',
-    sourceStateFailed: false
-  })
-
-  assert.equal(locationGroupResult.kind, 'localVolume')
-  assert.equal(locationGroupResult.role, 'watchedRoot')
-  assert.equal(locationGroupResult.availability, 'scanning')
-  assert.equal(locationGroupResult.health, 'healthy')
 }
 
 console.log('Location sources validation passed.')

@@ -18,7 +18,7 @@ import {
   type ContentProjection,
   type ContentRow,
   type ContentRowIcon
-} from '../projection/contents'
+} from './projection'
 
 defineOptions({
   name: 'ContentsTable'

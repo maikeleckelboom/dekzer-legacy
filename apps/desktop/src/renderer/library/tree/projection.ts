@@ -8,7 +8,7 @@ import type {
   BrowserState,
   SourceState,
   SourceTarget
-} from '../runtime/state'
+} from '../state'
 import type {
   BrowserTreeAction,
   BrowserTreeActionState,
@@ -17,7 +17,7 @@ import type {
   BrowserTreeIcon,
   BrowserTreeNode,
   BrowserTreeNodeId
-} from '../tree/types'
+} from './types'
 import { copyEntryPoint } from '../runtime/entryPoint'
 import { formatSourceDisplayName } from './sourcePresentation'
 import { classifyLibraryEntryName, type LibraryEntryRole } from './entryPresentation'
@@ -399,9 +399,7 @@ function projectLiteralNode(options: {
   }
 }
 
-function browserTreeIconForEntryRole(
-  role: LibraryEntryRole
-): import('../tree/types').BrowserTreeIcon {
+function browserTreeIconForEntryRole(role: LibraryEntryRole): BrowserTreeIcon {
   switch (role) {
     case 'folder':
       return 'folder'
@@ -745,10 +743,10 @@ function formatNavigationRowKind(rowKind: NavigationRow['rowKind']): string {
       return 'Preparation scope'
     case 'source':
       return 'Source'
-    case 'locationGroup':
-      return 'Location group'
     case 'location':
       return 'Location'
+    default:
+      return 'Navigation item'
   }
 }
 

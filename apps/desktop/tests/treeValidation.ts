@@ -1,14 +1,14 @@
 import { strict as assert } from 'node:assert'
 
-import { projectState } from '../src/renderer/libraryBrowser/projection/tree'
+import { projectState } from '../src/renderer/library/tree/projection'
 import {
   getTreeItemAriaExpanded,
   getTreeItemAriaSelected
-} from '../src/renderer/libraryBrowser/tree/aria'
+} from '../src/renderer/library/tree/aria'
 import {
   resolveTreeKeyboardIntent,
   type TreeKeyboardIntent
-} from '../src/renderer/libraryBrowser/tree/keys'
+} from '../src/renderer/library/tree/keys'
 import {
   canActivateBrowserTreeAction,
   canRevealBrowserTreeChildren,
@@ -23,14 +23,14 @@ import {
   isBrowserTreeActionLoading,
   isBrowserTreeBranch,
   isBrowserTreeLeaf
-} from '../src/renderer/libraryBrowser/tree/projection'
-import type { LoadedChildren, BrowserState } from '../src/renderer/libraryBrowser/runtime/state'
+} from '../src/renderer/library/tree/listProjection'
+import type { LoadedChildren, BrowserState } from '../src/renderer/library/state'
 import type {
   BrowserTreeNode,
   BrowserTreeNodeId,
   BrowserTreeRowRole,
   BrowserTreeVisibleItem
-} from '../src/renderer/libraryBrowser/tree/types'
+} from '../src/renderer/library/tree/types'
 import type { ReadResult, ChildWindow } from '../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
@@ -38,7 +38,7 @@ import type {
   NavigationRowSelectorKind
 } from '../src/shared/libraryNavigation/readRows'
 import { computed } from 'vue'
-import { useTreeController } from '../src/renderer/libraryBrowser/tree/controller'
+import { useTreeController } from '../src/renderer/library/tree/controller'
 
 const libraryHierarchyFixtureTree = {
   name: 'Tree validation fixture',
@@ -1139,7 +1139,6 @@ function resolvesToDifferentCategory(
 function validatesRowRoleDistinctions(): void {
   const everyRole: readonly BrowserTreeRowRole[] = [
     'collectionView',
-    'locationGroup',
     'source',
     'sourceLocation',
     'literalDirectory',
@@ -1157,39 +1156,20 @@ function validatesRowRoleDistinctions(): void {
   }
 
   assert.ok(
-    resolvesToDifferentCategory('locationGroup', 'source'),
-    'locationGroup must not share category with source'
-  )
-  assert.ok(
-    resolvesToDifferentCategory('locationGroup', 'sourceLocation'),
-    'locationGroup must not share category with sourceLocation'
-  )
-  assert.ok(
     resolvesToDifferentCategory('collectionView', 'source'),
     'collectionView must differ from source'
   )
 
   const sourceNode = nodeWithRole('source')
   assert.equal(sourceNode.role, 'source', 'source role must be explicit')
-
-  const locationGroupNode = nodeWithRole('locationGroup')
-  assert.equal(locationGroupNode.role, 'locationGroup', 'locationGroup role must be explicit')
-
-  assert.notEqual(
-    locationGroupNode.role,
-    sourceNode.role,
-    'locationGroup and source must resolve to different roles'
-  )
 }
 
 function validatesFolderOpenClosedFromExpansion(): void {
   const dir = nodeWithRole('literalDirectory', 'folder')
   const sourceLocation = nodeWithRole('sourceLocation')
-  const locationGroup = nodeWithRole('locationGroup')
 
   assert.equal(typeof dir.role, 'string', 'literalDirectory must have role')
   assert.equal(typeof sourceLocation.role, 'string', 'sourceLocation must have role')
-  assert.equal(typeof locationGroup.role, 'string', 'locationGroup must have role')
 
   const expandedDir: BrowserTreeVisibleItem = {
     id: dir.id,

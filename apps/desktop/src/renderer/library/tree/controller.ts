@@ -2,7 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { computed, nextTick, ref, watchEffect } from 'vue'
 
 import { resolveTreeKeyboardIntent, type TreeKeyboardIntent } from './keys'
-import { flattenVisibleTree, getFirstVisibleNodeId } from './projection'
+import { flattenVisibleTree, getFirstVisibleNodeId } from './listProjection'
 import type { TreeContext } from './context'
 import type { BrowserTreeNode, BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
 

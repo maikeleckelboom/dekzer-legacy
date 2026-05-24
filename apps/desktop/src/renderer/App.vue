@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import LibraryBrowserLibraryBrowserPanel from './libraryBrowser/LibraryBrowserPanel.vue'
+import LibraryPanel from './library/panel.vue'
 import { AppearanceToggle } from './appearance'
 </script>
 
@@ -12,6 +12,6 @@ import { AppearanceToggle } from './appearance'
       <AppearanceToggle />
     </header>
 
-    <LibraryBrowserLibraryBrowserPanel class="self-center" />
+    <LibraryPanel class="self-center" />
   </main>
 </template>

@@ -3,7 +3,7 @@ import { onBeforeUnmount, ref, watch } from 'vue'
 
 import { getTreeItemAriaExpanded, getTreeItemAriaSelected } from './aria'
 import { useTreeContext } from './context'
-import TreeRow from './TreeRow.vue'
+import TreeRow from './treeRow.vue'
 import type { BrowserTreeVisibleItem } from './types'
 
 defineOptions({

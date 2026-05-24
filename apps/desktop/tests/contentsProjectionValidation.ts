@@ -4,17 +4,17 @@ import {
   projectContents,
   type ContentProjection,
   type ContentRow
-} from '../src/renderer/libraryBrowser/projection/contents'
+} from '../src/renderer/library/contents/projection'
 import {
   projectState,
   type BrowserProjection
-} from '../src/renderer/libraryBrowser/projection/tree'
+} from '../src/renderer/library/tree/projection'
 import type {
   BrowserState,
   DirectoryState,
   LoadedChildren,
   SourceState
-} from '../src/renderer/libraryBrowser/runtime/state'
+} from '../src/renderer/library/state'
 import type { ChildRow, EntryPoint } from '../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,

@@ -1,10 +1,10 @@
 import type { ChildRow, Presence } from '../../../shared/libraryHierarchy/readChildren'
-import type { BrowserProjection } from './tree'
-import type { BrowserState, LoadedChildren, RowBinding } from '../runtime/state'
+import type { BrowserProjection } from '../tree/projection'
+import type { BrowserState, LoadedChildren, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { sameEntryPoint } from '../runtime/entryPoint'
-import { classifyLibraryEntryName, type LibraryEntryRole } from './entryPresentation'
-import { formatSourceDisplayName } from './sourcePresentation'
+import { classifyLibraryEntryName, type LibraryEntryRole } from '../tree/entryPresentation'
+import { formatSourceDisplayName } from '../tree/sourcePresentation'
 
 export type ContentProjectionKind =
   | 'emptySelection'

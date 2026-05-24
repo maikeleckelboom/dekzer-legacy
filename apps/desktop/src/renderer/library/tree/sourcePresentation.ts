@@ -229,17 +229,11 @@ function resolveSourceKindFromRow(
   if (rowKind === 'source' && selectorKind === 'source') {
     return 'localLibrary'
   }
-  if (rowKind === 'locationGroup' && selectorKind === 'sourceLocation') {
-    return 'localVolume'
-  }
   if (rowKind === 'location' && selectorKind === 'sourceLocation') {
     return 'localFolder'
   }
   if (rowKind === 'source') {
     return 'localLibrary'
-  }
-  if (rowKind === 'locationGroup') {
-    return 'localVolume'
   }
   if (rowKind === 'location') {
     return 'localFolder'

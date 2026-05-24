@@ -24,8 +24,6 @@ export function resolveBrowserTreeRowIcon(
   switch (node.role) {
     case 'collectionView':
       return NavigationIcon
-    case 'locationGroup':
-      return isExpanded ? FolderOpenIcon : FolderIcon
     case 'source':
       return SourceIcon
     case 'sourceLocation':

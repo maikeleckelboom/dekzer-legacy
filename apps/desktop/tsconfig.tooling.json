@@ -7,7 +7,7 @@
     "src/main/**/*",
     "src/preload/**/*",
     "src/shared/**/*",
-    "src/renderer/libraryBrowser/**/*.ts"
+    "src/renderer/library/**/*.ts"
   ],
   "compilerOptions": {
     "baseUrl": ".",

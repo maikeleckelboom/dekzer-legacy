@@ -5,7 +5,7 @@ import {
   getNextVisibleNodeId,
   getParentVisibleNodeId,
   getPreviousVisibleNodeId
-} from './projection'
+} from './listProjection'
 import type { BrowserTreeNodeId, BrowserTreeVisibleItem } from './types'
 
 export const treeKeyboardKeys = {

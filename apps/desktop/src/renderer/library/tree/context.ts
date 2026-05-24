@@ -19,7 +19,7 @@ export type TreeContext = {
 }
 
 const treeContext = createRequiredContext<TreeContext>({
-  contextName: 'libraryBrowser.tree',
+  contextName: 'library.tree',
   providerName: 'TreeRoot'
 })
 

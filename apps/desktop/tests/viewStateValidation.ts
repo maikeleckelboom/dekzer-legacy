@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert'
 
-import { createViewStateStore } from '../src/renderer/libraryBrowser/runtime/viewState'
-import type { ViewStateApi } from '../src/renderer/libraryBrowser/runtime/viewState'
+import { createViewStateStore } from '../src/renderer/library/runtime/viewState'
+import type { ViewStateApi } from '../src/renderer/library/runtime/viewState'
 import type { PersistedLibraryBrowserViewState } from '../src/shared/libraryBrowser/viewState'
 
 void main()

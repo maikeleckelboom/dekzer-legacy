@@ -1,7 +1,15 @@
 import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
-import type { BrowserTreeRowRole } from '../tree/types'
+import type { BrowserTreeRowRole } from './types'
 
 export function browserRowRoleForNavigationRow(row: NavigationRow): BrowserTreeRowRole {
+  if (row.selectorKind === 'source') {
+    return 'source'
+  }
+
+  if (row.selectorKind === 'sourceLocation') {
+    return 'sourceLocation'
+  }
+
   switch (row.rowKind) {
     case 'view':
     case 'collectionGroup':
@@ -12,10 +20,9 @@ export function browserRowRoleForNavigationRow(row: NavigationRow): BrowserTreeR
     case 'prepPolicyScope':
       return 'preparationSurface'
     case 'source':
-      return 'source'
-    case 'locationGroup':
-      return 'locationGroup'
     case 'location':
-      return 'sourceLocation'
+      return 'source'
+    default:
+      return 'collectionView'
   }
 }

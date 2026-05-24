@@ -1,12 +1,12 @@
-import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundary/status'
-import type { NavigationReadRowsResult } from '../../../shared/libraryNavigation/readRows'
+import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
+import type { NavigationReadRowsResult } from '../../shared/libraryNavigation/readRows'
 import type {
   LocalRootChoiceStatus,
   LocalRootScanStatus,
   LocalRootScanSummary,
   RemoveSourceStatus
-} from '../boundary/localRootActions'
-import type { RootLifecycleRefreshStatus } from '../runtime/rootLifecycle'
+} from './boundary/localRootActions'
+import type { RootLifecycleRefreshStatus } from './runtime/rootLifecycle'
 
 export type LibraryOperationFeedbackKind =
   | 'checkingHost'

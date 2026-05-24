@@ -21,8 +21,8 @@ import {
 import {
   createLibraryHierarchyReadController,
   type LibraryBrowserApi
-} from '../src/renderer/libraryBrowser/boundary/hierarchyRead'
-import type { BrowserTreeNode } from '../src/renderer/libraryBrowser/tree/types'
+} from '../src/renderer/library/boundary/hierarchyRead'
+import type { BrowserTreeNode } from '../src/renderer/library/tree/types'
 import {
   hierarchyReadChannels,
   type ReadErrorCode,
