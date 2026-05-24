@@ -282,6 +282,241 @@ pub struct SearchNavigationNodeLibraryBrowserWindowReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct ReadSelectedContentsRequest {
+    pub scope: SelectedContentsScope,
+    pub limit: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub cursor: Option<String>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+#[ts(tag = "type", content = "payload", rename_all = "camelCase")]
+pub enum SelectedContentsScope {
+    Source {
+        #[serde(rename = "sourceId")]
+        #[ts(rename = "sourceId")]
+        #[serde(with = "crate::wire::i64_string")]
+        #[schemars(with = "String")]
+        #[ts(as = "String")]
+        source_id: i64,
+    },
+    SourceLocation {
+        #[serde(rename = "sourceLocationId")]
+        #[ts(rename = "sourceLocationId")]
+        #[serde(with = "crate::wire::i64_string")]
+        #[schemars(with = "String")]
+        #[ts(as = "String")]
+        source_location_id: i64,
+    },
+    Directory {
+        #[serde(rename = "sourceId")]
+        #[ts(rename = "sourceId")]
+        #[serde(with = "crate::wire::i64_string")]
+        #[schemars(with = "String")]
+        #[ts(as = "String")]
+        source_id: i64,
+        #[serde(rename = "sourceDirectoryId")]
+        #[ts(rename = "sourceDirectoryId")]
+        #[serde(with = "crate::wire::i64_string")]
+        #[schemars(with = "String")]
+        #[ts(as = "String")]
+        source_directory_id: i64,
+    },
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSelectedContentsReply {
+    pub result: SelectedContentsResult,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SelectedContentsResult {
+    pub state: SelectedContentsState,
+    pub scope: SelectedContentsScope,
+    pub rows: Vec<SelectedContentsRow>,
+    pub coverage: SelectedContentsCoverage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub next_cursor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub detail: Option<String>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SelectedContentsState {
+    Ready,
+    Empty,
+    Partial,
+    SourceUnavailable,
+    LocationMissing,
+    Blocked,
+    Failed,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SelectedContentsCoverageState {
+    Complete,
+    Pending,
+    Scanning,
+    Blocked,
+    Failed,
+    SourceUnavailable,
+    LocationMissing,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SelectedContentsCoverage {
+    pub state: SelectedContentsCoverageState,
+    pub recursive_scope_complete: bool,
+    pub empty_result_authoritative: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub detail: Option<String>,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SelectedContentsRow {
+    pub stable_id: String,
+    pub label: String,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub library_asset_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub row_version: i64,
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub primary_source_file_id: Option<i64>,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub scoped_source_file_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+    pub relative_path: String,
+    pub file_name: String,
+    pub media_class: SelectedContentsMediaClass,
+    pub availability_state: LibraryAssetAvailabilityState,
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub duration_ms: Option<i64>,
+    pub musical_key: Option<String>,
+    pub tempo_bpm: Option<f64>,
+    pub waveform_quality_current: Option<i64>,
+    pub waveform_quality_target: Option<i64>,
+    pub stems_state_summary: Option<LibraryAssetStemsStateSummary>,
+    pub prep_readiness_summary: LibraryAssetPrepReadinessSummary,
+    pub updated_at_ms: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SelectedContentsMediaClass {
+    Audio,
+    Video,
+}
+
+impl SelectedContentsMediaClass {
+    pub fn from_projection_value(value: &str) -> Option<Self> {
+        match value.as_bytes() {
+            b"audio" => Some(Self::Audio),
+            b"video" => Some(Self::Video),
+            _ => None,
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct ReadLibraryAssetWaveformOverviewRequest {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
@@ -1078,6 +1313,7 @@ pub enum SnapshotReadCommand {
     ReadLiteralHierarchyChildren(ReadLiteralHierarchyChildrenRequest),
     ReadNavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowRequest),
     SearchNavigationNodeLibraryBrowserWindow(SearchNavigationNodeLibraryBrowserWindowRequest),
+    ReadSelectedContents(ReadSelectedContentsRequest),
     ReadLibraryAssetWaveformOverview(ReadLibraryAssetWaveformOverviewRequest),
     ReadLibraryAssetPreparationDetail(ReadLibraryAssetPreparationDetailRequest),
 }
@@ -1094,6 +1330,7 @@ pub enum SnapshotReadReply {
     LiteralHierarchyChildren(ReadLiteralHierarchyChildrenReply),
     NavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowReply),
     NavigationNodeLibraryBrowserSearch(SearchNavigationNodeLibraryBrowserWindowReply),
+    SelectedContents(ReadSelectedContentsReply),
     LibraryAssetWaveformOverview(ReadLibraryAssetWaveformOverviewReply),
     LibraryAssetPreparationDetail(ReadLibraryAssetPreparationDetailReply),
 }

@@ -19,6 +19,8 @@ import type {
   ReadNavigationNodeLibraryBrowserWindowRequest,
   ReadNavigationRowsReply,
   ReadNavigationRowsRequest,
+  ReadSelectedContentsReply,
+  ReadSelectedContentsRequest,
   RegisterLocalRootReply,
   RegisterLocalRootRequest,
   RenamePlaylistReply,
@@ -184,6 +186,22 @@ export class LibraryBoundaryClient {
       },
       "snapshotRead",
       "navigationNodeLibraryBrowserSearch"
+    );
+  }
+
+  readSelectedContents(
+    request: ReadSelectedContentsRequest
+  ): Promise<ReadSelectedContentsReply> {
+    return this.sendAndExpect(
+      {
+        type: "snapshotRead",
+        payload: {
+          type: "readSelectedContents",
+          payload: request
+        }
+      },
+      "snapshotRead",
+      "selectedContents"
     );
   }
 

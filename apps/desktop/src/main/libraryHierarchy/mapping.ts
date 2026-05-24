@@ -58,6 +58,7 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
       id: `source-directory:${sourceDirectoryId}`,
       kind: 'directory',
       label: row.displayName,
+      sourceId: row.sourceId,
       directoryId: sourceDirectoryId,
       ...(row.parentSourceDirectoryId === null
         ? {}
@@ -80,6 +81,7 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
     id: `source-file:${sourceFileId}`,
     kind: 'file',
     label: row.displayName,
+    sourceId: row.sourceId,
     fileId: sourceFileId,
     ...(row.parentSourceDirectoryId === null
       ? {}

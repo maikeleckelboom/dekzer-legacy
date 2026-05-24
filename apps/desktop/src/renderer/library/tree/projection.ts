@@ -329,6 +329,7 @@ function projectLiteralNode(options: {
   if (node.kind === 'directory') {
     options.bindingsById.set(node.id, {
       kind: 'directory',
+      sourceId: node.sourceId,
       directoryId: node.directoryId,
       ...(node.parentDirectoryId === undefined
         ? {}
@@ -383,6 +384,7 @@ function projectLiteralNode(options: {
 
   options.bindingsById.set(node.id, {
     kind: 'file',
+    sourceId: node.sourceId,
     fileId: node.fileId,
     ...(node.parentDirectoryId === undefined ? {} : { parentDirectoryId: node.parentDirectoryId }),
     entryPoint: copyEntryPoint(options.entryPoint)

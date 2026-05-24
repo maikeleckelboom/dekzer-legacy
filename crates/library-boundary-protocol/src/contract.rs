@@ -48,6 +48,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadLiteralHierarchyChildrenRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSelectedContentsRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsScope>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetWaveformOverviewRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetPreparationDetailRequest>(&cfg, &mut output);
     push_ts_decl::<crate::CommandReply>(&cfg, &mut output);
@@ -72,6 +74,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadLiteralHierarchyChildrenReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSelectedContentsReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetWaveformOverviewReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetPreparationDetailReply>(&cfg, &mut output);
     push_ts_decl::<crate::NavigationRow>(&cfg, &mut output);
@@ -85,6 +88,12 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LiteralHierarchyPresenceState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsResult>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsState>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsCoverage>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsCoverageState>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsRow>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsMediaClass>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBrowserWindow>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryAssetBrowserRow>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryAssetAvailabilityState>(&cfg, &mut output);

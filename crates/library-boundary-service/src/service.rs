@@ -17,7 +17,8 @@ use crate::snapshot_read_protocol::{
     map_maintained_read_model_revisions, map_read_library_asset_preparation_detail_reply,
     map_read_library_asset_waveform_overview_reply, map_read_literal_hierarchy_children_reply,
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
-    map_search_navigation_node_library_browser_window_reply, store_literal_hierarchy_entry_point,
+    map_read_selected_contents_reply, map_search_navigation_node_library_browser_window_reply,
+    store_literal_hierarchy_entry_point, store_selected_contents_scope,
 };
 use crate::storage_environment::resolve_library_storage_environment;
 
@@ -342,6 +343,23 @@ impl LibraryBoundaryService {
         map_search_navigation_node_library_browser_window_reply(window).map_err(map_store_error)
     }
 
+    pub fn read_selected_contents(
+        &self,
+        request: protocol::ReadSelectedContentsRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadSelectedContentsReply> {
+        validate_selected_contents_scope(&request.scope)?;
+        validate_selected_contents_limit(request.limit)?;
+        let result = self
+            .durable_store
+            .read_selected_contents(
+                store_selected_contents_scope(request.scope),
+                request.limit,
+                request.cursor.as_deref(),
+            )
+            .map_err(map_store_error)?;
+        map_read_selected_contents_reply(result).map_err(map_store_error)
+    }
+
     pub fn read_library_asset_waveform_overview(
         &self,
         request: protocol::ReadLibraryAssetWaveformOverviewRequest,
@@ -484,6 +502,9 @@ impl LibraryBoundaryService {
                 self.search_navigation_node_library_browser_window(request)
                     .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserSearch)
             }
+            protocol::SnapshotReadCommand::ReadSelectedContents(request) => self
+                .read_selected_contents(request)
+                .map(protocol::SnapshotReadReply::SelectedContents),
             protocol::SnapshotReadCommand::ReadLibraryAssetWaveformOverview(request) => self
                 .read_library_asset_waveform_overview(request)
                 .map(protocol::SnapshotReadReply::LibraryAssetWaveformOverview),
@@ -525,6 +546,38 @@ fn require_positive_i64(value: i64, field_name: &str) -> protocol::ProtocolResul
     } else {
         Err(protocol::ProtocolError::InvalidRequest {
             detail: format!("{field_name} must be positive"),
+        })
+    }
+}
+
+fn validate_selected_contents_scope(
+    scope: &protocol::SelectedContentsScope,
+) -> protocol::ProtocolResult<()> {
+    match scope {
+        protocol::SelectedContentsScope::Source { source_id } => {
+            require_positive_i64(*source_id, "selected contents sourceId")?;
+        }
+        protocol::SelectedContentsScope::SourceLocation { source_location_id } => {
+            require_positive_i64(*source_location_id, "selected contents sourceLocationId")?;
+        }
+        protocol::SelectedContentsScope::Directory {
+            source_id,
+            source_directory_id,
+        } => {
+            require_positive_i64(*source_id, "selected contents sourceId")?;
+            require_positive_i64(*source_directory_id, "selected contents sourceDirectoryId")?;
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_selected_contents_limit(limit: usize) -> protocol::ProtocolResult<()> {
+    if (1..=200).contains(&limit) {
+        Ok(())
+    } else {
+        Err(protocol::ProtocolError::InvalidRequest {
+            detail: "selected contents limit must be between 1 and 200".to_string(),
         })
     }
 }

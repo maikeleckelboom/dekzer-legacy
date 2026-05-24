@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { createLibraryBoundaryHost } from './libraryBoundary/host'
 import { registerReadChildrenIpc } from './libraryHierarchy/readChildren'
 import { registerReadNavigationRowsIpc } from './libraryNavigation/readRows'
+import { registerSelectedContentsReadIpc } from './librarySelectedContents/read'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
@@ -65,6 +66,7 @@ app.whenReady().then(() => {
   registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
   registerReadNavigationRowsIpc(ipcMain, host)
   registerReadChildrenIpc(ipcMain, host)
+  registerSelectedContentsReadIpc(ipcMain, host)
   registerLocalRootChoiceIpc(ipcMain, host, {
     dialog,
     getParentWindow: getLibraryRootChoiceParentWindow

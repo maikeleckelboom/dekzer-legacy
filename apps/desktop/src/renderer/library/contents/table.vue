@@ -49,6 +49,9 @@ function formatContentDetail(row: ContentRow): string {
   if (row.kind === 'file') {
     if (row.presence === 'missing') return 'Missing'
     if (row.presence === 'removed') return 'Removed'
+    if (row.detail !== undefined) return row.detail
+    if (row.mediaClass === 'audio') return 'Audio'
+    if (row.mediaClass === 'video') return 'Video'
     const icon = row.icon
     switch (icon) {
       case 'music':
@@ -109,6 +112,8 @@ function iconToneForRow(row: ContentRow): IconTone {
 
   if (row.presence === 'missing') return 'warning'
   if (row.presence === 'removed') return 'danger'
+  if (row.availabilityState === 'unavailable') return 'warning'
+  if (row.availabilityState === 'degraded') return 'warning'
 
   const icon = row.icon
   switch (icon) {
@@ -131,6 +136,8 @@ function labelClassForRow(row: ContentRow): string {
   if (row.kind === 'state') return 'text-(--color-text-muted)'
   if (row.presence === 'missing') return 'text-(--color-warning)'
   if (row.presence === 'removed') return 'text-(--color-danger)'
+  if (row.availabilityState === 'unavailable') return 'text-(--color-warning)'
+  if (row.availabilityState === 'degraded') return 'text-(--color-warning)'
 
   const icon = row.icon
   switch (icon) {

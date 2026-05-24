@@ -82,6 +82,7 @@ export type ChildRow =
       readonly id: string
       readonly kind: 'directory'
       readonly label: string
+      readonly sourceId: string
       readonly directoryId: string
       readonly parentDirectoryId?: string
       readonly presence: Presence
@@ -94,6 +95,7 @@ export type ChildRow =
       readonly id: string
       readonly kind: 'file'
       readonly label: string
+      readonly sourceId: string
       readonly fileId: string
       readonly parentDirectoryId?: string
       readonly presence: Presence

@@ -67,6 +67,10 @@ pub use read_models::literal_hierarchy::{
     StoreLiteralHierarchyEntryPoint, StoreLiteralHierarchyNode, StoreLiteralHierarchyWindow,
 };
 pub use read_models::navigation::NavigationRow;
+pub use read_models::selected_contents::{
+    StoreSelectedContentsCoverage, StoreSelectedContentsCoverageState, StoreSelectedContentsResult,
+    StoreSelectedContentsRow, StoreSelectedContentsScope, StoreSelectedContentsState,
+};
 pub use store::{
     DurableStoreBootstrapStatus, LibraryStoreContext, LocalRoot, LocalRootAvailability,
     MaintainedReadModelRevision, MaintainedReadModelScope, ReadLocalRootsResult,

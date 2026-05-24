@@ -3,4 +3,5 @@ pub mod library_asset_waveform_overview;
 pub mod library_browser;
 pub mod literal_hierarchy;
 pub mod navigation;
+pub mod selected_contents;
 pub(crate) mod waveform_profile_selection;

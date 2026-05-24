@@ -18,6 +18,11 @@ import {
   type NavigationReadRowsRequest,
   type NavigationReadRowsResult
 } from '../shared/libraryNavigation/readRows'
+import {
+  selectedContentsReadChannels,
+  type SelectedContentsReadResult,
+  type SelectedContentsRequest
+} from '../shared/librarySelectedContents/read'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../shared/libraryRoots/readLocalRoots'
@@ -91,6 +96,14 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             hierarchyReadChannels.readChildren,
             request
           )) as ReadResult
+        }
+      },
+      selectedContents: {
+        async read(request: SelectedContentsRequest): Promise<SelectedContentsReadResult> {
+          return (await ipcRenderer.invoke(
+            selectedContentsReadChannels.read,
+            request
+          )) as SelectedContentsReadResult
         }
       },
       roots: {

@@ -101,6 +101,7 @@ export type RowBinding =
     }
   | {
       readonly kind: 'directory'
+      readonly sourceId: string
       readonly directoryId: string
       readonly parentDirectoryId?: string
       readonly entryPoint: EntryPoint
@@ -108,6 +109,7 @@ export type RowBinding =
     }
   | {
       readonly kind: 'file'
+      readonly sourceId: string
       readonly fileId: string
       readonly parentDirectoryId?: string
       readonly entryPoint: EntryPoint

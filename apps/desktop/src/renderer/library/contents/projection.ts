@@ -1,9 +1,13 @@
 import type { ChildRow, Presence } from '../../../shared/libraryHierarchy/readChildren'
+import type {
+  SelectedContentsReadResult,
+  SelectedContentsResult,
+  SelectedContentsRow
+} from '../../../shared/librarySelectedContents/read'
+import type { SelectedContentsBoundaryState } from '../boundary/selectedContentsRead'
 import type { BrowserProjection } from '../tree/projection'
-import type { BrowserState, LoadedChildren, RowBinding } from '../state'
+import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
-import { sameEntryPoint } from '../runtime/entryPoint'
-import { classifyLibraryEntryName, type LibraryEntryRole } from '../tree/entryPresentation'
 import { formatSourceDisplayName } from '../tree/sourcePresentation'
 
 export type ContentProjectionKind =
@@ -43,6 +47,8 @@ export type ContentRow = {
   readonly detail?: string
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
+  readonly mediaClass?: 'audio' | 'video'
+  readonly availabilityState?: 'available' | 'unavailable' | 'degraded'
   readonly action?: ContentRowAction
 }
 
@@ -57,6 +63,7 @@ export type ProjectContentsOptions = {
   readonly state: BrowserState
   readonly selectedNodeId?: BrowserTreeNodeId
   readonly bindingsById?: BrowserProjection['bindingsById']
+  readonly selectedContentsState?: SelectedContentsBoundaryState
 }
 
 export function projectContents(options: ProjectContentsOptions): ContentProjection {
@@ -95,17 +102,16 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
   switch (binding.kind) {
     case 'source':
       return projectSourceContents({
-        state: options.state,
         selectedNodeId,
         binding,
-        bindingsById: options.bindingsById
+        selectedContentsState: options.selectedContentsState
       })
     case 'directory':
       return projectDirectoryContents({
         state: options.state,
         selectedNodeId,
         binding,
-        bindingsById: options.bindingsById
+        selectedContentsState: options.selectedContentsState
       })
     case 'file':
       return projectFileContents({
@@ -174,64 +180,15 @@ function projectHostContents(
 }
 
 function projectSourceContents(options: {
-  readonly state: BrowserState
   readonly selectedNodeId: BrowserTreeNodeId
   readonly binding: Extract<RowBinding, { readonly kind: 'source' }>
-  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+  readonly selectedContentsState: SelectedContentsBoundaryState | undefined
 }): ContentProjection {
-  const sourceState = options.state.sourceReadStates.get(options.selectedNodeId)
   const title = formatSourceDisplayName(options.binding.target.label)
-
-  if (sourceState === undefined || sourceState.kind === 'unloaded') {
-    const detail = sourceState?.detail ?? 'Contents not loaded yet.'
-
-    return loadableStateProjection({
-      kind: 'notLoaded',
-      ownerId: options.selectedNodeId,
-      title,
-      state: 'notLoaded',
-      label: 'Contents not loaded',
-      detail,
-      action: {
-        kind: 'loadChildren',
-        nodeId: options.selectedNodeId,
-        label: 'Load contents'
-      }
-    })
-  }
-
-  if (sourceState.kind === 'loading') {
-    return stateProjection({
-      kind: 'loading',
-      ownerId: options.selectedNodeId,
-      title,
-      state: 'loading',
-      label: 'Loading contents',
-      detail: sourceState.detail ?? 'Loading folder contents.'
-    })
-  }
-
-  if (sourceState.kind === 'failed') {
-    return loadableStateProjection({
-      kind: 'failed',
-      ownerId: options.selectedNodeId,
-      title,
-      state: 'failed',
-      label: 'Contents unavailable',
-      detail: sourceState.detail,
-      action: {
-        kind: 'loadChildren',
-        nodeId: options.selectedNodeId,
-        label: 'Retry'
-      }
-    })
-  }
-
-  return projectLoadedContents({
-    ownerNodeId: options.selectedNodeId,
+  return projectSelectedContentsState({
+    ownerId: options.selectedNodeId,
     title,
-    children: sourceState.children,
-    bindingsById: options.bindingsById
+    selectedContentsState: options.selectedContentsState
   })
 }
 
@@ -239,63 +196,117 @@ function projectDirectoryContents(options: {
   readonly state: BrowserState
   readonly selectedNodeId: BrowserTreeNodeId
   readonly binding: Extract<RowBinding, { readonly kind: 'directory' }>
-  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+  readonly selectedContentsState: SelectedContentsBoundaryState | undefined
 }): ContentProjection {
   const directoryRow = findLoadedChildRow(options.state, options.selectedNodeId)
-  const directoryState = options.state.directoryReadStates.get(options.binding.directoryId)
   const title = directoryRow?.label ?? 'Selected folder'
+  return projectSelectedContentsState({
+    ownerId: options.selectedNodeId,
+    title,
+    selectedContentsState: options.selectedContentsState
+  })
+}
 
-  if (directoryState === undefined || directoryState.kind === 'unloaded') {
-    const detail = directoryState?.detail ?? 'Contents not loaded yet.'
+function projectSelectedContentsState(options: {
+  readonly ownerId: BrowserTreeNodeId
+  readonly title: string
+  readonly selectedContentsState: SelectedContentsBoundaryState | undefined
+}): ContentProjection {
+  const state = options.selectedContentsState
 
-    return loadableStateProjection({
-      kind: 'notLoaded',
-      ownerId: options.selectedNodeId,
-      title,
-      state: 'notLoaded',
-      label: 'Contents not loaded',
-      detail,
-      action: {
-        kind: 'loadChildren',
-        nodeId: options.selectedNodeId,
-        label: 'Load contents'
-      }
-    })
-  }
-
-  if (directoryState.kind === 'loading') {
+  if (state === undefined || state.kind === 'idle') {
     return stateProjection({
       kind: 'loading',
-      ownerId: options.selectedNodeId,
-      title,
+      ownerId: options.ownerId,
+      title: options.title,
       state: 'loading',
-      label: 'Loading contents',
-      detail: directoryState.detail ?? 'Loading contents.'
+      label: 'Loading selected contents',
+      detail: state?.detail ?? 'Loading selected contents.'
     })
   }
 
-  if (directoryState.kind === 'failed') {
-    return loadableStateProjection({
+  if (state.kind === 'loading') {
+    return stateProjection({
+      kind: 'loading',
+      ownerId: options.ownerId,
+      title: options.title,
+      state: 'loading',
+      label: 'Loading selected contents',
+      detail: state.detail ?? 'Loading selected contents.'
+    })
+  }
+
+  if (state.kind === 'failed') {
+    return stateProjection({
       kind: 'failed',
-      ownerId: options.selectedNodeId,
-      title,
+      ownerId: options.ownerId,
+      title: options.title,
       state: 'failed',
       label: 'Contents unavailable',
-      detail: directoryState.detail,
-      action: {
-        kind: 'loadChildren',
-        nodeId: options.selectedNodeId,
-        label: 'Retry'
-      }
+      detail: state.detail
     })
   }
 
-  return projectLoadedContents({
-    ownerNodeId: options.selectedNodeId,
-    title,
-    children: directoryState.children,
-    bindingsById: options.bindingsById
+  return projectSelectedContentsReadResult({
+    ownerId: options.ownerId,
+    title: options.title,
+    result: state.result
   })
+}
+
+function projectSelectedContentsReadResult(options: {
+  readonly ownerId: BrowserTreeNodeId
+  readonly title: string
+  readonly result: SelectedContentsReadResult
+}): ContentProjection {
+  if (options.result.state !== 'ready') {
+    return stateProjection({
+      kind: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
+      ownerId: options.ownerId,
+      title: options.title,
+      state: options.result.state === 'readFailed' ? 'failed' : 'unsupported',
+      label: 'Contents unavailable',
+      detail: options.result.error.message
+    })
+  }
+
+  return projectSelectedContentsResult({
+    ownerId: options.ownerId,
+    title: options.title,
+    result: options.result.result
+  })
+}
+
+function projectSelectedContentsResult(options: {
+  readonly ownerId: BrowserTreeNodeId
+  readonly title: string
+  readonly result: SelectedContentsResult
+}): ContentProjection {
+  const result = options.result
+  const rows = result.rows.map(selectedContentsRow)
+
+  if (rows.length === 0) {
+    return {
+      kind: selectedContentsProjectionKind(result),
+      title: options.title,
+      detail: selectedContentsDetail(result),
+      rows: [
+        stateRow({
+          ownerId: options.ownerId,
+          state: selectedContentsStateRowState(result),
+          label: selectedContentsStateLabel(result),
+          detail: selectedContentsDetail(result)
+        })
+      ]
+    }
+  }
+
+  return {
+    kind: selectedContentsProjectionKind(result),
+    title: options.title,
+    detail: selectedContentsDetail(result),
+    rows
+  }
 }
 
 function projectFileContents(options: {
@@ -317,115 +328,111 @@ function projectFileContents(options: {
   })
 }
 
-function projectLoadedContents(options: {
-  readonly ownerNodeId: BrowserTreeNodeId
-  readonly title: string
-  readonly children: LoadedChildren
-  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
-}): ContentProjection {
-  const rows: ContentRow[] = options.children.rows
-    .filter((row) => isVisibleContentRow(row))
-    .map((row) => contentChildRow(row))
-
-  if (options.children.nextOffset !== undefined) {
-    rows.push(contentMoreRowForLoadedChildren(options))
-  }
-
-  if (rows.length === 0) {
-    rows.push(
-      stateRow({
-        ownerId: options.ownerNodeId,
-        state: 'empty',
-        label: 'Empty folder',
-        detail: 'No items are available here.'
-      })
-    )
-  }
-
+function selectedContentsRow(row: SelectedContentsRow): ContentRow {
   return {
-    kind: 'ready',
-    title: options.title,
-    detail: formatLoadedDetail(options.children),
-    rows
-  }
-}
-
-function contentChildRow(row: ChildRow): ContentRow {
-  const icon = contentChildRowIcon(row)
-
-  return {
-    id: row.id,
-    kind: row.kind,
+    id: row.stableId,
+    kind: 'file',
     label: row.label,
-    presence: row.presence,
-    detail: formatPresenceDetail(row),
-    icon
+    detail: selectedContentsRowDetail(row),
+    icon: row.mediaClass === 'video' ? 'video' : 'music',
+    mediaClass: row.mediaClass,
+    availabilityState: row.availabilityState
   }
 }
 
-function contentChildRowIcon(row: ChildRow): ContentRowIcon {
-  if (row.kind === 'directory') {
-    return 'folder'
-  }
+function selectedContentsRowDetail(row: SelectedContentsRow): string {
+  const parts = [row.artist, row.album].filter(
+    (value): value is string => value !== undefined && value.trim().length > 0
+  )
+  const base = parts.length > 0 ? parts.join(' - ') : row.relativePath
 
-  const presentation = classifyLibraryEntryName(row.label)
-
-  return presentationRoleToContentRowIcon(presentation.role)
-}
-
-function presentationRoleToContentRowIcon(role: LibraryEntryRole): ContentRowIcon {
-  switch (role) {
-    case 'folder':
-      return 'folder'
-    case 'audio':
-      return 'music'
-    case 'video':
-      return 'video'
-    case 'cueSheet':
-      return 'cueSheet'
-    case 'playlist':
-      return 'playlist'
-    case 'artwork':
-      return 'image'
-    case 'metadata':
-      return 'metadata'
-    case 'unknown':
-    case 'nonMedia':
-      return 'music'
+  switch (row.availabilityState) {
+    case 'available':
+      return base
+    case 'degraded':
+      return `Degraded - ${base}`
+    case 'unavailable':
+      return `Unavailable - ${base}`
   }
 }
 
-function isVisibleContentRow(row: ChildRow): boolean {
-  if (row.kind === 'directory') {
-    return true
+function selectedContentsProjectionKind(result: SelectedContentsResult): ContentProjectionKind {
+  switch (result.state) {
+    case 'ready':
+    case 'empty':
+    case 'partial':
+      return 'ready'
+    case 'blocked':
+    case 'failed':
+      return 'failed'
+    case 'sourceUnavailable':
+    case 'locationMissing':
+      return 'unsupported'
   }
-
-  const presentation = classifyLibraryEntryName(row.label)
-
-  return presentation.visibility !== 'hiddenNonMedia'
 }
 
-function contentMoreRowForLoadedChildren(options: {
-  readonly ownerNodeId: BrowserTreeNodeId
-  readonly children: LoadedChildren
-  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
-}): ContentRow {
-  const moreBinding = findMoreBinding({
-    ownerNodeId: options.ownerNodeId,
-    children: options.children,
-    bindingsById: options.bindingsById
-  })
+function selectedContentsStateRowState(
+  result: SelectedContentsResult
+): Exclude<ContentRow['state'], undefined> {
+  switch (result.state) {
+    case 'ready':
+    case 'empty':
+      return 'empty'
+    case 'partial':
+      return 'loading'
+    case 'blocked':
+    case 'failed':
+      return 'failed'
+    case 'sourceUnavailable':
+    case 'locationMissing':
+      return 'unsupported'
+  }
+}
 
-  if (moreBinding === undefined) {
-    return stateRow({
-      ownerId: options.ownerNodeId,
-      state: 'unsupported',
-      label: 'More items unavailable',
-      detail: 'More items are available.'
-    })
+function selectedContentsStateLabel(result: SelectedContentsResult): string {
+  switch (result.state) {
+    case 'ready':
+    case 'empty':
+      return result.coverage.emptyResultAuthoritative
+        ? 'No media found'
+        : 'No media found yet'
+    case 'partial':
+      return 'Still indexing'
+    case 'sourceUnavailable':
+      return 'Source unavailable'
+    case 'locationMissing':
+      return 'Folder missing'
+    case 'blocked':
+      return 'Contents blocked'
+    case 'failed':
+      return 'Contents failed'
+  }
+}
+
+function selectedContentsDetail(result: SelectedContentsResult): string {
+  if (result.detail !== undefined) {
+    return result.detail
   }
 
-  return contentMoreRow(moreBinding.nodeId, moreBinding.binding)
+  if (result.rows.length === 1) {
+    return selectedContentsCoveragePrefix(result) ?? '1 media item loaded.'
+  }
+
+  const prefix = selectedContentsCoveragePrefix(result)
+  const count = `${result.rows.length} media items loaded.`
+  return prefix === undefined ? count : `${prefix} ${count}`
+}
+
+function selectedContentsCoveragePrefix(result: SelectedContentsResult): string | undefined {
+  if (result.state === 'partial') {
+    return 'Still indexing. Results may be incomplete.'
+  }
+
+  if (result.coverage.state === 'pending' || result.coverage.state === 'scanning') {
+    return 'Indexing is incomplete.'
+  }
+
+  return undefined
 }
 
 function contentMoreRow(
@@ -479,31 +486,6 @@ function stateProjection(options: {
   }
 }
 
-function loadableStateProjection(options: {
-  readonly kind: ContentProjectionKind
-  readonly ownerId: string
-  readonly title: string
-  readonly state: Exclude<ContentRow['state'], undefined>
-  readonly label: string
-  readonly detail: string
-  readonly action: ContentRowAction
-}): ContentProjection {
-  return {
-    kind: options.kind,
-    title: options.title,
-    detail: options.detail,
-    rows: [
-      stateRow({
-        ownerId: options.ownerId,
-        state: options.state,
-        label: options.label,
-        detail: options.detail,
-        action: options.action
-      })
-    ]
-  }
-}
-
 function stateRow(options: {
   readonly ownerId: string
   readonly state: Exclude<ContentRow['state'], undefined>
@@ -520,53 +502,6 @@ function stateRow(options: {
     icon: contentStateIcon(options.state),
     ...(options.action === undefined ? {} : { action: options.action })
   }
-}
-
-function findMoreBinding(options: {
-  readonly ownerNodeId: BrowserTreeNodeId
-  readonly children: LoadedChildren
-  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
-}):
-  | {
-      readonly nodeId: BrowserTreeNodeId
-      readonly binding: Extract<RowBinding, { readonly kind: 'more' }>
-    }
-  | undefined {
-  const nextOffset = options.children.nextOffset
-
-  if (nextOffset === undefined || options.bindingsById === undefined) {
-    return undefined
-  }
-
-  for (const [nodeId, binding] of options.bindingsById) {
-    if (binding.kind !== 'more') {
-      continue
-    }
-
-    if (binding.ownerId !== options.ownerNodeId) {
-      continue
-    }
-
-    if (binding.target.offset !== nextOffset) {
-      continue
-    }
-
-    if (binding.target.limit !== options.children.limit) {
-      continue
-    }
-
-    if ((binding.target.parentDirectoryId ?? undefined) !== options.children.parentDirectoryId) {
-      continue
-    }
-
-    if (!sameEntryPoint(binding.target.entryPoint, options.children.entryPoint)) {
-      continue
-    }
-
-    return { nodeId, binding }
-  }
-
-  return undefined
 }
 
 function findLoadedChildRow(state: BrowserState, nodeId: BrowserTreeNodeId): ChildRow | undefined {
@@ -595,14 +530,6 @@ function findLoadedChildRow(state: BrowserState, nodeId: BrowserTreeNodeId): Chi
   }
 
   return undefined
-}
-
-function formatLoadedDetail(children: LoadedChildren): string {
-  if (children.nextOffset === undefined) {
-    return `${children.rows.length} ${children.rows.length === 1 ? 'item' : 'items'} loaded.`
-  }
-
-  return `${children.rows.length} of ${children.totalRows} items loaded.`
 }
 
 function formatPresenceDetail(row: ChildRow): string {

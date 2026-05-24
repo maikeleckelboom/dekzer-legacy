@@ -12,6 +12,10 @@ import type {
   NavigationReadRowsRequest,
   NavigationReadRowsResult
 } from './libraryNavigation/readRows'
+import type {
+  SelectedContentsReadResult,
+  SelectedContentsRequest
+} from './librarySelectedContents/read'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
@@ -28,6 +32,7 @@ export type LibraryApi = {
   readonly host: LibraryHostApi
   readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
+  readonly selectedContents: LibrarySelectedContentsApi
   readonly roots: LibraryRootsApi
   readonly browser: LibraryBrowserApi
 }
@@ -43,6 +48,10 @@ export type LibraryHierarchyApi = {
 
 export type LibraryNavigationApi = {
   readRows(request: NavigationReadRowsRequest): Promise<NavigationReadRowsResult>
+}
+
+export type LibrarySelectedContentsApi = {
+  read(request: SelectedContentsRequest): Promise<SelectedContentsReadResult>
 }
 
 export type LibraryRootsApi = {

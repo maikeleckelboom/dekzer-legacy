@@ -37,6 +37,7 @@ impl MaintainedSnapshotScope {
             SnapshotReadCommand::ReadLiteralHierarchyChildren(_)
             | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(_)
+            | SnapshotReadCommand::ReadSelectedContents(_)
             | SnapshotReadCommand::ReadLibraryAssetWaveformOverview(_)
             | SnapshotReadCommand::ReadLibraryAssetPreparationDetail(_) => Self::LibraryBrowser,
         }
@@ -159,7 +160,8 @@ mod tests {
         LiteralHierarchyEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
         ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
         ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsRequest, ReadSelectedContentsRequest,
+        SearchNavigationNodeLibraryBrowserWindowRequest, SelectedContentsScope,
         SnapshotReadCommand,
     };
     use serde_json::json;
@@ -211,6 +213,14 @@ mod tests {
                     limit: 100,
                 },
             ),
+            SnapshotReadCommand::ReadSelectedContents(ReadSelectedContentsRequest {
+                scope: SelectedContentsScope::Directory {
+                    source_id: 8,
+                    source_directory_id: 9,
+                },
+                limit: 100,
+                cursor: None,
+            }),
             SnapshotReadCommand::ReadLibraryAssetWaveformOverview(
                 ReadLibraryAssetWaveformOverviewRequest {
                     library_asset_id: 42,

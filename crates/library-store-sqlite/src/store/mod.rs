@@ -22,6 +22,7 @@ mod playlists;
 mod projections;
 mod promotion;
 mod revisions;
+mod selected_contents_reads;
 mod sources;
 mod work_items;
 

@@ -36,7 +36,7 @@ export type RemoveLibraryAssetFromPlaylistRequest = { playlistId: string, librar
 
 export type MovePlaylistEntryRequest = { playlistId: string, playlistEntryId: string, newPosition: number, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLiteralHierarchyChildren", "payload": ReadLiteralHierarchyChildrenRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLiteralHierarchyChildren", "payload": ReadLiteralHierarchyChildrenRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "readSelectedContents", "payload": ReadSelectedContentsRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -49,6 +49,10 @@ export type ReadLiteralHierarchyChildrenRequest = { entryPoint: LiteralHierarchy
 export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
 
 export type SearchNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, query: string, offset: number, limit: number, };
+
+export type ReadSelectedContentsRequest = { scope: SelectedContentsScope, limit: number, cursor?: string, };
+
+export type SelectedContentsScope = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
 
 export type ReadLibraryAssetWaveformOverviewRequest = { libraryAssetId: string, };
 
@@ -84,7 +88,7 @@ export type RemoveLibraryAssetFromPlaylistReply = { removed: boolean, };
 
 export type MovePlaylistEntryReply = { moved: boolean, };
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "literalHierarchyChildren", "payload": ReadLiteralHierarchyChildrenReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "literalHierarchyChildren", "payload": ReadLiteralHierarchyChildrenReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "selectedContents", "payload": ReadSelectedContentsReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -97,6 +101,8 @@ export type ReadLiteralHierarchyChildrenReply = { window: LiteralHierarchyWindow
 export type ReadNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
 
 export type SearchNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
+
+export type ReadSelectedContentsReply = { result: SelectedContentsResult, };
 
 export type ReadLibraryAssetWaveformOverviewReply = { overview: LibraryAssetWaveformOverview | null, };
 
@@ -123,6 +129,18 @@ export type LiteralHierarchyPresenceState = "present" | "missing" | "removed";
 export type DirectoryMediaState = { "kind": "unknown" } | { "kind": "hasMediaDescendants" } | { "kind": "noMediaDescendants" };
 
 export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
+
+export type SelectedContentsResult = { state: SelectedContentsState, scope: SelectedContentsScope, rows: Array<SelectedContentsRow>, coverage: SelectedContentsCoverage, nextCursor?: string, detail?: string, };
+
+export type SelectedContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed";
+
+export type SelectedContentsCoverage = { state: SelectedContentsCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
+
+export type SelectedContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
+
+export type SelectedContentsRow = { stableId: string, label: string, libraryAssetId: string, rowVersion: string, primarySourceFileId: string | null, scopedSourceFileId: string, sourceId: string, relativePath: string, fileName: string, mediaClass: SelectedContentsMediaClass, availabilityState: LibraryAssetAvailabilityState, title: string | null, artist: string | null, album: string | null, durationMs: number | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary, updatedAtMs: number, };
+
+export type SelectedContentsMediaClass = "audio" | "video";
 
 export type LibraryBrowserWindow = { offset: number, limit: number, totalRows: number, rows: Array<LibraryAssetBrowserRow>, };
 
