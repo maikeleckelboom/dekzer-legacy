@@ -142,5 +142,5 @@ export async function startedHostWithClient(
 }
 
 function rejectUnexpectedClientCall(): Promise<never> {
-  return Promise.reject(new Error('client methods should not be called by host validation'))
+  return Promise.reject(new Error('client methods should not be called by this test'))
 }
