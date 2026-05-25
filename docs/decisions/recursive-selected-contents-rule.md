@@ -496,7 +496,7 @@ type SelectedContentsRow = {
 - `stableId = 'source-file:' + scopedSourceFileId` for scanned source-file rows.
 - Source-file rows must not invent track metadata (title, artist, album, duration etc. are absent).
 - `scopedSourceFileId` is required for every row because every contents row has exactly one scoped source file.
-- `readiness` is optional because preparation is not one flat status. Readiness facets may later cover independent preparation domains such as analysis, cue readiness, beatgrid, stems, loudness, source/file readiness, notes, and transition planning.
+- `prepReadinessSummary` is a required compact readiness summary. Preparation is not one flat concept; richer readiness facets may be added later, but the current row shape uses this single summary field.
 
 When a selected target is permanently deleted, active subscribers receive a tombstone/invalidated-target result, such as `location_missing` or `source_unavailable`, not an empty result.
 

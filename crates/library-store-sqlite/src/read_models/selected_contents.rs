@@ -1880,13 +1880,13 @@ mod tests {
         eprintln!("=== Directory prefix query plan ===\n{plan}");
 
         assert!(
-            plan_lower.contains("relative_path"),
-            "directory-prefix scope should reference relative_path in its plan, observed:\n{plan}"
+            plan_lower.contains("source_files_source_relative_path_binary"),
+            "directory-prefix scope should use the source_files_source_relative_path_binary index, observed:\n{plan}"
         );
     }
 
     #[test]
-    fn selected_contents_accepted_locations_uses_source_id_index() {
+    fn selected_contents_accepted_locations_avoids_source_files_table_scan() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -1928,7 +1928,7 @@ mod tests {
 
         assert!(
             !plan_lower.contains("scan source_files"),
-            "accepted-locations scope should use an index, not a full table scan"
+            "accepted-locations scope should not full-table-scan source_files, observed:\n{plan}"
         );
     }
 
@@ -1977,14 +1977,20 @@ mod tests {
         eprintln!("=== Mixed promotion query plan ===\n{plan}");
 
         assert!(
-            plan_lower.contains("source_files"),
-            "mixed-promotion query plan should reference source_files, observed:\n{plan}"
+            plan_lower.contains("sqlite_autoindex_sourcesegmentsets_1"),
+            "mixed-promotion plan should use indexed lookup on SourceSegmentSets, observed:\n{plan}"
         );
         assert!(
-            plan_lower.contains("librarybrowserrows")
-                || plan_lower.contains("libraryassetattachments")
-                || plan_lower.contains("sourcesegments"),
-            "mixed-promotion query plan should reference promotion-chain tables, observed:\n{plan}"
+            plan_lower.contains("sqlite_autoindex_sourcesegments_1"),
+            "mixed-promotion plan should use indexed lookup on SourceSegments, observed:\n{plan}"
+        );
+        assert!(
+            plan_lower.contains("sqlite_autoindex_libraryassetattachments_1"),
+            "mixed-promotion plan should use indexed lookup on LibraryAssetAttachments, observed:\n{plan}"
+        );
+        assert!(
+            plan_lower.contains("integer primary key"),
+            "mixed-promotion plan should use primary-key lookup on LibraryBrowserRows, observed:\n{plan}"
         );
     }
 
