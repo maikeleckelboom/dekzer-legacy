@@ -512,22 +512,22 @@ readiness evaluation step that consumes the artifact.
 This distinction matters for scheduler design. Analysis jobs and readiness targets are
 related but not the same thing.
 
-### Naming Alignment Note
+### Naming Alignment
 
-This document canonicalizes `audio_deck_load`, `video_deck_load`, `waveform_preview`, and
-`broadcast_metadata_projection` as readiness target keys. The companion document
-`media-role-classification.md` uses `audio_deck`, `video_deck`, `waveform_analysis`, and
-`beatgrid_analysis`. These must be reconciled before readiness and scheduler work goes
-deeper:
+This document and `media-role-classification.md` agree on canonical readiness target keys:
 
-- `audio_deck_load` / `video_deck_load` are readiness targets (this document).
-- `audio_deck` / `video_deck` as used in `media-role-classification.md` are role or
-  target family names, not readiness target keys.
-- `waveform_analysis` / `beatgrid_analysis` are analysis work domains, not readiness
-  targets.
-- `media-role-classification.md` must either adopt these canonical target keys or define
-  explicitly that its usage is role/family naming rather than readiness target identity.
-  The two documents must not disagree on what a key string means.
+```
+audio_deck_load
+video_deck_load
+visual_output
+artwork_attachment
+waveform_preview
+broadcast_metadata_projection
+```
+
+Analysis work kinds such as `waveform_analysis` and `beatgrid_analysis` are analysis
+work domains or artifacts, not readiness targets. Analysis completion may produce
+evidence, but readiness still requires an explicit readiness evaluation step.
 
 ### Rules
 
@@ -659,7 +659,6 @@ deck runtime owns source access policy or becomes file access authority through 
 analysis job completion (waveform_analysis, beatgrid_analysis) is treated as automatic
   readiness target fulfillment without a readiness evaluation step
 readiness_target keys disagree between this document and media-role-classification.md
-  without an explicit reconciliation note
 ```
 
 A future scheduler, admission, or request row may reference a deck-load request,
@@ -683,8 +682,7 @@ This document defers to future work:
 - Final deck UI and workspace surface assignments
 - Performance session event schema and storage
 - Broadcast projection protocol and wire format
-- Exact readiness target reconciliation between this document and
-  `media-role-classification.md` (must be resolved before scheduler work deepens)
+
 
 ---
 
@@ -694,8 +692,8 @@ This document extends, not replaces, the following:
 
 - `media-role-classification.md`: defines library item identity, roles, classification
   pipeline, and readiness as target-specific usability. This document adds the deck-side
-  boundary that consumption is not mutation. Readiness target key naming between these two
-  documents must be reconciled; see the Naming Alignment Note in Readiness Targets above.
+  boundary that consumption is not mutation. Both documents agree on canonical readiness
+  target keys; see Naming Alignment in Readiness Targets above.
 
 - `work-scheduling.md`: defines deck load semantics (query path + request path), work
   lanes, scheduler ownership. This document adds the deck runtime authority that receives
@@ -726,8 +724,7 @@ must prove:
 - Readiness is target-specific and does not load decks
 - Readiness targets belong to a named target family; analysis jobs are not readiness
   targets
-- Readiness target keys are consistent with `media-role-classification.md` or a
-  reconciliation note exists
+- Readiness target keys are consistent with `media-role-classification.md`
 - Deck load creates runtime binding, not library mutation
 - Resource handles are issued at the runtime resource boundary; deck runtime owns
   bindings, not source access policy
