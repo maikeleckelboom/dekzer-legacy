@@ -1806,4 +1806,210 @@ mod tests {
         assert!(origins.contains(&StoreSelectedContentsRowOrigin::LibraryAsset));
         assert!(origins.contains(&StoreSelectedContentsRowOrigin::SourceFile));
     }
+
+    #[test]
+    fn selected_contents_whole_source_uses_index_not_table_scan() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..30 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let sql = super::selected_rows_sql(None, "sf.source_id = ?1");
+        let plan = dump_query_plan(
+            &connection,
+            &sql,
+            &[
+                rusqlite::types::Value::Integer(1),
+                rusqlite::types::Value::Integer(100),
+            ],
+        );
+        let plan_lower = plan.to_lowercase();
+
+        eprintln!("=== Whole source query plan ===\n{plan}");
+
+        assert!(
+            !plan_lower.contains("scan source_files"),
+            "whole-source scope should use an index, not a full table scan"
+        );
+    }
+
+    #[test]
+    fn selected_contents_directory_prefix_uses_binary_collation_index() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Nested", "complete");
+        insert_directory(&connection, 12, 1, "Music2", "complete");
+        for i in 0..30 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                11,
+                &format!("Music/Nested/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+        insert_scanned_file(&connection, 2000, 1, 12, "Music2/other.wav", "audio");
+
+        let source_predicate = format!(
+            "sf.source_id = ?1 AND {}",
+            super::source_file_descendant_predicate("sf", "?2")
+        );
+        let sql = super::selected_rows_sql(None, &source_predicate);
+        let plan = dump_query_plan(
+            &connection,
+            &sql,
+            &[
+                rusqlite::types::Value::Integer(1),
+                rusqlite::types::Value::Text("Music/Nested".to_string()),
+                rusqlite::types::Value::Integer(100),
+            ],
+        );
+        let plan_lower = plan.to_lowercase();
+
+        eprintln!("=== Directory prefix query plan ===\n{plan}");
+
+        assert!(
+            plan_lower.contains("relative_path"),
+            "directory-prefix scope should reference relative_path in its plan, observed:\n{plan}"
+        );
+    }
+
+    #[test]
+    fn selected_contents_accepted_locations_uses_source_id_index() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Other", "complete");
+        insert_location(&connection, 100, 1, "Music", "user", "registered_subpath");
+        for i in 0..30 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+        insert_scanned_file(&connection, 2000, 1, 11, "Other/clip.mp4", "video");
+
+        let predicate = format!(
+            "sf.source_id = ?1
+             AND EXISTS (
+                 SELECT 1
+                 FROM accepted_locations al
+                 WHERE {}
+             )",
+            super::relative_path_scope_predicate("sf", "al.relative_path")
+        );
+        let sql = super::selected_rows_sql(Some(super::accepted_locations_cte()), &predicate);
+        let plan = dump_query_plan(
+            &connection,
+            &sql,
+            &[
+                rusqlite::types::Value::Integer(1),
+                rusqlite::types::Value::Integer(100),
+            ],
+        );
+        let plan_lower = plan.to_lowercase();
+
+        eprintln!("=== Accepted locations query plan ===\n{plan}");
+
+        assert!(
+            !plan_lower.contains("scan source_files"),
+            "accepted-locations scope should use an index, not a full table scan"
+        );
+    }
+
+    #[test]
+    fn selected_contents_mixed_promotion_uses_join_indexes() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..10 {
+            let source_file_id = 1000 + i as i64;
+            let library_asset_id = i as i64 + 1;
+            insert_asset_file(
+                &connection,
+                library_asset_id,
+                source_file_id,
+                1,
+                10,
+                &format!("Music/promoted_{:02}.wav", i),
+                "audio",
+                &format!("Track {:02}", i),
+            );
+        }
+        for i in 0..10 {
+            insert_scanned_file(
+                &connection,
+                2000 + i as i64,
+                1,
+                10,
+                &format!("Music/scanned_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let sql = super::selected_rows_sql(None, "sf.source_id = ?1");
+        let plan = dump_query_plan(
+            &connection,
+            &sql,
+            &[
+                rusqlite::types::Value::Integer(1),
+                rusqlite::types::Value::Integer(100),
+            ],
+        );
+        let plan_lower = plan.to_lowercase();
+
+        eprintln!("=== Mixed promotion query plan ===\n{plan}");
+
+        assert!(
+            plan_lower.contains("source_files"),
+            "mixed-promotion query plan should reference source_files, observed:\n{plan}"
+        );
+        assert!(
+            plan_lower.contains("librarybrowserrows")
+                || plan_lower.contains("libraryassetattachments")
+                || plan_lower.contains("sourcesegments"),
+            "mixed-promotion query plan should reference promotion-chain tables, observed:\n{plan}"
+        );
+    }
+
+    fn dump_query_plan(
+        connection: &Connection,
+        sql: &str,
+        params: &[rusqlite::types::Value],
+    ) -> String {
+        let explain_sql = format!("EXPLAIN QUERY PLAN {sql}");
+        let mut stmt = connection
+            .prepare(&explain_sql)
+            .expect("prepare EXPLAIN QUERY PLAN");
+        let rows = stmt
+            .query_map(rusqlite::params_from_iter(params.iter()), |row| {
+                Ok(format!(
+                    "{:>4}|{:>4}|{}",
+                    row.get::<_, i64>(0).unwrap_or(-1),
+                    row.get::<_, i64>(1).unwrap_or(-1),
+                    row.get::<_, String>(3).unwrap_or_default(),
+                ))
+            })
+            .expect("query EXPLAIN QUERY PLAN rows");
+
+        rows.map(|r| r.expect("read plan row"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
 }
