@@ -34,7 +34,7 @@
     "fix": "pnpm run fix:ts && pnpm run fix:rust",
     "format:check": "pnpm --filter @dekzer/desktop run format:check && pnpm run fmt:rust",
     "typecheck": "pnpm --filter @dekzer/library-boundary-contract run typecheck && pnpm run library:client:typecheck && pnpm run library:stdio:typecheck && pnpm --filter @dekzer/desktop run typecheck",
-    "verify": "git diff --check && pnpm run library:contract:check && pnpm run library:stdio:contract:check && pnpm run typecheck && pnpm run desktop:test && pnpm run library:client:test && pnpm run library:stdio:test && pnpm run test:rust && pnpm run desktop:lint && pnpm run fmt:rust && pnpm run lint:rust",
+    "verify": "git diff --check && pnpm run library:contract:check && pnpm run library:stdio:contract:check && pnpm run typecheck && pnpm run desktop:test && pnpm run library:client:test && pnpm run library:stdio:test && pnpm run test:rust && pnpm run desktop:lint && pnpm run format:check && pnpm run lint:rust",
     "build": "pnpm run library:stdio:build && pnpm run build:desktop",
     "build:desktop": "pnpm --filter @dekzer/desktop run build",
     "start:desktop": "pnpm --filter @dekzer/desktop run start:built",
