@@ -22,6 +22,7 @@ import {
   hierarchyReadChannels,
   type ReadResult
 } from '../../../src/shared/libraryHierarchy/readChildren'
+import type { LiteralHierarchyCoverage } from '@dekzer/library-boundary-contract'
 import {
   navigationReadChannels,
   type NavigationReadRowsResult
@@ -303,7 +304,7 @@ function sourceNavigationRow(): Awaited<
   }
 }
 
-function completeCoverage() {
+function completeCoverage(): LiteralHierarchyCoverage {
   return {
     state: 'complete' as const,
     recursiveScopeComplete: true,
