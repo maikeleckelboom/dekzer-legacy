@@ -6,11 +6,11 @@ import {
   type LibraryBoundaryHostStatus
 } from '../../../src/shared/libraryBoundary/status'
 import {
-  libraryBrowserChannels,
-  type LibraryBrowserViewStateReadResult,
-  type LibraryBrowserViewStateWriteResult,
-  type PersistedLibraryBrowserViewState
-} from '../../../src/shared/libraryBrowser/viewState'
+  libraryViewStateChannels,
+  type LibraryViewStateReadResult,
+  type LibraryViewStateWriteResult,
+  type PersistedLibraryViewState
+} from '../../../src/shared/libraryViewState/viewState'
 import {
   hierarchyReadChannels,
   type ReadResult
@@ -43,7 +43,7 @@ describe('preload renderer API', () => {
       }
     }
     const scanRequest = { rootId: 'root-1' }
-    const persistedViewState: PersistedLibraryBrowserViewState = {
+    const persistedViewState: PersistedLibraryViewState = {
       version: 1,
       selectedNodeId: 'navigation-row:1',
       expandedNodeIds: ['navigation-row:1']
@@ -109,7 +109,7 @@ describe('preload renderer API', () => {
       state: 'unregistered',
       unregistered: true
     }
-    const viewStateReadResult: LibraryBrowserViewStateReadResult = {
+    const viewStateReadResult: LibraryViewStateReadResult = {
       state: 'ready',
       viewState: {
         version: 1,
@@ -117,7 +117,7 @@ describe('preload renderer API', () => {
         expandedNodeIds: ['navigation-row:1', 'source-directory:2']
       }
     }
-    const viewStateWriteResult: LibraryBrowserViewStateWriteResult = { state: 'written' }
+    const viewStateWriteResult: LibraryViewStateWriteResult = { state: 'written' }
     let receivedChoiceArgs: readonly unknown[] | undefined
     let receivedHierarchyRequest: unknown
     let receivedNavigationRequest: unknown
@@ -169,12 +169,12 @@ describe('preload renderer API', () => {
           return unregisterLocalRootResult
         }
 
-        if (channel === libraryBrowserChannels.readViewState) {
+        if (channel === libraryViewStateChannels.readViewState) {
           expect(args).toEqual([])
           return viewStateReadResult
         }
 
-        if (channel === libraryBrowserChannels.writeViewState) {
+        if (channel === libraryViewStateChannels.writeViewState) {
           receivedViewStatePayload = args[0]
           return viewStateWriteResult
         }

@@ -1,28 +1,28 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { libraryBrowserChannels } from '../../shared/libraryBrowser/viewState'
+import { libraryViewStateChannels } from '../../shared/libraryViewState/viewState'
 import type {
-  LibraryBrowserViewStateReadResult,
-  LibraryBrowserViewStateWriteResult,
-  PersistedLibraryBrowserViewState
-} from '../../shared/libraryBrowser/viewState'
+  LibraryViewStateReadResult,
+  LibraryViewStateWriteResult,
+  PersistedLibraryViewState
+} from '../../shared/libraryViewState/viewState'
 import type { LibraryBoundaryHost } from '../libraryBoundary/host'
 
-export type LibraryBrowserViewStateIpcMain = {
+export type LibraryViewStateIpcMain = {
   handle(channel: string, listener: (...args: readonly unknown[]) => unknown): void
 }
 
-const viewStateFileName = 'library-browser-view-state.json'
+const viewStateFileName = 'library-view-state.json'
 
-export function registerLibraryBrowserViewStateIpc(
-  ipcMain: LibraryBrowserViewStateIpcMain,
+export function registerLibraryViewStateIpc(
+  ipcMain: LibraryViewStateIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(libraryBrowserChannels.readViewState, () => readViewStateFromHost(host))
+  ipcMain.handle(libraryViewStateChannels.readViewState, () => readViewStateFromHost(host))
 
-  ipcMain.handle(libraryBrowserChannels.writeViewState, (_event: unknown, viewState: unknown) => {
+  ipcMain.handle(libraryViewStateChannels.writeViewState, (_event: unknown, viewState: unknown) => {
     if (!isValidViewState(viewState)) {
-      const result: LibraryBrowserViewStateWriteResult = {
+      const result: LibraryViewStateWriteResult = {
         state: 'failed',
         detail: 'Invalid view state payload.'
       }
@@ -35,7 +35,7 @@ export function registerLibraryBrowserViewStateIpc(
 
 export async function readViewStateFromHost(
   host: LibraryBoundaryHost
-): Promise<LibraryBrowserViewStateReadResult> {
+): Promise<LibraryViewStateReadResult> {
   try {
     const raw = await readFile(viewStateFilePath(host), 'utf-8')
     const parsed: unknown = JSON.parse(raw)
@@ -59,8 +59,8 @@ export async function readViewStateFromHost(
 
 export async function writeViewStateToHost(
   host: LibraryBoundaryHost,
-  viewState: PersistedLibraryBrowserViewState
-): Promise<LibraryBrowserViewStateWriteResult> {
+  viewState: PersistedLibraryViewState
+): Promise<LibraryViewStateWriteResult> {
   try {
     const dir = userDataPath(host)
     await mkdir(dir, { recursive: true })
@@ -79,7 +79,7 @@ export async function writeViewStateToHost(
   } catch {
     return {
       state: 'failed',
-      detail: 'Unable to write library browser view state.'
+      detail: 'Unable to write library view state.'
     }
   }
 }
@@ -92,7 +92,7 @@ function viewStateFilePath(host: LibraryBoundaryHost): string {
   return join(userDataPath(host), viewStateFileName)
 }
 
-export function isValidViewState(value: unknown): value is PersistedLibraryBrowserViewState {
+export function isValidViewState(value: unknown): value is PersistedLibraryViewState {
   if (value === null || typeof value !== 'object') return false
   const obj = value as Record<string, unknown>
   if (obj.version !== 1) return false

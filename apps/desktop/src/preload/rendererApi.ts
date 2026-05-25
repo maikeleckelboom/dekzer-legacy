@@ -3,11 +3,11 @@ import {
   type LibraryBoundaryHostStatus
 } from '../shared/libraryBoundary/status'
 import {
-  libraryBrowserChannels,
-  type LibraryBrowserViewStateReadResult,
-  type LibraryBrowserViewStateWriteResult,
-  type PersistedLibraryBrowserViewState
-} from '../shared/libraryBrowser/viewState'
+  libraryViewStateChannels,
+  type LibraryViewStateReadResult,
+  type LibraryViewStateWriteResult,
+  type PersistedLibraryViewState
+} from '../shared/libraryViewState/viewState'
 import {
   hierarchyReadChannels,
   type ReadRequest,
@@ -129,18 +129,18 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       },
       browser: {
         viewState: {
-          async readViewState(): Promise<LibraryBrowserViewStateReadResult> {
+          async readViewState(): Promise<LibraryViewStateReadResult> {
             return (await ipcRenderer.invoke(
-              libraryBrowserChannels.readViewState
-            )) as LibraryBrowserViewStateReadResult
+              libraryViewStateChannels.readViewState
+            )) as LibraryViewStateReadResult
           },
           async writeViewState(
-            viewState: PersistedLibraryBrowserViewState
-          ): Promise<LibraryBrowserViewStateWriteResult> {
+            viewState: PersistedLibraryViewState
+          ): Promise<LibraryViewStateWriteResult> {
             return (await ipcRenderer.invoke(
-              libraryBrowserChannels.writeViewState,
+              libraryViewStateChannels.writeViewState,
               viewState
-            )) as LibraryBrowserViewStateWriteResult
+            )) as LibraryViewStateWriteResult
           }
         }
       }

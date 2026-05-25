@@ -4,7 +4,7 @@ import {
   createViewStateStore,
   type ViewStateApi
 } from '../../../../src/renderer/library/runtime/viewState'
-import type { PersistedLibraryBrowserViewState } from '../../../../src/shared/libraryBrowser/viewState'
+import type { PersistedLibraryViewState } from '../../../../src/shared/libraryViewState/viewState'
 
 describe('createViewStateStore', () => {
   it('coalesces queued writes to the newest pending state', async () => {
@@ -43,7 +43,7 @@ describe('createViewStateStore', () => {
   })
 
   it('does not let a failed write block later writes', async () => {
-    const writes: PersistedLibraryBrowserViewState[] = []
+    const writes: PersistedLibraryViewState[] = []
     let callCount = 0
     const api = createViewStateApi({
       writeViewState: async (state) => {
@@ -85,7 +85,7 @@ describe('createViewStateStore', () => {
 })
 
 type RecordedWrite = {
-  readonly state: PersistedLibraryBrowserViewState
+  readonly state: PersistedLibraryViewState
   readonly sequence: number
 }
 

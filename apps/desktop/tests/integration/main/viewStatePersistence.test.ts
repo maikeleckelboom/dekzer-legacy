@@ -7,12 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   isValidViewState,
   readViewStateFromHost,
-  registerLibraryBrowserViewStateIpc,
+  registerLibraryViewStateIpc,
   writeViewStateToHost
-} from '../../../src/main/libraryBrowser/viewState'
+} from '../../../src/main/libraryViewState/viewState'
 import type { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
 import type { LibraryBoundaryHostConfig } from '../../../src/main/libraryBoundary/config'
-import { libraryBrowserChannels } from '../../../src/shared/libraryBrowser/viewState'
+import { libraryViewStateChannels } from '../../../src/shared/libraryViewState/viewState'
 
 const tempRoots: string[] = []
 
@@ -36,7 +36,7 @@ describe('persisted library view state', () => {
       })
     ).resolves.toEqual({ state: 'written' })
 
-    writeFileSync(join(malformedDir, 'library-browser-view-state.json'), '{ malformed }', 'utf-8')
+    writeFileSync(join(malformedDir, 'library-view-state.json'), '{ malformed }', 'utf-8')
 
     await expect(readViewStateFromHost(fakeHost(malformedDir))).resolves.toEqual({
       state: 'empty'
@@ -71,14 +71,14 @@ describe('persisted library view state', () => {
       write?: (viewState: unknown) => unknown
     } = {}
 
-    registerLibraryBrowserViewStateIpc(
+    registerLibraryViewStateIpc(
       {
         handle(channel, listener): void {
-          if (channel === libraryBrowserChannels.readViewState) {
+          if (channel === libraryViewStateChannels.readViewState) {
             registration.read = () => listener({})
           }
 
-          if (channel === libraryBrowserChannels.writeViewState) {
+          if (channel === libraryViewStateChannels.writeViewState) {
             registration.write = (viewState) => listener({}, viewState)
           }
         }

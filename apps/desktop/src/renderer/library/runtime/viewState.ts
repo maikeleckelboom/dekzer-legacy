@@ -1,34 +1,32 @@
 import type {
-  LibraryBrowserViewStateReadResult,
-  LibraryBrowserViewStateWriteResult,
-  PersistedLibraryBrowserViewState
-} from '../../../shared/libraryBrowser/viewState'
+  LibraryViewStateReadResult,
+  LibraryViewStateWriteResult,
+  PersistedLibraryViewState
+} from '../../../shared/libraryViewState/viewState'
 
 export type ViewStateApi = {
   readonly library: {
     readonly browser: {
       readonly viewState: {
-        readonly readViewState: () => Promise<LibraryBrowserViewStateReadResult>
+        readonly readViewState: () => Promise<LibraryViewStateReadResult>
         readonly writeViewState: (
-          state: PersistedLibraryBrowserViewState
-        ) => Promise<LibraryBrowserViewStateWriteResult>
+          state: PersistedLibraryViewState
+        ) => Promise<LibraryViewStateWriteResult>
       }
     }
   }
 }
 
 export type ViewStateStore = {
-  readonly save: (state: PersistedLibraryBrowserViewState) => void
-  readonly load: () => Promise<LibraryBrowserViewStateReadResult>
+  readonly save: (state: PersistedLibraryViewState) => void
+  readonly load: () => Promise<LibraryViewStateReadResult>
 }
 
 function getRendererApi(): ViewStateApi {
   return (window as unknown as { readonly dekzer: ViewStateApi }).dekzer
 }
 
-function normalizeViewStateForPersist(
-  state: PersistedLibraryBrowserViewState
-): PersistedLibraryBrowserViewState {
+function normalizeViewStateForPersist(state: PersistedLibraryViewState): PersistedLibraryViewState {
   return {
     version: 1,
     ...(state.selectedNodeId === undefined ? {} : { selectedNodeId: state.selectedNodeId }),
@@ -37,7 +35,7 @@ function normalizeViewStateForPersist(
 }
 
 export function createViewStateStore(api: ViewStateApi = getRendererApi()): ViewStateStore {
-  let pendingState: PersistedLibraryBrowserViewState | undefined
+  let pendingState: PersistedLibraryViewState | undefined
   let writeInFlight = false
 
   function drain(): void {
@@ -62,12 +60,12 @@ export function createViewStateStore(api: ViewStateApi = getRendererApi()): View
   }
 
   return {
-    save(state: PersistedLibraryBrowserViewState): void {
+    save(state: PersistedLibraryViewState): void {
       pendingState = normalizeViewStateForPersist(state)
       drain()
     },
 
-    load(): Promise<LibraryBrowserViewStateReadResult> {
+    load(): Promise<LibraryViewStateReadResult> {
       return api.library.browser.viewState.readViewState()
     }
   }
