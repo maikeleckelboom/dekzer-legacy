@@ -255,7 +255,14 @@ function sourceFileVisibilityButtonClass(value: SourceFileVisibility): string {
 
 function setSourceFileVisibility(value: SourceFileVisibility): void {
   markUserInteraction()
-  hierarchyRead.setSourceFileVisibility(value, { expandedNodeIds: expandedNodeIds.value })
+
+  const replayNodeIds = new Set<BrowserTreeNodeId>(expandedNodeIds.value)
+
+  if (selectedNodeId.value !== undefined) {
+    replayNodeIds.add(selectedNodeId.value)
+  }
+
+  hierarchyRead.setSourceFileVisibility(value, { replayNodeIds })
 }
 
 function saveViewState(): void {

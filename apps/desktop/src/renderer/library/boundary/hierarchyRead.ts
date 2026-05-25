@@ -68,7 +68,12 @@ export type LibraryHierarchyReadController = {
 }
 
 export type SourceFileVisibilityOptions = {
-  readonly expandedNodeIds?: Iterable<BrowserTreeNodeId>
+  readonly replayNodeIds?: Iterable<BrowserTreeNodeId>
+}
+
+type VisibilityReplayIntent = {
+  readonly sourceTargets: ReadonlyMap<BrowserTreeNodeId, SourceTarget>
+  readonly directoryTargets: ReadonlyMap<BrowserTreeNodeId, DirectoryTarget>
 }
 
 export function useLibraryHierarchyRead(
@@ -171,8 +176,10 @@ export function createLibraryHierarchyReadController(
       return
     }
 
-    const expandedNodeIds = new Set(options.expandedNodeIds ?? [])
+    const replayNodeIds = new Set(options.replayNodeIds ?? [])
     const replaySequence = ++visibilityReplaySequence
+
+    const intent = captureVisibilityReplayIntent(replayNodeIds)
 
     sourceFileVisibility.value = nextVisibility
     hierarchyReadResult.value = undefined
@@ -184,84 +191,116 @@ export function createLibraryHierarchyReadController(
         : new Map()
     directoryReadStates.value = new Map()
 
-    if (expandedNodeIds.size === 0) {
+    if (intent.sourceTargets.size === 0 && intent.directoryTargets.size === 0) {
       void loadFirstSource()
       return
     }
 
-    void replayExpandedReads(expandedNodeIds, replaySequence)
+    void replayVisibilityIntent(intent, replaySequence)
   }
 
-  async function replayExpandedReads(
-    pendingNodeIds: Set<BrowserTreeNodeId>,
+  function captureVisibilityReplayIntent(
+    nodeIds: ReadonlySet<BrowserTreeNodeId>
+  ): VisibilityReplayIntent {
+    const sourceTargets = new Map<BrowserTreeNodeId, SourceTarget>()
+    const directoryTargets = new Map<BrowserTreeNodeId, DirectoryTarget>()
+
+    const projection = browserProjection.value
+
+    if (projection?.kind !== 'tree') {
+      return { sourceTargets, directoryTargets }
+    }
+
+    const bindingsById = projection.bindingsById
+
+    for (const nodeId of nodeIds) {
+      const binding = bindingsById.get(nodeId)
+
+      if (binding?.kind === 'source') {
+        sourceTargets.set(nodeId, binding.target)
+      } else if (binding?.kind === 'directory') {
+        directoryTargets.set(nodeId, {
+          entryPoint: copyEntryPoint(binding.entryPoint),
+          ...(binding.label === undefined ? {} : { label: binding.label }),
+          directoryId: binding.directoryId
+        })
+      }
+    }
+
+    return { sourceTargets, directoryTargets }
+  }
+
+  async function replayVisibilityIntent(
+    intent: VisibilityReplayIntent,
     replaySequence: number
   ): Promise<boolean> {
-    while (pendingNodeIds.size > 0) {
+    let madeProgress = false
+
+    for (const [nodeId, target] of intent.sourceTargets) {
       if (replaySequence !== visibilityReplaySequence) {
-        return false
+        return madeProgress
+      }
+
+      await readSource(nodeId, target)
+      madeProgress = true
+    }
+
+    for (const [nodeId, directoryTarget] of intent.directoryTargets) {
+      if (replaySequence !== visibilityReplaySequence) {
+        return madeProgress
       }
 
       const projection = browserProjection.value
 
       if (projection?.kind !== 'tree') {
-        return false
+        return madeProgress
       }
 
-      const nextTarget = nextExpandedReplayTarget(pendingNodeIds, projection.bindingsById)
+      const directoryBinding = projection.bindingsById.get(nodeId)
 
-      if (nextTarget === undefined) {
-        pendingNodeIds.clear()
-        return false
+      if (directoryBinding?.kind === 'directory') {
+        await readDirectory(directoryTarget)
+        madeProgress = true
+        continue
       }
 
-      pendingNodeIds.delete(nextTarget.nodeId)
+      const owningSource = findSourceByEntryPoint(
+        projection.bindingsById,
+        directoryTarget.entryPoint
+      )
 
-      if (nextTarget.kind === 'source') {
-        await readSource(nextTarget.nodeId, nextTarget.target)
-      } else {
-        await readDirectory(nextTarget.target)
+      if (owningSource === undefined) {
+        continue
+      }
+
+      await readSource(owningSource.nodeId, owningSource.target)
+
+      const retryProjection = browserProjection.value
+
+      if (retryProjection?.kind === 'tree') {
+        const retryBinding = retryProjection.bindingsById.get(nodeId)
+
+        if (retryBinding?.kind === 'directory') {
+          await readDirectory(directoryTarget)
+          madeProgress = true
+        }
       }
     }
 
-    return true
+    if (!madeProgress) {
+      await loadFirstSource()
+    }
+
+    return madeProgress
   }
 
-  function nextExpandedReplayTarget(
-    pendingNodeIds: ReadonlySet<BrowserTreeNodeId>,
-    bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>
-  ):
-    | {
-        readonly kind: 'source'
-        readonly nodeId: BrowserTreeNodeId
-        readonly target: SourceTarget
-      }
-    | {
-        readonly kind: 'directory'
-        readonly nodeId: BrowserTreeNodeId
-        readonly target: DirectoryTarget
-      }
-    | undefined {
-    for (const nodeId of pendingNodeIds) {
-      const binding = bindingsById.get(nodeId)
-
-      if (binding?.kind === 'source') {
-        return {
-          kind: 'source',
-          nodeId,
-          target: binding.target
-        }
-      }
-
-      if (binding?.kind === 'directory') {
-        return {
-          kind: 'directory',
-          nodeId,
-          target: {
-            entryPoint: binding.entryPoint,
-            ...(binding.label === undefined ? {} : { label: binding.label }),
-            directoryId: binding.directoryId
-          }
-        }
+  function findSourceByEntryPoint(
+    bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>,
+    entryPoint: EntryPoint
+  ): { readonly nodeId: BrowserTreeNodeId; readonly target: SourceTarget } | undefined {
+    for (const [nodeId, binding] of bindingsById) {
+      if (binding.kind === 'source' && sameEntryPoint(binding.target.entryPoint, entryPoint)) {
+        return { nodeId, target: binding.target }
       }
     }
 
