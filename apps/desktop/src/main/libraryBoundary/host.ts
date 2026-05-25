@@ -21,7 +21,7 @@ import {
 
 const MAX_STARTUP_DIAGNOSTIC_LINES = 8
 
-export type LibraryBoundaryHostLogger = {
+export type HostLogger = {
   warn(message?: unknown, ...optionalParams: unknown[]): void
   error?(message?: unknown, ...optionalParams: unknown[]): void
 }
@@ -37,33 +37,33 @@ export type { LibraryBoundaryStdioDiagnostic }
 
 export type LibraryBoundaryHostTransportOptions = LibraryBoundaryStdioTransportOptions
 
-export type LibraryBoundaryHostTransportFactory = (
+export type HostTransportFactory = (
   options: LibraryBoundaryHostTransportOptions
 ) => LibraryBoundaryHostTransport
 
-export type LibraryBoundaryHostClientFactory = (
+export type HostClientFactory = (
   transport: LibraryBoundaryHostTransport
 ) => LibraryBoundaryHostClient
 
-export type LibraryBoundaryHostDependencies = {
-  readonly createTransport?: LibraryBoundaryHostTransportFactory
-  readonly createClient?: LibraryBoundaryHostClientFactory
+export type HostDependencies = {
+  readonly createTransport?: HostTransportFactory
+  readonly createClient?: HostClientFactory
   readonly resolveStdioBinaryPath?: typeof resolveHostStdioBinaryPath
 }
 
-export type CreateLibraryBoundaryHostOptions = {
+export type CreateHostOptions = {
   readonly app: Pick<App, 'getPath' | 'getAppPath'>
   readonly isDev: boolean
   readonly env?: NodeJS.ProcessEnv
   readonly platform?: NodeJS.Platform
   readonly resourcesPath?: string
-  readonly logger?: LibraryBoundaryHostLogger
+  readonly logger?: HostLogger
 }
 
 export class LibraryBoundaryHost {
   readonly #config: LibraryBoundaryHostConfig
-  readonly #dependencies: LibraryBoundaryHostDependencies
-  readonly #logger: LibraryBoundaryHostLogger
+  readonly #dependencies: HostDependencies
+  readonly #logger: HostLogger
   #client: LibraryBoundaryHostClient | undefined
   #startPromise: Promise<LibraryBoundaryHostClient> | undefined
   #state: LibraryBoundaryHostState = 'idle'
@@ -74,8 +74,8 @@ export class LibraryBoundaryHost {
 
   constructor(
     config: LibraryBoundaryHostConfig,
-    logger: LibraryBoundaryHostLogger = console,
-    dependencies: LibraryBoundaryHostDependencies = {}
+    logger: HostLogger = console,
+    dependencies: HostDependencies = {}
   ) {
     this.#config = config
     this.#dependencies = dependencies
@@ -205,7 +205,7 @@ export class LibraryBoundaryHost {
     }
   }
 
-  async #resolveTransportFactory(): Promise<LibraryBoundaryHostTransportFactory> {
+  async #resolveTransportFactory(): Promise<HostTransportFactory> {
     if (this.#dependencies.createTransport !== undefined) {
       return this.#dependencies.createTransport
     }
@@ -214,7 +214,7 @@ export class LibraryBoundaryHost {
     return module.createLibraryBoundaryStdioTransport
   }
 
-  async #resolveClientFactory(): Promise<LibraryBoundaryHostClientFactory> {
+  async #resolveClientFactory(): Promise<HostClientFactory> {
     if (this.#dependencies.createClient !== undefined) {
       return this.#dependencies.createClient
     }
@@ -281,8 +281,6 @@ export class LibraryBoundaryHost {
   }
 }
 
-export function createLibraryBoundaryHost(
-  options: CreateLibraryBoundaryHostOptions
-): LibraryBoundaryHost {
+export function createLibraryBoundaryHost(options: CreateHostOptions): LibraryBoundaryHost {
   return new LibraryBoundaryHost(resolveHostConfig(options), options.logger)
 }
