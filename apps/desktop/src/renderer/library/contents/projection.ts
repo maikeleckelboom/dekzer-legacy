@@ -329,14 +329,29 @@ function projectFileContents(options: {
 }
 
 function selectedContentsRow(row: SelectedContentsRow): ContentRow {
+  const icon = row.mediaClass === 'video' ? 'video' : 'music'
+  const detail =
+    row.origin === 'sourceFile' ? selectedSourceFileRowDetail(row) : selectedContentsRowDetail(row)
   return {
     id: row.stableId,
     kind: 'file',
     label: row.label,
-    detail: selectedContentsRowDetail(row),
-    icon: row.mediaClass === 'video' ? 'video' : 'music',
+    detail,
+    icon,
     mediaClass: row.mediaClass,
     availabilityState: row.availabilityState
+  }
+}
+
+function selectedSourceFileRowDetail(row: SelectedContentsRow): string {
+  const base = row.relativePath
+  switch (row.availabilityState) {
+    case 'available':
+      return base
+    case 'degraded':
+      return `Degraded - ${base}`
+    case 'unavailable':
+      return `Unavailable - ${base}`
   }
 }
 

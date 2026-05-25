@@ -570,6 +570,7 @@ const fn map_selected_contents_coverage_state(
 fn map_selected_contents_row(
     row: store::StoreSelectedContentsRow,
 ) -> store::LibrarySqliteResult<protocol::SelectedContentsRow> {
+    let origin = map_selected_contents_row_origin(&row.origin);
     let media_class = protocol::SelectedContentsMediaClass::from_projection_value(&row.media_class)
         .ok_or_else(|| invalid_selected_contents_value("media_class", &row.media_class))?;
     let availability_state =
@@ -595,6 +596,7 @@ fn map_selected_contents_row(
     Ok(protocol::SelectedContentsRow {
         stable_id: row.stable_id,
         label: row.label,
+        origin,
         library_asset_id: row.library_asset_id,
         row_version: row.row_version,
         primary_source_file_id: row.primary_source_file_id,
@@ -616,6 +618,19 @@ fn map_selected_contents_row(
         prep_readiness_summary,
         updated_at_ms: row.updated_at,
     })
+}
+
+const fn map_selected_contents_row_origin(
+    origin: &store::StoreSelectedContentsRowOrigin,
+) -> protocol::SelectedContentsRowOrigin {
+    match origin {
+        store::StoreSelectedContentsRowOrigin::LibraryAsset => {
+            protocol::SelectedContentsRowOrigin::LibraryAsset
+        }
+        store::StoreSelectedContentsRowOrigin::SourceFile => {
+            protocol::SelectedContentsRowOrigin::SourceFile
+        }
+    }
 }
 
 fn invalid_library_browser_projection_value(

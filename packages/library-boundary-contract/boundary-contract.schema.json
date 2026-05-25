@@ -2303,7 +2303,10 @@
           "type": "string"
         },
         "libraryAssetId": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "mediaClass": {
           "$ref": "#/$defs/SelectedContentsMediaClass"
@@ -2313,6 +2316,9 @@
             "string",
             "null"
           ]
+        },
+        "origin": {
+          "$ref": "#/$defs/SelectedContentsRowOrigin"
         },
         "prepReadinessSummary": {
           "$ref": "#/$defs/LibraryAssetPrepReadinessSummary"
@@ -2327,7 +2333,10 @@
           "type": "string"
         },
         "rowVersion": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "scopedSourceFileId": {
           "type": "string"
@@ -2383,8 +2392,7 @@
       "required": [
         "stableId",
         "label",
-        "libraryAssetId",
-        "rowVersion",
+        "origin",
         "scopedSourceFileId",
         "sourceId",
         "relativePath",
@@ -2393,6 +2401,13 @@
         "availabilityState",
         "prepReadinessSummary",
         "updatedAtMs"
+      ]
+    },
+    "SelectedContentsRowOrigin": {
+      "type": "string",
+      "enum": [
+        "libraryAsset",
+        "sourceFile"
       ]
     },
     "SelectedContentsScope": {

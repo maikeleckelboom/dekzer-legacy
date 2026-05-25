@@ -432,6 +432,42 @@ pub struct SelectedContentsCoverage {
 }
 
 #[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SelectedContentsRowOrigin {
+    LibraryAsset,
+    SourceFile,
+}
+
+impl SelectedContentsRowOrigin {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::LibraryAsset => "libraryAsset",
+            Self::SourceFile => "sourceFile",
+        }
+    }
+
+    pub fn from_projection_value(value: &str) -> Option<Self> {
+        match value.as_bytes() {
+            b"libraryAsset" => Some(Self::LibraryAsset),
+            b"sourceFile" => Some(Self::SourceFile),
+            _ => None,
+        }
+    }
+}
+
+#[derive(
     Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
 )]
 #[serde(rename_all = "camelCase")]
@@ -439,14 +475,15 @@ pub struct SelectedContentsCoverage {
 pub struct SelectedContentsRow {
     pub stable_id: String,
     pub label: String,
-    #[serde(with = "crate::wire::i64_string")]
-    #[schemars(with = "String")]
-    #[ts(as = "String")]
-    pub library_asset_id: i64,
-    #[serde(with = "crate::wire::i64_string")]
-    #[schemars(with = "String")]
-    #[ts(as = "String")]
-    pub row_version: i64,
+    pub origin: SelectedContentsRowOrigin,
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub library_asset_id: Option<i64>,
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub row_version: Option<i64>,
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]

@@ -138,7 +138,9 @@ export type SelectedContentsCoverage = { state: SelectedContentsCoverageState, r
 
 export type SelectedContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
 
-export type SelectedContentsRow = { stableId: string, label: string, libraryAssetId: string, rowVersion: string, primarySourceFileId: string | null, scopedSourceFileId: string, sourceId: string, relativePath: string, fileName: string, mediaClass: SelectedContentsMediaClass, availabilityState: LibraryAssetAvailabilityState, title: string | null, artist: string | null, album: string | null, durationMs: number | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary, updatedAtMs: number, };
+export type SelectedContentsRow = { stableId: string, label: string, origin: SelectedContentsRowOrigin, libraryAssetId: string | null, rowVersion: string | null, primarySourceFileId: string | null, scopedSourceFileId: string, sourceId: string, relativePath: string, fileName: string, mediaClass: SelectedContentsMediaClass, availabilityState: LibraryAssetAvailabilityState, title: string | null, artist: string | null, album: string | null, durationMs: number | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary, updatedAtMs: number, };
+
+export type SelectedContentsRowOrigin = "libraryAsset" | "sourceFile";
 
 export type SelectedContentsMediaClass = "audio" | "video";
 

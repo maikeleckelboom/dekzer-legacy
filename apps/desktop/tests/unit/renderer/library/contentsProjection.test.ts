@@ -61,6 +61,25 @@ describe('projectContents', () => {
     ])
   })
 
+  it('projects source-file-origin rows with distinct stable IDs', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readySelectedContents({
+        rows: [
+          selectedRow('library-asset:1', 'Promoted Track', 'audio', 'libraryAsset'),
+          selectedRow('source-file:2000', 'scanned.wav', 'audio', 'sourceFile')
+        ]
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.rows).toHaveLength(2)
+    const rowIds = contents.rows.map((row) => row.id)
+    expect(rowIds).toContain('library-asset:1')
+    expect(rowIds).toContain('source-file:2000')
+  })
+
   it('uses the selected directory label and selected contents result', () => {
     const state = browserState({
       sourceState: {
@@ -363,22 +382,24 @@ function selectedContentsResult(options: {
 function selectedRow(
   stableId: string,
   label: string,
-  mediaClass: SelectedContentsRow['mediaClass']
+  mediaClass: SelectedContentsRow['mediaClass'],
+  origin: SelectedContentsRow['origin'] = 'libraryAsset'
 ): SelectedContentsRow {
   return {
     stableId,
     label,
-    libraryAssetId: stableId,
-    rowVersion: '1',
+    origin,
+    ...(origin === 'libraryAsset' ? { libraryAssetId: stableId } : {}),
+    ...(origin === 'libraryAsset' ? { rowVersion: '1' } : {}),
     scopedSourceFileId: `file-${stableId}`,
     sourceId: '7',
     relativePath: label,
     fileName: label,
     mediaClass,
     availabilityState: 'available',
-    artist: 'Artist',
-    album: 'Album',
-    prepReadinessSummary: 'notRequired',
+    ...(origin === 'libraryAsset' ? { artist: 'Artist' } : {}),
+    ...(origin === 'libraryAsset' ? { album: 'Album' } : {}),
+    prepReadinessSummary: origin === 'libraryAsset' ? 'notRequired' : 'underprepared',
     updatedAtMs: 100
   }
 }

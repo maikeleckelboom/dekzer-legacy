@@ -73,6 +73,8 @@ export type SelectedContentsCoverage = {
   readonly detail?: string
 }
 
+export type SelectedContentsRowOrigin = 'libraryAsset' | 'sourceFile'
+
 export type SelectedContentsMediaClass = 'audio' | 'video'
 export type SelectedContentsAvailabilityState = 'available' | 'unavailable' | 'degraded'
 export type SelectedContentsStemsStateSummary =
@@ -94,8 +96,9 @@ export type SelectedContentsPrepReadinessSummary =
 export type SelectedContentsRow = {
   readonly stableId: string
   readonly label: string
-  readonly libraryAssetId: string
-  readonly rowVersion: string
+  readonly origin: SelectedContentsRowOrigin
+  readonly libraryAssetId?: string
+  readonly rowVersion?: string
   readonly primarySourceFileId?: string
   readonly scopedSourceFileId: string
   readonly sourceId: string

@@ -69,7 +69,8 @@ pub use read_models::literal_hierarchy::{
 pub use read_models::navigation::NavigationRow;
 pub use read_models::selected_contents::{
     StoreSelectedContentsCoverage, StoreSelectedContentsCoverageState, StoreSelectedContentsResult,
-    StoreSelectedContentsRow, StoreSelectedContentsScope, StoreSelectedContentsState,
+    StoreSelectedContentsRow, StoreSelectedContentsRowOrigin, StoreSelectedContentsScope,
+    StoreSelectedContentsState,
 };
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,

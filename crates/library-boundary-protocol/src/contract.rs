@@ -93,6 +93,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SelectedContentsCoverage>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsCoverageState>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsRow>(&cfg, &mut output);
+    push_ts_decl::<crate::SelectedContentsRowOrigin>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsMediaClass>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBrowserWindow>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryAssetBrowserRow>(&cfg, &mut output);

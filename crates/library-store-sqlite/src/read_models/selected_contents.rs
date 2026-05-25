@@ -56,12 +56,19 @@ pub struct StoreSelectedContentsResult {
     pub detail: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreSelectedContentsRowOrigin {
+    LibraryAsset,
+    SourceFile,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct StoreSelectedContentsRow {
     pub stable_id: String,
     pub label: String,
-    pub library_asset_id: i64,
-    pub row_version: i64,
+    pub origin: StoreSelectedContentsRowOrigin,
+    pub library_asset_id: Option<i64>,
+    pub row_version: Option<i64>,
     pub primary_source_file_id: Option<i64>,
     pub scoped_source_file_id: i64,
     pub source_id: i64,
@@ -124,7 +131,7 @@ const SELECTED_CONTENTS_ORDER_SQL: &str = "CASE availability_state
     lower(COALESCE(artist, '')) ASC,
     lower(COALESCE(album, '')) ASC,
     lower(COALESCE(relative_path, '')) ASC,
-    library_asset_id ASC";
+    scoped_source_file_id ASC";
 
 pub(crate) fn read_selected_contents(
     connection: &Connection,
@@ -816,13 +823,14 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
                     sf.source_id,
                     sf.relative_path,
                     sf.name,
-                    sf.media_class
+                    sf.media_class,
+                    sf.updated_at
              FROM source_files sf
              WHERE sf.presence_state = 'present'
                AND sf.media_class IN ('audio', 'video')
                AND {source_predicate}
          ),
-         source_scope AS (
+         promoted_scope AS (
              SELECT pbr.library_asset_id,
                     pbr.row_version,
                     pbr.primary_source_file_id,
@@ -865,14 +873,14 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
              JOIN LibraryBrowserRows pbr
                ON pbr.library_asset_id = pia.library_asset_id
          ),
-         dedup AS (
+         promoted AS (
              SELECT library_asset_id,
                     row_version,
                     primary_source_file_id,
-                    source_file_id,
+                    source_file_id AS scoped_source_file_id,
                     source_id,
                     relative_path,
-                    name,
+                    name AS file_name,
                     media_class,
                     availability_state,
                     title,
@@ -886,16 +894,44 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
                     stems_state_summary,
                     prep_readiness_summary,
                     updated_at
-             FROM source_scope
+             FROM promoted_scope
              WHERE attachment_rank = 1
+         ),
+         source_file_rows AS (
+             SELECT NULL AS library_asset_id,
+                    NULL AS row_version,
+                    NULL AS primary_source_file_id,
+                    sf.source_file_id AS scoped_source_file_id,
+                    sf.source_id,
+                    sf.relative_path,
+                    sf.name AS file_name,
+                    sf.media_class,
+                    'available' AS availability_state,
+                    NULL AS title,
+                    NULL AS artist,
+                    NULL AS album,
+                    NULL AS duration_ms,
+                    NULL AS musical_key,
+                    NULL AS tempo_bpm,
+                    NULL AS waveform_quality_current,
+                    NULL AS waveform_quality_target,
+                    NULL AS stems_state_summary,
+                    'underprepared' AS prep_readiness_summary,
+                    sf.updated_at
+             FROM scope_files sf
+             WHERE NOT EXISTS (
+                 SELECT 1
+                 FROM promoted_scope ps
+                 WHERE ps.source_file_id = sf.source_file_id
+             )
          )
          SELECT library_asset_id,
                 row_version,
                 primary_source_file_id,
-                source_file_id,
+                scoped_source_file_id,
                 source_id,
                 relative_path,
-                name,
+                file_name,
                 media_class,
                 availability_state,
                 title,
@@ -909,7 +945,11 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
                 stems_state_summary,
                 prep_readiness_summary,
                 updated_at
-         FROM dedup
+         FROM (
+             SELECT * FROM promoted
+             UNION ALL
+             SELECT * FROM source_file_rows
+         )
          ORDER BY {SELECTED_CONTENTS_ORDER_SQL}
          LIMIT ?{}",
         if prefix_cte.is_some() || source_predicate == "sf.source_id = ?1" {
@@ -949,35 +989,70 @@ fn source_file_descendant_predicate(alias: &str, prefix_sql: &str) -> String {
 fn selected_contents_row_from_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<StoreSelectedContentsRow> {
-    let library_asset_id = row.get(0)?;
-    let title = row.get::<_, Option<String>>(9)?;
-    let file_name = row.get::<_, String>(6)?;
-    let relative_path = row.get::<_, String>(5)?;
+    let library_asset_id: Option<i64> = row.get(0)?;
+    let row_version: Option<i64> = row.get(1)?;
+    let primary_source_file_id: Option<i64> = row.get(2)?;
+    let scoped_source_file_id: i64 = row.get(3)?;
+    let source_id: i64 = row.get(4)?;
+    let relative_path: String = row.get(5)?;
+    let file_name: String = row.get(6)?;
+    let media_class: String = row.get(7)?;
+    let availability_state: String = row.get(8)?;
+    let title: Option<String> = row.get(9)?;
+    let artist: Option<String> = row.get(10)?;
+    let album: Option<String> = row.get(11)?;
+    let duration_ms: Option<i64> = row.get(12)?;
+    let musical_key: Option<String> = row.get(13)?;
+    let tempo_bpm: Option<f64> = row.get(14)?;
+    let waveform_quality_current: Option<i64> = row.get(15)?;
+    let waveform_quality_target: Option<i64> = row.get(16)?;
+    let stems_state_summary: Option<String> = row.get(17)?;
+    let prep_readiness_summary: String = row.get(18)?;
+    let updated_at: i64 = row.get(19)?;
+
+    let origin = if library_asset_id.is_some() {
+        StoreSelectedContentsRowOrigin::LibraryAsset
+    } else {
+        StoreSelectedContentsRowOrigin::SourceFile
+    };
+
+    let stable_id = match &origin {
+        StoreSelectedContentsRowOrigin::LibraryAsset => {
+            let id =
+                library_asset_id.expect("library_asset_id must be present for LibraryAsset origin");
+            format!("library-asset:{id}")
+        }
+        StoreSelectedContentsRowOrigin::SourceFile => {
+            format!("source-file:{scoped_source_file_id}")
+        }
+    };
+
     let label = selected_contents_label(title.as_deref(), &file_name, &relative_path);
 
     Ok(StoreSelectedContentsRow {
-        stable_id: format!("library-asset:{library_asset_id}"),
+        stable_id,
         label,
+        origin,
         library_asset_id,
-        row_version: row.get(1)?,
-        primary_source_file_id: row.get(2)?,
-        scoped_source_file_id: row.get(3)?,
-        source_id: row.get(4)?,
+        row_version,
+        primary_source_file_id,
+        scoped_source_file_id,
+        source_id,
         relative_path,
         file_name,
-        media_class: row.get(7)?,
-        availability_state: row.get(8)?,
+        media_class,
+        availability_state,
         title,
-        artist: row.get(10)?,
-        album: row.get(11)?,
-        duration_ms: row.get(12)?,
-        musical_key: row.get(13)?,
-        tempo_bpm: row.get(14)?,
-        waveform_quality_current: row.get(15)?,
-        waveform_quality_target: row.get(16)?,
-        stems_state_summary: row.get(17)?,
-        prep_readiness_summary: row.get(18)?,
-        updated_at: row.get(19)?,
+        artist,
+        album,
+        duration_ms,
+        musical_key,
+        tempo_bpm,
+        waveform_quality_current,
+        waveform_quality_target,
+        stems_state_summary,
+        prep_readiness_summary,
+        updated_at,
     })
 }
 
@@ -1028,8 +1103,8 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        StoreSelectedContentsCoverageState, StoreSelectedContentsScope, StoreSelectedContentsState,
-        read_selected_contents,
+        StoreSelectedContentsCoverageState, StoreSelectedContentsRowOrigin,
+        StoreSelectedContentsScope, StoreSelectedContentsState, read_selected_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -1382,9 +1457,9 @@ mod tests {
             result
                 .rows
                 .iter()
-                .map(|row| row.library_asset_id)
+                .map(|row| (row.origin, row.library_asset_id))
                 .collect::<Vec<_>>(),
-            vec![1]
+            vec![(StoreSelectedContentsRowOrigin::LibraryAsset, Some(1))]
         );
         assert_eq!(
             result.coverage.state,
@@ -1479,9 +1554,13 @@ mod tests {
             result
                 .rows
                 .iter()
-                .map(|row| (row.library_asset_id, row.media_class.as_str()))
+                .map(|row| (row.origin, row.library_asset_id, row.media_class.as_str()))
                 .collect::<Vec<_>>(),
-            vec![(1, "audio")]
+            vec![(
+                StoreSelectedContentsRowOrigin::LibraryAsset,
+                Some(1),
+                "audio"
+            )]
         );
     }
 
@@ -1509,5 +1588,222 @@ mod tests {
             StoreSelectedContentsCoverageState::Pending
         );
         assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    fn insert_scanned_file(
+        connection: &Connection,
+        source_file_id: i64,
+        source_id: i64,
+        parent_directory_id: i64,
+        relative_path: &str,
+        media_class: &str,
+    ) {
+        let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
+        connection
+            .execute(
+                "INSERT INTO source_files (
+                     source_file_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     media_class,
+                     presence_state,
+                     first_discovered_at,
+                     last_observed_at,
+                     last_presence_change_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'present', 1, 1, 1, 1, 1)",
+                params![
+                    source_file_id,
+                    source_id,
+                    parent_directory_id,
+                    file_name,
+                    relative_path,
+                    media_class
+                ],
+            )
+            .expect("insert scanned source file");
+    }
+
+    #[test]
+    fn source_scope_returns_source_file_rows_without_promotion() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Music/track.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Music/clip.mp4", "video");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.rows.len(), 2);
+
+        for row in &result.rows {
+            assert_eq!(row.origin, StoreSelectedContentsRowOrigin::SourceFile);
+            assert!(row.library_asset_id.is_none());
+            assert!(row.row_version.is_none());
+            assert!(row.primary_source_file_id.is_none());
+            assert!(row.title.is_none());
+            assert!(row.artist.is_none());
+            assert!(row.album.is_none());
+            assert!(row.duration_ms.is_none());
+            assert_eq!(row.availability_state, "available");
+            assert_eq!(row.prep_readiness_summary, "underprepared");
+            assert!(
+                row.stable_id.starts_with("source-file:"),
+                "source-file row stable_id must start with 'source-file:', got: {}",
+                row.stable_id
+            );
+        }
+
+        let media_classes: Vec<&str> = result
+            .rows
+            .iter()
+            .map(|row| row.media_class.as_str())
+            .collect();
+        assert!(media_classes.contains(&"audio"));
+        assert!(media_classes.contains(&"video"));
+    }
+
+    #[test]
+    fn promoted_asset_rows_still_work_when_promotion_rows_exist() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_asset_file(
+            &connection,
+            1,
+            1000,
+            1,
+            10,
+            "Music/track.wav",
+            "audio",
+            "Track",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(
+            result.rows[0].origin,
+            StoreSelectedContentsRowOrigin::LibraryAsset
+        );
+        assert_eq!(result.rows[0].library_asset_id, Some(1));
+        assert!(
+            result.rows[0].stable_id.starts_with("library-asset:"),
+            "promoted row stable_id must start with 'library-asset:', got: {}",
+            result.rows[0].stable_id
+        );
+    }
+
+    #[test]
+    fn complete_scope_with_media_files_without_promotion_returns_ready_not_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Music/track.wav", "audio");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(
+            result.rows[0].origin,
+            StoreSelectedContentsRowOrigin::SourceFile
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete
+        );
+    }
+
+    #[test]
+    fn complete_scope_with_no_media_files_returns_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Documents", "complete");
+        insert_scanned_file(
+            &connection,
+            1000,
+            1,
+            10,
+            "Documents/readme.txt",
+            "unsupported",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Empty);
+        assert!(result.rows.is_empty());
+        assert!(result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn mixed_promoted_and_source_file_rows_cohonest() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_asset_file(
+            &connection,
+            1,
+            1000,
+            1,
+            10,
+            "Music/promoted.wav",
+            "audio",
+            "Promoted",
+        );
+        insert_scanned_file(&connection, 1001, 1, 10, "Music/scanned.wav", "audio");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.rows.len(), 2);
+
+        let origins: Vec<_> = result.rows.iter().map(|r| r.origin).collect();
+        assert!(origins.contains(&StoreSelectedContentsRowOrigin::LibraryAsset));
+        assert!(origins.contains(&StoreSelectedContentsRowOrigin::SourceFile));
     }
 }

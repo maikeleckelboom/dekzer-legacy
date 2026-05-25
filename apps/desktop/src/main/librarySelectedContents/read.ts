@@ -297,8 +297,9 @@ function mapSelectedContentsRow(row: ContractSelectedContentsRow): SelectedConte
   return {
     stableId: row.stableId,
     label: row.label,
-    libraryAssetId: row.libraryAssetId,
-    rowVersion: row.rowVersion,
+    origin: row.origin,
+    ...(row.libraryAssetId === null ? {} : { libraryAssetId: row.libraryAssetId }),
+    ...(row.rowVersion === null ? {} : { rowVersion: row.rowVersion }),
     ...(row.primarySourceFileId === null ? {} : { primarySourceFileId: row.primarySourceFileId }),
     scopedSourceFileId: row.scopedSourceFileId,
     sourceId: row.sourceId,
