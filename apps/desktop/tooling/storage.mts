@@ -5,10 +5,12 @@ import { fileURLToPath } from 'node:url'
 export type StorageSubcommand = 'status' | 'reset' | 'doctor'
 type CargoStorageSubcommand = Exclude<StorageSubcommand, 'doctor'>
 
+export type UserDataSource = 'environmentOverride' | 'developmentDefault' | 'argument'
+
 export type ParsedStorageArgs = {
   subcommand: StorageSubcommand
   userDataPath: string
-  userDataSource: 'environmentOverride' | 'developmentDefault' | 'argument'
+  userDataSource: UserDataSource
   confirmDelete: boolean
 }
 
@@ -60,6 +62,69 @@ export function resolveDefaultUserDataPath(): {
     path: resolve(resolveWorkspaceRoot(), '.dev-user-data', 'default'),
     source: 'developmentDefault'
   }
+}
+
+export function parseDevArgs(argv: readonly string[]): {
+  userDataPath: string
+  userDataSource: UserDataSource
+} {
+  let userDataPathFromArg: string | undefined
+  let seenUserData = false
+
+  let i = 0
+  while (i < argv.length) {
+    const arg = argv[i]!
+
+    if (arg === '--user-data') {
+      if (seenUserData) {
+        throw new Error('duplicate --user-data')
+      }
+      seenUserData = true
+
+      i++
+      const value = argv[i]
+
+      if (value === undefined || value === '' || value.startsWith('--')) {
+        throw new Error('--user-data requires an absolute path value')
+      }
+      if (!isAbsolute(value)) {
+        throw new Error('--user-data requires an absolute path value')
+      }
+
+      userDataPathFromArg = value
+      i++
+    } else if (arg.startsWith('--user-data=')) {
+      if (seenUserData) {
+        throw new Error('duplicate --user-data')
+      }
+      seenUserData = true
+
+      const value = arg.slice('--user-data='.length)
+
+      if (value === '') {
+        throw new Error('--user-data requires an absolute path value')
+      }
+      if (!isAbsolute(value)) {
+        throw new Error('--user-data requires an absolute path value')
+      }
+
+      userDataPathFromArg = value
+      i++
+    } else if (arg === '--') {
+      i++
+    } else if (arg.startsWith('--')) {
+      throw new Error(`unknown argument "${arg}"`)
+    } else {
+      throw new Error(`unexpected argument "${arg}"`)
+    }
+  }
+
+  if (userDataPathFromArg !== undefined) {
+    return { userDataPath: userDataPathFromArg, userDataSource: 'argument' }
+  }
+
+  const def = resolveDefaultUserDataPath()
+  return { userDataPath: def.path, userDataSource: def.source }
 }
 
 export function parseArgs(argv: readonly string[]): ParsedStorageArgs {
@@ -381,12 +446,12 @@ export type DevelopmentStorageCheck = {
   readonly storageRootPath: string
   readonly durableStorePath: string
   readonly userDataPath: string
-  readonly userDataSource: 'environmentOverride' | 'developmentDefault'
+  readonly userDataSource: UserDataSource
 }
 
 export async function checkDevelopmentStorage(
   userDataPath: string,
-  userDataSource: 'environmentOverride' | 'developmentDefault'
+  userDataSource: UserDataSource
 ): Promise<DevelopmentStorageCheck> {
   const parsed: ParsedStorageArgs = {
     subcommand: 'status',

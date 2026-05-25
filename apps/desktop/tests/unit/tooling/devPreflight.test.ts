@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { isAbsolute } from 'node:path'
 
 import {
   evaluateDevPreflight,
@@ -7,7 +8,11 @@ import {
   runDevPreflight,
   type DevPreflightDeps
 } from '../../../tooling/dev.mjs'
-import type { StorageSchemaState } from '../../../tooling/storage.mjs'
+import {
+  parseDevArgs,
+  type StorageSchemaState,
+  type UserDataSource
+} from '../../../tooling/storage.mjs'
 
 describe('dev preflight evaluateDevPreflight', () => {
   it('starts Electron when schema is compatible', () => {
@@ -513,5 +518,301 @@ describe('formatAbortCommands', () => {
       '  pnpm --filter @dekzer/desktop run storage:reset -- --confirm-delete'
     )
     expect(commands).toContain('  pnpm --filter @dekzer/desktop run dev:fresh')
+  })
+})
+
+describe('parseDevArgs', () => {
+  const envVar = 'DESKTOP_LIBRARY_USER_DATA_PATH'
+  let originalEnv: string | undefined
+
+  beforeEach(() => {
+    originalEnv = process.env[envVar]
+    delete process.env[envVar]
+  })
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env[envVar]
+    } else {
+      process.env[envVar] = originalEnv
+    }
+  })
+
+  it('resolves default user data when no env and no arguments', () => {
+    const result = parseDevArgs([])
+
+    expect(isAbsolute(result.userDataPath)).toBe(true)
+    expect(result.userDataSource).toBe('developmentDefault')
+  })
+
+  it('uses DESKTOP_LIBRARY_USER_DATA_PATH when set', () => {
+    process.env[envVar] = '/custom/env/path'
+
+    const result = parseDevArgs([])
+
+    expect(result.userDataPath).toBe('/custom/env/path')
+    expect(result.userDataSource).toBe('environmentOverride')
+  })
+
+  it('accepts --user-data with space-separated absolute path', () => {
+    const result = parseDevArgs(['--user-data', '/custom/args/path'])
+
+    expect(result.userDataPath).toBe('/custom/args/path')
+    expect(result.userDataSource).toBe('argument')
+  })
+
+  it('accepts --user-data with equals-separated absolute path', () => {
+    const result = parseDevArgs(['--user-data=/custom/args/path'])
+
+    expect(result.userDataPath).toBe('/custom/args/path')
+    expect(result.userDataSource).toBe('argument')
+  })
+
+  it('prefers --user-data argument over environment variable', () => {
+    process.env[envVar] = '/custom/env/path'
+
+    const result = parseDevArgs(['--user-data', '/custom/args/path'])
+
+    expect(result.userDataPath).toBe('/custom/args/path')
+    expect(result.userDataSource).toBe('argument')
+  })
+
+  it('rejects duplicate --user-data', () => {
+    expect(() => parseDevArgs(['--user-data', '/a', '--user-data', '/b'])).toThrow(
+      'duplicate --user-data'
+    )
+  })
+
+  it('rejects duplicate --user-data with mixed forms', () => {
+    expect(() => parseDevArgs(['--user-data=/a', '--user-data', '/b'])).toThrow(
+      'duplicate --user-data'
+    )
+  })
+
+  it('rejects relative --user-data path', () => {
+    expect(() => parseDevArgs(['--user-data', 'relative/path'])).toThrow(
+      '--user-data requires an absolute path value'
+    )
+  })
+
+  it('rejects relative --user-data path in equals form', () => {
+    expect(() => parseDevArgs(['--user-data=relative/path'])).toThrow(
+      '--user-data requires an absolute path value'
+    )
+  })
+
+  it('rejects missing --user-data value at end of argv', () => {
+    expect(() => parseDevArgs(['--user-data'])).toThrow(
+      '--user-data requires an absolute path value'
+    )
+  })
+
+  it('rejects missing --user-data value before another flag', () => {
+    expect(() => parseDevArgs(['--user-data', '--other'])).toThrow(
+      '--user-data requires an absolute path value'
+    )
+  })
+
+  it('rejects empty --user-data= value', () => {
+    expect(() => parseDevArgs(['--user-data='])).toThrow(
+      '--user-data requires an absolute path value'
+    )
+  })
+
+  it('rejects unknown argument', () => {
+    expect(() => parseDevArgs(['--unknown'])).toThrow('unknown argument "--unknown"')
+  })
+
+  it('rejects unexpected positional argument', () => {
+    expect(() => parseDevArgs(['foobar'])).toThrow('unexpected argument "foobar"')
+  })
+
+  it('accepts -- separator before --user-data', () => {
+    const result = parseDevArgs(['--', '--user-data', '/custom/args/path'])
+
+    expect(result.userDataPath).toBe('/custom/args/path')
+    expect(result.userDataSource).toBe('argument')
+  })
+})
+
+describe('formatIncompatibleMessage argument source', () => {
+  it('includes argument source note when user data source is argument', () => {
+    const lines = formatIncompatibleMessage(
+      '/custom/args/development',
+      '/custom/args/development/library.sqlite',
+      undefined,
+      'argument'
+    )
+
+    expect(lines).toContain('Storage root: /custom/args/development')
+    expect(lines).toContain('  (resolved via --user-data)')
+    expect(lines).toContain('Database: /custom/args/development/library.sqlite')
+
+    const rootIndex = lines.indexOf('Storage root: /custom/args/development')
+    const noteIndex = lines.indexOf('  (resolved via --user-data)')
+    const dbIndex = lines.indexOf('Database: /custom/args/development/library.sqlite')
+    expect(rootIndex).toBeLessThan(noteIndex)
+    expect(noteIndex).toBeLessThan(dbIndex)
+  })
+
+  it('does not show argument note for developmentDefault source', () => {
+    const lines = formatIncompatibleMessage(
+      '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
+      undefined,
+      'developmentDefault'
+    )
+
+    expect(lines).not.toContain('  (resolved via --user-data)')
+  })
+
+  it('does not show argument note for environmentOverride source', () => {
+    const lines = formatIncompatibleMessage(
+      '/custom/path/development',
+      '/custom/path/development/library.sqlite',
+      undefined,
+      'environmentOverride'
+    )
+
+    expect(lines).toContain('  (resolved via DESKTOP_LIBRARY_USER_DATA_PATH)')
+    expect(lines).not.toContain('  (resolved via --user-data)')
+  })
+})
+
+describe('dev preflight with argument userDataSource', () => {
+  function createDeps(overrides: Partial<DevPreflightDeps> = {}): DevPreflightDeps {
+    return {
+      checkStorage: async () => ({
+        kind: 'checked' as const,
+        schema: { state: 'compatible' as StorageSchemaState },
+        storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
+        userDataSource: 'developmentDefault' as const
+      }),
+      resetStorage: async () => 0,
+      spawnDev: async () => 0,
+      isInteractive: () => true,
+      promptYesNo: async () => false,
+      println: () => undefined,
+      exit: () => {
+        throw new ExitSignal(1)
+      },
+      ...overrides
+    }
+  }
+
+  class ExitSignal {
+    readonly code: number
+    constructor(code: number) {
+      this.code = code
+    }
+  }
+
+  it('starts Electron when schema is compatible with argument source', async () => {
+    let devStarted = false
+    const deps = createDeps({
+      checkStorage: async () => ({
+        kind: 'checked' as const,
+        schema: { state: 'compatible' as StorageSchemaState },
+        storageRootPath: '/custom/args/development',
+        durableStorePath: '/custom/args/development/library.sqlite',
+        userDataSource: 'argument' as UserDataSource
+      }),
+      spawnDev: async () => {
+        devStarted = true
+        return 0
+      }
+    })
+
+    await runDevPreflight(deps)
+    expect(devStarted).toBe(true)
+  })
+
+  it('resets and starts on incompatible schema with argument source', async () => {
+    let devStarted = false
+    let resetCalled = false
+    const deps = createDeps({
+      checkStorage: async () => ({
+        kind: 'checked' as const,
+        schema: {
+          state: 'incompatible' as StorageSchemaState,
+          detail: 'column mismatch'
+        },
+        storageRootPath: '/custom/args/development',
+        durableStorePath: '/custom/args/development/library.sqlite',
+        userDataSource: 'argument' as UserDataSource
+      }),
+      promptYesNo: async () => true,
+      resetStorage: async () => {
+        resetCalled = true
+        return 0
+      },
+      spawnDev: async () => {
+        devStarted = true
+        return 0
+      }
+    })
+
+    await runDevPreflight(deps)
+    expect(resetCalled).toBe(true)
+    expect(devStarted).toBe(true)
+  })
+
+  it('aborts and prints argument source in non-TTY with incompatible schema', async () => {
+    const printed: string[] = []
+    let exitCode: number | undefined
+
+    const deps = createDeps({
+      checkStorage: async () => ({
+        kind: 'checked' as const,
+        schema: { state: 'incompatible' as StorageSchemaState },
+        storageRootPath: '/custom/args/development',
+        durableStorePath: '/custom/args/development/library.sqlite',
+        userDataSource: 'argument' as UserDataSource
+      }),
+      isInteractive: () => false,
+      println: (message: string) => {
+        printed.push(message)
+      },
+      exit: (code: number) => {
+        exitCode = code
+        throw new ExitSignal(code)
+      }
+    })
+
+    await expect(runDevPreflight(deps)).rejects.toThrow(ExitSignal)
+    expect(exitCode).toBe(1)
+    expect(printed).toContain('  (resolved via --user-data)')
+    expect(printed).toContain('  pnpm --filter @dekzer/desktop run storage:doctor')
+    expect(printed).toContain(
+      '  pnpm --filter @dekzer/desktop run storage:reset -- --confirm-delete'
+    )
+    expect(printed).toContain('  pnpm --filter @dekzer/desktop run dev:fresh')
+  })
+
+  it('prints argument source in prompt message when incompatible and interactive', async () => {
+    const printed: string[] = []
+    let promptCalled = false
+
+    const deps = createDeps({
+      checkStorage: async () => ({
+        kind: 'checked' as const,
+        schema: { state: 'incompatible' as StorageSchemaState },
+        storageRootPath: '/custom/args/development',
+        durableStorePath: '/custom/args/development/library.sqlite',
+        userDataSource: 'argument' as UserDataSource
+      }),
+      promptYesNo: async () => {
+        promptCalled = true
+        return false
+      },
+      println: (message: string) => {
+        printed.push(message)
+      }
+    })
+
+    await expect(runDevPreflight(deps)).rejects.toThrow(ExitSignal)
+    expect(promptCalled).toBe(true)
+    expect(printed).toContain('  (resolved via --user-data)')
   })
 })

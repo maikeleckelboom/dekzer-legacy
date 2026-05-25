@@ -5,10 +5,11 @@ import { createInterface } from 'node:readline'
 
 import {
   checkDevelopmentStorage,
-  resolveDefaultUserDataPath,
+  parseDevArgs,
   spawnCargoStorageCommand,
   type ParsedStorageArgs,
-  type StorageSchemaState
+  type StorageSchemaState,
+  type UserDataSource
 } from './storage.mjs'
 
 export type DevPreflightResult =
@@ -22,7 +23,7 @@ export type DevStorageCheckResult =
       readonly schema: { readonly state: StorageSchemaState; readonly detail?: string }
       readonly storageRootPath: string
       readonly durableStorePath: string
-      readonly userDataSource: 'environmentOverride' | 'developmentDefault'
+      readonly userDataSource: UserDataSource
     }
   | {
       readonly kind: 'checkFailed'
@@ -34,7 +35,7 @@ export function evaluateDevPreflight(
   schemaDetail: string | undefined,
   storageRootPath: string,
   durableStorePath: string,
-  userDataSource: 'environmentOverride' | 'developmentDefault',
+  userDataSource: UserDataSource,
   isInteractive: boolean
 ): DevPreflightResult {
   if (schemaState === 'missing') {
@@ -72,7 +73,7 @@ export function formatIncompatibleMessage(
   storageRootPath: string,
   durableStorePath: string,
   schemaDetail: string | undefined,
-  userDataSource: 'environmentOverride' | 'developmentDefault'
+  userDataSource: UserDataSource
 ): string[] {
   const lines: string[] = [
     '',
@@ -83,6 +84,8 @@ export function formatIncompatibleMessage(
 
   if (userDataSource === 'environmentOverride') {
     lines.push('  (resolved via DESKTOP_LIBRARY_USER_DATA_PATH)')
+  } else if (userDataSource === 'argument') {
+    lines.push('  (resolved via --user-data)')
   }
 
   lines.push(`Database: ${durableStorePath}`)
@@ -230,40 +233,47 @@ function spawnElectronViteDev(): Promise<number> {
   })
 }
 
-function createResetArgs(userDataPath: string, userDataSource: string): ParsedStorageArgs {
+function createResetArgs(userDataPath: string, userDataSource: UserDataSource): ParsedStorageArgs {
   return {
     subcommand: 'reset',
     userDataPath,
-    userDataSource: userDataSource as 'environmentOverride' | 'developmentDefault',
+    userDataSource,
     confirmDelete: true
   }
 }
 
 async function main(): Promise<void> {
-  const { path: userDataPath, source: userDataSource } = resolveDefaultUserDataPath()
+  try {
+    const { userDataPath, userDataSource } = parseDevArgs(process.argv.slice(2))
 
-  await runDevPreflight({
-    checkStorage: async () => {
-      try {
-        const check = await checkDevelopmentStorage(userDataPath, userDataSource)
-        return {
-          kind: 'checked',
-          schema: check.schema,
-          storageRootPath: check.storageRootPath,
-          durableStorePath: check.durableStorePath,
-          userDataSource: check.userDataSource
+    console.log(`[dev] user data: ${userDataPath} (source: ${userDataSource})`)
+
+    await runDevPreflight({
+      checkStorage: async () => {
+        try {
+          const check = await checkDevelopmentStorage(userDataPath, userDataSource)
+          return {
+            kind: 'checked',
+            schema: check.schema,
+            storageRootPath: check.storageRootPath,
+            durableStorePath: check.durableStorePath,
+            userDataSource: check.userDataSource
+          }
+        } catch (error: unknown) {
+          return checkFailed(errorDetail(error))
         }
-      } catch (error: unknown) {
-        return checkFailed(errorDetail(error))
-      }
-    },
-    resetStorage: () => spawnCargoStorageCommand(createResetArgs(userDataPath, userDataSource)),
-    spawnDev: spawnElectronViteDev,
-    isInteractive: () => process.stdin.isTTY === true && process.stdout.isTTY === true,
-    promptYesNo,
-    println: (message: string) => console.log(message),
-    exit: (code: number) => process.exit(code)
-  })
+      },
+      resetStorage: () => spawnCargoStorageCommand(createResetArgs(userDataPath, userDataSource)),
+      spawnDev: spawnElectronViteDev,
+      isInteractive: () => process.stdin.isTTY === true && process.stdout.isTTY === true,
+      promptYesNo,
+      println: (message: string) => console.log(message),
+      exit: (code: number) => process.exit(code)
+    })
+  } catch (error: unknown) {
+    console.error(`[dev] ${error instanceof Error ? error.message : 'unknown error'}`)
+    process.exit(1)
+  }
 }
 
 const thisFile = resolve(fileURLToPath(import.meta.url))
