@@ -1,9 +1,10 @@
 use std::fs;
-use std::io::Write;
+use std::path::Path;
 
 use library_boundary_protocol::{
-    CommandReply, CommandRequest, LibraryRootCommand, LibraryRootReply,
-    RegisterLocalRootRequest, RunRootScanRequest,
+    CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, LibraryRootCommand,
+    LibraryRootReply, RegisterLocalRootReply, RegisterLocalRootRequest, RunRootScanReply,
+    RunRootScanRequest,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -16,122 +17,96 @@ fn open_service(tempdir: &TempDir) -> LibraryBoundaryService {
     .expect("open boundary service")
 }
 
-fn create_music_folder(root: &std::path::Path) {
-    let nested = root.join("artists").join("alpha");
-    fs::create_dir_all(&nested).expect("create nested dir");
-    let mut f = fs::File::create(nested.join("track_one.wav")).expect("create wav");
-    f.write_all(b"not-real-audio-data").expect("write wav data");
-    let mut f = fs::File::create(nested.join("track_two.flac")).expect("create flac");
-    f.write_all(b"not-real-audio-data").expect("write flac data");
+fn write_file(path: &Path, bytes: &[u8]) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("create parent directories");
+    }
+    fs::write(path, bytes).expect("write file");
+}
 
-    let images = root.join("artwork");
-    fs::create_dir_all(&images).expect("create artwork dir");
-    let mut f = fs::File::create(images.join("cover.png")).expect("create png");
-    f.write_all(b"fake-png-data").expect("write png data");
+fn register_root(service: &LibraryBoundaryService, path: &Path) -> RegisterLocalRootReply {
+    let outcome = service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest {
+            absolute_path: path.to_string_lossy().into_owned(),
+        }),
+    ));
+    let reply = expect_command_reply(outcome, "register local root");
+    match reply {
+        CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(reply)) => reply,
+        other => panic!("Expected register reply, got {other:?}"),
+    }
+}
 
-    let mut f = fs::File::create(root.join("loose.mp3")).expect("create mp3");
-    f.write_all(b"fake-mp3-data").expect("write mp3 data");
+fn run_scan(service: &LibraryBoundaryService, root_id: i64) -> RunRootScanReply {
+    let outcome = service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id }),
+    ));
+    let reply = expect_command_reply(outcome, "run root scan");
+    match reply {
+        CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(reply)) => reply,
+        other => panic!("Expected scan reply, got {other:?}"),
+    }
+}
+
+fn expect_command_reply(outcome: CommandOutcome, context: &str) -> CommandReply {
+    match outcome {
+        CommandOutcome::Success(env) => env.reply,
+        CommandOutcome::Error(env) => panic!("{context} failed: {:?}", env.error),
+    }
+}
+
+fn expect_command_error(outcome: CommandOutcome) -> CommandErrorEnvelope {
+    match outcome {
+        CommandOutcome::Success(env) => panic!("Expected command error, got {:?}", env.reply),
+        CommandOutcome::Error(env) => env,
+    }
 }
 
 #[test]
-fn register_and_scan_with_nested_directories_and_audio_files() {
+fn register_and_scan_mixed_nested_folder_succeeds() {
     let tempdir = TempDir::new().expect("create tempdir");
     let music_root = tempdir.path().join("music-root");
-    std::fs::create_dir_all(&music_root).expect("create music root");
-    create_music_folder(&music_root);
+    write_file(
+        &music_root
+            .join("artists")
+            .join("alpha")
+            .join("track_one.wav"),
+        b"not-real-audio-data",
+    );
+    write_file(
+        &music_root
+            .join("artists")
+            .join("alpha")
+            .join("track_two.flac"),
+        b"not-real-audio-data",
+    );
+    write_file(
+        &music_root.join("artwork").join("cover.png"),
+        b"fake-png-data",
+    );
+    write_file(&music_root.join("loose.mp3"), b"fake-mp3-data");
 
     let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    let scanned = run_scan(&service, registered.root_id);
 
-    let register_cmd = CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
-        RegisterLocalRootRequest {
-            absolute_path: music_root.to_string_lossy().into_owned(),
-        },
-    ));
-    let outcome = service.handle_command(register_cmd);
-    let reply = match outcome {
-        library_boundary_protocol::CommandOutcome::Success(env) => env.reply,
-        library_boundary_protocol::CommandOutcome::Error(env) => {
-            panic!("Registration failed: {:?}", env.error);
-        }
-    };
-    let registered = match reply {
-        CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(reply)) => reply,
-        other => panic!("Expected register reply, got {:?}", other),
-    };
     assert!(registered.root_id > 0);
     assert!(!registered.canonical_path.is_empty());
-
-    let scan_cmd = CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(
-        RunRootScanRequest {
-            root_id: registered.root_id,
-        },
-    ));
-    let outcome = service.handle_command(scan_cmd);
-    let reply = match outcome {
-        library_boundary_protocol::CommandOutcome::Success(env) => env.reply,
-        library_boundary_protocol::CommandOutcome::Error(env) => {
-            panic!(
-                "Scan failed with protocol error: {:?}",
-                env.error
-            );
-        }
-    };
-    let scanned = match reply {
-        CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(reply)) => reply,
-        other => panic!("Expected scan reply, got {:?}", other),
-    };
-
     assert_eq!(scanned.root_id, registered.root_id);
     assert!(scanned.scan_run_id > 0);
-    assert_eq!(
-        scanned.discovered_file_count, 4,
-        "Expected 4 files (3 audio + 1 image), got {}",
-        scanned.discovered_file_count,
-    );
+    assert_eq!(scanned.discovered_file_count, 4);
     assert!(scanned.queued_source_work_items > 0);
 }
 
 #[test]
-fn scan_empty_folder_succeeds_with_zero_files() {
+fn scan_empty_folder_succeeds() {
     let tempdir = TempDir::new().expect("create tempdir");
     let empty_root = tempdir.path().join("empty-root");
-    std::fs::create_dir_all(&empty_root).expect("create empty root");
+    fs::create_dir_all(&empty_root).expect("create empty root");
 
     let service = open_service(&tempdir);
-
-    let register_cmd = CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
-        RegisterLocalRootRequest {
-            absolute_path: empty_root.to_string_lossy().into_owned(),
-        },
-    ));
-    let outcome = service.handle_command(register_cmd);
-    let reply = match outcome {
-        library_boundary_protocol::CommandOutcome::Success(env) => env.reply,
-        library_boundary_protocol::CommandOutcome::Error(env) => {
-            panic!("Registration failed: {:?}", env.error);
-        }
-    };
-    let registered = match reply {
-        CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(reply)) => reply,
-        other => panic!("Expected register reply, got {:?}", other),
-    };
-
-    let scan_cmd = CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(
-        RunRootScanRequest {
-            root_id: registered.root_id,
-        },
-    ));
-    let outcome = service.handle_command(scan_cmd);
-    let reply = match outcome {
-        library_boundary_protocol::CommandOutcome::Success(env) => env.reply,
-        library_boundary_protocol::CommandOutcome::Error(env) => {
-            panic!("Scan failed: {:?}", env.error);
-        }
-    };
-    let scanned = match reply {
-        CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(reply)) => reply,
-        other => panic!("Expected scan reply, got {:?}", other),
-    };
+    let registered = register_root(&service, &empty_root);
+    let scanned = run_scan(&service, registered.root_id);
 
     assert_eq!(scanned.root_id, registered.root_id);
     assert!(scanned.scan_run_id > 0);
@@ -140,114 +115,61 @@ fn scan_empty_folder_succeeds_with_zero_files() {
 }
 
 #[test]
-fn rescan_after_first_scan_succeeds() {
+fn rescan_after_successful_scan_succeeds() {
     let tempdir = TempDir::new().expect("create tempdir");
     let music_root = tempdir.path().join("music-root");
-    std::fs::create_dir_all(&music_root).expect("create music root");
-    let mut f = fs::File::create(music_root.join("track.wav")).expect("create wav");
-    f.write_all(b"data").expect("write data");
+    write_file(&music_root.join("track.wav"), b"data");
 
     let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
 
-    let register_cmd = CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
-        RegisterLocalRootRequest {
-            absolute_path: music_root.to_string_lossy().into_owned(),
-        },
-    ));
-    let outcome = service.handle_command(register_cmd);
-    let reply = match outcome {
-        library_boundary_protocol::CommandOutcome::Success(env) => env.reply,
-        library_boundary_protocol::CommandOutcome::Error(_env) => panic!("Register fail"),
-    };
-    let registered = match reply {
-        CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(reply)) => reply,
-        other => panic!("Expected register reply, got {:?}", other),
-    };
+    let first_scan = run_scan(&service, registered.root_id);
+    assert_eq!(first_scan.root_id, registered.root_id);
+    assert!(first_scan.scan_run_id > 0);
+    assert_eq!(first_scan.discovered_file_count, 1);
 
-    let do_scan = |service: &LibraryBoundaryService| -> usize {
-        let outcome = service.handle_command(CommandRequest::LibraryRoots(
-            LibraryRootCommand::RunRootScan(RunRootScanRequest {
-                root_id: registered.root_id,
-            }),
-        ));
-        let reply = match outcome {
-            library_boundary_protocol::CommandOutcome::Success(env) => env.reply,
-            library_boundary_protocol::CommandOutcome::Error(env) => {
-                panic!("Scan failed: {:?}", env.error);
-            }
-        };
-        match reply {
-            CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(reply)) => {
-                reply.discovered_file_count
-            }
-            other => panic!("Expected scan reply, got {:?}", other),
-        }
-    };
-
-    let first_count = do_scan(&service);
-    assert_eq!(first_count, 1, "First scan should find 1 file");
-
-    let second_count = do_scan(&service);
-    assert_eq!(second_count, 1, "Rescan should find 1 file");
+    let rescan = run_scan(&service, registered.root_id);
+    assert_eq!(rescan.root_id, registered.root_id);
+    assert!(rescan.scan_run_id > 0);
+    assert_eq!(rescan.discovered_file_count, 1);
 }
 
 #[test]
-fn scan_with_stale_root_id_returns_error() {
+fn scan_with_invalid_root_id_rejects() {
     let tempdir = TempDir::new().expect("create tempdir");
     let service = open_service(&tempdir);
 
-    let scan_cmd = CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(
-        RunRootScanRequest { root_id: 99999 },
-    ));
-    let outcome = service.handle_command(scan_cmd);
-    match outcome {
-        library_boundary_protocol::CommandOutcome::Success(_) => {
-            panic!("Scan with unknown root should fail");
-        }
-        library_boundary_protocol::CommandOutcome::Error(env) => {
-            assert_eq!(env.error.code(), "DURABLE_STORE_FAILURE");
-            let msg = env.error.to_string();
-            assert!(
-                msg.contains("does not exist"),
-                "Error message should mention root does not exist, got: {msg}",
-            );
-        }
-    }
+    let zero_root_error =
+        expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
+            LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 0 }),
+        )));
+    assert_eq!(zero_root_error.error.code(), "INVALID_REQUEST");
+    assert!(
+        zero_root_error.error.to_string().contains("rootId"),
+        "Error should mention rootId, got: {}",
+        zero_root_error.error,
+    );
+
+    let negative_root_error =
+        expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
+            LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: -5 }),
+        )));
+    assert_eq!(negative_root_error.error.code(), "INVALID_REQUEST");
 }
 
 #[test]
-fn scan_with_invalid_root_id_returns_protocol_error() {
+fn scan_with_unknown_root_id_returns_current_store_error() {
     let tempdir = TempDir::new().expect("create tempdir");
     let service = open_service(&tempdir);
 
-    let scan_cmd = CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(
-        RunRootScanRequest { root_id: 0 },
-    ));
-    let outcome = service.handle_command(scan_cmd);
-    match outcome {
-        library_boundary_protocol::CommandOutcome::Success(_) => {
-            panic!("Scan with zero root ID should fail");
-        }
-        library_boundary_protocol::CommandOutcome::Error(env) => {
-            assert_eq!(env.error.code(), "INVALID_REQUEST");
-            let msg = env.error.to_string();
-            assert!(
-                msg.contains("rootId"),
-                "Error should mention rootId, got: {msg}"
-            );
-        }
-    }
+    let error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 99999 }),
+    )));
 
-    let scan_cmd2 = CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(
-        RunRootScanRequest { root_id: -5 },
-    ));
-    let outcome2 = service.handle_command(scan_cmd2);
-    match outcome2 {
-        library_boundary_protocol::CommandOutcome::Success(_) => {
-            panic!("Scan with negative root ID should fail");
-        }
-        library_boundary_protocol::CommandOutcome::Error(env) => {
-            assert_eq!(env.error.code(), "INVALID_REQUEST");
-        }
-    }
+    assert_eq!(error.error.code(), "DURABLE_STORE_FAILURE");
+    assert!(
+        error.error.to_string().contains("does not exist"),
+        "Current store error should mention root does not exist, got: {}",
+        error.error,
+    );
 }

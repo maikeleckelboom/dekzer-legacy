@@ -1481,6 +1481,110 @@ mod tests {
     }
 
     #[test]
+    fn start_scan_session_clears_finished_timestamp_on_rescan() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            SourceStateAuthorityTx::new(write)
+                .upsert_source_scan_state(&UpsertSourceScanStateInput {
+                    source_id,
+                    scan_phase: SourceScanPhase::Complete,
+                    last_scan_started_at: Some(100),
+                    last_scan_finished_at: Some(150),
+                    last_successful_scan_at: Some(150),
+                    scan_issue_kind: Some(SourceAccessIssueKind::UnknownIo),
+                    error_detail: Some("stale issue from prior scan".to_string()),
+                    updated_at: 150,
+                })
+                .expect("set completed scan state");
+            SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(parent_dir_id),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "albums".to_string(),
+                    relative_path: "albums".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: Some("blocked".to_string()),
+                    dir_scan_issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                    dir_scan_error_detail: Some("stale directory issue".to_string()),
+                    scanned_at: Some(150),
+                    mtime_ns: None,
+                    first_created_at: Some(12),
+                    changed_at: 150,
+                })
+                .expect("set stale directory scan issue");
+            Ok(())
+        })
+        .expect("prepare completed scan state");
+
+        let scan_run_id = admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write).start_scan_session(source_id, 200)
+        })
+        .expect("start scan session");
+        assert_eq!(scan_run_id, 200);
+
+        let (
+            scan_phase,
+            last_scan_started_at,
+            last_scan_finished_at,
+            scan_issue_kind,
+            error_detail,
+        ): (
+            String,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+            Option<String>,
+        ) = connection
+            .query_row(
+                "SELECT scan_phase,
+                        last_scan_started_at,
+                        last_scan_finished_at,
+                        scan_issue_kind,
+                        error_detail
+                 FROM source_scan_state
+                 WHERE source_id = ?1",
+                [source_id],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
+            )
+            .expect("read scan state");
+        let (dir_scan_state, dir_scan_issue_kind, dir_scan_error_detail): (
+            String,
+            Option<String>,
+            Option<String>,
+        ) = connection
+            .query_row(
+                "SELECT dir_scan_state, dir_scan_issue_kind, dir_scan_error_detail
+                 FROM source_directories
+                 WHERE source_directory_id = ?1",
+                [parent_dir_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("read directory scan state");
+
+        assert_eq!(scan_phase, "scanning");
+        assert_eq!(last_scan_started_at, Some(200));
+        assert_eq!(last_scan_finished_at, None);
+        assert_eq!(scan_issue_kind, None);
+        assert_eq!(error_detail, None);
+        assert_eq!(dir_scan_state, "pending");
+        assert_eq!(dir_scan_issue_kind, None);
+        assert_eq!(dir_scan_error_detail, None);
+    }
+
+    #[test]
     fn blocked_directory_outcome_survives_scan_finalization() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
