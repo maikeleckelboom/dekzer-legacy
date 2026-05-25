@@ -106,6 +106,39 @@ describe('deriveOperationFeedback', () => {
       kind: 'scanFailed',
       tone: 'error'
     })
+    expect(
+      deriveOperationFeedback({
+        ...base,
+        scanStatus: 'failed',
+        scanFailureMessage: 'Unable to run local library root scan.',
+        scanFailureDetail: 'fixture scan failure'
+      })
+    ).toMatchObject({
+      kind: 'scanFailed',
+      tone: 'error',
+      detail: 'Unable to run local library root scan. fixture scan failure'
+    })
+    expect(
+      deriveOperationFeedback({
+        ...base,
+        scanStatus: 'failed',
+        scanFailureMessage: 'Unable to run local library root scan.'
+      })
+    ).toMatchObject({
+      kind: 'scanFailed',
+      tone: 'error',
+      detail: 'Unable to run local library root scan.'
+    })
+    expect(
+      deriveOperationFeedback({
+        ...base,
+        scanStatus: 'failed',
+        scanFailureDetail: 'database is locked'
+      })
+    ).toMatchObject({
+      kind: 'scanFailed',
+      tone: 'error'
+    })
     expect(deriveOperationFeedback({ ...base, refreshStatus: 'failed' })).toMatchObject({
       kind: 'refreshFailed',
       tone: 'warning'
@@ -219,7 +252,7 @@ describe('deriveOperationFeedback', () => {
 })
 
 function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): OperationFeedbackInputs {
-  return {
+  const base: OperationFeedbackInputs = {
     hostStatus: hostWithState('started'),
     rootChoiceStatus: 'idle',
     registeredRootPath: '/Music',
@@ -231,9 +264,9 @@ function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): Operat
     navigationReadRequestError: undefined,
     hierarchyReadRequestError: undefined,
     navigationReadResult: undefined,
-    removeSourceStatus: 'idle',
-    ...overrides
+    removeSourceStatus: 'idle'
   }
+  return { ...base, ...overrides }
 }
 
 function noRootInputs(overrides: Partial<OperationFeedbackInputs> = {}): OperationFeedbackInputs {

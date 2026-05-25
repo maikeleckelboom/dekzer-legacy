@@ -2,6 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { LibraryBoundaryProtocolError } from '@dekzer/library-boundary-client'
+
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
@@ -11,6 +13,7 @@ import {
 } from '../../../src/main/libraryBoundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
 import {
+  type ScanLogger,
   registerLocalRootScanIpc,
   runLocalRootScanThroughHost
 } from '../../../src/main/libraryRoots/runScan'
@@ -25,6 +28,11 @@ import {
 
 const tempRoots: string[] = []
 
+const noLog: ScanLogger = {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  error() {}
+}
+
 afterEach(() => {
   for (const tempRoot of tempRoots.splice(0)) {
     rmSync(tempRoot, { recursive: true, force: true })
@@ -37,23 +45,31 @@ describe('local root scan boundary', () => {
     const idleHost = new LibraryBoundaryHost(config, silentLogger())
 
     await expect(
-      runLocalRootScanThroughHost(idleHost, { rootId: 'root-1' })
+      runLocalRootScanThroughHost(idleHost, { rootId: 'root-1' }, noLog)
     ).resolves.toMatchObject({
       state: 'hostUnavailable',
       error: { code: 'hostNotStarted' }
     })
 
     await expect(
-      runLocalRootScanThroughHost(await startedHostWithClient(config, createFakeClient()), null)
+      runLocalRootScanThroughHost(
+        await startedHostWithClient(config, createFakeClient()),
+        null,
+        noLog
+      )
     ).resolves.toMatchObject({
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
 
     await expect(
-      runLocalRootScanThroughHost(await startedHostWithClient(config, createFakeClient()), {
-        rootId: '   '
-      })
+      runLocalRootScanThroughHost(
+        await startedHostWithClient(config, createFakeClient()),
+        {
+          rootId: '   '
+        },
+        noLog
+      )
     ).resolves.toMatchObject({
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
@@ -76,7 +92,8 @@ describe('local root scan boundary', () => {
             }
           })
         ),
-        { rootId: 'root-1' }
+        { rootId: 'root-1' },
+        noLog
       )
     ).resolves.toEqual({
       state: 'scanned',
@@ -97,12 +114,81 @@ describe('local root scan boundary', () => {
             }
           })
         ),
-        { rootId: 'root-1' }
+        { rootId: 'root-1' },
+        noLog
       )
     ).resolves.toMatchObject({
       state: 'scanFailed',
-      error: { code: 'scanFailed' }
+      error: { code: 'scanFailed', detail: 'fixture scan failure' }
     })
+  })
+
+  it('preserves scan failure detail from thrown errors', async () => {
+    const config = hostConfig()
+
+    const protocolErrorResult = await runLocalRootScanThroughHost(
+      await startedHostWithClient(
+        config,
+        createFakeClient({
+          runRootScan: async () => {
+            throw new LibraryBoundaryProtocolError({
+              type: 'durableStoreFailure',
+              payload: { detail: 'database is locked' }
+            })
+          }
+        })
+      ),
+      { rootId: 'root-2' },
+      noLog
+    )
+    expect(protocolErrorResult.state).toBe('scanFailed')
+    if (protocolErrorResult.state === 'scanFailed') {
+      expect(protocolErrorResult.error.message).toContain('protocol error')
+      expect(protocolErrorResult.error.detail).toContain('database is locked')
+    }
+
+    const unknownThrownResult = await runLocalRootScanThroughHost(
+      await startedHostWithClient(
+        config,
+        createFakeClient({
+          runRootScan: async () => {
+            throw 'unexpected string error'
+          }
+        })
+      ),
+      { rootId: 'root-3' },
+      noLog
+    )
+    expect(unknownThrownResult.state).toBe('scanFailed')
+    if (unknownThrownResult.state === 'scanFailed') {
+      expect(unknownThrownResult.error.detail).toBe('unexpected string error')
+    }
+  })
+
+  it('logs the full error when the scan client throws', async () => {
+    const config = hostConfig()
+    const logEntries: unknown[][] = []
+
+    await runLocalRootScanThroughHost(
+      await startedHostWithClient(
+        config,
+        createFakeClient({
+          runRootScan: async () => {
+            throw new Error('diagnostic fixture')
+          }
+        })
+      ),
+      { rootId: 'root-diag' },
+      {
+        error: (...args: unknown[]) => {
+          logEntries.push(args)
+        }
+      }
+    )
+
+    expect(logEntries.length).toBe(1)
+    expect(logEntries[0]![0]).toBe('[local-root-scan] failed')
+    expect(logEntries[0]![1]).toMatchObject({ rootId: 'root-diag' })
   })
 
   it('registers the scan IPC channel', () => {

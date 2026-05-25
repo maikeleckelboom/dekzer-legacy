@@ -316,6 +316,129 @@ describe('local root scan lifecycle', () => {
   })
 })
 
+describe('local root scan failure detail preservation', () => {
+  it('preserves scan failure message and detail from the result error', async () => {
+    const controller = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+        runScan: async () => ({
+          state: 'scanFailed',
+          error: {
+            code: 'scanFailed',
+            message: 'Unable to run local library root scan.',
+            detail: 'durableStoreFailure: database is locked'
+          }
+        })
+      })
+    )
+
+    await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(true)
+    await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('failed')
+    expect(controller.scanFailureMessage.value).toBe('Unable to run local library root scan.')
+    expect(controller.scanFailureDetail.value).toBe('durableStoreFailure: database is locked')
+  })
+
+  it('preserves scan failure message without detail', async () => {
+    const controller = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+        runScan: async () => ({
+          state: 'scanFailed',
+          error: {
+            code: 'scanFailed',
+            message: 'Library root scan failed due to a transport error.'
+          }
+        })
+      })
+    )
+
+    await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(true)
+    await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('failed')
+    expect(controller.scanFailureMessage.value).toBe(
+      'Library root scan failed due to a transport error.'
+    )
+    expect(controller.scanFailureDetail.value).toBeUndefined()
+  })
+
+  it('falls back to a safe message when the scan API throws', async () => {
+    const controller = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+        runScan: async () => {
+          throw new Error('unexpected renderer failure')
+        }
+      })
+    )
+
+    await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(true)
+    await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('failed')
+    expect(controller.scanFailureMessage.value).toBe('Unable to scan folder.')
+    expect(controller.scanFailureDetail.value).toBeUndefined()
+  })
+
+  it('uses a safe message for hostUnavailable and invalidRequest scan results', async () => {
+    const hostUnavailableController = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+        runScan: async () => ({
+          state: 'hostUnavailable',
+          error: { code: 'hostFailed', message: 'Library boundary host is unavailable.' }
+        })
+      })
+    )
+
+    await expect(hostUnavailableController.chooseAndRegisterLocalRoot()).resolves.toBe(true)
+    await expect(hostUnavailableController.runRegisteredRootScan()).resolves.toBe(true)
+    expect(hostUnavailableController.scanStatus.value).toBe('failed')
+    expect(hostUnavailableController.scanFailureMessage.value).toBe(
+      'Library service is not ready. Try again when it has started.'
+    )
+    expect(hostUnavailableController.scanFailureDetail.value).toBeUndefined()
+  })
+
+  it('resets scan failure message and detail when scan succeeds after failure', async () => {
+    let scanCallCount = 0
+    const controller = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+        runScan: async () => {
+          scanCallCount++
+          if (scanCallCount === 1) {
+            return {
+              state: 'scanFailed',
+              error: {
+                code: 'scanFailed',
+                message: 'Unable to run local library root scan.',
+                detail: 'transport error'
+              }
+            }
+          }
+          return scannedRootResult()
+        }
+      })
+    )
+
+    await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(true)
+    await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('failed')
+    expect(controller.scanFailureMessage.value).toBe('Unable to run local library root scan.')
+    expect(controller.scanFailureDetail.value).toBe('transport error')
+
+    await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('scanned')
+    expect(controller.scanFailureMessage.value).toBeUndefined()
+    expect(controller.scanFailureDetail.value).toBeUndefined()
+  })
+})
+
 describe('local root remove lifecycle', () => {
   it('calls unregister with the selected backend root id', async () => {
     const unregisterLocalRoot = vi.fn(async () => ({

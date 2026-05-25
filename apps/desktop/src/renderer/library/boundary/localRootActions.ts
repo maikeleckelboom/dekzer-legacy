@@ -4,7 +4,10 @@ import { computed, ref } from 'vue'
 import type { LocalRootChoiceResult } from '../../../shared/libraryRoots/chooseAndRegisterLocal'
 import type { LocalRootRegistrationRoot } from '../../../shared/libraryRoots/registerLocalRoot'
 import type { LocalRoot, ReadLocalRootsOutcome } from '../../../shared/libraryRoots/readLocalRoots'
-import type { LocalRootScanResult } from '../../../shared/libraryRoots/runScan'
+import type {
+  LocalRootScanErrorState,
+  LocalRootScanResult
+} from '../../../shared/libraryRoots/runScan'
 import type { UnregisterLocalRootResult } from '../../../shared/libraryRoots/unregisterLocalRoot'
 import type { RendererApi } from '../../../shared/rendererApi'
 
@@ -36,6 +39,8 @@ export type LocalRootActionsController = {
   readonly canChooseLocalRoot: ComputedRef<boolean>
   readonly scanStatus: Ref<LocalRootScanStatus>
   readonly scanSummary: Ref<LocalRootScanSummary | undefined>
+  readonly scanFailureMessage: Ref<string | undefined>
+  readonly scanFailureDetail: Ref<string | undefined>
   readonly scanButtonLabel: ComputedRef<string>
   readonly canRunRegisteredRootScan: ComputedRef<boolean>
   readonly localRootsReadState: Ref<LocalRootsReadState>
@@ -72,6 +77,7 @@ export function createLocalRootActionsController(
   const scanStatus = ref<LocalRootScanStatus>('idle')
   const scanSummary = ref<LocalRootScanSummary>()
   const scanFailureMessage = ref<string>()
+  const scanFailureDetail = ref<string>()
   const localRootsReadState = ref<LocalRootsReadState>({ kind: 'unread' })
   const removeSourceStatus = ref<RemoveSourceStatus>('idle')
   const removeFailureMessage = ref<string>()
@@ -172,6 +178,7 @@ export function createLocalRootActionsController(
     scanStatus.value = 'scanning'
     scanSummary.value = undefined
     scanFailureMessage.value = undefined
+    scanFailureDetail.value = undefined
 
     try {
       const result = await rootApi.runScan({
@@ -189,7 +196,9 @@ export function createLocalRootActionsController(
       }
 
       scanStatus.value = 'failed'
-      scanFailureMessage.value = scanFailureFor(result.state)
+      const { message, detail } = scanFailureMessageFor(result)
+      scanFailureMessage.value = message
+      scanFailureDetail.value = detail
       return true
     } catch {
       if (!isCurrentScan(rootId, sequence)) {
@@ -207,6 +216,7 @@ export function createLocalRootActionsController(
     scanStatus.value = 'idle'
     scanSummary.value = undefined
     scanFailureMessage.value = undefined
+    scanFailureDetail.value = undefined
   }
 
   function isCurrentScan(rootId: string, sequence: number): boolean {
@@ -392,6 +402,8 @@ export function createLocalRootActionsController(
     canChooseLocalRoot,
     scanStatus,
     scanSummary,
+    scanFailureMessage,
+    scanFailureDetail,
     scanButtonLabel,
     canRunRegisteredRootScan,
     localRootsReadState,
@@ -434,12 +446,26 @@ function rootChoiceFailureFor(
   }
 }
 
-function scanFailureFor(state: Exclude<LocalRootScanResult['state'], 'scanned'>): string {
+function scanFailureMessageFor(
+  result: Extract<LocalRootScanResult, { state: LocalRootScanErrorState }>
+): { message: string; detail: string | undefined } {
+  if (result.state === 'scanFailed') {
+    return { message: result.error.message, detail: result.error.detail }
+  }
+
+  return {
+    message: scanFailureFor(result.state as 'hostUnavailable' | 'invalidRequest'),
+    detail: undefined
+  }
+}
+
+function scanFailureFor(
+  state: Exclude<LocalRootScanResult['state'], 'scanned' | 'scanFailed'>
+): string {
   switch (state) {
     case 'hostUnavailable':
       return 'Library service is not ready. Try again when it has started.'
     case 'invalidRequest':
-    case 'scanFailed':
       return safeRootScanFailure
   }
 }

@@ -145,6 +145,12 @@ const operationFeedback = computed(() =>
     registeredRootPath: rootActions.registeredRootPath.value,
     scanStatus: rootActions.scanStatus.value,
     scanSummary: rootActions.scanSummary.value,
+    ...(rootActions.scanFailureMessage.value === undefined
+      ? {}
+      : { scanFailureMessage: rootActions.scanFailureMessage.value }),
+    ...(rootActions.scanFailureDetail.value === undefined
+      ? {}
+      : { scanFailureDetail: rootActions.scanFailureDetail.value }),
     refreshStatus: rootLifecycle.refreshStatus.value,
     navigationReadIsLoading: hierarchyRead.navigationReadIsLoading.value,
     hierarchyReadIsLoading: hierarchyRead.hierarchyReadIsLoading.value,

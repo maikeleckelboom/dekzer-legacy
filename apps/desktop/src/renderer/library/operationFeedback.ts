@@ -44,6 +44,8 @@ export type OperationFeedbackInputs = {
   readonly registeredRootPath: string | undefined
   readonly scanStatus: LocalRootScanStatus
   readonly scanSummary: LocalRootScanSummary | undefined
+  readonly scanFailureMessage?: string
+  readonly scanFailureDetail?: string
   readonly refreshStatus: RootLifecycleRefreshStatus
   readonly navigationReadIsLoading: boolean
   readonly hierarchyReadIsLoading: boolean
@@ -202,7 +204,8 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
   }
 
   if (inputs.scanStatus === 'failed') {
-    return build('scanFailed')
+    const failureDetail = scanFailureDetail(inputs.scanFailureMessage, inputs.scanFailureDetail)
+    return build('scanFailed', failureDetail === undefined ? {} : { detail: failureDetail })
   }
 
   if (inputs.removeSourceStatus === 'failed') {
@@ -288,4 +291,19 @@ function scanDetail(summary: LocalRootScanSummary | undefined): string {
     `${summary.discoveredFileCount} ${summary.discoveredFileCount === 1 ? 'file' : 'files'} discovered.`,
     `${summary.queuedSourceWorkItems} ${summary.queuedSourceWorkItems === 1 ? 'item' : 'items'} queued.`
   ].join(' ')
+}
+
+function scanFailureDetail(
+  scanFailureMessage: string | undefined,
+  scanFailureDetail: string | undefined
+): string | undefined {
+  if (scanFailureMessage !== undefined && scanFailureDetail !== undefined) {
+    return `${scanFailureMessage} ${scanFailureDetail}`
+  }
+
+  if (scanFailureMessage !== undefined) {
+    return scanFailureMessage
+  }
+
+  return undefined
 }

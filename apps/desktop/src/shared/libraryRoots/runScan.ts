@@ -11,6 +11,7 @@ export type LocalRootScanErrorCode =
 export type LocalRootScanError = {
   readonly code: LocalRootScanErrorCode
   readonly message: string
+  readonly detail?: string
 }
 
 export type LocalRootScanErrorState = Exclude<LocalRootScanState, 'scanned'>
