@@ -70,7 +70,7 @@ describe('projectState', () => {
     })
   })
 
-  it('filters unwired navigation rows and hidden non-media child rows', () => {
+  it('filters unwired navigation rows and backend-hidden file rows', () => {
     const projection = projectTree(
       browserState({
         rows: [
@@ -78,7 +78,10 @@ describe('projectState', () => {
           navigationRowWithSelectorKind('allAudio', '100'),
           navigationRowWithNullSelector()
         ],
-        sourceChildren: loadedChildren([fileNode('11', 'track.wav'), fileNode('99', 'desktop.ini')])
+        sourceChildren: loadedChildren([
+          fileNode('11', 'track.wav'),
+          fileNode('99', 'desktop.ini', { mediaClass: 'unsupported' })
+        ])
       })
     )
 
@@ -94,6 +97,41 @@ describe('projectState', () => {
     )
     expect(unsupportedOnly.bindingsById.has('navigation-row:100')).toBe(false)
     expect(unsupportedOnly.nodes.some((node) => node.id === 'navigation-row:100')).toBe(false)
+  })
+
+  it('projects literal file presentation from backend media class', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
+          fileNode('12', 'cover.png', { mediaClass: 'unsupported' }),
+          fileNode('13', 'clip.wav', { mediaClass: 'video' }),
+          fileNode('14', 'track.raw', { mediaClass: 'audio' }),
+          fileNode('15', 'mystery.mp3', { mediaClass: 'none' })
+        ])
+      })
+    )
+
+    const sourceNode = projection.nodes[0]
+    expect(loadedChildIds(sourceNode)).toEqual([
+      'source-file:11',
+      'source-file:13',
+      'source-file:14'
+    ])
+    expect(requiredNode(projection.nodes, 'source-file:11')).toMatchObject({
+      icon: 'image',
+      detail: 'Image file'
+    })
+    expect(requiredNode(projection.nodes, 'source-file:13')).toMatchObject({
+      icon: 'video',
+      detail: 'Video file'
+    })
+    expect(requiredNode(projection.nodes, 'source-file:14')).toMatchObject({
+      icon: 'music',
+      detail: 'Audio file'
+    })
+    expect(projection.bindingsById.has('source-file:12')).toBe(false)
+    expect(projection.bindingsById.has('source-file:15')).toBe(false)
   })
 
   it('projects host status instead of stale navigation rows', () => {
@@ -496,13 +534,20 @@ function directoryNode(
   }
 }
 
-function fileNode(fileId: string, label: string): Extract<ChildRow, { readonly kind: 'file' }> {
+function fileNode(
+  fileId: string,
+  label: string,
+  options: {
+    readonly mediaClass?: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
+  } = {}
+): Extract<ChildRow, { readonly kind: 'file' }> {
   return {
     id: `source-file:${fileId}`,
     kind: 'file',
     label,
     sourceId: '7',
     fileId,
+    mediaClass: options.mediaClass ?? 'audio',
     presence: 'present',
     updatedAtMs: 100
   }

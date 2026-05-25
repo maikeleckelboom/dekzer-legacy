@@ -1289,6 +1289,41 @@ pub enum DirectoryMediaState {
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LiteralHierarchyFileMediaClass {
+    Audio,
+    Video,
+    Image,
+    Unsupported,
+    None,
+}
+
+impl LiteralHierarchyFileMediaClass {
+    pub fn from_projection_value(value: &str) -> Option<Self> {
+        match value.as_bytes() {
+            b"audio" => Some(Self::Audio),
+            b"video" => Some(Self::Video),
+            b"image" => Some(Self::Image),
+            b"unsupported" => Some(Self::Unsupported),
+            b"none" => Some(Self::None),
+            _ => None,
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -1318,6 +1353,9 @@ pub struct LiteralHierarchyNode {
     pub parent_source_directory_id: Option<i64>,
     pub relative_path: String,
     pub display_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub media_class: Option<LiteralHierarchyFileMediaClass>,
     pub presence_state: LiteralHierarchyPresenceState,
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
@@ -1387,14 +1425,14 @@ mod tests {
         LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
         LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
         LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LiteralHierarchyEntryPoint, LiteralHierarchyNode, LiteralHierarchyNodeKind,
-        LiteralHierarchyPresenceState, LiteralHierarchyWindow, LoadNavigationRowByStableKeyRequest,
-        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
-        NavigationRowSelectorKind, ReadLibraryAssetPreparationDetailRequest,
-        ReadLibraryAssetWaveformOverviewRequest, ReadLiteralHierarchyChildrenReply,
-        ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
-        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
-        SearchNavigationNodeLibraryBrowserWindowReply,
+        LiteralHierarchyEntryPoint, LiteralHierarchyFileMediaClass, LiteralHierarchyNode,
+        LiteralHierarchyNodeKind, LiteralHierarchyPresenceState, LiteralHierarchyWindow,
+        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigationRow,
+        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
+        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
+        ReadLiteralHierarchyChildrenReply, ReadLiteralHierarchyChildrenRequest,
+        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
     };
     use serde_json::json;
@@ -1577,6 +1615,7 @@ mod tests {
                         parent_source_directory_id: None,
                         relative_path: "Albums".to_string(),
                         display_name: "Albums".to_string(),
+                        media_class: None,
                         presence_state: LiteralHierarchyPresenceState::Present,
                         size_bytes: None,
                         modified_at_ns: None,
@@ -1626,6 +1665,47 @@ mod tests {
                     }
                 }
             })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(json).expect("deserialize reply"),
+            reply
+        );
+    }
+
+    #[test]
+    fn literal_hierarchy_file_media_class_serializes_as_media_class() {
+        let reply =
+            SnapshotReadReply::LiteralHierarchyChildren(ReadLiteralHierarchyChildrenReply {
+                window: Some(LiteralHierarchyWindow {
+                    entry_point: LiteralHierarchyEntryPoint::Source { source_id: 7 },
+                    parent_source_directory_id: None,
+                    offset: 0,
+                    limit: 25,
+                    total_rows: 1,
+                    rows: vec![LiteralHierarchyNode {
+                        node_kind: LiteralHierarchyNodeKind::File,
+                        source_id: 7,
+                        source_directory_id: None,
+                        source_file_id: Some(31),
+                        parent_source_directory_id: None,
+                        relative_path: "cover.mp3".to_string(),
+                        display_name: "cover.mp3".to_string(),
+                        media_class: Some(LiteralHierarchyFileMediaClass::Image),
+                        presence_state: LiteralHierarchyPresenceState::Present,
+                        size_bytes: Some(10),
+                        modified_at_ns: Some(20),
+                        updated_at_ms: 100,
+                        has_child_directories: None,
+                        directory_media_state: None,
+                        directory_scan_state: None,
+                    }],
+                }),
+            });
+
+        let json = serde_json::to_value(&reply).expect("serialize literal hierarchy reply");
+        assert_eq!(
+            json["payload"]["window"]["rows"][0]["mediaClass"],
+            json!("image")
         );
         assert_eq!(
             serde_json::from_value::<SnapshotReadReply>(json).expect("deserialize reply"),

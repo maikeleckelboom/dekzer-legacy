@@ -1,5 +1,5 @@
-// Media-class helpers are used by parked filesystem/path annotation flows, not
-// by the maintained snapshot-read center.
+// Source-file observation owns provisional path-based media classification.
+// Maintained read models should consume the stored source_files.media_class.
 #![allow(dead_code)]
 
 use std::path::Path;

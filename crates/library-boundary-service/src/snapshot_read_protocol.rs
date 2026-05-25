@@ -300,6 +300,7 @@ fn map_literal_hierarchy_node(
     )?;
     let directory_media_state = map_directory_media_state(&node)?;
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
+    let media_class = map_literal_hierarchy_file_media_class(&node)?;
 
     Ok(protocol::LiteralHierarchyNode {
         node_kind: map_literal_hierarchy_node_kind(&node.node_kind)?,
@@ -309,6 +310,7 @@ fn map_literal_hierarchy_node(
         parent_source_directory_id: node.parent_source_directory_id,
         relative_path: node.relative_path,
         display_name: node.display_name,
+        media_class,
         presence_state: map_literal_hierarchy_presence_state(&node.presence_state)?,
         size_bytes: node.size_bytes,
         modified_at_ns: node.modified_at_ns,
@@ -328,6 +330,30 @@ fn map_literal_hierarchy_node_kind(
         other => Err(malformed_store_state(format!(
             "literal hierarchy node has unsupported kind {other:?}"
         ))),
+    }
+}
+
+fn map_literal_hierarchy_file_media_class(
+    node: &store::StoreLiteralHierarchyNode,
+) -> store::LibrarySqliteResult<Option<protocol::LiteralHierarchyFileMediaClass>> {
+    match (node.node_kind.as_str(), node.media_class.as_deref()) {
+        ("file", Some(value)) => {
+            protocol::LiteralHierarchyFileMediaClass::from_projection_value(value)
+                .map(Some)
+                .ok_or_else(|| {
+                    malformed_store_state(format!(
+                        "literal hierarchy file node has unsupported media_class {value:?}"
+                    ))
+                })
+        }
+        ("file", None) => Err(malformed_store_state(
+            "literal hierarchy file node is missing media_class",
+        )),
+        ("directory", None) => Ok(None),
+        ("directory", Some(_)) => Err(malformed_store_state(
+            "literal hierarchy directory node unexpectedly has media_class",
+        )),
+        _ => Ok(None),
     }
 }
 
@@ -942,6 +968,7 @@ mod tests {
             parent_source_directory_id: None,
             relative_path: "Albums".to_string(),
             display_name: "Albums".to_string(),
+            media_class: None,
             presence_state: "present".to_string(),
             size_bytes: None,
             modified_at_ns: None,
@@ -961,6 +988,7 @@ mod tests {
             parent_source_directory_id: Some(11),
             relative_path: "Albums/track.flac".to_string(),
             display_name: "track.flac".to_string(),
+            media_class: Some("audio".to_string()),
             presence_state: "present".to_string(),
             size_bytes: Some(10),
             modified_at_ns: Some(20),
@@ -997,9 +1025,35 @@ mod tests {
         );
 
         let file = &window.rows[1];
+        assert_eq!(
+            file.media_class,
+            Some(protocol::LiteralHierarchyFileMediaClass::Audio)
+        );
         assert_eq!(file.has_child_directories, None);
         assert_eq!(file.directory_media_state, None);
         assert_eq!(file.directory_scan_state, None);
+    }
+
+    #[test]
+    fn literal_hierarchy_mapping_preserves_file_media_class_values() {
+        for (stored, expected) in [
+            ("audio", protocol::LiteralHierarchyFileMediaClass::Audio),
+            ("video", protocol::LiteralHierarchyFileMediaClass::Video),
+            ("image", protocol::LiteralHierarchyFileMediaClass::Image),
+            (
+                "unsupported",
+                protocol::LiteralHierarchyFileMediaClass::Unsupported,
+            ),
+            ("none", protocol::LiteralHierarchyFileMediaClass::None),
+        ] {
+            let mut node = file_node();
+            node.display_name = format!("fixture-{stored}");
+            node.media_class = Some(stored.to_string());
+
+            let mapped = map_literal_hierarchy_node(node).expect("map file node");
+
+            assert_eq!(mapped.media_class, Some(expected), "{stored}");
+        }
     }
 
     #[test]

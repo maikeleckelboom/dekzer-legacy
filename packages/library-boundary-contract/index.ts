@@ -120,9 +120,11 @@ export type LiteralHierarchyEntryPoint = { "type": "source", "payload": { source
 
 export type LiteralHierarchyWindow = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LiteralHierarchyNode>, };
 
-export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryMediaState?: DirectoryMediaState, directoryScanState?: DirectoryScanState, };
+export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, mediaClass?: LiteralHierarchyFileMediaClass, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryMediaState?: DirectoryMediaState, directoryScanState?: DirectoryScanState, };
 
 export type LiteralHierarchyNodeKind = "directory" | "file";
+
+export type LiteralHierarchyFileMediaClass = "audio" | "video" | "image" | "unsupported" | "none";
 
 export type LiteralHierarchyPresenceState = "present" | "missing" | "removed";
 

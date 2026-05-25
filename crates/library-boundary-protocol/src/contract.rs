@@ -85,6 +85,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LiteralHierarchyWindow>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyNode>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyNodeKind>(&cfg, &mut output);
+    push_ts_decl::<crate::LiteralHierarchyFileMediaClass>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyPresenceState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
@@ -172,6 +173,7 @@ mod tests {
         assert!(ts.contains("unregisterLocalRoot"));
         assert!(ts.contains("readLiteralHierarchyChildren"));
         assert!(ts.contains("LiteralHierarchyNode"));
+        assert!(ts.contains("LiteralHierarchyFileMediaClass"));
         assert!(ts.contains("DirectoryMediaState"));
         assert!(ts.contains("DirectoryScanState"));
         assert!(ts.contains("readNavigationNodeLibraryBrowserWindow"));

@@ -20,7 +20,6 @@ import type {
 } from './types'
 import { copyEntryPoint } from '../runtime/entryPoint'
 import { formatSourceDisplayName } from './sourcePresentation'
-import { classifyLibraryEntryName, type LibraryEntryRole } from './entryPresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
 
 export type BrowserProjection = {
@@ -361,7 +360,6 @@ function projectLiteralNode(options: {
     }
   }
 
-  const presentation = classifyLibraryEntryName(node.label)
   const fileBadge = presenceBadge(node.presence)
 
   options.bindingsById.set(node.id, {
@@ -377,8 +375,8 @@ function projectLiteralNode(options: {
     role: 'literalFile',
     label: node.label,
     ...(fileBadge === undefined ? {} : { badge: fileBadge }),
-    icon: browserTreeIconForEntryRole(presentation.role),
-    detail: formatFileDetail(node.presence),
+    icon: browserTreeIconForMediaClass(node.mediaClass),
+    detail: formatFileDetail(node.presence, node.mediaClass),
     children: { kind: 'none' }
   }
 }
@@ -398,36 +396,28 @@ function isConfirmedDirectoryLeaf(
   )
 }
 
-function browserTreeIconForEntryRole(role: LibraryEntryRole): BrowserTreeIcon {
-  switch (role) {
-    case 'folder':
-      return 'folder'
-    case 'audio':
-      return 'music'
-    case 'video':
-      return 'video'
-    case 'cueSheet':
-      return 'cueSheet'
-    case 'playlist':
-      return 'playlist'
-    case 'artwork':
-      return 'image'
-    case 'metadata':
-      return 'metadata'
-    case 'unknown':
-    case 'nonMedia':
-      return 'file'
-  }
-}
-
 function isVisibleLiteralNode(node: ChildRow): boolean {
   if (node.kind === 'directory') {
     return true
   }
 
-  const presentation = classifyLibraryEntryName(node.label)
+  return node.mediaClass === 'audio' || node.mediaClass === 'video' || node.mediaClass === 'image'
+}
 
-  return presentation.visibility !== 'hiddenNonMedia'
+function browserTreeIconForMediaClass(
+  mediaClass: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
+): BrowserTreeIcon {
+  switch (mediaClass) {
+    case 'audio':
+      return 'music'
+    case 'video':
+      return 'video'
+    case 'image':
+      return 'image'
+    case 'unsupported':
+    case 'none':
+      return 'file'
+  }
 }
 
 function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTreeChildren {
@@ -810,14 +800,33 @@ function formatMoreDetail(offset: number, limit: number, totalRows: number): str
   return `Items ${offset + 1}-${Math.min(offset + limit, totalRows)} of ${totalRows} are available.`
 }
 
-function formatFileDetail(presence: ChildRow['presence']): string {
+function formatFileDetail(
+  presence: ChildRow['presence'],
+  mediaClass: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
+): string {
   switch (presence) {
     case 'present':
-      return 'File'
+      return formatPresentFileDetail(mediaClass)
     case 'missing':
       return 'File missing'
     case 'removed':
       return 'File removed'
+  }
+}
+
+function formatPresentFileDetail(
+  mediaClass: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
+): string {
+  switch (mediaClass) {
+    case 'audio':
+      return 'Audio file'
+    case 'video':
+      return 'Video file'
+    case 'image':
+      return 'Image file'
+    case 'unsupported':
+    case 'none':
+      return 'File'
   }
 }
 

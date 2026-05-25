@@ -1120,6 +1120,16 @@
         }
       ]
     },
+    "LiteralHierarchyFileMediaClass": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video",
+        "image",
+        "unsupported",
+        "none"
+      ]
+    },
     "LiteralHierarchyNode": {
       "type": "object",
       "properties": {
@@ -1150,6 +1160,16 @@
           "type": [
             "boolean",
             "null"
+          ]
+        },
+        "mediaClass": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LiteralHierarchyFileMediaClass"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "modifiedAtNs": {

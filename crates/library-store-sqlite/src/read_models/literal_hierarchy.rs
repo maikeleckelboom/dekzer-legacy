@@ -27,6 +27,7 @@ pub struct StoreLiteralHierarchyNode {
     pub parent_source_directory_id: Option<i64>,
     pub relative_path: String,
     pub display_name: String,
+    pub media_class: Option<String>,
     pub presence_state: String,
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
@@ -325,6 +326,7 @@ fn read_child_rows(
                 parent_source_directory_id,
                 relative_path,
                 display_name,
+                media_class,
                 presence_state,
                 size_bytes,
                 modified_at_ns,
@@ -341,6 +343,7 @@ fn read_child_rows(
                     parent_source_directory_id,
                     relative_path,
                     name AS display_name,
+                    NULL AS media_class,
                     presence_state,
                     NULL AS size_bytes,
                     NULL AS modified_at_ns,
@@ -364,6 +367,7 @@ fn read_child_rows(
                     parent_source_directory_id,
                     relative_path,
                     name AS display_name,
+                    media_class,
                     presence_state,
                     size_bytes,
                     mtime_ns AS modified_at_ns,
@@ -398,16 +402,112 @@ fn read_child_rows(
                     parent_source_directory_id: row.get(4)?,
                     relative_path: row.get(5)?,
                     display_name: row.get(6)?,
-                    presence_state: row.get(7)?,
-                    size_bytes: row.get(8)?,
-                    modified_at_ns: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    has_child_directories: row.get(11)?,
-                    has_media_descendant: row.get(12)?,
-                    dir_scan_state: row.get(13)?,
+                    media_class: row.get(7)?,
+                    presence_state: row.get(8)?,
+                    size_bytes: row.get(9)?,
+                    modified_at_ns: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    has_child_directories: row.get(12)?,
+                    has_media_descendant: row.get(13)?,
+                    dir_scan_state: row.get(14)?,
                 })
             },
         )?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{StoreLiteralHierarchyEntryPoint, read_children};
+    use crate::schema::install_baseline_schema_for_test;
+    use rusqlite::{Connection, params};
+
+    fn test_connection() -> Connection {
+        let mut connection = Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        connection
+    }
+
+    fn insert_source(connection: &Connection, source_id: i64) {
+        connection
+            .execute(
+                "INSERT INTO sources (
+                     source_id,
+                     source_class,
+                     authority,
+                     identity_key,
+                     display_name,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (?1, 'external_mounted', 'device', ?2, ?3, 1, 1)",
+                params![source_id, format!("source:{source_id}"), "Fixture"],
+            )
+            .expect("insert source");
+    }
+
+    fn insert_file(connection: &Connection, source_file_id: i64, name: &str, media_class: &str) {
+        connection
+            .execute(
+                "INSERT INTO source_files (
+                     source_file_id,
+                     source_id,
+                     name,
+                     relative_path,
+                     media_class,
+                     presence_state,
+                     first_discovered_at,
+                     last_observed_at,
+                     last_presence_change_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (?1, 7, ?2, ?2, ?3, 'present', 1, 1, 1, 1, 1)",
+                params![source_file_id, name, media_class],
+            )
+            .expect("insert source file");
+    }
+
+    #[test]
+    fn file_rows_include_stored_media_class_values() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+
+        for (source_file_id, name, media_class) in [
+            (11, "track.flac", "audio"),
+            (12, "clip.mp4", "video"),
+            (13, "cover.mp3", "image"),
+            (14, "notes.txt", "unsupported"),
+            (15, "mystery", "none"),
+        ] {
+            insert_file(&connection, source_file_id, name, media_class);
+        }
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        let media_classes = window
+            .rows
+            .iter()
+            .map(|row| (row.display_name.as_str(), row.media_class.as_deref()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            media_classes,
+            vec![
+                ("clip.mp4", Some("video")),
+                ("cover.mp3", Some("image")),
+                ("mystery", Some("none")),
+                ("notes.txt", Some("unsupported")),
+                ("track.flac", Some("audio")),
+            ]
+        );
+    }
 }

@@ -72,8 +72,9 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
   }
 
   const sourceFileId = row.sourceFileId
+  const mediaClass = row.mediaClass
 
-  if (sourceFileId === null) {
+  if (sourceFileId === null || mediaClass === undefined) {
     return undefined
   }
 
@@ -83,6 +84,7 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
     label: row.displayName,
     sourceId: row.sourceId,
     fileId: sourceFileId,
+    mediaClass,
     ...(row.parentSourceDirectoryId === null
       ? {}
       : { parentDirectoryId: row.parentSourceDirectoryId }),

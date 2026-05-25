@@ -328,6 +328,7 @@ function fileNode(
     sourceId: '7',
     fileId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
+    mediaClass: 'audio',
     presence: 'present',
     updatedAtMs
   }
