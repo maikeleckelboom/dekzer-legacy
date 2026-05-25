@@ -24,6 +24,12 @@ type StorageEnvironmentStatus = {
   walExists: boolean
   shmPath: string
   shmExists: boolean
+  schema?: StorageSchemaStatus
+}
+
+type StorageSchemaStatus = {
+  state: 'missing' | 'compatible' | 'incompatible' | 'unreadable'
+  detail?: string
 }
 
 type StorageStatusEnvelope = {
@@ -264,18 +270,21 @@ function isStorageStatusEnvelope(value: unknown): value is StorageStatusEnvelope
   return (
     candidate.type === 'storageStatus' &&
     typeof candidate.userDataPath === 'string' &&
-    isStorageEnvironmentStatus(candidate.development) &&
-    isStorageEnvironmentStatus(candidate.production)
+    isStorageEnvironmentStatus(candidate.development, true) &&
+    isStorageEnvironmentStatus(candidate.production, false)
   )
 }
 
-function isStorageEnvironmentStatus(value: unknown): value is StorageEnvironmentStatus {
+function isStorageEnvironmentStatus(
+  value: unknown,
+  schemaRequired: boolean
+): value is StorageEnvironmentStatus {
   if (typeof value !== 'object' || value === null) {
     return false
   }
 
   const candidate = value as Partial<StorageEnvironmentStatus>
-  return (
+  const hasExpectedStorageShape =
     typeof candidate.environment === 'string' &&
     typeof candidate.storageRootPath === 'string' &&
     typeof candidate.storageRootExists === 'boolean' &&
@@ -287,12 +296,40 @@ function isStorageEnvironmentStatus(value: unknown): value is StorageEnvironment
     typeof candidate.walExists === 'boolean' &&
     typeof candidate.shmPath === 'string' &&
     typeof candidate.shmExists === 'boolean'
+
+  if (!hasExpectedStorageShape) {
+    return false
+  }
+
+  if (schemaRequired) {
+    return isStorageSchemaStatus(candidate.schema)
+  }
+
+  return candidate.schema === undefined || isStorageSchemaStatus(candidate.schema)
+}
+
+function isStorageSchemaStatus(value: unknown): value is StorageSchemaStatus {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const candidate = value as Partial<StorageSchemaStatus>
+  return (
+    (candidate.state === 'missing' ||
+      candidate.state === 'compatible' ||
+      candidate.state === 'incompatible' ||
+      candidate.state === 'unreadable') &&
+    (candidate.detail === undefined || typeof candidate.detail === 'string')
   )
 }
 
 async function runStorageDoctor(parsed: ParsedStorageArgs): Promise<void> {
   const status = await readCargoStorageStatus(parsed)
   const development = status.development
+  const schema = development.schema
+  if (schema === undefined) {
+    throw new Error('storage status did not include development schema compatibility')
+  }
 
   console.log(`[storage:doctor] development storage root: ${development.storageRootPath}`)
   console.log(
@@ -306,16 +343,21 @@ async function runStorageDoctor(parsed: ParsedStorageArgs): Promise<void> {
   console.log(
     `[storage:doctor] artifact file store exists: ${yesNo(development.artifactFileStoreExists)}`
   )
-  console.log('[storage:doctor] schema compatibility: not exposed by Rust storage status')
+  console.log(`[storage:doctor] schema compatibility: ${schema.state}`)
+  if (schema.detail !== undefined) {
+    console.log(`[storage:doctor] schema detail: ${schema.detail}`)
+  }
 
-  if (development.durableStoreExists) {
-    console.log(
-      `[storage:doctor] if desktop startup reports a schema mismatch, run: ${resetCommand(parsed)}`
-    )
-  } else {
+  if (schema.state === 'missing') {
     console.log(
       '[storage:doctor] no development database exists; normal dev startup will create one'
     )
+  } else if (schema.state === 'compatible') {
+    console.log(
+      '[storage:doctor] development database is compatible with the current storage schema'
+    )
+  } else {
+    console.log(`[storage:doctor] reset development storage with: ${resetCommand(parsed)}`)
   }
 }
 

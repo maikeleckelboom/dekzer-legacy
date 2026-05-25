@@ -269,6 +269,7 @@ version = "0.0.0"
 dependencies = [
  "library-boundary-protocol",
  "library-boundary-service",
+ "library-store-sqlite",
  "serde",
  "serde_json",
  "tempfile",

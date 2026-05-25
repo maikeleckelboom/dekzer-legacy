@@ -72,7 +72,8 @@ pub use read_models::selected_contents::{
     StoreSelectedContentsRow, StoreSelectedContentsScope, StoreSelectedContentsState,
 };
 pub use store::{
-    DurableStoreBootstrapStatus, LibraryStoreContext, LocalRoot, LocalRootAvailability,
+    DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
+    DurableStoreSchemaCompatibilityState, LibraryStoreContext, LocalRoot, LocalRootAvailability,
     MaintainedReadModelRevision, MaintainedReadModelScope, ReadLocalRootsResult,
     RegisterLocalRootInput, RootScanMaterializationResult, SqliteDurableStore,
     SqliteDurableStoreAppOwnedState, StoreEnvironment, UnregisterLocalRootInput,

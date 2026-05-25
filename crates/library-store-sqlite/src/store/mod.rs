@@ -27,7 +27,8 @@ mod sources;
 mod work_items;
 
 pub use context::{
-    DurableStoreBootstrapStatus, LibraryStoreContext, SqliteDurableStoreAppOwnedState,
+    DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
+    DurableStoreSchemaCompatibilityState, LibraryStoreContext, SqliteDurableStoreAppOwnedState,
     StoreEnvironment, durable_store_path,
 };
 pub use discovery::RootScanMaterializationResult;
@@ -68,6 +69,10 @@ impl SqliteDurableStore {
         app_owned_state: &SqliteDurableStoreAppOwnedState,
     ) -> Result<DurableStoreBootstrapStatus, crate::DurableStoreOpenFailure> {
         bootstrap::bootstrap_or_validate_app_owned_state(app_owned_state)
+    }
+
+    pub fn schema_compatibility(path: impl AsRef<Path>) -> DurableStoreSchemaCompatibility {
+        bootstrap::schema_compatibility(path)
     }
 
     fn with_discovery_tx<T, F>(&self, f: F) -> LibrarySqliteResult<T>

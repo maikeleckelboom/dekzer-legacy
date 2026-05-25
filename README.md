@@ -90,7 +90,7 @@ Desktop library storage:
 - Production resolves the library user data root from Electron main's `app.getPath("userData")`; the Rust store derives `library.sqlite3` under that root.
 - Development resolves the same host-owned user data root, marks the store environment as `development`, and the Rust store derives `development/library.sqlite3` under that root so renderer HMR does not relocate storage.
 - `DESKTOP_LIBRARY_USER_DATA_PATH` may override the development user data root for local diagnostics. The path must be absolute and is shared by the desktop host and storage wrapper.
-- `library-boundary-stdio storage status --user-data <path>` prints the derived development and production database, sidecar, WAL, and SHM paths without opening or resetting SQLite.
+- `library-boundary-stdio storage status --user-data <path>` prints the derived development and production database, sidecar, WAL, and SHM paths, plus development schema compatibility from the Rust store status path. It does not start the boundary service or reset storage.
 - `library-boundary-stdio storage reset --user-data <path> --confirm-delete` deletes only the derived development storage directory. Reset is not automatic and is not exposed through the renderer.
 
 Workspace ownership:

@@ -46,8 +46,9 @@ pnpm --filter @dekzer/desktop run storage:doctor
 
 `storage:status` prints the resolved user data path, its source, and the Rust-owned status JSON.
 `storage:doctor` is non-destructive. It prints the resolved target, checks whether the development
-database exists, and reports that schema compatibility is not currently exposed by Rust storage
-status. If desktop startup reports a schema mismatch, reset development storage.
+database exists, and reports the Rust-owned schema compatibility status: `missing`, `compatible`,
+`incompatible`, or `unreadable`. Missing databases are created by normal dev startup; incompatible
+or unreadable development databases can be reset explicitly.
 
 ## Reset Storage
 

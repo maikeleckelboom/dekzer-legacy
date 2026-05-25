@@ -44,6 +44,69 @@ pub enum DurableStoreBootstrapStatus {
     OpenedCanonicalStore,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DurableStoreSchemaCompatibility {
+    state: DurableStoreSchemaCompatibilityState,
+    detail: Option<String>,
+}
+
+impl DurableStoreSchemaCompatibility {
+    pub(crate) fn missing() -> Self {
+        Self {
+            state: DurableStoreSchemaCompatibilityState::Missing,
+            detail: None,
+        }
+    }
+
+    pub(crate) fn compatible() -> Self {
+        Self {
+            state: DurableStoreSchemaCompatibilityState::Compatible,
+            detail: None,
+        }
+    }
+
+    pub(crate) fn incompatible(detail: impl Into<String>) -> Self {
+        Self {
+            state: DurableStoreSchemaCompatibilityState::Incompatible,
+            detail: Some(detail.into()),
+        }
+    }
+
+    pub(crate) fn unreadable(detail: impl Into<String>) -> Self {
+        Self {
+            state: DurableStoreSchemaCompatibilityState::Unreadable,
+            detail: Some(detail.into()),
+        }
+    }
+
+    pub fn state(&self) -> DurableStoreSchemaCompatibilityState {
+        self.state
+    }
+
+    pub fn detail(&self) -> Option<&str> {
+        self.detail.as_deref()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DurableStoreSchemaCompatibilityState {
+    Missing,
+    Compatible,
+    Incompatible,
+    Unreadable,
+}
+
+impl DurableStoreSchemaCompatibilityState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Missing => "missing",
+            Self::Compatible => "compatible",
+            Self::Incompatible => "incompatible",
+            Self::Unreadable => "unreadable",
+        }
+    }
+}
+
 /// App-owned library state is rooted at the durable SQLite path.
 /// The sibling artifact file store is derived from that path
 /// and is never derived from mounted source media.

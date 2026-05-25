@@ -41,8 +41,16 @@ pub(crate) fn install_baseline_schema_for_test(
     validate_baseline_schema(connection)
 }
 
-fn validate_existing_canonical_baseline_schema(connection: &Connection) -> LibrarySqliteResult<()> {
-    validate_baseline_schema(connection).map_err(|error| match error {
+pub(crate) fn check_existing_canonical_baseline_schema(
+    connection: &Connection,
+) -> LibrarySqliteResult<()> {
+    validate_baseline_schema(connection)
+}
+
+pub(crate) fn validate_existing_canonical_baseline_schema(
+    connection: &Connection,
+) -> LibrarySqliteResult<()> {
+    check_existing_canonical_baseline_schema(connection).map_err(|error| match error {
         LibrarySqliteError::MalformedSchemaState(detail) => {
             LibrarySqliteError::MalformedSchemaState(format!(
                 "database schema does not match the canonical substrate baseline: {detail}"

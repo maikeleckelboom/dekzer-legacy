@@ -14,6 +14,9 @@ use library_boundary_service::{
     LibraryStoreContext, ProtocolError, StoreEnvironment, reset_development_library_storage,
     resolve_library_storage_environment,
 };
+use library_store_sqlite::{
+    DurableStoreSchemaCompatibility, DurableStoreSchemaCompatibilityState, SqliteDurableStore,
+};
 use serde::Serialize;
 
 use crate::cli::{CliCommand, StorageCommand, parse_cli_args};
@@ -52,8 +55,14 @@ fn run_storage_command(command: StorageCommand) -> Result<(), StorageCommandErro
             let status = StorageStatusEnvelope {
                 envelope_type: "storageStatus",
                 user_data_path: path_string(development_environment.user_data_path()),
-                development: StorageEnvironmentStatus::from_environment(&development_environment),
-                production: StorageEnvironmentStatus::from_environment(&production_environment),
+                development: StorageEnvironmentStatus::from_environment(
+                    &development_environment,
+                    SchemaStatusMode::Include,
+                ),
+                production: StorageEnvironmentStatus::from_environment(
+                    &production_environment,
+                    SchemaStatusMode::Omit,
+                ),
             };
             println!("{}", serde_json::to_string(&status)?);
             Ok(())
@@ -200,10 +209,15 @@ struct StorageEnvironmentStatus {
     wal_exists: bool,
     shm_path: String,
     shm_exists: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    schema: Option<StorageSchemaStatus>,
 }
 
 impl StorageEnvironmentStatus {
-    fn from_environment(environment: &LibraryStorageEnvironment) -> Self {
+    fn from_environment(
+        environment: &LibraryStorageEnvironment,
+        schema_mode: SchemaStatusMode,
+    ) -> Self {
         Self {
             environment: environment.environment().as_str(),
             storage_root_path: path_string(environment.storage_root_path()),
@@ -216,8 +230,41 @@ impl StorageEnvironmentStatus {
             wal_exists: environment.wal_path().exists(),
             shm_path: path_string(environment.shm_path()),
             shm_exists: environment.shm_path().exists(),
+            schema: match schema_mode {
+                SchemaStatusMode::Include => Some(StorageSchemaStatus::from(
+                    SqliteDurableStore::schema_compatibility(environment.durable_store_path()),
+                )),
+                SchemaStatusMode::Omit => None,
+            },
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SchemaStatusMode {
+    Include,
+    Omit,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StorageSchemaStatus {
+    state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+}
+
+impl From<DurableStoreSchemaCompatibility> for StorageSchemaStatus {
+    fn from(compatibility: DurableStoreSchemaCompatibility) -> Self {
+        Self {
+            state: schema_state_string(compatibility.state()),
+            detail: compatibility.detail().map(str::to_string),
+        }
+    }
+}
+
+fn schema_state_string(state: DurableStoreSchemaCompatibilityState) -> &'static str {
+    state.as_str()
 }
 
 #[derive(Debug, Serialize)]

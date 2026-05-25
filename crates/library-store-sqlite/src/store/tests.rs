@@ -1,5 +1,7 @@
 use super::discovery::{RootScanHierarchyObservationReason, RootScanObservation};
-use super::{DurableStoreBootstrapStatus, SqliteDurableStore};
+use super::{
+    DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, SqliteDurableStore,
+};
 use crate::authority::ingest::{DiscoveredFileInput, DiscoveryBatch};
 use crate::authority::roots::{
     ApplyRootMountedInput, ApplyRootUnmountedInput, RegisterRemovableRootInput, RootIdentityKind,
@@ -377,6 +379,79 @@ fn bootstrap_or_validate_installs_the_canonical_baseline_for_empty_databases() {
         SqliteDurableStore::bootstrap_or_validate(&db_path).expect("reopen canonical database");
 
     assert_eq!(reopened, DurableStoreBootstrapStatus::OpenedCanonicalStore);
+}
+
+#[test]
+fn schema_compatibility_reports_missing_without_creating_a_database() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+
+    let compatibility = SqliteDurableStore::schema_compatibility(&db_path);
+
+    assert_eq!(
+        compatibility.state(),
+        DurableStoreSchemaCompatibilityState::Missing
+    );
+    assert_eq!(compatibility.detail(), None);
+    assert!(!db_path.exists());
+}
+
+#[test]
+fn schema_compatibility_reports_compatible_for_canonical_databases() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    SqliteDurableStore::bootstrap_or_validate(&db_path).expect("bootstrap canonical database");
+
+    let compatibility = SqliteDurableStore::schema_compatibility(&db_path);
+
+    assert_eq!(
+        compatibility.state(),
+        DurableStoreSchemaCompatibilityState::Compatible
+    );
+    assert_eq!(compatibility.detail(), None);
+}
+
+#[test]
+fn schema_compatibility_reports_incompatible_for_noncanonical_databases() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let connection = Connection::open(&db_path).expect("open database");
+    connection
+        .execute_batch(
+            "CREATE TABLE IncompatiblePlaceholder (
+                 placeholder_id INTEGER PRIMARY KEY
+             ) STRICT;",
+        )
+        .expect("create incompatible table");
+
+    let compatibility = SqliteDurableStore::schema_compatibility(&db_path);
+
+    assert_eq!(
+        compatibility.state(),
+        DurableStoreSchemaCompatibilityState::Incompatible
+    );
+    let detail = compatibility.detail().expect("incompatibility detail");
+    assert!(detail.contains("canonical substrate baseline"));
+    assert!(detail.contains("IncompatiblePlaceholder"));
+}
+
+#[test]
+fn schema_compatibility_reports_unreadable_for_non_sqlite_files() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    fs::write(&db_path, b"not sqlite").expect("write invalid database bytes");
+
+    let compatibility = SqliteDurableStore::schema_compatibility(&db_path);
+
+    assert_eq!(
+        compatibility.state(),
+        DurableStoreSchemaCompatibilityState::Unreadable
+    );
+    assert!(
+        compatibility
+            .detail()
+            .is_some_and(|detail| !detail.is_empty())
+    );
 }
 
 #[test]
