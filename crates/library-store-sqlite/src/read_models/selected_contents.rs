@@ -1157,6 +1157,7 @@ mod tests {
             .expect("insert source location");
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn insert_asset_file(
         connection: &Connection,
         library_asset_id: i64,

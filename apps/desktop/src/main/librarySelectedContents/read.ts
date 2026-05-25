@@ -293,9 +293,7 @@ function mapCoverage(result: ContractSelectedContentsResult): SelectedContentsCo
   }
 }
 
-function mapSelectedContentsRow(
-  row: ContractSelectedContentsRow
-): SelectedContentsRow | undefined {
+function mapSelectedContentsRow(row: ContractSelectedContentsRow): SelectedContentsRow | undefined {
   return {
     stableId: row.stableId,
     label: row.label,

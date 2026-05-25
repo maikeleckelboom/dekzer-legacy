@@ -128,14 +128,16 @@ function selectedFallbackRootId(
   return visibleRemovableRows[0]?.rootId
 }
 
-function removeUnavailableReason(input: SourceActionModelInput & {
-  readonly visibleSourceRows: readonly VisibleSourceRow[]
-  readonly visibleRemovableRows: readonly VisibleSourceRow[]
-  readonly visibleRootIds: ReadonlySet<string>
-  readonly removableRootIds: ReadonlySet<string>
-  readonly selectedSourceRootId: string | undefined
-  readonly removeVisible: boolean
-}): string | undefined {
+function removeUnavailableReason(
+  input: SourceActionModelInput & {
+    readonly visibleSourceRows: readonly VisibleSourceRow[]
+    readonly visibleRemovableRows: readonly VisibleSourceRow[]
+    readonly visibleRootIds: ReadonlySet<string>
+    readonly removableRootIds: ReadonlySet<string>
+    readonly selectedSourceRootId: string | undefined
+    readonly removeVisible: boolean
+  }
+): string | undefined {
   if (input.removeVisible) {
     if (input.removeSourceStatus === 'removing') {
       return 'A source removal is already in progress.'

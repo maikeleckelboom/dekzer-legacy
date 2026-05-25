@@ -13,10 +13,7 @@ import {
   type LibraryOperationFeedbackTone
 } from './operationFeedback'
 import { useRootLifecycle } from './runtime/rootLifecycle'
-import {
-  deriveSourceActionModel,
-  hasVisibleSourceRootBinding
-} from './runtime/sourceActions'
+import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
 import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
 import TreeRoot from './tree/treeRoot.vue'
@@ -157,11 +154,13 @@ const operationFeedback = computed(() =>
   })
 )
 
-const showOperationFeedback = computed(
-  () => visibleOperationFeedbackKinds.has(operationFeedback.value.kind)
+const showOperationFeedback = computed(() =>
+  visibleOperationFeedbackKinds.has(operationFeedback.value.kind)
 )
 
-const operationFeedbackClass = computed(() => operationFeedbackToneClass(operationFeedback.value.tone))
+const operationFeedbackClass = computed(() =>
+  operationFeedbackToneClass(operationFeedback.value.tone)
+)
 
 watch(
   preferredNodeId,
@@ -443,7 +442,9 @@ function activateContentRowAction(row: ContentRow): void {
   void hierarchyRead.requestNodeChildren(action.nodeId)
 }
 
-function requestSelectedContentsForCurrentSelection(options: { readonly force?: boolean } = {}): void {
+function requestSelectedContentsForCurrentSelection(
+  options: { readonly force?: boolean } = {}
+): void {
   const selectedId = selectedNodeId.value
   const projection = hierarchyRead.browserProjection.value
 
@@ -454,7 +455,6 @@ function requestSelectedContentsForCurrentSelection(options: { readonly force?: 
 
   void selectedContentsRead.readForBinding(projection.bindingsById.get(selectedId), options)
 }
-
 </script>
 
 <template>

@@ -2,7 +2,8 @@ import { spawn } from 'node:child_process'
 import { isAbsolute, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export type StorageSubcommand = 'status' | 'reset'
+export type StorageSubcommand = 'status' | 'reset' | 'doctor'
+type CargoStorageSubcommand = Exclude<StorageSubcommand, 'doctor'>
 
 export type ParsedStorageArgs = {
   subcommand: StorageSubcommand
@@ -11,7 +12,28 @@ export type ParsedStorageArgs = {
   confirmDelete: boolean
 }
 
-const VALID_SUBCOMMANDS: readonly string[] = ['status', 'reset']
+type StorageEnvironmentStatus = {
+  environment: string
+  storageRootPath: string
+  storageRootExists: boolean
+  durableStorePath: string
+  durableStoreExists: boolean
+  artifactFileStorePath: string
+  artifactFileStoreExists: boolean
+  walPath: string
+  walExists: boolean
+  shmPath: string
+  shmExists: boolean
+}
+
+type StorageStatusEnvelope = {
+  type: 'storageStatus'
+  userDataPath: string
+  development: StorageEnvironmentStatus
+  production: StorageEnvironmentStatus
+}
+
+const VALID_SUBCOMMANDS: readonly string[] = ['status', 'reset', 'doctor']
 const ENV_VAR = 'DESKTOP_LIBRARY_USER_DATA_PATH'
 
 export function resolveWorkspaceRoot(): string {
@@ -35,7 +57,9 @@ export function resolveDefaultUserDataPath(): {
 export function parseArgs(argv: readonly string[]): ParsedStorageArgs {
   const subcommandRaw = argv[0]
   if (subcommandRaw === undefined || !VALID_SUBCOMMANDS.includes(subcommandRaw)) {
-    throw new Error(`unknown subcommand "${subcommandRaw ?? ''}"; expected status or reset`)
+    throw new Error(
+      `unknown subcommand "${subcommandRaw ?? ''}"; expected status, reset, or doctor`
+    )
   }
   const subcommand = subcommandRaw as StorageSubcommand
 
@@ -102,6 +126,9 @@ export function parseArgs(argv: readonly string[]): ParsedStorageArgs {
   if (subcommand === 'reset' && !confirmDelete) {
     throw new Error('--confirm-delete is required for reset')
   }
+  if (subcommand !== 'reset' && confirmDelete) {
+    throw new Error('--confirm-delete is only valid for reset')
+  }
 
   let userDataPath: string
   let userDataSource: 'argument' | 'environmentOverride' | 'developmentDefault'
@@ -118,22 +145,33 @@ export function parseArgs(argv: readonly string[]): ParsedStorageArgs {
   return { subcommand, userDataPath, userDataSource, confirmDelete }
 }
 
-export async function spawnCargoStorageCommand(parsed: ParsedStorageArgs): Promise<number> {
+function cargoStorageArgs(parsed: ParsedStorageArgs, subcommand: CargoStorageSubcommand): string[] {
   const cargoArgs = [
     'run',
+    '--quiet',
     '-p',
     'library-boundary-stdio',
     '--',
     'storage',
-    parsed.subcommand,
+    subcommand,
     '--user-data',
     parsed.userDataPath
   ]
 
-  if (parsed.subcommand === 'reset' && parsed.confirmDelete) {
+  if (subcommand === 'reset' && parsed.confirmDelete) {
     cargoArgs.push('--confirm-delete')
   }
 
+  return cargoArgs
+}
+
+export async function spawnCargoStorageCommand(parsed: ParsedStorageArgs): Promise<number> {
+  if (parsed.subcommand === 'doctor') {
+    await runStorageDoctor(parsed)
+    return 0
+  }
+
+  const cargoArgs = cargoStorageArgs(parsed, parsed.subcommand)
   const cargoCommand = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
   const workspaceRoot = resolveWorkspaceRoot()
 
@@ -156,6 +194,142 @@ export async function spawnCargoStorageCommand(parsed: ParsedStorageArgs): Promi
       resolveExitCode(code ?? 1)
     })
   })
+}
+
+async function readCargoStorageStatus(parsed: ParsedStorageArgs): Promise<StorageStatusEnvelope> {
+  const cargoArgs = cargoStorageArgs(parsed, 'status')
+  const cargoCommand = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
+  const workspaceRoot = resolveWorkspaceRoot()
+
+  return new Promise<StorageStatusEnvelope>((resolveStatus, rejectStatus) => {
+    const child = spawn(cargoCommand, cargoArgs, {
+      cwd: workspaceRoot,
+      stdio: ['ignore', 'pipe', 'inherit']
+    })
+
+    let stdout = ''
+
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk
+    })
+
+    child.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'ENOENT') {
+        rejectStatus(new Error(`cargo not found at workspace root ${workspaceRoot}`))
+      } else {
+        rejectStatus(new Error(`failed to spawn cargo: ${err.message}`))
+      }
+    })
+
+    child.on('exit', (code) => {
+      if (code !== 0) {
+        rejectStatus(new Error(`storage status exited with code ${code ?? 1}`))
+        return
+      }
+
+      const output = stdout.trim()
+      try {
+        resolveStatus(parseStorageStatusEnvelope(output))
+      } catch (e: unknown) {
+        if (e instanceof Error) {
+          rejectStatus(e)
+          return
+        }
+        rejectStatus(new Error('failed to parse storage status output'))
+      }
+    })
+  })
+}
+
+function parseStorageStatusEnvelope(output: string): StorageStatusEnvelope {
+  if (output.length === 0) {
+    throw new Error('storage status returned no JSON output')
+  }
+
+  const value: unknown = JSON.parse(output)
+  if (!isStorageStatusEnvelope(value)) {
+    throw new Error('storage status returned an unexpected JSON shape')
+  }
+
+  return value
+}
+
+function isStorageStatusEnvelope(value: unknown): value is StorageStatusEnvelope {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const candidate = value as Partial<StorageStatusEnvelope>
+  return (
+    candidate.type === 'storageStatus' &&
+    typeof candidate.userDataPath === 'string' &&
+    isStorageEnvironmentStatus(candidate.development) &&
+    isStorageEnvironmentStatus(candidate.production)
+  )
+}
+
+function isStorageEnvironmentStatus(value: unknown): value is StorageEnvironmentStatus {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const candidate = value as Partial<StorageEnvironmentStatus>
+  return (
+    typeof candidate.environment === 'string' &&
+    typeof candidate.storageRootPath === 'string' &&
+    typeof candidate.storageRootExists === 'boolean' &&
+    typeof candidate.durableStorePath === 'string' &&
+    typeof candidate.durableStoreExists === 'boolean' &&
+    typeof candidate.artifactFileStorePath === 'string' &&
+    typeof candidate.artifactFileStoreExists === 'boolean' &&
+    typeof candidate.walPath === 'string' &&
+    typeof candidate.walExists === 'boolean' &&
+    typeof candidate.shmPath === 'string' &&
+    typeof candidate.shmExists === 'boolean'
+  )
+}
+
+async function runStorageDoctor(parsed: ParsedStorageArgs): Promise<void> {
+  const status = await readCargoStorageStatus(parsed)
+  const development = status.development
+
+  console.log(`[storage:doctor] development storage root: ${development.storageRootPath}`)
+  console.log(
+    `[storage:doctor] development storage root exists: ${yesNo(development.storageRootExists)}`
+  )
+  console.log(`[storage:doctor] development database: ${development.durableStorePath}`)
+  console.log(
+    `[storage:doctor] development database exists: ${yesNo(development.durableStoreExists)}`
+  )
+  console.log(`[storage:doctor] artifact file store: ${development.artifactFileStorePath}`)
+  console.log(
+    `[storage:doctor] artifact file store exists: ${yesNo(development.artifactFileStoreExists)}`
+  )
+  console.log('[storage:doctor] schema compatibility: not exposed by Rust storage status')
+
+  if (development.durableStoreExists) {
+    console.log(
+      `[storage:doctor] if desktop startup reports a schema mismatch, run: ${resetCommand(parsed)}`
+    )
+  } else {
+    console.log(
+      '[storage:doctor] no development database exists; normal dev startup will create one'
+    )
+  }
+}
+
+function yesNo(value: boolean): 'yes' | 'no' {
+  return value ? 'yes' : 'no'
+}
+
+function resetCommand(parsed: ParsedStorageArgs): string {
+  const base = 'pnpm --filter @dekzer/desktop run storage:reset --'
+  if (parsed.userDataSource === 'argument') {
+    return `${base} --user-data "${parsed.userDataPath}" --confirm-delete`
+  }
+
+  return `${base} --confirm-delete`
 }
 
 async function main(): Promise<void> {

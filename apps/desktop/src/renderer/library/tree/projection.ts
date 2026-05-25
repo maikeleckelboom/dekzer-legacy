@@ -36,9 +36,7 @@ type ProjectedNodeState = {
   readonly action?: BrowserTreeAction
 }
 
-export function projectState(
-  state: BrowserState
-): BrowserProjection | undefined {
+export function projectState(state: BrowserState): BrowserProjection | undefined {
   const hostProjection = projectHostStatus(state.hostStatus)
 
   if (hostProjection !== undefined) {

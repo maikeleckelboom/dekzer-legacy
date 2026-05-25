@@ -14,11 +14,7 @@ import {
   WarningIcon
 } from '../../icons'
 import type { IconComponent, IconTone } from '../../icons'
-import {
-  type ContentProjection,
-  type ContentRow,
-  type ContentRowIcon
-} from './projection'
+import { type ContentProjection, type ContentRow, type ContentRowIcon } from './projection'
 
 defineOptions({
   name: 'ContentsTable'

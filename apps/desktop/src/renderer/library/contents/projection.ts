@@ -393,9 +393,7 @@ function selectedContentsStateLabel(result: SelectedContentsResult): string {
   switch (result.state) {
     case 'ready':
     case 'empty':
-      return result.coverage.emptyResultAuthoritative
-        ? 'No media found'
-        : 'No media found yet'
+      return result.coverage.emptyResultAuthoritative ? 'No media found' : 'No media found yet'
     case 'partial':
       return 'Still indexing'
     case 'sourceUnavailable':

@@ -32,7 +32,10 @@ export type LibraryBoundaryHostBinaryPolicy =
   | LibraryBoundaryHostDevelopmentBinaryPolicy
   | LibraryBoundaryHostPackagedBinaryPolicy
 
-export type LibraryBoundaryHostStorageSource = 'electronUserData' | 'environmentOverride' | 'developmentDefault'
+export type LibraryBoundaryHostStorageSource =
+  | 'electronUserData'
+  | 'environmentOverride'
+  | 'developmentDefault'
 
 export type LibraryBoundaryHostStorageEnvironment = {
   readonly kind: 'userDataRoot'

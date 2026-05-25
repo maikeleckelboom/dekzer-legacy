@@ -23,23 +23,26 @@ Run workspace commands from this directory:
 
 ```bash
 pnpm install
-pnpm run dev:desktop
+pnpm run desktop:dev
+pnpm run desktop:dev:fresh
 pnpm run library:contract:export
 pnpm run library:contract:check
 pnpm run library:contract:build
 pnpm run library:stdio:contract:export
 pnpm run library:stdio:contract:check
 pnpm run typecheck
+pnpm run verify
 pnpm run library:client:typecheck
 pnpm run library:client:build
 pnpm run library:client:test
 pnpm run library:stdio:typecheck
 pnpm run library:stdio:build
 pnpm run library:stdio:test
-pnpm run desktop:validate
-pnpm run check
+pnpm run desktop:test
+pnpm run desktop:verify
 pnpm run build
 pnpm run test
+pnpm run lint
 pnpm run test:rust
 pnpm run fmt:rust
 pnpm run lint:rust
@@ -48,7 +51,8 @@ pnpm run build:desktop
 
 Current root scripts:
 
-- `dev:desktop` starts the desktop app.
+- `desktop:dev` starts the desktop app without resetting development storage.
+- `desktop:dev:fresh` resets development storage through the Rust storage reset command, then starts the desktop app.
 - `build:desktop` builds the desktop app.
 - `library:contract:export` regenerates `packages/library-boundary-contract` from `crates/library-boundary-protocol`.
 - `library:contract:check` verifies the generated boundary contract package is current.
@@ -61,14 +65,19 @@ Current root scripts:
 - `library:stdio:typecheck` typechecks the TypeScript stdio transport package.
 - `library:stdio:build` builds the generated boundary contract package, boundary client, and stdio transport package.
 - `library:stdio:test` builds the Rust stdio server and runs the stdio transport validation and cross-process smoke fixtures.
-- `desktop:validate` runs the desktop behavioral validation suite, including host policy, storage environment, local root scan, hierarchy read, and restart persistence checks.
+- `desktop:test` runs the desktop Vitest suite.
+- `desktop:verify` runs desktop typecheck, Vitest, and lint.
+- `desktop:storage:status` prints the resolved development storage target and Rust-owned status JSON.
+- `desktop:storage:doctor` checks the resolved development storage target without resetting it.
+- `desktop:storage:reset` resets the resolved development storage target when called with `-- --confirm-delete`.
 - `typecheck` runs the generated boundary contract package typecheck, boundary client typecheck, stdio transport typecheck, and desktop typecheck.
 - `build` builds the generated boundary contract package, boundary client, stdio transport package, and desktop app.
-- `test` runs the boundary client/session validation fixture, stdio transport validation and cross-process smoke fixtures, and the Rust workspace test suite.
+- `test` runs desktop Vitest, boundary client/session validation, stdio transport validation and cross-process smoke fixtures, and the Rust workspace test suite.
+- `lint` runs desktop ESLint and Rust clippy.
 - `test:rust` runs `cargo test --workspace`.
 - `fmt:rust` runs `cargo fmt --all --check`.
 - `lint:rust` runs `cargo clippy --workspace --all-targets -- -D warnings`.
-- `check` runs the boundary contract stale check, stdio transport contract stale check, TypeScript typechecks, desktop host validation, boundary client and stdio validation fixtures, Rust fmt, clippy, and test gates.
+- `verify` runs the pre-merge gate: `git diff --check`, boundary contract stale checks, TypeScript typechecks, desktop tests, library client and stdio transport tests, Rust tests, desktop lint, Rust fmt check, and Rust clippy.
 
 Stdio readiness:
 
@@ -80,7 +89,7 @@ Desktop library storage:
 
 - Production resolves the library user data root from Electron main's `app.getPath("userData")`; the Rust store derives `library.sqlite3` under that root.
 - Development resolves the same host-owned user data root, marks the store environment as `development`, and the Rust store derives `development/library.sqlite3` under that root so renderer HMR does not relocate storage.
-- `DESKTOP_LIBRARY_USER_DATA_PATH` may override the user data root for local diagnostics. The path must be absolute, and the override is resolved only in `apps/desktop/src/main/libraryBoundary/config.ts`.
+- `DESKTOP_LIBRARY_USER_DATA_PATH` may override the development user data root for local diagnostics. The path must be absolute and is shared by the desktop host and storage wrapper.
 - `library-boundary-stdio storage status --user-data <path>` prints the derived development and production database, sidecar, WAL, and SHM paths without opening or resetting SQLite.
 - `library-boundary-stdio storage reset --user-data <path> --confirm-delete` deletes only the derived development storage directory. Reset is not automatic and is not exposed through the renderer.
 

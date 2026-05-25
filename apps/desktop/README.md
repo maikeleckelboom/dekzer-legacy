@@ -8,9 +8,11 @@ Run it from the workspace root at `C:\dev\dekzer`.
 
 ```bash
 pnpm install
-pnpm run dev:desktop
+pnpm run desktop:dev
+pnpm run desktop:dev:fresh
 pnpm run typecheck
-pnpm run desktop:validate
+pnpm run desktop:test
+pnpm run desktop:verify
 pnpm run build:desktop
 ```
 

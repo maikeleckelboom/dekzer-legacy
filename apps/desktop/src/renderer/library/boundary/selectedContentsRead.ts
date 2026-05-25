@@ -29,7 +29,10 @@ export type SelectedContentsBoundaryState =
 
 export type SelectedContentsReadController = {
   readonly state: Ref<SelectedContentsBoundaryState>
-  readonly readForBinding: (binding: RowBinding | undefined, options?: ReadOptions) => Promise<boolean>
+  readonly readForBinding: (
+    binding: RowBinding | undefined,
+    options?: ReadOptions
+  ) => Promise<boolean>
   readonly clear: () => void
   readonly start: () => void
   readonly stop: () => void
