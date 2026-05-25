@@ -108,7 +108,7 @@ CREATE TABLE source_scan_state
 (
     source_id                  INTEGER PRIMARY KEY REFERENCES sources (source_id) ON DELETE CASCADE,
     scan_phase                 TEXT    NOT NULL
-        CHECK (scan_phase IN ('idle', 'scanning', 'complete', 'blocked', 'failed')),
+        CHECK (scan_phase IN ('idle', 'scanning', 'complete', 'partial', 'blocked', 'failed')),
     last_scan_started_at       INTEGER,
     last_scan_finished_at      INTEGER,
     last_successful_scan_at    INTEGER,
@@ -146,7 +146,7 @@ CREATE TABLE source_scan_state
             OR last_scan_finished_at IS NULL
             OR last_successful_scan_at <= last_scan_finished_at
     ),
-    CHECK (scan_phase <> 'blocked' OR scan_issue_kind IS NOT NULL)
+    CHECK (scan_phase NOT IN ('blocked', 'partial') OR scan_issue_kind IS NOT NULL)
 ) STRICT;
 
 CREATE TABLE source_locations

@@ -123,6 +123,7 @@ pub(crate) fn read_children(
                 | StoreLiteralHierarchyCoverageState::Blocked
                 | StoreLiteralHierarchyCoverageState::Failed
         )
+        && anchor.source_readiness.scan_phase.as_deref() != Some("partial")
     {
         return Ok(Some(StoreLiteralHierarchyWindow {
             entry_point,
@@ -143,6 +144,10 @@ pub(crate) fn read_children(
     )?;
     coverage.empty_result_authoritative =
         coverage.state == StoreLiteralHierarchyCoverageState::Complete && total_rows == 0;
+    if anchor.source_readiness.scan_phase.as_deref() == Some("partial") {
+        coverage.empty_result_authoritative = false;
+        coverage.recursive_scope_complete = false;
+    }
     let rows = read_child_rows(
         connection,
         anchor.source_id,
@@ -453,6 +458,7 @@ fn source_readiness_coverage(source: &SourceReadiness) -> Option<StoreLiteralHie
             false,
             "The selected source scan failed.",
         )),
+        Some("partial") => None,
         _ => None,
     }
 }
@@ -560,18 +566,29 @@ fn literal_coverage_from_counts(
             "The selected hierarchy scope is still scanning.",
         );
     }
-    if counts.pending_directories > 0 || source.scan_phase.as_deref() != Some("complete") {
+    let scan_finalized = matches!(
+        source.scan_phase.as_deref(),
+        Some("complete") | Some("partial")
+    );
+    if counts.pending_directories > 0 || !scan_finalized {
         return literal_coverage(
             pending_or_scanning_coverage_state(source),
             false,
             "The selected hierarchy scope has incomplete scan coverage.",
         );
     }
-    if counts.total_directories == 0 && source.scan_phase.as_deref() != Some("complete") {
+    if counts.total_directories == 0 && !scan_finalized {
         return literal_coverage(
             pending_or_scanning_coverage_state(source),
             false,
             "The selected hierarchy scope has not completed scan coverage.",
+        );
+    }
+    if source.scan_phase.as_deref() == Some("partial") {
+        return literal_coverage(
+            StoreLiteralHierarchyCoverageState::Blocked,
+            false,
+            "The selected source scan has incomplete descendant coverage.",
         );
     }
     literal_coverage(
@@ -1370,6 +1387,103 @@ mod tests {
         assert_eq!(
             directory_window.rows[0].media_class.as_deref(),
             Some("image")
+        );
+    }
+
+    #[test]
+    fn partial_scan_phase_does_not_produce_authoritative_empty() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 7",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+        );
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert!(!window.coverage.empty_result_authoritative);
+        assert!(!window.coverage.recursive_scope_complete);
+    }
+
+    #[test]
+    fn partial_scan_phase_returns_visible_rows_and_blocked_coverage() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 7",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+        );
+        insert_file_in_directory(&connection, 31, Some(20), "Music/track.flac", "audio");
+        insert_directory(
+            &connection,
+            21,
+            Some(20),
+            "Music/Locked",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "blocked",
+        );
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(20),
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Blocked
+        );
+        assert!(!window.coverage.recursive_scope_complete);
+        assert!(!window.coverage.empty_result_authoritative);
+        assert!(
+            !window.rows.is_empty(),
+            "partial scan must return visible rows outside blocked subtree"
         );
     }
 }

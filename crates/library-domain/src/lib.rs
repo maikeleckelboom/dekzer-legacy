@@ -138,6 +138,7 @@ mod tests {
                 (SourceScanPhase::Idle, "idle"),
                 (SourceScanPhase::Scanning, "scanning"),
                 (SourceScanPhase::Complete, "complete"),
+                (SourceScanPhase::Partial, "partial"),
                 (SourceScanPhase::Blocked, "blocked"),
                 (SourceScanPhase::Failed, "failed"),
             ]

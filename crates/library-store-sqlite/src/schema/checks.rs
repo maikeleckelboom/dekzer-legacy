@@ -99,9 +99,9 @@ fn validate_source_state_constraints(connection: &Connection) -> LibrarySqliteRe
 fn validate_source_scan_state_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
     let sql = read_required_normalized_table_sql(connection, "source_scan_state")?;
     for fragment in [
-        "scan_phase IN ('idle', 'scanning', 'complete', 'blocked', 'failed')",
+        "scan_phase IN ('idle', 'scanning', 'complete', 'partial', 'blocked', 'failed')",
         "last_scan_finished_at >= last_scan_started_at",
-        "scan_phase <> 'blocked' OR scan_issue_kind IS NOT NULL",
+        "scan_phase NOT IN ('blocked', 'partial') OR scan_issue_kind IS NOT NULL",
     ] {
         require_sql_fragment(
             &sql,

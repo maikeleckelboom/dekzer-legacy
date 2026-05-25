@@ -127,6 +127,7 @@ pub enum RootScanPhase {
     Idle,
     Scanning,
     Complete,
+    Partial,
     BlockedUnavailable,
     InterruptedUnavailable,
     Failed,
@@ -359,19 +360,27 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             return Err(LibrarySqliteError::MissingRoot(root_id));
         };
         let mut next = record.state.clone();
-        next.scan_phase = RootScanPhase::Complete;
-        next.last_scan_finished_at = Some(
-            next.last_scan_finished_at
-                .unwrap_or(completed_at_ms)
-                .max(completed_at_ms),
-        );
-        next.last_successful_scan_at = Some(
-            next.last_successful_scan_at
-                .unwrap_or(completed_at_ms)
-                .max(completed_at_ms),
-        );
-        next.scan_issue_kind = None;
-        next.error_detail = None;
+        if next.scan_phase == RootScanPhase::Partial {
+            next.last_scan_finished_at = Some(
+                next.last_scan_finished_at
+                    .unwrap_or(completed_at_ms)
+                    .max(completed_at_ms),
+            );
+        } else {
+            next.scan_phase = RootScanPhase::Complete;
+            next.last_scan_finished_at = Some(
+                next.last_scan_finished_at
+                    .unwrap_or(completed_at_ms)
+                    .max(completed_at_ms),
+            );
+            next.last_successful_scan_at = Some(
+                next.last_successful_scan_at
+                    .unwrap_or(completed_at_ms)
+                    .max(completed_at_ms),
+            );
+            next.scan_issue_kind = None;
+            next.error_detail = None;
+        }
         next.updated_at = completed_at_ms;
         self.write_source_state(&next)
     }
@@ -1334,6 +1343,7 @@ fn parse_scan_phase(
         "idle" => Ok(RootScanPhase::Idle),
         "scanning" => Ok(RootScanPhase::Scanning),
         "complete" => Ok(RootScanPhase::Complete),
+        "partial" => Ok(RootScanPhase::Partial),
         "blocked" => Ok(
             if scan_issue_kind == Some(SourceAccessIssueKind::IoInterrupted.as_str()) {
                 RootScanPhase::InterruptedUnavailable
@@ -1369,6 +1379,7 @@ fn source_scan_phase_value(phase: RootScanPhase) -> &'static str {
         RootScanPhase::Idle => "idle",
         RootScanPhase::Scanning => "scanning",
         RootScanPhase::Complete => "complete",
+        RootScanPhase::Partial => "partial",
         RootScanPhase::BlockedUnavailable | RootScanPhase::InterruptedUnavailable => "blocked",
         RootScanPhase::Failed => "failed",
     }
@@ -1390,6 +1401,9 @@ fn scan_issue_kind_value(
                 .as_str(),
         ),
         RootScanPhase::Failed => Some(current.unwrap_or(SourceAccessIssueKind::UnknownIo).as_str()),
+        RootScanPhase::Partial => {
+            Some(current.unwrap_or(SourceAccessIssueKind::UnknownIo).as_str())
+        }
         _ => None,
     }
 }

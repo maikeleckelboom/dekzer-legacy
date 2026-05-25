@@ -192,12 +192,15 @@ pub(crate) fn read_selected_contents(
     let state = selected_contents_state(&coverage, rows.is_empty());
     let detail = selected_contents_detail(state, coverage.state);
 
+    let empty_result_authoritative = state == StoreSelectedContentsState::Empty
+        && source_readiness.scan_phase.as_deref() != Some("partial");
+
     Ok(StoreSelectedContentsResult {
         state,
         scope,
         rows,
         coverage: StoreSelectedContentsCoverage {
-            empty_result_authoritative: state == StoreSelectedContentsState::Empty,
+            empty_result_authoritative,
             ..coverage
         },
         next_cursor: None,
@@ -527,6 +530,7 @@ fn source_unavailable_state(
             StoreSelectedContentsCoverageState::Failed,
             "The selected source scan failed.",
         )),
+        Some("partial") => None,
         _ => None,
     }
 }
@@ -690,7 +694,10 @@ fn coverage_from_counts(
 ) -> StoreSelectedContentsCoverage {
     if counts.total_directories == 0 {
         if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
-            && source.scan_phase.as_deref() == Some("complete")
+            && matches!(
+                source.scan_phase.as_deref(),
+                Some("complete") | Some("partial")
+            )
         {
             return coverage(
                 StoreSelectedContentsCoverageState::Complete,
@@ -746,13 +753,24 @@ fn coverage_from_counts(
         );
     }
 
-    if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
-        && source.scan_phase.as_deref() != Some("complete")
-    {
+    let scan_finalized = matches!(
+        source.scan_phase.as_deref(),
+        Some("complete") | Some("partial")
+    );
+
+    if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. }) && !scan_finalized {
         return coverage(
             StoreSelectedContentsCoverageState::Pending,
             false,
             "The selected source has not completed a full recursive scan.",
+        );
+    }
+
+    if source.scan_phase.as_deref() == Some("partial") {
+        return coverage(
+            StoreSelectedContentsCoverageState::Blocked,
+            false,
+            "The selected source scan has incomplete descendant coverage.",
         );
     }
 
@@ -2371,5 +2389,70 @@ mod tests {
         rows.map(|r| r.expect("read plan row"))
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    #[test]
+    fn partial_scan_phase_does_not_produce_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.coverage.recursive_scope_complete);
+        assert_ne!(result.state, StoreSelectedContentsState::Empty);
+    }
+
+    #[test]
+    fn partial_scan_phase_returns_visible_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Music/track.wav", "audio");
+        insert_directory(&connection, 11, 1, "Music/Locked", "blocked");
+        connection
+            .execute(
+                "UPDATE source_directories SET dir_scan_issue_kind = 'permission_denied' WHERE source_directory_id = 11",
+                [],
+            )
+            .expect("set blocked issue kind");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert!(
+            !result.rows.is_empty(),
+            "partial scan must return visible rows"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Blocked
+        );
+        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.coverage.empty_result_authoritative);
     }
 }

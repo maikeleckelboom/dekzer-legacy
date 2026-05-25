@@ -392,17 +392,33 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
              WHERE source_id = ?1",
             params![root_id, now_ms],
         )?;
-        let scan_rows_changed = self.tx().execute(
-            "UPDATE source_scan_state
-             SET scan_phase = 'complete',
-                 last_scan_finished_at = ?2,
-                 last_successful_scan_at = ?2,
-                 scan_issue_kind = NULL,
-                 error_detail = NULL,
-                 updated_at = ?2
-             WHERE source_id = ?1",
-            params![root_id, now_ms],
-        )?;
+
+        let descendant_coverage = self.load_descendant_coverage_issue(root_id)?;
+        let scan_rows_changed = match descendant_coverage {
+            Some((phase, issue_kind, error_detail)) => self.tx().execute(
+                "UPDATE source_scan_state
+                     SET scan_phase = ?2,
+                         last_scan_finished_at = ?3,
+                         last_successful_scan_at = last_successful_scan_at,
+                         scan_issue_kind = ?4,
+                         error_detail = ?5,
+                         updated_at = ?3
+                     WHERE source_id = ?1",
+                params![root_id, phase, now_ms, issue_kind, error_detail],
+            )?,
+            None => self.tx().execute(
+                "UPDATE source_scan_state
+                     SET scan_phase = 'complete',
+                         last_scan_finished_at = ?2,
+                         last_successful_scan_at = ?2,
+                         scan_issue_kind = NULL,
+                         error_detail = NULL,
+                         updated_at = ?2
+                     WHERE source_id = ?1",
+                params![root_id, now_ms],
+            )?,
+        };
+
         if state_rows_changed == 0 || scan_rows_changed == 0 {
             return Err(LibrarySqliteError::MissingRoot(root_id));
         }
@@ -860,6 +876,61 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             .query_map([root_id], |row| row.get::<_, String>(0))?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+
+    fn load_descendant_coverage_issue(
+        &self,
+        root_id: i64,
+    ) -> LibrarySqliteResult<Option<(&'static str, Option<String>, Option<String>)>> {
+        let failed_issue: Option<(String, Option<String>)> = self
+            .tx()
+            .query_row(
+                "SELECT dir_scan_issue_kind, dir_scan_error_detail
+                 FROM source_directories
+                 WHERE source_id = ?1
+                   AND presence_state = 'present'
+                   AND dir_scan_state = 'failed'
+                   AND dir_scan_issue_kind IS NOT NULL
+                 ORDER BY relative_path ASC
+                 LIMIT 1",
+                [root_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+
+        if let Some((issue_kind, _error_detail)) = failed_issue {
+            return Ok(Some((
+                "partial",
+                Some(issue_kind),
+                Some("descendant directory coverage is incomplete".to_string()),
+            )));
+        }
+
+        let blocked_issue: Option<(String, Option<String>)> = self
+            .tx()
+            .query_row(
+                "SELECT dir_scan_issue_kind, dir_scan_error_detail
+                 FROM source_directories
+                 WHERE source_id = ?1
+                   AND presence_state = 'present'
+                   AND dir_scan_state = 'blocked'
+                   AND dir_scan_issue_kind IS NOT NULL
+                 ORDER BY relative_path ASC
+                 LIMIT 1",
+                [root_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+
+        if let Some((issue_kind, _error_detail)) = blocked_issue {
+            return Ok(Some((
+                "partial",
+                Some(issue_kind),
+                Some("descendant directory coverage is incomplete".to_string()),
+            )));
+        }
+
+        Ok(None)
     }
 
     fn queue_rebind_work_if_needed(
@@ -2102,6 +2173,258 @@ mod tests {
             candidate_path,
             Some("/test/reprobe".to_string()),
             "blocked source must still yield a candidate path for fresh re-probe"
+        );
+    }
+
+    #[test]
+    fn finalized_scan_with_blocked_descendant_becomes_partial_not_complete() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/locked".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                        diagnostic_detail: Some("permission denied".to_string()),
+                        observed_at_ms: 20,
+                    },
+                )
+                .expect("commit blocked directory outcome");
+            Ok(())
+        })
+        .expect("write blocked directory outcome");
+
+        let previous_successful_at: Option<i64> = connection
+            .query_row(
+                "SELECT last_successful_scan_at FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read last_successful_scan_at");
+
+        run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
+
+        let scan_phase: String = connection
+            .query_row(
+                "SELECT scan_phase FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan phase");
+        assert_eq!(scan_phase, "partial");
+
+        let last_scan_finished_at: Option<i64> = connection
+            .query_row(
+                "SELECT last_scan_finished_at FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read last_scan_finished_at");
+        assert!(last_scan_finished_at.is_some());
+
+        let last_successful_scan_at: Option<i64> = connection
+            .query_row(
+                "SELECT last_successful_scan_at FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read last_successful_scan_at");
+        assert_eq!(
+            last_successful_scan_at, previous_successful_at,
+            "partial finalization must not update last_successful_scan_at"
+        );
+
+        let scan_issue_kind: Option<String> = connection
+            .query_row(
+                "SELECT scan_issue_kind FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan_issue_kind");
+        assert!(
+            scan_issue_kind.is_some(),
+            "partial scan phase must have a non-null scan_issue_kind"
+        );
+
+        let locked_facts = read_directory_facts(&connection, "albums/locked");
+        assert_eq!(locked_facts.dir_scan_state, "blocked");
+    }
+
+    #[test]
+    fn finalized_scan_with_failed_descendant_becomes_partial_not_complete() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/corrupt".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Failed,
+                        issue_kind: Some(SourceAccessIssueKind::UnknownIo),
+                        diagnostic_detail: Some("read error".to_string()),
+                        observed_at_ms: 20,
+                    },
+                )
+                .expect("commit failed directory outcome");
+            Ok(())
+        })
+        .expect("write failed directory outcome");
+
+        let previous_successful_at: Option<i64> = connection
+            .query_row(
+                "SELECT last_successful_scan_at FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read last_successful_scan_at");
+
+        run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
+
+        let scan_phase: String = connection
+            .query_row(
+                "SELECT scan_phase FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan phase");
+        assert_eq!(scan_phase, "partial");
+
+        let scan_issue_kind: Option<String> = connection
+            .query_row(
+                "SELECT scan_issue_kind FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan_issue_kind");
+        assert_eq!(scan_issue_kind.as_deref(), Some("unknown_io"));
+
+        let last_successful_scan_at: Option<i64> = connection
+            .query_row(
+                "SELECT last_successful_scan_at FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read last_successful_scan_at");
+        assert_eq!(
+            last_successful_scan_at, previous_successful_at,
+            "partial finalization must not update last_successful_scan_at"
+        );
+    }
+
+    #[test]
+    fn fully_covered_scan_becomes_complete() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
+
+        let scan_phase: String = connection
+            .query_row(
+                "SELECT scan_phase FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan phase");
+        assert_eq!(scan_phase, "complete");
+
+        let last_successful_scan_at: Option<i64> = connection
+            .query_row(
+                "SELECT last_successful_scan_at FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read last_successful_scan_at");
+        assert!(last_successful_scan_at.is_some());
+
+        let scan_issue_kind: Option<String> = connection
+            .query_row(
+                "SELECT scan_issue_kind FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan_issue_kind");
+        assert!(scan_issue_kind.is_none());
+
+        let error_detail: Option<String> = connection
+            .query_row(
+                "SELECT error_detail FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read error_detail");
+        assert!(error_detail.is_none());
+    }
+
+    #[test]
+    fn partial_scan_prefers_failed_descendant_issue_over_blocked() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/blocked".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                        diagnostic_detail: Some("permission denied".to_string()),
+                        observed_at_ms: 20,
+                    },
+                )
+                .expect("commit blocked directory outcome");
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/failed".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Failed,
+                        issue_kind: Some(SourceAccessIssueKind::TimedOut),
+                        diagnostic_detail: Some("timed out".to_string()),
+                        observed_at_ms: 20,
+                    },
+                )
+                .expect("commit failed directory outcome");
+            Ok(())
+        })
+        .expect("write directory outcomes");
+
+        run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
+
+        let scan_phase: String = connection
+            .query_row(
+                "SELECT scan_phase FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan phase");
+        assert_eq!(scan_phase, "partial");
+
+        let scan_issue_kind: Option<String> = connection
+            .query_row(
+                "SELECT scan_issue_kind FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan_issue_kind");
+        assert_eq!(
+            scan_issue_kind.as_deref(),
+            Some("timed_out"),
+            "partial scan must prefer failed descendant issue over blocked"
         );
     }
 }

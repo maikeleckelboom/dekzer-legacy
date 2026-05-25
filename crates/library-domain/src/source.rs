@@ -117,6 +117,7 @@ pub enum SourceScanPhase {
     Idle,
     Scanning,
     Complete,
+    Partial,
     Blocked,
     Failed,
 }
@@ -127,6 +128,7 @@ impl SourceScanPhase {
             Self::Idle => "idle",
             Self::Scanning => "scanning",
             Self::Complete => "complete",
+            Self::Partial => "partial",
             Self::Blocked => "blocked",
             Self::Failed => "failed",
         }
@@ -137,6 +139,7 @@ impl SourceScanPhase {
             "idle" => Some(Self::Idle),
             "scanning" => Some(Self::Scanning),
             "complete" => Some(Self::Complete),
+            "partial" => Some(Self::Partial),
             "blocked" => Some(Self::Blocked),
             "failed" => Some(Self::Failed),
             _ => None,
