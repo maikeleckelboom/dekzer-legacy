@@ -1774,7 +1774,7 @@ mod tests {
     }
 
     #[test]
-    fn mixed_promoted_and_source_file_rows_cohonest() {
+    fn mixed_promoted_and_source_file_rows_coexist() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);

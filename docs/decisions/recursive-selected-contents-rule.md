@@ -181,7 +181,12 @@ Directory-level `dir_scan_state` values:
 
 ## Query execution contract
 
-The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target, queries media, collapses duplicates, and returns browse projection rows.
+The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target, queries media, collapses duplicates, and returns projection rows that may originate from two kinds of source:
+
+- **promoted library asset rows**: when the scoped `source_files` have been promoted through segment attachment into `LibraryBrowserRows`, those rows are returned as the primary contents.
+- **scanned source-file rows**: when scoped `source_files` have no corresponding promoted library asset row (yet), the scanned source file itself is returned as a contents row.
+
+The renderer never constructs fallback rows.
 
 Conceptually:
 
@@ -189,8 +194,11 @@ Conceptually:
 selected tree row
   -> resolve selector/binding target
   -> derive source_id and optional relative path prefix/scope
-  -> query recursive descendant media rows from substrate/index
-  -> join through asset identity and browse projection rows
+  -> query scoped source_files (audio + video, present)
+  -> for each source_file with a promoted LibraryBrowserRow:
+       return a promoted library asset row
+  -> for each source_file without a promoted LibraryBrowserRow:
+       return a scanned source-file row
   -> return rows plus scan coverage metadata
   -> render contents table
 ```
@@ -315,7 +323,9 @@ Do not run the rows query and coverage query across different implicit read stat
 
 Ordering is deterministic and projection-owned. Do not rely on internal SQLite rowid ordering, current renderer order, expanded tree order, or incidental query result order.
 
-Default first-load ordering is `title ASC` after availability priority, with artist, album, path, and durable row identity as deterministic tie-breakers. This is the default order for the contents table unless the user explicitly chooses another sort.
+Default first-load ordering is `title ASC` after availability priority, with artist, album, path, and `scoped_source_file_id` as deterministic tie-breakers. This is the default order for the contents table unless the user explicitly chooses another sort.
+
+Because the result may contain both promoted library asset rows and scanned source-file rows, the tie-breaker must be stable across both origins. `scoped_source_file_id` is the default tie-breaker because every contents row has exactly one scoped source file, while `library_asset_id` is absent for source-file rows.
 
 ```sql
 ORDER BY
@@ -329,22 +339,24 @@ ORDER BY
   lower(COALESCE(artist, '')) ASC,
   lower(COALESCE(album, '')) ASC,
   lower(COALESCE(relative_path, '')) ASC,
-  library_asset_id ASC
+  scoped_source_file_id ASC
 ```
 
-Every ordered query needs a stable tie-breaker. `library_asset_id` is the default tie-breaker for recursive contents rows.
+Every ordered query needs a stable tie-breaker. `scoped_source_file_id` is the default tie-breaker for recursive contents rows.
 
 ### 9. Deduplication and asset collapse
 
-If multiple scoped `source_files` map to the same `library_asset_id`, the result returns one row.
+If multiple scoped `source_files` map to the same `library_asset_id`, the result returns one promoted row.
 
-Deduplication rule:
+Promoted-library-asset deduplication rule:
 
 1. Group by `library_asset_id`.
 2. Prefer an attachment whose source file is present.
 3. If `LibraryBrowserRows.primary_source_file_id` is within the selected scope and present, use it as the scoped attachment anchor.
 4. Otherwise, use the present scoped source file with the lowest `source_file_id`.
 5. If only degraded or unavailable attachments exist, choose the stable attachment that best represents the availability state and surface that state.
+
+Source-file-origin rows are one row per scoped scanned source file when no promoted row exists for that source file. They are not collapsed against each other and are not deduplicated by `library_asset_id`.
 
 Do not leave duplicate collapse to the renderer.
 
@@ -358,14 +370,14 @@ The cursor stores the last emitted row's complete ordered key tuple for the acti
 type SelectedContentsCursor = {
   version: 1
   scopeFingerprint: string
-  order: 'availability_title_artist_album_path_asset_id'
+  order: 'availability_title_artist_album_path_scoped_source_file_id'
   last: {
     availabilityRank: number
     titleKey: string
     artistKey: string
     albumKey: string
     relativePathKey: string
-    libraryAssetId: string
+    scopedSourceFileId: string
   }
 }
 ```
@@ -450,33 +462,41 @@ type SelectedContentsResult =
       reason: string
     }
 
+type SelectedContentsRowOrigin = 'libraryAsset' | 'sourceFile'
+
 type SelectedContentsRow = {
-  libraryAssetId: string
-  rowVersion: number
+  stableId: string
+  label: string
+  origin: SelectedContentsRowOrigin
+  libraryAssetId?: string
+  rowVersion?: string
+  primarySourceFileId?: string
+  scopedSourceFileId: string
+  sourceId: string
+  relativePath: string
+  fileName: string
+  mediaClass: 'audio' | 'video'
+  availabilityState: 'available' | 'unavailable' | 'degraded'
   title?: string
   artist?: string
   album?: string
   durationMs?: number
-  availabilityState: 'available' | 'unavailable' | 'degraded'
-  primarySourceFileId?: string
-  scopedSourceFileId?: string
-  relativePath?: string
-  readiness?: SelectedContentsReadinessSummary
+  musicalKey?: string
+  tempoBpm?: number
+  waveformQualityCurrent?: number
+  waveformQualityTarget?: number
+  stemsStateSummary?: string
+  prepReadinessSummary: string
+  updatedAtMs: number
 }
 
-type SelectedContentsReadinessSummary = {
-  summaryLabel?: string
-  facets?: readonly SelectedContentsReadinessFacet[]
-}
-
-type SelectedContentsReadinessFacet = {
-  kind: string
-  state: 'ready' | 'needs_attention' | 'pending' | 'unavailable' | 'unknown'
-  label?: string
-}
-```
-
-`readiness` is optional because preparation is not one flat status. Readiness facets may later cover independent preparation domains such as analysis, cue readiness, beatgrid, stems, loudness, source/file readiness, notes, and transition planning.
+- `libraryAssetId` exists only for `origin: 'libraryAsset'` rows. It is absent for source-file rows.
+- `rowVersion` exists only for `origin: 'libraryAsset'` rows. It is absent for source-file rows.
+- `stableId = 'library-asset:' + libraryAssetId` for promoted library asset rows.
+- `stableId = 'source-file:' + scopedSourceFileId` for scanned source-file rows.
+- Source-file rows must not invent track metadata (title, artist, album, duration etc. are absent).
+- `scopedSourceFileId` is required for every row because every contents row has exactly one scoped source file.
+- `readiness` is optional because preparation is not one flat status. Readiness facets may later cover independent preparation domains such as analysis, cue readiness, beatgrid, stems, loudness, source/file readiness, notes, and transition planning.
 
 When a selected target is permanently deleted, active subscribers receive a tombstone/invalidated-target result, such as `location_missing` or `source_unavailable`, not an empty result.
 
@@ -487,10 +507,12 @@ The UI must reflect the exact `SelectedContentsResult` state truthfully.
 - `loading`: show progress skeleton or loading row. Do not show stale empty copy.
 - `partial`: show rows found so far plus `Still indexing. Results may be incomplete.`
 - `empty`: show `No playable media found under this folder.` Only valid with complete coverage.
+  - Complete coverage with no scoped audio/video source files is authoritative empty.
 - `source_unavailable`: show known rows as unavailable if supplied, or show a global unavailable state. Never show empty.
 - `location_missing`: show the configured library folder as missing and offer repair or relink actions.
 - `blocked`: show explicit permission-needed or policy-blocked state.
 - `failed`: show failed state with retry or rescan action.
+- Complete coverage with scoped audio/video source files returns `ready` state with source-file rows even before promotion.
 - degraded rows: include by default, mark visually degraded, keep playable.
 - unsupported or `none` media rows: strictly exclude from default recursive contents.
 
