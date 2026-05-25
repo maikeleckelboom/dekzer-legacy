@@ -8,6 +8,7 @@ use std::path::Path;
 pub(crate) enum BrowseMediaClass {
     Audio,
     Video,
+    Image,
     Unsupported,
 }
 
@@ -16,6 +17,7 @@ impl BrowseMediaClass {
         match self {
             BrowseMediaClass::Audio => "audio",
             BrowseMediaClass::Video => "video",
+            BrowseMediaClass::Image => "image",
             BrowseMediaClass::Unsupported => "unsupported",
         }
     }
@@ -27,7 +29,8 @@ pub(crate) fn canonical_media_class_from_file_kind(
     match file_kind? {
         "audio" => Some(BrowseMediaClass::Audio),
         "video" => Some(BrowseMediaClass::Video),
-        "cue_sheet" | "image" | "log_doc" | "text_doc" | "archive" | "other" => {
+        "image" => Some(BrowseMediaClass::Image),
+        "cue_sheet" | "log_doc" | "text_doc" | "archive" | "other" => {
             Some(BrowseMediaClass::Unsupported)
         }
         "unknown" => None,
@@ -41,6 +44,7 @@ pub(crate) fn canonical_media_class_from_media_kind(
     match media_kind? {
         "audio" => Some(BrowseMediaClass::Audio),
         "video" => Some(BrowseMediaClass::Video),
+        "image" => Some(BrowseMediaClass::Image),
         _ => Some(BrowseMediaClass::Unsupported),
     }
 }
@@ -89,7 +93,7 @@ mod tests {
     };
 
     #[test]
-    fn file_kind_mapping_classifies_audio_video_and_unsupported_classes() {
+    fn file_kind_mapping_classifies_audio_video_image_and_unsupported_classes() {
         assert_eq!(
             canonical_media_class_from_file_kind(Some("audio")),
             Some(BrowseMediaClass::Audio)
@@ -100,6 +104,10 @@ mod tests {
         );
         assert_eq!(
             canonical_media_class_from_file_kind(Some("image")),
+            Some(BrowseMediaClass::Image)
+        );
+        assert_eq!(
+            canonical_media_class_from_file_kind(Some("cue_sheet")),
             Some(BrowseMediaClass::Unsupported)
         );
         assert_eq!(canonical_media_class_from_file_kind(Some("unknown")), None);
@@ -107,13 +115,17 @@ mod tests {
     }
 
     #[test]
-    fn media_kind_mapping_preserves_video_and_downgrades_non_dj_visuals_to_unsupported() {
+    fn media_kind_mapping_preserves_video_and_image_and_downgrades_others_to_unsupported() {
         assert_eq!(
             canonical_media_class_from_media_kind(Some("video")),
             Some(BrowseMediaClass::Video)
         );
         assert_eq!(
             canonical_media_class_from_media_kind(Some("image")),
+            Some(BrowseMediaClass::Image)
+        );
+        assert_eq!(
+            canonical_media_class_from_media_kind(Some("other")),
             Some(BrowseMediaClass::Unsupported)
         );
     }
@@ -129,6 +141,10 @@ mod tests {
             Some(BrowseMediaClass::Video)
         );
         assert_eq!(
+            provisional_media_class_from_path("crate/cover.png"),
+            Some(BrowseMediaClass::Image)
+        );
+        assert_eq!(
             provisional_media_class_from_path("crate/notes.txt"),
             Some(BrowseMediaClass::Unsupported)
         );
@@ -141,7 +157,7 @@ mod tests {
         assert_eq!(media_class_str_from_path("lib/track.alac"), "audio");
         assert_eq!(media_class_str_from_path("lib/track.mp3"), "audio");
         assert_eq!(media_class_str_from_path("lib/clip.mkv"), "video");
-        assert_eq!(media_class_str_from_path("lib/cover.png"), "unsupported");
+        assert_eq!(media_class_str_from_path("lib/cover.png"), "image");
         assert_eq!(media_class_str_from_path("lib/readme"), "none");
     }
 

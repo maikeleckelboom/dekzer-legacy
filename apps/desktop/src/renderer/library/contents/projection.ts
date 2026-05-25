@@ -47,7 +47,7 @@ export type ContentRow = {
   readonly detail?: string
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
-  readonly mediaClass?: 'audio' | 'video'
+  readonly mediaClass?: 'audio' | 'video' | 'image'
   readonly availabilityState?: 'available' | 'unavailable' | 'degraded'
   readonly action?: ContentRowAction
 }
@@ -329,7 +329,7 @@ function projectFileContents(options: {
 }
 
 function selectedContentsRow(row: SelectedContentsRow): ContentRow {
-  const icon = row.mediaClass === 'video' ? 'video' : 'music'
+  const icon = row.mediaClass === 'video' ? 'video' : row.mediaClass === 'image' ? 'image' : 'music'
   const detail =
     row.origin === 'sourceFile' ? selectedSourceFileRowDetail(row) : selectedContentsRowDetail(row)
   return {

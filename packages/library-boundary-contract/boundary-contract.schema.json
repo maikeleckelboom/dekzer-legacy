@@ -2230,7 +2230,8 @@
       "type": "string",
       "enum": [
         "audio",
-        "video"
+        "video",
+        "image"
       ]
     },
     "SelectedContentsResult": {

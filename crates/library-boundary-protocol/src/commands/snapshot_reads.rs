@@ -530,6 +530,7 @@ pub struct SelectedContentsRow {
 pub enum SelectedContentsMediaClass {
     Audio,
     Video,
+    Image,
 }
 
 impl SelectedContentsMediaClass {
@@ -537,6 +538,7 @@ impl SelectedContentsMediaClass {
         match value.as_bytes() {
             b"audio" => Some(Self::Audio),
             b"video" => Some(Self::Video),
+            b"image" => Some(Self::Image),
             _ => None,
         }
     }

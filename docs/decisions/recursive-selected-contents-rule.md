@@ -176,8 +176,11 @@ Directory-level `dir_scan_state` values:
 
 - `audio`: included in primary recursive contents.
 - `video`: included in primary recursive contents.
+- `image`: included in primary recursive contents.
 - `unsupported`: strictly excluded from default recursive contents.
 - `none`: strictly excluded from default recursive contents.
+
+Image rows are source companion/source-file rows, not playable track rows. They use `stableId = source-file:{scopedSourceFileId}`, have no `libraryAssetId`, have no `rowVersion`, and do not invent track metadata.
 
 ## Query execution contract
 
@@ -194,7 +197,7 @@ Conceptually:
 selected tree row
   -> resolve selector/binding target
   -> derive source_id and optional relative path prefix/scope
-  -> query scoped source_files (audio + video, present)
+  -> query scoped source_files (audio + video + image, present)
   -> for each source_file with a promoted LibraryBrowserRow:
        return a promoted library asset row
   -> for each source_file without a promoted LibraryBrowserRow:
@@ -475,7 +478,7 @@ type SelectedContentsRow = {
   sourceId: string
   relativePath: string
   fileName: string
-  mediaClass: 'audio' | 'video'
+  mediaClass: 'audio' | 'video' | 'image'
   availabilityState: 'available' | 'unavailable' | 'degraded'
   title?: string
   artist?: string
@@ -506,13 +509,13 @@ The UI must reflect the exact `SelectedContentsResult` state truthfully.
 
 - `loading`: show progress skeleton or loading row. Do not show stale empty copy.
 - `partial`: show rows found so far plus `Still indexing. Results may be incomplete.`
-- `empty`: show `No playable media found under this folder.` Only valid with complete coverage.
-  - Complete coverage with no scoped audio/video source files is authoritative empty.
+- `empty`: show `No media found under this folder.` Only valid with complete coverage.
+  - Complete coverage with no scoped audio/video/image source files is authoritative empty.
 - `source_unavailable`: show known rows as unavailable if supplied, or show a global unavailable state. Never show empty.
 - `location_missing`: show the configured library folder as missing and offer repair or relink actions.
 - `blocked`: show explicit permission-needed or policy-blocked state.
 - `failed`: show failed state with retry or rescan action.
-- Complete coverage with scoped audio/video source files returns `ready` state with source-file rows even before promotion.
+- Complete coverage with scoped audio/video/image source files returns ready rows, not empty, even before promotion.
 - degraded rows: include by default, mark visually degraded, keep playable.
 - unsupported or `none` media rows: strictly exclude from default recursive contents.
 

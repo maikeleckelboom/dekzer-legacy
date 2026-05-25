@@ -232,7 +232,7 @@ CREATE TABLE source_files
     size_bytes                  INTEGER CHECK (size_bytes IS NULL OR size_bytes >= 0),
     mtime_ns                    INTEGER CHECK (mtime_ns IS NULL OR mtime_ns >= 0),
     media_class                 TEXT    NOT NULL DEFAULT 'none'
-        CHECK (media_class IN ('audio', 'video', 'unsupported', 'none')),
+        CHECK (media_class IN ('audio', 'video', 'image', 'unsupported', 'none')),
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
     first_discovered_at         INTEGER NOT NULL,
@@ -251,7 +251,7 @@ CREATE INDEX source_files_source_presence
 
 CREATE INDEX source_files_media_class_parent
     ON source_files (source_id, presence_state, media_class, parent_source_directory_id)
-    WHERE media_class IN ('audio', 'video')
+    WHERE media_class IN ('audio', 'video', 'image')
       AND parent_source_directory_id IS NOT NULL;
 
 CREATE INDEX source_files_parent_source_directory

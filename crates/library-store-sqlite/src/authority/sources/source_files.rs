@@ -215,7 +215,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                  FROM source_files
                  WHERE source_file_id = ?1
                    AND presence_state = 'present'
-                   AND media_class IN ('audio', 'video')",
+                   AND media_class IN ('audio', 'video', 'image')",
                 [source_file_id],
                 |row| row.get::<_, Option<i64>>(0),
             )

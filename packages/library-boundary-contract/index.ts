@@ -142,7 +142,7 @@ export type SelectedContentsRow = { stableId: string, label: string, origin: Sel
 
 export type SelectedContentsRowOrigin = "libraryAsset" | "sourceFile";
 
-export type SelectedContentsMediaClass = "audio" | "video";
+export type SelectedContentsMediaClass = "audio" | "video" | "image";
 
 export type LibraryBrowserWindow = { offset: number, limit: number, totalRows: number, rows: Array<LibraryAssetBrowserRow>, };
 

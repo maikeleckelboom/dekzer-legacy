@@ -827,7 +827,7 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
                     sf.updated_at
              FROM source_files sf
              WHERE sf.presence_state = 'present'
-               AND sf.media_class IN ('audio', 'video')
+               AND sf.media_class IN ('audio', 'video', 'image')
                AND {source_predicate}
          ),
          promoted_scope AS (
@@ -1533,7 +1533,7 @@ mod tests {
             1002,
             1,
             10,
-            "Music/cover.png",
+            "Music/readme.txt",
             "unsupported",
             "Cover",
         );
@@ -1744,7 +1744,51 @@ mod tests {
     }
 
     #[test]
-    fn complete_scope_with_no_media_files_returns_authoritative_empty() {
+    fn directory_with_image_files_returns_ready_source_file_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Covers", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Covers/front.jpg", "image");
+        insert_scanned_file(&connection, 1001, 1, 10, "Covers/back.png", "image");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete
+        );
+        for row in &result.rows {
+            assert_eq!(row.origin, StoreSelectedContentsRowOrigin::SourceFile);
+            assert!(row.library_asset_id.is_none());
+            assert!(row.row_version.is_none());
+            assert!(row.title.is_none());
+            assert!(row.artist.is_none());
+            assert!(row.album.is_none());
+            assert!(row.duration_ms.is_none());
+            assert_eq!(row.media_class.as_str(), "image");
+            assert_eq!(row.availability_state, "available");
+            assert_eq!(row.prep_readiness_summary, "underprepared");
+            assert!(
+                row.stable_id.starts_with("source-file:"),
+                "image source-file row stable_id must start with 'source-file:', got: {}",
+                row.stable_id
+            );
+        }
+    }
+
+    #[test]
+    fn directory_with_only_unsupported_files_returns_authoritative_empty() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Documents", "complete");
@@ -1771,6 +1815,57 @@ mod tests {
         assert_eq!(result.state, StoreSelectedContentsState::Empty);
         assert!(result.rows.is_empty());
         assert!(result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn directory_with_none_files_returns_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Data", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Data/notes", "none");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Empty);
+        assert!(result.rows.is_empty());
+        assert!(result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn directory_with_image_files_during_pending_scan_returns_partial() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Covers", "pending");
+        insert_scanned_file(&connection, 1000, 1, 10, "Covers/front.jpg", "image");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Partial);
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0].media_class.as_str(), "image");
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Pending
+        );
+        assert!(!result.coverage.empty_result_authoritative);
     }
 
     #[test]

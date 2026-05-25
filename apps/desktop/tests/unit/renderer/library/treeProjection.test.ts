@@ -154,7 +154,7 @@ describe('projectState', () => {
     )
     const unknownNode = findNode(unknownProjection.nodes, 'source-directory:12')
     expect(unknownNode?.children.kind).toBe('deferred')
-    expect(unknownNode?.hasDirectoryDisclosureHint).toBeUndefined()
+    expect(unknownNode?.hasDirectoryDisclosureHint).toBe(true)
   })
 })
 

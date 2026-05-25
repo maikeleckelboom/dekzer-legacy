@@ -36,7 +36,17 @@ const cueSheetExtensions = new Set(['.cue'])
 
 const playlistExtensions = new Set(['.m3u', '.m3u8', '.pls'])
 
-const artworkExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+const artworkExtensions = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.bmp',
+  '.tif',
+  '.tiff',
+  '.psd'
+])
 
 const metadataExtensions = new Set(['.nfo'])
 

@@ -731,7 +731,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  WHERE f.source_id = ?1
                    AND f.presence_state = 'present'
                    AND f.parent_source_directory_id IS NOT NULL
-                   AND f.media_class IN ('audio', 'video')
+                   AND f.media_class IN ('audio', 'video', 'image')
                  UNION
                  SELECT d.parent_source_directory_id
                  FROM source_directories d
@@ -1139,7 +1139,7 @@ mod tests {
     }
 
     #[test]
-    fn png_file_stores_unsupported_media_class() {
+    fn png_file_stores_image_media_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1151,10 +1151,7 @@ mod tests {
             "cover.png",
             "albums/cover.png",
         );
-        assert_eq!(
-            read_media_class(&connection, "albums/cover.png"),
-            "unsupported"
-        );
+        assert_eq!(read_media_class(&connection, "albums/cover.png"), "image");
     }
 
     #[test]
@@ -1239,7 +1236,7 @@ mod tests {
     }
 
     #[test]
-    fn sibling_folder_without_media_is_unknown_until_coverage_is_complete() {
+    fn sibling_folder_with_image_has_media_descendant() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1281,7 +1278,10 @@ mod tests {
         );
 
         let before_finalization = read_directory_facts(&connection, "docs");
-        assert!(!before_finalization.has_media_descendant);
+        assert!(
+            before_finalization.has_media_descendant,
+            "cover.png (image) must propagate has_media_descendant"
+        );
         assert_eq!(before_finalization.dir_scan_state, "pending");
         assert_eq!(before_finalization.scanned_at, None);
 
@@ -1293,6 +1293,69 @@ mod tests {
         );
 
         let after_finalization = read_directory_facts(&connection, "docs");
+        assert!(after_finalization.has_media_descendant);
+        assert_eq!(after_finalization.dir_scan_state, "complete");
+        assert!(after_finalization.scanned_at.is_some());
+    }
+
+    #[test]
+    fn folder_with_only_unsupported_files_has_no_media_descendant() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _root_dir_id) = setup_source_with_directory(&mut connection);
+
+        let misc_dir_id = admit_write(&mut connection, |write| {
+            let dir_id = SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(31),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "misc".to_string(),
+                    relative_path: "misc".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    scanned_at: None,
+                    mtime_ns: None,
+                    first_created_at: Some(12),
+                    changed_at: 12,
+                })
+                .expect("upsert misc directory");
+            Ok(dir_id)
+        })
+        .expect("write misc directory");
+
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(misc_dir_id),
+            "readme.txt",
+            "misc/readme.txt",
+        );
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(misc_dir_id),
+            "archive.zip",
+            "misc/archive.zip",
+        );
+
+        let before_finalization = read_directory_facts(&connection, "misc");
+        assert!(!before_finalization.has_media_descendant);
+        assert_eq!(before_finalization.dir_scan_state, "pending");
+        assert_eq!(before_finalization.scanned_at, None);
+
+        run_coverage_finalization(
+            &mut connection,
+            source_id,
+            &["misc".to_string()],
+            &[
+                "misc/readme.txt".to_string(),
+                "misc/archive.zip".to_string(),
+            ],
+        );
+
+        let after_finalization = read_directory_facts(&connection, "misc");
         assert!(!after_finalization.has_media_descendant);
         assert_eq!(after_finalization.dir_scan_state, "complete");
         assert!(after_finalization.scanned_at.is_some());

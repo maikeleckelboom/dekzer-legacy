@@ -342,7 +342,7 @@ function projectLiteralNode(options: {
     const dirBadge = presenceBadge(node.presence)
 
     const hasDirectoryDisclosureHint =
-      node.hasChildDirectories || node.directoryMediaState.kind === 'hasMediaDescendants'
+      node.hasChildDirectories || node.directoryMediaState.kind !== 'noMediaDescendants'
 
     if (
       isUnloaded &&
