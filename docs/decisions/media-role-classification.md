@@ -208,13 +208,22 @@ A file can hold a role and still be blocked for a specific target. These are ind
 Readiness targets:
 
 ```
-audio_deck
-video_deck
+audio_deck_load
+video_deck_load
 visual_output
 artwork_attachment
-waveform_analysis
-beatgrid_analysis
+waveform_preview
+broadcast_metadata_projection
 ```
+
+Analysis work kinds such as `beatgrid_analysis` are capabilities or work
+products, not deck-load readiness targets. They may appear as scheduler
+work kinds or as derived artifacts, but they do not answer whether an item
+is usable for a target now.
+
+Protocol/API casing may expose camelCase representations such as
+`audioDeckLoad`, but those are representations of the canonical target
+key, not separate targets.
 
 Readiness states:
 
@@ -243,20 +252,20 @@ Examples:
 
 ```
 music-video.mp4
-  performance_item          role
-  visual_asset              role
-  audio_deck: ready         readiness (has usable audio stream)
-  video_deck: ready         readiness (has usable video stream)
+  performance_item              role
+  visual_asset                  role
+  audio_deck_load: ready        readiness (has usable audio stream)
+  video_deck_load: ready        readiness (has usable video stream)
 
 silent-loop.mp4
-  visual_asset              role
-  audio_deck: blocked       readiness (no_audio_stream)
-  video_deck: ready         readiness
+  visual_asset                  role
+  audio_deck_load: blocked      readiness (no_audio_stream)
+  video_deck_load: ready        readiness
 
 cover.jpg
-  artwork_candidate         role
-  audio_deck: unsupported   readiness (not applicable)
-  artwork_attachment: ready readiness
+  artwork_candidate             role
+  audio_deck_load: unsupported  readiness (not applicable)
+  artwork_attachment: ready     readiness
 ```
 
 ### 9. Readiness is invalidated by substrate events, not queried by the renderer
@@ -460,7 +469,7 @@ media_streams (
 -- Do not fabricate evaluated_at timestamps for rows that have never been evaluated.
 item_readiness (
   library_item_id   INTEGER NOT NULL REFERENCES library_items(library_item_id),
-  target            TEXT NOT NULL,        -- audio_deck | video_deck | visual_output | artwork_attachment | waveform_analysis | beatgrid_analysis
+  target            TEXT NOT NULL,        -- audio_deck_load | video_deck_load | visual_output | artwork_attachment | waveform_preview | broadcast_metadata_projection
   status            TEXT NOT NULL,        -- pending | ready | degraded | blocked | unsupported
   reason            TEXT,                 -- block reason when status = blocked
   invalidated_at    INTEGER,              -- when last invalidated; null if never invalidated

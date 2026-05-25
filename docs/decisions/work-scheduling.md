@@ -413,7 +413,7 @@ Deck load has two separate paths. They must not be conflated.
 
 ```
 1. Deck load request arrives.
-2. Query item_readiness for (library_item_id, audio_deck) or (video_deck).
+2. Query item_readiness for (library_item_id, audio_deck_load) or (library_item_id, video_deck_load).
 3. If status = ready    → proceed with load.
    If status = blocked  → return blocked + reason to UI. No work created.
    If status = degraded → proceed with warning.
@@ -655,7 +655,8 @@ correct scheduling behavior. They are not the full scheduler runtime.
 
 ```sql
 -- Scan sessions. Directory traversal is tracked here, not in work_items.
-scan_runs (
+scan_runs
+(
   scan_run_id             INTEGER PRIMARY KEY,
   source_id               INTEGER NOT NULL,
   run_kind                TEXT NOT NULL,
@@ -770,7 +771,7 @@ work_items (
     -- CHECK (target_kind IN (
     --   'classification', 'readiness', 'analysis_profile', 'identity', 'none'))
   target_key                  TEXT NOT NULL DEFAULT 'none',
-    -- 'audio_deck' for readiness, 'waveform_overview:v1' for analysis, 'none' otherwise
+    -- 'audio_deck_load' for readiness, 'waveform_overview:v1' for analysis, 'none' otherwise
 
   -- Basis: input facts this work depends on. Used for staleness and deduplication.
   basis_kind                  TEXT NOT NULL,
