@@ -102,6 +102,36 @@ describe('projectContents', () => {
     expect(contents.rows.map((row) => row.label)).toEqual(['inside.wav'])
   })
 
+  it('keeps selected directory contents primary-media scoped for image-only folders', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([
+          directoryNode('50', 'Covers', undefined, {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
+            directoryScanState: 'complete'
+          })
+        ])
+      }
+    })
+    const contents = projectForSelection(
+      state,
+      'source-directory:50',
+      readySelectedContents({ rows: [], state: 'empty' })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Covers')
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No primary media found'
+    })
+  })
+
   it('projects loading, empty, partial, failed, and unsupported selected content states', () => {
     expect(projectForSelection(browserState({}), 'navigation-row:7').rows[0]).toMatchObject({
       kind: 'state',
@@ -309,7 +339,22 @@ function sourceNavigationRow(): NavigationRow {
 function directoryNode(
   directoryId: string,
   label: string,
-  parentDirectoryId?: string
+  parentDirectoryId?: string,
+  options: {
+    readonly hasChildDirectories?: boolean
+    readonly directoryPrimaryMediaState?: Extract<
+      ChildRow,
+      { readonly kind: 'directory' }
+    >['directoryPrimaryMediaState']
+    readonly directoryImageMediaState?: Extract<
+      ChildRow,
+      { readonly kind: 'directory' }
+    >['directoryImageMediaState']
+    readonly directoryScanState?: Extract<
+      ChildRow,
+      { readonly kind: 'directory' }
+    >['directoryScanState']
+  } = {}
 ): Extract<ChildRow, { readonly kind: 'directory' }> {
   return {
     id: `source-directory:${directoryId}`,
@@ -319,10 +364,14 @@ function directoryNode(
     directoryId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
-    hasChildDirectories: true,
-    directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
-    directoryImageMediaState: { kind: 'noImageMediaDescendants' },
-    directoryScanState: 'scanning',
+    hasChildDirectories: options.hasChildDirectories ?? true,
+    directoryPrimaryMediaState: options.directoryPrimaryMediaState ?? {
+      kind: 'hasPrimaryMediaDescendants'
+    },
+    directoryImageMediaState: options.directoryImageMediaState ?? {
+      kind: 'noImageMediaDescendants'
+    },
+    directoryScanState: options.directoryScanState ?? 'scanning',
     updatedAtMs: 100
   }
 }

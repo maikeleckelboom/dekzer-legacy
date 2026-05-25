@@ -340,6 +340,30 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
   })
 
+  it('keeps image-only directories expandable in performance-and-images visibility', () => {
+    const projection = projectTree(
+      browserState({
+        sourceFileVisibility: 'performanceAndImages',
+        sourceChildren: loadedChildren(
+          [
+            directoryNode('50', 'Covers', {
+              hasChildDirectories: false,
+              directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+              directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
+              directoryScanState: 'complete'
+            })
+          ],
+          { sourceFileVisibility: 'performanceAndImages' }
+        )
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:50')
+
+    expect(node.children.kind).toBe('deferred')
+    expect(isBrowserTreeBranch(node)).toBe(true)
+    expect(canRevealBrowserTreeChildren(node)).toBe(true)
+  })
+
   it('state-only child rows do not accidentally decide branch identity', () => {
     const node: BrowserTreeNode = {
       id: 'state-only-owner',

@@ -23,6 +23,7 @@ import type {
   DirectoryTarget,
   MoreState,
   LoadedChildren,
+  RowBinding,
   SourceState,
   SourceTarget
 } from '../state'
@@ -58,9 +59,16 @@ export type LibraryHierarchyReadController = {
   readonly loadFirstSource: () => Promise<boolean>
   readonly requestNodeChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
   readonly requestDirectoryChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
-  readonly setSourceFileVisibility: (sourceFileVisibility: SourceFileVisibility) => void
+  readonly setSourceFileVisibility: (
+    sourceFileVisibility: SourceFileVisibility,
+    options?: SourceFileVisibilityOptions
+  ) => void
   readonly start: () => void
   readonly stop: () => void
+}
+
+export type SourceFileVisibilityOptions = {
+  readonly expandedNodeIds?: Iterable<BrowserTreeNodeId>
 }
 
 export function useLibraryHierarchyRead(
@@ -101,6 +109,7 @@ export function createLibraryHierarchyReadController(
   let navigationReadSequence = 0
   let sourceReadSequence = 0
   let directoryReadSequence = 0
+  let visibilityReplaySequence = 0
 
   const currentRoot = computed(() => {
     const result = hierarchyReadResult.value
@@ -154,10 +163,16 @@ export function createLibraryHierarchyReadController(
     void refresh()
   }
 
-  function setSourceFileVisibility(nextVisibility: SourceFileVisibility): void {
+  function setSourceFileVisibility(
+    nextVisibility: SourceFileVisibility,
+    options: SourceFileVisibilityOptions = {}
+  ): void {
     if (sourceFileVisibility.value === nextVisibility) {
       return
     }
+
+    const expandedNodeIds = new Set(options.expandedNodeIds ?? [])
+    const replaySequence = ++visibilityReplaySequence
 
     sourceFileVisibility.value = nextVisibility
     hierarchyReadResult.value = undefined
@@ -168,7 +183,89 @@ export function createLibraryHierarchyReadController(
         ? withDiscoveredUnloadedSourceStates(navigationReadResult.value.rows)
         : new Map()
     directoryReadStates.value = new Map()
-    void loadFirstSource()
+
+    if (expandedNodeIds.size === 0) {
+      void loadFirstSource()
+      return
+    }
+
+    void replayExpandedReads(expandedNodeIds, replaySequence)
+  }
+
+  async function replayExpandedReads(
+    pendingNodeIds: Set<BrowserTreeNodeId>,
+    replaySequence: number
+  ): Promise<boolean> {
+    while (pendingNodeIds.size > 0) {
+      if (replaySequence !== visibilityReplaySequence) {
+        return false
+      }
+
+      const projection = browserProjection.value
+
+      if (projection?.kind !== 'tree') {
+        return false
+      }
+
+      const nextTarget = nextExpandedReplayTarget(pendingNodeIds, projection.bindingsById)
+
+      if (nextTarget === undefined) {
+        pendingNodeIds.clear()
+        return false
+      }
+
+      pendingNodeIds.delete(nextTarget.nodeId)
+
+      if (nextTarget.kind === 'source') {
+        await readSource(nextTarget.nodeId, nextTarget.target)
+      } else {
+        await readDirectory(nextTarget.target)
+      }
+    }
+
+    return true
+  }
+
+  function nextExpandedReplayTarget(
+    pendingNodeIds: ReadonlySet<BrowserTreeNodeId>,
+    bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>
+  ):
+    | {
+        readonly kind: 'source'
+        readonly nodeId: BrowserTreeNodeId
+        readonly target: SourceTarget
+      }
+    | {
+        readonly kind: 'directory'
+        readonly nodeId: BrowserTreeNodeId
+        readonly target: DirectoryTarget
+      }
+    | undefined {
+    for (const nodeId of pendingNodeIds) {
+      const binding = bindingsById.get(nodeId)
+
+      if (binding?.kind === 'source') {
+        return {
+          kind: 'source',
+          nodeId,
+          target: binding.target
+        }
+      }
+
+      if (binding?.kind === 'directory') {
+        return {
+          kind: 'directory',
+          nodeId,
+          target: {
+            entryPoint: binding.entryPoint,
+            ...(binding.label === undefined ? {} : { label: binding.label }),
+            directoryId: binding.directoryId
+          }
+        }
+      }
+    }
+
+    return undefined
   }
 
   async function refresh(): Promise<boolean> {
