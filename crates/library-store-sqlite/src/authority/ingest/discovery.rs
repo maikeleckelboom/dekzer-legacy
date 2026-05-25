@@ -181,9 +181,8 @@ struct ProcessedFile {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SourceScanIncompleteCoverage {
-    scan_phase: &'static str,
-    scan_issue_kind: Option<String>,
-    error_detail: Option<String>,
+    scan_issue_kind: String,
+    error_detail: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -404,20 +403,14 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         let scan_rows_changed = match descendant_coverage {
             Some(ref cov) => self.tx().execute(
                 "UPDATE source_scan_state
-                     SET scan_phase = ?2,
-                         last_scan_finished_at = ?3,
+                     SET scan_phase = 'partial',
+                         last_scan_finished_at = ?2,
                          last_successful_scan_at = last_successful_scan_at,
-                         scan_issue_kind = ?4,
-                         error_detail = ?5,
-                         updated_at = ?3
+                         scan_issue_kind = ?3,
+                         error_detail = ?4,
+                         updated_at = ?2
                      WHERE source_id = ?1",
-                params![
-                    root_id,
-                    cov.scan_phase,
-                    now_ms,
-                    cov.scan_issue_kind,
-                    cov.error_detail
-                ],
+                params![root_id, now_ms, &cov.scan_issue_kind, &cov.error_detail,],
             )?,
             None => self.tx().execute(
                 "UPDATE source_scan_state
@@ -926,9 +919,8 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         if let Some((maybe_issue_kind, _error_detail)) = failed_issue {
             let issue_kind = maybe_issue_kind.unwrap_or_else(|| "unknown_io".to_string());
             return Ok(Some(SourceScanIncompleteCoverage {
-                scan_phase: "partial",
-                scan_issue_kind: Some(issue_kind),
-                error_detail: Some("descendant directory coverage is incomplete".to_string()),
+                scan_issue_kind: issue_kind,
+                error_detail: "descendant directory coverage is incomplete".to_string(),
             }));
         }
 
@@ -955,9 +947,8 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         if let Some((maybe_issue_kind, _error_detail)) = blocked_issue {
             let issue_kind = maybe_issue_kind.unwrap_or_else(|| "unknown_io".to_string());
             return Ok(Some(SourceScanIncompleteCoverage {
-                scan_phase: "partial",
-                scan_issue_kind: Some(issue_kind),
-                error_detail: Some("descendant directory coverage is incomplete".to_string()),
+                scan_issue_kind: issue_kind,
+                error_detail: "descendant directory coverage is incomplete".to_string(),
             }));
         }
 
@@ -977,11 +968,9 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
 
         if has_pending_or_scanning.is_some() {
             return Ok(Some(SourceScanIncompleteCoverage {
-                scan_phase: "partial",
-                scan_issue_kind: Some("unknown_io".to_string()),
-                error_detail: Some(
-                    "incomplete directory coverage remains after scan finalization".to_string(),
-                ),
+                scan_issue_kind: "unknown_io".to_string(),
+                error_detail: "incomplete directory coverage remains after scan finalization"
+                    .to_string(),
             }));
         }
 
