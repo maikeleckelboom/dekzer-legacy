@@ -275,6 +275,7 @@ CREATE TABLE source_directories
     updated_at                  INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
     CHECK (parent_source_directory_id IS NULL OR relative_path <> ''),
+    CHECK (dir_scan_state NOT IN ('blocked', 'failed') OR dir_scan_issue_kind IS NOT NULL),
     UNIQUE (source_id, relative_path)
 ) STRICT;
 

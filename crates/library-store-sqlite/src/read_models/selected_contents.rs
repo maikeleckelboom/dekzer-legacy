@@ -192,8 +192,8 @@ pub(crate) fn read_selected_contents(
     let state = selected_contents_state(&coverage, rows.is_empty());
     let detail = selected_contents_detail(state, coverage.state);
 
-    let empty_result_authoritative = state == StoreSelectedContentsState::Empty
-        && source_readiness.scan_phase.as_deref() != Some("partial");
+    let empty_result_authoritative =
+        state == StoreSelectedContentsState::Empty && coverage.recursive_scope_complete;
 
     Ok(StoreSelectedContentsResult {
         state,
@@ -694,10 +694,7 @@ fn coverage_from_counts(
 ) -> StoreSelectedContentsCoverage {
     if counts.total_directories == 0 {
         if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
-            && matches!(
-                source.scan_phase.as_deref(),
-                Some("complete") | Some("partial")
-            )
+            && source.scan_phase.as_deref() == Some("complete")
         {
             return coverage(
                 StoreSelectedContentsCoverageState::Complete,
@@ -766,9 +763,11 @@ fn coverage_from_counts(
         );
     }
 
-    if source.scan_phase.as_deref() == Some("partial") {
+    if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
+        && source.scan_phase.as_deref() == Some("partial")
+    {
         return coverage(
-            StoreSelectedContentsCoverageState::Blocked,
+            StoreSelectedContentsCoverageState::Pending,
             false,
             "The selected source scan has incomplete descendant coverage.",
         );
@@ -2428,13 +2427,8 @@ mod tests {
             .expect("set partial scan phase");
         insert_directory(&connection, 10, 1, "Music", "complete");
         insert_scanned_file(&connection, 1000, 1, 10, "Music/track.wav", "audio");
-        insert_directory(&connection, 11, 1, "Music/Locked", "blocked");
-        connection
-            .execute(
-                "UPDATE source_directories SET dir_scan_issue_kind = 'permission_denied' WHERE source_directory_id = 11",
-                [],
-            )
-            .expect("set blocked issue kind");
+        insert_directory(&connection, 11, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
 
         let result = read_selected_contents(
             &connection,
@@ -2454,5 +2448,128 @@ mod tests {
         );
         assert!(!result.coverage.recursive_scope_complete);
         assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn clean_directory_under_partial_source_is_complete_and_authoritative() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_directory(&connection, 12, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
+        insert_scanned_file(&connection, 1000, 1, 11, "Music/Good/track.wav", "audio");
+
+        let dir_result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 11,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents for Good");
+
+        assert_eq!(
+            dir_result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "clean sibling directory under partial source must have complete coverage"
+        );
+        assert!(dir_result.coverage.recursive_scope_complete);
+        assert_eq!(dir_result.state, StoreSelectedContentsState::Ready);
+        assert!(!dir_result.rows.is_empty());
+
+        let source_result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents for source");
+
+        assert_ne!(
+            source_result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "whole source must remain non-complete when partial"
+        );
+        assert!(!source_result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn clean_empty_directory_under_partial_source_is_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_directory(&connection, 12, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
+
+        let dir_result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 11,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents for empty Good");
+
+        assert_eq!(
+            dir_result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "clean empty sibling directory under partial source may be authoritative empty"
+        );
+        assert!(dir_result.coverage.recursive_scope_complete);
+        assert!(dir_result.coverage.empty_result_authoritative);
+        assert_eq!(dir_result.state, StoreSelectedContentsState::Empty);
+    }
+
+    #[test]
+    fn blocked_scope_under_partial_source_remains_blocked() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
+
+        let dir_result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 11,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents for Locked");
+
+        assert_eq!(
+            dir_result.coverage.state,
+            StoreSelectedContentsCoverageState::Blocked,
+            "blocked scope under partial source must remain blocked"
+        );
+        assert!(!dir_result.coverage.recursive_scope_complete);
+        assert!(!dir_result.coverage.empty_result_authoritative);
+        assert_eq!(dir_result.state, StoreSelectedContentsState::Blocked);
     }
 }

@@ -44,6 +44,7 @@ fn validate_residual_semantic_checks(connection: &Connection) -> LibrarySqliteRe
     validate_source_locator_constraints(connection)?;
     validate_source_state_constraints(connection)?;
     validate_source_scan_state_constraints(connection)?;
+    validate_source_directories_constraints(connection)?;
     validate_source_location_constraints(connection)?;
     validate_browser_user_order_constraints(connection)?;
     validate_navigation_rows_constraints(connection)?;
@@ -107,6 +108,22 @@ fn validate_source_scan_state_constraints(connection: &Connection) -> LibrarySql
             &sql,
             fragment,
             format!("source_scan_state must retain scan-state constraint fragment {fragment:?}"),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_source_directories_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
+    let sql = read_required_normalized_table_sql(connection, "source_directories")?;
+    for fragment in [
+        "presence_state IN ('present', 'missing', 'removed')",
+        "dir_scan_state IN ('pending', 'scanning', 'complete', 'failed', 'blocked')",
+        "dir_scan_state NOT IN ('blocked', 'failed') OR dir_scan_issue_kind IS NOT NULL",
+    ] {
+        require_sql_fragment(
+            &sql,
+            fragment,
+            format!("source_directories must retain directory constraint fragment {fragment:?}"),
         )?;
     }
     Ok(())

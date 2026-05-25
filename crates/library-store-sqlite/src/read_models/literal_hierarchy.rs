@@ -144,10 +144,6 @@ pub(crate) fn read_children(
     )?;
     coverage.empty_result_authoritative =
         coverage.state == StoreLiteralHierarchyCoverageState::Complete && total_rows == 0;
-    if anchor.source_readiness.scan_phase.as_deref() == Some("partial") {
-        coverage.empty_result_authoritative = false;
-        coverage.recursive_scope_complete = false;
-    }
     let rows = read_child_rows(
         connection,
         anchor.source_id,
@@ -387,6 +383,7 @@ fn read_hierarchy_coverage(
         ));
     }
 
+    let is_whole_source = parent_source_directory_id.is_none();
     let counts = if let Some(parent_source_directory_id) = parent_source_directory_id {
         let Some((relative_path, presence_state)) =
             load_directory_path_and_presence(connection, source_id, parent_source_directory_id)?
@@ -409,7 +406,11 @@ fn read_hierarchy_coverage(
         read_whole_source_coverage_counts(connection, source_id)?
     };
 
-    Ok(literal_coverage_from_counts(source, counts))
+    Ok(literal_coverage_from_counts(
+        source,
+        counts,
+        is_whole_source,
+    ))
 }
 
 fn source_readiness_coverage(source: &SourceReadiness) -> Option<StoreLiteralHierarchyCoverage> {
@@ -544,6 +545,7 @@ fn coverage_counts_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Coverag
 fn literal_coverage_from_counts(
     source: &SourceReadiness,
     counts: CoverageCounts,
+    is_whole_source: bool,
 ) -> StoreLiteralHierarchyCoverage {
     if counts.blocked_directories > 0 {
         return literal_coverage(
@@ -584,9 +586,9 @@ fn literal_coverage_from_counts(
             "The selected hierarchy scope has not completed scan coverage.",
         );
     }
-    if source.scan_phase.as_deref() == Some("partial") {
+    if is_whole_source && source.scan_phase.as_deref() == Some("partial") {
         return literal_coverage(
-            StoreLiteralHierarchyCoverageState::Blocked,
+            StoreLiteralHierarchyCoverageState::Pending,
             false,
             "The selected source scan has incomplete descendant coverage.",
         );
@@ -920,6 +922,7 @@ mod tests {
         name: &str,
         facts: DirectoryFacts,
         dir_scan_state: &str,
+        dir_scan_issue_kind: Option<&str>,
     ) {
         connection
             .execute(
@@ -934,11 +937,12 @@ mod tests {
                      has_primary_media_descendant,
                      has_image_media_descendant,
                      dir_scan_state,
+                     dir_scan_issue_kind,
                      dir_scan_updated_at,
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 7, ?2, ?3, ?3, 'present', ?4, ?5, ?6, ?7, 1, 1, 1)",
+                 VALUES (?1, 7, ?2, ?3, ?3, 'present', ?4, ?5, ?6, ?7, ?8, 1, 1, 1)",
                 params![
                     source_directory_id,
                     parent_source_directory_id,
@@ -946,7 +950,8 @@ mod tests {
                     facts.has_child_directories,
                     facts.has_primary_media_descendant,
                     facts.has_image_media_descendant,
-                    dir_scan_state
+                    dir_scan_state,
+                    dir_scan_issue_kind,
                 ],
             )
             .expect("insert source directory");
@@ -1031,6 +1036,7 @@ mod tests {
                 has_image_media_descendant: false,
             },
             "complete",
+            None,
         );
         insert_directory(
             &connection,
@@ -1043,6 +1049,7 @@ mod tests {
                 has_image_media_descendant: false,
             },
             "complete",
+            None,
         );
         set_directory_scan_issue(&connection, 21, "blocked", "permission_denied");
 
@@ -1266,6 +1273,7 @@ mod tests {
                 has_image_media_descendant: false,
             },
             "pending",
+            None,
         );
         insert_file_in_directory(
             &connection,
@@ -1324,6 +1332,7 @@ mod tests {
                 has_image_media_descendant: true,
             },
             "complete",
+            None,
         );
         insert_file_in_directory(&connection, 31, Some(21), "Covers/front.jpg", "image");
 
@@ -1357,6 +1366,7 @@ mod tests {
                 has_image_media_descendant: true,
             },
             "complete",
+            None,
         );
         insert_file_in_directory(&connection, 31, Some(21), "Covers/front.jpg", "image");
 
@@ -1411,6 +1421,7 @@ mod tests {
                 has_image_media_descendant: false,
             },
             "complete",
+            None,
         );
 
         let window = read_children(
@@ -1449,6 +1460,7 @@ mod tests {
                 has_image_media_descendant: false,
             },
             "complete",
+            None,
         );
         insert_file_in_directory(&connection, 31, Some(20), "Music/track.flac", "audio");
         insert_directory(
@@ -1461,8 +1473,10 @@ mod tests {
                 has_primary_media_descendant: false,
                 has_image_media_descendant: false,
             },
-            "blocked",
+            "complete",
+            None,
         );
+        set_directory_scan_issue(&connection, 21, "blocked", "permission_denied");
 
         let window = read_children(
             &connection,
@@ -1484,6 +1498,212 @@ mod tests {
         assert!(
             !window.rows.is_empty(),
             "partial scan must return visible rows outside blocked subtree"
+        );
+    }
+
+    #[test]
+    fn clean_sibling_directory_under_partial_source_is_complete() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 7",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryFacts {
+                has_child_directories: true,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            21,
+            Some(20),
+            "Music/Good",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            22,
+            Some(20),
+            "Music/Locked",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        set_directory_scan_issue(&connection, 22, "blocked", "permission_denied");
+
+        let good_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(21),
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read Music/Good hierarchy")
+        .expect("Music/Good window");
+
+        assert_eq!(
+            good_window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Complete,
+            "clean sibling directory under partial source must have complete coverage"
+        );
+        assert!(
+            good_window.coverage.recursive_scope_complete,
+            "clean sibling directory under partial source must have recursiveScopeComplete = true"
+        );
+        assert!(
+            good_window.coverage.empty_result_authoritative,
+            "clean empty sibling directory under partial source may be authoritative empty"
+        );
+
+        let locked_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(22),
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read Music/Locked hierarchy")
+        .expect("Music/Locked window");
+
+        assert_eq!(
+            locked_window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Blocked,
+            "blocked subtree must remain blocked"
+        );
+        assert!(!locked_window.coverage.recursive_scope_complete);
+        assert!(!locked_window.coverage.empty_result_authoritative);
+
+        let source_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read whole source hierarchy")
+        .expect("whole source window");
+
+        assert_ne!(
+            source_window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Complete,
+            "whole source must remain non-complete when partial"
+        );
+        assert!(!source_window.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn complete_directory_under_partial_source_with_media_files_returns_rows() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 7",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryFacts {
+                has_child_directories: true,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            21,
+            Some(20),
+            "Music/Good",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file_in_directory(&connection, 31, Some(21), "Music/Good/track.flac", "audio");
+        insert_directory(
+            &connection,
+            22,
+            Some(20),
+            "Music/Locked",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        set_directory_scan_issue(&connection, 22, "blocked", "permission_denied");
+
+        let good_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(21),
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read Music/Good hierarchy")
+        .expect("Music/Good window");
+
+        assert_eq!(
+            good_window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Complete,
+            "clean sibling directory with media must have complete coverage"
+        );
+        assert!(good_window.coverage.recursive_scope_complete);
+        assert!(
+            !good_window.rows.is_empty(),
+            "clean sibling directory must return media rows"
+        );
+
+        let source_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read whole source hierarchy")
+        .expect("whole source window");
+
+        assert_ne!(
+            source_window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Complete,
+            "whole source must remain non-complete when partial"
         );
     }
 }

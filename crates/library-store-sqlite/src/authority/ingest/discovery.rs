@@ -393,7 +393,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             params![root_id, now_ms],
         )?;
 
-        let descendant_coverage = self.load_descendant_coverage_issue(root_id)?;
+        let descendant_coverage = self.load_source_scan_incomplete_coverage(root_id)?;
         let scan_rows_changed = match descendant_coverage {
             Some((phase, issue_kind, error_detail)) => self.tx().execute(
                 "UPDATE source_scan_state
@@ -659,6 +659,12 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             return Ok(None);
         }
 
+        let effective_issue_kind = if matches!(final_directory_scan_state, "blocked" | "failed") {
+            Some(issue_kind.unwrap_or(SourceAccessIssueKind::UnknownIo))
+        } else {
+            issue_kind
+        };
+
         let mut parent_source_directory_id = None;
         let mut running_relative_path = String::new();
         for segment in relative_path.split('/') {
@@ -686,7 +692,9 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                             }
                             .to_string(),
                         ),
-                        dir_scan_issue_kind: is_final_directory.then_some(issue_kind).flatten(),
+                        dir_scan_issue_kind: is_final_directory
+                            .then_some(effective_issue_kind)
+                            .flatten(),
                         dir_scan_error_detail: if is_final_directory {
                             error_detail.clone()
                         } else {
@@ -878,11 +886,11 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         Ok(rows)
     }
 
-    fn load_descendant_coverage_issue(
+    fn load_source_scan_incomplete_coverage(
         &self,
         root_id: i64,
     ) -> LibrarySqliteResult<Option<(&'static str, Option<String>, Option<String>)>> {
-        let failed_issue: Option<(String, Option<String>)> = self
+        let failed_issue: Option<(Option<String>, Option<String>)> = self
             .tx()
             .query_row(
                 "SELECT dir_scan_issue_kind, dir_scan_error_detail
@@ -890,15 +898,20 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  WHERE source_id = ?1
                    AND presence_state = 'present'
                    AND dir_scan_state = 'failed'
-                   AND dir_scan_issue_kind IS NOT NULL
                  ORDER BY relative_path ASC
                  LIMIT 1",
                 [root_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                    ))
+                },
             )
             .optional()?;
 
-        if let Some((issue_kind, _error_detail)) = failed_issue {
+        if let Some((maybe_issue_kind, _error_detail)) = failed_issue {
+            let issue_kind = maybe_issue_kind.unwrap_or_else(|| "unknown_io".to_string());
             return Ok(Some((
                 "partial",
                 Some(issue_kind),
@@ -906,7 +919,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             )));
         }
 
-        let blocked_issue: Option<(String, Option<String>)> = self
+        let blocked_issue: Option<(Option<String>, Option<String>)> = self
             .tx()
             .query_row(
                 "SELECT dir_scan_issue_kind, dir_scan_error_detail
@@ -914,19 +927,46 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  WHERE source_id = ?1
                    AND presence_state = 'present'
                    AND dir_scan_state = 'blocked'
-                   AND dir_scan_issue_kind IS NOT NULL
                  ORDER BY relative_path ASC
                  LIMIT 1",
                 [root_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                    ))
+                },
             )
             .optional()?;
 
-        if let Some((issue_kind, _error_detail)) = blocked_issue {
+        if let Some((maybe_issue_kind, _error_detail)) = blocked_issue {
+            let issue_kind = maybe_issue_kind.unwrap_or_else(|| "unknown_io".to_string());
             return Ok(Some((
                 "partial",
                 Some(issue_kind),
                 Some("descendant directory coverage is incomplete".to_string()),
+            )));
+        }
+
+        let has_pending_or_scanning: Option<i64> = self
+            .tx()
+            .query_row(
+                "SELECT 1
+                 FROM source_directories
+                 WHERE source_id = ?1
+                   AND presence_state = 'present'
+                   AND dir_scan_state IN ('pending', 'scanning')
+                 LIMIT 1",
+                [root_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        if has_pending_or_scanning.is_some() {
+            return Ok(Some((
+                "partial",
+                Some("unknown_io".to_string()),
+                Some("incomplete directory coverage remains after scan finalization".to_string()),
             )));
         }
 
@@ -2425,6 +2465,294 @@ mod tests {
             scan_issue_kind.as_deref(),
             Some("timed_out"),
             "partial scan must prefer failed descendant issue over blocked"
+        );
+    }
+
+    #[test]
+    fn blocked_directory_without_issue_receives_fallback_unknown_io() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/blocked_no_issue".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: None,
+                        diagnostic_detail: Some("blocked reason".to_string()),
+                        observed_at_ms: 30,
+                    },
+                )
+                .expect("commit blocked outcome without issue");
+            Ok(())
+        })
+        .expect("write blocked outcome without issue");
+
+        let dir_issue: Option<String> = connection
+            .query_row(
+                "SELECT dir_scan_issue_kind FROM source_directories WHERE relative_path = 'albums/blocked_no_issue'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read dir_scan_issue_kind");
+        assert_eq!(
+            dir_issue.as_deref(),
+            Some("unknown_io"),
+            "blocked directory without explicit issue must receive fallback unknown_io"
+        );
+    }
+
+    #[test]
+    fn failed_directory_without_issue_receives_fallback_unknown_io() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/failed_no_issue".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Failed,
+                        issue_kind: None,
+                        diagnostic_detail: Some("failed reason".to_string()),
+                        observed_at_ms: 30,
+                    },
+                )
+                .expect("commit failed outcome without issue");
+            Ok(())
+        })
+        .expect("write failed outcome without issue");
+
+        let dir_issue: Option<String> = connection
+            .query_row(
+                "SELECT dir_scan_issue_kind FROM source_directories WHERE relative_path = 'albums/failed_no_issue'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read dir_scan_issue_kind");
+        assert_eq!(
+            dir_issue.as_deref(),
+            Some("unknown_io"),
+            "failed directory without explicit issue must receive fallback unknown_io"
+        );
+    }
+
+    #[test]
+    fn schema_rejects_blocked_directory_without_issue_kind() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+
+        let source_id = admit_write(&mut connection, |write| {
+            let source_id = SourcesAuthorityTx::new(write)
+                .upsert_source(&crate::authority::sources::UpsertSourceInput {
+                    source_id: Some(1),
+                    source_class: "internal".to_string(),
+                    authority: "system".to_string(),
+                    identity_kind: "filesystem_uuid".to_string(),
+                    identity_value: "check-test".to_string(),
+                    display_name: "Check Test".to_string(),
+                    medium_label: None,
+                    is_user_visible: true,
+                    browser_order_ordinal: Some(0),
+                    changed_at: 10,
+                })
+                .expect("upsert source");
+            Ok(source_id)
+        })
+        .expect("write source");
+
+        let result = connection.execute(
+            "INSERT INTO source_directories (
+                 source_directory_id,
+                 source_id,
+                 parent_source_directory_id,
+                 name,
+                 relative_path,
+                 presence_state,
+                 dir_scan_state,
+                 dir_scan_updated_at,
+                 created_at,
+                 updated_at
+             )
+             VALUES (60, ?1, NULL, 'Locked', 'Locked', 'present', 'blocked', 1, 1, 1)",
+            [source_id],
+        );
+
+        assert!(
+            result.is_err(),
+            "blocked directory without dir_scan_issue_kind must be rejected by schema CHECK"
+        );
+    }
+
+    #[test]
+    fn schema_rejects_failed_directory_without_issue_kind() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+
+        let source_id = admit_write(&mut connection, |write| {
+            let source_id = SourcesAuthorityTx::new(write)
+                .upsert_source(&crate::authority::sources::UpsertSourceInput {
+                    source_id: Some(1),
+                    source_class: "internal".to_string(),
+                    authority: "system".to_string(),
+                    identity_kind: "filesystem_uuid".to_string(),
+                    identity_value: "check-test-2".to_string(),
+                    display_name: "Check Test 2".to_string(),
+                    medium_label: None,
+                    is_user_visible: true,
+                    browser_order_ordinal: Some(0),
+                    changed_at: 10,
+                })
+                .expect("upsert source");
+            Ok(source_id)
+        })
+        .expect("write source");
+
+        let result = connection.execute(
+            "INSERT INTO source_directories (
+                 source_directory_id,
+                 source_id,
+                 parent_source_directory_id,
+                 name,
+                 relative_path,
+                 presence_state,
+                 dir_scan_state,
+                 dir_scan_updated_at,
+                 created_at,
+                 updated_at
+             )
+             VALUES (61, ?1, NULL, 'Failed', 'Failed', 'present', 'failed', 1, 1, 1)",
+            [source_id],
+        );
+
+        assert!(
+            result.is_err(),
+            "failed directory without dir_scan_issue_kind must be rejected by schema CHECK"
+        );
+    }
+
+    #[test]
+    fn blocked_directory_remains_blocked_after_finalization() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/locked".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                        diagnostic_detail: Some("permission denied".to_string()),
+                        observed_at_ms: 30,
+                    },
+                )
+                .expect("commit blocked outcome");
+            Ok(())
+        })
+        .expect("write blocked outcome");
+
+        run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
+
+        let locked_facts = read_directory_facts(&connection, "albums/locked");
+        assert_eq!(locked_facts.dir_scan_state, "blocked");
+        assert_eq!(
+            locked_facts.scanned_at, None,
+            "blocked directory should not have scanned_at set during finalization"
+        );
+
+        let scan_phase: String = connection
+            .query_row(
+                "SELECT scan_phase FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan phase");
+        assert_eq!(scan_phase, "partial");
+    }
+
+    #[test]
+    fn finalized_scan_with_pending_descendant_under_blocked_subtree_becomes_partial() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/locked".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                        diagnostic_detail: Some("permission denied".to_string()),
+                        observed_at_ms: 20,
+                    },
+                )
+                .expect("commit blocked outcome");
+            Ok(())
+        })
+        .expect("write blocked outcome");
+
+        admit_write(&mut connection, |write| {
+            SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(90),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "sub".to_string(),
+                    relative_path: "albums/locked/sub".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
+                    scanned_at: None,
+                    mtime_ns: None,
+                    first_created_at: Some(20),
+                    changed_at: 20,
+                })
+                .expect("upsert child directory under blocked");
+            Ok(())
+        })
+        .expect("write child directory");
+
+        run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
+
+        let scan_phase: String = connection
+            .query_row(
+                "SELECT scan_phase FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan phase");
+        assert_eq!(
+            scan_phase, "partial",
+            "scan with pending descendant under blocked subtree must be partial, not complete"
+        );
+
+        let scan_issue_kind: Option<String> = connection
+            .query_row(
+                "SELECT scan_issue_kind FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .expect("read scan_issue_kind");
+        assert!(
+            scan_issue_kind.is_some(),
+            "partial scan must have non-null scan_issue_kind"
         );
     }
 }
