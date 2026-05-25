@@ -90,28 +90,81 @@ broadcast_projection
 
 ## Authority Boundaries
 
-### Library Authority
+### Source Access Authority
 
 Owns:
 
-- `library_items` rows, `item_origins`, `file_identities`
-- `library_item_roles` rows, including classifier-originated and user-originated
-  role decisions
-- `library_item_role_events` rows
-- `source_files` rows, availability state, discovery state
-- `source_directories` rows, directory scan state, directory affordance facts
-- `source_locations` rows, source location lifecycle
-- `source_scan_state` rows, scan phase
-- Stable product identity binding to file identity
+- `source_locations` rows and source location lifecycle where the lifecycle concern is
+  access or location scoped
+- Mount and access state
+- Source access issue classification
+- Source availability as source-level access state
 
 Does not own:
 
-- Deck state, playhead, cue state, loaded runtime item
-- Broadcast state, live session timeline
-- Performance session events
-- Deck transport, tempo, pitch, sync participation
-- Runtime resource handles
-- Transition, mix, or route state
+- Library item identity
+- Roles
+- Deck readiness
+- Deck runtime
+- Scan inventory facts
+
+### Scanner / Inventory Authority
+
+Owns:
+
+- `source_files` rows as discovered filesystem inventory
+- `source_directories` rows
+- `source_scan_state` rows, scan phase
+- `presence_state`
+- Directory scan state, directory affordance facts
+- Source-file provisional `media_class` used only as inventory evidence and browse
+  visibility input
+- Discovery timestamps and observation facts
+
+Does not own:
+
+- Library item identity
+- Role meaning
+- Deck-load eligibility
+- Readiness answers
+- Deck state
+
+Rejection cases for this authority:
+
+- `source_files.availability_state` is treated as deck or runtime availability
+- `source_files.media_class` or `presence_state` is used as readiness proof or
+  deck-load eligibility
+
+### Library Item Authority
+
+Owns:
+
+- `library_items` rows
+- `item_origins`
+- `file_identities` or equivalent identity binding
+- Stable product-addressable identity
+
+Does not own:
+
+- Source access state or mount state
+- Scan phase or discovery facts
+- Deck runtime
+- Performance events
+
+### Role Classification Authority
+
+Owns:
+
+- `library_item_roles` rows, including classifier-originated and user-originated
+  role decisions
+- `library_item_role_events` rows
+
+Does not own:
+
+- Deck state
+- Readiness execution
+- Scheduler work identity
+- Library item identity mutation
 
 ### Readiness Authority
 
@@ -120,7 +173,8 @@ Owns:
 - `item_readiness` rows (one per `library_item_id, target`)
 - Target-specific readiness answers: proof that the item may be used for that target
 - Readiness re-evaluation requests (may request scheduler work; does not own work item rows)
-- Invalidation in response to substrate events (source change, probe update, role change, policy change)
+- Invalidation in response to substrate events (source change, probe update, role change,
+  policy change)
 
 Reads:
 
@@ -133,15 +187,16 @@ Does not own:
 - Deck runtime or loaded deck item creation
 - Library identity mutation
 - Performance session event creation
-- Readiness work execution (the scheduler runs readiness work; the readiness evaluator owns the output rows)
-- Expensive inline evaluation (must enqueue work through the scheduler for anything beyond a bounded synchronous check)
+- Readiness work execution (the scheduler runs readiness work; the readiness evaluator
+  owns the output rows)
+- Expensive inline evaluation (must enqueue work through the scheduler for anything
+  beyond a bounded synchronous check)
 
 Rules:
 
-- Readiness is target-specific. Global `deckReady` is rejected. Deck loading
-  needs an explicit target such as `audio_deck_load` or `video_deck_load`.
-  Do not use generic deck readiness when the real question is readiness for
-  a specific runtime target.
+- Readiness is target-specific. Global `deckReady` is rejected. Deck loading needs an
+  explicit target such as `audio_deck_load` or `video_deck_load`. Do not use generic
+  deck readiness when the real question is readiness for a specific runtime target.
 - Readiness answers must be bounded.
 - Pending readiness may request scheduler work.
 - Readiness evaluation must not perform expensive work inline.
@@ -162,7 +217,8 @@ Owns:
 Reads:
 
 - Substrate tables for scheduling decisions
-- Foreground interest signals, explicit user requests, deck load requests (via control plane)
+- Foreground interest signals, explicit user requests, deck load requests (via control
+  plane)
 
 Does not own:
 
@@ -179,7 +235,8 @@ Rules:
 - Scheduler must not mutate deck state.
 - Scheduler must not emit performance events.
 - Scheduler must not treat queued/deferred/requested as scan phase or deck state.
-- Scheduler work completion may update readiness-owned rows or artifacts through the owning authority.
+- Scheduler work completion may update readiness-owned rows or artifacts through the
+  owning authority.
 
 ### Deck Runtime Authority
 
@@ -206,13 +263,23 @@ Does not own:
 
 Rules:
 
-- Creates `loaded_deck_item` from a `deck_load_request` only after readiness policy allows it.
-- References library identity by `library_item_id`. Does not copy or mutate library truth.
+- Creates `loaded_deck_item` from a `deck_load_request` only after readiness policy
+  allows it.
+- References library identity by `library_item_id`. Does not copy or mutate library
+  truth.
 - Runtime settings (tempo, pitch, cues, loops) may diverge from library metadata.
 - Runtime cue/loop/playhead/tempo state belongs to deck runtime, not library item.
-- If the source disappears after load, deck runtime decides whether the loaded resource remains
-  playable, degraded, blocked, or invalidated based on resource ownership and buffering state.
-- Library source unavailability does not automatically rewrite historical performance events.
+- If the source disappears after load, deck runtime decides whether the loaded resource
+  remains playable, degraded, blocked, or invalidated based on resource ownership and
+  buffering state.
+- Library source unavailability does not automatically rewrite historical performance
+  events.
+- Resource handles are issued by the resource or media authority at the runtime resource
+  boundary. Deck Runtime owns bindings to handles, not the durable media artifacts or
+  source access policy that produced them. Deck Runtime must not become file access
+  authority, decoder authority, or resource policy authority as a side effect of owning
+  handle bindings.
+- The exact schema, persistence strategy, and Rust types are future work.
 
 ### Performance Session Authority
 
@@ -234,6 +301,13 @@ Does not own:
 Rules:
 
 - May reference `library_item_id` and `loaded_deck_item_id` in events.
+- If a `performance_session_event` references a loaded deck item, the referenced identity
+  must be stable within the performance session and event log. Volatile runtime handles
+  must not be used as durable event identity.
+- Performance events may capture event-time display or metadata snapshots, or
+  projection-version references. Such snapshots are historical evidence and are not
+  library authority. Library metadata changing after the fact must not alter historical
+  event records.
 - Events are durable or replayable facts about what happened at runtime.
 - Performance session does not own the runtime state that produced the events.
 - A load event records that a deck load occurred; it does not perform the load.
@@ -249,7 +323,8 @@ Consumes:
 
 - Performance session events
 - Deck runtime projection (current loaded items, deck state summaries)
-- Library item projection (title, artist, album, artwork, metadata)
+- Privacy-filtered, versioned library item projection (title, artist, album, artwork,
+  metadata); not mutable library tables directly
 
 Does not own:
 
@@ -265,6 +340,9 @@ Rules:
 - It does not own deck transport.
 - It does not own library item identity.
 - It does not infer track identity from filenames.
+- It consumes privacy-filtered library item projection or event-time metadata snapshots,
+  not mutable library tables directly. This is required because broadcast has privacy and
+  publication policy that library tables do not enforce.
 - It may publish:
   - current loaded item
   - deck state summary
@@ -323,7 +401,8 @@ Rules:
    If unsupported, returns unsupported (target type not applicable).
 5. Deck Runtime Authority obtains or receives resource handles needed for runtime use.
 6. Performance Session Authority records load event.
-7. Broadcast Projection Authority may project the load event and current deck/session state.
+7. Broadcast Projection Authority may project the load event and current deck/session
+   state using privacy-filtered projection.
 ```
 
 ### Distinctions
@@ -372,7 +451,8 @@ Rules:
 - If the source disappears after load, deck runtime decides whether the loaded resource
   remains playable, degraded, blocked, or invalidated based on resource ownership and
   buffering state.
-- Library source unavailability does not automatically rewrite historical performance events.
+- Library source unavailability does not automatically rewrite historical performance
+  events.
 - The exact schema, persistence strategy, and Rust types are future work.
 
 ---
@@ -381,9 +461,9 @@ Rules:
 
 Readiness targets must be explicit and target-specific.
 
-A readiness target has one canonical domain identity. Durable storage uses the
-canonical target key. Boundary or protocol naming may transform representation
-style, but must not create a second target identity.
+A readiness target has one canonical domain identity. Durable storage uses the canonical
+target key. Boundary or protocol naming may transform representation style, but must not
+create a second target identity.
 
 Canonical targets:
 
@@ -404,7 +484,52 @@ videoDeckLoad        is the protocol representation of video_deck_load
 visualOutput         is the protocol representation of visual_output
 ```
 
-Rules:
+### Readiness Target Taxonomy
+
+Readiness targets belong to target families. The `readiness_target` field is not a
+junk drawer. Every target belongs to one of:
+
+```
+runtime_load
+  audio_deck_load
+  video_deck_load
+
+output_projection
+  visual_output
+  broadcast_metadata_projection
+
+attachment_projection
+  artwork_attachment
+  waveform_preview
+```
+
+Analysis jobs such as `waveform_analysis` or `beatgrid_analysis` produce evidence and
+artifacts. They are not automatically readiness targets. `waveform_analysis` is a work
+domain; `waveform_preview` is a consumption target derived from that work. These are
+distinct: an analysis job completing does not make `waveform_preview` ready without a
+readiness evaluation step that consumes the artifact.
+
+This distinction matters for scheduler design. Analysis jobs and readiness targets are
+related but not the same thing.
+
+### Naming Alignment Note
+
+This document canonicalizes `audio_deck_load`, `video_deck_load`, `waveform_preview`, and
+`broadcast_metadata_projection` as readiness target keys. The companion document
+`media-role-classification.md` uses `audio_deck`, `video_deck`, `waveform_analysis`, and
+`beatgrid_analysis`. These must be reconciled before readiness and scheduler work goes
+deeper:
+
+- `audio_deck_load` / `video_deck_load` are readiness targets (this document).
+- `audio_deck` / `video_deck` as used in `media-role-classification.md` are role or
+  target family names, not readiness target keys.
+- `waveform_analysis` / `beatgrid_analysis` are analysis work domains, not readiness
+  targets.
+- `media-role-classification.md` must either adopt these canonical target keys or define
+  explicitly that its usage is role/family naming rather than readiness target identity.
+  The two documents must not disagree on what a key string means.
+
+### Rules
 
 - Readiness is target-specific. A music video may be `audio_deck_load: ready` and
   `video_deck_load: ready` simultaneously. An audio-only track may be
@@ -433,8 +558,8 @@ Rules:
 - Scheduler must not mutate deck state.
 - Scheduler must not emit performance events.
 - Scheduler must not treat queued/deferred/requested as scan phase or deck state.
-- Scheduler work completion may update readiness-owned rows or artifacts through
-  the owning authority.
+- Scheduler work completion may update readiness-owned rows or artifacts through the
+  owning authority.
 - Foreground interest expires. A deck load request creates transient urgency, not
   permanent scheduler priority. See `work-scheduling.md` for foreground interest TTL.
 
@@ -442,33 +567,36 @@ Rules:
 
 ## Source Loss After Load
 
-Source availability belongs to the library/source authority. Loaded resource validity
+Source availability belongs to the source access authority. Loaded resource validity
 belongs to the deck runtime authority.
 
 Possible loaded deck item runtime states:
 
 ```
-playable           resource is usable
-degraded           resource is usable with known limitations (e.g. source lost but buffer holds)
+playable            resource is usable
+degraded            resource is usable with known limitations (e.g. source lost but
+                    buffer holds)
 resourceUnavailable source is gone and buffer is insufficient
-invalidated        binding is no longer valid (source replaced, identity changed)
-unloaded           binding was explicitly removed by deck authority
+invalidated         binding is no longer valid (source replaced, identity changed)
+unloaded            binding was explicitly removed by deck authority
 ```
 
 Rules:
 
-- Source authority reports source availability. Library source unavailability does
-  not directly mutate deck runtime.
-- Source availability changes invalidate readiness rows for affected items.
+- Source authority reports source availability. Library source unavailability does not
+  directly mutate deck runtime.
+- Source availability changes invalidate or degrade readiness answers for affected targets
+  according to target policy. A loaded or buffered item may remain playable while future
+  loads of the same item become unavailable. Readiness invalidation is not always total;
+  the appropriate response depends on the target and whether the resource is buffered.
 - Deck runtime detects resource loss through its own handles. It does not poll
   `source_files.availability`.
-- Historical performance events remain historical facts. A source that disappears
-  does not erase the fact that it was loaded and played.
-- Broadcast projection must surface degraded/unavailable state when relevant, but must
-  not rewrite the past. Broadcast does not publish raw source mutation as
-  performance authority.
-- Exact runtime state machine, transition rules, and invalidation protocol are
-  future work.
+- Historical performance events remain historical facts. A source that disappears does not
+  erase the fact that it was loaded and played.
+- Broadcast projection must surface degraded/unavailable state when relevant, but must not
+  rewrite the past. Broadcast does not publish raw source mutation as performance
+  authority.
+- Exact runtime state machine, transition rules, and invalidation protocol are future work.
 
 ---
 
@@ -482,13 +610,17 @@ Rules:
 - Broadcast projection does not own deck transport.
 - Broadcast projection does not own library item identity.
 - Broadcast projection does not infer track identity from filenames.
-- Broadcast projection must not publish raw source paths unless an explicit privacy
-  policy allows it.
+- Broadcast projection must not publish raw source paths unless an explicit privacy policy
+  allows it.
+- Broadcast projection consumes privacy-filtered, versioned library item projection or
+  event-time metadata snapshots. It does not consume mutable library tables directly.
+  Library metadata that changes after a broadcast event must not alter the published
+  history of that event.
 - Broadcast projection subscribes to projections, not to raw `source_files` or
   `library_items` rows.
 - The exact schema, protocol, and projection pipeline are future work.
-- Broadcast policy (what is publishable, under what conditions, to which destinations)
-  is a separate product decision. This document defines only the ownership boundary.
+- Broadcast policy (what is publishable, under what conditions, to which destinations) is
+  a separate product decision. This document defines only the ownership boundary.
 
 ---
 
@@ -498,23 +630,36 @@ The following designs are invalid and must be rejected in code review:
 
 ```
 library_item carries playhead, deck slot, cue state, or loaded runtime status
-source_files.media_class is used as deck-load eligibility
+source_files.media_class is used as deck-load eligibility or readiness proof
+source_files.availability_state is treated as deck or runtime availability
 readiness writes deck state
 scheduler writes deck state
 renderer loads deck by mutating store rows
-broadcast subscribes directly to source_files as performance authority
+broadcast subscribes directly to source_files or library_items as performance authority
+broadcast consumes mutable library tables directly without privacy-filtered projection
 performance session events depend on mutable filename/path as primary identity
+performance_session_event uses a volatile runtime handle as durable event identity
 deck load performs probe/analysis inline
 global deckReady replaces target-specific readiness
 queued/deferred/requested are added to source scan phase
 library_items carries a deck_id or deck_slot_id column
 item_readiness includes transport state, playhead, or tempo
-work_items owns deck runtime state, stores loaded deck state, or treats a deck_id column as deck authority
+work_items owns deck runtime state, stores loaded deck state, or treats a deck_id column
+  as deck authority
 source_files has a loaded_in_deck flag
-loaded_deck_item is stored as a library item row or owned by the Library Authority
+loaded_deck_item is stored as a library item row or owned by any library authority
 broadcast projection writes to library_items or item_readiness
 renderer creates a loaded_deck_item by calling a library mutation
 performance_session_event references source_files.source_file_id as primary identity
+source access state, mount state, or source availability is owned by Library Item Authority
+scan inventory facts or presence_state are owned by Source Access Authority
+role decisions are owned by Scanner/Inventory Authority or Library Item Authority
+deck runtime owns source access policy or becomes file access authority through handle
+  binding
+analysis job completion (waveform_analysis, beatgrid_analysis) is treated as automatic
+  readiness target fulfillment without a readiness evaluation step
+readiness_target keys disagree between this document and media-role-classification.md
+  without an explicit reconciliation note
 ```
 
 A future scheduler, admission, or request row may reference a deck-load request,
@@ -538,6 +683,8 @@ This document defers to future work:
 - Final deck UI and workspace surface assignments
 - Performance session event schema and storage
 - Broadcast projection protocol and wire format
+- Exact readiness target reconciliation between this document and
+  `media-role-classification.md` (must be resolved before scheduler work deepens)
 
 ---
 
@@ -547,7 +694,8 @@ This document extends, not replaces, the following:
 
 - `media-role-classification.md`: defines library item identity, roles, classification
   pipeline, and readiness as target-specific usability. This document adds the deck-side
-  boundary that consumption is not mutation.
+  boundary that consumption is not mutation. Readiness target key naming between these two
+  documents must be reconciled; see the Naming Alignment Note in Readiness Targets above.
 
 - `work-scheduling.md`: defines deck load semantics (query path + request path), work
   lanes, scheduler ownership. This document adds the deck runtime authority that receives
@@ -555,7 +703,8 @@ This document extends, not replaces, the following:
 
 - `source-access-and-scan-coverage.md`: defines source access authority. This document
   adds the rule that source unavailability after load is a deck runtime decision, not a
-  library mutation.
+  library mutation, and that source availability changes invalidate or degrade readiness
+  answers according to target policy rather than always fully invalidating.
 
 - `recursive-selected-contents-rule.md`: defines how tree selection projects recursive
   primary media. This document adds the rule that contents projection does not load decks
@@ -571,12 +720,25 @@ This document extends, not replaces, the following:
 Any future readiness, scheduler, deck, performance session, or broadcast implementation
 must prove:
 
+- Library substrate authority is split: source access, scanner/inventory, library item
+  identity, and role classification are separate owners with separate rejection cases
 - Library authority remains separate from deck runtime authority
 - Readiness is target-specific and does not load decks
+- Readiness targets belong to a named target family; analysis jobs are not readiness
+  targets
+- Readiness target keys are consistent with `media-role-classification.md` or a
+  reconciliation note exists
 - Deck load creates runtime binding, not library mutation
-- Performance session records runtime events, not scan/source events
-- Broadcast projection reads performance/session projections, not raw filesystem inventory
+- Resource handles are issued at the runtime resource boundary; deck runtime owns
+  bindings, not source access policy
+- Performance session records runtime events using stable session-scoped identity;
+  volatile runtime handles are not used as durable event identity
+- Performance event-time metadata snapshots are historical evidence, not library authority
+- Broadcast projection reads privacy-filtered, versioned projections or event-time
+  snapshots, not raw library tables
+- Source availability changes invalidate or degrade readiness answers according to target
+  policy; readiness invalidation is not always total
+- No stored visibility flag, deck state column, or loaded flag exists on library items or
+  source files
 - Renderer remains requester/presenter, not authority
 - Scheduler does not write to output tables owned by other authorities
-- No stored visibility flag, deck state column, or loaded flag exists on library items
-  or source files
