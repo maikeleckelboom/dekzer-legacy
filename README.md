@@ -40,6 +40,7 @@ pnpm run library:stdio:build
 pnpm run library:stdio:test
 pnpm run desktop:test
 pnpm run desktop:verify
+pnpm run desktop:lint
 pnpm run build
 pnpm run test
 pnpm run lint
@@ -47,6 +48,10 @@ pnpm run test:rust
 pnpm run fmt:rust
 pnpm run lint:rust
 pnpm run build:desktop
+pnpm run fix
+pnpm run fix:ts
+pnpm run fix:rust
+pnpm run desktop:fix
 ```
 
 Current root scripts:
@@ -78,6 +83,18 @@ Current root scripts:
 - `fmt:rust` runs `cargo fmt --all --check`.
 - `lint:rust` runs `cargo clippy --workspace --all-targets -- -D warnings`.
 - `verify` runs the pre-merge gate: `git diff --check`, boundary contract stale checks, TypeScript typechecks, desktop tests, library client and stdio transport tests, Rust tests, desktop lint, Rust fmt check, and Rust clippy.
+- `format:check` runs the read-only formatting gate for TypeScript (Prettier) and Rust (cargo fmt --check).
+- `desktop:fix` runs the desktop auto-fix scripts (Prettier and ESLint --fix).
+- `fix:ts` runs the desktop auto-fix scripts.
+- `fix:rust` runs `cargo fmt --all`.
+- `fix` runs `fix:ts` then `fix:rust`.
+
+## Fix versus verify
+
+- `pnpm run fix` mutates files: it runs formatters and auto-fixable lint rules.
+- `pnpm run verify` is the read-only merge gate: it never writes files.
+- If `verify` fails only on deterministic formatting or auto-fixable lint, run `pnpm run fix`, inspect the diff, then rerun `pnpm run verify`.
+- Do not use fix commands to hide type, test, architecture, or behavior failures.
 
 Stdio readiness:
 
