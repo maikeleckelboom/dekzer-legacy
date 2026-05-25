@@ -235,8 +235,8 @@ describe('preload renderer API', () => {
       selectedContentsResult
     )
     expect(receivedSelectedContentsRequest).toBe(selectedContentsRequest)
-    await expect(api.library.browser.viewState.readViewState()).resolves.toBe(viewStateReadResult)
-    await expect(api.library.browser.viewState.writeViewState(persistedViewState)).resolves.toBe(
+    await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)
+    await expect(api.library.viewState.writeViewState(persistedViewState)).resolves.toBe(
       viewStateWriteResult
     )
     expect(receivedViewStatePayload).toBe(persistedViewState)

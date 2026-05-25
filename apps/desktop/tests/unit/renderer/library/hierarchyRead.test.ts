@@ -247,11 +247,9 @@ function testLibraryApi(options: {
         }
       })
     },
-    browser: {
-      viewState: {
-        readViewState: async () => ({ state: 'empty' }),
-        writeViewState: async () => ({ state: 'written' })
-      }
+    viewState: {
+      readViewState: async () => ({ state: 'empty' }),
+      writeViewState: async () => ({ state: 'written' })
     }
   }
 }

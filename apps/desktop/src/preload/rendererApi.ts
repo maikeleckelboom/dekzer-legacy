@@ -127,21 +127,19 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           )) as UnregisterLocalRootResult
         }
       },
-      browser: {
-        viewState: {
-          async readViewState(): Promise<LibraryViewStateReadResult> {
-            return (await ipcRenderer.invoke(
-              libraryViewStateChannels.readViewState
-            )) as LibraryViewStateReadResult
-          },
-          async writeViewState(
-            viewState: PersistedLibraryViewState
-          ): Promise<LibraryViewStateWriteResult> {
-            return (await ipcRenderer.invoke(
-              libraryViewStateChannels.writeViewState,
-              viewState
-            )) as LibraryViewStateWriteResult
-          }
+      viewState: {
+        readViewState: async (): Promise<LibraryViewStateReadResult> => {
+          return (await ipcRenderer.invoke(
+            libraryViewStateChannels.readViewState
+          )) as LibraryViewStateReadResult
+        },
+        writeViewState: async (
+          viewState: PersistedLibraryViewState
+        ): Promise<LibraryViewStateWriteResult> => {
+          return (await ipcRenderer.invoke(
+            libraryViewStateChannels.writeViewState,
+            viewState
+          )) as LibraryViewStateWriteResult
         }
       }
     }

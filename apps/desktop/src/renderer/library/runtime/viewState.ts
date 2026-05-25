@@ -6,13 +6,11 @@ import type {
 
 export type ViewStateApi = {
   readonly library: {
-    readonly browser: {
-      readonly viewState: {
-        readonly readViewState: () => Promise<LibraryViewStateReadResult>
-        readonly writeViewState: (
-          state: PersistedLibraryViewState
-        ) => Promise<LibraryViewStateWriteResult>
-      }
+    readonly viewState: {
+      readonly readViewState: () => Promise<LibraryViewStateReadResult>
+      readonly writeViewState: (
+        state: PersistedLibraryViewState
+      ) => Promise<LibraryViewStateWriteResult>
     }
   }
 }
@@ -47,7 +45,7 @@ export function createViewStateStore(api: ViewStateApi = getRendererApi()): View
     pendingState = undefined
     writeInFlight = true
 
-    api.library.browser.viewState.writeViewState(state).then(
+    api.library.viewState.writeViewState(state).then(
       () => {
         writeInFlight = false
         drain()
@@ -66,7 +64,7 @@ export function createViewStateStore(api: ViewStateApi = getRendererApi()): View
     },
 
     load(): Promise<LibraryViewStateReadResult> {
-      return api.library.browser.viewState.readViewState()
+      return api.library.viewState.readViewState()
     }
   }
 }

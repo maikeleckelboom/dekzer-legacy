@@ -34,7 +34,7 @@ export type LibraryApi = {
   readonly hierarchy: LibraryHierarchyApi
   readonly selectedContents: LibrarySelectedContentsApi
   readonly roots: LibraryRootsApi
-  readonly browser: LibraryViewStateApi
+  readonly viewState: LibraryViewStateApi
 }
 
 export type LibraryHostApi = {
@@ -62,8 +62,6 @@ export type LibraryRootsApi = {
 }
 
 export type LibraryViewStateApi = {
-  readonly viewState: {
-    readViewState(): Promise<LibraryViewStateReadResult>
-    writeViewState(viewState: PersistedLibraryViewState): Promise<LibraryViewStateWriteResult>
-  }
+  readViewState(): Promise<LibraryViewStateReadResult>
+  writeViewState(viewState: PersistedLibraryViewState): Promise<LibraryViewStateWriteResult>
 }

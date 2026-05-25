@@ -128,15 +128,13 @@ function createQueuedWriteApi(): {
 }
 
 function createViewStateApi(options: {
-  readonly writeViewState: ViewStateApi['library']['browser']['viewState']['writeViewState']
+  readonly writeViewState: ViewStateApi['library']['viewState']['writeViewState']
 }): ViewStateApi {
   return {
     library: {
-      browser: {
-        viewState: {
-          readViewState: async () => ({ state: 'empty' }),
-          writeViewState: options.writeViewState
-        }
+      viewState: {
+        readViewState: async () => ({ state: 'empty' }),
+        writeViewState: options.writeViewState
       }
     }
   }
