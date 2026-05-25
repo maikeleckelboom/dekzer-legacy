@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline'
 
 import {
   checkDevelopmentStorage,
+  desktopLibraryUserDataEnvironmentVariable,
   parseDevArgs,
   spawnCargoStorageCommand,
   type ParsedStorageArgs,
@@ -206,13 +207,24 @@ async function promptYesNo(): Promise<boolean> {
   }
 }
 
-function spawnElectronViteDev(): Promise<number> {
+export function createElectronViteDevEnvironment(
+  userDataPath: string,
+  parentEnv: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  return {
+    ...parentEnv,
+    [desktopLibraryUserDataEnvironmentVariable]: userDataPath
+  }
+}
+
+export function spawnElectronViteDev(userDataPath: string): Promise<number> {
   const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const desktopRoot = resolveDesktopRoot()
 
   return new Promise<number>((resolveExit) => {
     const child = spawn(command, ['exec', 'electron-vite', 'dev', '--ignoreConfigWarning'], {
       cwd: desktopRoot,
+      env: createElectronViteDevEnvironment(userDataPath),
       stdio: 'inherit'
     })
 
@@ -233,7 +245,10 @@ function spawnElectronViteDev(): Promise<number> {
   })
 }
 
-function createResetArgs(userDataPath: string, userDataSource: UserDataSource): ParsedStorageArgs {
+export function createResetArgs(
+  userDataPath: string,
+  userDataSource: UserDataSource
+): ParsedStorageArgs {
   return {
     subcommand: 'reset',
     userDataPath,
@@ -264,7 +279,7 @@ async function main(): Promise<void> {
         }
       },
       resetStorage: () => spawnCargoStorageCommand(createResetArgs(userDataPath, userDataSource)),
-      spawnDev: spawnElectronViteDev,
+      spawnDev: () => spawnElectronViteDev(userDataPath),
       isInteractive: () => process.stdin.isTTY === true && process.stdout.isTTY === true,
       promptYesNo,
       println: (message: string) => console.log(message),

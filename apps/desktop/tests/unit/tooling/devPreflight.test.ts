@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { isAbsolute } from 'node:path'
 
 import {
+  createElectronViteDevEnvironment,
+  createResetArgs,
   evaluateDevPreflight,
   formatAbortCommands,
   formatIncompatibleMessage,
@@ -9,6 +11,7 @@ import {
   type DevPreflightDeps
 } from '../../../tooling/dev.mjs'
 import {
+  desktopLibraryUserDataEnvironmentVariable,
   parseDevArgs,
   type StorageSchemaState,
   type UserDataSource
@@ -522,7 +525,7 @@ describe('formatAbortCommands', () => {
 })
 
 describe('parseDevArgs', () => {
-  const envVar = 'DESKTOP_LIBRARY_USER_DATA_PATH'
+  const envVar = desktopLibraryUserDataEnvironmentVariable
   let originalEnv: string | undefined
 
   beforeEach(() => {
@@ -632,6 +635,52 @@ describe('parseDevArgs', () => {
 
     expect(result.userDataPath).toBe('/custom/args/path')
     expect(result.userDataSource).toBe('argument')
+  })
+})
+
+describe('createElectronViteDevEnvironment', () => {
+  const envVar = desktopLibraryUserDataEnvironmentVariable
+  let originalEnv: string | undefined
+
+  beforeEach(() => {
+    originalEnv = process.env[envVar]
+    delete process.env[envVar]
+  })
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env[envVar]
+    } else {
+      process.env[envVar] = originalEnv
+    }
+  })
+
+  it('passes argument-selected user data path to the Electron child env', () => {
+    const selected = parseDevArgs(['--user-data', '/custom/args/path'])
+    const childEnv = createElectronViteDevEnvironment(selected.userDataPath, {})
+
+    expect(selected.userDataSource).toBe('argument')
+    expect(childEnv[envVar]).toBe('/custom/args/path')
+  })
+
+  it('preserves environment-selected user data path in the Electron child env', () => {
+    process.env[envVar] = '/custom/env/path'
+
+    const selected = parseDevArgs([])
+    const childEnv = createElectronViteDevEnvironment(selected.userDataPath, {
+      [envVar]: '/custom/env/path'
+    })
+
+    expect(selected.userDataSource).toBe('environmentOverride')
+    expect(childEnv[envVar]).toBe('/custom/env/path')
+  })
+
+  it('passes the resolved development default so the child cannot drift from preflight', () => {
+    const selected = parseDevArgs([])
+    const childEnv = createElectronViteDevEnvironment(selected.userDataPath, {})
+
+    expect(selected.userDataSource).toBe('developmentDefault')
+    expect(childEnv[envVar]).toBe(selected.userDataPath)
   })
 })
 
@@ -756,6 +805,17 @@ describe('dev preflight with argument userDataSource', () => {
     await runDevPreflight(deps)
     expect(resetCalled).toBe(true)
     expect(devStarted).toBe(true)
+  })
+
+  it('creates reset args with the selected argument user data path', () => {
+    const resetArgs = createResetArgs('/custom/args/path', 'argument')
+
+    expect(resetArgs).toEqual({
+      subcommand: 'reset',
+      userDataPath: '/custom/args/path',
+      userDataSource: 'argument',
+      confirmDelete: true
+    })
   })
 
   it('aborts and prints argument source in non-TTY with incompatible schema', async () => {

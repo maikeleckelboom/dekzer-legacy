@@ -43,8 +43,7 @@ type StorageStatusEnvelope = {
   production: StorageEnvironmentStatus
 }
 
-const VALID_SUBCOMMANDS: readonly string[] = ['status', 'reset', 'doctor']
-const ENV_VAR = 'DESKTOP_LIBRARY_USER_DATA_PATH'
+export const desktopLibraryUserDataEnvironmentVariable = 'DESKTOP_LIBRARY_USER_DATA_PATH'
 
 export function resolveWorkspaceRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -54,7 +53,7 @@ export function resolveDefaultUserDataPath(): {
   path: string
   source: 'environmentOverride' | 'developmentDefault'
 } {
-  const envPath = process.env[ENV_VAR]
+  const envPath = process.env[desktopLibraryUserDataEnvironmentVariable]
   if (envPath !== undefined && envPath !== '') {
     return { path: envPath, source: 'environmentOverride' }
   }
@@ -75,41 +74,11 @@ export function parseDevArgs(argv: readonly string[]): {
   while (i < argv.length) {
     const arg = argv[i]!
 
-    if (arg === '--user-data') {
-      if (seenUserData) {
-        throw new Error('duplicate --user-data')
-      }
+    const userDataOption = parseUserDataOption(argv, i, seenUserData)
+    if (userDataOption !== undefined) {
       seenUserData = true
-
-      i++
-      const value = argv[i]
-
-      if (value === undefined || value === '' || value.startsWith('--')) {
-        throw new Error('--user-data requires an absolute path value')
-      }
-      if (!isAbsolute(value)) {
-        throw new Error('--user-data requires an absolute path value')
-      }
-
-      userDataPathFromArg = value
-      i++
-    } else if (arg.startsWith('--user-data=')) {
-      if (seenUserData) {
-        throw new Error('duplicate --user-data')
-      }
-      seenUserData = true
-
-      const value = arg.slice('--user-data='.length)
-
-      if (value === '') {
-        throw new Error('--user-data requires an absolute path value')
-      }
-      if (!isAbsolute(value)) {
-        throw new Error('--user-data requires an absolute path value')
-      }
-
-      userDataPathFromArg = value
-      i++
+      userDataPathFromArg = userDataOption.userDataPath
+      i = userDataOption.nextIndex
     } else if (arg === '--') {
       i++
     } else if (arg.startsWith('--')) {
@@ -129,12 +98,12 @@ export function parseDevArgs(argv: readonly string[]): {
 
 export function parseArgs(argv: readonly string[]): ParsedStorageArgs {
   const subcommandRaw = argv[0]
-  if (subcommandRaw === undefined || !VALID_SUBCOMMANDS.includes(subcommandRaw)) {
+  if (!isStorageSubcommand(subcommandRaw)) {
     throw new Error(
       `unknown subcommand "${subcommandRaw ?? ''}"; expected status, reset, or doctor`
     )
   }
-  const subcommand = subcommandRaw as StorageSubcommand
+  const subcommand = subcommandRaw
 
   let userDataPathFromArg: string | undefined
   let confirmDelete = false
@@ -145,41 +114,11 @@ export function parseArgs(argv: readonly string[]): ParsedStorageArgs {
   while (i < argv.length) {
     const arg = argv[i]!
 
-    if (arg === '--user-data') {
-      if (seenUserData) {
-        throw new Error('duplicate --user-data')
-      }
+    const userDataOption = parseUserDataOption(argv, i, seenUserData)
+    if (userDataOption !== undefined) {
       seenUserData = true
-
-      i++
-      const value = argv[i]
-
-      if (value === undefined || value === '' || value.startsWith('--')) {
-        throw new Error('--user-data requires an absolute path value')
-      }
-      if (!isAbsolute(value)) {
-        throw new Error('--user-data requires an absolute path value')
-      }
-
-      userDataPathFromArg = value
-      i++
-    } else if (arg.startsWith('--user-data=')) {
-      if (seenUserData) {
-        throw new Error('duplicate --user-data')
-      }
-      seenUserData = true
-
-      const value = arg.slice('--user-data='.length)
-
-      if (value === '') {
-        throw new Error('--user-data requires an absolute path value')
-      }
-      if (!isAbsolute(value)) {
-        throw new Error('--user-data requires an absolute path value')
-      }
-
-      userDataPathFromArg = value
-      i++
+      userDataPathFromArg = userDataOption.userDataPath
+      i = userDataOption.nextIndex
     } else if (arg === '--confirm-delete') {
       if (seenConfirmDelete) {
         throw new Error('duplicate --confirm-delete')
@@ -216,6 +155,51 @@ export function parseArgs(argv: readonly string[]): ParsedStorageArgs {
   }
 
   return { subcommand, userDataPath, userDataSource, confirmDelete }
+}
+
+function isStorageSubcommand(value: string | undefined): value is StorageSubcommand {
+  return value === 'status' || value === 'reset' || value === 'doctor'
+}
+
+function parseUserDataOption(
+  argv: readonly string[],
+  index: number,
+  seenUserData: boolean
+): { readonly userDataPath: string; readonly nextIndex: number } | undefined {
+  const arg = argv[index]
+  if (arg === undefined) {
+    return undefined
+  }
+
+  if (arg === '--user-data') {
+    if (seenUserData) {
+      throw new Error('duplicate --user-data')
+    }
+
+    const value = argv[index + 1]
+    validateUserDataPathArgument(value)
+
+    return { userDataPath: value, nextIndex: index + 2 }
+  }
+
+  if (arg.startsWith('--user-data=')) {
+    if (seenUserData) {
+      throw new Error('duplicate --user-data')
+    }
+
+    const value = arg.slice('--user-data='.length)
+    validateUserDataPathArgument(value)
+
+    return { userDataPath: value, nextIndex: index + 1 }
+  }
+
+  return undefined
+}
+
+function validateUserDataPathArgument(value: string | undefined): asserts value is string {
+  if (value === undefined || value === '' || value.startsWith('--') || !isAbsolute(value)) {
+    throw new Error('--user-data requires an absolute path value')
+  }
 }
 
 function cargoStorageArgs(parsed: ParsedStorageArgs, subcommand: CargoStorageSubcommand): string[] {
