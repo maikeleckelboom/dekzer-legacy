@@ -212,30 +212,71 @@ export function createElectronViteDevEnvironment(
   parentEnv: NodeJS.ProcessEnv = process.env
 ): NodeJS.ProcessEnv {
   return {
-    ...parentEnv,
+    ...createSafeChildEnvironment(parentEnv),
     [libraryUserDataPathEnvVar]: userDataPath
   }
 }
 
+export function createSafeChildEnvironment(parentEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const childEnv: NodeJS.ProcessEnv = {}
+
+  for (const [key, value] of Object.entries(parentEnv)) {
+    if (!isValidChildEnvironmentEntry(key, value)) {
+      continue
+    }
+
+    childEnv[key] = value
+  }
+
+  return childEnv
+}
+
+function isValidChildEnvironmentEntry(key: string, value: string | undefined): value is string {
+  return value !== undefined && !key.startsWith('=') && !key.includes('\0') && !value.includes('\0')
+}
+
+export function formatElectronViteDevSpawnError(
+  command: string,
+  err: NodeJS.ErrnoException
+): string {
+  const code = typeof err.code === 'string' && err.code.length > 0 ? ` (${err.code})` : ''
+
+  if (err.code === 'ENOENT') {
+    return `[dev] error: ${command} not found while starting electron-vite${code}`
+  }
+
+  const hint = err.code === 'EINVAL' ? '. Hint: the child process environment may be invalid.' : ''
+
+  return `[dev] error: failed to start electron-vite through ${command}${code}: ${err.message}${hint}`
+}
+
 export function spawnElectronViteDev(userDataPath: string): Promise<number> {
-  const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const desktopRoot = resolveDesktopRoot()
+  const command = process.execPath
+  const electronViteBin = resolve(
+    desktopRoot,
+    'node_modules',
+    'electron-vite',
+    'bin',
+    'electron-vite.js'
+  )
 
   return new Promise<number>((resolveExit) => {
-    const child = spawn(command, ['exec', 'electron-vite', 'dev', '--ignoreConfigWarning'], {
-      cwd: desktopRoot,
-      env: createElectronViteDevEnvironment(userDataPath),
-      stdio: 'inherit'
-    })
+    let child: ReturnType<typeof spawn>
+    try {
+      child = spawn(command, [electronViteBin, 'dev', '--ignoreConfigWarning'], {
+        cwd: desktopRoot,
+        env: createElectronViteDevEnvironment(userDataPath),
+        stdio: 'inherit'
+      })
+    } catch (error: unknown) {
+      console.error(formatElectronViteDevSpawnError(command, toErrnoException(error)))
+      resolveExit(1)
+      return
+    }
 
     child.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'ENOENT') {
-        console.error(`[dev] error: ${command} not found while starting electron-vite`)
-      } else {
-        console.error(
-          `[dev] error: failed to start electron-vite through ${command}: ${err.message}`
-        )
-      }
+      console.error(formatElectronViteDevSpawnError(command, err))
       resolveExit(1)
     })
 
@@ -243,6 +284,14 @@ export function spawnElectronViteDev(userDataPath: string): Promise<number> {
       resolveExit(code ?? 1)
     })
   })
+}
+
+function toErrnoException(error: unknown): NodeJS.ErrnoException {
+  if (error instanceof Error) {
+    return error
+  }
+
+  return new Error(String(error))
 }
 
 export function createResetArgs(

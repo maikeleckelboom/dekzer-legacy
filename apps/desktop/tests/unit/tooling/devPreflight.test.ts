@@ -6,6 +6,7 @@ import {
   createResetArgs,
   evaluateDevPreflight,
   formatAbortCommands,
+  formatElectronViteDevSpawnError,
   formatIncompatibleMessage,
   runDevPreflight,
   type DevPreflightDeps
@@ -681,6 +682,64 @@ describe('createElectronViteDevEnvironment', () => {
 
     expect(selected.userDataSource).toBe('developmentDefault')
     expect(childEnv[envVar]).toBe(selected.userDataPath)
+  })
+
+  it('drops invalid Windows pseudo env keys', () => {
+    const childEnv = createElectronViteDevEnvironment('/selected/user-data', {
+      '=C:': 'C:\\dev\\dekzer',
+      NORMAL_KEY: 'normal-value'
+    })
+
+    expect(childEnv['=C:']).toBeUndefined()
+    expect(childEnv.NORMAL_KEY).toBe('normal-value')
+  })
+
+  it('drops undefined env values', () => {
+    const childEnv = createElectronViteDevEnvironment('/selected/user-data', {
+      SOME_KEY: undefined,
+      OTHER_KEY: 'other-value'
+    })
+
+    expect(childEnv.SOME_KEY).toBeUndefined()
+    expect(childEnv.OTHER_KEY).toBe('other-value')
+  })
+
+  it('drops null-byte keys and values', () => {
+    const childEnv = createElectronViteDevEnvironment('/selected/user-data', {
+      ['BAD\0KEY']: 'bad-key-value',
+      BAD_VALUE: 'bad\0value',
+      GOOD_KEY: 'good-value'
+    })
+
+    expect(childEnv['BAD\0KEY']).toBeUndefined()
+    expect(childEnv.BAD_VALUE).toBeUndefined()
+    expect(childEnv.GOOD_KEY).toBe('good-value')
+  })
+
+  it('preserves normal Path entries', () => {
+    const childEnv = createElectronViteDevEnvironment('/selected/user-data', {
+      Path: 'C:\\Windows\\System32;C:\\Program Files\\nodejs'
+    })
+
+    expect(childEnv.Path).toBe('C:\\Windows\\System32;C:\\Program Files\\nodejs')
+  })
+
+  it('always sets DESKTOP_LIBRARY_USER_DATA_PATH to the selected path', () => {
+    const childEnv = createElectronViteDevEnvironment('/selected/user-data', {
+      [envVar]: '/stale/parent/user-data'
+    })
+
+    expect(childEnv[envVar]).toBe('/selected/user-data')
+  })
+})
+
+describe('formatElectronViteDevSpawnError', () => {
+  it('includes command, error code, and EINVAL hint', () => {
+    const err = Object.assign(new Error('spawn EINVAL'), { code: 'EINVAL' })
+
+    expect(formatElectronViteDevSpawnError('pnpm.cmd', err)).toBe(
+      '[dev] error: failed to start electron-vite through pnpm.cmd (EINVAL): spawn EINVAL. Hint: the child process environment may be invalid.'
+    )
   })
 })
 
