@@ -8,9 +8,9 @@ import { LibraryBoundaryStdioProcessExitError } from '@dekzer/library-boundary-s
 import {
   libraryUserDataPathEnvVar,
   boundaryStdioBinaryPathEnvVar,
-  resolveLibraryBoundaryHostConfig,
-  resolveLibraryBoundaryStdioBinaryPath,
-  selectLibraryBoundaryHostEnvironment,
+  resolveHostConfig,
+  resolveHostStdioBinaryPath,
+  selectHostEnvironment,
   type LibraryBoundaryHostConfig
 } from '../../../src/main/libraryBoundary/config'
 import { LibraryBoundaryHostError } from '../../../src/main/libraryBoundary/errors'
@@ -47,10 +47,10 @@ describe('library boundary host', () => {
     const fakeBinaryPath = join(tempRoot, 'library-boundary-stdio')
     writeFileSync(fakeBinaryPath, '')
 
-    expect(selectLibraryBoundaryHostEnvironment(true)).toBe('development')
-    expect(selectLibraryBoundaryHostEnvironment(false)).toBe('production')
+    expect(selectHostEnvironment(true)).toBe('development')
+    expect(selectHostEnvironment(false)).toBe('production')
 
-    const devConfig = resolveLibraryBoundaryHostConfig({
+    const devConfig = resolveHostConfig({
       app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
       isDev: true,
       env: {
@@ -72,13 +72,11 @@ describe('library boundary host', () => {
         source: 'environmentOverride'
       }
     })
-    expect(resolveLibraryBoundaryStdioBinaryPath(devConfig.binaryPolicy)).toBe(
-      resolve(fakeBinaryPath)
-    )
+    expect(resolveHostStdioBinaryPath(devConfig.binaryPolicy)).toBe(resolve(fakeBinaryPath))
 
     const overriddenUserDataPath = join(tempRoot, 'diagnostic-user-data')
     expect(
-      resolveLibraryBoundaryHostConfig({
+      resolveHostConfig({
         app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
         isDev: true,
         env: {
@@ -95,7 +93,7 @@ describe('library boundary host', () => {
 
     expectHostError(
       () =>
-        resolveLibraryBoundaryHostConfig({
+        resolveHostConfig({
           app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
           isDev: true,
           env: {
@@ -426,7 +424,7 @@ function hostConfig(): LibraryBoundaryHostConfig {
   const fakeBinaryPath = join(tempRoot, 'library-boundary-stdio')
   writeFileSync(fakeBinaryPath, '')
 
-  return resolveLibraryBoundaryHostConfig({
+  return resolveHostConfig({
     app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
     isDev: true,
     env: {

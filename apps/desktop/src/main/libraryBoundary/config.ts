@@ -49,7 +49,7 @@ export type LibraryBoundaryHostConfig = {
   readonly binaryPolicy: LibraryBoundaryHostBinaryPolicy
 }
 
-export type ResolveLibraryBoundaryHostConfigOptions = {
+export type ResolveHostConfigOptions = {
   readonly app: LibraryBoundaryHostApp
   readonly isDev: boolean
   readonly env?: NodeJS.ProcessEnv
@@ -57,7 +57,7 @@ export type ResolveLibraryBoundaryHostConfigOptions = {
   readonly resourcesPath?: string
 }
 
-export type ResolveLibraryBoundaryStdioBinaryPolicyOptions = {
+export type ResolveHostStdioBinaryPolicyOptions = {
   readonly isDev: boolean
   readonly desktopAppPath: string
   readonly env?: NodeJS.ProcessEnv
@@ -67,19 +67,17 @@ export type ResolveLibraryBoundaryStdioBinaryPolicyOptions = {
 
 type BinaryExists = (binaryPath: string) => boolean
 
-export function resolveLibraryBoundaryHostConfig(
-  options: ResolveLibraryBoundaryHostConfigOptions
-): LibraryBoundaryHostConfig {
+export function resolveHostConfig(options: ResolveHostConfigOptions): LibraryBoundaryHostConfig {
   const desktopAppPath = options.app.getAppPath()
   return {
-    storageEnvironment: resolveLibraryBoundaryStorageEnvironment(
+    storageEnvironment: resolveHostStorageEnv(
       options.app,
       options.env,
       options.isDev,
       desktopAppPath
     ),
-    environment: selectLibraryBoundaryHostEnvironment(options.isDev),
-    binaryPolicy: resolveLibraryBoundaryStdioBinaryPolicy({
+    environment: selectHostEnvironment(options.isDev),
+    binaryPolicy: resolveHostStdioBinaryPolicy({
       isDev: options.isDev,
       desktopAppPath,
       ...(options.env === undefined ? {} : { env: options.env }),
@@ -89,7 +87,7 @@ export function resolveLibraryBoundaryHostConfig(
   }
 }
 
-export function resolveLibraryBoundaryStorageEnvironment(
+export function resolveHostStorageEnv(
   app: LibraryBoundaryHostApp,
   env: NodeJS.ProcessEnv = process.env,
   isDev?: boolean,
@@ -112,14 +110,12 @@ export function resolveLibraryBoundaryStorageEnvironment(
   return normalizeStorageEnvironmentPath(app.getPath('userData'), 'electronUserData')
 }
 
-export function selectLibraryBoundaryHostEnvironment(
-  isDev: boolean
-): LibraryBoundaryHostEnvironment {
+export function selectHostEnvironment(isDev: boolean): LibraryBoundaryHostEnvironment {
   return isDev ? 'development' : 'production'
 }
 
-export function resolveLibraryBoundaryStdioBinaryPolicy(
-  options: ResolveLibraryBoundaryStdioBinaryPolicyOptions
+export function resolveHostStdioBinaryPolicy(
+  options: ResolveHostStdioBinaryPolicyOptions
 ): LibraryBoundaryHostBinaryPolicy {
   const platform = options.platform ?? process.platform
   const executableName = libraryBoundaryStdioExecutableName(platform)
@@ -151,7 +147,7 @@ export function resolveLibraryBoundaryStdioBinaryPolicy(
   }
 }
 
-export function resolveLibraryBoundaryStdioBinaryPath(
+export function resolveHostStdioBinaryPath(
   policy: LibraryBoundaryHostBinaryPolicy,
   binaryExists: BinaryExists = existsSync
 ): string {

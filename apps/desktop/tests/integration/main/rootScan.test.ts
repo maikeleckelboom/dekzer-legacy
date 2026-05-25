@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import {
   boundaryStdioBinaryPathEnvVar,
-  resolveLibraryBoundaryHostConfig,
+  resolveHostConfig,
   type LibraryBoundaryHostConfig
 } from '../../../src/main/libraryBoundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
@@ -132,7 +132,7 @@ function hostConfig(): LibraryBoundaryHostConfig {
   const fakeBinaryPath = join(tempRoot, 'library-boundary-stdio')
   writeFileSync(fakeBinaryPath, '')
 
-  return resolveLibraryBoundaryHostConfig({
+  return resolveHostConfig({
     app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
     isDev: true,
     env: {

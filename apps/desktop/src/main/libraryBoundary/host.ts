@@ -9,8 +9,8 @@ import type {
 } from '@dekzer/library-boundary-stdio-transport'
 
 import {
-  resolveLibraryBoundaryHostConfig,
-  resolveLibraryBoundaryStdioBinaryPath,
+  resolveHostConfig,
+  resolveHostStdioBinaryPath,
   type LibraryBoundaryHostConfig
 } from './config'
 import {
@@ -48,7 +48,7 @@ export type LibraryBoundaryHostClientFactory = (
 export type LibraryBoundaryHostDependencies = {
   readonly createTransport?: LibraryBoundaryHostTransportFactory
   readonly createClient?: LibraryBoundaryHostClientFactory
-  readonly resolveStdioBinaryPath?: typeof resolveLibraryBoundaryStdioBinaryPath
+  readonly resolveStdioBinaryPath?: typeof resolveHostStdioBinaryPath
 }
 
 export type CreateLibraryBoundaryHostOptions = {
@@ -157,7 +157,7 @@ export class LibraryBoundaryHost {
   async #start(): Promise<LibraryBoundaryHostClient> {
     try {
       const resolveStdioBinaryPath =
-        this.#dependencies.resolveStdioBinaryPath ?? resolveLibraryBoundaryStdioBinaryPath
+        this.#dependencies.resolveStdioBinaryPath ?? resolveHostStdioBinaryPath
       const serverBinaryPath = resolveStdioBinaryPath(this.#config.binaryPolicy)
       const createTransport = await this.#resolveTransportFactory()
       const transport = createTransport({
@@ -284,5 +284,5 @@ export class LibraryBoundaryHost {
 export function createLibraryBoundaryHost(
   options: CreateLibraryBoundaryHostOptions
 ): LibraryBoundaryHost {
-  return new LibraryBoundaryHost(resolveLibraryBoundaryHostConfig(options), options.logger)
+  return new LibraryBoundaryHost(resolveHostConfig(options), options.logger)
 }
