@@ -23,16 +23,47 @@ alone.
 
 ## Ownership
 
-The Source Access Authority owns:
+### Source Access Authority
+
+Owns:
 
 - resolving a source locator to an effective root;
 - using platform access grants where required;
 - probing whether the source root is accessible;
 - classifying OS and product-policy access outcomes into product issue kinds;
 - opening a bounded access session for scanner use;
-- recording source-level access state and directory enumeration outcomes.
+- recording source-level access state, mount state, and source availability;
+- source access issue classification;
+- source-level access policy: which source locations are valid, which mounts are
+  available, which credentials or grants apply, whether a source is accessible,
+  blocked, missing, or unavailable.
 
-It does not own media identity, role assignment, readiness, browser projection, renderer state, or UI copy.
+Source Access Authority may provide a bounded access session and classified
+access failure to the scanner. It does not own inventory rows, scan phase,
+media identity, role assignment, readiness, browser projection, renderer state,
+UI copy, or deck/runtime concerns.
+
+### Scanner / Inventory Authority
+
+Owns:
+
+- `source_files` rows as discovered filesystem inventory;
+- `source_directories` rows;
+- `source_scan_state` rows, scan phase;
+- `presence_state`;
+- directory enumeration persistence and scan coverage state.
+
+Scanner / Inventory Authority records directory enumeration outcomes as coverage
+outputs. When a directory enumeration encounters an access failure, the outcome
+uses issue kinds produced by Source Access Authority access/policy classification.
+Access failure classification is Source Access Authority's responsibility; the
+coverage record that resulted is Scanner/Inventory Authority's output.
+
+Neither authority owns:
+
+- media identity, role assignment, readiness, browser projection, renderer state,
+  or UI copy;
+- deck or runtime concerns.
 
 ---
 

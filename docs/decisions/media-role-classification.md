@@ -228,14 +228,18 @@ key, not separate targets.
 Readiness states:
 
 ```
-pending       probe not yet complete or evaluation not yet run
 ready         usable for this target
-degraded      usable with known limitations
+degraded      usable with known limitations; permitted only when target
+              policy explicitly allows degraded runtime use
+pending       required evidence or work is not yet complete
 blocked       not usable; reason is known
+unavailable   required source or resource is not accessible
 unsupported   target type not applicable to this item
+failed        readiness evaluation or required evidence evaluation failed
+              unexpectedly (distinct from blocked/unavailable)
 ```
 
-Block reasons:
+Readiness reason codes:
 
 ```
 probe_pending
@@ -470,8 +474,8 @@ media_streams (
 item_readiness (
   library_item_id   INTEGER NOT NULL REFERENCES library_items(library_item_id),
   target            TEXT NOT NULL,        -- audio_deck_load | video_deck_load | visual_output | artwork_attachment | waveform_preview | broadcast_metadata_projection
-  status            TEXT NOT NULL,        -- pending | ready | degraded | blocked | unsupported
-  reason            TEXT,                 -- block reason when status = blocked
+  status            TEXT NOT NULL,        -- ready | degraded | pending | blocked | unavailable | unsupported | failed
+  reason            TEXT,                 -- readiness reason code; populated for blocked, degraded, unavailable, or failed statuses
   invalidated_at    INTEGER,              -- when last invalidated; null if never invalidated
   last_evaluated_at INTEGER,              -- when last evaluation completed; null if never evaluated
   evaluator_version TEXT,

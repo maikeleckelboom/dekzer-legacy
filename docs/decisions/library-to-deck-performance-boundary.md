@@ -234,6 +234,9 @@ Readiness result statuses:
 
 ```
 ready        item satisfies all conditions for the target now
+degraded     item can be used for the target now with known limitations;
+             permitted only when target policy explicitly allows degraded
+             runtime use
 pending      required evidence or scheduled work is not yet complete
 blocked      policy or known condition prevents readiness; not automatically
              treated as pending work
@@ -242,6 +245,10 @@ unsupported  target does not apply to this item type
 failed       readiness evaluation or required evidence evaluation failed
              unexpectedly (distinct from blocked/unavailable)
 ```
+
+`degraded` is distinct from `ready` and `blocked`. A degraded item is usable
+but carries known limitations that the target policy must accept before runtime
+binding proceeds.
 
 `failed` is distinct from `blocked` and `unavailable`. A failed evaluation may
 be retried; a blocked item requires a policy or condition change; an unavailable
@@ -534,17 +541,29 @@ Rules:
 ```
 1. User or controller requests deck load for a library_item_id and target deck.
 2. Control plane validates request shape.
-3. Readiness Authority returns ready, pending, blocked, unavailable, unsupported, or
-   failed for the target.
-4. If ready, Deck Runtime Authority admits the load request and asks Resource / Media
+3. Readiness Authority returns ready, degraded, pending, blocked, unavailable,
+   unsupported, or failed for the target.
+4. Only ready and degraded may lead to runtime binding.
+
+   If ready, Deck Runtime Authority admits the load request and asks Resource / Media
    Authority for the required runtime resource handles.
+
+   If degraded, Deck Runtime Authority admits the load request only when the target
+   policy explicitly permits degraded runtime use. If the target policy does not
+   permit degraded use, the load is treated as blocked and returned to the caller
+   with a degraded-blocked reason.
+
    If pending, control plane requests scheduler admission for readiness work and returns
    pending. Control plane does not create work rows directly.
+
    If blocked, returns blocked + reason to UI. Blocked is not treated as pending work
    by default; the load path does not create scheduler work unless the readiness result
    explicitly classifies the condition as remediable pending work.
+
    If unavailable, returns unavailable to UI.
+
    If unsupported, returns unsupported (target type not applicable).
+
    If failed, returns failure + reason to UI; evaluation may be retried.
 5. Resource / Media Authority issues the required resource handles, or returns a
    resource failure to Deck Runtime Authority.
@@ -714,8 +733,8 @@ evidence, but readiness still requires an explicit readiness evaluation step.
 - Readiness must not create loaded deck items.
 - Readiness row shape is owned by the readiness authority. Adding new targets does not
   make readiness own deck state.
-- Readiness results use the status set defined under Readiness Authority: ready, pending,
-  blocked, unavailable, unsupported, failed. Do not introduce synonyms or aliases for
+- Readiness results use the status set defined under Readiness Authority: ready, degraded,
+  pending, blocked, unavailable, unsupported, failed. Do not introduce synonyms or aliases for
   these statuses at other layers.
 
 ---

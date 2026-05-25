@@ -43,8 +43,11 @@ decisions.
 
 Deck load does not perform expensive work inline. It queries current readiness
 synchronously. If readiness is unknown or pending, it requests interactive
-readiness work through the control plane and receives a bounded response:
-ready | pending | blocked | unavailable. It does not wait for work to finish.
+readiness work through the control plane and receives a bounded response from
+the canonical readiness status set: ready | degraded | pending | blocked |
+unavailable | unsupported | failed. Only ready and degraded may lead to
+runtime binding. Degraded proceeds only when target policy explicitly permits
+degraded runtime use. It does not wait for work to finish.
 
 Effective priority is computed from urgency, value, cost, and age at scheduling
 time. It is not stored as a column.
@@ -414,12 +417,15 @@ Deck load has two separate paths. They must not be conflated.
 ```
 1. Deck load request arrives.
 2. Query item_readiness for (library_item_id, audio_deck_load) or (library_item_id, video_deck_load).
-3. If status = ready    → proceed with load.
-   If status = blocked  → return blocked + reason to UI. No work created.
-   If status = degraded → proceed with warning.
-   If status = pending  → proceed to request path.
-   If no row exists     → proceed to request path.
-   If file unavailable  → return unavailable to UI.
+3. If status = ready        → proceed with load.
+   If status = degraded     → proceed with load only when target policy explicitly
+                              permits degraded runtime use. Otherwise treat as blocked.
+   If status = blocked      → return blocked + reason to UI. No work created.
+   If status = unavailable  → return unavailable to UI.
+   If status = unsupported  → return unsupported to UI (target type not applicable).
+   If status = failed       → return failure + reason to UI; evaluation may be retried.
+   If status = pending      → proceed to request path.
+   If no row exists         → proceed to request path.
 ```
 
 **Request path (via control plane, not inline)**
@@ -1026,8 +1032,9 @@ The implementation is correct only when all of the following hold:
   sources sharing a physical device share one storage budget group
 - A work item requiring multiple resource budget groups acquires all or none;
   it does not partially acquire and block
-- Deck load queries readiness synchronously and returns ready/pending/blocked/
-  unavailable without creating work or blocking on work completion
+- Deck load queries readiness synchronously and returns the canonical
+  readiness status (ready | degraded | pending | blocked | unavailable |
+  unsupported | failed) without creating work or blocking on work completion
 - Deck load may request interactive readiness work via the control plane; the
   control plane enforces idempotence before any insert
 - Browse rendering produces no work items as a side effect

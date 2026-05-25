@@ -2,18 +2,22 @@
 
 ## Decision
 
-When a source-rooted library tree row is selected, the contents table represents the primary media under that selected row recursively.
+When a source-rooted library tree row is selected, the contents table represents the primary media under that selected
+row recursively.
 
 Tree expansion and contents selection are separate product surfaces:
 
 - Tree expansion shows immediate hierarchy children for navigation.
 - Tree selection shows recursive primary media descendant contents for work.
 
-The contents table must not show only the immediate loaded tree children unless the selected row is known to have no relevant descendants beyond them.
+The contents table must not show only the immediate loaded tree children unless the selected row is known to have no
+relevant descendants beyond them.
 
-This document is the canonical source for recursive selection, query execution, renderer contracts, result shapes, scan coverage, and index requirements.
+This document is the canonical source for recursive selection, query execution, renderer contracts, result shapes, scan
+coverage, and index requirements.
 
-For product semantics regarding source locations, including creation, lifecycle, display, proposal handling, and reconnect behavior, see `source-locations-lifecycle-contract.md`.
+For product semantics regarding source locations, including creation, lifecycle, display, proposal handling, and
+reconnect behavior, see `source-locations-lifecycle-contract.md`.
 
 ## Scope
 
@@ -23,7 +27,8 @@ This rule applies to source-rooted hierarchy selections:
 - source location
 - directory
 
-It does not define playlist, crate, smart-view, search-result, all-tracks, recently-added, or other collection-backed selection semantics. Those nodes use separate query contracts.
+It does not define playlist, crate, smart-view, search-result, all-tracks, recently-added, or other collection-backed
+selection semantics. Those nodes use separate query contracts.
 
 ## Short canon
 
@@ -41,7 +46,8 @@ Collection-backed nodes use separate query contracts.
 
 ## Selector payload contract
 
-Selectable navigation rows must carry a durable selector payload. The selector payload must be canonical JSON with no extra fields.
+Selectable navigation rows must carry a durable selector payload. The selector payload must be canonical JSON with no
+extra fields.
 
 Canonical `selector_kind` values:
 
@@ -65,17 +71,22 @@ Canonical payloads:
 
 If `selector_kind` and `payload.kind` disagree, the renderer must reject the row as invalid projection data.
 
-The renderer may pass selector payloads through. It must not parse product identity from labels, visible tree shape, DOM structure, expanded state, or path text.
+The renderer may pass selector payloads through. It must not parse product identity from labels, visible tree shape, DOM
+structure, expanded state, or path text.
 
 The substrate or boundary resolver owns payload validation and conversion into typed targets.
 
 ## Schema pre-requisites and enum contracts
 
-To support virtual trees and recursive completeness guarantees without eager reads, the schema must include structural and coverage facts.
+To support virtual trees and recursive completeness guarantees without eager reads, the schema must include structural
+and coverage facts. Coverage semantics (complete, pending, scanning, blocked, failed) and product issue kinds are
+defined in `source-access-and-scan-coverage.md`. This section defines the directory-level schema columns needed for tree
+affordance and recursive contents completeness.
 
 ### Required columns
 
-The baseline schema must include these facts directly in the baseline SQL. This project is greenfield for the current substrate baseline; do not add a patch migration for this pass unless explicitly instructed.
+The baseline schema must include these facts directly in the baseline SQL. This project is greenfield for the current
+substrate baseline; do not add a patch migration for this pass unless explicitly instructed.
 
 ```sql
 source_directories.has_child_directories INTEGER NOT NULL DEFAULT 0
@@ -93,16 +104,18 @@ source_directories.scanned_at INTEGER;
 source_directories.dir_scan_state TEXT NOT NULL DEFAULT 'pending'
 CHECK (dir_scan_state IN ('pending', 'scanning', 'complete', 'failed', 'blocked'));
 
-source_directories.dir_scan_error_kind TEXT;
-source_directories.dir_scan_error_detail TEXT;
+source_directories.dir_issue_kind TEXT;
+source_directories.dir_issue_detail TEXT;
 
 source_directories.dir_scan_updated_at INTEGER NOT NULL;
 
 source_scan_state.scan_phase TEXT NOT NULL DEFAULT 'idle'
-CHECK (scan_phase IN ('idle', 'scanning', 'blocked', 'failed', 'complete'));
+CHECK (scan_phase IN ('idle', 'scanning', 'partial', 'blocked', 'failed', 'complete'));
 ```
 
-`dir_scan_updated_at` is `NOT NULL` and required on insert in the greenfield baseline. `mtime_ns` and `scanned_at` are nullable because directories can be pending, blocked, missing, or unavailable before the authority has trustworthy filesystem metadata or a completed scan attempt.
+`dir_scan_updated_at` is `NOT NULL` and required on insert in the greenfield baseline. `mtime_ns` and `scanned_at` are
+nullable because directories can be pending, blocked, missing, or unavailable before the authority has trustworthy
+filesystem metadata or a completed scan attempt.
 
 The baseline schema must also make literal hierarchy ownership structurally safe:
 
@@ -116,17 +129,23 @@ source_files.parent_source_directory_id
   ON DELETE CASCADE;
 ```
 
-Do not keep `ON DELETE SET NULL` for ordinary parent-directory relationships in the greenfield baseline. Deleting a directory subtree must not produce orphaned hierarchy rows.
+Do not keep `ON DELETE SET NULL` for ordinary parent-directory relationships in the greenfield baseline. Deleting a
+directory subtree must not produce orphaned hierarchy rows.
 
 `has_child_directories`, `has_primary_media_descendant`, and `has_image_media_descendant` are distinct facts:
 
 - `has_child_directories` answers whether immediate child directories exist, regardless of media relevance.
-- `has_primary_media_descendant` answers whether the substrate has positive evidence that this directory has audio/video descendants.
-- `has_image_media_descendant` answers whether the substrate has positive evidence that this directory has image descendants.
+- `has_primary_media_descendant` answers whether the substrate has positive evidence that this directory has audio/video
+  descendants.
+- `has_image_media_descendant` answers whether the substrate has positive evidence that this directory has image
+  descendants.
 
-`has_primary_media_descendant = 0` and `has_image_media_descendant = 0` do not mean the directory is proven empty unless the relevant directory coverage is complete. Use `dir_scan_state` to distinguish unknown, pending, scanning, blocked, failed, and complete coverage.
+`has_primary_media_descendant = 0` and `has_image_media_descendant = 0` do not mean the directory is proven empty unless
+the relevant directory coverage is complete. Use `dir_scan_state` to distinguish unknown, pending, scanning, blocked,
+failed, and complete coverage.
 
-`has_primary_media_descendant` and `has_image_media_descendant` replace `media_browseability` in the greenfield baseline. Do not keep stale aliases.
+`has_primary_media_descendant` and `has_image_media_descendant` replace `media_browseability` in the greenfield
+baseline. Do not keep stale aliases.
 
 ### Enum behavior matrix
 
@@ -134,33 +153,49 @@ Every enum value must map to a documented query behavior and visible state.
 
 #### `sources.source_class`
 
-- `internal`: not mount-state gated. Still subject to storage, permission, database, and scan-state failures. It must not be treated as unreachable due to removable-device mount state.
+- `internal`: not mount-state gated. Still subject to storage, permission, database, and scan-state failures. It must
+  not be treated as unreachable due to removable-device mount state.
 - `external_mounted`: subject to mount state.
 - `removable_mounted`: subject to mount state.
 
 #### `source_state.mount_status`
 
 - `mounted`: media may be queryable.
-- `unknown`: source availability is unresolved. The renderer must show resolving/unknown state or stale known rows as unavailable/uncertain. It must not assume availability.
+- `unknown`: source availability is unresolved. The renderer must show resolving/unknown state or stale known rows as
+  unavailable/uncertain. It must not assume availability.
 - `unmounted`: media is globally unavailable. The contents projection returns `source_unavailable`, not an empty table.
-- `eject_requested`: media is globally unavailable or becoming unavailable. The contents projection returns `source_unavailable` or `stale_cursor`, not an empty table.
-- `eject_pending`: media is globally unavailable or becoming unavailable. The contents projection returns `source_unavailable` or `stale_cursor`, not an empty table.
+- `eject_requested`: media is globally unavailable or becoming unavailable. The contents projection returns
+  `source_unavailable` or `stale_cursor`, not an empty table.
+- `eject_pending`: media is globally unavailable or becoming unavailable. The contents projection returns
+  `source_unavailable` or `stale_cursor`, not an empty table.
 
 #### `source_scan_state.scan_phase` and `source_directories.dir_scan_state`
 
-`source_scan_state.scan_phase` describes source-level scan lifecycle. `idle` means no active worker; it does not mean fully scanned.
+`source_scan_state.scan_phase` describes source-level scan lifecycle. `idle` means no active worker; it does not mean
+fully scanned.
 
 Source-level `scan_phase` values:
 
 - `idle`: no active source scan worker. The source may still have incomplete directory coverage.
 - `scanning`: active source scan worker.
+- `partial`: source scan has ended or been finalized without reaching all directories. Some directories remain pending,
+  scanning, blocked, or failed. Not all directories have complete coverage.
 - `blocked`: source scan cannot proceed due to permission, policy, or source availability.
 - `failed`: source scan aborted with an error.
-- `complete`: all `source_directories` rows for the source have `dir_scan_state = 'complete'`, and the source scan is not blocked or failed.
+- `complete`: all `source_directories` rows for the source have `dir_scan_state = 'complete'`, and the source scan is
+  not blocked or failed.
 
-The transition to source-level `complete` happens only during scan finalization, in the same write transaction that proves there are no remaining `pending`, `scanning`, `blocked`, or `failed` directory rows for the source. If a rescan, reconnect verification, directory insertion, or source-location repair reopens coverage for any directory, source-level `scan_phase` must leave `complete`.
+The transition to source-level `complete` happens only during scan finalization, in the same write transaction that
+proves there are no remaining `pending`, `scanning`, `blocked`, or `failed` directory rows for the source. If a rescan,
+reconnect verification, directory insertion, or source-location repair reopens coverage for any directory, source-level
+`scan_phase` must leave `complete`.
 
-`source_directories.dir_scan_state` describes subtree coverage. Recursive selected contents completeness is derived from directory scan states for the selected subtree, not from source-level `complete` alone.
+`partial` is distinct from `scanning`, `blocked`, and `failed`. A `partial` phase means the scan finished but some
+coverage gaps remain — it is not an active, blocked, or failed state. It carries incomplete coverage and must not be
+treated as complete or authoritative-empty.
+
+`source_directories.dir_scan_state` describes subtree coverage. Recursive selected contents completeness is derived from
+directory scan states for the selected subtree, not from source-level `complete` alone.
 
 Directory-level `dir_scan_state` values:
 
@@ -174,28 +209,40 @@ Directory-level `dir_scan_state` values:
 
 - `available`: rendered normally and playable.
 - `degraded`: included in the default view, rendered with warning, and playable.
-- `unavailable`: excluded from the ordinary playable-media result when the selected scope is available; shown as unavailable when the selected source or scope itself is unavailable and the projection has known prior rows; shown in explicit issue/readiness views; never treated as empty.
+- `unavailable`: excluded from the ordinary playable-media result when the selected scope is available; shown as
+  unavailable when the selected source or scope itself is unavailable and the projection has known prior rows; shown in
+  explicit issue/readiness views; never treated as empty.
 
 #### `source_files.media_class`
 
 - `audio`: raw source-file class for audio files; included in primary media.
-- `video`: raw source-file class for video files; visible as a primary media candidate until future video inspection proves actual deck/output eligibility.
-- `image`: raw source-file class for image files; image media is stored and can be exposed through explicit source-file visibility in the tree, but is not primary media and is not included in normal recursive selected contents.
+- `video`: raw source-file class for video files; visible as a primary media candidate until future video inspection
+  proves actual deck/output eligibility.
+- `image`: raw source-file class for image files; image media is stored and can be exposed through explicit source-file
+  visibility in the tree, but is not primary media and is not included in normal recursive selected contents.
 - `unsupported`: strictly excluded from normal recursive selected contents.
 - `none`: strictly excluded from normal recursive selected contents.
 
-`source_files.media_class` is raw/provisional source-file classification. Normal recursive selected contents is primary-media content. Primary media currently means audio/video. Image files are source companion/image media, not normal selected contents rows.
+`source_files.media_class` is raw/provisional source-file classification. Normal recursive selected contents is
+primary-media content. Primary media currently means audio/video. Image files are source companion/image media, not
+normal selected contents rows.
 
-Tree source-file visibility and selected contents scope are separate concepts. `performance` tree mode exposes primary media; `performanceAndImages` tree mode may reveal image rows and image-only folders. Switching tree source-file visibility must not redefine the selected contents scope.
+Tree source-file visibility and selected contents scope are separate concepts. `performance` tree mode exposes primary
+media; `performanceAndImages` tree mode may reveal image rows and image-only folders. Switching tree source-file
+visibility must not redefine the selected contents scope.
 
-Image-only folders do not satisfy primary media descendant facts in `performance` mode. `performanceAndImages` tree mode may reveal those folders through image media descendant facts.
+Image-only folders do not satisfy primary media descendant facts in `performance` mode. `performanceAndImages` tree mode
+may reveal those folders through image media descendant facts.
 
 ## Query execution contract
 
-The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target, queries primary media, collapses duplicates, and returns projection rows that may originate from two kinds of source:
+The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target, queries
+primary media, collapses duplicates, and returns projection rows that may originate from two kinds of source:
 
-- **promoted library asset rows**: when the scoped `source_files` have been promoted through segment attachment into `LibraryBrowserRows`, those rows are returned as the primary contents.
-- **scanned source-file rows**: when scoped `source_files` have no corresponding promoted library asset row (yet), the scanned source file itself is returned as a contents row.
+- **promoted library asset rows**: when the scoped `source_files` have been promoted through segment attachment into
+  `LibraryBrowserRows`, those rows are returned as the primary contents.
+- **scanned source-file rows**: when scoped `source_files` have no corresponding promoted library asset row (yet), the
+  scanned source file itself is returned as a contents row.
 
 The renderer never constructs fallback rows.
 
@@ -242,17 +289,22 @@ AND sf.relative_path COLLATE BINARY >= :prefix || '/'
 AND sf.relative_path COLLATE BINARY <  :prefix || char(48)
 ```
 
-`char(48)` is `'0'`. This relies on the ASCII/UTF-8 ordering invariant that `/` is codepoint 47 and `0` is codepoint 48. They are adjacent, so no valid descendant path beginning with `prefix || '/'` can sort outside the range, and no sibling path can sort between `prefix || '/'` and `prefix || '0'`.
+`char(48)` is `'0'`. This relies on the ASCII/UTF-8 ordering invariant that `/` is codepoint 47 and `0` is codepoint 48.
+They are adjacent, so no valid descendant path beginning with `prefix || '/'` can sort outside the range, and no sibling
+path can sort between `prefix || '/'` and `prefix || '0'`.
 
-The upper-bound expression must be produced by a named helper or named query builder, not copied inline as an unexplained magic literal.
+The upper-bound expression must be produced by a named helper or named query builder, not copied inline as an
+unexplained magic literal.
 
 ### 3. Source-root prefix handling
 
 A source root uses the source-level scope policy.
 
-For whole-source scope, omit the prefix predicate or use a deliberate root-prefix helper that includes all source files for that source.
+For whole-source scope, omit the prefix predicate or use a deliberate root-prefix helper that includes all source files
+for that source.
 
-Do not accidentally require `relative_path >= '/'` for root selection, because stored relative paths are not absolute paths.
+Do not accidentally require `relative_path >= '/'` for root selection, because stored relative paths are not absolute
+paths.
 
 ### 4. Source-location and directory prefix handling
 
@@ -268,7 +320,8 @@ The selected directory's own files are included when their stored relative paths
 
 ### 5. Aggregate source-level scope
 
-For source selection with accepted locations, recursive contents cover the union of accepted visible source-location subtrees.
+For source selection with accepted locations, recursive contents cover the union of accepted visible source-location
+subtrees.
 
 Aggregate scope includes only source locations with:
 
@@ -284,9 +337,11 @@ Configured but unavailable source locations do not trigger whole-source fallback
 
 ### 6. Aggregate scan completeness
 
-For source selection with accepted locations, scan coverage must be computed over the union of accepted visible source-location subtrees.
+For source selection with accepted locations, scan coverage must be computed over the union of accepted visible
+source-location subtrees.
 
-If any included location subtree is `pending`, `scanning`, `failed`, or `blocked`, the source aggregate coverage is not complete.
+If any included location subtree is `pending`, `scanning`, `failed`, or `blocked`, the source aggregate coverage is not
+complete.
 
 Required conceptual query shape for aggregate source selection:
 
@@ -322,21 +377,29 @@ SELECT
 FROM covered_directories;
 ```
 
-The production query may use a different equivalent shape, but it must cover every accepted visible source-location prefix in the same read transaction as the contents rows. It must not check only the first accepted location or only the source root.
+The production query may use a different equivalent shape, but it must cover every accepted visible source-location
+prefix in the same read transaction as the contents rows. It must not check only the first accepted location or only the
+source root.
 
 ### 7. Read transaction rule
 
 Contents rows and scan coverage must be read from one consistent snapshot.
 
-Do not run the rows query and coverage query across different implicit read states where scan progress can advance between them and produce inconsistent UI.
+Do not run the rows query and coverage query across different implicit read states where scan progress can advance
+between them and produce inconsistent UI.
 
 ### 8. Strict ordering rule
 
-Ordering is deterministic and projection-owned. Do not rely on internal SQLite rowid ordering, current renderer order, expanded tree order, or incidental query result order.
+Ordering is deterministic and projection-owned. Do not rely on internal SQLite rowid ordering, current renderer order,
+expanded tree order, or incidental query result order.
 
-Default first-load ordering is `title ASC` after availability priority, with artist, album, path, and `scoped_source_file_id` as deterministic tie-breakers. This is the default order for the contents table unless the user explicitly chooses another sort.
+Default first-load ordering is `title ASC` after availability priority, with artist, album, path, and
+`scoped_source_file_id` as deterministic tie-breakers. This is the default order for the contents table unless the user
+explicitly chooses another sort.
 
-Because the result may contain both promoted library asset rows and scanned source-file rows, the tie-breaker must be stable across both origins. `scoped_source_file_id` is the default tie-breaker because every contents row has exactly one scoped source file, while `library_asset_id` is absent for source-file rows.
+Because the result may contain both promoted library asset rows and scanned source-file rows, the tie-breaker must be
+stable across both origins. `scoped_source_file_id` is the default tie-breaker because every contents row has exactly
+one scoped source file, while `library_asset_id` is absent for source-file rows.
 
 ```sql
 ORDER BY
@@ -353,7 +416,8 @@ ORDER BY
   scoped_source_file_id ASC
 ```
 
-Every ordered query needs a stable tie-breaker. `scoped_source_file_id` is the default tie-breaker for recursive contents rows.
+Every ordered query needs a stable tie-breaker. `scoped_source_file_id` is the default tie-breaker for recursive
+contents rows.
 
 ### 9. Deduplication and asset collapse
 
@@ -363,17 +427,22 @@ Promoted-library-asset deduplication rule:
 
 1. Group by `library_asset_id`.
 2. Prefer an attachment whose source file is present.
-3. If `LibraryBrowserRows.primary_source_file_id` is within the selected scope and present, use it as the scoped attachment anchor.
+3. If `LibraryBrowserRows.primary_source_file_id` is within the selected scope and present, use it as the scoped
+   attachment anchor.
 4. Otherwise, use the present scoped source file with the lowest `source_file_id`.
-5. If only degraded or unavailable attachments exist, choose the stable attachment that best represents the availability state and surface that state.
+5. If only degraded or unavailable attachments exist, choose the stable attachment that best represents the availability
+   state and surface that state.
 
-Source-file-origin rows are one row per scoped scanned source file when no promoted row exists for that source file. They are not collapsed against each other and are not deduplicated by `library_asset_id`.
+Source-file-origin rows are one row per scoped scanned source file when no promoted row exists for that source file.
+They are not collapsed against each other and are not deduplicated by `library_asset_id`.
 
 Do not leave duplicate collapse to the renderer.
 
 ### 10. Pagination cursor contract
 
-Recursive contents pagination uses keyset cursors, not offset cursors. Offset pagination is not stable enough for a live-updating scan result set because inserts, removals, and duplicate-collapse changes can shift row positions between page reads.
+Recursive contents pagination uses keyset cursors, not offset cursors. Offset pagination is not stable enough for a
+live-updating scan result set because inserts, removals, and duplicate-collapse changes can shift row positions between
+page reads.
 
 The cursor stores the last emitted row's complete ordered key tuple for the active sort:
 
@@ -393,123 +462,47 @@ type SelectedContentsCursor = {
 }
 ```
 
-The serialized cursor may be an opaque string at the renderer boundary, but the substrate owns its decoded structure and validation. A cursor is valid only for the selected scope fingerprint and ordering that produced it.
+The serialized cursor may be an opaque string at the renderer boundary, but the substrate owns its decoded structure and
+validation. A cursor is valid only for the selected scope fingerprint and ordering that produced it.
 
-If the selected source or scope becomes unavailable, unmounted, permission-denied, changes aggregate scope, changes ordering, or otherwise invalidates the cursor during pagination, the next page request must return `source_unavailable`, `location_missing`, `blocked`, or `stale_cursor`.
+If the selected source or scope becomes unavailable, unmounted, permission-denied, changes aggregate scope, changes
+ordering, or otherwise invalidates the cursor during pagination, the next page request must return `source_unavailable`,
+`location_missing`, `blocked`, or `stale_cursor`.
 
 It must never return an empty page as if the scope simply ran out of media.
 
 ## Renderer boundary and result shape
 
-The substrate returns a strictly typed result shape. The renderer consumes this projection and must never rebuild product display state from raw filesystem rows.
+The substrate returns a strictly typed `SelectedContentsResult` across the renderer boundary.
+The canonical shape is owned by the generated/shared contract, not by this document.
+This section describes the conceptual states and rules the shape must satisfy.
 
-All durable SQLite row identifiers crossing the renderer boundary are encoded as strings unless the boundary contract explicitly proves they are safe JavaScript integers.
+Conceptual result states:
 
-```ts
-type SelectedContentsCursor = string
+- `ready`: rows available with complete coverage.
+- `partial`: rows available with incomplete (scanning, pending, partial) coverage. Must show a scan-progress indicator.
+- `empty`: no rows and coverage is complete (authoritative empty).
+- `source_unavailable`: source is not accessible; known prior rows may be surfaced as unavailable.
+- `location_missing`: configured source location is unreachable.
+- `blocked`: permission or policy blocked.
+- `failed`: unexpected error.
+- `stale_cursor`: pagination cursor is no longer valid.
 
-type SelectedContentsPage = {
-  cursor?: SelectedContentsCursor
-  limit: number
-  totalKnownRows?: number
-}
+Conceptual row shape requirements (not the contract shape):
 
-type SelectedContentsResult =
-  | {
-      state: 'ready'
-      scope: SelectedContentsScope
-      rows: readonly SelectedContentsRow[]
-      page: SelectedContentsPage
-      coverage: {
-        state: 'complete'
-      }
-    }
-  | {
-      state: 'partial'
-      scope: SelectedContentsScope
-      rows: readonly SelectedContentsRow[]
-      page: SelectedContentsPage
-      coverage: {
-        state: 'scanning' | 'pending'
-        scannedRowCount?: number
-        detail?: string
-      }
-    }
-  | {
-      state: 'empty'
-      scope: SelectedContentsScope
-      rows: []
-      coverage: {
-        state: 'complete'
-      }
-    }
-  | {
-      state: 'source_unavailable'
-      scope: SelectedContentsScope
-      reason: string
-      knownRows?: readonly SelectedContentsRow[]
-    }
-  | {
-      state: 'location_missing'
-      scope: SelectedContentsScope
-      reason: string
-      knownRows?: readonly SelectedContentsRow[]
-    }
-  | {
-      state: 'blocked'
-      scope: SelectedContentsScope
-      reason: string
-      rows?: readonly SelectedContentsRow[]
-    }
-  | {
-      state: 'failed'
-      scope: SelectedContentsScope
-      error: string
-      rows?: readonly SelectedContentsRow[]
-    }
-  | {
-      state: 'stale_cursor'
-      scope: SelectedContentsScope
-      reason: string
-    }
+- Every contents row has exactly one scoped source file, identified by `scopedSourceFileId`.
+- Rows may originate from promoted library assets (`origin: 'libraryAsset'`) or scanned source files (
+  `origin: 'sourceFile'`).
+- Promoted library asset rows carry `libraryAssetId`, `rowVersion`, and metadata fields.
+- Source-file rows carry scoped source-file identity only; they must not invent track metadata.
+- `stableId` is the durable row identity: `'library-asset:' + libraryAssetId` for promoted rows,
+  `'source-file:' + scopedSourceFileId` for source-file rows.
+- All durable SQLite row identifiers crossing the renderer boundary are encoded as strings unless the boundary contract
+  explicitly proves they are safe JavaScript integers.
+- `prepReadinessSummary` is a required compact readiness summary.
 
-type SelectedContentsRowOrigin = 'libraryAsset' | 'sourceFile'
-
-type SelectedContentsRow = {
-  stableId: string
-  label: string
-  origin: SelectedContentsRowOrigin
-  libraryAssetId?: string
-  rowVersion?: string
-  primarySourceFileId?: string
-  scopedSourceFileId: string
-  sourceId: string
-  relativePath: string
-  fileName: string
-  mediaClass: 'audio' | 'video'
-  availabilityState: 'available' | 'unavailable' | 'degraded'
-  title?: string
-  artist?: string
-  album?: string
-  durationMs?: number
-  musicalKey?: string
-  tempoBpm?: number
-  waveformQualityCurrent?: number
-  waveformQualityTarget?: number
-  stemsStateSummary?: string
-  prepReadinessSummary: string
-  updatedAtMs: number
-}
-
-- `libraryAssetId` exists only for `origin: 'libraryAsset'` rows. It is absent for source-file rows.
-- `rowVersion` exists only for `origin: 'libraryAsset'` rows. It is absent for source-file rows.
-- `stableId = 'library-asset:' + libraryAssetId` for promoted library asset rows.
-- `stableId = 'source-file:' + scopedSourceFileId` for scanned source-file rows.
-- Source-file rows must not invent track metadata (title, artist, album, duration etc. are absent).
-- `scopedSourceFileId` is required for every row because every contents row has exactly one scoped source file.
-- `prepReadinessSummary` is a required compact readiness summary. Preparation is not one flat concept; richer readiness facets may be added later, but the current row shape uses this single summary field.
-
-When a selected target is permanently deleted, active subscribers receive a tombstone/invalidated-target result, such as `location_missing` or `source_unavailable`, not an empty result.
+When a selected target is permanently deleted, active subscribers receive a tombstone/invalidated-target result, such as
+`location_missing` or `source_unavailable`, not an empty result.
 
 ## Visible contents states matrix
 
@@ -519,7 +512,8 @@ The UI must reflect the exact `SelectedContentsResult` state truthfully.
 - `partial`: show rows found so far plus `Still indexing. Results may be incomplete.`
 - `empty`: show `No primary media found under this folder.` Only valid with complete coverage.
   - Complete coverage with no scoped audio/video source files is authoritative empty.
-- `source_unavailable`: show known rows as unavailable if supplied, or show a global unavailable state. Never show empty.
+- `source_unavailable`: show known rows as unavailable if supplied, or show a global unavailable state. Never show
+  empty.
 - `location_missing`: show the configured library folder as missing and offer repair or relink actions.
 - `blocked`: show explicit permission-needed or policy-blocked state.
 - `failed`: show failed state with retry or rescan action.
@@ -543,7 +537,8 @@ The renderer does not need to hold recursive descendant contents inside the tree
 - scroll position
 - selected target
 
-The contents table uses its own cursor, page size, order key, and virtual scroll state. Its pagination must not depend on tree scroll position or tree expansion state.
+The contents table uses its own cursor, page size, order key, and virtual scroll state. Its pagination must not depend
+on tree scroll position or tree expansion state.
 
 Virtual tree chevrons are driven by substrate affordance signals:
 
@@ -560,11 +555,14 @@ These are explicit code-review vetoes:
 1. The renderer must never walk its own tree nodes to build the contents table.
 2. The renderer must never treat expansion state as a filter on the contents result set.
 3. The renderer must never issue raw `source_files` queries directly.
-4. The renderer must never parse source, source location, directory, or file identity out of display labels or path text.
+4. The renderer must never parse source, source location, directory, or file identity out of display labels or path
+   text.
 5. The renderer must never silently present partial recursive results as complete.
 6. The renderer must never reconstruct product display fields from raw filesystem rows.
-7. The renderer must never eagerly fetch depth+1 children for every visible tree row only to decide whether to show a chevron.
-8. The renderer must never apply source-rooted path-prefix logic to playlist, crate, smart-view, or collection-backed nodes.
+7. The renderer must never eagerly fetch depth+1 children for every visible tree row only to decide whether to show a
+   chevron.
+8. The renderer must never apply source-rooted path-prefix logic to playlist, crate, smart-view, or collection-backed
+   nodes.
 
 ## Implementation readiness
 
@@ -578,12 +576,14 @@ Implementation is allowed only after:
 - `source_directories.mtime_ns` exists in the baseline schema
 - `source_directories.scanned_at` exists in the baseline schema
 - `source_scan_state.scan_phase` includes `complete` and has the transition rule defined above
-- parent-directory foreign keys for `source_directories` and `source_files` cascade instead of setting children to `NULL`
+- parent-directory foreign keys for `source_directories` and `source_files` cascade instead of setting children to
+  `NULL`
 - hot-path prefix indexes exist with `BINARY` collation
 - `SelectedContentsResult` is represented as a real typed boundary contract
 - recursive contents pagination uses the keyset cursor contract defined above
 - fixtures cover aggregate scope, missing locations, duplicate collapse, scan coverage, and prefix-boundary exclusion
-- the hot-path contents query has an `EXPLAIN QUERY PLAN` test proving the planner uses the `source_id + relative_path` binary index for prefix scans
+- the hot-path contents query has an `EXPLAIN QUERY PLAN` test proving the planner uses the `source_id + relative_path`
+  binary index for prefix scans
 
 ## Test and fixture contract
 
@@ -603,4 +603,5 @@ At minimum, fixtures must test:
 10. unsupported and `none` media files are excluded from normal recursive selected contents
 11. selector payloads resolve to typed targets
 
-The test suite must run `EXPLAIN QUERY PLAN` against the hot-path contents query and assert the planner uses the `source_id + relative_path` binary index for prefix scans. Do not lock the entire SQLite plan string unless unavoidable.
+The test suite must run `EXPLAIN QUERY PLAN` against the hot-path contents query and assert the planner uses the
+`source_id + relative_path` binary index for prefix scans. Do not lock the entire SQLite plan string unless unavoidable.
