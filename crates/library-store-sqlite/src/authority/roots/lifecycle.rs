@@ -328,6 +328,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         let mut next = record.state.clone();
         next.scan_phase = RootScanPhase::Scanning;
         next.last_scan_started_at = Some(started_at_ms);
+        next.last_scan_finished_at = None;
         next.scan_issue_kind = None;
         next.error_detail = None;
         next.updated_at = started_at_ms;

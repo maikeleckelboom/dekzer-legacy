@@ -210,6 +210,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  scan_issue_kind = NULL,
                  error_detail = NULL,
                  last_scan_started_at = ?2,
+                 last_scan_finished_at = NULL,
                  updated_at = ?2
              WHERE source_id = ?1",
             params![root_id, started_at_ms],
