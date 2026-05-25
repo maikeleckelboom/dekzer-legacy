@@ -9,6 +9,11 @@ import type {
 } from '../../../../src/shared/libraryNavigation/readRows'
 import type { BrowserState, LoadedChildren } from '../../../../src/renderer/library/state'
 import {
+  canRevealBrowserTreeChildren,
+  flattenVisibleTree,
+  isBrowserTreeBranch
+} from '../../../../src/renderer/library/tree/listProjection'
+import {
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
@@ -111,37 +116,8 @@ describe('projectState', () => {
     expect(stoppedProjection.bindingsById.has('navigation-row:7')).toBe(false)
   })
 
-  it('uses directory coverage facts for disclosure state', () => {
-    const hasMediaProjection = projectTree(
-      browserState({
-        sourceChildren: loadedChildren([
-          directoryNode('12', 'Album', {
-            hasChildDirectories: false,
-            directoryMediaState: { kind: 'hasMediaDescendants' }
-          })
-        ])
-      })
-    )
-    expect(
-      findNode(hasMediaProjection.nodes, 'source-directory:12')?.hasDirectoryDisclosureHint
-    ).toBe(true)
-
-    const confirmedEmptyProjection = projectTree(
-      browserState({
-        sourceChildren: loadedChildren([
-          directoryNode('12', 'Album', {
-            hasChildDirectories: false,
-            directoryMediaState: { kind: 'noMediaDescendants' },
-            directoryScanState: 'complete'
-          })
-        ])
-      })
-    )
-    expect(findNode(confirmedEmptyProjection.nodes, 'source-directory:12')?.children.kind).toBe(
-      'none'
-    )
-
-    const unknownProjection = projectTree(
+  it('projecting an unloaded loadable directory creates a branch with deferred child state', () => {
+    const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
@@ -152,9 +128,197 @@ describe('projectState', () => {
         ])
       })
     )
-    const unknownNode = findNode(unknownProjection.nodes, 'source-directory:12')
-    expect(unknownNode?.children.kind).toBe('deferred')
-    expect(unknownNode?.hasDirectoryDisclosureHint).toBe(true)
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('deferred')
+    expect(node.children.kind === 'deferred' ? node.children.stateNode.role : undefined).toBe(
+      'state'
+    )
+    expect(node.action).toMatchObject({ kind: 'loadChildren', state: { kind: 'idle' } })
+    expect(isBrowserTreeBranch(node)).toBe(true)
+    expect(canRevealBrowserTreeChildren(node)).toBe(true)
+  })
+
+  it('expanding a deferred directory cannot flatten to zero visible child rows', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Album', {
+            hasChildDirectories: false,
+            directoryMediaState: { kind: 'unknown' },
+            directoryScanState: 'pending'
+          })
+        ])
+      })
+    )
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+
+    expect(
+      childItemsFor(visibleItems, 'source-directory:12').map((item) => item.node.role)
+    ).toEqual(['state'])
+  })
+
+  it('loading directory remains a branch and keeps disclosure', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Album', {
+            hasChildDirectories: false,
+            directoryMediaState: { kind: 'unknown' },
+            directoryScanState: 'pending'
+          })
+        ]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loading',
+              requestKey: 'source:7/directory:12',
+              sequence: 1,
+              detail: 'Loading children.'
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('loading')
+    expect(isBrowserTreeBranch(node)).toBe(true)
+    expect(canRevealBrowserTreeChildren(node)).toBe(true)
+  })
+
+  it('loading directory materializes a stable loading child representation when expanded', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([directoryNode('12', 'Album')]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loading',
+              requestKey: 'source:7/directory:12',
+              sequence: 1,
+              detail: 'Loading children.'
+            }
+          ]
+        ])
+      })
+    )
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+    const childRows = childItemsFor(visibleItems, 'source-directory:12')
+
+    expect(childRows).toHaveLength(1)
+    expect(childRows[0]?.node).toMatchObject({
+      role: 'state',
+      icon: 'loading'
+    })
+  })
+
+  it('failed directory remains a branch and materializes explicit failure state when expanded', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([directoryNode('12', 'Album')]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'failed',
+              detail: 'Unable to read children.'
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+
+    expect(node.children.kind).toBe('failed')
+    expect(isBrowserTreeBranch(node)).toBe(true)
+    expect(childItemsFor(visibleItems, 'source-directory:12')[0]?.node).toMatchObject({
+      role: 'state',
+      icon: 'warning'
+    })
+  })
+
+  it('complete no-media/no-child directory can still project as leaf with no children', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Album', {
+            hasChildDirectories: false,
+            directoryMediaState: { kind: 'noMediaDescendants' },
+            directoryScanState: 'complete'
+          })
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+  })
+
+  it('state-only child rows do not accidentally decide branch identity', () => {
+    const node: BrowserTreeNode = {
+      id: 'state-only-owner',
+      label: 'State-only owner',
+      role: 'literalDirectory',
+      children: {
+        kind: 'loaded',
+        nodes: [
+          {
+            id: 'state-only-child',
+            label: 'Status',
+            role: 'state',
+            children: { kind: 'none' }
+          }
+        ]
+      }
+    }
+    const visibleItems = flattenVisibleTree({
+      nodes: [node],
+      expandedNodeIds: new Set(['state-only-owner'])
+    })
+
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    expect(visibleItems).toHaveLength(1)
+  })
+
+  it('expanded state alone does not create disclosure for a confirmed leaf', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Album', {
+            hasChildDirectories: false,
+            directoryMediaState: { kind: 'noMediaDescendants' },
+            directoryScanState: 'complete'
+          })
+        ])
+      })
+    )
+    const visibleItems = flattenVisibleTree({
+      nodes: [requiredNode(projection.nodes, 'source-directory:12')],
+      expandedNodeIds: new Set(['source-directory:12'])
+    })
+
+    expect(visibleItems).toHaveLength(1)
+    expect(visibleItems[0]).toMatchObject({
+      isBranch: false,
+      canRevealChildren: false,
+      isExpanded: false
+    })
   })
 })
 
@@ -169,10 +333,32 @@ function projectTree(state: BrowserState): BrowserProjection {
   return projection
 }
 
+function requiredNode(
+  nodes: readonly BrowserTreeNode[],
+  nodeId: BrowserTreeNodeId
+): BrowserTreeNode {
+  const node = findNode(nodes, nodeId)
+
+  expect(node).toBeDefined()
+  if (node === undefined) {
+    throw new Error(`Expected projected node ${nodeId}.`)
+  }
+
+  return node
+}
+
+function childItemsFor(
+  visibleItems: ReturnType<typeof flattenVisibleTree>,
+  parentId: BrowserTreeNodeId
+): ReturnType<typeof flattenVisibleTree> {
+  return visibleItems.filter((item) => item.parentId === parentId)
+}
+
 function browserState(
   options: {
     readonly rows?: readonly NavigationRow[]
     readonly sourceChildren?: LoadedChildren
+    readonly directoryStates?: BrowserState['directoryReadStates']
   } = {}
 ): BrowserState {
   return {
@@ -189,7 +375,7 @@ function browserState(
               }
             ]
           ]),
-    directoryReadStates: new Map()
+    directoryReadStates: options.directoryStates ?? new Map()
   }
 }
 

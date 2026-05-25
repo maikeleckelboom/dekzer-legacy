@@ -5,12 +5,20 @@ export type BrowserTreeChildren =
       readonly kind: 'none'
     }
   | {
+      readonly kind: 'deferred'
+      readonly stateNode: BrowserTreeNode
+    }
+  | {
+      readonly kind: 'loading'
+      readonly stateNode: BrowserTreeNode
+    }
+  | {
       readonly kind: 'loaded'
       readonly nodes: readonly BrowserTreeNode[]
     }
   | {
-      readonly kind: 'deferred'
-      readonly detail?: string
+      readonly kind: 'failed'
+      readonly stateNode: BrowserTreeNode
     }
 
 export type BrowserTreeActionState =
@@ -83,7 +91,6 @@ export type BrowserTreeNode = {
   readonly icon?: BrowserTreeIcon
   readonly children: BrowserTreeChildren
   readonly action?: BrowserTreeAction
-  readonly hasDirectoryDisclosureHint?: boolean
 }
 
 export type BrowserTreeVisibleItem = {

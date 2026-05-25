@@ -130,7 +130,13 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
     case 'readState':
       return stateProjection({
         kind:
-          binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'failed' : 'ready',
+          binding.state === 'loading'
+            ? 'loading'
+            : binding.state === 'error'
+              ? 'failed'
+              : binding.state === 'notLoaded'
+                ? 'notLoaded'
+                : 'ready',
         ownerId: selectedNodeId,
         title: 'Status',
         state: contentStateFromReadState(binding.state),
@@ -562,6 +568,8 @@ function contentStateFromReadState(
   state: Extract<RowBinding, { readonly kind: 'readState' }>['state']
 ): Exclude<ContentRow['state'], undefined> {
   switch (state) {
+    case 'notLoaded':
+      return 'notLoaded'
     case 'loading':
       return 'loading'
     case 'empty':
@@ -577,6 +585,8 @@ function formatReadStateLabel(
   state: Extract<RowBinding, { readonly kind: 'readState' }>['state']
 ): string {
   switch (state) {
+    case 'notLoaded':
+      return 'Not loaded'
     case 'loading':
       return 'Loading'
     case 'empty':

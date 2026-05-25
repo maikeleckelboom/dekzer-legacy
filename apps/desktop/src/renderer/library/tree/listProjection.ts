@@ -35,7 +35,7 @@ export function isBrowserTreeLeaf(node: BrowserTreeNode): boolean {
 }
 
 export function isBrowserTreeBranch(node: BrowserTreeNode): boolean {
-  return node.children.kind === 'deferred' || canRevealBrowserTreeChildren(node)
+  return canRevealBrowserTreeChildren(node)
 }
 
 export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly BrowserTreeNode[] {
@@ -47,11 +47,29 @@ export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly Br
 }
 
 export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
-  if (node.hasDirectoryDisclosureHint === true) {
-    return true
+  switch (node.children.kind) {
+    case 'none':
+      return false
+    case 'deferred':
+    case 'loading':
+    case 'failed':
+      return true
+    case 'loaded':
+      return node.children.nodes.some((child) => child.role !== 'state')
   }
+}
 
-  return getLoadedBrowserTreeChildren(node).some((child) => child.role !== 'state')
+export function getBrowserTreeChildRows(node: BrowserTreeNode): readonly BrowserTreeNode[] {
+  switch (node.children.kind) {
+    case 'none':
+      return []
+    case 'deferred':
+    case 'loading':
+    case 'failed':
+      return [node.children.stateNode]
+    case 'loaded':
+      return node.children.nodes
+  }
 }
 
 export function canActivateBrowserTreeAction(node: BrowserTreeNode): boolean {
@@ -126,7 +144,7 @@ function appendVisibleNodes(options: {
   const siblingCount = options.nodes.length
 
   options.nodes.forEach((node, nodeIndex) => {
-    const children = getLoadedBrowserTreeChildren(node)
+    const children = getBrowserTreeChildRows(node)
     const isBranch = isBrowserTreeBranch(node)
     const canReveal = canRevealBrowserTreeChildren(node)
     const canActivate = canActivateBrowserTreeAction(node)

@@ -36,6 +36,8 @@ type ProjectedNodeState = {
   readonly action?: BrowserTreeAction
 }
 
+type BrowserTreeReadState = 'notLoaded' | 'loading' | 'empty' | 'unavailable' | 'error'
+
 export function projectState(state: BrowserState): BrowserProjection | undefined {
   const hostProjection = projectHostStatus(state.hostStatus)
 
@@ -199,49 +201,41 @@ function projectSourceChildren(options: {
     const detail = state?.detail ?? 'Contents not loaded yet.'
 
     return {
-      children: {
-        kind: 'deferred',
-        detail
-      },
+      children: deferredChildren(
+        {
+          ownerId: options.ownerId,
+          label: 'Source contents not loaded',
+          detail
+        },
+        options.bindingsById
+      ),
       action: loadChildrenAction('idle', detail)
     }
   }
 
   if (state.kind === 'loading') {
     return {
-      children: {
-        kind: 'loaded',
-        nodes: [
-          trackedReadStateNode(
-            {
-              ownerId: options.ownerId,
-              state: 'loading',
-              label: 'Loading folder contents',
-              detail: state.detail ?? 'Loading folder contents.'
-            },
-            options.bindingsById
-          )
-        ]
-      }
+      children: loadingChildren(
+        {
+          ownerId: options.ownerId,
+          label: 'Loading source contents',
+          detail: state.detail ?? 'Loading source contents.'
+        },
+        options.bindingsById
+      )
     }
   }
 
   if (state.kind === 'failed') {
     return {
-      children: {
-        kind: 'loaded',
-        nodes: [
-          trackedReadStateNode(
-            {
-              ownerId: options.ownerId,
-              state: 'error',
-              label: 'Folder contents unavailable',
-              detail: state.detail
-            },
-            options.bindingsById
-          )
-        ]
-      }
+      children: failedChildren(
+        {
+          ownerId: options.ownerId,
+          label: 'Source contents unavailable',
+          detail: state.detail
+        },
+        options.bindingsById
+      )
     }
   }
 
@@ -337,18 +331,9 @@ function projectLiteralNode(options: {
     })
 
     const directoryState = options.directoryReadStates.get(node.directoryId)
-    const isUnloaded = directoryState === undefined || directoryState.kind === 'unloaded'
-
     const dirBadge = presenceBadge(node.presence)
 
-    const hasDirectoryDisclosureHint =
-      node.hasChildDirectories || node.directoryMediaState.kind !== 'noMediaDescendants'
-
-    if (
-      isUnloaded &&
-      !node.hasChildDirectories &&
-      node.directoryMediaState.kind === 'noMediaDescendants'
-    ) {
+    if (isConfirmedDirectoryLeaf(node, directoryState)) {
       return {
         id: node.id,
         role: 'literalDirectory',
@@ -367,7 +352,6 @@ function projectLiteralNode(options: {
       ...(dirBadge === undefined ? {} : { badge: dirBadge }),
       icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
-      ...(hasDirectoryDisclosureHint ? { hasDirectoryDisclosureHint: true } : {}),
       ...projectDirectoryChildren({
         ownerId: node.id,
         state: directoryState,
@@ -397,6 +381,21 @@ function projectLiteralNode(options: {
     detail: formatFileDetail(node.presence),
     children: { kind: 'none' }
   }
+}
+
+function isConfirmedDirectoryLeaf(
+  node: Extract<ChildRow, { readonly kind: 'directory' }>,
+  state: DirectoryState | undefined
+): boolean {
+  if (state !== undefined && state.kind !== 'unloaded') {
+    return false
+  }
+
+  return (
+    !node.hasChildDirectories &&
+    node.directoryMediaState.kind === 'noMediaDescendants' &&
+    node.directoryScanState === 'complete'
+  )
 }
 
 function browserTreeIconForEntryRole(role: LibraryEntryRole): BrowserTreeIcon {
@@ -435,6 +434,66 @@ function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTr
   return nodes.length === 0 ? { kind: 'none' } : { kind: 'loaded', nodes }
 }
 
+function deferredChildren(
+  options: {
+    readonly ownerId: string
+    readonly label: string
+    readonly detail: string
+  },
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
+): BrowserTreeChildren {
+  return {
+    kind: 'deferred',
+    stateNode: trackedReadStateNode(
+      {
+        ...options,
+        state: 'notLoaded'
+      },
+      bindingsById
+    )
+  }
+}
+
+function loadingChildren(
+  options: {
+    readonly ownerId: string
+    readonly label: string
+    readonly detail: string
+  },
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
+): BrowserTreeChildren {
+  return {
+    kind: 'loading',
+    stateNode: trackedReadStateNode(
+      {
+        ...options,
+        state: 'loading'
+      },
+      bindingsById
+    )
+  }
+}
+
+function failedChildren(
+  options: {
+    readonly ownerId: string
+    readonly label: string
+    readonly detail: string
+  },
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
+): BrowserTreeChildren {
+  return {
+    kind: 'failed',
+    stateNode: trackedReadStateNode(
+      {
+        ...options,
+        state: 'error'
+      },
+      bindingsById
+    )
+  }
+}
+
 function projectDirectoryChildren(options: {
   readonly ownerId: string
   readonly state: DirectoryState | undefined
@@ -447,49 +506,41 @@ function projectDirectoryChildren(options: {
     const detail = state?.detail ?? 'Contents not loaded yet.'
 
     return {
-      children: {
-        kind: 'deferred',
-        detail
-      },
+      children: deferredChildren(
+        {
+          ownerId: options.ownerId,
+          label: 'Folder contents not loaded',
+          detail
+        },
+        options.bindingsById
+      ),
       action: loadChildrenAction('idle', detail)
     }
   }
 
   if (state.kind === 'loading') {
     return {
-      children: {
-        kind: 'loaded',
-        nodes: [
-          trackedReadStateNode(
-            {
-              ownerId: options.ownerId,
-              state: 'loading',
-              label: 'Loading contents',
-              detail: state.detail ?? 'Loading contents.'
-            },
-            options.bindingsById
-          )
-        ]
-      }
+      children: loadingChildren(
+        {
+          ownerId: options.ownerId,
+          label: 'Loading contents',
+          detail: state.detail ?? 'Loading contents.'
+        },
+        options.bindingsById
+      )
     }
   }
 
   if (state.kind === 'failed') {
     return {
-      children: {
-        kind: 'loaded',
-        nodes: [
-          trackedReadStateNode(
-            {
-              ownerId: options.ownerId,
-              state: 'error',
-              label: 'Contents unavailable',
-              detail: state.detail
-            },
-            options.bindingsById
-          )
-        ]
-      }
+      children: failedChildren(
+        {
+          ownerId: options.ownerId,
+          label: 'Contents unavailable',
+          detail: state.detail
+        },
+        options.bindingsById
+      )
     }
   }
 
@@ -507,7 +558,7 @@ function projectDirectoryChildren(options: {
 
 function emptyProjection(options: {
   readonly ownerId: string
-  readonly state: 'loading' | 'empty' | 'unavailable' | 'error'
+  readonly state: BrowserTreeReadState
   readonly label: string
   readonly detail: string
 }): BrowserProjection {
@@ -523,7 +574,7 @@ function emptyProjection(options: {
 
 function readStateNode(options: {
   readonly ownerId: string
-  readonly state: 'loading' | 'empty' | 'unavailable' | 'error'
+  readonly state: BrowserTreeReadState
   readonly label: string
   readonly detail: string
 }): BrowserTreeNode {
@@ -560,7 +611,7 @@ function loadChildrenAction(
 function trackedReadStateNode(
   options: {
     readonly ownerId: string
-    readonly state: 'loading' | 'empty' | 'unavailable' | 'error'
+    readonly state: BrowserTreeReadState
     readonly label: string
     readonly detail: string
   },
@@ -653,13 +704,14 @@ function trackedMoreNode(
   return node
 }
 
-function readStateIcon(state: 'loading' | 'empty' | 'unavailable' | 'error'): BrowserTreeIcon {
+function readStateIcon(state: BrowserTreeReadState): BrowserTreeIcon {
   switch (state) {
     case 'loading':
       return 'loading'
     case 'error':
     case 'unavailable':
       return 'warning'
+    case 'notLoaded':
     case 'empty':
       return 'state'
   }

@@ -116,7 +116,7 @@ export type RowBinding =
     }
   | {
       readonly kind: 'readState'
-      readonly state: 'loading' | 'empty' | 'unavailable' | 'error'
+      readonly state: 'notLoaded' | 'loading' | 'empty' | 'unavailable' | 'error'
       readonly ownerId: string
       readonly detail: string
     }
