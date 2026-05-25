@@ -22,9 +22,10 @@ library_item -> readiness_target -> deck_load_request -> loaded_deck_item
 ```
 
 The current library substrate work is grounded: source access, scan coverage, selected contents,
-media visibility policy, role classification, and source-file browsing. Deck state, transition
-events, track identity, and performance session projection exist now as architectural boundaries
-only. Those boundaries must be recorded before readiness and scheduler work goes deeper.
+media visibility policy, and source-file browsing. Role classification is defined as the next
+product layer. Deck state, transition events, track identity, and performance session projection
+exist now as architectural boundaries only. Those boundaries must be recorded before readiness
+and scheduler work goes deeper.
 
 ---
 
@@ -57,8 +58,8 @@ item_role
   companion_metadata
 
 readiness_target
-  explicit target capability such as audioDeckLoad, videoDeckLoad, visualOutput,
-  artworkAttachment, or future deck/output targets
+  explicit target capability such as audio_deck_load, video_deck_load,
+  visual_output, artwork_attachment, or future deck/output targets
 
 readiness_proof
   bounded answer that says whether the item may be used for that target now,
@@ -94,7 +95,8 @@ broadcast_projection
 Owns:
 
 - `library_items` rows, `item_origins`, `file_identities`
-- `library_item_roles` rows (classifier-originated)
+- `library_item_roles` rows, including classifier-originated and user-originated
+  role decisions
 - `library_item_role_events` rows
 - `source_files` rows, availability state, discovery state
 - `source_directories` rows, directory scan state, directory affordance facts
@@ -117,7 +119,7 @@ Owns:
 
 - `item_readiness` rows (one per `library_item_id, target`)
 - Target-specific readiness answers: proof that the item may be used for that target
-- Readiness re-evaluation scheduling (work item creation, not execution)
+- Readiness re-evaluation requests (may request scheduler work; does not own work item rows)
 - Invalidation in response to substrate events (source change, probe update, role change, policy change)
 
 Reads:
@@ -136,17 +138,22 @@ Does not own:
 
 Rules:
 
-- Readiness is target-specific. Global `deckReady` is rejected.
+- Readiness is target-specific. Global `deckReady` is rejected. Deck loading
+  needs an explicit target such as `audio_deck_load` or `video_deck_load`.
+  Do not use generic deck readiness when the real question is readiness for
+  a specific runtime target.
 - Readiness answers must be bounded.
 - Pending readiness may request scheduler work.
 - Readiness evaluation must not perform expensive work inline.
+- Readiness must not own deck state.
 - Readiness must not create loaded deck items.
 
 ### Scheduler
 
 Owns:
 
-- Work selection, leasing, priority computation, budget enforcement, cancellation flow
+- Work enqueue, admission, selection, leasing, priority computation, execution order,
+  budget enforcement, cancellation flow
 - `work_items` rows, `scan_runs` rows
 - Work identity idempotence
 - Resource budget group management
@@ -372,35 +379,39 @@ Rules:
 
 ## Readiness Targets
 
-Readiness targets must be explicit and target-specific. Global `deckReady` is rejected.
+Readiness targets must be explicit and target-specific.
 
-Current targets from `media-role-classification.md`:
+A readiness target has one canonical domain identity. Durable storage uses the
+canonical target key. Boundary or protocol naming may transform representation
+style, but must not create a second target identity.
+
+Canonical targets:
 
 ```
-audio_deck
-video_deck
+audio_deck_load
+video_deck_load
 visual_output
 artwork_attachment
-waveform_analysis
-beatgrid_analysis
+waveform_preview
+broadcast_metadata_projection
 ```
 
-Future deck/output targets may include:
+Protocol representation examples (same semantic targets, not separate identities):
 
 ```
-audioDeckLoad
-videoDeckLoad
-visualOutput
-artworkAttachment
-waveformPreview
-broadcastMetadataProjection
+audioDeckLoad        is the protocol representation of audio_deck_load
+videoDeckLoad        is the protocol representation of video_deck_load
+visualOutput         is the protocol representation of visual_output
 ```
 
 Rules:
 
-- Readiness is target-specific. A music video may be `audio_deck: ready` and
-  `video_deck: ready` simultaneously. An audio-only track may be `audio_deck: ready`
-  and `video_deck: unsupported`.
+- Readiness is target-specific. A music video may be `audio_deck_load: ready` and
+  `video_deck_load: ready` simultaneously. An audio-only track may be
+  `audio_deck_load: ready` and `video_deck_load: unsupported`.
+- Global `deckReady` is rejected. Deck loading needs an explicit target such as
+  `audio_deck_load` or `video_deck_load`. Do not overload `audio_deck`,
+  `audioDeckLoad`, and `deckReady` as competing concepts.
 - Readiness may depend on role, probe facts, source availability, resource availability,
   analysis artifacts, and target policy.
 - Readiness answers must be bounded. Expensive work is enqueued, not performed inline.
@@ -446,14 +457,16 @@ unloaded           binding was explicitly removed by deck authority
 
 Rules:
 
-- Source availability changes are library/source authority events. They invalidate
-  readiness rows for affected items.
+- Source authority reports source availability. Library source unavailability does
+  not directly mutate deck runtime.
+- Source availability changes invalidate readiness rows for affected items.
 - Deck runtime detects resource loss through its own handles. It does not poll
   `source_files.availability`.
 - Historical performance events remain historical facts. A source that disappears
   does not erase the fact that it was loaded and played.
 - Broadcast projection must surface degraded/unavailable state when relevant, but must
-  not rewrite the past.
+  not rewrite the past. Broadcast does not publish raw source mutation as
+  performance authority.
 - Exact runtime state machine, transition rules, and invalidation protocol are
   future work.
 
@@ -496,13 +509,17 @@ global deckReady replaces target-specific readiness
 queued/deferred/requested are added to source scan phase
 library_items carries a deck_id or deck_slot_id column
 item_readiness includes transport state, playhead, or tempo
-work_items has a deck_id column
+work_items owns deck runtime state, stores loaded deck state, or treats a deck_id column as deck authority
 source_files has a loaded_in_deck flag
-loaded_deck_item is stored in the same schema as library_items
+loaded_deck_item is stored as a library item row or owned by the Library Authority
 broadcast projection writes to library_items or item_readiness
 renderer creates a loaded_deck_item by calling a library mutation
 performance_session_event references source_files.source_file_id as primary identity
 ```
+
+A future scheduler, admission, or request row may reference a deck-load request,
+foreground-interest source, or target deck if the reference is explicitly
+non-authoritative and does not mutate deck state.
 
 ---
 
