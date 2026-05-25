@@ -295,17 +295,15 @@ function projectLiteralNodes(options: {
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
-  return options.nodes
-    .filter((node) => isVisibleLiteralNode(node))
-    .map((node) =>
-      projectLiteralNode({
-        node,
-        entryPoint: options.entryPoint,
-        ...(options.label === undefined ? {} : { label: options.label }),
-        directoryReadStates: options.directoryReadStates,
-        bindingsById: options.bindingsById
-      })
-    )
+  return options.nodes.map((node) =>
+    projectLiteralNode({
+      node,
+      entryPoint: options.entryPoint,
+      ...(options.label === undefined ? {} : { label: options.label }),
+      directoryReadStates: options.directoryReadStates,
+      bindingsById: options.bindingsById
+    })
+  )
 }
 
 function projectLiteralNode(options: {
@@ -394,14 +392,6 @@ function isConfirmedDirectoryLeaf(
     node.directoryMediaState.kind === 'noMediaDescendants' &&
     node.directoryScanState === 'complete'
   )
-}
-
-function isVisibleLiteralNode(node: ChildRow): boolean {
-  if (node.kind === 'directory') {
-    return true
-  }
-
-  return node.mediaClass === 'audio' || node.mediaClass === 'video' || node.mediaClass === 'image'
 }
 
 function browserTreeIconForMediaClass(

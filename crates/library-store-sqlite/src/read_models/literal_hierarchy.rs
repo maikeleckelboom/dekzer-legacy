@@ -50,6 +50,8 @@ struct SourceLocationAnchor {
     relative_path: String,
 }
 
+const DEFAULT_BROWSE_FILE_PREDICATE_SQL: &str = "media_class IN ('audio', 'video', 'image')";
+
 pub(crate) fn read_children(
     connection: &Connection,
     entry_point: StoreLiteralHierarchyEntryPoint,
@@ -276,7 +278,8 @@ fn read_child_count(
     parent_source_directory_id: Option<i64>,
 ) -> LibrarySqliteResult<usize> {
     let count = connection.query_row(
-        "SELECT (
+        &format!(
+            "SELECT (
              SELECT COUNT(*)
              FROM source_directories
              WHERE source_id = ?1
@@ -290,11 +293,13 @@ fn read_child_count(
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
+               AND {DEFAULT_BROWSE_FILE_PREDICATE_SQL}
                AND (
                     (?2 IS NULL AND parent_source_directory_id IS NULL)
                     OR parent_source_directory_id = ?2
                )
-         )",
+         )"
+        ),
         params![source_id, parent_source_directory_id],
         |row| row.get::<_, i64>(0),
     )?;
@@ -318,7 +323,7 @@ fn read_child_rows(
     let limit = i64::try_from(limit).map_err(|_| {
         LibrarySqliteError::WriteInvariant("literal hierarchy limit does not fit i64".to_string())
     })?;
-    let mut statement = connection.prepare(
+    let mut statement = connection.prepare(&format!(
         "SELECT node_kind,
                 source_id,
                 source_directory_id,
@@ -378,6 +383,7 @@ fn read_child_rows(
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
+               AND {DEFAULT_BROWSE_FILE_PREDICATE_SQL}
                AND (
                     (?2 IS NULL AND parent_source_directory_id IS NULL)
                     OR parent_source_directory_id = ?2
@@ -388,8 +394,8 @@ fn read_child_rows(
                   display_name ASC,
                   relative_path ASC
          LIMIT ?3
-         OFFSET ?4",
-    )?;
+         OFFSET ?4"
+    ))?;
     let rows = statement
         .query_map(
             params![source_id, parent_source_directory_id, limit, offset],
@@ -447,12 +453,61 @@ mod tests {
             .expect("insert source");
     }
 
+    fn insert_directory(
+        connection: &Connection,
+        source_directory_id: i64,
+        parent_source_directory_id: Option<i64>,
+        name: &str,
+        has_child_directories: bool,
+        has_media_descendant: bool,
+        dir_scan_state: &str,
+    ) {
+        connection
+            .execute(
+                "INSERT INTO source_directories (
+                     source_directory_id,
+                     source_id,
+                     parent_source_directory_id,
+                     name,
+                     relative_path,
+                     presence_state,
+                     has_child_directories,
+                     has_media_descendant,
+                     dir_scan_state,
+                     dir_scan_updated_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (?1, 7, ?2, ?3, ?3, 'present', ?4, ?5, ?6, 1, 1, 1)",
+                params![
+                    source_directory_id,
+                    parent_source_directory_id,
+                    name,
+                    has_child_directories,
+                    has_media_descendant,
+                    dir_scan_state
+                ],
+            )
+            .expect("insert source directory");
+    }
+
     fn insert_file(connection: &Connection, source_file_id: i64, name: &str, media_class: &str) {
+        insert_file_in_directory(connection, source_file_id, None, name, media_class);
+    }
+
+    fn insert_file_in_directory(
+        connection: &Connection,
+        source_file_id: i64,
+        parent_source_directory_id: Option<i64>,
+        name: &str,
+        media_class: &str,
+    ) {
         connection
             .execute(
                 "INSERT INTO source_files (
                      source_file_id,
                      source_id,
+                     parent_source_directory_id,
                      name,
                      relative_path,
                      media_class,
@@ -463,14 +518,19 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 7, ?2, ?2, ?3, 'present', 1, 1, 1, 1, 1)",
-                params![source_file_id, name, media_class],
+                 VALUES (?1, 7, ?2, ?3, ?3, ?4, 'present', 1, 1, 1, 1, 1)",
+                params![
+                    source_file_id,
+                    parent_source_directory_id,
+                    name,
+                    media_class
+                ],
             )
             .expect("insert source file");
     }
 
     #[test]
-    fn file_rows_include_stored_media_class_values() {
+    fn default_browse_file_rows_include_product_visible_media_classes() {
         let connection = test_connection();
         insert_source(&connection, 7);
 
@@ -504,10 +564,133 @@ mod tests {
             vec![
                 ("clip.mp4", Some("video")),
                 ("cover.mp3", Some("image")),
-                ("mystery", Some("none")),
-                ("notes.txt", Some("unsupported")),
                 ("track.flac", Some("audio")),
             ]
         );
+    }
+
+    #[test]
+    fn default_browse_total_rows_excludes_unsupported_and_none_files() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_file(&connection, 11, "track.flac", "audio");
+        insert_file(&connection, 12, "clip.mp4", "video");
+        insert_file(&connection, 13, "cover.jpg", "image");
+        insert_file(&connection, 14, "notes.txt", "unsupported");
+        insert_file(&connection, 15, "mystery", "none");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(window.total_rows, 3);
+        assert_eq!(window.rows.len(), 3);
+    }
+
+    #[test]
+    fn default_browse_paginates_over_product_visible_files_only() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+
+        for index in 0..10 {
+            insert_file(
+                &connection,
+                100 + index,
+                &format!("00-hidden-{index:02}.txt"),
+                "unsupported",
+            );
+        }
+        insert_file(&connection, 11, "visible-a.wav", "audio");
+        insert_file(&connection, 12, "visible-b.mp4", "video");
+        insert_file(&connection, 13, "zz-hidden", "none");
+
+        let first_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            1,
+        )
+        .expect("read first literal hierarchy page")
+        .expect("source window");
+        let second_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            1,
+            1,
+        )
+        .expect("read second literal hierarchy page")
+        .expect("source window");
+
+        assert_eq!(first_window.total_rows, 2);
+        assert_eq!(
+            first_window
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["visible-a.wav"]
+        );
+        assert_eq!(second_window.total_rows, 2);
+        assert_eq!(
+            second_window
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["visible-b.mp4"]
+        );
+    }
+
+    #[test]
+    fn default_browse_directories_remain_visible_when_file_rows_are_hidden() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(&connection, 21, None, "Documents", false, false, "complete");
+        insert_file_in_directory(
+            &connection,
+            31,
+            Some(21),
+            "Documents/readme.txt",
+            "unsupported",
+        );
+
+        let root_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+        )
+        .expect("read literal hierarchy root")
+        .expect("source window");
+        let directory_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(21),
+            0,
+            10,
+        )
+        .expect("read literal hierarchy directory")
+        .expect("directory window");
+
+        assert_eq!(root_window.total_rows, 1);
+        assert_eq!(
+            root_window
+                .rows
+                .iter()
+                .map(|row| (row.node_kind.as_str(), row.display_name.as_str()))
+                .collect::<Vec<_>>(),
+            vec![("directory", "Documents")]
+        );
+        assert_eq!(directory_window.total_rows, 0);
+        assert!(directory_window.rows.is_empty());
     }
 }

@@ -70,7 +70,7 @@ describe('projectState', () => {
     })
   })
 
-  it('filters unwired navigation rows and backend-hidden file rows', () => {
+  it('filters unwired navigation rows', () => {
     const projection = projectTree(
       browserState({
         rows: [
@@ -80,13 +80,13 @@ describe('projectState', () => {
         ],
         sourceChildren: loadedChildren([
           fileNode('11', 'track.wav'),
-          fileNode('99', 'desktop.ini', { mediaClass: 'unsupported' })
+          fileNode('99', 'clip.mp4', { mediaClass: 'video' })
         ])
       })
     )
 
     expect(projection.nodes.map((node) => node.id)).toEqual(['navigation-row:7'])
-    expect(loadedChildIds(projection.nodes[0])).toEqual(['source-file:11'])
+    expect(loadedChildIds(projection.nodes[0])).toEqual(['source-file:11', 'source-file:99'])
     expect(projection.bindingsById.has('navigation-row:100')).toBe(false)
     expect(projection.bindingsById.has('navigation-row:99')).toBe(false)
 
@@ -104,10 +104,8 @@ describe('projectState', () => {
       browserState({
         sourceChildren: loadedChildren([
           fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
-          fileNode('12', 'cover.png', { mediaClass: 'unsupported' }),
           fileNode('13', 'clip.wav', { mediaClass: 'video' }),
-          fileNode('14', 'track.raw', { mediaClass: 'audio' }),
-          fileNode('15', 'mystery.mp3', { mediaClass: 'none' })
+          fileNode('14', 'track.raw', { mediaClass: 'audio' })
         ])
       })
     )
@@ -130,8 +128,29 @@ describe('projectState', () => {
       icon: 'music',
       detail: 'Audio file'
     })
-    expect(projection.bindingsById.has('source-file:12')).toBe(false)
-    expect(projection.bindingsById.has('source-file:15')).toBe(false)
+  })
+
+  it('projects unexpected backend-hidden media classes defensively', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          fileNode('12', 'desktop.ini', { mediaClass: 'unsupported' }),
+          fileNode('15', 'mystery', { mediaClass: 'none' })
+        ])
+      })
+    )
+
+    expect(loadedChildIds(projection.nodes[0])).toEqual(['source-file:12', 'source-file:15'])
+    expect(requiredNode(projection.nodes, 'source-file:12')).toMatchObject({
+      icon: 'file',
+      detail: 'File'
+    })
+    expect(requiredNode(projection.nodes, 'source-file:15')).toMatchObject({
+      icon: 'file',
+      detail: 'File'
+    })
+    expect(projection.bindingsById.get('source-file:12')).toMatchObject({ kind: 'file' })
+    expect(projection.bindingsById.get('source-file:15')).toMatchObject({ kind: 'file' })
   })
 
   it('projects host status instead of stale navigation rows', () => {
