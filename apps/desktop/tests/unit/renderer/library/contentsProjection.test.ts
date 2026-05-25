@@ -16,7 +16,7 @@ import {
   type ContentProjection,
   type ContentRow
 } from '../../../../src/renderer/library/contents/projection'
-import type { ChildRow, EntryPoint } from '../../../../src/shared/libraryHierarchy/readChildren'
+import type { ChildRow, EntryPoint, HierarchyCoverage } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow
@@ -275,6 +275,11 @@ function loadedChildren(
     sourceFileVisibility: 'performance',
     rows,
     totalRows,
+    coverage: {
+      state: 'complete',
+      recursiveScopeComplete: true,
+      emptyResultAuthoritative: rows.length === 0
+    } satisfies HierarchyCoverage,
     ...(nextOffset === undefined ? {} : { nextOffset }),
     limit: 50
   }

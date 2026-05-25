@@ -7,6 +7,7 @@ import {
 import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
 import type {
   ChildRow,
+  HierarchyCoverage,
   ReadErrorCode,
   ReadRequest,
   ReadResult
@@ -547,6 +548,22 @@ function imageHierarchyReadResult(
       coverage: completeCoverage(),
       nodes: [fileNode('11', 'track.wav'), fileNode('12', 'cover.jpg', undefined, 'image')]
     }
+  }
+}
+
+function completeCoverage(): HierarchyCoverage {
+  return {
+    state: 'complete',
+    recursiveScopeComplete: true,
+    emptyResultAuthoritative: false
+  }
+}
+
+function completeEmptyCoverage(): HierarchyCoverage {
+  return {
+    state: 'complete',
+    recursiveScopeComplete: true,
+    emptyResultAuthoritative: true
   }
 }
 

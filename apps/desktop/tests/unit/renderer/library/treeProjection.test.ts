@@ -4,6 +4,7 @@ import type { LibraryBoundaryHostStatus } from '../../../../src/shared/libraryBo
 import type {
   ChildRow,
   EntryPoint,
+  HierarchyCoverage,
   SourceFileVisibility
 } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
@@ -475,6 +476,11 @@ function loadedChildren(
     sourceFileVisibility: options.sourceFileVisibility ?? 'performance',
     rows,
     totalRows,
+    coverage: {
+      state: 'complete',
+      recursiveScopeComplete: true,
+      emptyResultAuthoritative: rows.length === 0
+    } satisfies HierarchyCoverage,
     ...(nextOffset === undefined ? {} : { nextOffset }),
     limit: 50
   }
