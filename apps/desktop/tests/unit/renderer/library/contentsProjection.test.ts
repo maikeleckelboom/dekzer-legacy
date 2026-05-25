@@ -19,7 +19,8 @@ import {
 import type {
   ChildRow,
   EntryPoint,
-  HierarchyCoverage
+  HierarchyCoverage,
+  SourceFileVisibility
 } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
@@ -242,6 +243,216 @@ describe('projectContents', () => {
   })
 })
 
+describe('projectContents performanceAndImages', () => {
+  it('shows image file rows for a loaded image-only directory', () => {
+    const directoryId = '50'
+    const directoryStates = new Map<string, DirectoryState>()
+    directoryStates.set(directoryId, {
+      kind: 'loaded',
+      children: loadedChildren([fileImageNode('img-1', 'Cover.jpg')])
+    })
+
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode(directoryId, 'Covers')])
+      },
+      directoryStates,
+      sourceFileVisibility: 'performanceAndImages'
+    })
+
+    const contents = projectForSelection(state, `source-directory:${directoryId}`)
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Covers')
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'file',
+      label: 'Cover.jpg',
+      mediaClass: 'image',
+      icon: 'image'
+    })
+    expect(contents.detail).toBe('1 visible file loaded.')
+  })
+
+  it('shows audio/video/image rows for a mixed-media loaded directory', () => {
+    const directoryId = '60'
+    const directoryStates = new Map<string, DirectoryState>()
+    directoryStates.set(directoryId, {
+      kind: 'loaded',
+      children: loadedChildren([
+        fileNode('a-1', 'track.flac'),
+        fileVideoNode('v-1', 'clip.mp4'),
+        fileImageNode('i-1', 'artwork.png')
+      ])
+    })
+
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode(directoryId, 'Mixed')])
+      },
+      directoryStates,
+      sourceFileVisibility: 'performanceAndImages'
+    })
+
+    const contents = projectForSelection(state, `source-directory:${directoryId}`)
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Mixed')
+    expect(contents.rows).toHaveLength(3)
+    expect(contents.rows.map((r) => r.mediaClass)).toEqual(['audio', 'video', 'image'])
+    expect(contents.rows.map((r) => r.icon)).toEqual(['music', 'video', 'image'])
+    expect(contents.detail).toBe('3 visible files loaded.')
+  })
+
+  it('shows not-loaded state when directory hierarchy rows are not loaded', () => {
+    const directoryId = '70'
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode(directoryId, 'Pending')])
+      },
+      sourceFileVisibility: 'performanceAndImages'
+    })
+
+    const contents = projectForSelection(state, `source-directory:${directoryId}`)
+
+    expect(contents.kind).toBe('notLoaded')
+    expect(contents.title).toBe('Pending')
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'notLoaded',
+      label: 'Visible files are not loaded yet.'
+    })
+    expect(contents.rows[0]!.action!).toMatchObject({
+      kind: 'loadChildren',
+      nodeId: `source-directory:${directoryId}`,
+      label: 'Load visible files'
+    })
+  })
+
+  it('shows empty state when loaded scope has no visible file children', () => {
+    const directoryId = '80'
+    const directoryStates = new Map<string, DirectoryState>()
+    directoryStates.set(directoryId, {
+      kind: 'loaded',
+      children: loadedChildren([])
+    })
+
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode(directoryId, 'EmptyDir')])
+      },
+      directoryStates,
+      sourceFileVisibility: 'performanceAndImages'
+    })
+
+    const contents = projectForSelection(state, `source-directory:${directoryId}`)
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('EmptyDir')
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No visible files loaded.'
+    })
+    expect(contents.detail).toBe('No visible files loaded.')
+  })
+
+  it('shows visible files for a loaded source in performanceAndImages mode', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([
+          fileNode('a-2', 'song.wav'),
+          fileImageNode('i-2', 'folder.jpg')
+        ])
+      },
+      sourceFileVisibility: 'performanceAndImages'
+    })
+
+    const contents = projectForSelection(state, 'navigation-row:7')
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Source Fixture')
+    expect(contents.rows).toHaveLength(2)
+    expect(contents.rows[0]).toMatchObject({ label: 'song.wav', mediaClass: 'audio' })
+    expect(contents.rows[1]).toMatchObject({ label: 'folder.jpg', mediaClass: 'image' })
+    expect(contents.detail).toBe('2 visible files loaded.')
+  })
+
+  it('shows loading state when directory hierarchy is loading', () => {
+    const directoryId = '90'
+    const directoryStates = new Map<string, DirectoryState>()
+    directoryStates.set(directoryId, {
+      kind: 'loading',
+      requestKey: 'dir-90',
+      sequence: 1,
+      detail: 'Loading children.'
+    })
+
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode(directoryId, 'LoadingDir')])
+      },
+      directoryStates,
+      sourceFileVisibility: 'performanceAndImages'
+    })
+
+    const contents = projectForSelection(state, `source-directory:${directoryId}`)
+
+    expect(contents.kind).toBe('loading')
+    expect(contents.title).toBe('LoadingDir')
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'loading',
+      label: 'Loading visible files.'
+    })
+  })
+
+  it('still reports no primary media for image-only folder in performance mode', () => {
+    const directoryId = '95'
+    const directoryStates = new Map<string, DirectoryState>()
+    directoryStates.set(directoryId, {
+      kind: 'loaded',
+      children: loadedChildren([fileImageNode('img-2', 'photo.jpg')])
+    })
+
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([
+          directoryNode(directoryId, 'Covers', undefined, {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
+            directoryScanState: 'complete'
+          })
+        ])
+      },
+      directoryStates,
+      sourceFileVisibility: 'performance'
+    })
+
+    const contents = projectForSelection(
+      state,
+      `source-directory:${directoryId}`,
+      readySelectedContents({ rows: [], state: 'empty' })
+    )
+
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No primary media found'
+    })
+  })
+})
+
 function projectForSelection(
   state: BrowserState,
   selectedNodeId: string,
@@ -272,6 +483,7 @@ function browserState(options: {
   readonly navigationReadResult?: NavigationReadRowsResult
   readonly sourceState?: SourceState
   readonly directoryStates?: ReadonlyMap<string, DirectoryState>
+  readonly sourceFileVisibility?: SourceFileVisibility
 }): BrowserState {
   const sourceStates = new Map<string, SourceState>()
 
@@ -286,7 +498,7 @@ function browserState(options: {
     },
     sourceReadStates: sourceStates,
     directoryReadStates: options.directoryStates ?? new Map(),
-    sourceFileVisibility: 'performance'
+    sourceFileVisibility: options.sourceFileVisibility ?? 'performance'
   }
 }
 
@@ -392,6 +604,38 @@ function fileNode(
     mediaClass: 'audio',
     presence: 'present',
     updatedAtMs
+  }
+}
+
+function fileImageNode(
+  fileId: string,
+  label: string
+): Extract<ChildRow, { readonly kind: 'file' }> {
+  return {
+    id: `source-file:${fileId}`,
+    kind: 'file',
+    label,
+    sourceId: '7',
+    fileId,
+    mediaClass: 'image',
+    presence: 'present',
+    updatedAtMs: 100
+  }
+}
+
+function fileVideoNode(
+  fileId: string,
+  label: string
+): Extract<ChildRow, { readonly kind: 'file' }> {
+  return {
+    id: `source-file:${fileId}`,
+    kind: 'file',
+    label,
+    sourceId: '7',
+    fileId,
+    mediaClass: 'video',
+    presence: 'present',
+    updatedAtMs: 100
   }
 }
 

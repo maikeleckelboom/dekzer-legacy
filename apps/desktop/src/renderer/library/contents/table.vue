@@ -4,6 +4,7 @@ import {
   FolderIcon,
   FolderOpenIcon,
   Icon,
+  ImageIcon,
   ListMusicIcon,
   LoadingIcon,
   MoreIcon,
@@ -47,6 +48,7 @@ function formatContentDetail(row: ContentRow): string {
     if (row.detail !== undefined) return row.detail
     if (row.mediaClass === 'audio') return 'Audio'
     if (row.mediaClass === 'video') return 'Video'
+    if (row.mediaClass === 'image') return 'Image'
     const icon = row.icon
     switch (icon) {
       case 'music':
@@ -75,6 +77,8 @@ function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconComponent 
       return MusicIcon
     case 'video':
       return VideoIcon
+    case 'image':
+      return ImageIcon
     case 'cueSheet':
       return FileTextIcon
     case 'playlist':
@@ -110,6 +114,7 @@ function iconToneForRow(row: ContentRow): IconTone {
   switch (icon) {
     case 'music':
     case 'video':
+    case 'image':
       return 'primary'
     case 'cueSheet':
     case 'playlist':
@@ -133,6 +138,7 @@ function labelClassForRow(row: ContentRow): string {
   switch (icon) {
     case 'music':
     case 'video':
+    case 'image':
       return 'text-(--color-text)'
     case 'cueSheet':
     case 'playlist':
