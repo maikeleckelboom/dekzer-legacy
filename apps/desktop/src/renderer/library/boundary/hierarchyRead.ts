@@ -233,34 +233,38 @@ export function createLibraryHierarchyReadController(
   async function replayVisibilityIntent(
     intent: VisibilityReplayIntent,
     replaySequence: number
-  ): Promise<boolean> {
-    let madeProgress = false
+  ): Promise<void> {
+    let loadedAnyReplayTarget = false
 
     for (const [nodeId, target] of intent.sourceTargets) {
       if (replaySequence !== visibilityReplaySequence) {
-        return madeProgress
+        return
       }
 
-      await readSource(nodeId, target)
-      madeProgress = true
+      const loaded = await readSource(nodeId, target)
+      if (loaded) {
+        loadedAnyReplayTarget = true
+      }
     }
 
     for (const [nodeId, directoryTarget] of intent.directoryTargets) {
       if (replaySequence !== visibilityReplaySequence) {
-        return madeProgress
+        return
       }
 
       const projection = browserProjection.value
 
       if (projection?.kind !== 'tree') {
-        return madeProgress
+        return
       }
 
       const directoryBinding = projection.bindingsById.get(nodeId)
 
       if (directoryBinding?.kind === 'directory') {
-        await readDirectory(directoryTarget)
-        madeProgress = true
+        const loaded = await readDirectory(directoryTarget)
+        if (loaded) {
+          loadedAnyReplayTarget = true
+        }
         continue
       }
 
@@ -273,7 +277,10 @@ export function createLibraryHierarchyReadController(
         continue
       }
 
-      await readSource(owningSource.nodeId, owningSource.target)
+      const sourceLoaded = await readSource(owningSource.nodeId, owningSource.target)
+      if (sourceLoaded) {
+        loadedAnyReplayTarget = true
+      }
 
       const retryProjection = browserProjection.value
 
@@ -281,17 +288,17 @@ export function createLibraryHierarchyReadController(
         const retryBinding = retryProjection.bindingsById.get(nodeId)
 
         if (retryBinding?.kind === 'directory') {
-          await readDirectory(directoryTarget)
-          madeProgress = true
+          const loaded = await readDirectory(directoryTarget)
+          if (loaded) {
+            loadedAnyReplayTarget = true
+          }
         }
       }
     }
 
-    if (!madeProgress) {
+    if (!loadedAnyReplayTarget) {
       await loadFirstSource()
     }
-
-    return madeProgress
   }
 
   function findSourceByEntryPoint(
