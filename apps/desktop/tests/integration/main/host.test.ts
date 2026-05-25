@@ -250,6 +250,74 @@ describe('library boundary host', () => {
     expect(registration.channel).toBe(hostStatusChannels.getStatus)
     expect(registration.handler?.().state).toBe('idle')
   })
+
+  it('classifies schema mismatch startup failures with a clearer message', async () => {
+    const config = hostConfig()
+    const schemaMismatchHost = new LibraryBoundaryHost(config, silentLogger(), {
+      createTransport: () => {
+        const ready = deferred<void>()
+        ready.reject(
+          new Error(
+            'database schema state is malformed: database schema does not match the canonical substrate baseline: table source_directories column count mismatch: canonical=17 live=16'
+          )
+        )
+        return {
+          ready: ready.promise,
+          close: async () => undefined,
+          execute: async () => {
+            throw new Error('execute should not be called by schema mismatch tests')
+          }
+        } satisfies LibraryBoundaryHostTransport
+      },
+      createClient: () => createFakeClient()
+    })
+
+    const controller = new LibraryBoundaryHostStatusController(
+      schemaMismatchHost,
+      silentStatusLogger()
+    )
+
+    await controller.start()
+
+    expect(controller.getStatus()).toMatchObject({
+      state: 'failed',
+      lastError: {
+        code: 'stdioTransportStartupFailure',
+        message: 'The development library database is incompatible with the current schema.'
+      }
+    })
+    expect(controller.getStatus().lastError?.detail).toContain('schema')
+  })
+
+  it('does not reclassify unrelated stdio startup failures', async () => {
+    const config = hostConfig()
+    const unrelatedHost = new LibraryBoundaryHost(config, silentLogger(), {
+      createTransport: () => {
+        const ready = deferred<void>()
+        ready.reject(new Error('process exited unexpectedly with code 1'))
+        return {
+          ready: ready.promise,
+          close: async () => undefined,
+          execute: async () => {
+            throw new Error('execute should not be called by unrelated failure tests')
+          }
+        } satisfies LibraryBoundaryHostTransport
+      },
+      createClient: () => createFakeClient()
+    })
+
+    const controller = new LibraryBoundaryHostStatusController(unrelatedHost, silentStatusLogger())
+
+    await controller.start()
+
+    expect(controller.getStatus()).toMatchObject({
+      state: 'failed',
+      lastError: {
+        code: 'stdioTransportStartupFailure',
+        message: 'Failed to start the library boundary stdio transport.'
+      }
+    })
+  })
 })
 
 function hostConfig(): LibraryBoundaryHostConfig {

@@ -144,9 +144,13 @@ function projectBinaryPolicy(
 function createLibraryBoundaryHostStatusError(error: unknown): LibraryBoundaryHostStatusError {
   if (error instanceof LibraryBoundaryHostError) {
     const detail = extractHostErrorCauseDetail(error)
+    const message =
+      error.code === 'stdioTransportStartupFailure' && isSchemaMismatchDetail(detail)
+        ? 'The development library database is incompatible with the current schema.'
+        : statusMessageForHostError(error.code)
     return {
       code: error.code,
-      message: statusMessageForHostError(error.code),
+      message,
       ...(detail === undefined ? {} : { detail })
     }
   }
@@ -181,6 +185,19 @@ function truncateFirstLine(text: string): string | undefined {
   }
 
   return firstLine.length <= 200 ? firstLine : `${firstLine.slice(0, 197)}...`
+}
+
+function isSchemaMismatchDetail(detail: string | undefined): boolean {
+  if (detail === undefined) {
+    return false
+  }
+
+  const lower = detail.toLowerCase()
+  return (
+    (lower.includes('schema') && lower.includes('malformed')) ||
+    (lower.includes('schema') && lower.includes('does not match')) ||
+    (lower.includes('schema') && lower.includes('incompatible'))
+  )
 }
 
 function statusMessageForHostError(code: LibraryBoundaryHostErrorCode): string {

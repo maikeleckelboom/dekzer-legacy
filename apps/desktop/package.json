@@ -24,7 +24,7 @@
     "storage:reset": "tsx tooling/storage.mts reset",
     "storage:doctor": "tsx tooling/storage.mts doctor",
     "start:built": "electron-vite preview --ignoreConfigWarning",
-    "dev": "electron-vite dev --ignoreConfigWarning",
+    "dev": "tsx tooling/dev.mts",
     "dev:fresh": "pnpm run storage:reset -- --confirm-delete && pnpm run dev",
     "build": "pnpm run clean && pnpm run typecheck && electron-vite build --ignoreConfigWarning",
     "postinstall": "electron-builder install-app-deps",

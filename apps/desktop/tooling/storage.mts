@@ -27,8 +27,10 @@ type StorageEnvironmentStatus = {
   schema?: StorageSchemaStatus
 }
 
-type StorageSchemaStatus = {
-  state: 'missing' | 'compatible' | 'incompatible' | 'unreadable'
+export type StorageSchemaState = 'missing' | 'compatible' | 'incompatible' | 'unreadable'
+
+export type StorageSchemaStatus = {
+  state: StorageSchemaState
   detail?: string
 }
 
@@ -372,6 +374,36 @@ function resetCommand(parsed: ParsedStorageArgs): string {
   }
 
   return `${base} --confirm-delete`
+}
+
+export type DevelopmentStorageCheck = {
+  readonly schema: StorageSchemaStatus
+  readonly storageRootPath: string
+  readonly userDataPath: string
+  readonly userDataSource: 'environmentOverride' | 'developmentDefault'
+}
+
+export async function checkDevelopmentStorage(
+  userDataPath: string,
+  userDataSource: 'environmentOverride' | 'developmentDefault'
+): Promise<DevelopmentStorageCheck> {
+  const parsed: ParsedStorageArgs = {
+    subcommand: 'status',
+    userDataPath,
+    userDataSource,
+    confirmDelete: false
+  }
+  const envelope = await readCargoStorageStatus(parsed)
+  const schema = envelope.development.schema
+  if (schema === undefined) {
+    throw new Error('storage status did not include development schema compatibility')
+  }
+  return {
+    schema,
+    storageRootPath: envelope.development.storageRootPath,
+    userDataPath,
+    userDataSource
+  }
 }
 
 async function main(): Promise<void> {
