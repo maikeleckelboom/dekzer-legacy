@@ -11,15 +11,12 @@ import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
 import { registerUnregisterLocalRootIpc } from './libraryRoots/unregisterLocalRoot'
 import { registerLibraryViewStateIpc } from './libraryViewState/viewState'
-import {
-  LibraryBoundaryHostStatusController,
-  registerLibraryBoundaryHostStatusIpc
-} from './libraryBoundary/status'
+import { HostStatusController, registerHostStatusIpc } from './libraryBoundary/status'
 import { hostStatusChannels } from '../shared/libraryBoundary/status'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
-let libraryBoundaryHostStatusController: LibraryBoundaryHostStatusController | undefined
+let hostStatusController: HostStatusController | undefined
 let isQuittingAfterLibraryBoundaryHostStop = false
 
 function createWindow(): void {
@@ -62,8 +59,8 @@ app.whenReady().then(() => {
     app,
     isDev: is.dev
   })
-  libraryBoundaryHostStatusController = new LibraryBoundaryHostStatusController(host)
-  registerLibraryBoundaryHostStatusIpc(ipcMain, libraryBoundaryHostStatusController)
+  hostStatusController = new HostStatusController(host)
+  registerHostStatusIpc(ipcMain, hostStatusController)
   registerReadNavigationRowsIpc(ipcMain, host)
   registerReadChildrenIpc(ipcMain, host)
   registerSelectedContentsReadIpc(ipcMain, host)
@@ -75,7 +72,7 @@ app.whenReady().then(() => {
   registerReadLocalRootsIpc(ipcMain, host)
   registerUnregisterLocalRootIpc(ipcMain, host)
   registerLibraryViewStateIpc(ipcMain, host)
-  libraryBoundaryHostStatusController.onStatusChanged((status) => {
+  hostStatusController.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(hostStatusChannels.statusChanged, status)
     }
@@ -88,7 +85,7 @@ app.whenReady().then(() => {
   })
 
   createWindow()
-  void libraryBoundaryHostStatusController.start()
+  void hostStatusController.start()
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -114,14 +111,14 @@ app.on('window-all-closed', () => {
 app.on('before-quit', (event) => {
   if (
     isQuittingAfterLibraryBoundaryHostStop ||
-    libraryBoundaryHostStatusController === undefined ||
-    !libraryBoundaryHostStatusController.hasStarted
+    hostStatusController === undefined ||
+    !hostStatusController.hasStarted
   ) {
     return
   }
 
   event.preventDefault()
-  void libraryBoundaryHostStatusController
+  void hostStatusController
     .stop()
     .catch((error: unknown) => {
       console.error('[library-boundary-host] failed to stop cleanly', error)

@@ -14,24 +14,24 @@ import {
   type LibraryBoundaryHostErrorCode
 } from './errors'
 
-export type LibraryBoundaryHostStatusLogger = {
+export type HostStatusLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
 }
 
-export type LibraryBoundaryHostStatusIpcMain = {
+export type HostStatusIpcMain = {
   handle(
     channel: string,
     listener: (event: unknown, ...args: readonly unknown[]) => LibraryBoundaryHostStatus
   ): void
 }
 
-export class LibraryBoundaryHostStatusController {
+export class HostStatusController {
   readonly #host: LibraryBoundaryHost
   readonly #listeners = new Set<LibraryBoundaryHostStatusChangedCallback>()
-  readonly #logger: LibraryBoundaryHostStatusLogger
+  readonly #logger: HostStatusLogger
   #lastError: LibraryBoundaryHostStatusError | undefined
 
-  constructor(host: LibraryBoundaryHost, logger: LibraryBoundaryHostStatusLogger = console) {
+  constructor(host: LibraryBoundaryHost, logger: HostStatusLogger = console) {
     this.#host = host
     this.#logger = logger
   }
@@ -41,7 +41,7 @@ export class LibraryBoundaryHostStatusController {
   }
 
   getStatus(): LibraryBoundaryHostStatus {
-    return createLibraryBoundaryHostStatus(this.#host, this.#lastError)
+    return projectHostStatus(this.#host, this.#lastError)
   }
 
   onStatusChanged(callback: LibraryBoundaryHostStatusChangedCallback): () => void {
@@ -99,14 +99,14 @@ export class LibraryBoundaryHostStatusController {
   }
 }
 
-export function registerLibraryBoundaryHostStatusIpc(
-  ipcMain: LibraryBoundaryHostStatusIpcMain,
-  controller: LibraryBoundaryHostStatusController
+export function registerHostStatusIpc(
+  ipcMain: HostStatusIpcMain,
+  controller: HostStatusController
 ): void {
   ipcMain.handle(hostStatusChannels.getStatus, () => controller.getStatus())
 }
 
-export function createLibraryBoundaryHostStatus(
+export function projectHostStatus(
   host: LibraryBoundaryHost,
   lastError?: LibraryBoundaryHostStatusError
 ): LibraryBoundaryHostStatus {

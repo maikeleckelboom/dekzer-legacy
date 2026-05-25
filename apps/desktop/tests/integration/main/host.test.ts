@@ -20,9 +20,9 @@ import {
   type LibraryBoundaryHostTransportOptions
 } from '../../../src/main/libraryBoundary/host'
 import {
-  createLibraryBoundaryHostStatus,
-  LibraryBoundaryHostStatusController,
-  registerLibraryBoundaryHostStatusIpc
+  projectHostStatus,
+  HostStatusController,
+  registerHostStatusIpc
 } from '../../../src/main/libraryBoundary/status'
 import { hostStatusChannels } from '../../../src/shared/libraryBoundary/status'
 import {
@@ -189,7 +189,7 @@ describe('library boundary host', () => {
         }) satisfies LibraryBoundaryHostTransport,
       createClient: () => createFakeClient()
     })
-    const controller = new LibraryBoundaryHostStatusController(host, silentStatusLogger())
+    const controller = new HostStatusController(host, silentStatusLogger())
     const publishedStates: string[] = []
     const unsubscribe = controller.onStatusChanged((status) => {
       publishedStates.push(status.state)
@@ -214,10 +214,7 @@ describe('library boundary host', () => {
         )
       }
     })
-    const failingController = new LibraryBoundaryHostStatusController(
-      failingHost,
-      silentStatusLogger()
-    )
+    const failingController = new HostStatusController(failingHost, silentStatusLogger())
 
     await failingController.start()
 
@@ -233,13 +230,13 @@ describe('library boundary host', () => {
 
   it('registers host status IPC on the status channel', () => {
     const host = new LibraryBoundaryHost(hostConfig(), silentLogger())
-    const controller = new LibraryBoundaryHostStatusController(host, silentStatusLogger())
+    const controller = new HostStatusController(host, silentStatusLogger())
     const registration: {
       channel?: string
-      handler?: () => ReturnType<typeof createLibraryBoundaryHostStatus>
+      handler?: () => ReturnType<typeof projectHostStatus>
     } = {}
 
-    registerLibraryBoundaryHostStatusIpc(
+    registerHostStatusIpc(
       {
         handle(channel, listener): void {
           registration.channel = channel
@@ -273,10 +270,7 @@ describe('library boundary host', () => {
       createClient: () => createFakeClient()
     })
 
-    const controller = new LibraryBoundaryHostStatusController(
-      schemaMismatchHost,
-      silentStatusLogger()
-    )
+    const controller = new HostStatusController(schemaMismatchHost, silentStatusLogger())
 
     await controller.start()
 
@@ -307,7 +301,7 @@ describe('library boundary host', () => {
       createClient: () => createFakeClient()
     })
 
-    const controller = new LibraryBoundaryHostStatusController(unrelatedHost, silentStatusLogger())
+    const controller = new HostStatusController(unrelatedHost, silentStatusLogger())
 
     await controller.start()
 
@@ -338,7 +332,7 @@ describe('library boundary host', () => {
       createClient: () => createFakeClient()
     })
 
-    const controller = new LibraryBoundaryHostStatusController(unrelatedHost, silentStatusLogger())
+    const controller = new HostStatusController(unrelatedHost, silentStatusLogger())
 
     await controller.start()
 
@@ -412,10 +406,7 @@ describe('library boundary host', () => {
       createClient: () => createFakeClient()
     })
 
-    const controller = new LibraryBoundaryHostStatusController(
-      schemaMismatchHost,
-      silentStatusLogger()
-    )
+    const controller = new HostStatusController(schemaMismatchHost, silentStatusLogger())
 
     await controller.start()
 
