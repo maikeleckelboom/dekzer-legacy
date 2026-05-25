@@ -337,10 +337,9 @@ impl SqliteDurableStore {
 
     fn read_root_scan_path(&self, root_id: i64) -> LibrarySqliteResult<PathBuf> {
         let connection = self.open_read_connection()?;
-        let Some((root_path, access_state)) = connection
+        let Some(root_path) = connection
             .query_row(
-                "SELECT COALESCE(ss.effective_path, sl.absolute_path) AS root_path,
-                        ss.access_state
+                "SELECT COALESCE(ss.effective_path, sl.absolute_path) AS root_path
                  FROM sources s
                  JOIN source_locators sl
                    ON sl.source_id = s.source_id
@@ -348,24 +347,17 @@ impl SqliteDurableStore {
                    ON ss.source_id = s.source_id
                  WHERE s.source_id = ?1",
                 [root_id],
-                |row| Ok((row.get::<_, Option<String>>(0)?, row.get::<_, String>(1)?)),
+                |row| row.get::<_, Option<String>>(0),
             )
             .optional()?
         else {
             return Err(LibrarySqliteError::MissingRoot(root_id));
         };
 
-        if access_state != "accessible" {
-            return Err(LibrarySqliteError::Canonical(CanonicalError::new(
-                CanonicalErrorCode::NotFound,
-                format!("root {root_id} is not accessible for scan: access_state={access_state}"),
-            )));
-        }
-
         let Some(root_path) = root_path else {
             return Err(LibrarySqliteError::Canonical(CanonicalError::new(
                 CanonicalErrorCode::NotFound,
-                format!("root {root_id} has no effective path for scan"),
+                format!("root {root_id} has no candidate path for scan"),
             )));
         };
 

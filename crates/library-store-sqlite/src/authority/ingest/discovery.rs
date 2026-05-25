@@ -371,8 +371,15 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
     ) -> LibrarySqliteResult<DiscoveryFinalizeResult> {
         self.require_root(root_id)?;
         let now_ms = unix_time_ms()?;
-        self.mark_missing_directories(root_id, observed_directory_paths, now_ms)?;
-        let missing_file_ids = self.mark_missing_files(root_id, observed_file_paths, now_ms)?;
+        let unproven_prefixes = self.load_unproven_directory_prefixes(root_id)?;
+        self.mark_missing_directories(
+            root_id,
+            observed_directory_paths,
+            &unproven_prefixes,
+            now_ms,
+        )?;
+        let missing_file_ids =
+            self.mark_missing_files(root_id, observed_file_paths, &unproven_prefixes, now_ms)?;
         self.reconcile_directory_coverage_facts(root_id, now_ms)?;
 
         let state_rows_changed = self.tx().execute(
@@ -743,6 +750,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         &self,
         root_id: i64,
         observed_directory_paths: &[String],
+        unproven_prefixes: &[String],
         now_ms: i64,
     ) -> LibrarySqliteResult<()> {
         let observed_directory_paths = observed_directory_paths
@@ -768,6 +776,9 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             if observed_directory_paths.contains(&relative_path) {
                 continue;
             }
+            if is_inside_unproven_subtree(&relative_path, unproven_prefixes) {
+                continue;
+            }
             self.tx().execute(
                 "UPDATE source_directories
                  SET presence_state = 'missing',
@@ -788,6 +799,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         &self,
         root_id: i64,
         observed_file_paths: &[String],
+        unproven_prefixes: &[String],
         now_ms: i64,
     ) -> LibrarySqliteResult<Vec<i64>> {
         let observed_file_paths = observed_file_paths.iter().cloned().collect::<HashSet<_>>();
@@ -817,6 +829,9 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             if observed_file_paths.contains(&row.relative_path) {
                 continue;
             }
+            if is_inside_unproven_subtree(&row.relative_path, unproven_prefixes) {
+                continue;
+            }
 
             self.tx().execute(
                 "UPDATE source_files
@@ -831,6 +846,20 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         }
 
         Ok(missing_file_ids)
+    }
+
+    fn load_unproven_directory_prefixes(&self, root_id: i64) -> LibrarySqliteResult<Vec<String>> {
+        let mut stmt = self.tx().prepare(
+            "SELECT relative_path
+             FROM source_directories
+             WHERE source_id = ?1
+               AND presence_state = 'present'
+               AND dir_scan_state IN ('blocked', 'failed')",
+        )?;
+        let rows = stmt
+            .query_map([root_id], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
     }
 
     fn queue_rebind_work_if_needed(
@@ -968,7 +997,16 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  updated_at = ?2
              WHERE source_id = ?1
                AND presence_state = 'present'
-               AND dir_scan_state IN ('pending', 'scanning', 'complete')",
+               AND dir_scan_state IN ('pending', 'scanning', 'complete')
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM source_directories blocked_ancestor
+                   WHERE blocked_ancestor.source_id = source_directories.source_id
+                     AND blocked_ancestor.presence_state = 'present'
+                     AND blocked_ancestor.dir_scan_state IN ('blocked', 'failed')
+                     AND source_directories.relative_path COLLATE BINARY >= blocked_ancestor.relative_path || '/'
+                     AND source_directories.relative_path COLLATE BINARY < blocked_ancestor.relative_path || char(48)
+               )",
             params![root_id, completed_at_ms],
         )?;
 
@@ -1125,6 +1163,17 @@ fn observation_basis_fingerprint(
     )
 }
 
+fn is_inside_unproven_subtree(relative_path: &str, unproven_prefixes: &[String]) -> bool {
+    unproven_prefixes.iter().any(|prefix| {
+        if relative_path == prefix.as_str() {
+            return true;
+        }
+        relative_path.len() > prefix.len()
+            && relative_path.as_bytes()[prefix.len()] == b'/'
+            && relative_path.starts_with(prefix.as_str())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::authority::ingest::{
@@ -1141,6 +1190,7 @@ mod tests {
     use library_domain::{
         SourceAccessIssueKind, SourceAccessState, SourcePresenceState, SourceScanPhase,
     };
+    use rusqlite::OptionalExtension;
 
     fn setup_source_with_directory(connection: &mut rusqlite::Connection) -> (i64, i64) {
         let source_id = admit_write(connection, |write| {
@@ -1739,6 +1789,319 @@ mod tests {
         assert!(
             read_directory_facts(&connection, "albums").has_child_directories,
             "observing albums/1998 must mark albums as having immediate child directories"
+        );
+    }
+
+    #[test]
+    fn blocked_subtree_does_not_mark_descendant_files_missing() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            let locked_dir_id = SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(60),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "Locked".to_string(),
+                    relative_path: "Music/Locked".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
+                    scanned_at: None,
+                    mtime_ns: None,
+                    first_created_at: Some(20),
+                    changed_at: 20,
+                })
+                .expect("upsert locked directory");
+            SourceFilesAuthorityTx::new(write)
+                .record_source_file_observation(&RecordSourceFileObservationInput {
+                    source_file_id: None,
+                    source_id,
+                    parent_source_directory_id: Some(locked_dir_id),
+                    name: "track.flac".to_string(),
+                    relative_path: "Music/Locked/track.flac".to_string(),
+                    size_bytes: Some(1000),
+                    mtime_ns: Some(500),
+                    presence_state: SourcePresenceState::Present,
+                    first_discovered_at: Some(20),
+                    observed_at: Some(20),
+                    presence_changed_at: 20,
+                    updated_at: 20,
+                })
+                .expect("record track file");
+            Ok(())
+        })
+        .expect("write locked directory and file");
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "Music/Locked".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                        diagnostic_detail: Some("permission denied".to_string()),
+                        observed_at_ms: 30,
+                    },
+                )
+                .expect("commit blocked outcome");
+            Ok(())
+        })
+        .expect("write blocked outcome");
+
+        run_coverage_finalization(&mut connection, source_id, &["Music".to_string()], &[]);
+
+        let locked_facts = read_directory_facts(&connection, "Music/Locked");
+        assert_eq!(locked_facts.dir_scan_state, "blocked");
+
+        let file_presence: String = connection
+            .query_row(
+                "SELECT presence_state FROM source_files WHERE relative_path = 'Music/Locked/track.flac'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read file presence");
+        assert_eq!(
+            file_presence, "present",
+            "file under blocked directory must not be marked missing"
+        );
+    }
+
+    #[test]
+    fn blocked_subtree_does_not_mark_descendant_directories_missing() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(70),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "Locked".to_string(),
+                    relative_path: "Music/Locked".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
+                    scanned_at: None,
+                    mtime_ns: None,
+                    first_created_at: Some(20),
+                    changed_at: 20,
+                })
+                .expect("upsert locked directory");
+            SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(71),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "Subfolder".to_string(),
+                    relative_path: "Music/Locked/Subfolder".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
+                    scanned_at: None,
+                    mtime_ns: None,
+                    first_created_at: Some(20),
+                    changed_at: 20,
+                })
+                .expect("upsert subfolder directory");
+            Ok(())
+        })
+        .expect("write directories");
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "Music/Locked".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                        diagnostic_detail: Some("permission denied".to_string()),
+                        observed_at_ms: 30,
+                    },
+                )
+                .expect("commit blocked outcome");
+            Ok(())
+        })
+        .expect("write blocked outcome");
+
+        run_coverage_finalization(&mut connection, source_id, &["Music".to_string()], &[]);
+
+        let locked_facts = read_directory_facts(&connection, "Music/Locked");
+        assert_eq!(locked_facts.dir_scan_state, "blocked");
+
+        let subfolder_presence: String = connection
+            .query_row(
+                "SELECT presence_state FROM source_directories WHERE relative_path = 'Music/Locked/Subfolder'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read subfolder presence");
+        assert_eq!(
+            subfolder_presence, "present",
+            "directory under blocked ancestor must not be marked missing"
+        );
+
+        let subfolder_facts = read_directory_facts(&connection, "Music/Locked/Subfolder");
+        assert_ne!(
+            subfolder_facts.dir_scan_state, "complete",
+            "unobserved directory under blocked subtree must not be finalized as complete"
+        );
+    }
+
+    #[test]
+    fn explicit_missing_outcome_still_marks_missing() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            SourceDirectoriesAuthorityTx::new(write)
+                .upsert_source_directory(&UpsertSourceDirectoryInput {
+                    source_directory_id: Some(80),
+                    source_id,
+                    parent_source_directory_id: None,
+                    name: "Album".to_string(),
+                    relative_path: "Music/Album".to_string(),
+                    presence_state: SourcePresenceState::Present,
+                    dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
+                    scanned_at: None,
+                    mtime_ns: None,
+                    first_created_at: Some(20),
+                    changed_at: 20,
+                })
+                .expect("upsert album directory");
+            Ok(())
+        })
+        .expect("write album directory");
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "Music/Album".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Missing,
+                        issue_kind: Some(SourceAccessIssueKind::Missing),
+                        diagnostic_detail: Some("directory not found".to_string()),
+                        observed_at_ms: 30,
+                    },
+                )
+                .expect("commit missing outcome");
+            Ok(())
+        })
+        .expect("write missing outcome");
+
+        run_coverage_finalization(&mut connection, source_id, &["Music".to_string()], &[]);
+
+        let album_presence: String = connection
+            .query_row(
+                "SELECT presence_state FROM source_directories WHERE relative_path = 'Music/Album'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read album presence");
+        assert_eq!(
+            album_presence, "missing",
+            "explicit missing outcome must mark directory as missing"
+        );
+    }
+
+    #[test]
+    fn previously_blocked_source_candidate_path_is_available() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+
+        let source_id: i64 = admit_write(&mut connection, |write| {
+            let source_id = SourcesAuthorityTx::new(write)
+                .upsert_source(&crate::authority::sources::UpsertSourceInput {
+                    source_id: Some(100),
+                    source_class: "internal".to_string(),
+                    authority: "system".to_string(),
+                    identity_kind: "filesystem_uuid".to_string(),
+                    identity_value: "reprobe-test".to_string(),
+                    display_name: "Reprobe Test".to_string(),
+                    medium_label: None,
+                    is_user_visible: true,
+                    browser_order_ordinal: Some(0),
+                    changed_at: 10,
+                })
+                .expect("upsert source");
+            SourceLocatorsAuthorityTx::new(write)
+                .upsert_source_locator(&UpsertSourceLocatorInput {
+                    source_id,
+                    locator: crate::authority::sources::SourceLocatorInput::AbsolutePath {
+                        absolute_path: "/test/reprobe".to_string(),
+                    },
+                })
+                .expect("upsert source locator");
+            SourceStateAuthorityTx::new(write)
+                .upsert_source_state(&UpsertSourceStateInput {
+                    source_id,
+                    mount_status: "mounted".to_string(),
+                    mount_epoch: 0,
+                    access_state: SourceAccessState::Blocked,
+                    access_issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                    access_error_detail: Some("permission denied".to_string()),
+                    access_checked_at: Some(10),
+                    mount_root: None,
+                    effective_path: Some("/test/reprobe".to_string()),
+                    observed_volume_label: None,
+                    filesystem_type: None,
+                    last_seen_at: None,
+                    updated_at: 10,
+                })
+                .expect("upsert blocked source state");
+            SourceStateAuthorityTx::new(write)
+                .upsert_source_scan_state(&UpsertSourceScanStateInput {
+                    source_id,
+                    scan_phase: SourceScanPhase::Blocked,
+                    last_scan_started_at: None,
+                    last_scan_finished_at: None,
+                    last_successful_scan_at: None,
+                    scan_issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                    error_detail: None,
+                    updated_at: 10,
+                })
+                .expect("upsert scan state");
+            Ok(source_id)
+        })
+        .expect("write blocked source");
+
+        let candidate_path: Option<String> = connection
+            .query_row(
+                "SELECT COALESCE(ss.effective_path, sl.absolute_path) AS root_path
+                 FROM sources s
+                 JOIN source_locators sl
+                   ON sl.source_id = s.source_id
+                 JOIN source_state ss
+                   ON ss.source_id = s.source_id
+                 WHERE s.source_id = ?1",
+                [source_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .expect("query candidate path")
+            .flatten();
+
+        assert_eq!(
+            candidate_path,
+            Some("/test/reprobe".to_string()),
+            "blocked source must still yield a candidate path for fresh re-probe"
         );
     }
 }
