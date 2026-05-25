@@ -16,7 +16,11 @@ import {
   type ContentProjection,
   type ContentRow
 } from '../../../../src/renderer/library/contents/projection'
-import type { ChildRow, EntryPoint, HierarchyCoverage } from '../../../../src/shared/libraryHierarchy/readChildren'
+import type {
+  ChildRow,
+  EntryPoint,
+  HierarchyCoverage
+} from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow

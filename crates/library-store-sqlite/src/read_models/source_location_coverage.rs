@@ -220,17 +220,22 @@ mod tests {
             .expect("set source scan phase");
     }
 
-    fn insert_directory(
-        connection: &Connection,
+    struct DirectoryFixture {
         source_directory_id: i64,
         source_id: i64,
         parent_source_directory_id: Option<i64>,
-        relative_path: &str,
-        presence_state: &str,
-        dir_scan_state: &str,
-        dir_scan_issue_kind: Option<&str>,
-    ) {
-        let name = relative_path.rsplit('/').next().unwrap_or(relative_path);
+        relative_path: String,
+        presence_state: String,
+        dir_scan_state: String,
+        dir_scan_issue_kind: Option<String>,
+    }
+
+    fn insert_directory(connection: &Connection, fix: &DirectoryFixture) {
+        let name = fix
+            .relative_path
+            .rsplit('/')
+            .next()
+            .unwrap_or(&fix.relative_path);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -251,14 +256,14 @@ mod tests {
                  )
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0, 0, ?7, ?8, 1, 1, 1)",
                 rusqlite::params![
-                    source_directory_id,
-                    source_id,
-                    parent_source_directory_id,
+                    fix.source_directory_id,
+                    fix.source_id,
+                    fix.parent_source_directory_id,
                     name,
-                    relative_path,
-                    presence_state,
-                    dir_scan_state,
-                    dir_scan_issue_kind,
+                    fix.relative_path,
+                    fix.presence_state,
+                    fix.dir_scan_state,
+                    fix.dir_scan_issue_kind,
                 ],
             )
             .expect("insert source directory");
@@ -270,13 +275,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage =
@@ -292,13 +299,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "missing",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "missing".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage =
@@ -314,13 +323,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "removed",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "removed".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage =
@@ -336,13 +347,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage = super::classify_source_location_coverage(
@@ -363,23 +376,27 @@ mod tests {
         set_source_scan_phase(&connection, 1, "partial");
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
         insert_directory(
             &connection,
-            11,
-            1,
-            Some(10),
-            "Music/Locked",
-            "present",
-            "blocked",
-            Some("permission_denied"),
+            &DirectoryFixture {
+                source_directory_id: 11,
+                source_id: 1,
+                parent_source_directory_id: Some(10),
+                relative_path: "Music/Locked".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "blocked".to_string(),
+                dir_scan_issue_kind: Some("permission_denied".to_string()),
+            },
         );
 
         let coverage = super::classify_source_location_coverage(
@@ -399,23 +416,27 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
         insert_directory(
             &connection,
-            11,
-            1,
-            Some(10),
-            "Music/Crashed",
-            "present",
-            "failed",
-            Some("unknown_io"),
+            &DirectoryFixture {
+                source_directory_id: 11,
+                source_id: 1,
+                parent_source_directory_id: Some(10),
+                relative_path: "Music/Crashed".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "failed".to_string(),
+                dir_scan_issue_kind: Some("unknown_io".to_string()),
+            },
         );
 
         let coverage = super::classify_source_location_coverage(
@@ -435,23 +456,27 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
         insert_directory(
             &connection,
-            11,
-            1,
-            Some(10),
-            "Music/Pending",
-            "present",
-            "pending",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 11,
+                source_id: 1,
+                parent_source_directory_id: Some(10),
+                relative_path: "Music/Pending".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "pending".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage = super::classify_source_location_coverage(
@@ -471,23 +496,27 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
         insert_directory(
             &connection,
-            11,
-            1,
-            Some(10),
-            "Music/Scanning",
-            "present",
-            "scanning",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 11,
+                source_id: 1,
+                parent_source_directory_id: Some(10),
+                relative_path: "Music/Scanning".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "scanning".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage = super::classify_source_location_coverage(
@@ -507,23 +536,27 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
         insert_directory(
             &connection,
-            11,
-            1,
-            Some(10),
-            "Music/Gone",
-            "missing",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 11,
+                source_id: 1,
+                parent_source_directory_id: Some(10),
+                relative_path: "Music/Gone".to_string(),
+                presence_state: "missing".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage = super::classify_source_location_coverage(
@@ -576,13 +609,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "blocked",
-            Some("permission_denied"),
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "blocked".to_string(),
+                dir_scan_issue_kind: Some("permission_denied".to_string()),
+            },
         );
 
         let coverage =
@@ -598,13 +633,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "pending",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "pending".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
 
         let coverage =
@@ -621,23 +658,27 @@ mod tests {
         set_source_scan_phase(&connection, 1, "partial");
         insert_directory(
             &connection,
-            10,
-            1,
-            None,
-            "Music",
-            "present",
-            "complete",
-            None,
+            &DirectoryFixture {
+                source_directory_id: 10,
+                source_id: 1,
+                parent_source_directory_id: None,
+                relative_path: "Music".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "complete".to_string(),
+                dir_scan_issue_kind: None,
+            },
         );
         insert_directory(
             &connection,
-            11,
-            1,
-            Some(10),
-            "Music/Locked",
-            "present",
-            "blocked",
-            Some("permission_denied"),
+            &DirectoryFixture {
+                source_directory_id: 11,
+                source_id: 1,
+                parent_source_directory_id: Some(10),
+                relative_path: "Music/Locked".to_string(),
+                presence_state: "present".to_string(),
+                dir_scan_state: "blocked".to_string(),
+                dir_scan_issue_kind: Some("permission_denied".to_string()),
+            },
         );
 
         let coverage = super::classify_source_location_coverage(

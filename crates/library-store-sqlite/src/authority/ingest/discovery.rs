@@ -180,6 +180,13 @@ struct ProcessedFile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceScanIncompleteCoverage {
+    scan_phase: &'static str,
+    scan_issue_kind: Option<String>,
+    error_detail: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct PresentSourceFileRow {
     source_file_id: i64,
     relative_path: String,
@@ -395,7 +402,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
 
         let descendant_coverage = self.load_source_scan_incomplete_coverage(root_id)?;
         let scan_rows_changed = match descendant_coverage {
-            Some((phase, issue_kind, error_detail)) => self.tx().execute(
+            Some(ref cov) => self.tx().execute(
                 "UPDATE source_scan_state
                      SET scan_phase = ?2,
                          last_scan_finished_at = ?3,
@@ -404,7 +411,13 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                          error_detail = ?5,
                          updated_at = ?3
                      WHERE source_id = ?1",
-                params![root_id, phase, now_ms, issue_kind, error_detail],
+                params![
+                    root_id,
+                    cov.scan_phase,
+                    now_ms,
+                    cov.scan_issue_kind,
+                    cov.error_detail
+                ],
             )?,
             None => self.tx().execute(
                 "UPDATE source_scan_state
@@ -889,7 +902,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
     fn load_source_scan_incomplete_coverage(
         &self,
         root_id: i64,
-    ) -> LibrarySqliteResult<Option<(&'static str, Option<String>, Option<String>)>> {
+    ) -> LibrarySqliteResult<Option<SourceScanIncompleteCoverage>> {
         let failed_issue: Option<(Option<String>, Option<String>)> = self
             .tx()
             .query_row(
@@ -912,11 +925,11 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
 
         if let Some((maybe_issue_kind, _error_detail)) = failed_issue {
             let issue_kind = maybe_issue_kind.unwrap_or_else(|| "unknown_io".to_string());
-            return Ok(Some((
-                "partial",
-                Some(issue_kind),
-                Some("descendant directory coverage is incomplete".to_string()),
-            )));
+            return Ok(Some(SourceScanIncompleteCoverage {
+                scan_phase: "partial",
+                scan_issue_kind: Some(issue_kind),
+                error_detail: Some("descendant directory coverage is incomplete".to_string()),
+            }));
         }
 
         let blocked_issue: Option<(Option<String>, Option<String>)> = self
@@ -941,11 +954,11 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
 
         if let Some((maybe_issue_kind, _error_detail)) = blocked_issue {
             let issue_kind = maybe_issue_kind.unwrap_or_else(|| "unknown_io".to_string());
-            return Ok(Some((
-                "partial",
-                Some(issue_kind),
-                Some("descendant directory coverage is incomplete".to_string()),
-            )));
+            return Ok(Some(SourceScanIncompleteCoverage {
+                scan_phase: "partial",
+                scan_issue_kind: Some(issue_kind),
+                error_detail: Some("descendant directory coverage is incomplete".to_string()),
+            }));
         }
 
         let has_pending_or_scanning: Option<i64> = self
@@ -963,11 +976,13 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             .optional()?;
 
         if has_pending_or_scanning.is_some() {
-            return Ok(Some((
-                "partial",
-                Some("unknown_io".to_string()),
-                Some("incomplete directory coverage remains after scan finalization".to_string()),
-            )));
+            return Ok(Some(SourceScanIncompleteCoverage {
+                scan_phase: "partial",
+                scan_issue_kind: Some("unknown_io".to_string()),
+                error_detail: Some(
+                    "incomplete directory coverage remains after scan finalization".to_string(),
+                ),
+            }));
         }
 
         Ok(None)
