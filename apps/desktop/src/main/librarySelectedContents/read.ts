@@ -9,7 +9,7 @@ import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
   selectedContentsReadChannels,
-  type SelectedContentsCoverage,
+  type ContentsCoverage,
   type SelectedContentsReadErrorCode,
   type SelectedContentsReadErrorState,
   type SelectedContentsReadResult,
@@ -284,7 +284,7 @@ function mapSelectedContentsResult(
   }
 }
 
-function mapCoverage(result: ContractSelectedContentsResult): SelectedContentsCoverage {
+function mapCoverage(result: ContractSelectedContentsResult): ContentsCoverage {
   return {
     state: result.coverage.state,
     recursiveScopeComplete: result.coverage.recursiveScopeComplete,

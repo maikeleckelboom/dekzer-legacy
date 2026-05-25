@@ -591,7 +591,7 @@ fn map_selected_contents_result(
             .into_iter()
             .map(map_selected_contents_row)
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
-        coverage: protocol::SelectedContentsCoverage {
+        coverage: protocol::ContentsCoverage {
             state: map_selected_contents_coverage_state(result.coverage.state),
             recursive_scope_complete: result.coverage.recursive_scope_complete,
             empty_result_authoritative: result.coverage.empty_result_authoritative,
@@ -641,32 +641,22 @@ const fn map_selected_contents_state(
 }
 
 const fn map_selected_contents_coverage_state(
-    state: store::StoreSelectedContentsCoverageState,
-) -> protocol::SelectedContentsCoverageState {
+    state: store::StoreContentsCoverageState,
+) -> protocol::ContentsCoverageState {
     match state {
-        store::StoreSelectedContentsCoverageState::Complete => {
-            protocol::SelectedContentsCoverageState::Complete
+        store::StoreContentsCoverageState::Complete => protocol::ContentsCoverageState::Complete,
+        store::StoreContentsCoverageState::Pending => protocol::ContentsCoverageState::Pending,
+        store::StoreContentsCoverageState::Scanning => protocol::ContentsCoverageState::Scanning,
+        store::StoreContentsCoverageState::Blocked => protocol::ContentsCoverageState::Blocked,
+        store::StoreContentsCoverageState::Failed => protocol::ContentsCoverageState::Failed,
+        store::StoreContentsCoverageState::SourceUnavailable => {
+            protocol::ContentsCoverageState::SourceUnavailable
         }
-        store::StoreSelectedContentsCoverageState::Pending => {
-            protocol::SelectedContentsCoverageState::Pending
+        store::StoreContentsCoverageState::LocationMissing => {
+            protocol::ContentsCoverageState::LocationMissing
         }
-        store::StoreSelectedContentsCoverageState::Scanning => {
-            protocol::SelectedContentsCoverageState::Scanning
-        }
-        store::StoreSelectedContentsCoverageState::Blocked => {
-            protocol::SelectedContentsCoverageState::Blocked
-        }
-        store::StoreSelectedContentsCoverageState::Failed => {
-            protocol::SelectedContentsCoverageState::Failed
-        }
-        store::StoreSelectedContentsCoverageState::SourceUnavailable => {
-            protocol::SelectedContentsCoverageState::SourceUnavailable
-        }
-        store::StoreSelectedContentsCoverageState::LocationMissing => {
-            protocol::SelectedContentsCoverageState::LocationMissing
-        }
-        store::StoreSelectedContentsCoverageState::Incomplete => {
-            protocol::SelectedContentsCoverageState::Incomplete
+        store::StoreContentsCoverageState::Incomplete => {
+            protocol::ContentsCoverageState::Incomplete
         }
     }
 }

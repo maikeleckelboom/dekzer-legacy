@@ -57,7 +57,7 @@ export type SelectedContentsState =
   | 'blocked'
   | 'failed'
 
-export type SelectedContentsCoverageState =
+export type ContentsCoverageState =
   | 'complete'
   | 'pending'
   | 'scanning'
@@ -67,8 +67,8 @@ export type SelectedContentsCoverageState =
   | 'locationMissing'
   | 'incomplete'
 
-export type SelectedContentsCoverage = {
-  readonly state: SelectedContentsCoverageState
+export type ContentsCoverage = {
+  readonly state: ContentsCoverageState
   readonly recursiveScopeComplete: boolean
   readonly emptyResultAuthoritative: boolean
   readonly detail?: string
@@ -124,7 +124,7 @@ export type SelectedContentsResult = {
   readonly state: SelectedContentsState
   readonly scope: SelectedContentsScope
   readonly rows: readonly SelectedContentsRow[]
-  readonly coverage: SelectedContentsCoverage
+  readonly coverage: ContentsCoverage
   readonly nextCursor?: string
   readonly detail?: string
 }

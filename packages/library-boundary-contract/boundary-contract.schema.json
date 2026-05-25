@@ -243,6 +243,44 @@
         "reply"
       ]
     },
+    "ContentsCoverage": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emptyResultAuthoritative": {
+          "type": "boolean"
+        },
+        "recursiveScopeComplete": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/$defs/ContentsCoverageState"
+        }
+      },
+      "required": [
+        "state",
+        "recursiveScopeComplete",
+        "emptyResultAuthoritative"
+      ]
+    },
+    "ContentsCoverageState": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "pending",
+        "scanning",
+        "blocked",
+        "failed",
+        "sourceUnavailable",
+        "locationMissing",
+        "incomplete"
+      ]
+    },
     "CreatePlaylistReply": {
       "type": "object",
       "properties": {
@@ -2310,44 +2348,6 @@
         "limit"
       ]
     },
-    "SelectedContentsCoverage": {
-      "type": "object",
-      "properties": {
-        "detail": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "emptyResultAuthoritative": {
-          "type": "boolean"
-        },
-        "recursiveScopeComplete": {
-          "type": "boolean"
-        },
-        "state": {
-          "$ref": "#/$defs/SelectedContentsCoverageState"
-        }
-      },
-      "required": [
-        "state",
-        "recursiveScopeComplete",
-        "emptyResultAuthoritative"
-      ]
-    },
-    "SelectedContentsCoverageState": {
-      "type": "string",
-      "enum": [
-        "complete",
-        "pending",
-        "scanning",
-        "blocked",
-        "failed",
-        "sourceUnavailable",
-        "locationMissing",
-        "incomplete"
-      ]
-    },
     "SelectedContentsMediaClass": {
       "type": "string",
       "enum": [
@@ -2359,7 +2359,7 @@
       "type": "object",
       "properties": {
         "coverage": {
-          "$ref": "#/$defs/SelectedContentsCoverage"
+          "$ref": "#/$defs/ContentsCoverage"
         },
         "detail": {
           "type": [

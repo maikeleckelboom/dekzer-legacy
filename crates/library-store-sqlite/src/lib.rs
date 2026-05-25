@@ -70,7 +70,7 @@ pub use read_models::literal_hierarchy::{
 };
 pub use read_models::navigation::NavigationRow;
 pub use read_models::selected_contents::{
-    StoreSelectedContentsCoverage, StoreSelectedContentsCoverageState, StoreSelectedContentsResult,
+    StoreContentsCoverage, StoreContentsCoverageState, StoreSelectedContentsResult,
     StoreSelectedContentsRow, StoreSelectedContentsRowOrigin, StoreSelectedContentsScope,
     StoreSelectedContentsState,
 };

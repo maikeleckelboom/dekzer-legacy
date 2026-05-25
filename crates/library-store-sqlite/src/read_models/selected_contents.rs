@@ -33,7 +33,7 @@ pub enum StoreSelectedContentsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreSelectedContentsCoverageState {
+pub enum StoreContentsCoverageState {
     Complete,
     Pending,
     Scanning,
@@ -45,8 +45,8 @@ pub enum StoreSelectedContentsCoverageState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoreSelectedContentsCoverage {
-    pub state: StoreSelectedContentsCoverageState,
+pub struct StoreContentsCoverage {
+    pub state: StoreContentsCoverageState,
     pub recursive_scope_complete: bool,
     pub empty_result_authoritative: bool,
     pub detail: Option<String>,
@@ -57,7 +57,7 @@ pub struct StoreSelectedContentsResult {
     pub state: StoreSelectedContentsState,
     pub scope: StoreSelectedContentsScope,
     pub rows: Vec<StoreSelectedContentsRow>,
-    pub coverage: StoreSelectedContentsCoverage,
+    pub coverage: StoreContentsCoverage,
     pub next_cursor: Option<String>,
     pub detail: Option<String>,
 }
@@ -165,7 +165,7 @@ pub(crate) fn read_selected_contents(
         return Ok(non_ready_result(
             scope,
             StoreSelectedContentsState::Failed,
-            StoreSelectedContentsCoverageState::Failed,
+            StoreContentsCoverageState::Failed,
             "Selected contents cursor paging is not available in this first slice.",
         ));
     }
@@ -174,7 +174,7 @@ pub(crate) fn read_selected_contents(
         return Ok(non_ready_result(
             scope,
             StoreSelectedContentsState::LocationMissing,
-            StoreSelectedContentsCoverageState::LocationMissing,
+            StoreContentsCoverageState::LocationMissing,
             "The selected library contents target is not available.",
         ));
     };
@@ -185,7 +185,7 @@ pub(crate) fn read_selected_contents(
             state,
             scope,
             rows,
-            coverage: StoreSelectedContentsCoverage {
+            coverage: StoreContentsCoverage {
                 state: coverage_state,
                 recursive_scope_complete: false,
                 empty_result_authoritative: false,
@@ -208,7 +208,7 @@ pub(crate) fn read_selected_contents(
         state,
         scope,
         rows,
-        coverage: StoreSelectedContentsCoverage {
+        coverage: StoreContentsCoverage {
             empty_result_authoritative,
             ..coverage
         },
@@ -423,7 +423,7 @@ fn source_unavailable_state(
     source: &SourceReadiness,
 ) -> Option<(
     StoreSelectedContentsState,
-    StoreSelectedContentsCoverageState,
+    StoreContentsCoverageState,
     &'static str,
 )> {
     if source.source_class != "internal"
@@ -431,7 +431,7 @@ fn source_unavailable_state(
     {
         return Some((
             StoreSelectedContentsState::SourceUnavailable,
-            StoreSelectedContentsCoverageState::SourceUnavailable,
+            StoreContentsCoverageState::SourceUnavailable,
             "The selected source is unavailable.",
         ));
     }
@@ -440,19 +440,19 @@ fn source_unavailable_state(
         Some("missing") => {
             return Some((
                 StoreSelectedContentsState::LocationMissing,
-                StoreSelectedContentsCoverageState::LocationMissing,
+                StoreContentsCoverageState::LocationMissing,
                 "The selected source root is missing.",
             ));
         }
         Some("blocked") => {
             let coverage_state = if source.access_issue_kind.as_deref() == Some("unavailable_mount")
             {
-                StoreSelectedContentsCoverageState::SourceUnavailable
+                StoreContentsCoverageState::SourceUnavailable
             } else {
-                StoreSelectedContentsCoverageState::Blocked
+                StoreContentsCoverageState::Blocked
             };
             let state = match coverage_state {
-                StoreSelectedContentsCoverageState::SourceUnavailable => {
+                StoreContentsCoverageState::SourceUnavailable => {
                     StoreSelectedContentsState::SourceUnavailable
                 }
                 _ => StoreSelectedContentsState::Blocked,
@@ -474,15 +474,15 @@ fn source_unavailable_state(
                 StoreSelectedContentsState::Blocked
             },
             if source.scan_issue_kind.as_deref() == Some("unavailable_mount") {
-                StoreSelectedContentsCoverageState::SourceUnavailable
+                StoreContentsCoverageState::SourceUnavailable
             } else {
-                StoreSelectedContentsCoverageState::Blocked
+                StoreContentsCoverageState::Blocked
             },
             "The selected source scan is blocked.",
         )),
         Some("failed") => Some((
             StoreSelectedContentsState::Failed,
-            StoreSelectedContentsCoverageState::Failed,
+            StoreContentsCoverageState::Failed,
             "The selected source scan failed.",
         )),
         Some("partial") => None,
@@ -494,7 +494,7 @@ fn read_coverage(
     connection: &Connection,
     source: &SourceReadiness,
     scope: &ResolvedSelectedContentsScope,
-) -> LibrarySqliteResult<StoreSelectedContentsCoverage> {
+) -> LibrarySqliteResult<StoreContentsCoverage> {
     let counts = match scope {
         ResolvedSelectedContentsScope::WholeSource { source_id } => {
             read_whole_source_coverage_counts(connection, *source_id)?
@@ -503,7 +503,7 @@ fn read_coverage(
             let paths = load_accepted_source_location_paths(connection, *source_id)?;
             if paths.is_empty() {
                 return Ok(coverage(
-                    StoreSelectedContentsCoverageState::LocationMissing,
+                    StoreContentsCoverageState::LocationMissing,
                     false,
                     "No accepted source locations found.",
                 ));
@@ -522,35 +522,35 @@ fn read_coverage(
                 AcceptedSourceLocationCoverage::AllPresent => {}
                 AcceptedSourceLocationCoverage::AllMissing => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::LocationMissing,
+                        StoreContentsCoverageState::LocationMissing,
                         false,
                         "All accepted source locations are missing.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::MixedMissing => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Incomplete,
+                        StoreContentsCoverageState::Incomplete,
                         false,
                         "One or more accepted source locations are missing. Results may be incomplete.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::Blocked => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Blocked,
+                        StoreContentsCoverageState::Blocked,
                         false,
                         "One or more accepted source locations is under a blocked subtree.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::Failed => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Failed,
+                        StoreContentsCoverageState::Failed,
                         false,
                         "One or more accepted source locations is under a failed subtree.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::Scanning => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Scanning,
+                        StoreContentsCoverageState::Scanning,
                         false,
                         "One or more accepted source locations is being scanned.",
                     ));
@@ -567,7 +567,7 @@ fn read_coverage(
         }
         ResolvedSelectedContentsScope::MissingLocation { .. } => {
             return Ok(coverage(
-                StoreSelectedContentsCoverageState::LocationMissing,
+                StoreContentsCoverageState::LocationMissing,
                 false,
                 "The selected folder is missing.",
             ));
@@ -586,35 +586,35 @@ fn read_coverage(
                 SourceLocationCoverage::Present => {}
                 SourceLocationCoverage::Missing => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::LocationMissing,
+                        StoreContentsCoverageState::LocationMissing,
                         false,
                         "The selected source location is missing.",
                     ));
                 }
                 SourceLocationCoverage::Blocked => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Blocked,
+                        StoreContentsCoverageState::Blocked,
                         false,
                         "The selected source location is under a blocked subtree.",
                     ));
                 }
                 SourceLocationCoverage::Failed => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Failed,
+                        StoreContentsCoverageState::Failed,
                         false,
                         "The selected source location is under a failed subtree.",
                     ));
                 }
                 SourceLocationCoverage::Scanning => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Scanning,
+                        StoreContentsCoverageState::Scanning,
                         false,
                         "The selected source location is being scanned.",
                     ));
                 }
                 SourceLocationCoverage::Pending => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::Pending,
+                        StoreContentsCoverageState::Pending,
                         false,
                         "The selected source location has pending coverage.",
                     ));
@@ -637,7 +637,7 @@ fn read_coverage(
                 DirectoryPresence::Present => {}
                 DirectoryPresence::Missing => {
                     return Ok(coverage(
-                        StoreSelectedContentsCoverageState::LocationMissing,
+                        StoreContentsCoverageState::LocationMissing,
                         false,
                         "The selected folder is missing.",
                     ));
@@ -752,13 +752,13 @@ fn coverage_from_counts(
     source: &SourceReadiness,
     scope: &ResolvedSelectedContentsScope,
     counts: CoverageCounts,
-) -> StoreSelectedContentsCoverage {
+) -> StoreContentsCoverage {
     if counts.total_directories == 0 {
         if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
             && source.scan_phase.as_deref() == Some("complete")
         {
             return coverage(
-                StoreSelectedContentsCoverageState::Complete,
+                StoreContentsCoverageState::Complete,
                 true,
                 "The selected source has complete scan coverage.",
             );
@@ -766,7 +766,7 @@ fn coverage_from_counts(
 
         if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. }) {
             return coverage(
-                StoreSelectedContentsCoverageState::Pending,
+                StoreContentsCoverageState::Pending,
                 false,
                 "The selected source has no completed directory coverage yet.",
             );
@@ -778,14 +778,14 @@ fn coverage_from_counts(
                 | ResolvedSelectedContentsScope::SourceLocationPrefix { .. }
         ) {
             return coverage(
-                StoreSelectedContentsCoverageState::Complete,
+                StoreContentsCoverageState::Complete,
                 true,
                 "The selected contents scope has complete scan coverage.",
             );
         }
 
         return coverage(
-            StoreSelectedContentsCoverageState::LocationMissing,
+            StoreContentsCoverageState::LocationMissing,
             false,
             "The selected contents scope has no present directory coverage.",
         );
@@ -793,7 +793,7 @@ fn coverage_from_counts(
 
     if counts.blocked_directories > 0 {
         return coverage(
-            StoreSelectedContentsCoverageState::Blocked,
+            StoreContentsCoverageState::Blocked,
             false,
             "Part of the selected contents scope is blocked.",
         );
@@ -801,7 +801,7 @@ fn coverage_from_counts(
 
     if counts.failed_directories > 0 {
         return coverage(
-            StoreSelectedContentsCoverageState::Failed,
+            StoreContentsCoverageState::Failed,
             false,
             "Part of the selected contents scope failed to scan.",
         );
@@ -809,7 +809,7 @@ fn coverage_from_counts(
 
     if counts.scanning_directories > 0 {
         return coverage(
-            StoreSelectedContentsCoverageState::Scanning,
+            StoreContentsCoverageState::Scanning,
             false,
             "The selected contents scope is still scanning.",
         );
@@ -817,7 +817,7 @@ fn coverage_from_counts(
 
     if counts.pending_directories > 0 {
         return coverage(
-            StoreSelectedContentsCoverageState::Pending,
+            StoreContentsCoverageState::Pending,
             false,
             "The selected contents scope has pending scan coverage.",
         );
@@ -830,7 +830,7 @@ fn coverage_from_counts(
         )
     {
         return coverage(
-            StoreSelectedContentsCoverageState::Pending,
+            StoreContentsCoverageState::Pending,
             false,
             "The selected source has not completed a full recursive scan.",
         );
@@ -840,35 +840,33 @@ fn coverage_from_counts(
         && source.scan_phase.as_deref() == Some("partial")
     {
         return coverage(
-            StoreSelectedContentsCoverageState::Pending,
+            StoreContentsCoverageState::Pending,
             false,
             "The selected source scan has incomplete descendant coverage.",
         );
     }
 
     coverage(
-        StoreSelectedContentsCoverageState::Complete,
+        StoreContentsCoverageState::Complete,
         true,
         "The selected contents scope has complete scan coverage.",
     )
 }
 
-fn pending_or_scanning_coverage_state(
-    source: &SourceReadiness,
-) -> StoreSelectedContentsCoverageState {
+fn pending_or_scanning_coverage_state(source: &SourceReadiness) -> StoreContentsCoverageState {
     if source.scan_phase.as_deref() == Some("scanning") {
-        StoreSelectedContentsCoverageState::Scanning
+        StoreContentsCoverageState::Scanning
     } else {
-        StoreSelectedContentsCoverageState::Pending
+        StoreContentsCoverageState::Pending
     }
 }
 
 fn coverage(
-    state: StoreSelectedContentsCoverageState,
+    state: StoreContentsCoverageState,
     recursive_scope_complete: bool,
     detail: &str,
-) -> StoreSelectedContentsCoverage {
-    StoreSelectedContentsCoverage {
+) -> StoreContentsCoverage {
+    StoreContentsCoverage {
         state,
         recursive_scope_complete,
         empty_result_authoritative: false,
@@ -877,43 +875,39 @@ fn coverage(
 }
 
 fn selected_contents_state(
-    coverage: &StoreSelectedContentsCoverage,
+    coverage: &StoreContentsCoverage,
     rows_empty: bool,
 ) -> StoreSelectedContentsState {
     match coverage.state {
-        StoreSelectedContentsCoverageState::Complete => {
+        StoreContentsCoverageState::Complete => {
             if rows_empty {
                 StoreSelectedContentsState::Empty
             } else {
                 StoreSelectedContentsState::Ready
             }
         }
-        StoreSelectedContentsCoverageState::Pending
-        | StoreSelectedContentsCoverageState::Scanning
-        | StoreSelectedContentsCoverageState::Incomplete => StoreSelectedContentsState::Partial,
-        StoreSelectedContentsCoverageState::Blocked => StoreSelectedContentsState::Blocked,
-        StoreSelectedContentsCoverageState::Failed => StoreSelectedContentsState::Failed,
-        StoreSelectedContentsCoverageState::SourceUnavailable => {
+        StoreContentsCoverageState::Pending
+        | StoreContentsCoverageState::Scanning
+        | StoreContentsCoverageState::Incomplete => StoreSelectedContentsState::Partial,
+        StoreContentsCoverageState::Blocked => StoreSelectedContentsState::Blocked,
+        StoreContentsCoverageState::Failed => StoreSelectedContentsState::Failed,
+        StoreContentsCoverageState::SourceUnavailable => {
             StoreSelectedContentsState::SourceUnavailable
         }
-        StoreSelectedContentsCoverageState::LocationMissing => {
-            StoreSelectedContentsState::LocationMissing
-        }
+        StoreContentsCoverageState::LocationMissing => StoreSelectedContentsState::LocationMissing,
     }
 }
 
 fn selected_contents_detail(
     state: StoreSelectedContentsState,
-    coverage_state: StoreSelectedContentsCoverageState,
+    coverage_state: StoreContentsCoverageState,
 ) -> Option<&'static str> {
     match state {
         StoreSelectedContentsState::Ready => None,
         StoreSelectedContentsState::Empty => Some("No primary media found in this scope."),
         StoreSelectedContentsState::Partial => Some(match coverage_state {
-            StoreSelectedContentsCoverageState::Scanning => {
-                "Still indexing. Results may be incomplete."
-            }
-            StoreSelectedContentsCoverageState::Incomplete => {
+            StoreContentsCoverageState::Scanning => "Still indexing. Results may be incomplete.",
+            StoreContentsCoverageState::Incomplete => {
                 "One or more accepted source locations are missing. Results may be incomplete."
             }
             _ => "Indexing is incomplete. Results may be incomplete.",
@@ -1306,14 +1300,14 @@ fn selected_contents_label(title: Option<&str>, file_name: &str, relative_path: 
 fn non_ready_result(
     scope: StoreSelectedContentsScope,
     state: StoreSelectedContentsState,
-    coverage_state: StoreSelectedContentsCoverageState,
+    coverage_state: StoreContentsCoverageState,
     detail: &str,
 ) -> StoreSelectedContentsResult {
     StoreSelectedContentsResult {
         state,
         scope,
         rows: Vec::new(),
-        coverage: StoreSelectedContentsCoverage {
+        coverage: StoreContentsCoverage {
             state: coverage_state,
             recursive_scope_complete: false,
             empty_result_authoritative: false,
@@ -1329,8 +1323,8 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        StoreSelectedContentsCoverageState, StoreSelectedContentsRowOrigin,
-        StoreSelectedContentsScope, StoreSelectedContentsState, read_selected_contents,
+        StoreContentsCoverageState, StoreSelectedContentsRowOrigin, StoreSelectedContentsScope,
+        StoreSelectedContentsState, read_selected_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -1744,10 +1738,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(StoreSelectedContentsRowOrigin::LibraryAsset, Some(1))]
         );
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
     }
 
     #[test]
@@ -1866,10 +1857,7 @@ mod tests {
         .expect("read selected contents");
 
         assert_eq!(result.state, StoreSelectedContentsState::Partial);
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Pending
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Pending);
         assert!(!result.coverage.empty_result_authoritative);
     }
 
@@ -1888,10 +1876,7 @@ mod tests {
         .expect("read selected contents");
 
         assert_eq!(result.state, StoreSelectedContentsState::Blocked);
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Blocked
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
         assert!(result.rows.is_empty());
         assert!(!result.coverage.empty_result_authoritative);
     }
@@ -1913,7 +1898,7 @@ mod tests {
         assert_eq!(result.state, StoreSelectedContentsState::LocationMissing);
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::LocationMissing
+            StoreContentsCoverageState::LocationMissing
         );
         assert!(result.rows.is_empty());
         assert!(!result.coverage.empty_result_authoritative);
@@ -1938,10 +1923,7 @@ mod tests {
         .expect("read selected contents");
 
         assert_eq!(result.state, StoreSelectedContentsState::Partial);
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Scanning
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Scanning);
         assert!(result.rows.is_empty());
         assert!(!result.coverage.empty_result_authoritative);
     }
@@ -1966,10 +1948,7 @@ mod tests {
         .expect("read selected contents");
 
         assert_eq!(result.state, StoreSelectedContentsState::Blocked);
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Blocked
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
         assert!(!result.coverage.recursive_scope_complete);
         assert!(!result.coverage.empty_result_authoritative);
     }
@@ -2121,10 +2100,7 @@ mod tests {
             result.rows[0].origin,
             StoreSelectedContentsRowOrigin::SourceFile
         );
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
     }
 
     #[test]
@@ -2148,10 +2124,7 @@ mod tests {
 
         assert_eq!(result.state, StoreSelectedContentsState::Empty);
         assert!(result.rows.is_empty());
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
         assert!(result.coverage.empty_result_authoritative);
     }
 
@@ -2228,10 +2201,7 @@ mod tests {
 
         assert_eq!(result.state, StoreSelectedContentsState::Partial);
         assert!(result.rows.is_empty());
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Pending
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Pending);
         assert!(!result.coverage.empty_result_authoritative);
     }
 
@@ -2533,10 +2503,7 @@ mod tests {
             !result.rows.is_empty(),
             "partial scan must return visible rows"
         );
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Blocked
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
         assert!(!result.coverage.recursive_scope_complete);
         assert!(!result.coverage.empty_result_authoritative);
     }
@@ -2570,7 +2537,7 @@ mod tests {
 
         assert_eq!(
             dir_result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "clean sibling directory under partial source must have complete coverage"
         );
         assert!(dir_result.coverage.recursive_scope_complete);
@@ -2587,7 +2554,7 @@ mod tests {
 
         assert_ne!(
             source_result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "whole source must remain non-complete when partial"
         );
         assert!(!source_result.coverage.empty_result_authoritative);
@@ -2621,7 +2588,7 @@ mod tests {
 
         assert_eq!(
             dir_result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "clean empty sibling directory under partial source may be authoritative empty"
         );
         assert!(dir_result.coverage.recursive_scope_complete);
@@ -2656,7 +2623,7 @@ mod tests {
 
         assert_eq!(
             dir_result.coverage.state,
-            StoreSelectedContentsCoverageState::Blocked,
+            StoreContentsCoverageState::Blocked,
             "blocked scope under partial source must remain blocked"
         );
         assert!(!dir_result.coverage.recursive_scope_complete);
@@ -2703,7 +2670,7 @@ mod tests {
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::LocationMissing,
+            StoreContentsCoverageState::LocationMissing,
             "coverage must be locationMissing for scope-proven absent path under partial scan"
         );
         assert!(!result.coverage.recursive_scope_complete);
@@ -2749,7 +2716,7 @@ mod tests {
         );
         assert_ne!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::LocationMissing,
+            StoreContentsCoverageState::LocationMissing,
             "blocked parent must not be classified as missing"
         );
         assert!(!result.coverage.empty_result_authoritative);
@@ -2784,7 +2751,7 @@ mod tests {
 
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Failed,
+            StoreContentsCoverageState::Failed,
             "failed parent must produce failed coverage"
         );
         assert!(!result.coverage.empty_result_authoritative);
@@ -2817,7 +2784,7 @@ mod tests {
 
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Pending,
+            StoreContentsCoverageState::Pending,
             "pending parent must produce pending coverage"
         );
         assert!(!result.coverage.empty_result_authoritative);
@@ -2863,7 +2830,7 @@ mod tests {
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "all accepted locations complete must produce complete coverage even under partial source"
         );
         assert!(result.coverage.recursive_scope_complete);
@@ -2912,7 +2879,7 @@ mod tests {
 
         assert_ne!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "source with a blocked accepted location must not be complete"
         );
         assert!(!result.coverage.empty_result_authoritative);
@@ -2963,12 +2930,12 @@ mod tests {
 
         assert_eq!(
             location_result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "SourceLocation scope for Music/Good must be complete"
         );
         assert_eq!(
             source_result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "Source with only Music/Good accepted location must be complete"
         );
 
@@ -3001,12 +2968,12 @@ mod tests {
 
         assert_eq!(
             location_result_blocked.coverage.state,
-            StoreSelectedContentsCoverageState::Blocked,
+            StoreContentsCoverageState::Blocked,
             "SourceLocation scope for Music/Locked must be blocked"
         );
         assert_eq!(
             source_result_blocked.coverage.state,
-            StoreSelectedContentsCoverageState::Blocked,
+            StoreContentsCoverageState::Blocked,
             "Source with blocked accepted location must be blocked"
         );
     }
@@ -3054,17 +3021,17 @@ mod tests {
         );
         assert_ne!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::LocationMissing,
+            StoreContentsCoverageState::LocationMissing,
             "mixed present + missing coverage must not be LocationMissing"
         );
         assert_ne!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete,
+            StoreContentsCoverageState::Complete,
             "mixed present + missing coverage must not be Complete"
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Incomplete,
+            StoreContentsCoverageState::Incomplete,
             "mixed present + missing coverage must be Incomplete"
         );
         assert!(!result.coverage.recursive_scope_complete);
@@ -3115,7 +3082,7 @@ mod tests {
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Incomplete,
+            StoreContentsCoverageState::Incomplete,
             "mixed present + missing coverage must be Incomplete"
         );
         assert!(!result.coverage.empty_result_authoritative);
@@ -3159,7 +3126,7 @@ mod tests {
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::LocationMissing,
+            StoreContentsCoverageState::LocationMissing,
             "all missing coverage must be LocationMissing"
         );
         assert!(result.rows.is_empty());
@@ -3222,7 +3189,7 @@ mod tests {
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Blocked,
+            StoreContentsCoverageState::Blocked,
             "present + blocked must be Blocked coverage"
         );
         assert!(!result.coverage.empty_result_authoritative);
@@ -3283,7 +3250,7 @@ mod tests {
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::Failed,
+            StoreContentsCoverageState::Failed,
             "present + failed must be Failed coverage"
         );
         assert!(!result.coverage.empty_result_authoritative);
@@ -3313,10 +3280,7 @@ mod tests {
         .expect("read selected contents");
 
         assert_eq!(result.state, StoreSelectedContentsState::Empty);
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
         assert!(result.coverage.recursive_scope_complete);
         assert!(result.coverage.empty_result_authoritative);
     }
@@ -3356,10 +3320,7 @@ mod tests {
         .expect("read selected contents");
 
         assert_eq!(result.state, StoreSelectedContentsState::Ready);
-        assert_eq!(
-            result.coverage.state,
-            StoreSelectedContentsCoverageState::Complete
-        );
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
         assert!(result.coverage.recursive_scope_complete);
     }
 
@@ -3394,7 +3355,7 @@ mod tests {
         );
         assert_eq!(
             result.coverage.state,
-            StoreSelectedContentsCoverageState::LocationMissing,
+            StoreContentsCoverageState::LocationMissing,
             "direct SourceLocation missing coverage must be LocationMissing"
         );
     }

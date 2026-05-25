@@ -95,8 +95,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsResult>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsState>(&cfg, &mut output);
-    push_ts_decl::<crate::SelectedContentsCoverage>(&cfg, &mut output);
-    push_ts_decl::<crate::SelectedContentsCoverageState>(&cfg, &mut output);
+    push_ts_decl::<crate::ContentsCoverage>(&cfg, &mut output);
+    push_ts_decl::<crate::ContentsCoverageState>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsRow>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsRowOrigin>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsMediaClass>(&cfg, &mut output);

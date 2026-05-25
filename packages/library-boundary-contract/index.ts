@@ -140,13 +140,13 @@ export type DirectoryImageMediaState = { "kind": "unknown" } | { "kind": "hasIma
 
 export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
 
-export type SelectedContentsResult = { state: SelectedContentsState, scope: SelectedContentsScope, rows: Array<SelectedContentsRow>, coverage: SelectedContentsCoverage, nextCursor?: string, detail?: string, };
+export type SelectedContentsResult = { state: SelectedContentsState, scope: SelectedContentsScope, rows: Array<SelectedContentsRow>, coverage: ContentsCoverage, nextCursor?: string, detail?: string, };
 
 export type SelectedContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed";
 
-export type SelectedContentsCoverage = { state: SelectedContentsCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
+export type ContentsCoverage = { state: ContentsCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
 
-export type SelectedContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
+export type ContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
 
 export type SelectedContentsRow = { stableId: string, label: string, origin: SelectedContentsRowOrigin, libraryAssetId: string | null, rowVersion: string | null, primarySourceFileId: string | null, scopedSourceFileId: string, sourceId: string, relativePath: string, fileName: string, mediaClass: SelectedContentsMediaClass, availabilityState: LibraryAssetAvailabilityState, title: string | null, artist: string | null, album: string | null, durationMs: number | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary, updatedAtMs: number, };
 

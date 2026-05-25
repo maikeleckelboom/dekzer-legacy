@@ -353,7 +353,7 @@ pub struct SelectedContentsResult {
     pub state: SelectedContentsState,
     pub scope: SelectedContentsScope,
     pub rows: Vec<SelectedContentsRow>,
-    pub coverage: SelectedContentsCoverage,
+    pub coverage: ContentsCoverage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub next_cursor: Option<String>,
@@ -400,7 +400,7 @@ pub enum SelectedContentsState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SelectedContentsCoverageState {
+pub enum ContentsCoverageState {
     Complete,
     Pending,
     Scanning,
@@ -423,8 +423,8 @@ pub enum SelectedContentsCoverageState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SelectedContentsCoverage {
-    pub state: SelectedContentsCoverageState,
+pub struct ContentsCoverage {
+    pub state: ContentsCoverageState,
     pub recursive_scope_complete: bool,
     pub empty_result_authoritative: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
