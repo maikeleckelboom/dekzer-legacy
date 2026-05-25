@@ -116,6 +116,7 @@ describe('dev preflight runDevPreflight', () => {
   function createDeps(overrides: Partial<DevPreflightDeps> = {}): DevPreflightDeps {
     return {
       checkStorage: async () => ({
+        kind: 'checked' as const,
         schema: { state: 'compatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
         userDataSource: 'developmentDefault' as const
@@ -139,7 +140,7 @@ describe('dev preflight runDevPreflight', () => {
     }
   }
 
-  it('starts Electron when schema is compatible', async () => {
+  it('starts Electron when schema is compatible and propagates success', async () => {
     let devStarted = false
     const deps = createDeps({
       spawnDev: async () => {
@@ -152,10 +153,25 @@ describe('dev preflight runDevPreflight', () => {
     expect(devStarted).toBe(true)
   })
 
+  it('exits when compatible storage starts Electron and Electron exits nonzero', async () => {
+    let exitCode: number | undefined
+    const deps = createDeps({
+      spawnDev: async () => 1,
+      exit: (code: number) => {
+        exitCode = code
+        throw new ExitSignal(code)
+      }
+    })
+
+    await expect(runDevPreflight(deps)).rejects.toThrow(ExitSignal)
+    expect(exitCode).toBe(1)
+  })
+
   it('starts Electron when schema is missing', async () => {
     let devStarted = false
     const deps = createDeps({
       checkStorage: async () => ({
+        kind: 'checked' as const,
         schema: { state: 'missing' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
         userDataSource: 'developmentDefault' as const
@@ -170,18 +186,86 @@ describe('dev preflight runDevPreflight', () => {
     expect(devStarted).toBe(true)
   })
 
-  it('starts Electron when storage check fails', async () => {
-    let devStarted = false
+  it('exits when missing storage starts Electron and Electron exits nonzero', async () => {
+    let exitCode: number | undefined
     const deps = createDeps({
-      checkStorage: async () => undefined,
+      checkStorage: async () => ({
+        kind: 'checked' as const,
+        schema: { state: 'missing' as StorageSchemaState },
+        storageRootPath: '/dev-user-data/default/development',
+        userDataSource: 'developmentDefault' as const
+      }),
+      spawnDev: async () => 1,
+      exit: (code: number) => {
+        exitCode = code
+        throw new ExitSignal(code)
+      }
+    })
+
+    await expect(runDevPreflight(deps)).rejects.toThrow(ExitSignal)
+    expect(exitCode).toBe(1)
+  })
+
+  it('aborts when storage check fails', async () => {
+    let devStarted = false
+    const printed: string[] = []
+    let exitCode: number | undefined
+    const deps = createDeps({
+      checkStorage: async () => ({
+        kind: 'checkFailed' as const,
+        detail: 'storage status returned no JSON output'
+      }),
       spawnDev: async () => {
         devStarted = true
+        return 0
+      },
+      promptYesNo: async () => {
+        throw new Error('prompt should not be called')
+      },
+      resetStorage: async () => {
+        throw new Error('reset should not be called')
+      },
+      println: (message: string) => {
+        printed.push(message)
+      },
+      exit: (code: number) => {
+        exitCode = code
+        throw new ExitSignal(code)
+      }
+    })
+
+    await expect(runDevPreflight(deps)).rejects.toThrow(ExitSignal)
+    expect(devStarted).toBe(false)
+    expect(exitCode).toBe(1)
+    expect(printed).toContain(
+      'Could not verify development storage compatibility. Dekzer was not started.'
+    )
+    expect(printed).toContain('Detail: storage status returned no JSON output')
+    expect(printed).toContain('  pnpm --filter @dekzer/desktop run storage:doctor')
+    expect(printed).toContain(
+      '  pnpm --filter @dekzer/desktop run storage:reset -- --confirm-delete'
+    )
+    expect(printed).toContain('  pnpm --filter @dekzer/desktop run dev:fresh')
+  })
+
+  it('does not prompt or reset when storage check fails', async () => {
+    let promptCalled = false
+    let resetCalled = false
+    const deps = createDeps({
+      checkStorage: async () => ({ kind: 'checkFailed' as const, detail: 'cargo failed' }),
+      promptYesNo: async () => {
+        promptCalled = true
+        return true
+      },
+      resetStorage: async () => {
+        resetCalled = true
         return 0
       }
     })
 
-    await runDevPreflight(deps)
-    expect(devStarted).toBe(true)
+    await expect(runDevPreflight(deps)).rejects.toThrow(ExitSignal)
+    expect(promptCalled).toBe(false)
+    expect(resetCalled).toBe(false)
   })
 
   it('resets and starts on incompatible schema with confirmation', async () => {
@@ -189,6 +273,7 @@ describe('dev preflight runDevPreflight', () => {
     let resetCalled = false
     const deps = createDeps({
       checkStorage: async () => ({
+        kind: 'checked' as const,
         schema: {
           state: 'incompatible' as StorageSchemaState,
           detail: 'column count mismatch'
@@ -212,6 +297,28 @@ describe('dev preflight runDevPreflight', () => {
     expect(devStarted).toBe(true)
   })
 
+  it('exits when confirmed reset succeeds and Electron exits nonzero', async () => {
+    let exitCode: number | undefined
+    const deps = createDeps({
+      checkStorage: async () => ({
+        kind: 'checked' as const,
+        schema: { state: 'incompatible' as StorageSchemaState },
+        storageRootPath: '/dev-user-data/default/development',
+        userDataSource: 'developmentDefault' as const
+      }),
+      promptYesNo: async () => true,
+      resetStorage: async () => 0,
+      spawnDev: async () => 1,
+      exit: (code: number) => {
+        exitCode = code
+        throw new ExitSignal(code)
+      }
+    })
+
+    await expect(runDevPreflight(deps)).rejects.toThrow(ExitSignal)
+    expect(exitCode).toBe(1)
+  })
+
   it('exits without reset when user declines on incompatible schema', async () => {
     let resetCalled = false
     let devStarted = false
@@ -219,6 +326,7 @@ describe('dev preflight runDevPreflight', () => {
 
     const deps = createDeps({
       checkStorage: async () => ({
+        kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
         userDataSource: 'developmentDefault' as const
@@ -252,6 +360,7 @@ describe('dev preflight runDevPreflight', () => {
 
     const deps = createDeps({
       checkStorage: async () => ({
+        kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
         userDataSource: 'developmentDefault' as const
@@ -288,6 +397,7 @@ describe('dev preflight runDevPreflight', () => {
 
     const deps = createDeps({
       checkStorage: async () => ({
+        kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
         userDataSource: 'developmentDefault' as const
@@ -317,6 +427,7 @@ describe('dev preflight runDevPreflight', () => {
 
     const deps = createDeps({
       checkStorage: async () => ({
+        kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
         userDataSource: 'developmentDefault' as const

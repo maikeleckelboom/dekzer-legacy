@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
+import { LibraryBoundaryStdioProcessExitError } from '@dekzer/library-boundary-stdio-transport'
 
 import {
   desktopLibraryUserDataEnvironmentVariable,
@@ -15,7 +16,8 @@ import {
 import { LibraryBoundaryHostError } from '../../../src/main/libraryBoundary/errors'
 import {
   LibraryBoundaryHost,
-  type LibraryBoundaryHostTransport
+  type LibraryBoundaryHostTransport,
+  type LibraryBoundaryHostTransportOptions
 } from '../../../src/main/libraryBoundary/host'
 import {
   createLibraryBoundaryHostStatus,
@@ -251,16 +253,15 @@ describe('library boundary host', () => {
     expect(registration.handler?.().state).toBe('idle')
   })
 
-  it('classifies schema mismatch startup failures with a clearer message', async () => {
+  it('classifies schema mismatch startup failures from startup diagnostics', async () => {
     const config = hostConfig()
+    const schemaDiagnostic =
+      'database schema state is malformed: database schema does not match the canonical substrate baseline: table source_directories column count mismatch: canonical=17 live=16'
     const schemaMismatchHost = new LibraryBoundaryHost(config, silentLogger(), {
-      createTransport: () => {
+      createTransport: (options) => {
         const ready = deferred<void>()
-        ready.reject(
-          new Error(
-            'database schema state is malformed: database schema does not match the canonical substrate baseline: table source_directories column count mismatch: canonical=17 live=16'
-          )
-        )
+        options.diagnostics?.({ stream: 'stderr', line: schemaDiagnostic })
+        ready.reject(new LibraryBoundaryStdioProcessExitError(1, null))
         return {
           ready: ready.promise,
           close: async () => undefined,
@@ -286,15 +287,15 @@ describe('library boundary host', () => {
         message: 'The development library database is incompatible with the current schema.'
       }
     })
-    expect(controller.getStatus().lastError?.detail).toContain('schema')
+    expect(controller.getStatus().lastError?.detail).toBe(schemaDiagnostic)
   })
 
-  it('does not reclassify unrelated stdio startup failures', async () => {
+  it('does not reclassify process exits without schema diagnostics', async () => {
     const config = hostConfig()
     const unrelatedHost = new LibraryBoundaryHost(config, silentLogger(), {
       createTransport: () => {
         const ready = deferred<void>()
-        ready.reject(new Error('process exited unexpectedly with code 1'))
+        ready.reject(new LibraryBoundaryStdioProcessExitError(1, null))
         return {
           ready: ready.promise,
           close: async () => undefined,
@@ -315,6 +316,75 @@ describe('library boundary host', () => {
       lastError: {
         code: 'stdioTransportStartupFailure',
         message: 'Failed to start the library boundary stdio transport.'
+      }
+    })
+  })
+
+  it('does not reclassify unrelated stderr diagnostics with process exits', async () => {
+    const config = hostConfig()
+    const unrelatedHost = new LibraryBoundaryHost(config, silentLogger(), {
+      createTransport: (options) => {
+        const ready = deferred<void>()
+        options.diagnostics?.({ stream: 'stderr', line: 'opened development database' })
+        ready.reject(new LibraryBoundaryStdioProcessExitError(1, null))
+        return {
+          ready: ready.promise,
+          close: async () => undefined,
+          execute: async () => {
+            throw new Error('execute should not be called by unrelated diagnostic tests')
+          }
+        } satisfies LibraryBoundaryHostTransport
+      },
+      createClient: () => createFakeClient()
+    })
+
+    const controller = new LibraryBoundaryHostStatusController(unrelatedHost, silentStatusLogger())
+
+    await controller.start()
+
+    expect(controller.getStatus()).toMatchObject({
+      state: 'failed',
+      lastError: {
+        code: 'stdioTransportStartupFailure',
+        message: 'Failed to start the library boundary stdio transport.',
+        detail: 'library boundary stdio process exited unexpectedly: code=1 signal=null'
+      }
+    })
+  })
+
+  it('bounds startup diagnostics captured before readiness', async () => {
+    const config = hostConfig()
+    const host = new LibraryBoundaryHost(config, silentLogger(), {
+      createTransport: (options: LibraryBoundaryHostTransportOptions) => {
+        const ready = deferred<void>()
+        for (let i = 0; i < 12; i += 1) {
+          options.diagnostics?.({ stream: 'stderr', line: `diagnostic ${i}` })
+        }
+        ready.reject(new LibraryBoundaryStdioProcessExitError(1, null))
+        return {
+          ready: ready.promise,
+          close: async () => undefined,
+          execute: async () => {
+            throw new Error('execute should not be called by bounded diagnostics tests')
+          }
+        } satisfies LibraryBoundaryHostTransport
+      },
+      createClient: () => createFakeClient()
+    })
+
+    await expect(host.start()).rejects.toMatchObject({
+      code: 'stdioTransportStartupFailure',
+      details: {
+        startupDiagnostics: [
+          'diagnostic 4',
+          'diagnostic 5',
+          'diagnostic 6',
+          'diagnostic 7',
+          'diagnostic 8',
+          'diagnostic 9',
+          'diagnostic 10',
+          'diagnostic 11'
+        ]
       }
     })
   })

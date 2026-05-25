@@ -22,6 +22,7 @@ export type LibraryBoundaryHostErrorDetails = {
   readonly executableName?: string
   readonly resourceRoot?: string
   readonly state?: LibraryBoundaryHostState
+  readonly startupDiagnostics?: readonly string[]
   readonly userDataPath?: string
   readonly userDataSource?: string
 }

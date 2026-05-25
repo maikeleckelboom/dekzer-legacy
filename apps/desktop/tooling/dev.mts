@@ -16,6 +16,18 @@ export type DevPreflightResult =
   | { kind: 'promptForReset'; lines: string[] }
   | { kind: 'abort'; lines: string[] }
 
+export type DevStorageCheckResult =
+  | {
+      readonly kind: 'checked'
+      readonly schema: { readonly state: StorageSchemaState; readonly detail?: string }
+      readonly storageRootPath: string
+      readonly userDataSource: 'environmentOverride' | 'developmentDefault'
+    }
+  | {
+      readonly kind: 'checkFailed'
+      readonly detail?: string
+    }
+
 export function evaluateDevPreflight(
   schemaState: StorageSchemaState,
   schemaDetail: string | undefined,
@@ -84,15 +96,19 @@ export function formatAbortCommands(): string[] {
   ]
 }
 
+export function formatCheckFailureMessage(detail: string | undefined): string[] {
+  const lines = ['', 'Could not verify development storage compatibility. Dekzer was not started.']
+
+  if (detail !== undefined) {
+    lines.push(`Detail: ${detail}`)
+  }
+
+  lines.push(...formatAbortCommands())
+  return lines
+}
+
 export type DevPreflightDeps = {
-  readonly checkStorage: () => Promise<
-    | {
-        readonly schema: { readonly state: StorageSchemaState; readonly detail?: string }
-        readonly storageRootPath: string
-        readonly userDataSource: 'environmentOverride' | 'developmentDefault'
-      }
-    | undefined
-  >
+  readonly checkStorage: () => Promise<DevStorageCheckResult>
   readonly resetStorage: () => Promise<number>
   readonly spawnDev: () => Promise<number>
   readonly isInteractive: () => boolean
@@ -104,9 +120,11 @@ export type DevPreflightDeps = {
 export async function runDevPreflight(deps: DevPreflightDeps): Promise<void> {
   const check = await deps.checkStorage()
 
-  if (check === undefined) {
-    deps.println('[dev] warning: could not check development storage status, starting anyway')
-    await deps.spawnDev()
+  if (check.kind === 'checkFailed') {
+    for (const line of formatCheckFailureMessage(check.detail)) {
+      deps.println(line)
+    }
+    deps.exit(1)
     return
   }
 
@@ -122,7 +140,7 @@ export async function runDevPreflight(deps: DevPreflightDeps): Promise<void> {
     if (result.message !== undefined) {
       deps.println(result.message)
     }
-    await deps.spawnDev()
+    await startDevOrExit(deps)
     return
   }
 
@@ -148,7 +166,14 @@ export async function runDevPreflight(deps: DevPreflightDeps): Promise<void> {
     deps.exit(1)
   }
 
-  await deps.spawnDev()
+  await startDevOrExit(deps)
+}
+
+async function startDevOrExit(deps: Pick<DevPreflightDeps, 'spawnDev' | 'exit'>): Promise<void> {
+  const exitCode = await deps.spawnDev()
+  if (exitCode !== 0) {
+    deps.exit(exitCode)
+  }
 }
 
 function resolveDesktopRoot(): string {
@@ -168,20 +193,22 @@ async function promptYesNo(): Promise<boolean> {
 }
 
 function spawnElectronViteDev(): Promise<number> {
-  const command = process.platform === 'win32' ? 'electron-vite.cmd' : 'electron-vite'
+  const command = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
   const desktopRoot = resolveDesktopRoot()
 
   return new Promise<number>((resolveExit) => {
-    const child = spawn(command, ['dev', '--ignoreConfigWarning'], {
+    const child = spawn(command, ['exec', 'electron-vite', 'dev', '--ignoreConfigWarning'], {
       cwd: desktopRoot,
       stdio: 'inherit'
     })
 
     child.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'ENOENT') {
-        console.error(`[dev] error: ${command} not found`)
+        console.error(`[dev] error: ${command} not found while starting electron-vite`)
       } else {
-        console.error(`[dev] error: failed to spawn ${command}: ${err.message}`)
+        console.error(
+          `[dev] error: failed to start electron-vite through ${command}: ${err.message}`
+        )
       }
       resolveExit(1)
     })
@@ -207,9 +234,15 @@ async function main(): Promise<void> {
   await runDevPreflight({
     checkStorage: async () => {
       try {
-        return await checkDevelopmentStorage(userDataPath, userDataSource)
-      } catch {
-        return undefined
+        const check = await checkDevelopmentStorage(userDataPath, userDataSource)
+        return {
+          kind: 'checked',
+          schema: check.schema,
+          storageRootPath: check.storageRootPath,
+          userDataSource: check.userDataSource
+        }
+      } catch (error: unknown) {
+        return checkFailed(errorDetail(error))
       }
     },
     resetStorage: () => spawnCargoStorageCommand(createResetArgs(userDataPath, userDataSource)),
@@ -226,4 +259,24 @@ const entryFile = process.argv[1] !== undefined ? resolve(process.argv[1]) : und
 
 if (entryFile === thisFile) {
   main()
+}
+
+function errorDetail(error: unknown): string | undefined {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'string') {
+    return error
+  }
+
+  return undefined
+}
+
+function checkFailed(detail: string | undefined): DevStorageCheckResult {
+  if (detail === undefined) {
+    return { kind: 'checkFailed' }
+  }
+
+  return { kind: 'checkFailed', detail }
 }

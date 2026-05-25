@@ -15,6 +15,8 @@ import {
 } from './config'
 import { LibraryBoundaryHostError, type LibraryBoundaryHostState } from './errors'
 
+const MAX_STARTUP_DIAGNOSTIC_LINES = 8
+
 export type LibraryBoundaryHostLogger = {
   warn(message?: unknown, ...optionalParams: unknown[]): void
   error?(message?: unknown, ...optionalParams: unknown[]): void
@@ -62,6 +64,7 @@ export class LibraryBoundaryHost {
   #startPromise: Promise<LibraryBoundaryHostClient> | undefined
   #state: LibraryBoundaryHostState = 'idle'
   #stopPromise: Promise<void> | undefined
+  #startupDiagnostics: string[] = []
   #transport: LibraryBoundaryHostTransport | undefined
 
   constructor(
@@ -126,6 +129,7 @@ export class LibraryBoundaryHost {
     }
 
     this.#state = 'starting'
+    this.#startupDiagnostics = []
     this.#startPromise = this.#start()
     return this.#startPromise
   }
@@ -165,8 +169,10 @@ export class LibraryBoundaryHost {
 
       this.#client = client
       this.#state = 'started'
+      this.#startupDiagnostics = []
       return client
     } catch (cause) {
+      const startupDiagnostics = this.#startupDiagnostics.slice()
       await this.#transport?.close().catch(() => undefined)
       this.#client = undefined
       this.#transport = undefined
@@ -181,7 +187,10 @@ export class LibraryBoundaryHost {
       throw new LibraryBoundaryHostError(
         'stdioTransportStartupFailure',
         'Failed to start the library boundary stdio transport.',
-        { cause }
+        {
+          cause,
+          details: startupDiagnostics.length === 0 ? {} : { startupDiagnostics }
+        }
       )
     }
   }
@@ -220,6 +229,16 @@ export class LibraryBoundaryHost {
   }
 
   #handleDiagnostic(diagnostic: LibraryBoundaryStdioDiagnostic): void {
+    if (this.#state === 'starting' && diagnostic.stream === 'stderr') {
+      this.#startupDiagnostics.push(diagnostic.line)
+      if (this.#startupDiagnostics.length > MAX_STARTUP_DIAGNOSTIC_LINES) {
+        this.#startupDiagnostics.splice(
+          0,
+          this.#startupDiagnostics.length - MAX_STARTUP_DIAGNOSTIC_LINES
+        )
+      }
+    }
+
     this.#logger.warn(`[library-boundary-host] ${diagnostic.stream}: ${diagnostic.line}`)
   }
 
