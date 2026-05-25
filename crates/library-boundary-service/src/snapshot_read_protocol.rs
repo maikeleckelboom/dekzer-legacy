@@ -665,6 +665,9 @@ const fn map_selected_contents_coverage_state(
         store::StoreSelectedContentsCoverageState::LocationMissing => {
             protocol::SelectedContentsCoverageState::LocationMissing
         }
+        store::StoreSelectedContentsCoverageState::Incomplete => {
+            protocol::SelectedContentsCoverageState::Incomplete
+        }
     }
 }
 

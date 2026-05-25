@@ -146,7 +146,7 @@ export type SelectedContentsState = "ready" | "empty" | "partial" | "sourceUnava
 
 export type SelectedContentsCoverage = { state: SelectedContentsCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
 
-export type SelectedContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
+export type SelectedContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
 
 export type SelectedContentsRow = { stableId: string, label: string, origin: SelectedContentsRowOrigin, libraryAssetId: string | null, rowVersion: string | null, primarySourceFileId: string | null, scopedSourceFileId: string, sourceId: string, relativePath: string, fileName: string, mediaClass: SelectedContentsMediaClass, availabilityState: LibraryAssetAvailabilityState, title: string | null, artist: string | null, album: string | null, durationMs: number | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary, updatedAtMs: number, };
 

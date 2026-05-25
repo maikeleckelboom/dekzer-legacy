@@ -452,6 +452,10 @@ function selectedContentsCoveragePrefix(result: SelectedContentsResult): string 
     return 'Indexing is incomplete.'
   }
 
+  if (result.coverage.state === 'incomplete') {
+    return 'One or more accepted source locations are missing. Results may be incomplete.'
+  }
+
   return undefined
 }
 

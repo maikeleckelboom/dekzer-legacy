@@ -65,6 +65,7 @@ export type SelectedContentsCoverageState =
   | 'failed'
   | 'sourceUnavailable'
   | 'locationMissing'
+  | 'incomplete'
 
 export type SelectedContentsCoverage = {
   readonly state: SelectedContentsCoverageState

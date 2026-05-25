@@ -408,6 +408,7 @@ pub enum SelectedContentsCoverageState {
     Failed,
     SourceUnavailable,
     LocationMissing,
+    Incomplete,
 }
 
 #[derive(

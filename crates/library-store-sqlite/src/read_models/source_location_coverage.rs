@@ -13,6 +13,17 @@ pub(crate) enum SourceLocationCoverage {
     Scanning,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AcceptedSourceLocationCoverage {
+    AllPresent,
+    AllMissing,
+    MixedMissing,
+    Blocked,
+    Failed,
+    Scanning,
+    Pending,
+}
+
 pub(crate) fn classify_source_location_coverage(
     connection: &Connection,
     source_id: i64,
@@ -64,38 +75,48 @@ pub(crate) fn classify_source_location_coverage(
 
 pub(crate) fn aggregate_source_location_coverages(
     coverages: &[SourceLocationCoverage],
-) -> SourceLocationCoverage {
+) -> AcceptedSourceLocationCoverage {
+    let mut has_present = false;
+    let mut has_missing = false;
     let mut has_blocked = false;
     let mut has_failed = false;
     let mut has_scanning = false;
-    let mut has_pending_or_unknown = false;
+    let mut has_pending = false;
 
     for coverage in coverages {
         match coverage {
-            SourceLocationCoverage::Missing => return SourceLocationCoverage::Missing,
+            SourceLocationCoverage::Present => has_present = true,
+            SourceLocationCoverage::Missing => has_missing = true,
             SourceLocationCoverage::Blocked => has_blocked = true,
             SourceLocationCoverage::Failed => has_failed = true,
             SourceLocationCoverage::Scanning => has_scanning = true,
-            SourceLocationCoverage::Pending => has_pending_or_unknown = true,
-            SourceLocationCoverage::Unknown => has_pending_or_unknown = true,
-            SourceLocationCoverage::Present => {}
+            SourceLocationCoverage::Pending => has_pending = true,
+            SourceLocationCoverage::Unknown => has_pending = true,
         }
     }
 
     if has_blocked {
-        return SourceLocationCoverage::Blocked;
+        return AcceptedSourceLocationCoverage::Blocked;
     }
     if has_failed {
-        return SourceLocationCoverage::Failed;
+        return AcceptedSourceLocationCoverage::Failed;
+    }
+    if has_missing && has_present {
+        return AcceptedSourceLocationCoverage::MixedMissing;
+    }
+    if has_missing && (has_scanning || has_pending) {
+        return AcceptedSourceLocationCoverage::MixedMissing;
+    }
+    if has_missing {
+        return AcceptedSourceLocationCoverage::AllMissing;
     }
     if has_scanning {
-        return SourceLocationCoverage::Scanning;
+        return AcceptedSourceLocationCoverage::Scanning;
     }
-    if has_pending_or_unknown {
-        return SourceLocationCoverage::Pending;
+    if has_pending {
+        return AcceptedSourceLocationCoverage::Pending;
     }
-
-    SourceLocationCoverage::Present
+    AcceptedSourceLocationCoverage::AllPresent
 }
 
 fn load_directory_presence_and_scan_state(
@@ -635,7 +656,8 @@ mod tests {
     }
 
     #[test]
-    fn aggregate_worst_coverage_wins() {
+    fn aggregate_all_present() {
+        use super::AcceptedSourceLocationCoverage;
         use super::aggregate_source_location_coverages;
 
         assert_eq!(
@@ -643,47 +665,173 @@ mod tests {
                 SourceLocationCoverage::Present,
                 SourceLocationCoverage::Present,
             ]),
-            SourceLocationCoverage::Present
+            AcceptedSourceLocationCoverage::AllPresent
         );
+    }
+
+    #[test]
+    fn aggregate_all_missing() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
+
+        assert_eq!(
+            aggregate_source_location_coverages(&[
+                SourceLocationCoverage::Missing,
+                SourceLocationCoverage::Missing,
+            ]),
+            AcceptedSourceLocationCoverage::AllMissing
+        );
+    }
+
+    #[test]
+    fn aggregate_present_plus_missing_is_mixed_missing() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
 
         assert_eq!(
             aggregate_source_location_coverages(&[
                 SourceLocationCoverage::Present,
-                SourceLocationCoverage::Blocked,
+                SourceLocationCoverage::Missing,
             ]),
-            SourceLocationCoverage::Blocked
+            AcceptedSourceLocationCoverage::MixedMissing
         );
+    }
+
+    #[test]
+    fn aggregate_missing_plus_blocked_is_blocked_not_missing() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
 
         assert_eq!(
             aggregate_source_location_coverages(&[
                 SourceLocationCoverage::Missing,
                 SourceLocationCoverage::Blocked,
             ]),
-            SourceLocationCoverage::Missing
+            AcceptedSourceLocationCoverage::Blocked
         );
+    }
+
+    #[test]
+    fn aggregate_missing_plus_failed_is_failed_not_missing() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
 
         assert_eq!(
             aggregate_source_location_coverages(&[
                 SourceLocationCoverage::Missing,
-                SourceLocationCoverage::Present,
+                SourceLocationCoverage::Failed,
             ]),
-            SourceLocationCoverage::Missing
+            AcceptedSourceLocationCoverage::Failed
         );
+    }
+
+    #[test]
+    fn aggregate_present_plus_blocked_is_blocked() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
+
+        assert_eq!(
+            aggregate_source_location_coverages(&[
+                SourceLocationCoverage::Present,
+                SourceLocationCoverage::Blocked,
+            ]),
+            AcceptedSourceLocationCoverage::Blocked
+        );
+    }
+
+    #[test]
+    fn aggregate_blocked_plus_scanning_is_blocked() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
 
         assert_eq!(
             aggregate_source_location_coverages(&[
                 SourceLocationCoverage::Blocked,
                 SourceLocationCoverage::Scanning,
             ]),
-            SourceLocationCoverage::Blocked
+            AcceptedSourceLocationCoverage::Blocked
         );
+    }
+
+    #[test]
+    fn aggregate_pending_plus_present_is_pending() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
 
         assert_eq!(
             aggregate_source_location_coverages(&[
                 SourceLocationCoverage::Pending,
                 SourceLocationCoverage::Present,
             ]),
-            SourceLocationCoverage::Pending
+            AcceptedSourceLocationCoverage::Pending
+        );
+    }
+
+    #[test]
+    fn aggregate_missing_plus_scanning_is_mixed_missing() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
+
+        assert_eq!(
+            aggregate_source_location_coverages(&[
+                SourceLocationCoverage::Missing,
+                SourceLocationCoverage::Scanning,
+            ]),
+            AcceptedSourceLocationCoverage::MixedMissing
+        );
+    }
+
+    #[test]
+    fn aggregate_missing_plus_pending_is_mixed_missing() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
+
+        assert_eq!(
+            aggregate_source_location_coverages(&[
+                SourceLocationCoverage::Missing,
+                SourceLocationCoverage::Pending,
+            ]),
+            AcceptedSourceLocationCoverage::MixedMissing
+        );
+    }
+
+    #[test]
+    fn aggregate_present_plus_missing_plus_blocked_is_blocked() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
+
+        assert_eq!(
+            aggregate_source_location_coverages(&[
+                SourceLocationCoverage::Present,
+                SourceLocationCoverage::Missing,
+                SourceLocationCoverage::Blocked,
+            ]),
+            AcceptedSourceLocationCoverage::Blocked
+        );
+    }
+
+    #[test]
+    fn aggregate_scanning_is_scanning() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
+
+        assert_eq!(
+            aggregate_source_location_coverages(&[
+                SourceLocationCoverage::Scanning,
+                SourceLocationCoverage::Scanning,
+            ]),
+            AcceptedSourceLocationCoverage::Scanning
+        );
+    }
+
+    #[test]
+    fn aggregate_unknown_is_pending() {
+        use super::AcceptedSourceLocationCoverage;
+        use super::aggregate_source_location_coverages;
+
+        assert_eq!(
+            aggregate_source_location_coverages(&[SourceLocationCoverage::Unknown]),
+            AcceptedSourceLocationCoverage::Pending
         );
     }
 }

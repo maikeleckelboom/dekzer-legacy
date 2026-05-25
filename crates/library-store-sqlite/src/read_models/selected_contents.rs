@@ -2,7 +2,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::browse_media::{SourceFileVisibility, source_file_visibility_predicate_sql_for_column};
 use crate::read_models::source_location_coverage::{
-    SourceLocationCoverage, aggregate_source_location_coverages, classify_source_location_coverage,
+    AcceptedSourceLocationCoverage, SourceLocationCoverage, aggregate_source_location_coverages,
+    classify_source_location_coverage,
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
@@ -40,6 +41,7 @@ pub enum StoreSelectedContentsCoverageState {
     Failed,
     SourceUnavailable,
     LocationMissing,
+    Incomplete,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -517,36 +519,43 @@ fn read_coverage(
             }
             let aggregate = aggregate_source_location_coverages(&coverages);
             match aggregate {
-                SourceLocationCoverage::Present => {}
-                SourceLocationCoverage::Missing => {
+                AcceptedSourceLocationCoverage::AllPresent => {}
+                AcceptedSourceLocationCoverage::AllMissing => {
                     return Ok(coverage(
                         StoreSelectedContentsCoverageState::LocationMissing,
                         false,
-                        "One or more accepted source locations are missing.",
+                        "All accepted source locations are missing.",
                     ));
                 }
-                SourceLocationCoverage::Blocked => {
+                AcceptedSourceLocationCoverage::MixedMissing => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Incomplete,
+                        false,
+                        "One or more accepted source locations are missing. Results may be incomplete.",
+                    ));
+                }
+                AcceptedSourceLocationCoverage::Blocked => {
                     return Ok(coverage(
                         StoreSelectedContentsCoverageState::Blocked,
                         false,
                         "One or more accepted source locations is under a blocked subtree.",
                     ));
                 }
-                SourceLocationCoverage::Failed => {
+                AcceptedSourceLocationCoverage::Failed => {
                     return Ok(coverage(
                         StoreSelectedContentsCoverageState::Failed,
                         false,
                         "One or more accepted source locations is under a failed subtree.",
                     ));
                 }
-                SourceLocationCoverage::Scanning => {
+                AcceptedSourceLocationCoverage::Scanning => {
                     return Ok(coverage(
                         StoreSelectedContentsCoverageState::Scanning,
                         false,
                         "One or more accepted source locations is being scanned.",
                     ));
                 }
-                SourceLocationCoverage::Pending | SourceLocationCoverage::Unknown => {
+                AcceptedSourceLocationCoverage::Pending => {
                     return Ok(coverage(
                         pending_or_scanning_coverage_state(source),
                         false,
@@ -880,7 +889,8 @@ fn selected_contents_state(
             }
         }
         StoreSelectedContentsCoverageState::Pending
-        | StoreSelectedContentsCoverageState::Scanning => StoreSelectedContentsState::Partial,
+        | StoreSelectedContentsCoverageState::Scanning
+        | StoreSelectedContentsCoverageState::Incomplete => StoreSelectedContentsState::Partial,
         StoreSelectedContentsCoverageState::Blocked => StoreSelectedContentsState::Blocked,
         StoreSelectedContentsCoverageState::Failed => StoreSelectedContentsState::Failed,
         StoreSelectedContentsCoverageState::SourceUnavailable => {
@@ -902,6 +912,9 @@ fn selected_contents_detail(
         StoreSelectedContentsState::Partial => Some(match coverage_state {
             StoreSelectedContentsCoverageState::Scanning => {
                 "Still indexing. Results may be incomplete."
+            }
+            StoreSelectedContentsCoverageState::Incomplete => {
+                "One or more accepted source locations are missing. Results may be incomplete."
             }
             _ => "Indexing is incomplete. Results may be incomplete.",
         }),
@@ -2995,6 +3008,394 @@ mod tests {
             source_result_blocked.coverage.state,
             StoreSelectedContentsCoverageState::Blocked,
             "Source with blocked accepted location must be blocked"
+        );
+    }
+
+    #[test]
+    fn accepted_locations_mixed_present_rows_plus_missing_is_not_location_missing() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_scanned_file(&connection, 5000, 1, 11, "Music/Good/track.wav", "audio");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Good",
+            "user",
+            "registered_subpath",
+        );
+        insert_location(
+            &connection,
+            101,
+            1,
+            "Music/DeletedFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert!(
+            !result.rows.is_empty(),
+            "rows from present accepted location must be returned"
+        );
+        assert_ne!(
+            result.state,
+            StoreSelectedContentsState::LocationMissing,
+            "mixed present + missing must not be LocationMissing"
+        );
+        assert_ne!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::LocationMissing,
+            "mixed present + missing coverage must not be LocationMissing"
+        );
+        assert_ne!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "mixed present + missing coverage must not be Complete"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Incomplete,
+            "mixed present + missing coverage must be Incomplete"
+        );
+        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn accepted_locations_mixed_present_empty_plus_missing_is_not_location_missing() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Empty", "complete");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Empty",
+            "user",
+            "registered_subpath",
+        );
+        insert_location(
+            &connection,
+            101,
+            1,
+            "Music/DeletedFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_ne!(
+            result.state,
+            StoreSelectedContentsState::Empty,
+            "mixed present + missing must not be Empty"
+        );
+        assert_ne!(
+            result.state,
+            StoreSelectedContentsState::LocationMissing,
+            "mixed present + missing must not be LocationMissing"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Incomplete,
+            "mixed present + missing coverage must be Incomplete"
+        );
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn accepted_locations_all_missing_is_location_missing() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Gone1",
+            "user",
+            "registered_subpath",
+        );
+        insert_location(
+            &connection,
+            101,
+            1,
+            "Music/Gone2",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(
+            result.state,
+            StoreSelectedContentsState::LocationMissing,
+            "all missing accepted locations must be LocationMissing"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::LocationMissing,
+            "all missing coverage must be LocationMissing"
+        );
+        assert!(result.rows.is_empty());
+        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.coverage.recursive_scope_complete);
+    }
+
+    #[test]
+    fn accepted_locations_present_plus_blocked_returns_rows_and_blocked_coverage() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_directory(&connection, 12, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Good",
+            "user",
+            "registered_subpath",
+        );
+        insert_location(
+            &connection,
+            101,
+            1,
+            "Music/Locked",
+            "user",
+            "registered_subpath",
+        );
+        insert_asset_file(
+            &connection,
+            1,
+            1000,
+            1,
+            11,
+            "Music/Good/track.wav",
+            "audio",
+            "Track",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert!(
+            !result.rows.is_empty(),
+            "rows from present accepted location must be returned"
+        );
+        assert_ne!(
+            result.state,
+            StoreSelectedContentsState::LocationMissing,
+            "present + blocked must not be LocationMissing"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Blocked,
+            "present + blocked must be Blocked coverage"
+        );
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn accepted_locations_present_plus_failed_returns_rows_and_failed_coverage() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_directory(&connection, 12, 1, "Music/Crashed", "complete");
+        set_directory_scan_issue(&connection, 12, "failed", "unknown_io");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Good",
+            "user",
+            "registered_subpath",
+        );
+        insert_location(
+            &connection,
+            101,
+            1,
+            "Music/Crashed",
+            "user",
+            "registered_subpath",
+        );
+        insert_asset_file(
+            &connection,
+            1,
+            1000,
+            1,
+            11,
+            "Music/Good/track.wav",
+            "audio",
+            "Track",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert!(
+            !result.rows.is_empty(),
+            "rows from present accepted location must be returned"
+        );
+        assert_ne!(
+            result.state,
+            StoreSelectedContentsState::LocationMissing,
+            "present + failed must not be LocationMissing"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Failed,
+            "present + failed must be Failed coverage"
+        );
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn accepted_locations_all_present_complete_no_rows_is_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Empty", "complete");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Empty",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Empty);
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete
+        );
+        assert!(result.coverage.recursive_scope_complete);
+        assert!(result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn accepted_locations_all_present_complete_with_rows_is_ready() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Good",
+            "user",
+            "registered_subpath",
+        );
+        insert_asset_file(
+            &connection,
+            1,
+            1000,
+            1,
+            11,
+            "Music/Good/track.wav",
+            "audio",
+            "Track",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete
+        );
+        assert!(result.coverage.recursive_scope_complete);
+    }
+
+    #[test]
+    fn direct_source_location_missing_still_returns_location_missing() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Deleted",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(
+            result.state,
+            StoreSelectedContentsState::LocationMissing,
+            "direct SourceLocation missing must remain LocationMissing"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::LocationMissing,
+            "direct SourceLocation missing coverage must be LocationMissing"
         );
     }
 }
