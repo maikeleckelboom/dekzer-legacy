@@ -35,7 +35,10 @@ const safeChildReadRequestFailure = 'Unable to request library hierarchy directo
 const safeUnexpectedChildWindowFailure = 'The hierarchy read returned an unexpected child window.'
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
-export type LibraryBrowserApi = RendererApi['library']
+export type LibraryHierarchyReadApi = Pick<
+  RendererApi['library'],
+  'host' | 'navigation' | 'hierarchy'
+>
 
 export type LibraryHierarchyReadController = {
   readonly hostStatus: Ref<LibraryBoundaryHostStatus | undefined>
@@ -58,7 +61,7 @@ export type LibraryHierarchyReadController = {
 }
 
 export function useLibraryHierarchyRead(
-  libraryApi: LibraryBrowserApi = getRendererApi().library
+  libraryApi: LibraryHierarchyReadApi = getRendererApi().library
 ): LibraryHierarchyReadController {
   const controller = createLibraryHierarchyReadController(libraryApi)
 
@@ -78,7 +81,7 @@ function getRendererApi(): RendererApi {
 }
 
 export function createLibraryHierarchyReadController(
-  libraryApi: LibraryBrowserApi
+  libraryApi: LibraryHierarchyReadApi
 ): LibraryHierarchyReadController {
   const hostStatus = ref<LibraryBoundaryHostStatus>()
   const navigationReadResult = ref<NavigationReadRowsResult>()

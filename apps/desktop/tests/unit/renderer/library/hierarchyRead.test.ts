@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createLibraryHierarchyReadController,
-  type LibraryBrowserApi
+  type LibraryHierarchyReadApi
 } from '../../../../src/renderer/library/boundary/hierarchyRead'
 import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
 import type {
@@ -187,9 +187,9 @@ describe('createLibraryHierarchyReadController', () => {
 })
 
 function testLibraryApi(options: {
-  readonly readRows?: LibraryBrowserApi['navigation']['readRows']
+  readonly readRows?: LibraryHierarchyReadApi['navigation']['readRows']
   readonly readChildren: (request: ReadRequest) => Promise<ReadResult>
-}): LibraryBrowserApi {
+}): LibraryHierarchyReadApi {
   return {
     host: {
       getStatus: async () => ({
@@ -213,43 +213,6 @@ function testLibraryApi(options: {
     },
     hierarchy: {
       readChildren: options.readChildren
-    },
-    selectedContents: {
-      read: async () => ({
-        state: 'readFailed',
-        error: {
-          code: 'readFailed',
-          message: 'Selected contents should not be called by hierarchy read tests.'
-        }
-      })
-    },
-    roots: {
-      chooseAndRegisterLocal: async () => ({ state: 'canceled' }),
-      runScan: async () => ({
-        state: 'scanFailed',
-        error: {
-          code: 'scanFailed',
-          message: 'Local root scan should not be called by hierarchy read tests.'
-        }
-      }),
-      readLocalRoots: async () => ({
-        state: 'hostFailed',
-        error: {
-          code: 'hostFailed',
-          message: 'Local root read should not be called by hierarchy read tests.'
-        }
-      }),
-      unregisterLocalRoot: async () => ({
-        state: 'invalidRequest',
-        error: {
-          code: 'invalidRequest',
-          message: 'Local root unregister should not be called by hierarchy read tests.'
-        }
-      })
-    },
-    viewState: {
-      readViewState: async () => ({ state: 'empty' }),
-      writeViewState: async () => ({ state: 'written' })
     }
   }
 }
