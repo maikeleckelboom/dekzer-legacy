@@ -1,5 +1,6 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
+use crate::browse_media::{SourceFileVisibility, source_file_visibility_predicate_sql};
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,7 +34,8 @@ pub struct StoreLiteralHierarchyNode {
     pub modified_at_ns: Option<i64>,
     pub updated_at: i64,
     pub has_child_directories: Option<bool>,
-    pub has_media_descendant: Option<bool>,
+    pub has_primary_media_descendant: Option<bool>,
+    pub has_image_media_descendant: Option<bool>,
     pub dir_scan_state: Option<String>,
 }
 
@@ -50,7 +52,7 @@ struct SourceLocationAnchor {
     relative_path: String,
 }
 
-const DEFAULT_BROWSE_FILE_PREDICATE_SQL: &str = "media_class IN ('audio', 'video', 'image')";
+const RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL: &str = "char(48)";
 
 pub(crate) fn read_children(
     connection: &Connection,
@@ -58,6 +60,7 @@ pub(crate) fn read_children(
     parent_source_directory_id: Option<i64>,
     offset: usize,
     limit: usize,
+    source_file_visibility: SourceFileVisibility,
 ) -> LibrarySqliteResult<Option<StoreLiteralHierarchyWindow>> {
     let Some(anchor) = resolve_read_anchor(connection, entry_point, parent_source_directory_id)?
     else {
@@ -79,6 +82,7 @@ pub(crate) fn read_children(
         connection,
         anchor.source_id,
         anchor.effective_parent_source_directory_id,
+        source_file_visibility,
     )?;
     let rows = read_child_rows(
         connection,
@@ -86,6 +90,7 @@ pub(crate) fn read_children(
         anchor.effective_parent_source_directory_id,
         offset,
         limit,
+        source_file_visibility,
     )?;
 
     Ok(Some(StoreLiteralHierarchyWindow {
@@ -276,7 +281,10 @@ fn read_child_count(
     connection: &Connection,
     source_id: i64,
     parent_source_directory_id: Option<i64>,
+    source_file_visibility: SourceFileVisibility,
 ) -> LibrarySqliteResult<usize> {
+    let directory_visibility_predicate = directory_visibility_predicate_sql(source_file_visibility);
+    let file_visibility_predicate = source_file_visibility_predicate_sql(source_file_visibility);
     let count = connection.query_row(
         &format!(
             "SELECT (
@@ -288,12 +296,13 @@ fn read_child_count(
                     (?2 IS NULL AND parent_source_directory_id IS NULL)
                     OR parent_source_directory_id = ?2
                )
+               AND {directory_visibility_predicate}
          ) + (
              SELECT COUNT(*)
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
-               AND {DEFAULT_BROWSE_FILE_PREDICATE_SQL}
+               AND {file_visibility_predicate}
                AND (
                     (?2 IS NULL AND parent_source_directory_id IS NULL)
                     OR parent_source_directory_id = ?2
@@ -316,6 +325,7 @@ fn read_child_rows(
     parent_source_directory_id: Option<i64>,
     offset: usize,
     limit: usize,
+    source_file_visibility: SourceFileVisibility,
 ) -> LibrarySqliteResult<Vec<StoreLiteralHierarchyNode>> {
     let offset = i64::try_from(offset).map_err(|_| {
         LibrarySqliteError::WriteInvariant("literal hierarchy offset does not fit i64".to_string())
@@ -323,6 +333,8 @@ fn read_child_rows(
     let limit = i64::try_from(limit).map_err(|_| {
         LibrarySqliteError::WriteInvariant("literal hierarchy limit does not fit i64".to_string())
     })?;
+    let directory_visibility_predicate = directory_visibility_predicate_sql(source_file_visibility);
+    let file_visibility_predicate = source_file_visibility_predicate_sql(source_file_visibility);
     let mut statement = connection.prepare(&format!(
         "SELECT node_kind,
                 source_id,
@@ -337,7 +349,8 @@ fn read_child_rows(
                 modified_at_ns,
                 updated_at,
                 has_child_directories,
-                has_media_descendant,
+                has_primary_media_descendant,
+                has_image_media_descendant,
                 dir_scan_state
          FROM (
              SELECT 0 AS sort_kind,
@@ -354,15 +367,17 @@ fn read_child_rows(
                     NULL AS modified_at_ns,
                     updated_at,
                     has_child_directories,
-                    has_media_descendant,
+                    has_primary_media_descendant,
+                    has_image_media_descendant,
                     dir_scan_state
              FROM source_directories
              WHERE source_id = ?1
                AND presence_state = 'present'
                AND (
-                    (?2 IS NULL AND parent_source_directory_id IS NULL)
+                   (?2 IS NULL AND parent_source_directory_id IS NULL)
                     OR parent_source_directory_id = ?2
                )
+               AND {directory_visibility_predicate}
              UNION ALL
              SELECT 1 AS sort_kind,
                     'file' AS node_kind,
@@ -378,12 +393,13 @@ fn read_child_rows(
                     mtime_ns AS modified_at_ns,
                     updated_at,
                     NULL AS has_child_directories,
-                    NULL AS has_media_descendant,
+                    NULL AS has_primary_media_descendant,
+                    NULL AS has_image_media_descendant,
                     NULL AS dir_scan_state
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
-               AND {DEFAULT_BROWSE_FILE_PREDICATE_SQL}
+               AND {file_visibility_predicate}
                AND (
                     (?2 IS NULL AND parent_source_directory_id IS NULL)
                     OR parent_source_directory_id = ?2
@@ -414,8 +430,9 @@ fn read_child_rows(
                     modified_at_ns: row.get(10)?,
                     updated_at: row.get(11)?,
                     has_child_directories: row.get(12)?,
-                    has_media_descendant: row.get(13)?,
-                    dir_scan_state: row.get(14)?,
+                    has_primary_media_descendant: row.get(13)?,
+                    has_image_media_descendant: row.get(14)?,
+                    dir_scan_state: row.get(15)?,
                 })
             },
         )?
@@ -423,9 +440,33 @@ fn read_child_rows(
     Ok(rows)
 }
 
+fn directory_visibility_predicate_sql(source_file_visibility: SourceFileVisibility) -> String {
+    let revealable_descendant_predicate = match source_file_visibility {
+        SourceFileVisibility::Performance => "has_primary_media_descendant = 1",
+        SourceFileVisibility::PerformanceAndImages => {
+            "(has_primary_media_descendant = 1 OR has_image_media_descendant = 1)"
+        }
+    };
+
+    format!(
+        "(dir_scan_state <> 'complete'
+          OR {revealable_descendant_predicate}
+          OR EXISTS (
+              SELECT 1
+              FROM source_directories descendant
+              WHERE descendant.source_id = source_directories.source_id
+                AND descendant.presence_state = 'present'
+                AND descendant.relative_path COLLATE BINARY >= source_directories.relative_path || '/'
+                AND descendant.relative_path COLLATE BINARY < source_directories.relative_path || {RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL}
+                AND descendant.dir_scan_state <> 'complete'
+          ))"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::{StoreLiteralHierarchyEntryPoint, read_children};
+    use crate::SourceFileVisibility;
     use crate::schema::install_baseline_schema_for_test;
     use rusqlite::{Connection, params};
 
@@ -453,13 +494,18 @@ mod tests {
             .expect("insert source");
     }
 
+    struct DirectoryFacts {
+        has_child_directories: bool,
+        has_primary_media_descendant: bool,
+        has_image_media_descendant: bool,
+    }
+
     fn insert_directory(
         connection: &Connection,
         source_directory_id: i64,
         parent_source_directory_id: Option<i64>,
         name: &str,
-        has_child_directories: bool,
-        has_media_descendant: bool,
+        facts: DirectoryFacts,
         dir_scan_state: &str,
     ) {
         connection
@@ -472,19 +518,21 @@ mod tests {
                      relative_path,
                      presence_state,
                      has_child_directories,
-                     has_media_descendant,
+                     has_primary_media_descendant,
+                     has_image_media_descendant,
                      dir_scan_state,
                      dir_scan_updated_at,
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 7, ?2, ?3, ?3, 'present', ?4, ?5, ?6, 1, 1, 1)",
+                 VALUES (?1, 7, ?2, ?3, ?3, 'present', ?4, ?5, ?6, ?7, 1, 1, 1)",
                 params![
                     source_directory_id,
                     parent_source_directory_id,
                     name,
-                    has_child_directories,
-                    has_media_descendant,
+                    facts.has_child_directories,
+                    facts.has_primary_media_descendant,
+                    facts.has_image_media_descendant,
                     dir_scan_state
                 ],
             )
@@ -530,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn default_browse_file_rows_include_product_visible_media_classes() {
+    fn performance_file_rows_include_primary_media_only() {
         let connection = test_connection();
         insert_source(&connection, 7);
 
@@ -550,6 +598,44 @@ mod tests {
             None,
             0,
             10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        let media_classes = window
+            .rows
+            .iter()
+            .map(|row| (row.display_name.as_str(), row.media_class.as_deref()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            media_classes,
+            vec![("clip.mp4", Some("video")), ("track.flac", Some("audio"))]
+        );
+    }
+
+    #[test]
+    fn performance_and_images_file_rows_include_image_media() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+
+        for (source_file_id, name, media_class) in [
+            (11, "track.flac", "audio"),
+            (12, "clip.mp4", "video"),
+            (13, "cover.jpg", "image"),
+            (14, "notes.txt", "unsupported"),
+            (15, "mystery", "none"),
+        ] {
+            insert_file(&connection, source_file_id, name, media_class);
+        }
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::PerformanceAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -563,14 +649,14 @@ mod tests {
             media_classes,
             vec![
                 ("clip.mp4", Some("video")),
-                ("cover.mp3", Some("image")),
+                ("cover.jpg", Some("image")),
                 ("track.flac", Some("audio")),
             ]
         );
     }
 
     #[test]
-    fn default_browse_total_rows_excludes_unsupported_and_none_files() {
+    fn performance_total_rows_excludes_image_unsupported_and_none_files() {
         let connection = test_connection();
         insert_source(&connection, 7);
         insert_file(&connection, 11, "track.flac", "audio");
@@ -585,6 +671,32 @@ mod tests {
             None,
             0,
             10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(window.total_rows, 2);
+        assert_eq!(window.rows.len(), 2);
+    }
+
+    #[test]
+    fn performance_and_images_total_rows_excludes_unsupported_and_none_files() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_file(&connection, 11, "track.flac", "audio");
+        insert_file(&connection, 12, "clip.mp4", "video");
+        insert_file(&connection, 13, "cover.jpg", "image");
+        insert_file(&connection, 14, "notes.txt", "unsupported");
+        insert_file(&connection, 15, "mystery", "none");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::PerformanceAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -594,7 +706,7 @@ mod tests {
     }
 
     #[test]
-    fn default_browse_paginates_over_product_visible_files_only() {
+    fn performance_paginates_over_primary_media_files_only() {
         let connection = test_connection();
         insert_source(&connection, 7);
 
@@ -616,6 +728,7 @@ mod tests {
             None,
             0,
             1,
+            SourceFileVisibility::Performance,
         )
         .expect("read first literal hierarchy page")
         .expect("source window");
@@ -625,6 +738,7 @@ mod tests {
             None,
             1,
             1,
+            SourceFileVisibility::Performance,
         )
         .expect("read second literal hierarchy page")
         .expect("source window");
@@ -650,10 +764,21 @@ mod tests {
     }
 
     #[test]
-    fn default_browse_directories_remain_visible_when_file_rows_are_hidden() {
+    fn performance_keeps_incomplete_directories_visible_when_file_rows_are_hidden() {
         let connection = test_connection();
         insert_source(&connection, 7);
-        insert_directory(&connection, 21, None, "Documents", false, false, "complete");
+        insert_directory(
+            &connection,
+            21,
+            None,
+            "Documents",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "pending",
+        );
         insert_file_in_directory(
             &connection,
             31,
@@ -668,6 +793,7 @@ mod tests {
             None,
             0,
             10,
+            SourceFileVisibility::Performance,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -677,6 +803,7 @@ mod tests {
             Some(21),
             0,
             10,
+            SourceFileVisibility::Performance,
         )
         .expect("read literal hierarchy directory")
         .expect("directory window");
@@ -692,5 +819,86 @@ mod tests {
         );
         assert_eq!(directory_window.total_rows, 0);
         assert!(directory_window.rows.is_empty());
+    }
+
+    #[test]
+    fn image_only_complete_folder_is_hidden_in_performance_mode() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            21,
+            None,
+            "Covers",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: true,
+            },
+            "complete",
+        );
+        insert_file_in_directory(&connection, 31, Some(21), "Covers/front.jpg", "image");
+
+        let root_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy root")
+        .expect("source window");
+
+        assert_eq!(root_window.total_rows, 0);
+        assert!(root_window.rows.is_empty());
+    }
+
+    #[test]
+    fn image_only_complete_folder_is_visible_in_performance_and_images_mode() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            21,
+            None,
+            "Covers",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: true,
+            },
+            "complete",
+        );
+        insert_file_in_directory(&connection, 31, Some(21), "Covers/front.jpg", "image");
+
+        let root_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::PerformanceAndImages,
+        )
+        .expect("read literal hierarchy root")
+        .expect("source window");
+        let directory_window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(21),
+            0,
+            10,
+            SourceFileVisibility::PerformanceAndImages,
+        )
+        .expect("read literal hierarchy directory")
+        .expect("directory window");
+
+        assert_eq!(root_window.total_rows, 1);
+        assert_eq!(root_window.rows[0].display_name, "Covers");
+        assert_eq!(directory_window.total_rows, 1);
+        assert_eq!(
+            directory_window.rows[0].media_class.as_deref(),
+            Some("image")
+        );
     }
 }

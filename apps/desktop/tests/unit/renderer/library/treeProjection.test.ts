@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import type { LibraryBoundaryHostStatus } from '../../../../src/shared/libraryBoundary/status'
-import type { ChildRow, EntryPoint } from '../../../../src/shared/libraryHierarchy/readChildren'
+import type {
+  ChildRow,
+  EntryPoint,
+  SourceFileVisibility
+} from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow,
@@ -62,7 +66,8 @@ describe('projectState', () => {
       ownerNodeId: 'navigation-row:7',
       entryPoint: sourceEntryPoint(),
       offset: 2,
-      limit: 50
+      limit: 50,
+      sourceFileVisibility: 'performance'
     })
     expect(findNode(projection.nodes, 'more:navigation-row:7:2')?.action).toMatchObject({
       kind: 'loadMore',
@@ -102,11 +107,15 @@ describe('projectState', () => {
   it('projects literal file presentation from backend media class', () => {
     const projection = projectTree(
       browserState({
-        sourceChildren: loadedChildren([
-          fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
-          fileNode('13', 'clip.wav', { mediaClass: 'video' }),
-          fileNode('14', 'track.raw', { mediaClass: 'audio' })
-        ])
+        sourceFileVisibility: 'performanceAndImages',
+        sourceChildren: loadedChildren(
+          [
+            fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
+            fileNode('13', 'clip.wav', { mediaClass: 'video' }),
+            fileNode('14', 'track.raw', { mediaClass: 'audio' })
+          ],
+          { sourceFileVisibility: 'performanceAndImages' }
+        )
       })
     )
 
@@ -179,7 +188,8 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: false,
-            directoryMediaState: { kind: 'unknown' },
+            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'pending'
           })
         ])
@@ -202,7 +212,8 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: false,
-            directoryMediaState: { kind: 'unknown' },
+            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'pending'
           })
         ])
@@ -224,7 +235,8 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: false,
-            directoryMediaState: { kind: 'unknown' },
+            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'pending'
           })
         ]),
@@ -313,7 +325,8 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: false,
-            directoryMediaState: { kind: 'noMediaDescendants' },
+            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete'
           })
         ])
@@ -359,7 +372,8 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: false,
-            directoryMediaState: { kind: 'noMediaDescendants' },
+            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete'
           })
         ])
@@ -416,6 +430,7 @@ function browserState(
     readonly rows?: readonly NavigationRow[]
     readonly sourceChildren?: LoadedChildren
     readonly directoryStates?: BrowserState['directoryReadStates']
+    readonly sourceFileVisibility?: SourceFileVisibility
   } = {}
 ): BrowserState {
   return {
@@ -432,7 +447,8 @@ function browserState(
               }
             ]
           ]),
-    directoryReadStates: options.directoryStates ?? new Map()
+    directoryReadStates: options.directoryStates ?? new Map(),
+    sourceFileVisibility: options.sourceFileVisibility ?? 'performance'
   }
 }
 
@@ -447,6 +463,7 @@ function loadedChildren(
   rows: readonly ChildRow[],
   options: {
     readonly totalRows?: number
+    readonly sourceFileVisibility?: SourceFileVisibility
   } = {}
 ): LoadedChildren {
   const totalRows = options.totalRows ?? rows.length
@@ -455,6 +472,7 @@ function loadedChildren(
   return {
     entryPoint: sourceEntryPoint(),
     label: 'Source Fixture',
+    sourceFileVisibility: options.sourceFileVisibility ?? 'performance',
     rows,
     totalRows,
     ...(nextOffset === undefined ? {} : { nextOffset }),
@@ -529,10 +547,14 @@ function directoryNode(
   label: string,
   options: {
     readonly hasChildDirectories?: boolean
-    readonly directoryMediaState?: Extract<
+    readonly directoryPrimaryMediaState?: Extract<
       ChildRow,
       { readonly kind: 'directory' }
-    >['directoryMediaState']
+    >['directoryPrimaryMediaState']
+    readonly directoryImageMediaState?: Extract<
+      ChildRow,
+      { readonly kind: 'directory' }
+    >['directoryImageMediaState']
     readonly directoryScanState?: Extract<
       ChildRow,
       { readonly kind: 'directory' }
@@ -547,7 +569,12 @@ function directoryNode(
     directoryId,
     presence: 'present',
     hasChildDirectories: options.hasChildDirectories ?? true,
-    directoryMediaState: options.directoryMediaState ?? { kind: 'hasMediaDescendants' },
+    directoryPrimaryMediaState: options.directoryPrimaryMediaState ?? {
+      kind: 'hasPrimaryMediaDescendants'
+    },
+    directoryImageMediaState: options.directoryImageMediaState ?? {
+      kind: 'noImageMediaDescendants'
+    },
     directoryScanState: options.directoryScanState ?? 'scanning',
     updatedAtMs: 100
   }

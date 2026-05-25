@@ -114,7 +114,7 @@ describe('projectContents', () => {
     expect(empty.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No media found'
+      label: 'No primary media found'
     })
 
     const partial = projectForSelection(
@@ -251,7 +251,8 @@ function browserState(options: {
       rows: [sourceNavigationRow()]
     },
     sourceReadStates: sourceStates,
-    directoryReadStates: options.directoryStates ?? new Map()
+    directoryReadStates: options.directoryStates ?? new Map(),
+    sourceFileVisibility: 'performance'
   }
 }
 
@@ -271,6 +272,7 @@ function loadedChildren(
     ...(options.parentDirectoryId === undefined
       ? {}
       : { parentDirectoryId: options.parentDirectoryId }),
+    sourceFileVisibility: 'performance',
     rows,
     totalRows,
     ...(nextOffset === undefined ? {} : { nextOffset }),
@@ -309,7 +311,8 @@ function directoryNode(
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
     hasChildDirectories: true,
-    directoryMediaState: { kind: 'hasMediaDescendants' },
+    directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+    directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'scanning',
     updatedAtMs: 100
   }

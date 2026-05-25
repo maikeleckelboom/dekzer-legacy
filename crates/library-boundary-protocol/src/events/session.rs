@@ -162,7 +162,7 @@ mod tests {
         ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsRequest, ReadSelectedContentsRequest,
         SearchNavigationNodeLibraryBrowserWindowRequest, SelectedContentsScope,
-        SnapshotReadCommand,
+        SnapshotReadCommand, SourceFileVisibility,
     };
     use serde_json::json;
 
@@ -196,6 +196,7 @@ mod tests {
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 100,
+                    source_file_visibility: Some(SourceFileVisibility::Performance),
                 },
             ),
             SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(

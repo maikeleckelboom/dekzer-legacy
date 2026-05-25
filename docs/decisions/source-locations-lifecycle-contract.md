@@ -131,8 +131,8 @@ Finalizing an affected subtree means the authority performs all of the following
   deletion or a repair rebuild that recreates canonical rows
 - updates `source_directories.dir_scan_state`, `dir_scan_updated_at`, `scanned_at`, and scan error fields for every
   affected directory
-- updates `source_directories.has_child_directories` and `source_directories.has_media_descendant` for the affected
-  directory and all impacted ancestors
+- updates `source_directories.has_child_directories`, `source_directories.has_primary_media_descendant`, and
+  `source_directories.has_image_media_descendant` for the affected directory and all impacted ancestors
 - updates source-level `source_scan_state.scan_phase` after directory-level coverage has been reconciled
 - commits browser/content projection invalidation in the same transaction, so subscribers cannot observe half-finalized
   hierarchy state
@@ -173,8 +173,8 @@ Badges remain reserved for exceptional or actionable state.
 A source can conceptually behave as a library-root source or a container source. MVP derives this from accepted source
 locations rather than storing a separate source-scope enum.
 
-- Zero accepted user-visible source locations: source selection means whole-source recursive media, provided the source
-  root is readable.
+- Zero accepted user-visible source locations: source selection means whole-source recursive primary media, provided the
+  source root is readable.
 - One or more accepted user-visible source locations: source selection means the aggregate of those accepted source
   locations.
 
@@ -223,7 +223,8 @@ Implementation is allowed only after:
 
 - the greenfield baseline SQL is edited directly; do not create a patch migration for this pass
 - `source_directories.has_child_directories` exists in the baseline schema
-- `source_directories.has_media_descendant` exists in the baseline schema and replaces `media_browseability`
+- `source_directories.has_primary_media_descendant` exists in the baseline schema
+- `source_directories.has_image_media_descendant` exists in the baseline schema
 - `source_directories.dir_scan_state` exists in the baseline schema
 - `source_directories.mtime_ns` exists in the baseline schema
 - `source_directories.scanned_at` exists in the baseline schema

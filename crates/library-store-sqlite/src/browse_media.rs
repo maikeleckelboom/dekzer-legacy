@@ -23,6 +23,43 @@ impl BrowseMediaClass {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SourceFileVisibility {
+    Performance,
+    PerformanceAndImages,
+}
+
+pub(crate) fn is_primary_media_class(media_class: &str) -> bool {
+    matches!(media_class, "audio" | "video")
+}
+
+pub(crate) fn is_image_media_class(media_class: &str) -> bool {
+    media_class == "image"
+}
+
+pub(crate) fn source_file_visibility_predicate_sql(
+    source_file_visibility: SourceFileVisibility,
+) -> &'static str {
+    match source_file_visibility {
+        SourceFileVisibility::Performance => "media_class IN ('audio', 'video')",
+        SourceFileVisibility::PerformanceAndImages => "media_class IN ('audio', 'video', 'image')",
+    }
+}
+
+pub(crate) fn source_file_visibility_predicate_sql_for_column(
+    source_file_visibility: SourceFileVisibility,
+    column_sql: &str,
+) -> String {
+    match source_file_visibility {
+        SourceFileVisibility::Performance => {
+            format!("{column_sql} IN ('audio', 'video')")
+        }
+        SourceFileVisibility::PerformanceAndImages => {
+            format!("{column_sql} IN ('audio', 'video', 'image')")
+        }
+    }
+}
+
 pub(crate) fn canonical_media_class_from_file_kind(
     file_kind: Option<&str>,
 ) -> Option<BrowseMediaClass> {

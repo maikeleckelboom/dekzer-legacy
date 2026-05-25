@@ -1,5 +1,9 @@
 import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
-import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
+import type {
+  EntryPoint,
+  ChildRow,
+  SourceFileVisibility
+} from '../../shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow
@@ -22,6 +26,7 @@ export type MoreTarget = {
   readonly entryPoint: EntryPoint
   readonly parentDirectoryId?: string
   readonly label?: string
+  readonly sourceFileVisibility: SourceFileVisibility
   readonly offset: number
   readonly limit: number
 }
@@ -42,6 +47,7 @@ export type LoadedChildren = {
   readonly entryPoint: EntryPoint
   readonly parentDirectoryId?: string
   readonly label?: string
+  readonly sourceFileVisibility: SourceFileVisibility
   readonly rows: readonly ChildRow[]
   readonly totalRows: number
   readonly nextOffset?: number
@@ -131,6 +137,7 @@ export type RowBinding =
 export type BrowserState = {
   readonly hostStatus?: LibraryBoundaryHostStatus
   readonly navigationReadResult?: NavigationReadRowsResult
+  readonly sourceFileVisibility: SourceFileVisibility
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
 }

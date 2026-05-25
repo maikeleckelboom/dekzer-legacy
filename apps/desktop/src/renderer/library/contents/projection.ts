@@ -24,7 +24,6 @@ export type ContentRowIcon =
   | 'folder'
   | 'music'
   | 'video'
-  | 'image'
   | 'cueSheet'
   | 'playlist'
   | 'metadata'
@@ -47,7 +46,7 @@ export type ContentRow = {
   readonly detail?: string
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
-  readonly mediaClass?: 'audio' | 'video' | 'image'
+  readonly mediaClass?: 'audio' | 'video'
   readonly availabilityState?: 'available' | 'unavailable' | 'degraded'
   readonly action?: ContentRowAction
 }
@@ -335,7 +334,7 @@ function projectFileContents(options: {
 }
 
 function selectedContentsRow(row: SelectedContentsRow): ContentRow {
-  const icon = row.mediaClass === 'video' ? 'video' : row.mediaClass === 'image' ? 'image' : 'music'
+  const icon = row.mediaClass === 'video' ? 'video' : 'music'
   const detail =
     row.origin === 'sourceFile' ? selectedSourceFileRowDetail(row) : selectedContentsRowDetail(row)
   return {
@@ -414,7 +413,9 @@ function selectedContentsStateLabel(result: SelectedContentsResult): string {
   switch (result.state) {
     case 'ready':
     case 'empty':
-      return result.coverage.emptyResultAuthoritative ? 'No media found' : 'No media found yet'
+      return result.coverage.emptyResultAuthoritative
+        ? 'No primary media found'
+        : 'No primary media found yet'
     case 'partial':
       return 'Still indexing'
     case 'sourceUnavailable':
@@ -434,11 +435,11 @@ function selectedContentsDetail(result: SelectedContentsResult): string {
   }
 
   if (result.rows.length === 1) {
-    return selectedContentsCoveragePrefix(result) ?? '1 media item loaded.'
+    return selectedContentsCoveragePrefix(result) ?? '1 primary media item loaded.'
   }
 
   const prefix = selectedContentsCoveragePrefix(result)
-  const count = `${result.rows.length} media items loaded.`
+  const count = `${result.rows.length} primary media items loaded.`
   return prefix === undefined ? count : `${prefix} ${count}`
 }
 

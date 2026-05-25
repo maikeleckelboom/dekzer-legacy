@@ -44,7 +44,9 @@ export type LoadNavigationRowRequest = { navigationRowId: string, };
 
 export type LoadNavigationRowByStableKeyRequest = { stableKey: string, };
 
-export type ReadLiteralHierarchyChildrenRequest = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, };
+export type ReadLiteralHierarchyChildrenRequest = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, sourceFileVisibility?: SourceFileVisibility, };
+
+export type SourceFileVisibility = "performance" | "performanceAndImages";
 
 export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
 
@@ -120,7 +122,7 @@ export type LiteralHierarchyEntryPoint = { "type": "source", "payload": { source
 
 export type LiteralHierarchyWindow = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LiteralHierarchyNode>, };
 
-export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, mediaClass?: LiteralHierarchyFileMediaClass, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryMediaState?: DirectoryMediaState, directoryScanState?: DirectoryScanState, };
+export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, mediaClass?: LiteralHierarchyFileMediaClass, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, };
 
 export type LiteralHierarchyNodeKind = "directory" | "file";
 
@@ -128,7 +130,9 @@ export type LiteralHierarchyFileMediaClass = "audio" | "video" | "image" | "unsu
 
 export type LiteralHierarchyPresenceState = "present" | "missing" | "removed";
 
-export type DirectoryMediaState = { "kind": "unknown" } | { "kind": "hasMediaDescendants" } | { "kind": "noMediaDescendants" };
+export type DirectoryPrimaryMediaState = { "kind": "unknown" } | { "kind": "hasPrimaryMediaDescendants" } | { "kind": "noPrimaryMediaDescendants" };
+
+export type DirectoryImageMediaState = { "kind": "unknown" } | { "kind": "hasImageMediaDescendants" } | { "kind": "noImageMediaDescendants" };
 
 export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
 
@@ -144,7 +148,7 @@ export type SelectedContentsRow = { stableId: string, label: string, origin: Sel
 
 export type SelectedContentsRowOrigin = "libraryAsset" | "sourceFile";
 
-export type SelectedContentsMediaClass = "audio" | "video" | "image";
+export type SelectedContentsMediaClass = "audio" | "video";
 
 export type LibraryBrowserWindow = { offset: number, limit: number, totalRows: number, rows: Array<LibraryAssetBrowserRow>, };
 

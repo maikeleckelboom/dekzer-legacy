@@ -48,7 +48,8 @@ describe('createLibraryHierarchyReadController', () => {
         label: 'Source Fixture'
       },
       offset: 0,
-      limit: 50
+      limit: 50,
+      sourceFileVisibility: 'performance'
     })
     expect(controller.currentRoot.value?.id).toBe('source:7')
     expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('loaded')
@@ -70,7 +71,8 @@ describe('createLibraryHierarchyReadController', () => {
       },
       parentDirectoryId: '12',
       offset: 0,
-      limit: 50
+      limit: 50,
+      sourceFileVisibility: 'performance'
     })
     expect(controller.directoryReadStates.value.get('12')).toMatchObject({
       kind: 'loaded'
@@ -184,6 +186,76 @@ describe('createLibraryHierarchyReadController', () => {
       })
     }
   })
+
+  it('keeps source-file visibility in hierarchy read identity', async () => {
+    const readRequests: ReadRequest[] = []
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          return request.sourceFileVisibility === 'performanceAndImages'
+            ? imageHierarchyReadResult(request.sourceFileVisibility)
+            : audioHierarchyReadResult(request.sourceFileVisibility ?? 'performance')
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    expect(readRequests[0]?.sourceFileVisibility).toBe('performance')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-file:11'
+    ])
+
+    controller.setSourceFileVisibility('performanceAndImages')
+    await waitForReadRequestCount(readRequests, 2)
+    expect(readRequests[1]?.sourceFileVisibility).toBe('performanceAndImages')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-file:11',
+      'source-file:12'
+    ])
+
+    controller.setSourceFileVisibility('performance')
+    await waitForReadRequestCount(readRequests, 3)
+    expect(readRequests[2]?.sourceFileVisibility).toBe('performance')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-file:11'
+    ])
+  })
+
+  it('ignores stale source-file visibility responses', async () => {
+    const readRequests: ReadRequest[] = []
+    const imageRead = deferred<Extract<ReadResult, { state: 'ready' }>>()
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          if (request.sourceFileVisibility === 'performanceAndImages') {
+            return imageRead.promise
+          }
+
+          return audioHierarchyReadResult(request.sourceFileVisibility ?? 'performance')
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    controller.setSourceFileVisibility('performanceAndImages')
+    await waitForReadRequestCount(readRequests, 2)
+    controller.setSourceFileVisibility('performance')
+    await waitForReadRequestCount(readRequests, 3)
+
+    imageRead.resolve(imageHierarchyReadResult('performanceAndImages'))
+    await waitForMicrotasks()
+
+    expect(controller.sourceFileVisibility.value).toBe('performance')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-file:11'
+    ])
+  })
 })
 
 function testLibraryApi(options: {
@@ -246,6 +318,7 @@ function directoryRootHierarchyReadResult(): Extract<ReadResult, { state: 'ready
       root: sourceRoot(),
       offset: 0,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 3,
       nodes: [
         directoryNode('12', 'Album'),
@@ -263,6 +336,7 @@ function partialSourceHierarchyReadResult(): Extract<ReadResult, { state: 'ready
       root: sourceRoot(),
       offset: 0,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 2,
       nodes: [directoryNode('12', 'Album')]
     }
@@ -276,6 +350,7 @@ function sourceMoreReadResult(): Extract<ReadResult, { state: 'ready' }> {
       root: sourceRoot(),
       offset: 1,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 2,
       nodes: [fileNode('99', 'root-track.wav')]
     }
@@ -292,6 +367,7 @@ function loadedDirectoryReadResult(
       parentDirectoryId,
       offset: 0,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 2,
       nodes: [
         fileNode(`${parentDirectoryId}-track`, 'track.wav', parentDirectoryId),
@@ -311,6 +387,7 @@ function partialDirectoryHierarchyReadResult(
       parentDirectoryId,
       offset: 0,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 2,
       nodes: [fileNode(`${parentDirectoryId}-a`, 'a.wav', parentDirectoryId)]
     }
@@ -327,6 +404,7 @@ function directoryMoreReadResult(
       parentDirectoryId,
       offset: 1,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 2,
       nodes: [fileNode(`${parentDirectoryId}-b`, 'b.wav', parentDirectoryId)]
     }
@@ -343,6 +421,7 @@ function emptyDirectoryReadResult(
       parentDirectoryId,
       offset: 0,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 0,
       nodes: []
     }
@@ -360,6 +439,7 @@ function wrongSourceContinuationResult(): Extract<ReadResult, { state: 'ready' }
       },
       offset: 1,
       limit: 50,
+      sourceFileVisibility: 'performance',
       totalRows: 2,
       nodes: [fileNode('999', 'intruder.wav')]
     }
@@ -402,7 +482,8 @@ function directoryNode(
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
     hasChildDirectories: true,
-    directoryMediaState: { kind: 'hasMediaDescendants' },
+    directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+    directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'scanning',
     updatedAtMs: 100
   }
@@ -411,7 +492,8 @@ function directoryNode(
 function fileNode(
   fileId: string,
   label: string,
-  parentDirectoryId?: string
+  parentDirectoryId?: string,
+  mediaClass: Extract<ChildRow, { kind: 'file' }>['mediaClass'] = 'audio'
 ): Extract<ChildRow, { kind: 'file' }> {
   return {
     id: `source-file:${fileId}`,
@@ -420,10 +502,75 @@ function fileNode(
     sourceId: '7',
     fileId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
-    mediaClass: 'audio',
+    mediaClass,
     presence: 'present',
     updatedAtMs: 101
   }
+}
+
+function audioHierarchyReadResult(
+  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+): Extract<ReadResult, { state: 'ready' }> {
+  return {
+    state: 'ready',
+    window: {
+      root: sourceRoot(),
+      offset: 0,
+      limit: 50,
+      sourceFileVisibility,
+      totalRows: 1,
+      nodes: [fileNode('11', 'track.wav')]
+    }
+  }
+}
+
+function imageHierarchyReadResult(
+  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+): Extract<ReadResult, { state: 'ready' }> {
+  return {
+    state: 'ready',
+    window: {
+      root: sourceRoot(),
+      offset: 0,
+      limit: 50,
+      sourceFileVisibility,
+      totalRows: 2,
+      nodes: [fileNode('11', 'track.wav'), fileNode('12', 'cover.jpg', undefined, 'image')]
+    }
+  }
+}
+
+function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } {
+  let resolveDeferred: (value: T) => void = () => undefined
+  const promise = new Promise<T>((resolve) => {
+    resolveDeferred = resolve
+  })
+
+  return {
+    promise,
+    resolve: resolveDeferred
+  }
+}
+
+async function waitForReadRequestCount(
+  readRequests: readonly ReadRequest[],
+  expectedCount: number
+): Promise<void> {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (readRequests.length >= expectedCount) {
+      await waitForMicrotasks()
+      return
+    }
+
+    await waitForMicrotasks()
+  }
+
+  throw new Error(`Expected ${expectedCount} hierarchy read requests.`)
+}
+
+async function waitForMicrotasks(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
 }
 
 function treeNodes(

@@ -75,7 +75,7 @@ export type SelectedContentsCoverage = {
 
 export type SelectedContentsRowOrigin = 'libraryAsset' | 'sourceFile'
 
-export type SelectedContentsMediaClass = 'audio' | 'video' | 'image'
+export type SelectedContentsMediaClass = 'audio' | 'video'
 export type SelectedContentsAvailabilityState = 'available' | 'unavailable' | 'degraded'
 export type SelectedContentsStemsStateSummary =
   | 'missing'

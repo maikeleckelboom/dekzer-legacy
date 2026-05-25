@@ -12,7 +12,10 @@ use crate::authority::work::{
     WorkItemsAuthorityTx,
 };
 use crate::authority::write_lane::AdmittedWrite;
-use crate::browse_media::classify_relative_path_file_kind;
+use crate::browse_media::{
+    SourceFileVisibility, classify_relative_path_file_kind,
+    source_file_visibility_predicate_sql_for_column,
+};
 use crate::time::unix_time_ms;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{SourceFileId, SourcePresenceState, WorkPriorityClass};
@@ -705,7 +708,8 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         self.tx().execute(
             "UPDATE source_directories
              SET has_child_directories = 0,
-                 has_media_descendant = 0
+                 has_primary_media_descendant = 0,
+                 has_image_media_descendant = 0
              WHERE source_id = ?1",
             [root_id],
         )?;
@@ -724,14 +728,19 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             [root_id],
         )?;
 
+        let primary_media_predicate = source_file_visibility_predicate_sql_for_column(
+            SourceFileVisibility::Performance,
+            "f.media_class",
+        );
         self.tx().execute(
-            "WITH RECURSIVE media_up(source_directory_id) AS (
+            &format!(
+                "WITH RECURSIVE media_up(source_directory_id) AS (
                  SELECT DISTINCT f.parent_source_directory_id
                  FROM source_files f
                  WHERE f.source_id = ?1
                    AND f.presence_state = 'present'
                    AND f.parent_source_directory_id IS NOT NULL
-                   AND f.media_class IN ('audio', 'video', 'image')
+                   AND {primary_media_predicate}
                  UNION
                  SELECT d.parent_source_directory_id
                  FROM source_directories d
@@ -741,10 +750,35 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                    AND d.parent_source_directory_id IS NOT NULL
              )
              UPDATE source_directories
-             SET has_media_descendant = 1
+             SET has_primary_media_descendant = 1
              WHERE source_id = ?1
                AND presence_state = 'present'
-               AND source_directory_id IN media_up",
+               AND source_directory_id IN media_up"
+            ),
+            [root_id],
+        )?;
+
+        self.tx().execute(
+            "WITH RECURSIVE image_up(source_directory_id) AS (
+                 SELECT DISTINCT f.parent_source_directory_id
+                 FROM source_files f
+                 WHERE f.source_id = ?1
+                   AND f.presence_state = 'present'
+                   AND f.parent_source_directory_id IS NOT NULL
+                   AND f.media_class = 'image'
+                 UNION
+                 SELECT d.parent_source_directory_id
+                 FROM source_directories d
+                 JOIN image_up b ON d.source_directory_id = b.source_directory_id
+                 WHERE d.source_id = ?1
+                   AND d.presence_state = 'present'
+                   AND d.parent_source_directory_id IS NOT NULL
+             )
+             UPDATE source_directories
+             SET has_image_media_descendant = 1
+             WHERE source_id = ?1
+               AND presence_state = 'present'
+               AND source_directory_id IN image_up",
             [root_id],
         )?;
 
@@ -1045,7 +1079,8 @@ mod tests {
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct DirectoryFacts {
         has_child_directories: bool,
-        has_media_descendant: bool,
+        has_primary_media_descendant: bool,
+        has_image_media_descendant: bool,
         dir_scan_state: String,
         scanned_at: Option<i64>,
     }
@@ -1057,7 +1092,8 @@ mod tests {
         connection
             .query_row(
                 "SELECT has_child_directories,
-                        has_media_descendant,
+                        has_primary_media_descendant,
+                        has_image_media_descendant,
                         dir_scan_state,
                         scanned_at
                  FROM source_directories
@@ -1066,9 +1102,10 @@ mod tests {
                 |row| {
                     Ok(DirectoryFacts {
                         has_child_directories: row.get(0)?,
-                        has_media_descendant: row.get(1)?,
-                        dir_scan_state: row.get(2)?,
-                        scanned_at: row.get(3)?,
+                        has_primary_media_descendant: row.get(1)?,
+                        has_image_media_descendant: row.get(2)?,
+                        dir_scan_state: row.get(3)?,
+                        scanned_at: row.get(4)?,
                     })
                 },
             )
@@ -1171,7 +1208,7 @@ mod tests {
     }
 
     #[test]
-    fn wma_and_alac_media_policy_marks_directory_as_having_media_descendants() {
+    fn wma_and_alac_media_policy_marks_directory_as_having_primary_media_descendants() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1215,9 +1252,10 @@ mod tests {
         assert_eq!(read_media_class(&connection, "nested/track.wma"), "audio");
         assert_eq!(read_media_class(&connection, "nested/track.alac"), "audio");
         assert!(
-            read_directory_facts(&connection, "nested").has_media_descendant,
-            ".wma and .alac media_class values must feed descendant media facts"
+            read_directory_facts(&connection, "nested").has_primary_media_descendant,
+            ".wma and .alac media_class values must feed primary media descendant facts"
         );
+        assert!(!read_directory_facts(&connection, "nested").has_image_media_descendant);
 
         run_coverage_finalization(
             &mut connection,
@@ -1230,13 +1268,14 @@ mod tests {
         );
 
         let facts = read_directory_facts(&connection, "nested");
-        assert!(facts.has_media_descendant);
+        assert!(facts.has_primary_media_descendant);
+        assert!(!facts.has_image_media_descendant);
         assert_eq!(facts.dir_scan_state, "complete");
         assert!(facts.scanned_at.is_some());
     }
 
     #[test]
-    fn sibling_folder_with_image_has_media_descendant() {
+    fn sibling_folder_with_image_has_image_media_descendant_only() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1278,10 +1317,8 @@ mod tests {
         );
 
         let before_finalization = read_directory_facts(&connection, "docs");
-        assert!(
-            before_finalization.has_media_descendant,
-            "cover.png (image) must propagate has_media_descendant"
-        );
+        assert!(!before_finalization.has_primary_media_descendant);
+        assert!(before_finalization.has_image_media_descendant);
         assert_eq!(before_finalization.dir_scan_state, "pending");
         assert_eq!(before_finalization.scanned_at, None);
 
@@ -1293,13 +1330,14 @@ mod tests {
         );
 
         let after_finalization = read_directory_facts(&connection, "docs");
-        assert!(after_finalization.has_media_descendant);
+        assert!(!after_finalization.has_primary_media_descendant);
+        assert!(after_finalization.has_image_media_descendant);
         assert_eq!(after_finalization.dir_scan_state, "complete");
         assert!(after_finalization.scanned_at.is_some());
     }
 
     #[test]
-    fn folder_with_only_unsupported_files_has_no_media_descendant() {
+    fn folder_with_only_unsupported_files_has_no_primary_or_image_media_descendants() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1341,7 +1379,8 @@ mod tests {
         );
 
         let before_finalization = read_directory_facts(&connection, "misc");
-        assert!(!before_finalization.has_media_descendant);
+        assert!(!before_finalization.has_primary_media_descendant);
+        assert!(!before_finalization.has_image_media_descendant);
         assert_eq!(before_finalization.dir_scan_state, "pending");
         assert_eq!(before_finalization.scanned_at, None);
 
@@ -1356,13 +1395,14 @@ mod tests {
         );
 
         let after_finalization = read_directory_facts(&connection, "misc");
-        assert!(!after_finalization.has_media_descendant);
+        assert!(!after_finalization.has_primary_media_descendant);
+        assert!(!after_finalization.has_image_media_descendant);
         assert_eq!(after_finalization.dir_scan_state, "complete");
         assert!(after_finalization.scanned_at.is_some());
     }
 
     #[test]
-    fn nested_audio_files_propagate_media_descendant_facts_to_ancestors() {
+    fn nested_audio_files_propagate_primary_media_descendant_facts_to_ancestors() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1411,9 +1451,9 @@ mod tests {
             "albums/mid/deep/song.flac",
         );
 
-        assert!(read_directory_facts(&connection, "albums").has_media_descendant);
-        assert!(read_directory_facts(&connection, "albums/mid").has_media_descendant);
-        assert!(read_directory_facts(&connection, "albums/mid/deep").has_media_descendant);
+        assert!(read_directory_facts(&connection, "albums").has_primary_media_descendant);
+        assert!(read_directory_facts(&connection, "albums/mid").has_primary_media_descendant);
+        assert!(read_directory_facts(&connection, "albums/mid/deep").has_primary_media_descendant);
 
         run_coverage_finalization(
             &mut connection,

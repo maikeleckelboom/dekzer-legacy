@@ -46,6 +46,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LoadNavigationRowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowByStableKeyRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLiteralHierarchyChildrenRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceFileVisibility>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSelectedContentsRequest>(&cfg, &mut output);
@@ -87,7 +88,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LiteralHierarchyNodeKind>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyFileMediaClass>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyPresenceState>(&cfg, &mut output);
-    push_ts_decl::<crate::DirectoryMediaState>(&cfg, &mut output);
+    push_ts_decl::<crate::DirectoryPrimaryMediaState>(&cfg, &mut output);
+    push_ts_decl::<crate::DirectoryImageMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsResult>(&cfg, &mut output);
     push_ts_decl::<crate::SelectedContentsState>(&cfg, &mut output);
@@ -174,7 +176,8 @@ mod tests {
         assert!(ts.contains("readLiteralHierarchyChildren"));
         assert!(ts.contains("LiteralHierarchyNode"));
         assert!(ts.contains("LiteralHierarchyFileMediaClass"));
-        assert!(ts.contains("DirectoryMediaState"));
+        assert!(ts.contains("DirectoryPrimaryMediaState"));
+        assert!(ts.contains("DirectoryImageMediaState"));
         assert!(ts.contains("DirectoryScanState"));
         assert!(ts.contains("readNavigationNodeLibraryBrowserWindow"));
         assert!(ts.contains("searchNavigationNodeLibraryBrowserWindow"));

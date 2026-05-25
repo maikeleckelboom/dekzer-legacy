@@ -200,8 +200,10 @@ CREATE TABLE source_directories
         CHECK (presence_state IN ('present', 'missing', 'removed')),
     has_child_directories       INTEGER NOT NULL DEFAULT 0
         CHECK (has_child_directories IN (0, 1)),
-    has_media_descendant        INTEGER NOT NULL DEFAULT 0
-        CHECK (has_media_descendant IN (0, 1)),
+    has_primary_media_descendant INTEGER NOT NULL DEFAULT 0
+        CHECK (has_primary_media_descendant IN (0, 1)),
+    has_image_media_descendant  INTEGER NOT NULL DEFAULT 0
+        CHECK (has_image_media_descendant IN (0, 1)),
     dir_scan_state              TEXT    NOT NULL DEFAULT 'pending'
         CHECK (dir_scan_state IN ('pending', 'scanning', 'complete', 'failed', 'blocked')),
     dir_scan_error_kind         TEXT,

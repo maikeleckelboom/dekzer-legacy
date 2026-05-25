@@ -2,12 +2,12 @@
 
 ## Decision
 
-When a source-rooted library tree row is selected, the contents table represents the media-relevant contents under that selected row recursively.
+When a source-rooted library tree row is selected, the contents table represents the primary media under that selected row recursively.
 
 Tree expansion and contents selection are separate product surfaces:
 
 - Tree expansion shows immediate hierarchy children for navigation.
-- Tree selection shows recursive media-relevant descendant contents for work.
+- Tree selection shows recursive primary media descendant contents for work.
 
 The contents table must not show only the immediate loaded tree children unless the selected row is known to have no relevant descendants beyond them.
 
@@ -29,7 +29,7 @@ It does not define playlist, crate, smart-view, search-result, all-tracks, recen
 
 ```text
 Tree expansion navigates immediate hierarchy.
-Tree selection projects recursive media contents.
+Tree selection projects recursive primary media contents.
 Source, source_location, and directory selections all resolve to substrate targets.
 The substrate owns descendant enumeration.
 The renderer never crawls the tree to answer recursive contents.
@@ -81,8 +81,11 @@ The baseline schema must include these facts directly in the baseline SQL. This 
 source_directories.has_child_directories INTEGER NOT NULL DEFAULT 0
 CHECK (has_child_directories IN (0, 1));
 
-source_directories.has_media_descendant INTEGER NOT NULL DEFAULT 0
-CHECK (has_media_descendant IN (0, 1));
+source_directories.has_primary_media_descendant INTEGER NOT NULL DEFAULT 0
+CHECK (has_primary_media_descendant IN (0, 1));
+
+source_directories.has_image_media_descendant INTEGER NOT NULL DEFAULT 0
+CHECK (has_image_media_descendant IN (0, 1));
 
 source_directories.mtime_ns INTEGER;
 source_directories.scanned_at INTEGER;
@@ -115,14 +118,15 @@ source_files.parent_source_directory_id
 
 Do not keep `ON DELETE SET NULL` for ordinary parent-directory relationships in the greenfield baseline. Deleting a directory subtree must not produce orphaned hierarchy rows.
 
-`has_child_directories` and `has_media_descendant` are distinct facts:
+`has_child_directories`, `has_primary_media_descendant`, and `has_image_media_descendant` are distinct facts:
 
 - `has_child_directories` answers whether immediate child directories exist, regardless of media relevance.
-- `has_media_descendant` answers whether the substrate has positive evidence that this directory has media-relevant descendants.
+- `has_primary_media_descendant` answers whether the substrate has positive evidence that this directory has audio/video descendants.
+- `has_image_media_descendant` answers whether the substrate has positive evidence that this directory has image descendants.
 
-`has_media_descendant = 0` does not mean the directory is proven empty unless the relevant directory coverage is complete. Use `dir_scan_state` to distinguish unknown, pending, scanning, blocked, failed, and complete coverage.
+`has_primary_media_descendant = 0` and `has_image_media_descendant = 0` do not mean the directory is proven empty unless the relevant directory coverage is complete. Use `dir_scan_state` to distinguish unknown, pending, scanning, blocked, failed, and complete coverage.
 
-`has_media_descendant` replaces `media_browseability` in the greenfield baseline. Do not keep both facts.
+`has_primary_media_descendant` and `has_image_media_descendant` replace `media_browseability` in the greenfield baseline. Do not keep stale aliases.
 
 ### Enum behavior matrix
 
@@ -174,17 +178,21 @@ Directory-level `dir_scan_state` values:
 
 #### `source_files.media_class`
 
-- `audio`: included in primary recursive contents.
-- `video`: included in primary recursive contents.
-- `image`: included in primary recursive contents.
-- `unsupported`: strictly excluded from default recursive contents.
-- `none`: strictly excluded from default recursive contents.
+- `audio`: raw source-file class for audio files; included in primary media.
+- `video`: raw source-file class for video files; visible as a primary media candidate until future video inspection proves actual deck/output eligibility.
+- `image`: raw source-file class for image files; image media is stored and can be exposed through explicit source-file visibility in the tree, but is not primary media and is not included in normal recursive selected contents.
+- `unsupported`: strictly excluded from normal recursive selected contents.
+- `none`: strictly excluded from normal recursive selected contents.
 
-Image rows are source companion/source-file rows, not playable track rows. They use `stableId = source-file:{scopedSourceFileId}`, have no `libraryAssetId`, have no `rowVersion`, and do not invent track metadata.
+`source_files.media_class` is raw/provisional source-file classification. Normal recursive selected contents is primary-media content. Primary media currently means audio/video. Image files are source companion/image media, not normal selected contents rows.
+
+Tree source-file visibility and selected contents scope are separate concepts. `performance` tree mode exposes primary media; `performanceAndImages` tree mode may reveal image rows and image-only folders. Switching tree source-file visibility must not redefine the selected contents scope.
+
+Image-only folders do not satisfy primary media descendant facts in `performance` mode. `performanceAndImages` tree mode may reveal those folders through image media descendant facts.
 
 ## Query execution contract
 
-The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target, queries media, collapses duplicates, and returns projection rows that may originate from two kinds of source:
+The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target, queries primary media, collapses duplicates, and returns projection rows that may originate from two kinds of source:
 
 - **promoted library asset rows**: when the scoped `source_files` have been promoted through segment attachment into `LibraryBrowserRows`, those rows are returned as the primary contents.
 - **scanned source-file rows**: when scoped `source_files` have no corresponding promoted library asset row (yet), the scanned source file itself is returned as a contents row.
@@ -197,7 +205,7 @@ Conceptually:
 selected tree row
   -> resolve selector/binding target
   -> derive source_id and optional relative path prefix/scope
-  -> query scoped source_files (audio + video + image, present)
+  -> query scoped source_files (audio + video, present)
   -> for each source_file with a promoted LibraryBrowserRow:
        return a promoted library asset row
   -> for each source_file without a promoted LibraryBrowserRow:
@@ -478,7 +486,7 @@ type SelectedContentsRow = {
   sourceId: string
   relativePath: string
   fileName: string
-  mediaClass: 'audio' | 'video' | 'image'
+  mediaClass: 'audio' | 'video'
   availabilityState: 'available' | 'unavailable' | 'degraded'
   title?: string
   artist?: string
@@ -509,15 +517,15 @@ The UI must reflect the exact `SelectedContentsResult` state truthfully.
 
 - `loading`: show progress skeleton or loading row. Do not show stale empty copy.
 - `partial`: show rows found so far plus `Still indexing. Results may be incomplete.`
-- `empty`: show `No media found under this folder.` Only valid with complete coverage.
-  - Complete coverage with no scoped audio/video/image source files is authoritative empty.
+- `empty`: show `No primary media found under this folder.` Only valid with complete coverage.
+  - Complete coverage with no scoped audio/video source files is authoritative empty.
 - `source_unavailable`: show known rows as unavailable if supplied, or show a global unavailable state. Never show empty.
 - `location_missing`: show the configured library folder as missing and offer repair or relink actions.
 - `blocked`: show explicit permission-needed or policy-blocked state.
 - `failed`: show failed state with retry or rescan action.
-- Complete coverage with scoped audio/video/image source files returns ready rows, not empty, even before promotion.
+- Complete coverage with scoped audio/video source files returns ready rows, not empty, even before promotion.
 - degraded rows: include by default, mark visually degraded, keep playable.
-- unsupported or `none` media rows: strictly exclude from default recursive contents.
+- unsupported or `none` media rows: strictly exclude from normal recursive selected contents.
 
 ## Virtualization and tree affordance rule
 
@@ -525,7 +533,7 @@ The tree and contents table are independently virtualizable because they answer 
 
 ```text
 tree expansion -> immediate child rows for navigation
-contents table -> recursive media rows for selected target
+contents table -> recursive primary media rows for selected target
 ```
 
 The renderer does not need to hold recursive descendant contents inside the tree. It holds only:
@@ -540,7 +548,8 @@ The contents table uses its own cursor, page size, order key, and virtual scroll
 Virtual tree chevrons are driven by substrate affordance signals:
 
 - `has_child_directories`
-- `has_media_descendant`
+- `has_primary_media_descendant`
+- `has_image_media_descendant`
 
 The renderer must not fetch depth+1 children for every visible row just to decide whether to show a chevron.
 
@@ -563,7 +572,8 @@ Implementation is allowed only after:
 
 - the greenfield baseline SQL is edited directly; do not create a patch migration for this pass
 - `source_directories.has_child_directories` exists in the baseline schema
-- `source_directories.has_media_descendant` exists in the baseline schema and replaces `media_browseability`
+- `source_directories.has_primary_media_descendant` exists in the baseline schema
+- `source_directories.has_image_media_descendant` exists in the baseline schema
 - `source_directories.dir_scan_state` exists in the baseline schema
 - `source_directories.mtime_ns` exists in the baseline schema
 - `source_directories.scanned_at` exists in the baseline schema
@@ -590,7 +600,7 @@ At minimum, fixtures must test:
 7. source-level aggregate excludes unaccepted, hidden, and unregistered locations
 8. configured but missing locations do not trigger whole-source fallback
 9. degraded rows are included and surfaced as degraded/playable
-10. unsupported and `none` media files are excluded from default recursive contents
+10. unsupported and `none` media files are excluded from normal recursive selected contents
 11. selector payloads resolve to typed targets
 
 The test suite must run `EXPLAIN QUERY PLAN` against the hot-path contents query and assert the planner uses the `source_id + relative_path` binary index for prefix scans. Do not lock the entire SQLite plan string unless unavoidable.

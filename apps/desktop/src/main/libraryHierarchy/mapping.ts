@@ -48,7 +48,8 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
     if (
       sourceDirectoryId === null ||
       row.hasChildDirectories === undefined ||
-      row.directoryMediaState === undefined ||
+      row.directoryPrimaryMediaState === undefined ||
+      row.directoryImageMediaState === undefined ||
       row.directoryScanState === undefined
     ) {
       return undefined
@@ -65,7 +66,8 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
         : { parentDirectoryId: row.parentSourceDirectoryId }),
       presence: row.presenceState,
       hasChildDirectories: row.hasChildDirectories,
-      directoryMediaState: row.directoryMediaState,
+      directoryPrimaryMediaState: row.directoryPrimaryMediaState,
+      directoryImageMediaState: row.directoryImageMediaState,
       directoryScanState: row.directoryScanState,
       updatedAtMs: row.updatedAtMs
     }

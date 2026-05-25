@@ -334,7 +334,8 @@ mod tests {
                 "relative_path",
                 "presence_state",
                 "has_child_directories",
-                "has_media_descendant",
+                "has_primary_media_descendant",
+                "has_image_media_descendant",
                 "dir_scan_state",
                 "dir_scan_error_kind",
                 "dir_scan_error_detail",
@@ -418,7 +419,8 @@ mod tests {
                      relative_path,
                      presence_state,
                      has_child_directories,
-                     has_media_descendant,
+                     has_primary_media_descendant,
+                     has_image_media_descendant,
                      dir_scan_state,
                      dir_scan_updated_at,
                      scanned_at,
@@ -426,7 +428,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (10, 1, NULL, 'pending', 'pending', 'present', 0, 0, 'pending', 100, NULL, NULL, 100, 100)",
+                 VALUES (10, 1, NULL, 'pending', 'pending', 'present', 0, 0, 0, 'pending', 100, NULL, NULL, 100, 100)",
                 [],
             )
             .expect("pending directory coverage facts are accepted");
@@ -440,7 +442,7 @@ mod tests {
                      name,
                      relative_path,
                      presence_state,
-                     has_media_descendant,
+                     has_primary_media_descendant,
                      dir_scan_state,
                      dir_scan_updated_at,
                      created_at,
@@ -460,14 +462,15 @@ mod tests {
                      name,
                      relative_path,
                      presence_state,
-                     has_media_descendant,
+                     has_primary_media_descendant,
+                     has_image_media_descendant,
                      dir_scan_state,
                      dir_scan_updated_at,
                      scanned_at,
                      created_at,
                      updated_at
                  )
-                 VALUES (12, 1, NULL, 'complete-empty', 'complete-empty', 'present', 0, 'complete', 102, 102, 102, 102)",
+                 VALUES (12, 1, NULL, 'complete-empty', 'complete-empty', 'present', 0, 0, 'complete', 102, 102, 102, 102)",
                 [],
             )
             .expect("confirmed no-media directory coverage facts are accepted");

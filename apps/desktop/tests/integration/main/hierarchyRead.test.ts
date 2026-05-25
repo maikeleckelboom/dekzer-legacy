@@ -81,7 +81,8 @@ describe('hierarchy and navigation reads through the host', () => {
             },
             parentSourceDirectoryId: null,
             offset: 0,
-            limit: 50
+            limit: 50,
+            sourceFileVisibility: 'performance'
           })
 
           return {
@@ -105,7 +106,8 @@ describe('hierarchy and navigation reads through the host', () => {
                   modifiedAtNs: null,
                   updatedAtMs: 100,
                   hasChildDirectories: true,
-                  directoryMediaState: { kind: 'hasMediaDescendants' },
+                  directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+                  directoryImageMediaState: { kind: 'noImageMediaDescendants' },
                   directoryScanState: 'scanning'
                 },
                 {

@@ -50,6 +50,7 @@ pub use authority::work::{
     ReplaceResolvedLibraryAssetPrepTargetsInput, ResolvedLibraryAssetPrepTargetInput,
     StaleCapabilityChange, StartWorkRunInput, StartedWorkRun, UpsertPrepPolicyInput,
 };
+pub use browse_media::SourceFileVisibility;
 pub use error::{
     CanonicalError, CanonicalErrorCode, CanonicalErrorCodeParseError, DurableStoreOpenFailure,
     DurableStoreOpenFailureKind, LibrarySqliteError, LibrarySqliteResult,

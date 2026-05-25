@@ -47,11 +47,14 @@ export type ReadTarget =
       readonly label?: string
     }
 
+export type SourceFileVisibility = 'performance' | 'performanceAndImages'
+
 export type ReadRequest = {
   readonly target?: ReadTarget
   readonly parentDirectoryId?: string
   readonly offset?: number
   readonly limit?: number
+  readonly sourceFileVisibility?: SourceFileVisibility
 }
 
 export type ReadRoot = {
@@ -66,15 +69,26 @@ export type Presence = 'present' | 'missing' | 'removed'
 
 export type FileMediaClass = 'audio' | 'video' | 'image' | 'unsupported' | 'none'
 
-export type DirectoryMediaState =
+export type DirectoryPrimaryMediaState =
   | {
       readonly kind: 'unknown'
     }
   | {
-      readonly kind: 'hasMediaDescendants'
+      readonly kind: 'hasPrimaryMediaDescendants'
     }
   | {
-      readonly kind: 'noMediaDescendants'
+      readonly kind: 'noPrimaryMediaDescendants'
+    }
+
+export type DirectoryImageMediaState =
+  | {
+      readonly kind: 'unknown'
+    }
+  | {
+      readonly kind: 'hasImageMediaDescendants'
+    }
+  | {
+      readonly kind: 'noImageMediaDescendants'
     }
 
 export type DirectoryScanState = 'pending' | 'scanning' | 'complete' | 'failed' | 'blocked'
@@ -89,7 +103,8 @@ export type ChildRow =
       readonly parentDirectoryId?: string
       readonly presence: Presence
       readonly hasChildDirectories: boolean
-      readonly directoryMediaState: DirectoryMediaState
+      readonly directoryPrimaryMediaState: DirectoryPrimaryMediaState
+      readonly directoryImageMediaState: DirectoryImageMediaState
       readonly directoryScanState: DirectoryScanState
       readonly updatedAtMs: number
     }
@@ -110,6 +125,7 @@ export type ChildWindow = {
   readonly parentDirectoryId?: string
   readonly offset: number
   readonly limit: number
+  readonly sourceFileVisibility: SourceFileVisibility
   readonly totalRows: number
   readonly nodes: readonly ChildRow[]
 }

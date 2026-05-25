@@ -287,7 +287,7 @@
         "playlistId"
       ]
     },
-    "DirectoryMediaState": {
+    "DirectoryImageMediaState": {
       "oneOf": [
         {
           "type": "object",
@@ -306,7 +306,7 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "hasMediaDescendants"
+              "const": "hasImageMediaDescendants"
             }
           },
           "required": [
@@ -318,7 +318,47 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "noMediaDescendants"
+              "const": "noImageMediaDescendants"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "DirectoryPrimaryMediaState": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "unknown"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "hasPrimaryMediaDescendants"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "noPrimaryMediaDescendants"
             }
           },
           "required": [
@@ -1133,10 +1173,20 @@
     "LiteralHierarchyNode": {
       "type": "object",
       "properties": {
-        "directoryMediaState": {
+        "directoryImageMediaState": {
           "anyOf": [
             {
-              "$ref": "#/$defs/DirectoryMediaState"
+              "$ref": "#/$defs/DirectoryImageMediaState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "directoryPrimaryMediaState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DirectoryPrimaryMediaState"
             },
             {
               "type": "null"
@@ -1928,6 +1978,16 @@
             "string",
             "null"
           ]
+        },
+        "sourceFileVisibility": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceFileVisibility"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -2250,8 +2310,7 @@
       "type": "string",
       "enum": [
         "audio",
-        "video",
-        "image"
+        "video"
       ]
     },
     "SelectedContentsResult": {
@@ -2817,6 +2876,13 @@
             "payload"
           ]
         }
+      ]
+    },
+    "SourceFileVisibility": {
+      "type": "string",
+      "enum": [
+        "performance",
+        "performanceAndImages"
       ]
     },
     "UnregisterLocalRootReply": {

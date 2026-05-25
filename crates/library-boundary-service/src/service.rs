@@ -19,6 +19,7 @@ use crate::snapshot_read_protocol::{
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
     map_read_selected_contents_reply, map_search_navigation_node_library_browser_window_reply,
     store_literal_hierarchy_entry_point, store_selected_contents_scope,
+    store_source_file_visibility,
 };
 use crate::storage_environment::resolve_library_storage_environment;
 
@@ -307,6 +308,7 @@ impl LibraryBoundaryService {
                 request.parent_source_directory_id,
                 request.offset,
                 request.limit,
+                store_source_file_visibility(request.source_file_visibility.unwrap_or_default()),
             )
             .map_err(map_store_error)?;
         map_read_literal_hierarchy_children_reply(window).map_err(map_store_error)
@@ -603,9 +605,10 @@ fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol:
 mod tests {
     use library_boundary_protocol::{
         CommandOutcome, CommandReply, CommandRequest, CreatePlaylistReply, CreatePlaylistRequest,
-        DeletePlaylistReply, DeletePlaylistRequest, DirectoryMediaState, DirectoryScanState,
-        LibraryBoundaryEvent, LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
-        LibraryRootCommand, LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
+        DeletePlaylistReply, DeletePlaylistRequest, DirectoryImageMediaState,
+        DirectoryPrimaryMediaState, DirectoryScanState, LibraryBoundaryEvent,
+        LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
+        LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
         LiteralHierarchyPresenceState, LoadNavigationRowByStableKeyReply,
         LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
         PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsReply,
@@ -831,6 +834,9 @@ mod tests {
                     parent_source_directory_id,
                     offset: 0,
                     limit: 10,
+                    source_file_visibility: Some(
+                        library_boundary_protocol::SourceFileVisibility::Performance,
+                    ),
                 },
             )),
         )))
@@ -912,8 +918,12 @@ mod tests {
         );
         assert_eq!(crate_row.has_child_directories, Some(false));
         assert_eq!(
-            crate_row.directory_media_state,
-            Some(DirectoryMediaState::HasMediaDescendants)
+            crate_row.directory_primary_media_state,
+            Some(DirectoryPrimaryMediaState::HasPrimaryMediaDescendants)
+        );
+        assert_eq!(
+            crate_row.directory_image_media_state,
+            Some(DirectoryImageMediaState::NoImageMediaDescendants)
         );
         assert_eq!(
             crate_row.directory_scan_state,
@@ -940,7 +950,8 @@ mod tests {
         assert_eq!(file_row.relative_path, "Crate/amen.wav");
         assert!(file_row.source_file_id.is_some());
         assert_eq!(file_row.has_child_directories, None);
-        assert_eq!(file_row.directory_media_state, None);
+        assert_eq!(file_row.directory_primary_media_state, None);
+        assert_eq!(file_row.directory_image_media_state, None);
         assert_eq!(file_row.directory_scan_state, None);
 
         drop(service);

@@ -53,6 +53,17 @@ pub(crate) fn store_literal_hierarchy_entry_point(
     }
 }
 
+pub(crate) const fn store_source_file_visibility(
+    source_file_visibility: protocol::SourceFileVisibility,
+) -> store::SourceFileVisibility {
+    match source_file_visibility {
+        protocol::SourceFileVisibility::Performance => store::SourceFileVisibility::Performance,
+        protocol::SourceFileVisibility::PerformanceAndImages => {
+            store::SourceFileVisibility::PerformanceAndImages
+        }
+    }
+}
+
 pub(crate) fn store_selected_contents_scope(
     scope: protocol::SelectedContentsScope,
 ) -> store::StoreSelectedContentsScope {
@@ -298,7 +309,8 @@ fn map_literal_hierarchy_node(
         node.has_child_directories,
         "has_child_directories",
     )?;
-    let directory_media_state = map_directory_media_state(&node)?;
+    let directory_primary_media_state = map_directory_primary_media_state(&node)?;
+    let directory_image_media_state = map_directory_image_media_state(&node)?;
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
     let media_class = map_literal_hierarchy_file_media_class(&node)?;
 
@@ -316,7 +328,8 @@ fn map_literal_hierarchy_node(
         modified_at_ns: node.modified_at_ns,
         updated_at_ms: node.updated_at,
         has_child_directories,
-        directory_media_state,
+        directory_primary_media_state,
+        directory_image_media_state,
         directory_scan_state,
     })
 }
@@ -385,27 +398,55 @@ fn map_directory_only_field<T>(
     }
 }
 
-fn map_directory_media_state(
+fn map_directory_primary_media_state(
     node: &store::StoreLiteralHierarchyNode,
-) -> store::LibrarySqliteResult<Option<protocol::DirectoryMediaState>> {
+) -> store::LibrarySqliteResult<Option<protocol::DirectoryPrimaryMediaState>> {
     if node.node_kind != "directory" {
         return Ok(None);
     }
 
-    let has_media_descendant = node.has_media_descendant.ok_or_else(|| {
-        malformed_store_state("literal hierarchy directory node is missing has_media_descendant")
+    let has_primary_media_descendant = node.has_primary_media_descendant.ok_or_else(|| {
+        malformed_store_state(
+            "literal hierarchy directory node is missing has_primary_media_descendant",
+        )
     })?;
     let dir_scan_state = node.dir_scan_state.as_deref().ok_or_else(|| {
         malformed_store_state("literal hierarchy directory node is missing dir_scan_state")
     })?;
     let directory_scan_state = map_directory_scan_state(dir_scan_state)?;
 
-    Ok(Some(if has_media_descendant {
-        protocol::DirectoryMediaState::HasMediaDescendants
+    Ok(Some(if has_primary_media_descendant {
+        protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants
     } else if directory_scan_state == protocol::DirectoryScanState::Complete {
-        protocol::DirectoryMediaState::NoMediaDescendants
+        protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants
     } else {
-        protocol::DirectoryMediaState::Unknown
+        protocol::DirectoryPrimaryMediaState::Unknown
+    }))
+}
+
+fn map_directory_image_media_state(
+    node: &store::StoreLiteralHierarchyNode,
+) -> store::LibrarySqliteResult<Option<protocol::DirectoryImageMediaState>> {
+    if node.node_kind != "directory" {
+        return Ok(None);
+    }
+
+    let has_image_media_descendant = node.has_image_media_descendant.ok_or_else(|| {
+        malformed_store_state(
+            "literal hierarchy directory node is missing has_image_media_descendant",
+        )
+    })?;
+    let dir_scan_state = node.dir_scan_state.as_deref().ok_or_else(|| {
+        malformed_store_state("literal hierarchy directory node is missing dir_scan_state")
+    })?;
+    let directory_scan_state = map_directory_scan_state(dir_scan_state)?;
+
+    Ok(Some(if has_image_media_descendant {
+        protocol::DirectoryImageMediaState::HasImageMediaDescendants
+    } else if directory_scan_state == protocol::DirectoryScanState::Complete {
+        protocol::DirectoryImageMediaState::NoImageMediaDescendants
+    } else {
+        protocol::DirectoryImageMediaState::Unknown
     }))
 }
 
@@ -952,12 +993,16 @@ fn malformed_store_state(detail: impl Into<String>) -> store::LibrarySqliteError
 
 #[cfg(test)]
 mod tests {
-    use super::{map_literal_hierarchy_node, map_read_literal_hierarchy_children_reply};
+    use super::{
+        map_literal_hierarchy_node, map_read_literal_hierarchy_children_reply,
+        store_source_file_visibility,
+    };
     use library_boundary_protocol as protocol;
     use library_store_sqlite as store;
 
     fn directory_node(
-        has_media_descendant: bool,
+        has_primary_media_descendant: bool,
+        has_image_media_descendant: bool,
         dir_scan_state: &str,
     ) -> store::StoreLiteralHierarchyNode {
         store::StoreLiteralHierarchyNode {
@@ -974,7 +1019,8 @@ mod tests {
             modified_at_ns: None,
             updated_at: 100,
             has_child_directories: Some(true),
-            has_media_descendant: Some(has_media_descendant),
+            has_primary_media_descendant: Some(has_primary_media_descendant),
+            has_image_media_descendant: Some(has_image_media_descendant),
             dir_scan_state: Some(dir_scan_state.to_string()),
         }
     }
@@ -994,9 +1040,22 @@ mod tests {
             modified_at_ns: Some(20),
             updated_at: 100,
             has_child_directories: None,
-            has_media_descendant: None,
+            has_primary_media_descendant: None,
+            has_image_media_descendant: None,
             dir_scan_state: None,
         }
+    }
+
+    #[test]
+    fn source_file_visibility_maps_to_store_policy() {
+        assert_eq!(
+            store_source_file_visibility(protocol::SourceFileVisibility::Performance),
+            store::SourceFileVisibility::Performance
+        );
+        assert_eq!(
+            store_source_file_visibility(protocol::SourceFileVisibility::PerformanceAndImages),
+            store::SourceFileVisibility::PerformanceAndImages
+        );
     }
 
     #[test]
@@ -1008,7 +1067,7 @@ mod tests {
                 offset: 0,
                 limit: 25,
                 total_rows: 2,
-                rows: vec![directory_node(true, "scanning"), file_node()],
+                rows: vec![directory_node(true, false, "scanning"), file_node()],
             }))
             .expect("map literal hierarchy reply");
         let window = reply.window.expect("window");
@@ -1016,8 +1075,12 @@ mod tests {
         let directory = &window.rows[0];
         assert_eq!(directory.has_child_directories, Some(true));
         assert_eq!(
-            directory.directory_media_state,
-            Some(protocol::DirectoryMediaState::HasMediaDescendants)
+            directory.directory_primary_media_state,
+            Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants)
+        );
+        assert_eq!(
+            directory.directory_image_media_state,
+            Some(protocol::DirectoryImageMediaState::Unknown)
         );
         assert_eq!(
             directory.directory_scan_state,
@@ -1030,7 +1093,8 @@ mod tests {
             Some(protocol::LiteralHierarchyFileMediaClass::Audio)
         );
         assert_eq!(file.has_child_directories, None);
-        assert_eq!(file.directory_media_state, None);
+        assert_eq!(file.directory_primary_media_state, None);
+        assert_eq!(file.directory_image_media_state, None);
         assert_eq!(file.directory_scan_state, None);
     }
 
@@ -1057,20 +1121,29 @@ mod tests {
     }
 
     #[test]
-    fn directory_media_state_requires_complete_coverage_for_negative_knowledge() {
-        let complete = map_literal_hierarchy_node(directory_node(false, "complete"))
+    fn directory_media_states_require_complete_coverage_for_negative_knowledge() {
+        let complete = map_literal_hierarchy_node(directory_node(false, false, "complete"))
             .expect("map complete directory");
         assert_eq!(
-            complete.directory_media_state,
-            Some(protocol::DirectoryMediaState::NoMediaDescendants)
+            complete.directory_primary_media_state,
+            Some(protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants)
+        );
+        assert_eq!(
+            complete.directory_image_media_state,
+            Some(protocol::DirectoryImageMediaState::NoImageMediaDescendants)
         );
 
         for scan_state in ["pending", "scanning", "blocked", "failed"] {
-            let mapped = map_literal_hierarchy_node(directory_node(false, scan_state))
+            let mapped = map_literal_hierarchy_node(directory_node(false, false, scan_state))
                 .expect("map incomplete directory");
             assert_eq!(
-                mapped.directory_media_state,
-                Some(protocol::DirectoryMediaState::Unknown),
+                mapped.directory_primary_media_state,
+                Some(protocol::DirectoryPrimaryMediaState::Unknown),
+                "{scan_state} must not map to confirmed no-primary-media"
+            );
+            assert_eq!(
+                mapped.directory_image_media_state,
+                Some(protocol::DirectoryImageMediaState::Unknown),
                 "{scan_state} must not map to confirmed no-media"
             );
         }
@@ -1078,7 +1151,7 @@ mod tests {
 
     #[test]
     fn malformed_directory_scan_state_is_rejected() {
-        let error = map_literal_hierarchy_node(directory_node(false, "unsupported"))
+        let error = map_literal_hierarchy_node(directory_node(false, false, "unsupported"))
             .expect_err("unsupported scan state must fail");
         let detail = match error {
             store::LibrarySqliteError::MalformedSchemaState(detail) => detail,

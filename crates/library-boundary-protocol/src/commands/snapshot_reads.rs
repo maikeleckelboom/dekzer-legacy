@@ -530,7 +530,6 @@ pub struct SelectedContentsRow {
 pub enum SelectedContentsMediaClass {
     Audio,
     Video,
-    Image,
 }
 
 impl SelectedContentsMediaClass {
@@ -538,7 +537,6 @@ impl SelectedContentsMediaClass {
         match value.as_bytes() {
             b"audio" => Some(Self::Audio),
             b"video" => Some(Self::Video),
-            b"image" => Some(Self::Image),
             _ => None,
         }
     }
@@ -1177,6 +1175,30 @@ pub struct ReadLiteralHierarchyChildrenRequest {
     pub parent_source_directory_id: Option<i64>,
     pub offset: usize,
     pub limit: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub source_file_visibility: Option<SourceFileVisibility>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceFileVisibility {
+    #[default]
+    Performance,
+    PerformanceAndImages,
 }
 
 #[derive(
@@ -1280,10 +1302,30 @@ pub enum DirectoryScanState {
 )]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(tag = "kind", rename_all = "camelCase")]
-pub enum DirectoryMediaState {
+pub enum DirectoryPrimaryMediaState {
     Unknown,
-    HasMediaDescendants,
-    NoMediaDescendants,
+    HasPrimaryMediaDescendants,
+    NoPrimaryMediaDescendants,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind", rename_all = "camelCase")]
+pub enum DirectoryImageMediaState {
+    Unknown,
+    HasImageMediaDescendants,
+    NoImageMediaDescendants,
 }
 
 #[derive(
@@ -1365,7 +1407,10 @@ pub struct LiteralHierarchyNode {
     pub has_child_directories: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub directory_media_state: Option<DirectoryMediaState>,
+    pub directory_primary_media_state: Option<DirectoryPrimaryMediaState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub directory_image_media_state: Option<DirectoryImageMediaState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub directory_scan_state: Option<DirectoryScanState>,
@@ -1415,8 +1460,8 @@ pub enum SnapshotReadReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        DirectoryMediaState, DirectoryScanState, LibraryAssetAvailabilityState,
-        LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
+        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
+        LibraryAssetAvailabilityState, LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
         LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
         LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
         LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
@@ -1433,7 +1478,8 @@ mod tests {
         ReadLiteralHierarchyChildrenReply, ReadLiteralHierarchyChildrenRequest,
         ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
-        SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
+        SearchNavigationNodeLibraryBrowserWindowRequest, SelectedContentsMediaClass,
+        SnapshotReadCommand, SnapshotReadReply, SourceFileVisibility,
     };
     use serde_json::json;
 
@@ -1448,6 +1494,7 @@ mod tests {
                 parent_source_directory_id: None,
                 offset: 0,
                 limit: 50,
+                source_file_visibility: Some(SourceFileVisibility::Performance),
             },
         );
         let navigation_node = SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
@@ -1490,6 +1537,7 @@ mod tests {
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 50,
+                    source_file_visibility: Some(SourceFileVisibility::Performance),
                 },
             )
         ));
@@ -1530,6 +1578,22 @@ mod tests {
                 },
             )
         ));
+    }
+
+    #[test]
+    fn selected_contents_media_class_is_primary_media_only() {
+        assert_eq!(
+            SelectedContentsMediaClass::from_projection_value("audio"),
+            Some(SelectedContentsMediaClass::Audio)
+        );
+        assert_eq!(
+            SelectedContentsMediaClass::from_projection_value("video"),
+            Some(SelectedContentsMediaClass::Video)
+        );
+        assert_eq!(
+            SelectedContentsMediaClass::from_projection_value("image"),
+            None
+        );
     }
 
     #[test]
@@ -1621,7 +1685,10 @@ mod tests {
                         modified_at_ns: None,
                         updated_at_ms: 100,
                         has_child_directories: Some(true),
-                        directory_media_state: Some(DirectoryMediaState::HasMediaDescendants),
+                        directory_primary_media_state: Some(
+                            DirectoryPrimaryMediaState::HasPrimaryMediaDescendants,
+                        ),
+                        directory_image_media_state: Some(DirectoryImageMediaState::Unknown),
                         directory_scan_state: Some(DirectoryScanState::Scanning),
                     }],
                 }),
@@ -1657,8 +1724,11 @@ mod tests {
                             "modifiedAtNs": null,
                             "updatedAtMs": 100,
                             "hasChildDirectories": true,
-                            "directoryMediaState": {
-                                "kind": "hasMediaDescendants"
+                            "directoryPrimaryMediaState": {
+                                "kind": "hasPrimaryMediaDescendants"
+                            },
+                            "directoryImageMediaState": {
+                                "kind": "unknown"
                             },
                             "directoryScanState": "scanning"
                         }]
@@ -1696,7 +1766,8 @@ mod tests {
                         modified_at_ns: Some(20),
                         updated_at_ms: 100,
                         has_child_directories: None,
-                        directory_media_state: None,
+                        directory_primary_media_state: None,
+                        directory_image_media_state: None,
                         directory_scan_state: None,
                     }],
                 }),
@@ -1771,6 +1842,7 @@ mod tests {
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 50,
+                    source_file_visibility: Some(SourceFileVisibility::Performance),
                 },
             ),
             SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(

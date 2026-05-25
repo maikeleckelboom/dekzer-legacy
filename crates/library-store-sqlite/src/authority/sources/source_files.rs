@@ -2,7 +2,10 @@ use rusqlite::{OptionalExtension, params};
 
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
-use crate::browse_media::media_class_str_from_path;
+use crate::browse_media::{
+    SourceFileVisibility, is_image_media_class, is_primary_media_class, media_class_str_from_path,
+    source_file_visibility_predicate_sql_for_column,
+};
 use library_domain::SourcePresenceState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,7 +82,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                     media_class,
                 ],
             )?;
-            self.propagate_media_descendant_fact(existing.source_file_id, input.updated_at)?;
+            self.propagate_source_file_descendant_facts(existing.source_file_id, input.updated_at)?;
             return Ok(existing.source_file_id);
         }
 
@@ -159,7 +162,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                 self.tx.last_insert_rowid()
             }
         };
-        self.propagate_media_descendant_fact(source_file_id, input.updated_at)?;
+        self.propagate_source_file_descendant_facts(source_file_id, input.updated_at)?;
         Ok(source_file_id)
     }
 
@@ -203,37 +206,89 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
         Ok(query)
     }
 
-    fn propagate_media_descendant_fact(
+    fn propagate_source_file_descendant_facts(
         &self,
         source_file_id: i64,
         updated_at: i64,
     ) -> LibrarySqliteResult<()> {
-        let media_parent = self
+        let known_media_predicate = source_file_visibility_predicate_sql_for_column(
+            SourceFileVisibility::PerformanceAndImages,
+            "media_class",
+        );
+        let source_file = self
             .tx
             .query_row(
-                "SELECT parent_source_directory_id
+                &format!(
+                    "SELECT parent_source_directory_id,
+                        media_class
                  FROM source_files
                  WHERE source_file_id = ?1
                    AND presence_state = 'present'
-                   AND media_class IN ('audio', 'video', 'image')",
+                   AND {known_media_predicate}"
+                ),
                 [source_file_id],
-                |row| row.get::<_, Option<i64>>(0),
+                |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, String>(1)?)),
             )
             .optional()?
-            .flatten();
+            .and_then(|(parent_source_directory_id, media_class)| {
+                parent_source_directory_id
+                    .map(|parent_source_directory_id| (parent_source_directory_id, media_class))
+            });
 
-        let Some(parent_source_directory_id) = media_parent else {
+        let Some((parent_source_directory_id, media_class)) = source_file else {
             return Ok(());
         };
 
-        self.tx.execute(
-            "WITH RECURSIVE media_up(source_directory_id) AS (
+        if is_primary_media_class(&media_class) {
+            self.propagate_primary_media_descendant_fact(parent_source_directory_id, updated_at)?;
+        }
+
+        if is_image_media_class(&media_class) {
+            self.propagate_image_media_descendant_fact(parent_source_directory_id, updated_at)?;
+        }
+
+        Ok(())
+    }
+
+    fn propagate_primary_media_descendant_fact(
+        &self,
+        parent_source_directory_id: i64,
+        updated_at: i64,
+    ) -> LibrarySqliteResult<()> {
+        self.propagate_descendant_fact(
+            parent_source_directory_id,
+            updated_at,
+            "has_primary_media_descendant",
+        )
+    }
+
+    fn propagate_image_media_descendant_fact(
+        &self,
+        parent_source_directory_id: i64,
+        updated_at: i64,
+    ) -> LibrarySqliteResult<()> {
+        self.propagate_descendant_fact(
+            parent_source_directory_id,
+            updated_at,
+            "has_image_media_descendant",
+        )
+    }
+
+    fn propagate_descendant_fact(
+        &self,
+        parent_source_directory_id: i64,
+        updated_at: i64,
+        fact_column: &'static str,
+    ) -> LibrarySqliteResult<()> {
+        let sql = match fact_column {
+            "has_primary_media_descendant" => {
+                "WITH RECURSIVE media_up(source_directory_id) AS (
                  SELECT ?1
                  WHERE EXISTS (
                      SELECT 1
                      FROM source_directories
                      WHERE source_directory_id = ?1
-                       AND has_media_descendant = 0
+                       AND has_primary_media_descendant = 0
                  )
                  UNION ALL
                  SELECT parent.source_directory_id
@@ -243,18 +298,50 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                  JOIN source_directories parent
                    ON parent.source_directory_id = child.parent_source_directory_id
                  WHERE child.parent_source_directory_id IS NOT NULL
-                   AND parent.has_media_descendant = 0
+                   AND parent.has_primary_media_descendant = 0
              )
              UPDATE source_directories
-             SET has_media_descendant = 1,
+             SET has_primary_media_descendant = 1,
                  dir_scan_updated_at = ?2,
                  updated_at = ?2
              WHERE source_directory_id IN (
                  SELECT source_directory_id
                  FROM media_up
-             )",
-            params![parent_source_directory_id, updated_at],
-        )?;
+             )"
+            }
+            "has_image_media_descendant" => {
+                "WITH RECURSIVE media_up(source_directory_id) AS (
+                 SELECT ?1
+                 WHERE EXISTS (
+                     SELECT 1
+                     FROM source_directories
+                     WHERE source_directory_id = ?1
+                       AND has_image_media_descendant = 0
+                 )
+                 UNION ALL
+                 SELECT parent.source_directory_id
+                 FROM source_directories child
+                 JOIN media_up current
+                   ON current.source_directory_id = child.source_directory_id
+                 JOIN source_directories parent
+                   ON parent.source_directory_id = child.parent_source_directory_id
+                 WHERE child.parent_source_directory_id IS NOT NULL
+                   AND parent.has_image_media_descendant = 0
+             )
+             UPDATE source_directories
+             SET has_image_media_descendant = 1,
+                 dir_scan_updated_at = ?2,
+                 updated_at = ?2
+             WHERE source_directory_id IN (
+                 SELECT source_directory_id
+                 FROM media_up
+             )"
+            }
+            _ => unreachable!("descendant fact column is an internal static value"),
+        };
+
+        self.tx
+            .execute(sql, params![parent_source_directory_id, updated_at])?;
         Ok(())
     }
 }
