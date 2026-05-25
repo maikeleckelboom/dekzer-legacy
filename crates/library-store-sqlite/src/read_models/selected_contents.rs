@@ -1,6 +1,9 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::browse_media::{SourceFileVisibility, source_file_visibility_predicate_sql_for_column};
+use crate::read_models::source_location_coverage::{
+    SourceLocationCoverage, aggregate_source_location_coverages, classify_source_location_coverage,
+};
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,6 +102,10 @@ enum ResolvedSelectedContentsScope {
         source_id: i64,
     },
     Prefix {
+        source_id: i64,
+        relative_path: String,
+    },
+    SourceLocationPrefix {
         source_id: i64,
         relative_path: String,
     },
@@ -223,13 +230,6 @@ fn resolve_scope(
                 ResolvedSelectedContentsScope::WholeSource {
                     source_id: *source_id,
                 }
-            } else if accepted_source_location_missing_count(connection, *source_id)? > 0 {
-                return Ok(Some((
-                    source_readiness,
-                    ResolvedSelectedContentsScope::AcceptedSourceLocations {
-                        source_id: *source_id,
-                    },
-                )));
             } else {
                 ResolvedSelectedContentsScope::AcceptedSourceLocations {
                     source_id: *source_id,
@@ -250,7 +250,7 @@ fn resolve_scope(
 
             Ok(Some((
                 source_readiness,
-                ResolvedSelectedContentsScope::Prefix {
+                ResolvedSelectedContentsScope::SourceLocationPrefix {
                     source_id,
                     relative_path,
                 },
@@ -356,69 +356,22 @@ fn accepted_source_location_count(
         .map_err(Into::into)
 }
 
-fn accepted_source_location_missing_count(
+fn load_accepted_source_location_paths(
     connection: &Connection,
     source_id: i64,
-) -> LibrarySqliteResult<i64> {
-    connection
-        .query_row(
-            "SELECT COUNT(*)
-             FROM source_locations sl
-             WHERE sl.source_id = ?1
-               AND sl.authority = 'user'
-               AND sl.location_kind = 'registered_subpath'
-               AND sl.is_user_visible = 1
-               AND (
-                   EXISTS (
-                       SELECT 1
-                       FROM source_directories sd
-                       WHERE sd.source_id = sl.source_id
-                         AND sd.relative_path COLLATE BINARY = sl.relative_path COLLATE BINARY
-                         AND sd.presence_state = 'missing'
-                   )
-                   OR (
-                       EXISTS (
-                           SELECT 1
-                           FROM source_scan_state sss
-                           WHERE sss.source_id = sl.source_id
-                             AND sss.scan_phase = 'complete'
-                       )
-                       AND NOT EXISTS (
-                           SELECT 1
-                           FROM source_directories sd
-                           WHERE sd.source_id = sl.source_id
-                             AND sd.relative_path COLLATE BINARY = sl.relative_path COLLATE BINARY
-                       )
-                   )
-               )",
-            [source_id],
-            |row| row.get(0),
-        )
-        .map_err(Into::into)
-}
-
-fn accepted_source_location_unknown_count(
-    connection: &Connection,
-    source_id: i64,
-) -> LibrarySqliteResult<i64> {
-    connection
-        .query_row(
-            "SELECT COUNT(*)
-             FROM source_locations sl
-             WHERE sl.source_id = ?1
-               AND sl.authority = 'user'
-               AND sl.location_kind = 'registered_subpath'
-               AND sl.is_user_visible = 1
-               AND NOT EXISTS (
-                   SELECT 1
-                   FROM source_directories sd
-                   WHERE sd.source_id = sl.source_id
-                     AND sd.relative_path COLLATE BINARY = sl.relative_path COLLATE BINARY
-               )",
-            [source_id],
-            |row| row.get(0),
-        )
-        .map_err(Into::into)
+) -> LibrarySqliteResult<Vec<String>> {
+    let mut stmt = connection.prepare(
+        "SELECT relative_path
+         FROM source_locations
+         WHERE source_id = ?1
+           AND authority = 'user'
+           AND location_kind = 'registered_subpath'
+           AND is_user_visible = 1",
+    )?;
+    let paths: Vec<String> = stmt
+        .query_map([source_id], |row| row.get(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(paths)
 }
 
 fn load_directory_presence(
@@ -545,19 +498,61 @@ fn read_coverage(
             read_whole_source_coverage_counts(connection, *source_id)?
         }
         ResolvedSelectedContentsScope::AcceptedSourceLocations { source_id } => {
-            if accepted_source_location_missing_count(connection, *source_id)? > 0 {
+            let paths = load_accepted_source_location_paths(connection, *source_id)?;
+            if paths.is_empty() {
                 return Ok(coverage(
                     StoreSelectedContentsCoverageState::LocationMissing,
                     false,
-                    "One or more accepted source locations are missing.",
+                    "No accepted source locations found.",
                 ));
             }
-            if accepted_source_location_unknown_count(connection, *source_id)? > 0 {
-                return Ok(coverage(
-                    pending_or_scanning_coverage_state(source),
-                    false,
-                    "One or more accepted source locations have not been proven present or missing yet.",
-                ));
+            let mut coverages = Vec::with_capacity(paths.len());
+            for path in &paths {
+                coverages.push(classify_source_location_coverage(
+                    connection,
+                    *source_id,
+                    path,
+                    source.scan_phase.as_deref(),
+                )?);
+            }
+            let aggregate = aggregate_source_location_coverages(&coverages);
+            match aggregate {
+                SourceLocationCoverage::Present => {}
+                SourceLocationCoverage::Missing => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::LocationMissing,
+                        false,
+                        "One or more accepted source locations are missing.",
+                    ));
+                }
+                SourceLocationCoverage::Blocked => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Blocked,
+                        false,
+                        "One or more accepted source locations is under a blocked subtree.",
+                    ));
+                }
+                SourceLocationCoverage::Failed => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Failed,
+                        false,
+                        "One or more accepted source locations is under a failed subtree.",
+                    ));
+                }
+                SourceLocationCoverage::Scanning => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Scanning,
+                        false,
+                        "One or more accepted source locations is being scanned.",
+                    ));
+                }
+                SourceLocationCoverage::Pending | SourceLocationCoverage::Unknown => {
+                    return Ok(coverage(
+                        pending_or_scanning_coverage_state(source),
+                        false,
+                        "One or more accepted source locations has incomplete coverage.",
+                    ));
+                }
             }
             read_accepted_source_locations_coverage_counts(connection, *source_id)?
         }
@@ -567,6 +562,63 @@ fn read_coverage(
                 false,
                 "The selected folder is missing.",
             ));
+        }
+        ResolvedSelectedContentsScope::SourceLocationPrefix {
+            source_id,
+            relative_path,
+        } => {
+            let location_coverage = classify_source_location_coverage(
+                connection,
+                *source_id,
+                relative_path,
+                source.scan_phase.as_deref(),
+            )?;
+            match location_coverage {
+                SourceLocationCoverage::Present => {}
+                SourceLocationCoverage::Missing => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::LocationMissing,
+                        false,
+                        "The selected source location is missing.",
+                    ));
+                }
+                SourceLocationCoverage::Blocked => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Blocked,
+                        false,
+                        "The selected source location is under a blocked subtree.",
+                    ));
+                }
+                SourceLocationCoverage::Failed => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Failed,
+                        false,
+                        "The selected source location is under a failed subtree.",
+                    ));
+                }
+                SourceLocationCoverage::Scanning => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Scanning,
+                        false,
+                        "The selected source location is being scanned.",
+                    ));
+                }
+                SourceLocationCoverage::Pending => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::Pending,
+                        false,
+                        "The selected source location has pending coverage.",
+                    ));
+                }
+                SourceLocationCoverage::Unknown => {
+                    return Ok(coverage(
+                        pending_or_scanning_coverage_state(source),
+                        false,
+                        "The selected source location has unproven coverage.",
+                    ));
+                }
+            }
+            read_prefix_coverage_counts(connection, *source_id, relative_path)?
         }
         ResolvedSelectedContentsScope::Prefix {
             source_id,
@@ -711,6 +763,18 @@ fn coverage_from_counts(
             );
         }
 
+        if matches!(
+            scope,
+            ResolvedSelectedContentsScope::AcceptedSourceLocations { .. }
+                | ResolvedSelectedContentsScope::SourceLocationPrefix { .. }
+        ) {
+            return coverage(
+                StoreSelectedContentsCoverageState::Complete,
+                true,
+                "The selected contents scope has complete scan coverage.",
+            );
+        }
+
         return coverage(
             StoreSelectedContentsCoverageState::LocationMissing,
             false,
@@ -750,12 +814,12 @@ fn coverage_from_counts(
         );
     }
 
-    let scan_finalized = matches!(
-        source.scan_phase.as_deref(),
-        Some("complete") | Some("partial")
-    );
-
-    if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. }) && !scan_finalized {
+    if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
+        && !matches!(
+            source.scan_phase.as_deref(),
+            Some("complete") | Some("partial")
+        )
+    {
         return coverage(
             StoreSelectedContentsCoverageState::Pending,
             false,
@@ -884,6 +948,20 @@ fn read_rows(
             read_rows_for_accepted_locations(connection, &predicate, *source_id, limit)
         }
         ResolvedSelectedContentsScope::Prefix {
+            source_id,
+            relative_path,
+        } => read_rows_with_source_predicate(
+            connection,
+            &format!(
+                "sf.source_id = ?1
+                 AND {}",
+                source_file_descendant_predicate("sf", "?2")
+            ),
+            *source_id,
+            Some(relative_path),
+            limit,
+        ),
+        ResolvedSelectedContentsScope::SourceLocationPrefix {
             source_id,
             relative_path,
         } => read_rows_with_source_predicate(
@@ -2571,5 +2649,352 @@ mod tests {
         assert!(!dir_result.coverage.recursive_scope_complete);
         assert!(!dir_result.coverage.empty_result_authoritative);
         assert_eq!(dir_result.state, StoreSelectedContentsState::Blocked);
+    }
+
+    #[test]
+    fn source_location_missing_proven_under_partial_scan() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/DeletedFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(
+            result.state,
+            StoreSelectedContentsState::LocationMissing,
+            "Music/DeletedFolder must be classified missing, not unknown or pending"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::LocationMissing,
+            "coverage must be locationMissing for scope-proven absent path under partial scan"
+        );
+        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn source_location_under_blocked_parent_is_blocked_not_missing() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Locked/DeletedFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_ne!(
+            result.state,
+            StoreSelectedContentsState::Empty,
+            "blocked location must not produce authoritative empty"
+        );
+        assert_ne!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::LocationMissing,
+            "blocked parent must not be classified as missing"
+        );
+        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.coverage.recursive_scope_complete);
+    }
+
+    #[test]
+    fn source_location_under_failed_parent_is_failed_not_missing() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Crashed", "complete");
+        set_directory_scan_issue(&connection, 11, "failed", "unknown_io");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Crashed/DeletedFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Failed,
+            "failed parent must produce failed coverage"
+        );
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn source_location_under_pending_parent_is_pending_not_missing() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Pending", "pending");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Pending/SubFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Pending,
+            "pending parent must produce pending coverage"
+        );
+        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.coverage.recursive_scope_complete);
+    }
+
+    #[test]
+    fn accepted_locations_complete_under_partial_source() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_directory(&connection, 12, 1, "Other", "complete");
+        set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Good",
+            "user",
+            "registered_subpath",
+        );
+        insert_scanned_file(&connection, 1000, 1, 11, "Music/Good/track.wav", "audio");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents for source with accepted location");
+
+        assert!(
+            !result.rows.is_empty(),
+            "accepted location rows must be returned"
+        );
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "all accepted locations complete must produce complete coverage even under partial source"
+        );
+        assert!(result.coverage.recursive_scope_complete);
+        assert!(result.coverage.empty_result_authoritative || !result.rows.is_empty());
+    }
+
+    #[test]
+    fn accepted_locations_noncomplete_under_partial_source_when_any_scope_unproven() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_directory(&connection, 12, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Good",
+            "user",
+            "registered_subpath",
+        );
+        insert_location(
+            &connection,
+            101,
+            1,
+            "Music/Locked",
+            "user",
+            "registered_subpath",
+        );
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_ne!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "source with a blocked accepted location must not be complete"
+        );
+        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.coverage.recursive_scope_complete);
+    }
+
+    #[test]
+    fn source_location_scope_and_source_agree_on_coverage() {
+        let connection = open_connection();
+        seed_assets(&connection);
+        insert_source(&connection, 1);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 1",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Good", "complete");
+        insert_directory(&connection, 12, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            1,
+            "Music/Good",
+            "user",
+            "registered_subpath",
+        );
+
+        let location_result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents for SourceLocation");
+
+        let source_result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents for Source");
+
+        assert_eq!(
+            location_result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "SourceLocation scope for Music/Good must be complete"
+        );
+        assert_eq!(
+            source_result.coverage.state,
+            StoreSelectedContentsCoverageState::Complete,
+            "Source with only Music/Good accepted location must be complete"
+        );
+
+        insert_location(
+            &connection,
+            101,
+            1,
+            "Music/Locked",
+            "user",
+            "registered_subpath",
+        );
+
+        let location_result_blocked = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::SourceLocation {
+                source_location_id: 101,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents for blocked SourceLocation");
+
+        let source_result_blocked = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents for Source with blocked location");
+
+        assert_eq!(
+            location_result_blocked.coverage.state,
+            StoreSelectedContentsCoverageState::Blocked,
+            "SourceLocation scope for Music/Locked must be blocked"
+        );
+        assert_eq!(
+            source_result_blocked.coverage.state,
+            StoreSelectedContentsCoverageState::Blocked,
+            "Source with blocked accepted location must be blocked"
+        );
     }
 }

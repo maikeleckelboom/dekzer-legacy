@@ -1,6 +1,9 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::browse_media::{SourceFileVisibility, source_file_visibility_predicate_sql};
+use crate::read_models::source_location_coverage::{
+    SourceLocationCoverage, classify_source_location_coverage,
+};
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,7 +67,7 @@ struct ReadAnchor {
     source_id: i64,
     effective_parent_source_directory_id: Option<i64>,
     source_readiness: SourceReadiness,
-    missing_location: bool,
+    location_unavailable_coverage: Option<SourceLocationCoverage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -112,7 +115,7 @@ pub(crate) fn read_children(
         &anchor.source_readiness,
         anchor.source_id,
         anchor.effective_parent_source_directory_id,
-        anchor.missing_location,
+        anchor.location_unavailable_coverage.as_ref(),
     )?;
 
     if !matches!(coverage.state, StoreLiteralHierarchyCoverageState::Complete)
@@ -184,7 +187,7 @@ fn resolve_read_anchor(
                 source_id,
                 effective_parent_source_directory_id: parent_source_directory_id,
                 source_readiness,
-                missing_location: false,
+                location_unavailable_coverage: None,
             }))
         }
         StoreLiteralHierarchyEntryPoint::SourceLocation { source_location_id } => {
@@ -198,6 +201,22 @@ fn resolve_read_anchor(
                 return Ok(None);
             };
 
+            let location_coverage = classify_source_location_coverage(
+                connection,
+                source_location.source_id,
+                &source_location.relative_path,
+                source_readiness.scan_phase.as_deref(),
+            )?;
+
+            if !matches!(location_coverage, SourceLocationCoverage::Present) {
+                return Ok(Some(ReadAnchor {
+                    source_id: source_location.source_id,
+                    effective_parent_source_directory_id: None,
+                    source_readiness,
+                    location_unavailable_coverage: Some(location_coverage),
+                }));
+            }
+
             let Some(base_directory_id) = directory_id_for_relative_path(
                 connection,
                 source_location.source_id,
@@ -208,7 +227,7 @@ fn resolve_read_anchor(
                     source_id: source_location.source_id,
                     effective_parent_source_directory_id: None,
                     source_readiness,
-                    missing_location: true,
+                    location_unavailable_coverage: Some(SourceLocationCoverage::Missing),
                 }));
             };
 
@@ -231,7 +250,7 @@ fn resolve_read_anchor(
                 source_id: source_location.source_id,
                 effective_parent_source_directory_id,
                 source_readiness,
-                missing_location: false,
+                location_unavailable_coverage: None,
             }))
         }
     }
@@ -370,17 +389,47 @@ fn read_hierarchy_coverage(
     source: &SourceReadiness,
     source_id: i64,
     parent_source_directory_id: Option<i64>,
-    missing_location: bool,
+    location_unavailable_coverage: Option<&SourceLocationCoverage>,
 ) -> LibrarySqliteResult<StoreLiteralHierarchyCoverage> {
     if let Some(coverage) = source_readiness_coverage(source) {
         return Ok(coverage);
     }
-    if missing_location {
-        return Ok(literal_coverage(
-            StoreLiteralHierarchyCoverageState::LocationMissing,
-            false,
-            "The selected source location is missing.",
-        ));
+    if let Some(location_coverage) = location_unavailable_coverage {
+        return Ok(match location_coverage {
+            SourceLocationCoverage::Missing => literal_coverage(
+                StoreLiteralHierarchyCoverageState::LocationMissing,
+                false,
+                "The selected source location is missing.",
+            ),
+            SourceLocationCoverage::Blocked => literal_coverage(
+                StoreLiteralHierarchyCoverageState::Blocked,
+                false,
+                "The selected source location is under a blocked subtree.",
+            ),
+            SourceLocationCoverage::Failed => literal_coverage(
+                StoreLiteralHierarchyCoverageState::Failed,
+                false,
+                "The selected source location is under a failed subtree.",
+            ),
+            SourceLocationCoverage::Pending => literal_coverage(
+                StoreLiteralHierarchyCoverageState::Pending,
+                false,
+                "The selected source location has pending coverage.",
+            ),
+            SourceLocationCoverage::Scanning => literal_coverage(
+                StoreLiteralHierarchyCoverageState::Scanning,
+                false,
+                "The selected source location is being scanned.",
+            ),
+            SourceLocationCoverage::Unknown => literal_coverage(
+                pending_or_scanning_coverage_state(source),
+                false,
+                "The selected source location has unproven coverage.",
+            ),
+            SourceLocationCoverage::Present => {
+                unreachable!("Present is not an unavailable coverage")
+            }
+        });
     }
 
     let is_whole_source = parent_source_directory_id.is_none();
@@ -1705,5 +1754,172 @@ mod tests {
             StoreLiteralHierarchyCoverageState::Complete,
             "whole source must remain non-complete when partial"
         );
+    }
+
+    fn insert_location(
+        connection: &Connection,
+        source_location_id: i64,
+        source_id: i64,
+        relative_path: &str,
+        authority: &str,
+        location_kind: &str,
+    ) {
+        connection
+            .execute(
+                "INSERT INTO source_locations (
+                     source_location_id,
+                     source_id,
+                     authority,
+                     location_kind,
+                     relative_path,
+                     display_name,
+                     is_user_visible,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?5, 1, 1, 1)",
+                rusqlite::params![
+                    source_location_id,
+                    source_id,
+                    authority,
+                    location_kind,
+                    relative_path
+                ],
+            )
+            .expect("insert source location");
+    }
+
+    #[test]
+    fn source_location_hierarchy_missing_proven_under_partial_scan() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 7",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryFacts {
+                has_child_directories: true,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            22,
+            Some(20),
+            "Music/Locked",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        set_directory_scan_issue(&connection, 22, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            7,
+            "Music/DeletedFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::SourceLocation {
+                source_location_id: 100,
+            },
+            None,
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source location window");
+
+        assert_eq!(
+            window.coverage.state,
+            StoreLiteralHierarchyCoverageState::LocationMissing,
+            "Music/DeletedFolder must be locationMissing even under partial scan when parent is complete"
+        );
+        assert!(!window.coverage.recursive_scope_complete);
+    }
+
+    #[test]
+    fn source_location_hierarchy_under_blocked_parent_is_blocked_not_missing() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        connection
+            .execute(
+                "UPDATE source_scan_state SET scan_phase = 'partial', scan_issue_kind = 'permission_denied' WHERE source_id = 7",
+                [],
+            )
+            .expect("set partial scan phase");
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryFacts {
+                has_child_directories: true,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            22,
+            Some(20),
+            "Music/Locked",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        set_directory_scan_issue(&connection, 22, "blocked", "permission_denied");
+        insert_location(
+            &connection,
+            100,
+            7,
+            "Music/Locked/SubFolder",
+            "user",
+            "registered_subpath",
+        );
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::SourceLocation {
+                source_location_id: 100,
+            },
+            None,
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source location window");
+
+        assert_eq!(
+            window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Blocked,
+            "source location under blocked parent must be blocked, not missing"
+        );
+        assert!(!window.coverage.empty_result_authoritative);
     }
 }
