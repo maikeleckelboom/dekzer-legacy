@@ -17,6 +17,26 @@ pub struct StoreLiteralHierarchyWindow {
     pub limit: usize,
     pub total_rows: usize,
     pub rows: Vec<StoreLiteralHierarchyNode>,
+    pub coverage: StoreLiteralHierarchyCoverage,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreLiteralHierarchyCoverageState {
+    Complete,
+    Pending,
+    Scanning,
+    Blocked,
+    Failed,
+    SourceUnavailable,
+    LocationMissing,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreLiteralHierarchyCoverage {
+    pub state: StoreLiteralHierarchyCoverageState,
+    pub recursive_scope_complete: bool,
+    pub empty_result_authoritative: bool,
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,13 +63,33 @@ pub struct StoreLiteralHierarchyNode {
 struct ReadAnchor {
     source_id: i64,
     effective_parent_source_directory_id: Option<i64>,
-    empty: bool,
+    source_readiness: SourceReadiness,
+    missing_location: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SourceLocationAnchor {
     source_id: i64,
     relative_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceReadiness {
+    source_class: String,
+    mount_status: Option<String>,
+    access_state: Option<String>,
+    access_issue_kind: Option<String>,
+    scan_phase: Option<String>,
+    scan_issue_kind: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CoverageCounts {
+    total_directories: i64,
+    pending_directories: i64,
+    scanning_directories: i64,
+    blocked_directories: i64,
+    failed_directories: i64,
 }
 
 const RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL: &str = "char(48)";
@@ -67,7 +107,23 @@ pub(crate) fn read_children(
         return Ok(None);
     };
 
-    if anchor.empty {
+    let mut coverage = read_hierarchy_coverage(
+        connection,
+        &anchor.source_readiness,
+        anchor.source_id,
+        anchor.effective_parent_source_directory_id,
+        anchor.missing_location,
+    )?;
+
+    if !matches!(coverage.state, StoreLiteralHierarchyCoverageState::Complete)
+        && matches!(
+            coverage.state,
+            StoreLiteralHierarchyCoverageState::SourceUnavailable
+                | StoreLiteralHierarchyCoverageState::LocationMissing
+                | StoreLiteralHierarchyCoverageState::Blocked
+                | StoreLiteralHierarchyCoverageState::Failed
+        )
+    {
         return Ok(Some(StoreLiteralHierarchyWindow {
             entry_point,
             parent_source_directory_id,
@@ -75,6 +131,7 @@ pub(crate) fn read_children(
             limit,
             total_rows: 0,
             rows: Vec::new(),
+            coverage,
         }));
     }
 
@@ -84,6 +141,8 @@ pub(crate) fn read_children(
         anchor.effective_parent_source_directory_id,
         source_file_visibility,
     )?;
+    coverage.empty_result_authoritative =
+        coverage.state == StoreLiteralHierarchyCoverageState::Complete && total_rows == 0;
     let rows = read_child_rows(
         connection,
         anchor.source_id,
@@ -100,6 +159,7 @@ pub(crate) fn read_children(
         limit,
         total_rows,
         rows,
+        coverage,
     }))
 }
 
@@ -110,9 +170,9 @@ fn resolve_read_anchor(
 ) -> LibrarySqliteResult<Option<ReadAnchor>> {
     match entry_point {
         StoreLiteralHierarchyEntryPoint::Source { source_id } => {
-            if !source_exists(connection, source_id)? {
+            let Some(source_readiness) = load_source_readiness(connection, source_id)? else {
                 return Ok(None);
-            }
+            };
             if let Some(parent_source_directory_id) = parent_source_directory_id
                 && !directory_belongs_to_source(connection, source_id, parent_source_directory_id)?
             {
@@ -122,11 +182,17 @@ fn resolve_read_anchor(
             Ok(Some(ReadAnchor {
                 source_id,
                 effective_parent_source_directory_id: parent_source_directory_id,
-                empty: false,
+                source_readiness,
+                missing_location: false,
             }))
         }
         StoreLiteralHierarchyEntryPoint::SourceLocation { source_location_id } => {
             let Some(source_location) = load_source_location(connection, source_location_id)?
+            else {
+                return Ok(None);
+            };
+            let Some(source_readiness) =
+                load_source_readiness(connection, source_location.source_id)?
             else {
                 return Ok(None);
             };
@@ -140,7 +206,8 @@ fn resolve_read_anchor(
                 return Ok(Some(ReadAnchor {
                     source_id: source_location.source_id,
                     effective_parent_source_directory_id: None,
-                    empty: true,
+                    source_readiness,
+                    missing_location: true,
                 }));
             };
 
@@ -162,24 +229,44 @@ fn resolve_read_anchor(
             Ok(Some(ReadAnchor {
                 source_id: source_location.source_id,
                 effective_parent_source_directory_id,
-                empty: false,
+                source_readiness,
+                missing_location: false,
             }))
         }
     }
 }
 
-fn source_exists(connection: &Connection, source_id: i64) -> LibrarySqliteResult<bool> {
+fn load_source_readiness(
+    connection: &Connection,
+    source_id: i64,
+) -> LibrarySqliteResult<Option<SourceReadiness>> {
     connection
         .query_row(
-            "SELECT EXISTS(
-                 SELECT 1
-                 FROM sources
-                 WHERE source_id = ?1
-             )",
+            "SELECT s.source_class,
+                    ss.mount_status,
+                    ss.access_state,
+                    ss.access_issue_kind,
+                    sss.scan_phase,
+                    sss.scan_issue_kind
+             FROM sources s
+             LEFT JOIN source_state ss
+               ON ss.source_id = s.source_id
+             LEFT JOIN source_scan_state sss
+               ON sss.source_id = s.source_id
+             WHERE s.source_id = ?1",
             [source_id],
-            |row| row.get::<_, i64>(0),
+            |row| {
+                Ok(SourceReadiness {
+                    source_class: row.get(0)?,
+                    mount_status: row.get(1)?,
+                    access_state: row.get(2)?,
+                    access_issue_kind: row.get(3)?,
+                    scan_phase: row.get(4)?,
+                    scan_issue_kind: row.get(5)?,
+                })
+            },
         )
-        .map(|exists| exists != 0)
+        .optional()
         .map_err(Into::into)
 }
 
@@ -275,6 +362,246 @@ fn directory_is_within_source_location(
         || relative_path
             .strip_prefix(source_location_relative_path)
             .is_some_and(|suffix| suffix.starts_with('/')))
+}
+
+fn read_hierarchy_coverage(
+    connection: &Connection,
+    source: &SourceReadiness,
+    source_id: i64,
+    parent_source_directory_id: Option<i64>,
+    missing_location: bool,
+) -> LibrarySqliteResult<StoreLiteralHierarchyCoverage> {
+    if let Some(coverage) = source_readiness_coverage(source) {
+        return Ok(coverage);
+    }
+    if missing_location {
+        return Ok(literal_coverage(
+            StoreLiteralHierarchyCoverageState::LocationMissing,
+            false,
+            "The selected source location is missing.",
+        ));
+    }
+
+    let counts = if let Some(parent_source_directory_id) = parent_source_directory_id {
+        let Some((relative_path, presence_state)) =
+            load_directory_path_and_presence(connection, source_id, parent_source_directory_id)?
+        else {
+            return Ok(literal_coverage(
+                pending_or_scanning_coverage_state(source),
+                false,
+                "The selected folder has not been proven present or missing yet.",
+            ));
+        };
+        if presence_state == "missing" {
+            return Ok(literal_coverage(
+                StoreLiteralHierarchyCoverageState::LocationMissing,
+                false,
+                "The selected folder is missing.",
+            ));
+        }
+        read_prefix_coverage_counts(connection, source_id, &relative_path)?
+    } else {
+        read_whole_source_coverage_counts(connection, source_id)?
+    };
+
+    Ok(literal_coverage_from_counts(source, counts))
+}
+
+fn source_readiness_coverage(source: &SourceReadiness) -> Option<StoreLiteralHierarchyCoverage> {
+    if source.source_class != "internal"
+        && !matches!(source.mount_status.as_deref(), Some("mounted"))
+    {
+        return Some(literal_coverage(
+            StoreLiteralHierarchyCoverageState::SourceUnavailable,
+            false,
+            "The selected source is unavailable.",
+        ));
+    }
+    match source.access_state.as_deref() {
+        Some("missing") => {
+            return Some(literal_coverage(
+                StoreLiteralHierarchyCoverageState::LocationMissing,
+                false,
+                "The selected source root is missing.",
+            ));
+        }
+        Some("blocked") => {
+            return Some(literal_coverage(
+                if source.access_issue_kind.as_deref() == Some("unavailable_mount") {
+                    StoreLiteralHierarchyCoverageState::SourceUnavailable
+                } else {
+                    StoreLiteralHierarchyCoverageState::Blocked
+                },
+                false,
+                "The selected source root is blocked.",
+            ));
+        }
+        _ => {}
+    }
+    match source.scan_phase.as_deref() {
+        Some("blocked") => Some(literal_coverage(
+            if source.scan_issue_kind.as_deref() == Some("unavailable_mount") {
+                StoreLiteralHierarchyCoverageState::SourceUnavailable
+            } else {
+                StoreLiteralHierarchyCoverageState::Blocked
+            },
+            false,
+            "The selected source scan is blocked.",
+        )),
+        Some("failed") => Some(literal_coverage(
+            StoreLiteralHierarchyCoverageState::Failed,
+            false,
+            "The selected source scan failed.",
+        )),
+        _ => None,
+    }
+}
+
+fn load_directory_path_and_presence(
+    connection: &Connection,
+    source_id: i64,
+    source_directory_id: i64,
+) -> LibrarySqliteResult<Option<(String, String)>> {
+    connection
+        .query_row(
+            "SELECT relative_path, presence_state
+             FROM source_directories
+             WHERE source_id = ?1
+               AND source_directory_id = ?2",
+            params![source_id, source_directory_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn read_whole_source_coverage_counts(
+    connection: &Connection,
+    source_id: i64,
+) -> LibrarySqliteResult<CoverageCounts> {
+    connection
+        .query_row(
+            "SELECT COUNT(*),
+                    SUM(CASE WHEN dir_scan_state = 'pending' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN dir_scan_state = 'scanning' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN dir_scan_state = 'blocked' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN dir_scan_state = 'failed' THEN 1 ELSE 0 END)
+             FROM source_directories
+             WHERE source_id = ?1
+               AND presence_state = 'present'",
+            [source_id],
+            coverage_counts_from_row,
+        )
+        .map_err(Into::into)
+}
+
+fn read_prefix_coverage_counts(
+    connection: &Connection,
+    source_id: i64,
+    relative_path: &str,
+) -> LibrarySqliteResult<CoverageCounts> {
+    connection
+        .query_row(
+            &format!(
+                "SELECT COUNT(*),
+                        SUM(CASE WHEN dir_scan_state = 'pending' THEN 1 ELSE 0 END),
+                        SUM(CASE WHEN dir_scan_state = 'scanning' THEN 1 ELSE 0 END),
+                        SUM(CASE WHEN dir_scan_state = 'blocked' THEN 1 ELSE 0 END),
+                        SUM(CASE WHEN dir_scan_state = 'failed' THEN 1 ELSE 0 END)
+                 FROM source_directories sd
+                 WHERE sd.source_id = ?1
+                   AND sd.presence_state = 'present'
+                   AND (
+                       sd.relative_path COLLATE BINARY = ?2 COLLATE BINARY
+                       OR (
+                           sd.relative_path COLLATE BINARY >= ?2 || '/'
+                           AND sd.relative_path COLLATE BINARY < ?2 || {RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL}
+                       )
+                   )"
+            ),
+            params![source_id, relative_path],
+            coverage_counts_from_row,
+        )
+        .map_err(Into::into)
+}
+
+fn coverage_counts_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CoverageCounts> {
+    Ok(CoverageCounts {
+        total_directories: row.get(0)?,
+        pending_directories: row.get::<_, Option<i64>>(1)?.unwrap_or(0),
+        scanning_directories: row.get::<_, Option<i64>>(2)?.unwrap_or(0),
+        blocked_directories: row.get::<_, Option<i64>>(3)?.unwrap_or(0),
+        failed_directories: row.get::<_, Option<i64>>(4)?.unwrap_or(0),
+    })
+}
+
+fn literal_coverage_from_counts(
+    source: &SourceReadiness,
+    counts: CoverageCounts,
+) -> StoreLiteralHierarchyCoverage {
+    if counts.blocked_directories > 0 {
+        return literal_coverage(
+            StoreLiteralHierarchyCoverageState::Blocked,
+            false,
+            "Part of the selected hierarchy scope is blocked.",
+        );
+    }
+    if counts.failed_directories > 0 {
+        return literal_coverage(
+            StoreLiteralHierarchyCoverageState::Failed,
+            false,
+            "Part of the selected hierarchy scope failed to scan.",
+        );
+    }
+    if counts.scanning_directories > 0 {
+        return literal_coverage(
+            StoreLiteralHierarchyCoverageState::Scanning,
+            false,
+            "The selected hierarchy scope is still scanning.",
+        );
+    }
+    if counts.pending_directories > 0 || source.scan_phase.as_deref() != Some("complete") {
+        return literal_coverage(
+            pending_or_scanning_coverage_state(source),
+            false,
+            "The selected hierarchy scope has incomplete scan coverage.",
+        );
+    }
+    if counts.total_directories == 0 && source.scan_phase.as_deref() != Some("complete") {
+        return literal_coverage(
+            pending_or_scanning_coverage_state(source),
+            false,
+            "The selected hierarchy scope has not completed scan coverage.",
+        );
+    }
+    literal_coverage(
+        StoreLiteralHierarchyCoverageState::Complete,
+        true,
+        "The selected hierarchy scope has complete scan coverage.",
+    )
+}
+
+fn pending_or_scanning_coverage_state(
+    source: &SourceReadiness,
+) -> StoreLiteralHierarchyCoverageState {
+    if source.scan_phase.as_deref() == Some("scanning") {
+        StoreLiteralHierarchyCoverageState::Scanning
+    } else {
+        StoreLiteralHierarchyCoverageState::Pending
+    }
+}
+
+fn literal_coverage(
+    state: StoreLiteralHierarchyCoverageState,
+    recursive_scope_complete: bool,
+    detail: &str,
+) -> StoreLiteralHierarchyCoverage {
+    StoreLiteralHierarchyCoverage {
+        state,
+        recursive_scope_complete,
+        empty_result_authoritative: false,
+        detail: Some(detail.to_string()),
+    }
 }
 
 fn read_child_count(
@@ -465,7 +792,9 @@ fn directory_visibility_predicate_sql(source_file_visibility: SourceFileVisibili
 
 #[cfg(test)]
 mod tests {
-    use super::{StoreLiteralHierarchyEntryPoint, read_children};
+    use super::{
+        StoreLiteralHierarchyCoverageState, StoreLiteralHierarchyEntryPoint, read_children,
+    };
     use crate::SourceFileVisibility;
     use crate::schema::install_baseline_schema_for_test;
     use rusqlite::{Connection, params};
@@ -492,6 +821,73 @@ mod tests {
                 params![source_id, format!("source:{source_id}"), "Fixture"],
             )
             .expect("insert source");
+        connection
+            .execute(
+                "INSERT INTO source_state (
+                     source_id,
+                     mount_status,
+                     mount_epoch,
+                     access_state,
+                     access_checked_at,
+                     effective_path,
+                     updated_at
+                 )
+                 VALUES (?1, 'mounted', 1, 'accessible', 1, 'root', 1)",
+                [source_id],
+            )
+            .expect("insert source state");
+        connection
+            .execute(
+                "INSERT INTO source_scan_state (
+                     source_id,
+                     scan_phase,
+                     last_scan_started_at,
+                     last_scan_finished_at,
+                     last_successful_scan_at,
+                     updated_at
+                 )
+                 VALUES (?1, 'complete', 1, 2, 2, 2)",
+                [source_id],
+            )
+            .expect("insert source scan state");
+    }
+
+    fn set_source_access(
+        connection: &Connection,
+        source_id: i64,
+        access_state: &str,
+        issue_kind: Option<&str>,
+    ) {
+        connection
+            .execute(
+                "UPDATE source_state
+                 SET access_state = ?2,
+                     access_issue_kind = ?3,
+                     access_checked_at = 10,
+                     updated_at = 10
+                 WHERE source_id = ?1",
+                params![source_id, access_state, issue_kind],
+            )
+            .expect("update source access");
+    }
+
+    fn set_directory_scan_issue(
+        connection: &Connection,
+        source_directory_id: i64,
+        dir_scan_state: &str,
+        issue_kind: &str,
+    ) {
+        connection
+            .execute(
+                "UPDATE source_directories
+                 SET dir_scan_state = ?2,
+                     dir_scan_issue_kind = ?3,
+                     dir_scan_updated_at = 10,
+                     updated_at = 10
+                 WHERE source_directory_id = ?1",
+                params![source_directory_id, dir_scan_state, issue_kind],
+            )
+            .expect("update directory scan issue");
     }
 
     struct DirectoryFacts {
@@ -575,6 +971,81 @@ mod tests {
                 ],
             )
             .expect("insert source file");
+    }
+
+    #[test]
+    fn source_access_block_returns_blocked_hierarchy_window_not_authoritative_empty() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        set_source_access(&connection, 7, "blocked", Some("permission_denied"));
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Blocked
+        );
+        assert_eq!(window.total_rows, 0);
+        assert!(window.rows.is_empty());
+        assert!(!window.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn blocked_descendant_prevents_complete_hierarchy_coverage() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryFacts {
+                has_child_directories: true,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+        );
+        insert_directory(
+            &connection,
+            21,
+            Some(20),
+            "Music/Locked",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+        );
+        set_directory_scan_issue(&connection, 21, "blocked", "permission_denied");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(20),
+            0,
+            10,
+            SourceFileVisibility::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Blocked
+        );
+        assert!(!window.coverage.recursive_scope_complete);
+        assert!(!window.coverage.empty_result_authoritative);
     }
 
     #[test]

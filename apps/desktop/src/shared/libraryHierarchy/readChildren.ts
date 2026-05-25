@@ -93,6 +93,22 @@ export type DirectoryImageMediaState =
 
 export type DirectoryScanState = 'pending' | 'scanning' | 'complete' | 'failed' | 'blocked'
 
+export type HierarchyCoverageState =
+  | 'complete'
+  | 'pending'
+  | 'scanning'
+  | 'blocked'
+  | 'failed'
+  | 'sourceUnavailable'
+  | 'locationMissing'
+
+export type HierarchyCoverage = {
+  readonly state: HierarchyCoverageState
+  readonly recursiveScopeComplete: boolean
+  readonly emptyResultAuthoritative: boolean
+  readonly detail?: string
+}
+
 export type ChildRow =
   | {
       readonly id: string
@@ -127,6 +143,7 @@ export type ChildWindow = {
   readonly limit: number
   readonly sourceFileVisibility: SourceFileVisibility
   readonly totalRows: number
+  readonly coverage: HierarchyCoverage
   readonly nodes: readonly ChildRow[]
 }
 

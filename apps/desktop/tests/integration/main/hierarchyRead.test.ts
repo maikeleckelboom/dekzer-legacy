@@ -92,6 +92,7 @@ describe('hierarchy and navigation reads through the host', () => {
               offset: request.offset,
               limit: request.limit,
               totalRows: 2,
+              coverage: completeCoverage(),
               rows: [
                 {
                   nodeKind: 'directory',
@@ -168,6 +169,7 @@ describe('hierarchy and navigation reads through the host', () => {
                 offset: request.offset,
                 limit: request.limit,
                 totalRows: 1,
+                coverage: completeCoverage(),
                 rows: [
                   {
                     nodeKind: 'file',
@@ -298,5 +300,14 @@ function sourceNavigationRow(): Awaited<
     selectorPayload: '7',
     updatedAtMs: 100,
     rowVersion: '1'
+  }
+}
+
+function completeCoverage() {
+  return {
+    state: 'complete' as const,
+    recursiveScopeComplete: true,
+    emptyResultAuthoritative: false,
+    detail: 'Complete.'
   }
 }

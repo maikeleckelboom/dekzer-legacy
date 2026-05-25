@@ -120,7 +120,11 @@ export type NavigationRowSelectorKind = "allMedia" | "allAudio" | "allVideos" | 
 
 export type LiteralHierarchyEntryPoint = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } };
 
-export type LiteralHierarchyWindow = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LiteralHierarchyNode>, };
+export type LiteralHierarchyWindow = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LiteralHierarchyNode>, coverage: LiteralHierarchyCoverage, };
+
+export type LiteralHierarchyCoverage = { state: LiteralHierarchyCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail: string | null, };
+
+export type LiteralHierarchyCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
 
 export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, mediaClass?: LiteralHierarchyFileMediaClass, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, };
 

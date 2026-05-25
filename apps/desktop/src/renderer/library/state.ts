@@ -2,6 +2,7 @@ import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/sta
 import type {
   EntryPoint,
   ChildRow,
+  HierarchyCoverage,
   SourceFileVisibility
 } from '../../shared/libraryHierarchy/readChildren'
 import type {
@@ -50,6 +51,7 @@ export type LoadedChildren = {
   readonly sourceFileVisibility: SourceFileVisibility
   readonly rows: readonly ChildRow[]
   readonly totalRows: number
+  readonly coverage: HierarchyCoverage
   readonly nextOffset?: number
   readonly limit: number
   readonly more?: MoreState

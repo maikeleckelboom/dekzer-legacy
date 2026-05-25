@@ -320,6 +320,7 @@ function directoryRootHierarchyReadResult(): Extract<ReadResult, { state: 'ready
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 3,
+      coverage: completeCoverage(),
       nodes: [
         directoryNode('12', 'Album'),
         directoryNode('13', 'Empty Album'),
@@ -338,6 +339,7 @@ function partialSourceHierarchyReadResult(): Extract<ReadResult, { state: 'ready
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 2,
+      coverage: completeCoverage(),
       nodes: [directoryNode('12', 'Album')]
     }
   }
@@ -352,6 +354,7 @@ function sourceMoreReadResult(): Extract<ReadResult, { state: 'ready' }> {
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 2,
+      coverage: completeCoverage(),
       nodes: [fileNode('99', 'root-track.wav')]
     }
   }
@@ -369,6 +372,7 @@ function loadedDirectoryReadResult(
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 2,
+      coverage: completeCoverage(),
       nodes: [
         fileNode(`${parentDirectoryId}-track`, 'track.wav', parentDirectoryId),
         directoryNode('99', 'Nested Album', parentDirectoryId)
@@ -389,6 +393,7 @@ function partialDirectoryHierarchyReadResult(
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 2,
+      coverage: completeCoverage(),
       nodes: [fileNode(`${parentDirectoryId}-a`, 'a.wav', parentDirectoryId)]
     }
   }
@@ -406,6 +411,7 @@ function directoryMoreReadResult(
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 2,
+      coverage: completeCoverage(),
       nodes: [fileNode(`${parentDirectoryId}-b`, 'b.wav', parentDirectoryId)]
     }
   }
@@ -423,6 +429,7 @@ function emptyDirectoryReadResult(
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 0,
+      coverage: completeEmptyCoverage(),
       nodes: []
     }
   }
@@ -441,6 +448,7 @@ function wrongSourceContinuationResult(): Extract<ReadResult, { state: 'ready' }
       limit: 50,
       sourceFileVisibility: 'performance',
       totalRows: 2,
+      coverage: completeCoverage(),
       nodes: [fileNode('999', 'intruder.wav')]
     }
   }
@@ -519,6 +527,7 @@ function audioHierarchyReadResult(
       limit: 50,
       sourceFileVisibility,
       totalRows: 1,
+      coverage: completeCoverage(),
       nodes: [fileNode('11', 'track.wav')]
     }
   }
@@ -535,6 +544,7 @@ function imageHierarchyReadResult(
       limit: 50,
       sourceFileVisibility,
       totalRows: 2,
+      coverage: completeCoverage(),
       nodes: [fileNode('11', 'track.wav'), fileNode('12', 'cover.jpg', undefined, 'image')]
     }
   }

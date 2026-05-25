@@ -5,8 +5,9 @@
 mod discovery;
 mod filesystem_walk;
 pub(crate) use discovery::{
-    DiscoveredFileCommitResult, DiscoveredFileInput, DiscoveredLocationInput,
-    DiscoveredLocationKind, DiscoveryBatch, DiscoveryCommitResult,
+    DirectoryEnumerationOutcome, DirectoryEnumerationOutcomeKind, DiscoveredFileCommitResult,
+    DiscoveredFileInput, DiscoveredLocationInput, DiscoveredLocationKind, DiscoveryBatch,
+    DiscoveryCommitResult,
 };
 pub(crate) use discovery::{
     DiscoveryChunkCommitResult, DiscoveryFinalizeResult, DiscoveryTx,

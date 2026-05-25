@@ -1,6 +1,7 @@
 import type {
   EntryPoint,
   ChildRow,
+  HierarchyCoverage,
   SourceFileVisibility
 } from '../../../shared/libraryHierarchy/readChildren'
 import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
@@ -261,7 +262,12 @@ function projectLoadedHierarchyChildren(options: {
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
   if (options.children.rows.length === 0 && options.children.nextOffset === undefined) {
-    return []
+    const stateNode = hierarchyCoverageStateNode(
+      options.ownerId,
+      options.children.coverage,
+      options.bindingsById
+    )
+    return stateNode === undefined ? [] : [stateNode]
   }
 
   const projectedNodes = projectLiteralNodes({
@@ -274,7 +280,12 @@ function projectLoadedHierarchyChildren(options: {
   })
 
   if (projectedNodes.length === 0 && options.children.nextOffset === undefined) {
-    return []
+    const stateNode = hierarchyCoverageStateNode(
+      options.ownerId,
+      options.children.coverage,
+      options.bindingsById
+    )
+    return stateNode === undefined ? [] : [stateNode]
   }
 
   if (options.children.nextOffset === undefined) {
@@ -291,6 +302,61 @@ function projectLoadedHierarchyChildren(options: {
       options.bindingsById
     )
   ]
+}
+
+function hierarchyCoverageStateNode(
+  ownerId: string,
+  coverage: HierarchyCoverage,
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
+): BrowserTreeNode | undefined {
+  switch (coverage.state) {
+    case 'complete':
+      if (!coverage.emptyResultAuthoritative) {
+        return undefined
+      }
+      return trackedReadStateNode(
+        {
+          ownerId,
+          state: 'empty',
+          label: 'No visible items',
+          detail: coverage.detail ?? 'No visible items in this scope.'
+        },
+        bindingsById
+      )
+    case 'pending':
+    case 'scanning':
+      return trackedReadStateNode(
+        {
+          ownerId,
+          state: 'loading',
+          label: coverage.state === 'scanning' ? 'Indexing source contents' : 'Indexing pending',
+          detail: coverage.detail ?? 'Source contents are still being indexed.'
+        },
+        bindingsById
+      )
+    case 'sourceUnavailable':
+    case 'locationMissing':
+      return trackedReadStateNode(
+        {
+          ownerId,
+          state: 'unavailable',
+          label: coverage.state === 'locationMissing' ? 'Location missing' : 'Source unavailable',
+          detail: coverage.detail ?? 'The selected source location is unavailable.'
+        },
+        bindingsById
+      )
+    case 'blocked':
+    case 'failed':
+      return trackedReadStateNode(
+        {
+          ownerId,
+          state: 'error',
+          label: coverage.state === 'blocked' ? 'Access blocked' : 'Scan failed',
+          detail: coverage.detail ?? 'The selected scope could not be fully scanned.'
+        },
+        bindingsById
+      )
+  }
 }
 
 function projectLiteralNodes(options: {

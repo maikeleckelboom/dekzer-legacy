@@ -17,9 +17,9 @@ use crate::{
     UpsertSourceStateInput,
 };
 use library_domain::{
-    ArtifactKind, ArtifactRole, NavigationSelector, PrepPolicyId, SourceFileId, SourceId,
-    SourcePresenceState, SourceResolutionStatus, SourceScanPhase, SourceSegmentId,
-    SourceSegmentSetId, WorkItemId, WorkPriorityClass, WorkRunOutcome, encode_selector,
+    ArtifactKind, ArtifactRole, NavigationSelector, PrepPolicyId, SourceAccessState, SourceFileId,
+    SourceId, SourcePresenceState, SourceScanPhase, SourceSegmentId, SourceSegmentSetId,
+    WorkItemId, WorkPriorityClass, WorkRunOutcome, encode_selector,
 };
 use rusqlite::Connection;
 use std::fs;
@@ -1107,6 +1107,8 @@ fn source_directory_writes_do_not_reseed_navigation_projection() {
             relative_path: "inventory".to_string(),
             presence_state: SourcePresenceState::Present,
             dir_scan_state: None,
+            dir_scan_issue_kind: None,
+            dir_scan_error_detail: None,
             scanned_at: None,
             mtime_ns: None,
             first_created_at: Some(20),
@@ -1195,7 +1197,7 @@ fn root_lifecycle_syncs_removable_roots_into_source_navigation_rows() {
 
     let state_row = connection
         .query_row(
-            "SELECT ss.resolution_status, sss.scan_phase
+            "SELECT ss.access_state, sss.scan_phase
                  FROM source_state ss
                  JOIN source_scan_state sss ON sss.source_id = ss.source_id
                  WHERE ss.source_id = ?1",
@@ -1206,7 +1208,7 @@ fn root_lifecycle_syncs_removable_roots_into_source_navigation_rows() {
     assert_eq!(
         state_row,
         (
-            SourceResolutionStatus::Resolved.as_str().to_string(),
+            SourceAccessState::Accessible.as_str().to_string(),
             SourceScanPhase::Idle.as_str().to_string(),
         )
     );
@@ -1503,7 +1505,10 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
             source_id,
             mount_status: RootMountStatus::Mounted.as_str().to_string(),
             mount_epoch: 0,
-            resolution_status: SourceResolutionStatus::Resolved,
+            access_state: SourceAccessState::Accessible,
+            access_issue_kind: None,
+            access_error_detail: None,
+            access_checked_at: Some(13),
             mount_root: Some("C:/music".to_string()),
             effective_path: Some("C:/music".to_string()),
             observed_volume_label: Some("Volume".to_string()),
@@ -1519,7 +1524,7 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
             last_scan_started_at: Some(12),
             last_scan_finished_at: Some(13),
             last_successful_scan_at: Some(13),
-            blocked_reason: None,
+            scan_issue_kind: None,
             error_detail: None,
             updated_at: 13,
         })
@@ -1533,6 +1538,8 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
             relative_path: "album".to_string(),
             presence_state: SourcePresenceState::Present,
             dir_scan_state: None,
+            dir_scan_issue_kind: None,
+            dir_scan_error_detail: None,
             scanned_at: None,
             mtime_ns: None,
             first_created_at: Some(14),

@@ -84,7 +84,8 @@ fn validate_source_state_constraints(connection: &Connection) -> LibrarySqliteRe
     for fragment in [
         "mount_status IN ('unknown', 'mounted', 'unmounted', 'eject_requested', 'eject_pending')",
         "mount_epoch >= 0",
-        "resolution_status IN ('resolved', 'missing', 'inaccessible', 'unknown')",
+        "access_state IN ('accessible', 'missing', 'blocked', 'unknown')",
+        "access_issue_kind IN ( 'missing', 'not_directory', 'permission_denied', 'privacy_permission_required', 'unavailable_mount', 'resource_busy', 'stale_network_handle', 'symlink_loop', 'symlink_escape_blocked', 'unsupported_path', 'invalid_path', 'io_interrupted', 'timed_out', 'unknown_io' )",
     ] {
         require_sql_fragment(
             &sql,
@@ -100,7 +101,7 @@ fn validate_source_scan_state_constraints(connection: &Connection) -> LibrarySql
     for fragment in [
         "scan_phase IN ('idle', 'scanning', 'complete', 'blocked', 'failed')",
         "last_scan_finished_at >= last_scan_started_at",
-        "scan_phase <> 'blocked' OR blocked_reason IS NOT NULL",
+        "scan_phase <> 'blocked' OR scan_issue_kind IS NOT NULL",
     ] {
         require_sql_fragment(
             &sql,

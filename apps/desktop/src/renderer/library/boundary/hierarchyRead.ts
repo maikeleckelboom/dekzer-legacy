@@ -874,6 +874,7 @@ function loadedChildrenFromWindow(
     sourceFileVisibility: target.sourceFileVisibility,
     rows: window.nodes,
     totalRows: window.totalRows,
+    coverage: window.coverage,
     limit: window.limit
   })
 }
@@ -891,6 +892,7 @@ function appendHierarchyChildrenWindow(
     sourceFileVisibility: children.sourceFileVisibility,
     rows: [...children.rows, ...window.nodes],
     totalRows: window.totalRows,
+    coverage: window.coverage,
     limit: window.limit
   })
 }
@@ -905,6 +907,7 @@ function withMoreState(children: LoadedChildren, more: MoreState): LoadedChildre
     sourceFileVisibility: children.sourceFileVisibility,
     rows: children.rows,
     totalRows: children.totalRows,
+    coverage: children.coverage,
     limit: children.limit,
     more
   })
@@ -917,6 +920,7 @@ function makeLoadedChildren(options: {
   readonly sourceFileVisibility: SourceFileVisibility
   readonly rows: readonly ChildRow[]
   readonly totalRows: number
+  readonly coverage: LoadedChildren['coverage']
   readonly limit: number
   readonly more?: MoreState
 }): LoadedChildren {
@@ -931,6 +935,7 @@ function makeLoadedChildren(options: {
     sourceFileVisibility: options.sourceFileVisibility,
     rows: options.rows,
     totalRows: options.totalRows,
+    coverage: options.coverage,
     ...(nextOffset === undefined ? {} : { nextOffset }),
     limit: Math.min(options.limit, readLimit),
     ...(options.more === undefined ? {} : { more: options.more })

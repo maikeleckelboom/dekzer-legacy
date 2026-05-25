@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params};
 
 use crate::authority::sources::format_source_identity_key;
+use crate::authority::sources::{SourceAccessProbeResult, probe_source_access};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::time::unix_time_ms;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
+use library_domain::SourceAccessIssueKind;
 
 const ROOT_IDENTITY_KIND_DEGRADED_ENROLLMENT: &str = "degraded_enrollment";
-const BLOCKED_REASON_SOURCE_UNAVAILABLE: &str = "source_unavailable";
-const BLOCKED_REASON_SCAN_INTERRUPTED: &str = "scan_interrupted";
 const ERROR_DETAIL_SCAN_FAILED: &str = "scan_failed";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,20 +104,20 @@ impl RootMountStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RootResolutionStatus {
+pub enum RootAccessState {
     Unknown,
-    Resolved,
+    Accessible,
     Missing,
-    Inaccessible,
+    Blocked,
 }
 
-impl RootResolutionStatus {
+impl RootAccessState {
     fn as_str(self) -> &'static str {
         match self {
             Self::Unknown => "unknown",
-            Self::Resolved => "resolved",
+            Self::Accessible => "accessible",
             Self::Missing => "missing",
-            Self::Inaccessible => "inaccessible",
+            Self::Blocked => "blocked",
         }
     }
 }
@@ -195,8 +195,8 @@ pub struct RootStatusDelta {
     pub root_id: i64,
     pub old_mount_status: RootMountStatus,
     pub new_mount_status: RootMountStatus,
-    pub old_resolution_status: RootResolutionStatus,
-    pub new_resolution_status: RootResolutionStatus,
+    pub old_access_state: RootAccessState,
+    pub new_access_state: RootAccessState,
     pub old_mount_epoch: i64,
     pub new_mount_epoch: i64,
     pub old_effective_path: Option<PathBuf>,
@@ -223,7 +223,10 @@ struct SourceLocatorRecord {
 struct SourceStateRecord {
     root_id: i64,
     mount_status: RootMountStatus,
-    resolution_status: RootResolutionStatus,
+    access_state: RootAccessState,
+    access_issue_kind: Option<SourceAccessIssueKind>,
+    access_error_detail: Option<String>,
+    access_checked_at: Option<i64>,
     mount_epoch: i64,
     mount_root: Option<String>,
     effective_path: Option<String>,
@@ -234,7 +237,7 @@ struct SourceStateRecord {
     last_scan_started_at: Option<i64>,
     last_scan_finished_at: Option<i64>,
     last_successful_scan_at: Option<i64>,
-    blocked_reason: Option<String>,
+    scan_issue_kind: Option<SourceAccessIssueKind>,
     error_detail: Option<String>,
     updated_at: i64,
 }
@@ -245,8 +248,8 @@ impl SourceStateRecord {
             root_id: self.root_id,
             old_mount_status: self.mount_status,
             new_mount_status: next.mount_status,
-            old_resolution_status: self.resolution_status,
-            new_resolution_status: next.resolution_status,
+            old_access_state: self.access_state,
+            new_access_state: next.access_state,
             old_mount_epoch: self.mount_epoch,
             new_mount_epoch: next.mount_epoch,
             old_effective_path: self.effective_path.as_ref().map(PathBuf::from),
@@ -324,7 +327,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         let mut next = record.state.clone();
         next.scan_phase = RootScanPhase::Scanning;
         next.last_scan_started_at = Some(started_at_ms);
-        next.blocked_reason = None;
+        next.scan_issue_kind = None;
         next.error_detail = None;
         next.updated_at = started_at_ms;
         self.write_source_state(&next)
@@ -341,7 +344,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         let mut next = record.state.clone();
         next.scan_phase = RootScanPhase::Failed;
         next.last_scan_finished_at = Some(failed_at_ms);
-        next.blocked_reason = None;
+        next.scan_issue_kind = Some(SourceAccessIssueKind::UnknownIo);
         next.error_detail = Some(ERROR_DETAIL_SCAN_FAILED.to_string());
         next.updated_at = failed_at_ms;
         self.write_source_state(&next)
@@ -367,7 +370,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 .unwrap_or(completed_at_ms)
                 .max(completed_at_ms),
         );
-        next.blocked_reason = None;
+        next.scan_issue_kind = None;
         next.error_detail = None;
         next.updated_at = completed_at_ms;
         self.write_source_state(&next)
@@ -383,9 +386,36 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         };
         let mut next = record.state.clone();
         next.scan_phase = RootScanPhase::BlockedUnavailable;
-        next.blocked_reason = Some(BLOCKED_REASON_SOURCE_UNAVAILABLE.to_string());
+        next.scan_issue_kind = Some(SourceAccessIssueKind::UnavailableMount);
         next.error_detail = None;
         next.updated_at = blocked_at_ms;
+        self.write_source_state(&next)
+    }
+
+    pub(crate) fn apply_root_access_probe_result(
+        &mut self,
+        root_id: i64,
+        probe: &SourceAccessProbeResult,
+    ) -> LibrarySqliteResult<()> {
+        let Some(record) = self.load_source_by_id(root_id)? else {
+            return Err(LibrarySqliteError::MissingRoot(root_id));
+        };
+        let (access_state, access_issue_kind, access_error_detail, access_checked_at) =
+            source_access_fields(probe);
+        let mut next = record.state.clone();
+        next.access_state = access_state;
+        next.access_issue_kind = access_issue_kind;
+        next.access_error_detail = access_error_detail;
+        next.access_checked_at = access_checked_at;
+        if let SourceAccessProbeResult::Accessible { effective_root, .. } = probe {
+            next.effective_path = Some(path_to_text(effective_root));
+            next.last_seen_at = Some(probe.checked_at_ms());
+        } else {
+            next.scan_phase = RootScanPhase::BlockedUnavailable;
+            next.scan_issue_kind = probe.issue_kind();
+            next.error_detail = probe.diagnostic_detail().map(str::to_string);
+        }
+        next.updated_at = probe.checked_at_ms();
         self.write_source_state(&next)
     }
 
@@ -404,7 +434,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             } else {
                 RootScanPhase::BlockedUnavailable
             };
-            next.blocked_reason = Some(BLOCKED_REASON_SCAN_INTERRUPTED.to_string());
+            next.scan_issue_kind = Some(SourceAccessIssueKind::IoInterrupted);
             next.error_detail = None;
             next.updated_at = interrupted_at_ms;
             self.write_source_state(&next)?;
@@ -430,7 +460,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 RootScanPhase::BlockedUnavailable | RootScanPhase::InterruptedUnavailable
             ) {
                 next.scan_phase = RootScanPhase::Idle;
-                next.blocked_reason = None;
+                next.scan_issue_kind = None;
                 next.error_detail = None;
                 next.updated_at = resumed_at_ms;
                 self.write_source_state(&next)?;
@@ -452,16 +482,21 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         }
 
         let absolute_path = matched.locator.absolute_path.clone().unwrap_or_default();
-        let resolution_status = evaluate_resolution_status(Path::new(&absolute_path));
-        let last_seen_at = if resolution_status == RootResolutionStatus::Resolved {
+        let access_probe = probe_source_access(Path::new(&absolute_path), refreshed_at_ms);
+        let last_seen_at = if access_probe.is_accessible() {
             Some(refreshed_at_ms)
         } else {
             matched.state.last_seen_at
         };
+        let (access_state, access_issue_kind, access_error_detail, access_checked_at) =
+            source_access_fields(&access_probe);
         let next = SourceStateRecord {
             root_id,
             mount_status: RootMountStatus::Mounted,
-            resolution_status,
+            access_state,
+            access_issue_kind,
+            access_error_detail,
+            access_checked_at,
             mount_epoch: 0,
             mount_root: None,
             effective_path: Some(absolute_path),
@@ -472,7 +507,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             last_scan_started_at: matched.state.last_scan_started_at,
             last_scan_finished_at: matched.state.last_scan_finished_at,
             last_successful_scan_at: matched.state.last_successful_scan_at,
-            blocked_reason: matched.state.blocked_reason.clone(),
+            scan_issue_kind: matched.state.scan_issue_kind,
             error_detail: matched.state.error_detail.clone(),
             updated_at: refreshed_at_ms,
         };
@@ -497,13 +532,19 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 &record.locator,
                 &input.mount_root,
             ));
-            let resolution_status = evaluate_resolution_status(Path::new(
-                effective_path.as_deref().unwrap_or_default(),
-            ));
+            let access_probe = probe_source_access(
+                Path::new(effective_path.as_deref().unwrap_or_default()),
+                input.event_at_ms,
+            );
+            let (access_state, access_issue_kind, access_error_detail, access_checked_at) =
+                source_access_fields(&access_probe);
             let next = SourceStateRecord {
                 root_id: record.state.root_id,
                 mount_status: RootMountStatus::Mounted,
-                resolution_status,
+                access_state,
+                access_issue_kind,
+                access_error_detail,
+                access_checked_at,
                 mount_epoch: next_mount_epoch(
                     record.state.mount_epoch,
                     record.locator.locator_kind,
@@ -519,7 +560,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 last_scan_started_at: record.state.last_scan_started_at,
                 last_scan_finished_at: record.state.last_scan_finished_at,
                 last_successful_scan_at: record.state.last_successful_scan_at,
-                blocked_reason: record.state.blocked_reason.clone(),
+                scan_issue_kind: record.state.scan_issue_kind,
                 error_detail: record.state.error_detail.clone(),
                 updated_at: input.event_at_ms,
             };
@@ -614,7 +655,10 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 }
                 let mut next = state.clone();
                 next.mount_status = RootMountStatus::Unmounted;
-                next.resolution_status = RootResolutionStatus::Unknown;
+                next.access_state = RootAccessState::Unknown;
+                next.access_issue_kind = Some(SourceAccessIssueKind::UnavailableMount);
+                next.access_error_detail = None;
+                next.access_checked_at = Some(input.event_at_ms);
                 next.mount_epoch = state.mount_epoch + 1;
                 next.mount_root = None;
                 next.effective_path = None;
@@ -649,18 +693,31 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             } else {
                 record.state.effective_path.clone()
             };
-            let next_resolution_status = if mount_root_changed {
+            let access_probe = if mount_root_changed {
                 next_effective_path
                     .as_deref()
-                    .map(|path| evaluate_resolution_status(Path::new(path)))
-                    .unwrap_or(record.state.resolution_status)
+                    .map(|path| probe_source_access(Path::new(path), input.event_at_ms))
             } else {
-                record.state.resolution_status
+                None
             };
+            let (
+                next_access_state,
+                next_access_issue_kind,
+                next_access_error_detail,
+                next_access_checked_at,
+            ) = access_probe.as_ref().map(source_access_fields).unwrap_or((
+                record.state.access_state,
+                record.state.access_issue_kind,
+                record.state.access_error_detail.clone(),
+                record.state.access_checked_at,
+            ));
             let next = SourceStateRecord {
                 root_id: record.state.root_id,
                 mount_status: record.state.mount_status,
-                resolution_status: next_resolution_status,
+                access_state: next_access_state,
+                access_issue_kind: next_access_issue_kind,
+                access_error_detail: next_access_error_detail,
+                access_checked_at: next_access_checked_at,
                 mount_epoch: record.state.mount_epoch,
                 mount_root: next_mount_root,
                 effective_path: next_effective_path,
@@ -677,7 +734,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 last_scan_started_at: record.state.last_scan_started_at,
                 last_scan_finished_at: record.state.last_scan_finished_at,
                 last_successful_scan_at: record.state.last_successful_scan_at,
-                blocked_reason: record.state.blocked_reason.clone(),
+                scan_issue_kind: record.state.scan_issue_kind,
                 error_detail: record.state.error_detail.clone(),
                 updated_at: input.event_at_ms,
             };
@@ -871,24 +928,40 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         absolute_path: &str,
     ) -> LibrarySqliteResult<bool> {
         let now_ms = unix_time_ms()?;
-        let (mount_status, resolution_status, effective_path, last_seen_at) = match locator_kind {
+        let (
+            mount_status,
+            access_state,
+            access_issue_kind,
+            access_error_detail,
+            access_checked_at,
+            effective_path,
+            last_seen_at,
+        ) = match locator_kind {
             SourceLocatorKind::AbsolutePath => {
-                let resolution_status = evaluate_resolution_status(Path::new(absolute_path));
-                let last_seen_at = if resolution_status == RootResolutionStatus::Resolved {
+                let access_probe = probe_source_access(Path::new(absolute_path), now_ms);
+                let last_seen_at = if access_probe.is_accessible() {
                     Some(now_ms)
                 } else {
                     None
                 };
+                let (access_state, access_issue_kind, access_error_detail, access_checked_at) =
+                    source_access_fields(&access_probe);
                 (
                     RootMountStatus::Mounted,
-                    resolution_status,
+                    access_state,
+                    access_issue_kind,
+                    access_error_detail,
+                    access_checked_at,
                     Some(absolute_path.to_string()),
                     last_seen_at,
                 )
             }
             SourceLocatorKind::RemovableVolume => (
                 RootMountStatus::Unknown,
-                RootResolutionStatus::Unknown,
+                RootAccessState::Unknown,
+                None,
+                None,
+                None,
                 None,
                 None,
             ),
@@ -898,7 +971,10 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  source_id,
                  mount_status,
                  mount_epoch,
-                 resolution_status,
+                 access_state,
+                 access_issue_kind,
+                 access_error_detail,
+                 access_checked_at,
                  mount_root,
                  effective_path,
                  observed_volume_label,
@@ -906,12 +982,15 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  last_seen_at,
                  updated_at
              )
-             VALUES (?1, ?2, 0, ?3, NULL, ?4, NULL, NULL, ?5, ?6)
+             VALUES (?1, ?2, 0, ?3, ?4, ?5, ?6, NULL, ?7, NULL, NULL, ?8, ?9)
              ON CONFLICT(source_id) DO NOTHING",
             params![
                 root_id,
                 mount_status.as_str(),
-                resolution_status.as_str(),
+                access_state.as_str(),
+                access_issue_kind.map(SourceAccessIssueKind::as_str),
+                access_error_detail,
+                access_checked_at,
                 effective_path,
                 last_seen_at,
                 now_ms,
@@ -924,7 +1003,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  last_scan_started_at,
                  last_scan_finished_at,
                  last_successful_scan_at,
-                 blocked_reason,
+                 scan_issue_kind,
                  error_detail,
                  updated_at
              )
@@ -941,7 +1020,10 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  source_id,
                  mount_status,
                  mount_epoch,
-                 resolution_status,
+                 access_state,
+                 access_issue_kind,
+                 access_error_detail,
+                 access_checked_at,
                  mount_root,
                  effective_path,
                  observed_volume_label,
@@ -949,11 +1031,14 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  last_seen_at,
                  updated_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
              ON CONFLICT(source_id) DO UPDATE
              SET mount_status = excluded.mount_status,
                  mount_epoch = excluded.mount_epoch,
-                 resolution_status = excluded.resolution_status,
+                 access_state = excluded.access_state,
+                 access_issue_kind = excluded.access_issue_kind,
+                 access_error_detail = excluded.access_error_detail,
+                 access_checked_at = excluded.access_checked_at,
                  mount_root = excluded.mount_root,
                  effective_path = excluded.effective_path,
                  observed_volume_label = excluded.observed_volume_label,
@@ -964,11 +1049,14 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 next.root_id,
                 next.mount_status.as_str(),
                 next.mount_epoch,
-                next.resolution_status.as_str(),
-                next.mount_root,
-                next.effective_path,
-                next.observed_volume_label,
-                next.filesystem_type,
+                next.access_state.as_str(),
+                next.access_issue_kind.map(SourceAccessIssueKind::as_str),
+                next.access_error_detail.as_deref(),
+                next.access_checked_at,
+                next.mount_root.as_deref(),
+                next.effective_path.as_deref(),
+                next.observed_volume_label.as_deref(),
+                next.filesystem_type.as_deref(),
                 next.last_seen_at,
                 next.updated_at,
             ],
@@ -980,7 +1068,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  last_scan_started_at,
                  last_scan_finished_at,
                  last_successful_scan_at,
-                 blocked_reason,
+                 scan_issue_kind,
                  error_detail,
                  updated_at
              )
@@ -990,7 +1078,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  last_scan_started_at = excluded.last_scan_started_at,
                  last_scan_finished_at = excluded.last_scan_finished_at,
                  last_successful_scan_at = excluded.last_successful_scan_at,
-                 blocked_reason = excluded.blocked_reason,
+                 scan_issue_kind = excluded.scan_issue_kind,
                  error_detail = excluded.error_detail,
                  updated_at = excluded.updated_at",
             params![
@@ -999,7 +1087,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                 next.last_scan_started_at,
                 next.last_scan_finished_at,
                 next.last_successful_scan_at,
-                blocked_reason_value(next.scan_phase, next.blocked_reason.as_deref()),
+                scan_issue_kind_value(next.scan_phase, next.scan_issue_kind),
                 error_detail_value(next.scan_phase, next.error_detail.as_deref()),
                 next.updated_at,
             ],
@@ -1012,7 +1100,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             return Err(LibrarySqliteError::MissingRoot(root_id));
         };
         Ok(record.state.mount_status == RootMountStatus::Mounted
-            && record.state.resolution_status == RootResolutionStatus::Resolved)
+            && record.state.access_state == RootAccessState::Accessible)
     }
 
     fn apply_source_presence_transition<F>(
@@ -1057,7 +1145,10 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                     sl.device_identity_value,
                     sl.relative_suffix,
                     lss.mount_status,
-                    lss.resolution_status,
+                    lss.access_state,
+                    lss.access_issue_kind,
+                    lss.access_error_detail,
+                    lss.access_checked_at,
                     lss.mount_epoch,
                     lss.mount_root,
                     lss.effective_path,
@@ -1068,7 +1159,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                     sss.last_scan_started_at,
                     sss.last_scan_finished_at,
                     sss.last_successful_scan_at,
-                    sss.blocked_reason,
+                    sss.scan_issue_kind,
                     sss.error_detail,
                     CASE
                         WHEN sss.updated_at > lss.updated_at THEN sss.updated_at
@@ -1100,7 +1191,10 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                         sl.device_identity_value,
                         sl.relative_suffix,
                         lss.mount_status,
-                        lss.resolution_status,
+                        lss.access_state,
+                        lss.access_issue_kind,
+                        lss.access_error_detail,
+                        lss.access_checked_at,
                         lss.mount_epoch,
                         lss.mount_root,
                         lss.effective_path,
@@ -1111,7 +1205,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                         sss.last_scan_started_at,
                         sss.last_scan_finished_at,
                         sss.last_successful_scan_at,
-                        sss.blocked_reason,
+                        sss.scan_issue_kind,
                         sss.error_detail,
                         CASE
                             WHEN sss.updated_at > lss.updated_at THEN sss.updated_at
@@ -1133,9 +1227,10 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
 
 fn load_matched_source(row: &rusqlite::Row<'_>) -> rusqlite::Result<MatchedSourceRecord> {
     let mount_status_text: String = row.get(6)?;
-    let resolution_status_text: String = row.get(7)?;
-    let scan_phase_text: String = row.get(14)?;
-    let blocked_reason: Option<String> = row.get(18)?;
+    let access_state_text: String = row.get(7)?;
+    let access_issue_kind_text: Option<String> = row.get(8)?;
+    let scan_phase_text: String = row.get(17)?;
+    let scan_issue_kind_text: Option<String> = row.get(21)?;
     Ok(MatchedSourceRecord {
         locator: SourceLocatorRecord {
             root_id: row.get(0)?,
@@ -1160,36 +1255,44 @@ fn load_matched_source(row: &rusqlite::Row<'_>) -> rusqlite::Result<MatchedSourc
                     Box::new(error),
                 )
             })?,
-            resolution_status: parse_resolution_status(&resolution_status_text).map_err(
-                |error| {
+            access_state: parse_access_state(&access_state_text).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    7,
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })?,
+            access_issue_kind: parse_optional_source_access_issue_kind(
+                "source_state.access_issue_kind",
+                access_issue_kind_text.as_deref(),
+                8,
+            )?,
+            access_error_detail: row.get(9)?,
+            access_checked_at: row.get(10)?,
+            mount_epoch: row.get(11)?,
+            mount_root: row.get(12)?,
+            effective_path: row.get(13)?,
+            observed_volume_label: row.get(14)?,
+            filesystem_type: row.get(15)?,
+            last_seen_at: row.get(16)?,
+            scan_phase: parse_scan_phase(&scan_phase_text, scan_issue_kind_text.as_deref())
+                .map_err(|error| {
                     rusqlite::Error::FromSqlConversionFailure(
-                        7,
+                        17,
                         rusqlite::types::Type::Text,
                         Box::new(error),
                     )
-                },
+                })?,
+            last_scan_started_at: row.get(18)?,
+            last_scan_finished_at: row.get(19)?,
+            last_successful_scan_at: row.get(20)?,
+            scan_issue_kind: parse_optional_source_access_issue_kind(
+                "source_scan_state.scan_issue_kind",
+                scan_issue_kind_text.as_deref(),
+                21,
             )?,
-            mount_epoch: row.get(8)?,
-            mount_root: row.get(9)?,
-            effective_path: row.get(10)?,
-            observed_volume_label: row.get(11)?,
-            filesystem_type: row.get(12)?,
-            last_seen_at: row.get(13)?,
-            scan_phase: parse_scan_phase(&scan_phase_text, blocked_reason.as_deref()).map_err(
-                |error| {
-                    rusqlite::Error::FromSqlConversionFailure(
-                        14,
-                        rusqlite::types::Type::Text,
-                        Box::new(error),
-                    )
-                },
-            )?,
-            last_scan_started_at: row.get(15)?,
-            last_scan_finished_at: row.get(16)?,
-            last_successful_scan_at: row.get(17)?,
-            blocked_reason,
-            error_detail: row.get(19)?,
-            updated_at: row.get(20)?,
+            error_detail: row.get(22)?,
+            updated_at: row.get(23)?,
         },
     })
 }
@@ -1213,32 +1316,52 @@ fn parse_mount_status(value: &str) -> LibrarySqliteResult<RootMountStatus> {
     }
 }
 
-fn parse_resolution_status(value: &str) -> LibrarySqliteResult<RootResolutionStatus> {
+fn parse_access_state(value: &str) -> LibrarySqliteResult<RootAccessState> {
     match value {
-        "unknown" => Ok(RootResolutionStatus::Unknown),
-        "resolved" => Ok(RootResolutionStatus::Resolved),
-        "missing" => Ok(RootResolutionStatus::Missing),
-        "inaccessible" => Ok(RootResolutionStatus::Inaccessible),
-        other => Err(malformed_value("source_state.resolution_status", other)),
+        "unknown" => Ok(RootAccessState::Unknown),
+        "accessible" => Ok(RootAccessState::Accessible),
+        "missing" => Ok(RootAccessState::Missing),
+        "blocked" => Ok(RootAccessState::Blocked),
+        other => Err(malformed_value("source_state.access_state", other)),
     }
 }
 
 fn parse_scan_phase(
     value: &str,
-    blocked_reason: Option<&str>,
+    scan_issue_kind: Option<&str>,
 ) -> LibrarySqliteResult<RootScanPhase> {
     match value {
         "idle" => Ok(RootScanPhase::Idle),
         "scanning" => Ok(RootScanPhase::Scanning),
         "complete" => Ok(RootScanPhase::Complete),
-        "blocked" => Ok(if blocked_reason == Some(BLOCKED_REASON_SCAN_INTERRUPTED) {
-            RootScanPhase::InterruptedUnavailable
-        } else {
-            RootScanPhase::BlockedUnavailable
-        }),
+        "blocked" => Ok(
+            if scan_issue_kind == Some(SourceAccessIssueKind::IoInterrupted.as_str()) {
+                RootScanPhase::InterruptedUnavailable
+            } else {
+                RootScanPhase::BlockedUnavailable
+            },
+        ),
         "failed" => Ok(RootScanPhase::Failed),
         other => Err(malformed_value("source_scan_state.scan_phase", other)),
     }
+}
+
+fn parse_optional_source_access_issue_kind(
+    column: &str,
+    value: Option<&str>,
+    column_index: usize,
+) -> rusqlite::Result<Option<SourceAccessIssueKind>> {
+    value
+        .map(|text| {
+            SourceAccessIssueKind::parse(text).ok_or_else(|| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    column_index,
+                    rusqlite::types::Type::Text,
+                    Box::new(malformed_value(column, text)),
+                )
+            })
+        })
+        .transpose()
 }
 
 fn source_scan_phase_value(phase: RootScanPhase) -> &'static str {
@@ -1251,18 +1374,22 @@ fn source_scan_phase_value(phase: RootScanPhase) -> &'static str {
     }
 }
 
-fn blocked_reason_value(phase: RootScanPhase, current: Option<&str>) -> Option<String> {
+fn scan_issue_kind_value(
+    phase: RootScanPhase,
+    current: Option<SourceAccessIssueKind>,
+) -> Option<&'static str> {
     match phase {
         RootScanPhase::BlockedUnavailable => Some(
             current
-                .unwrap_or(BLOCKED_REASON_SOURCE_UNAVAILABLE)
-                .to_string(),
+                .unwrap_or(SourceAccessIssueKind::UnavailableMount)
+                .as_str(),
         ),
         RootScanPhase::InterruptedUnavailable => Some(
             current
-                .unwrap_or(BLOCKED_REASON_SCAN_INTERRUPTED)
-                .to_string(),
+                .unwrap_or(SourceAccessIssueKind::IoInterrupted)
+                .as_str(),
         ),
+        RootScanPhase::Failed => Some(current.unwrap_or(SourceAccessIssueKind::UnknownIo).as_str()),
         _ => None,
     }
 }
@@ -1274,14 +1401,14 @@ fn error_detail_value(phase: RootScanPhase, current: Option<&str>) -> Option<Str
     }
 }
 
-fn availability_state_from_mount_and_resolution(
+fn availability_state_from_mount_and_access(
     mount_status: RootMountStatus,
-    resolution_status: RootResolutionStatus,
+    access_state: RootAccessState,
 ) -> &'static str {
     match mount_status {
         RootMountStatus::Unknown | RootMountStatus::Unmounted => "unavailable",
         RootMountStatus::Mounted => {
-            if resolution_status == RootResolutionStatus::Resolved {
+            if access_state == RootAccessState::Accessible {
                 "available"
             } else {
                 "degraded"
@@ -1316,11 +1443,41 @@ fn compute_effective_path_from_text(locator: &SourceLocatorRecord, mount_root: &
     compute_effective_path_text(locator, Path::new(mount_root))
 }
 
-fn evaluate_resolution_status(path: &Path) -> RootResolutionStatus {
-    match std::fs::metadata(path) {
-        Ok(_) => RootResolutionStatus::Resolved,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => RootResolutionStatus::Missing,
-        Err(_) => RootResolutionStatus::Inaccessible,
+fn source_access_fields(
+    probe: &SourceAccessProbeResult,
+) -> (
+    RootAccessState,
+    Option<SourceAccessIssueKind>,
+    Option<String>,
+    Option<i64>,
+) {
+    match probe {
+        SourceAccessProbeResult::Accessible { checked_at_ms, .. } => (
+            RootAccessState::Accessible,
+            None,
+            None,
+            Some(*checked_at_ms),
+        ),
+        SourceAccessProbeResult::Missing {
+            issue_kind,
+            diagnostic_detail,
+            checked_at_ms,
+        } => (
+            RootAccessState::Missing,
+            Some(*issue_kind),
+            diagnostic_detail.clone(),
+            Some(*checked_at_ms),
+        ),
+        SourceAccessProbeResult::Blocked {
+            issue_kind,
+            diagnostic_detail,
+            checked_at_ms,
+        } => (
+            RootAccessState::Blocked,
+            Some(*issue_kind),
+            diagnostic_detail.clone(),
+            Some(*checked_at_ms),
+        ),
     }
 }
 

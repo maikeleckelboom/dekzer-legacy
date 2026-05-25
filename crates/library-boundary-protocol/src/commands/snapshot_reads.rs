@@ -1225,6 +1225,44 @@ pub struct LiteralHierarchyWindow {
     pub limit: usize,
     pub total_rows: usize,
     pub rows: Vec<LiteralHierarchyNode>,
+    pub coverage: LiteralHierarchyCoverage,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LiteralHierarchyCoverageState {
+    Complete,
+    Pending,
+    Scanning,
+    Blocked,
+    Failed,
+    SourceUnavailable,
+    LocationMissing,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LiteralHierarchyCoverage {
+    pub state: LiteralHierarchyCoverageState,
+    pub recursive_scope_complete: bool,
+    pub empty_result_authoritative: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 #[derive(
@@ -1470,14 +1508,15 @@ mod tests {
         LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
         LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
         LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LiteralHierarchyEntryPoint, LiteralHierarchyFileMediaClass, LiteralHierarchyNode,
-        LiteralHierarchyNodeKind, LiteralHierarchyPresenceState, LiteralHierarchyWindow,
-        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigationRow,
-        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
-        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLiteralHierarchyChildrenReply, ReadLiteralHierarchyChildrenRequest,
-        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        LiteralHierarchyCoverage, LiteralHierarchyCoverageState, LiteralHierarchyEntryPoint,
+        LiteralHierarchyFileMediaClass, LiteralHierarchyNode, LiteralHierarchyNodeKind,
+        LiteralHierarchyPresenceState, LiteralHierarchyWindow, LoadNavigationRowByStableKeyRequest,
+        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
+        NavigationRowSelectorKind, ReadLibraryAssetPreparationDetailRequest,
+        ReadLibraryAssetWaveformOverviewRequest, ReadLiteralHierarchyChildrenReply,
+        ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
+        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
+        SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SelectedContentsMediaClass,
         SnapshotReadCommand, SnapshotReadReply, SourceFileVisibility,
     };
@@ -1671,6 +1710,12 @@ mod tests {
                     offset: 0,
                     limit: 25,
                     total_rows: 1,
+                    coverage: LiteralHierarchyCoverage {
+                        state: LiteralHierarchyCoverageState::Scanning,
+                        recursive_scope_complete: false,
+                        empty_result_authoritative: false,
+                        detail: Some("Still indexing.".to_string()),
+                    },
                     rows: vec![LiteralHierarchyNode {
                         node_kind: LiteralHierarchyNodeKind::Directory,
                         source_id: 7,
@@ -1711,6 +1756,12 @@ mod tests {
                         "offset": 0,
                         "limit": 25,
                         "totalRows": 1,
+                        "coverage": {
+                            "state": "scanning",
+                            "recursiveScopeComplete": false,
+                            "emptyResultAuthoritative": false,
+                            "detail": "Still indexing."
+                        },
                         "rows": [{
                             "nodeKind": "directory",
                             "sourceId": "7",
@@ -1752,6 +1803,12 @@ mod tests {
                     offset: 0,
                     limit: 25,
                     total_rows: 1,
+                    coverage: LiteralHierarchyCoverage {
+                        state: LiteralHierarchyCoverageState::Complete,
+                        recursive_scope_complete: true,
+                        empty_result_authoritative: false,
+                        detail: Some("Complete.".to_string()),
+                    },
                     rows: vec![LiteralHierarchyNode {
                         node_kind: LiteralHierarchyNodeKind::File,
                         source_id: 7,

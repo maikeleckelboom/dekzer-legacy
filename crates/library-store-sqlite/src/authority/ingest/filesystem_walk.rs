@@ -2,10 +2,15 @@ use std::fmt;
 use std::path::{Component, Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::authority::sources::source_access_issue_kind_from_io_error;
 use crate::source_media::{SourceMediaOperation, SourceMediaWritePolicy, source_media_metadata};
+use library_domain::SourceAccessIssueKind;
 use walkdir::WalkDir;
 
-use super::{DiscoveredFileInput, DiscoveredLocationInput, DiscoveredLocationKind};
+use super::{
+    DirectoryEnumerationOutcome, DirectoryEnumerationOutcomeKind, DiscoveredFileInput,
+    DiscoveredLocationInput, DiscoveredLocationKind,
+};
 
 const FOLLOW_FILESYSTEM_SYMLINKS: bool = false;
 const FILESYSTEM_DISCOVERY_SOURCE_MEDIA_WRITE_POLICY: SourceMediaWritePolicy =
@@ -40,6 +45,42 @@ pub struct FilesystemWalkEntries {
     iter: walkdir::IntoIter,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FilesystemWalkError {
+    pub relative_path: String,
+    pub issue_kind: SourceAccessIssueKind,
+    pub diagnostic_detail: String,
+    pub observed_at_ms: i64,
+}
+
+impl FilesystemWalkError {
+    pub fn into_outcome(self) -> DirectoryEnumerationOutcome {
+        let outcome = match self.issue_kind {
+            SourceAccessIssueKind::Missing => DirectoryEnumerationOutcomeKind::Missing,
+            SourceAccessIssueKind::PermissionDenied
+            | SourceAccessIssueKind::PrivacyPermissionRequired
+            | SourceAccessIssueKind::UnavailableMount
+            | SourceAccessIssueKind::ResourceBusy
+            | SourceAccessIssueKind::StaleNetworkHandle
+            | SourceAccessIssueKind::SymlinkLoop
+            | SourceAccessIssueKind::SymlinkEscapeBlocked
+            | SourceAccessIssueKind::UnsupportedPath
+            | SourceAccessIssueKind::NotDirectory => DirectoryEnumerationOutcomeKind::Blocked,
+            SourceAccessIssueKind::InvalidPath
+            | SourceAccessIssueKind::IoInterrupted
+            | SourceAccessIssueKind::TimedOut
+            | SourceAccessIssueKind::UnknownIo => DirectoryEnumerationOutcomeKind::Failed,
+        };
+        DirectoryEnumerationOutcome {
+            relative_path: self.relative_path,
+            outcome,
+            issue_kind: Some(self.issue_kind),
+            diagnostic_detail: Some(self.diagnostic_detail),
+            observed_at_ms: self.observed_at_ms,
+        }
+    }
+}
+
 impl FilesystemWalkEntries {
     pub fn new(root: &Path) -> Self {
         Self::from_source_media_root(root, FILESYSTEM_DISCOVERY_SOURCE_MEDIA_WRITE_POLICY)
@@ -69,7 +110,7 @@ impl fmt::Debug for FilesystemWalkEntries {
 }
 
 impl Iterator for FilesystemWalkEntries {
-    type Item = Result<DiscoveredLocationInput, std::io::Error>;
+    type Item = Result<DiscoveredLocationInput, FilesystemWalkError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -77,6 +118,13 @@ impl Iterator for FilesystemWalkEntries {
             match entry {
                 Ok(entry) => {
                     let file_type = entry.file_type();
+                    if file_type.is_symlink() {
+                        match symlink_escape_error(&self.root_path, entry.path()) {
+                            Ok(Some(error)) => return Some(Err(error)),
+                            Ok(None) => continue,
+                            Err(error) => return Some(Err(error)),
+                        }
+                    }
                     if !file_type.is_dir() && !file_type.is_file() {
                         continue;
                     }
@@ -85,17 +133,35 @@ impl Iterator for FilesystemWalkEntries {
                     let canonical_path = match normalize_relative_path(&self.root_path, entry_path)
                     {
                         Ok(path) => path,
-                        Err(error) => return Some(Err(error)),
+                        Err(error) => {
+                            return Some(Err(walk_error_from_io(
+                                &self.root_path,
+                                entry_path,
+                                error,
+                            )));
+                        }
                     };
                     let display_name = match display_name_for_entry(&self.root_path, entry_path) {
                         Ok(name) => name,
-                        Err(error) => return Some(Err(error)),
+                        Err(error) => {
+                            return Some(Err(walk_error_from_io(
+                                &self.root_path,
+                                entry_path,
+                                error,
+                            )));
+                        }
                     };
 
                     let modified_at_ns = if file_type.is_file() {
                         match source_media_metadata(self.source_media_write_policy, entry_path) {
                             Ok(metadata) => modified_at_ns_from_metadata(&metadata),
-                            Err(error) => return Some(Err(error)),
+                            Err(error) => {
+                                return Some(Err(walk_error_from_io(
+                                    &self.root_path,
+                                    entry_path,
+                                    error,
+                                )));
+                            }
                         }
                     } else {
                         entry
@@ -106,7 +172,13 @@ impl Iterator for FilesystemWalkEntries {
                     let file_size_bytes = if file_type.is_file() {
                         match source_media_metadata(self.source_media_write_policy, entry_path) {
                             Ok(metadata) => i64::try_from(metadata.len()).ok(),
-                            Err(error) => return Some(Err(error)),
+                            Err(error) => {
+                                return Some(Err(walk_error_from_io(
+                                    &self.root_path,
+                                    entry_path,
+                                    error,
+                                )));
+                            }
                         }
                     } else {
                         None
@@ -126,7 +198,9 @@ impl Iterator for FilesystemWalkEntries {
                     }
                     .into_location_input()));
                 }
-                Err(error) => return Some(Err(std::io::Error::other(error))),
+                Err(error) => {
+                    return Some(Err(walk_error_from_walkdir(&self.root_path, error)));
+                }
             }
         }
     }
@@ -134,7 +208,7 @@ impl Iterator for FilesystemWalkEntries {
 
 pub fn collect_discovered_file_inputs(
     root_path: &Path,
-) -> Result<Vec<DiscoveredFileInput>, std::io::Error> {
+) -> Result<Vec<DiscoveredFileInput>, FilesystemWalkError> {
     let mut discovered = Vec::new();
 
     for entry in FilesystemWalkEntries::new(root_path) {
@@ -224,6 +298,85 @@ fn normalize_relative_path(root_path: &Path, entry_path: &Path) -> Result<String
     Ok(segments.join("/"))
 }
 
+fn symlink_escape_error(
+    root_path: &Path,
+    entry_path: &Path,
+) -> Result<Option<FilesystemWalkError>, FilesystemWalkError> {
+    let target = std::fs::read_link(entry_path)
+        .map_err(|error| walk_error_from_io(root_path, entry_path, error))?;
+    let absolute_target = if target.is_absolute() {
+        target
+    } else {
+        entry_path
+            .parent()
+            .map(|parent| parent.join(&target))
+            .unwrap_or(target)
+    };
+    let canonical_target = match std::fs::canonicalize(&absolute_target) {
+        Ok(target) => target,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(Some(FilesystemWalkError {
+                relative_path: normalize_relative_path(root_path, entry_path)
+                    .unwrap_or_else(|_| path_leaf_name(entry_path)),
+                issue_kind: SourceAccessIssueKind::Missing,
+                diagnostic_detail: error.to_string(),
+                observed_at_ms: unix_time_ms_now(),
+            }));
+        }
+        Err(error) => return Err(walk_error_from_io(root_path, entry_path, error)),
+    };
+    let canonical_root = std::fs::canonicalize(root_path)
+        .map_err(|error| walk_error_from_io(root_path, root_path, error))?;
+    if canonical_target.starts_with(canonical_root) {
+        return Ok(None);
+    }
+
+    Ok(Some(FilesystemWalkError {
+        relative_path: normalize_relative_path(root_path, entry_path)
+            .unwrap_or_else(|_| path_leaf_name(entry_path)),
+        issue_kind: SourceAccessIssueKind::SymlinkEscapeBlocked,
+        diagnostic_detail: format!(
+            "symlink {:?} targets {:?} outside source root {:?}",
+            entry_path, canonical_target, root_path
+        ),
+        observed_at_ms: unix_time_ms_now(),
+    }))
+}
+
+fn walk_error_from_walkdir(root_path: &Path, error: walkdir::Error) -> FilesystemWalkError {
+    let issue_kind = if error.loop_ancestor().is_some() {
+        SourceAccessIssueKind::SymlinkLoop
+    } else {
+        error
+            .io_error()
+            .map(source_access_issue_kind_from_io_error)
+            .unwrap_or(SourceAccessIssueKind::UnknownIo)
+    };
+    let relative_path = error
+        .path()
+        .and_then(|path| normalize_relative_path(root_path, path).ok())
+        .unwrap_or_default();
+    FilesystemWalkError {
+        relative_path,
+        issue_kind,
+        diagnostic_detail: error.to_string(),
+        observed_at_ms: unix_time_ms_now(),
+    }
+}
+
+fn walk_error_from_io(
+    root_path: &Path,
+    entry_path: &Path,
+    error: std::io::Error,
+) -> FilesystemWalkError {
+    FilesystemWalkError {
+        relative_path: normalize_relative_path(root_path, entry_path).unwrap_or_default(),
+        issue_kind: source_access_issue_kind_from_io_error(&error),
+        diagnostic_detail: error.to_string(),
+        observed_at_ms: unix_time_ms_now(),
+    }
+}
+
 fn unix_time_ms_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -241,8 +394,12 @@ fn modified_at_ns_from_metadata(metadata: &std::fs::Metadata) -> Option<i64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FilesystemWalkEntries, collect_discovered_file_inputs, normalize_relative_path};
-    use crate::authority::ingest::DiscoveredLocationKind;
+    use super::{
+        FilesystemWalkEntries, FilesystemWalkError, collect_discovered_file_inputs,
+        normalize_relative_path,
+    };
+    use crate::authority::ingest::{DirectoryEnumerationOutcomeKind, DiscoveredLocationKind};
+    use library_domain::SourceAccessIssueKind;
 
     #[test]
     fn filesystem_walk_entries_yield_root_folders_and_files_in_stable_order() {
@@ -311,5 +468,22 @@ mod tests {
             .expect_err("outside-root path must be rejected");
 
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn symlink_escape_issue_maps_to_blocked_directory_outcome() {
+        let outcome = FilesystemWalkError {
+            relative_path: "linked".to_string(),
+            issue_kind: SourceAccessIssueKind::SymlinkEscapeBlocked,
+            diagnostic_detail: "symlink target leaves source root".to_string(),
+            observed_at_ms: 10,
+        }
+        .into_outcome();
+
+        assert_eq!(outcome.outcome, DirectoryEnumerationOutcomeKind::Blocked);
+        assert_eq!(
+            outcome.issue_kind,
+            Some(SourceAccessIssueKind::SymlinkEscapeBlocked)
+        );
     }
 }

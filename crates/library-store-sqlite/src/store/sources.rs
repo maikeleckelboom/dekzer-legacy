@@ -172,7 +172,7 @@ impl SqliteDurableStore {
     pub fn read_local_roots(&self) -> LibrarySqliteResult<ReadLocalRootsResult> {
         let connection = open_connection(&self.path)?;
         let mut statement = connection.prepare(
-            "SELECT sl.source_id, sl.absolute_path, lss.resolution_status
+            "SELECT sl.source_id, sl.absolute_path, lss.access_state
              FROM source_locators sl
              JOIN sources s ON s.source_id = sl.source_id
              LEFT JOIN source_state lss
@@ -183,9 +183,9 @@ impl SqliteDurableStore {
         )?;
         let roots = statement
             .query_map([], |row| {
-                let resolution_status: Option<String> = row.get(2)?;
-                let availability = match resolution_status.as_deref() {
-                    Some("resolved") => LocalRootAvailability::Available,
+                let access_state: Option<String> = row.get(2)?;
+                let availability = match access_state.as_deref() {
+                    Some("accessible") => LocalRootAvailability::Available,
                     _ => LocalRootAvailability::Unavailable,
                 };
                 Ok(LocalRoot {

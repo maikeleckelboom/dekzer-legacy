@@ -65,8 +65,8 @@ mod tests {
     use crate::schema::install_baseline_schema_for_test;
     use library_domain::{
         ArtifactKind, ArtifactRole, CapabilityKind, CapabilityStabilityClass, CapabilityState,
-        LibraryAssetId, LibraryAssetRetentionPolicy, SourceFileId, SourcePresenceState,
-        SourceResolutionStatus, SourceScanPhase, SourceSegmentId, SourceSegmentSetId, WorkItemId,
+        LibraryAssetId, LibraryAssetRetentionPolicy, SourceAccessState, SourceFileId,
+        SourcePresenceState, SourceScanPhase, SourceSegmentId, SourceSegmentSetId, WorkItemId,
         WorkItemState, WorkPriorityClass, WorkRunOutcome, WorkSubject,
     };
 
@@ -803,7 +803,10 @@ mod tests {
             source_id,
             mount_status: RootMountStatus::Mounted.as_str().to_string(),
             mount_epoch: 0,
-            resolution_status: SourceResolutionStatus::Resolved,
+            access_state: SourceAccessState::Accessible,
+            access_issue_kind: None,
+            access_error_detail: None,
+            access_checked_at: Some(changed_at),
             mount_root: Some(root_path.to_string()),
             effective_path: Some(root_path.to_string()),
             observed_volume_label: Some("Volume".to_string()),
@@ -818,7 +821,7 @@ mod tests {
                 last_scan_started_at: Some(changed_at),
                 last_scan_finished_at: Some(changed_at),
                 last_successful_scan_at: Some(changed_at),
-                blocked_reason: None,
+                scan_issue_kind: None,
                 error_detail: None,
                 updated_at: changed_at,
             },
@@ -832,6 +835,8 @@ mod tests {
                 relative_path: "album".to_string(),
                 presence_state: SourcePresenceState::Present,
                 dir_scan_state: None,
+                dir_scan_issue_kind: None,
+                dir_scan_error_detail: None,
                 scanned_at: None,
                 mtime_ns: None,
                 first_created_at: Some(changed_at),

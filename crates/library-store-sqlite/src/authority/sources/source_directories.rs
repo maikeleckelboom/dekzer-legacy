@@ -2,7 +2,7 @@ use rusqlite::{OptionalExtension, params};
 
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
-use library_domain::SourcePresenceState;
+use library_domain::{SourceAccessIssueKind, SourcePresenceState};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpsertSourceDirectoryInput {
@@ -13,6 +13,8 @@ pub struct UpsertSourceDirectoryInput {
     pub relative_path: String,
     pub presence_state: SourcePresenceState,
     pub dir_scan_state: Option<String>,
+    pub dir_scan_issue_kind: Option<SourceAccessIssueKind>,
+    pub dir_scan_error_detail: Option<String>,
     pub scanned_at: Option<i64>,
     pub mtime_ns: Option<i64>,
     pub first_created_at: Option<i64>,
@@ -43,17 +45,11 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                      relative_path = ?5,
                      presence_state = ?6,
                      dir_scan_state = COALESCE(?8, dir_scan_state),
-                     dir_scan_error_kind = CASE
-                         WHEN ?8 IS NULL THEN dir_scan_error_kind
-                         ELSE NULL
-                     END,
-                     dir_scan_error_detail = CASE
-                         WHEN ?8 IS NULL THEN dir_scan_error_detail
-                         ELSE NULL
-                     END,
+                     dir_scan_issue_kind = ?9,
+                     dir_scan_error_detail = ?10,
                      dir_scan_updated_at = ?7,
-                     scanned_at = COALESCE(?9, scanned_at),
-                     mtime_ns = COALESCE(?10, mtime_ns),
+                     scanned_at = COALESCE(?11, scanned_at),
+                     mtime_ns = COALESCE(?12, mtime_ns),
                      updated_at = ?7
                  WHERE source_directory_id = ?1",
                 params![
@@ -65,6 +61,8 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                     input.presence_state.as_str(),
                     input.changed_at,
                     input.dir_scan_state.as_deref(),
+                    input.dir_scan_issue_kind.map(SourceAccessIssueKind::as_str),
+                    input.dir_scan_error_detail.as_deref(),
                     input.scanned_at,
                     input.mtime_ns,
                 ],
@@ -86,13 +84,15 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          relative_path,
                          presence_state,
                          dir_scan_state,
+                         dir_scan_issue_kind,
+                         dir_scan_error_detail,
                          dir_scan_updated_at,
                          scanned_at,
                          mtime_ns,
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                     params![
                         source_directory_id,
                         input.source_id,
@@ -101,6 +101,8 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                         input.relative_path,
                         input.presence_state.as_str(),
                         dir_scan_state,
+                        input.dir_scan_issue_kind.map(SourceAccessIssueKind::as_str),
+                        input.dir_scan_error_detail.as_deref(),
                         input.changed_at,
                         input.scanned_at,
                         input.mtime_ns,
@@ -120,13 +122,15 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          relative_path,
                          presence_state,
                          dir_scan_state,
+                         dir_scan_issue_kind,
+                         dir_scan_error_detail,
                          dir_scan_updated_at,
                          scanned_at,
                          mtime_ns,
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                     params![
                         input.source_id,
                         input.parent_source_directory_id,
@@ -134,6 +138,8 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                         input.relative_path,
                         input.presence_state.as_str(),
                         dir_scan_state,
+                        input.dir_scan_issue_kind.map(SourceAccessIssueKind::as_str),
+                        input.dir_scan_error_detail.as_deref(),
                         input.changed_at,
                         input.scanned_at,
                         input.mtime_ns,

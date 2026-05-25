@@ -1108,6 +1108,43 @@
         }
       ]
     },
+    "LiteralHierarchyCoverage": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emptyResultAuthoritative": {
+          "type": "boolean"
+        },
+        "recursiveScopeComplete": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/$defs/LiteralHierarchyCoverageState"
+        }
+      },
+      "required": [
+        "state",
+        "recursiveScopeComplete",
+        "emptyResultAuthoritative"
+      ]
+    },
+    "LiteralHierarchyCoverageState": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "pending",
+        "scanning",
+        "blocked",
+        "failed",
+        "sourceUnavailable",
+        "locationMissing"
+      ]
+    },
     "LiteralHierarchyEntryPoint": {
       "oneOf": [
         {
@@ -1298,6 +1335,9 @@
     "LiteralHierarchyWindow": {
       "type": "object",
       "properties": {
+        "coverage": {
+          "$ref": "#/$defs/LiteralHierarchyCoverage"
+        },
         "entryPoint": {
           "$ref": "#/$defs/LiteralHierarchyEntryPoint"
         },
@@ -1334,7 +1374,8 @@
         "offset",
         "limit",
         "totalRows",
-        "rows"
+        "rows",
+        "coverage"
       ]
     },
     "LoadNavigationRowByStableKeyReply": {

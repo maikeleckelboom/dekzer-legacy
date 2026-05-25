@@ -65,6 +65,7 @@ pub use read_models::library_asset_waveform_overview::{
 };
 pub use read_models::library_browser::{ScopedLibraryAssetBrowserRow, StoreLibraryBrowserWindow};
 pub use read_models::literal_hierarchy::{
+    StoreLiteralHierarchyCoverage, StoreLiteralHierarchyCoverageState,
     StoreLiteralHierarchyEntryPoint, StoreLiteralHierarchyNode, StoreLiteralHierarchyWindow,
 };
 pub use read_models::navigation::NavigationRow;

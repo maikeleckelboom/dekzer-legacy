@@ -102,14 +102,19 @@ enum ResolvedSelectedContentsScope {
         source_id: i64,
         relative_path: String,
     },
+    MissingLocation {
+        source_id: i64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SourceReadiness {
     source_class: String,
     mount_status: Option<String>,
-    resolution_status: Option<String>,
+    access_state: Option<String>,
+    access_issue_kind: Option<String>,
     scan_phase: Option<String>,
+    scan_issue_kind: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -119,6 +124,13 @@ struct CoverageCounts {
     scanning_directories: i64,
     blocked_directories: i64,
     failed_directories: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DirectoryPresence {
+    Present,
+    Missing,
+    Unknown,
 }
 
 const RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL: &str = "char(48)";
@@ -233,16 +245,6 @@ fn resolve_scope(
                 return Ok(None);
             };
 
-            if !present_directory_exists(connection, source_id, &relative_path)? {
-                return Ok(Some((
-                    source_readiness,
-                    ResolvedSelectedContentsScope::Prefix {
-                        source_id,
-                        relative_path,
-                    },
-                )));
-            }
-
             Ok(Some((
                 source_readiness,
                 ResolvedSelectedContentsScope::Prefix {
@@ -263,9 +265,8 @@ fn resolve_scope(
             else {
                 return Ok(Some((
                     source_readiness,
-                    ResolvedSelectedContentsScope::Prefix {
+                    ResolvedSelectedContentsScope::MissingLocation {
                         source_id: *source_id,
-                        relative_path: String::new(),
                     },
                 )));
             };
@@ -289,8 +290,10 @@ fn load_source_readiness(
         .query_row(
             "SELECT s.source_class,
                     ss.mount_status,
-                    ss.resolution_status,
-                    sss.scan_phase
+                    ss.access_state,
+                    ss.access_issue_kind,
+                    sss.scan_phase,
+                    sss.scan_issue_kind
              FROM sources s
              LEFT JOIN source_state ss
                ON ss.source_id = s.source_id
@@ -302,8 +305,10 @@ fn load_source_readiness(
                 Ok(SourceReadiness {
                     source_class: row.get(0)?,
                     mount_status: row.get(1)?,
-                    resolution_status: row.get(2)?,
-                    scan_phase: row.get(3)?,
+                    access_state: row.get(2)?,
+                    access_issue_kind: row.get(3)?,
+                    scan_phase: row.get(4)?,
+                    scan_issue_kind: row.get(5)?,
                 })
             },
         )
@@ -360,12 +365,28 @@ fn accepted_source_location_missing_count(
                AND sl.authority = 'user'
                AND sl.location_kind = 'registered_subpath'
                AND sl.is_user_visible = 1
-               AND NOT EXISTS (
-                   SELECT 1
-                   FROM source_directories sd
-                   WHERE sd.source_id = sl.source_id
-                     AND sd.relative_path COLLATE BINARY = sl.relative_path COLLATE BINARY
-                     AND sd.presence_state = 'present'
+               AND (
+                   EXISTS (
+                       SELECT 1
+                       FROM source_directories sd
+                       WHERE sd.source_id = sl.source_id
+                         AND sd.relative_path COLLATE BINARY = sl.relative_path COLLATE BINARY
+                         AND sd.presence_state = 'missing'
+                   )
+                   OR (
+                       EXISTS (
+                           SELECT 1
+                           FROM source_scan_state sss
+                           WHERE sss.source_id = sl.source_id
+                             AND sss.scan_phase = 'complete'
+                       )
+                       AND NOT EXISTS (
+                           SELECT 1
+                           FROM source_directories sd
+                           WHERE sd.source_id = sl.source_id
+                             AND sd.relative_path COLLATE BINARY = sl.relative_path COLLATE BINARY
+                       )
+                   )
                )",
             [source_id],
             |row| row.get(0),
@@ -373,25 +394,52 @@ fn accepted_source_location_missing_count(
         .map_err(Into::into)
 }
 
-fn present_directory_exists(
+fn accepted_source_location_unknown_count(
+    connection: &Connection,
+    source_id: i64,
+) -> LibrarySqliteResult<i64> {
+    connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM source_locations sl
+             WHERE sl.source_id = ?1
+               AND sl.authority = 'user'
+               AND sl.location_kind = 'registered_subpath'
+               AND sl.is_user_visible = 1
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM source_directories sd
+                   WHERE sd.source_id = sl.source_id
+                     AND sd.relative_path COLLATE BINARY = sl.relative_path COLLATE BINARY
+               )",
+            [source_id],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+}
+
+fn load_directory_presence(
     connection: &Connection,
     source_id: i64,
     relative_path: &str,
-) -> LibrarySqliteResult<bool> {
-    connection
+) -> LibrarySqliteResult<DirectoryPresence> {
+    let presence_state = connection
         .query_row(
-            "SELECT EXISTS(
-                 SELECT 1
-                 FROM source_directories
-                 WHERE source_id = ?1
-                   AND relative_path COLLATE BINARY = ?2 COLLATE BINARY
-                   AND presence_state = 'present'
-             )",
+            "SELECT presence_state
+             FROM source_directories
+             WHERE source_id = ?1
+               AND relative_path COLLATE BINARY = ?2 COLLATE BINARY",
             params![source_id, relative_path],
-            |row| row.get::<_, i64>(0),
+            |row| row.get::<_, String>(0),
         )
-        .map(|exists| exists != 0)
-        .map_err(Into::into)
+        .optional()?;
+    Ok(presence_state
+        .map(|state| match state.as_str() {
+            "present" => DirectoryPresence::Present,
+            "missing" => DirectoryPresence::Missing,
+            _ => DirectoryPresence::Unknown,
+        })
+        .unwrap_or(DirectoryPresence::Unknown))
 }
 
 fn load_present_directory_path(
@@ -420,14 +468,6 @@ fn source_unavailable_state(
     StoreSelectedContentsCoverageState,
     &'static str,
 )> {
-    if source.resolution_status.as_deref() == Some("inaccessible") {
-        return Some((
-            StoreSelectedContentsState::Blocked,
-            StoreSelectedContentsCoverageState::Blocked,
-            "The selected source is blocked or inaccessible.",
-        ));
-    }
-
     if source.source_class != "internal"
         && !matches!(source.mount_status.as_deref(), Some("mounted"))
     {
@@ -438,10 +478,48 @@ fn source_unavailable_state(
         ));
     }
 
+    match source.access_state.as_deref() {
+        Some("missing") => {
+            return Some((
+                StoreSelectedContentsState::LocationMissing,
+                StoreSelectedContentsCoverageState::LocationMissing,
+                "The selected source root is missing.",
+            ));
+        }
+        Some("blocked") => {
+            let coverage_state = if source.access_issue_kind.as_deref() == Some("unavailable_mount")
+            {
+                StoreSelectedContentsCoverageState::SourceUnavailable
+            } else {
+                StoreSelectedContentsCoverageState::Blocked
+            };
+            let state = match coverage_state {
+                StoreSelectedContentsCoverageState::SourceUnavailable => {
+                    StoreSelectedContentsState::SourceUnavailable
+                }
+                _ => StoreSelectedContentsState::Blocked,
+            };
+            return Some((
+                state,
+                coverage_state,
+                "The selected source root is blocked.",
+            ));
+        }
+        _ => {}
+    }
+
     match source.scan_phase.as_deref() {
         Some("blocked") => Some((
-            StoreSelectedContentsState::Blocked,
-            StoreSelectedContentsCoverageState::Blocked,
+            if source.scan_issue_kind.as_deref() == Some("unavailable_mount") {
+                StoreSelectedContentsState::SourceUnavailable
+            } else {
+                StoreSelectedContentsState::Blocked
+            },
+            if source.scan_issue_kind.as_deref() == Some("unavailable_mount") {
+                StoreSelectedContentsCoverageState::SourceUnavailable
+            } else {
+                StoreSelectedContentsCoverageState::Blocked
+            },
             "The selected source scan is blocked.",
         )),
         Some("failed") => Some((
@@ -470,18 +548,42 @@ fn read_coverage(
                     "One or more accepted source locations are missing.",
                 ));
             }
+            if accepted_source_location_unknown_count(connection, *source_id)? > 0 {
+                return Ok(coverage(
+                    pending_or_scanning_coverage_state(source),
+                    false,
+                    "One or more accepted source locations have not been proven present or missing yet.",
+                ));
+            }
             read_accepted_source_locations_coverage_counts(connection, *source_id)?
+        }
+        ResolvedSelectedContentsScope::MissingLocation { .. } => {
+            return Ok(coverage(
+                StoreSelectedContentsCoverageState::LocationMissing,
+                false,
+                "The selected folder is missing.",
+            ));
         }
         ResolvedSelectedContentsScope::Prefix {
             source_id,
             relative_path,
         } => {
-            if !present_directory_exists(connection, *source_id, relative_path)? {
-                return Ok(coverage(
-                    StoreSelectedContentsCoverageState::LocationMissing,
-                    false,
-                    "The selected folder is missing.",
-                ));
+            match load_directory_presence(connection, *source_id, relative_path)? {
+                DirectoryPresence::Present => {}
+                DirectoryPresence::Missing => {
+                    return Ok(coverage(
+                        StoreSelectedContentsCoverageState::LocationMissing,
+                        false,
+                        "The selected folder is missing.",
+                    ));
+                }
+                DirectoryPresence::Unknown => {
+                    return Ok(coverage(
+                        pending_or_scanning_coverage_state(source),
+                        false,
+                        "The selected folder has not been proven present or missing yet.",
+                    ));
+                }
             }
             read_prefix_coverage_counts(connection, *source_id, relative_path)?
         }
@@ -661,6 +763,16 @@ fn coverage_from_counts(
     )
 }
 
+fn pending_or_scanning_coverage_state(
+    source: &SourceReadiness,
+) -> StoreSelectedContentsCoverageState {
+    if source.scan_phase.as_deref() == Some("scanning") {
+        StoreSelectedContentsCoverageState::Scanning
+    } else {
+        StoreSelectedContentsCoverageState::Pending
+    }
+}
+
 fn coverage(
     state: StoreSelectedContentsCoverageState,
     recursive_scope_complete: bool,
@@ -768,6 +880,7 @@ fn read_rows(
             Some(relative_path),
             limit,
         ),
+        ResolvedSelectedContentsScope::MissingLocation { .. } => Ok(Vec::new()),
     }
 }
 
@@ -1145,12 +1258,13 @@ mod tests {
                      source_id,
                      mount_status,
                      mount_epoch,
-                     resolution_status,
+                     access_state,
+                     access_checked_at,
                      mount_root,
                      effective_path,
                      updated_at
                  )
-                 VALUES (?1, 'mounted', 1, 'resolved', 'root', 'root', 1)",
+                 VALUES (?1, 'mounted', 1, 'accessible', 1, 'root', 'root', 1)",
                 [source_id],
             )
             .expect("insert source state");
@@ -1202,6 +1316,62 @@ mod tests {
                 ],
             )
             .expect("insert source directory");
+    }
+
+    fn set_source_access(
+        connection: &Connection,
+        source_id: i64,
+        access_state: &str,
+        issue_kind: Option<&str>,
+    ) {
+        connection
+            .execute(
+                "UPDATE source_state
+                 SET access_state = ?2,
+                     access_issue_kind = ?3,
+                     access_checked_at = 10,
+                     updated_at = 10
+                 WHERE source_id = ?1",
+                params![source_id, access_state, issue_kind],
+            )
+            .expect("update source access");
+    }
+
+    fn set_source_scan_phase(
+        connection: &Connection,
+        source_id: i64,
+        scan_phase: &str,
+        issue_kind: Option<&str>,
+    ) {
+        connection
+            .execute(
+                "UPDATE source_scan_state
+                 SET scan_phase = ?2,
+                     scan_issue_kind = ?3,
+                     updated_at = 10
+                 WHERE source_id = ?1",
+                params![source_id, scan_phase, issue_kind],
+            )
+            .expect("update source scan phase");
+    }
+
+    fn set_directory_scan_issue(
+        connection: &Connection,
+        source_directory_id: i64,
+        dir_scan_state: &str,
+        issue_kind: &str,
+    ) {
+        connection
+            .execute(
+                "UPDATE source_directories
+                 SET dir_scan_state = ?2,
+                     dir_scan_issue_kind = ?3,
+                     dir_scan_updated_at = 10,
+                     updated_at = 10
+                 WHERE source_directory_id = ?1",
+                params![source_directory_id, dir_scan_state, issue_kind],
+            )
+            .expect("update directory scan issue");
     }
 
     fn insert_location(
@@ -1592,6 +1762,107 @@ mod tests {
             result.coverage.state,
             StoreSelectedContentsCoverageState::Pending
         );
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn source_access_block_is_blocked_not_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        set_source_access(&connection, 1, "blocked", Some("permission_denied"));
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Blocked);
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Blocked
+        );
+        assert!(result.rows.is_empty());
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn missing_source_root_is_location_missing_not_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        set_source_access(&connection, 1, "missing", Some("missing"));
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Source { source_id: 1 },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::LocationMissing);
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::LocationMissing
+        );
+        assert!(result.rows.is_empty());
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn scanning_empty_scope_is_scanning_not_authoritative_empty() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        set_source_scan_phase(&connection, 1, "scanning", None);
+        insert_directory(&connection, 10, 1, "Scanning", "scanning");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Partial);
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Scanning
+        );
+        assert!(result.rows.is_empty());
+        assert!(!result.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn blocked_descendant_prevents_recursive_scope_from_being_complete() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Locked", "complete");
+        set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
+
+        let result = read_selected_contents(
+            &connection,
+            StoreSelectedContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            10,
+            None,
+        )
+        .expect("read selected contents");
+
+        assert_eq!(result.state, StoreSelectedContentsState::Blocked);
+        assert_eq!(
+            result.coverage.state,
+            StoreSelectedContentsCoverageState::Blocked
+        );
+        assert!(!result.coverage.recursive_scope_complete);
         assert!(!result.coverage.empty_result_authoritative);
     }
 

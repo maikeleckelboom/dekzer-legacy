@@ -954,7 +954,7 @@ fn load_next_library_browser_rows(
                     sf.name,
                     sf.presence_state,
                     lss.mount_status AS source_mount_status,
-                    lss.resolution_status AS source_resolution_status,
+                    lss.access_state AS source_access_state,
                     sfacts.duration_ms AS source_duration_ms,
                     sfacts.updated_at AS source_facts_updated_at,
                     CAST(json_extract(CAST(source_payload.payload AS TEXT), '$.title') AS TEXT) AS source_title,
@@ -967,7 +967,7 @@ fn load_next_library_browser_rows(
                     CASE
                         WHEN sf.presence_state = 'present'
                              AND COALESCE(lss.mount_status, 'mounted') = 'mounted'
-                             AND COALESCE(lss.resolution_status, 'resolved') = 'resolved'
+                             AND COALESCE(lss.access_state, 'accessible') = 'accessible'
                             THEN 0
                         WHEN sf.presence_state = 'present'
                             THEN 1

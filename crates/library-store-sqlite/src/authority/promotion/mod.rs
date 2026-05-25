@@ -51,8 +51,8 @@ mod tests {
     use library_domain::{
         ArtifactId, CapabilityKind, CapabilityStabilityClass, CapabilityState,
         LibraryAssetRetentionPolicy, PrepScope, PrepTargetStabilityClass, ProjectionDomain,
-        SourceFileId, SourcePresenceState, SourceResolutionStatus, SourceScanPhase,
-        SourceSegmentId, SourceSegmentSetId, WorkPriorityClass,
+        SourceAccessState, SourceFileId, SourcePresenceState, SourceScanPhase, SourceSegmentId,
+        SourceSegmentSetId, WorkPriorityClass,
     };
 
     use super::{
@@ -103,7 +103,10 @@ mod tests {
                     source_id,
                     mount_status: RootMountStatus::Mounted.as_str().to_string(),
                     mount_epoch: 0,
-                    resolution_status: SourceResolutionStatus::Resolved,
+                    access_state: SourceAccessState::Accessible,
+                    access_issue_kind: None,
+                    access_error_detail: None,
+                    access_checked_at: Some(13),
                     mount_root: Some("C:/music".to_string()),
                     effective_path: Some("C:/music".to_string()),
                     observed_volume_label: Some("USB".to_string()),
@@ -119,7 +122,7 @@ mod tests {
                     last_scan_started_at: Some(12),
                     last_scan_finished_at: Some(13),
                     last_successful_scan_at: Some(13),
-                    blocked_reason: None,
+                    scan_issue_kind: None,
                     error_detail: None,
                     updated_at: 13,
                 })
@@ -133,6 +136,8 @@ mod tests {
                     relative_path: "album".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(14),

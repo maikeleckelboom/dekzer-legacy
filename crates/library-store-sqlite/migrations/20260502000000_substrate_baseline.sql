@@ -72,8 +72,30 @@ CREATE TABLE source_state
     mount_status              TEXT    NOT NULL
         CHECK (mount_status IN ('unknown', 'mounted', 'unmounted', 'eject_requested', 'eject_pending')),
     mount_epoch               INTEGER NOT NULL CHECK (mount_epoch >= 0),
-    resolution_status         TEXT    NOT NULL
-        CHECK (resolution_status IN ('resolved', 'missing', 'inaccessible', 'unknown')),
+    access_state              TEXT    NOT NULL
+        CHECK (access_state IN ('accessible', 'missing', 'blocked', 'unknown')),
+    access_issue_kind         TEXT
+        CHECK (
+            access_issue_kind IS NULL
+                OR access_issue_kind IN (
+                    'missing',
+                    'not_directory',
+                    'permission_denied',
+                    'privacy_permission_required',
+                    'unavailable_mount',
+                    'resource_busy',
+                    'stale_network_handle',
+                    'symlink_loop',
+                    'symlink_escape_blocked',
+                    'unsupported_path',
+                    'invalid_path',
+                    'io_interrupted',
+                    'timed_out',
+                    'unknown_io'
+                )
+        ),
+    access_error_detail       TEXT,
+    access_checked_at         INTEGER,
     mount_root                TEXT,
     effective_path            TEXT,
     observed_volume_label     TEXT,
@@ -90,7 +112,26 @@ CREATE TABLE source_scan_state
     last_scan_started_at       INTEGER,
     last_scan_finished_at      INTEGER,
     last_successful_scan_at    INTEGER,
-    blocked_reason             TEXT,
+    scan_issue_kind            TEXT
+        CHECK (
+            scan_issue_kind IS NULL
+                OR scan_issue_kind IN (
+                    'missing',
+                    'not_directory',
+                    'permission_denied',
+                    'privacy_permission_required',
+                    'unavailable_mount',
+                    'resource_busy',
+                    'stale_network_handle',
+                    'symlink_loop',
+                    'symlink_escape_blocked',
+                    'unsupported_path',
+                    'invalid_path',
+                    'io_interrupted',
+                    'timed_out',
+                    'unknown_io'
+                )
+        ),
     error_detail               TEXT,
     updated_at                 INTEGER NOT NULL,
     CHECK (
@@ -105,7 +146,7 @@ CREATE TABLE source_scan_state
             OR last_scan_finished_at IS NULL
             OR last_successful_scan_at <= last_scan_finished_at
     ),
-    CHECK (scan_phase <> 'blocked' OR blocked_reason IS NOT NULL)
+    CHECK (scan_phase <> 'blocked' OR scan_issue_kind IS NOT NULL)
 ) STRICT;
 
 CREATE TABLE source_locations
@@ -206,7 +247,26 @@ CREATE TABLE source_directories
         CHECK (has_image_media_descendant IN (0, 1)),
     dir_scan_state              TEXT    NOT NULL DEFAULT 'pending'
         CHECK (dir_scan_state IN ('pending', 'scanning', 'complete', 'failed', 'blocked')),
-    dir_scan_error_kind         TEXT,
+    dir_scan_issue_kind         TEXT
+        CHECK (
+            dir_scan_issue_kind IS NULL
+                OR dir_scan_issue_kind IN (
+                    'missing',
+                    'not_directory',
+                    'permission_denied',
+                    'privacy_permission_required',
+                    'unavailable_mount',
+                    'resource_busy',
+                    'stale_network_handle',
+                    'symlink_loop',
+                    'symlink_escape_blocked',
+                    'unsupported_path',
+                    'invalid_path',
+                    'io_interrupted',
+                    'timed_out',
+                    'unknown_io'
+                )
+        ),
     dir_scan_error_detail       TEXT,
     dir_scan_updated_at         INTEGER NOT NULL,
     scanned_at                  INTEGER,

@@ -280,12 +280,46 @@ fn map_literal_hierarchy_window(
         offset: window.offset,
         limit: window.limit,
         total_rows: window.total_rows,
+        coverage: protocol::LiteralHierarchyCoverage {
+            state: map_literal_hierarchy_coverage_state(window.coverage.state),
+            recursive_scope_complete: window.coverage.recursive_scope_complete,
+            empty_result_authoritative: window.coverage.empty_result_authoritative,
+            detail: window.coverage.detail,
+        },
         rows: window
             .rows
             .into_iter()
             .map(map_literal_hierarchy_node)
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
     })
+}
+
+const fn map_literal_hierarchy_coverage_state(
+    state: store::StoreLiteralHierarchyCoverageState,
+) -> protocol::LiteralHierarchyCoverageState {
+    match state {
+        store::StoreLiteralHierarchyCoverageState::Complete => {
+            protocol::LiteralHierarchyCoverageState::Complete
+        }
+        store::StoreLiteralHierarchyCoverageState::Pending => {
+            protocol::LiteralHierarchyCoverageState::Pending
+        }
+        store::StoreLiteralHierarchyCoverageState::Scanning => {
+            protocol::LiteralHierarchyCoverageState::Scanning
+        }
+        store::StoreLiteralHierarchyCoverageState::Blocked => {
+            protocol::LiteralHierarchyCoverageState::Blocked
+        }
+        store::StoreLiteralHierarchyCoverageState::Failed => {
+            protocol::LiteralHierarchyCoverageState::Failed
+        }
+        store::StoreLiteralHierarchyCoverageState::SourceUnavailable => {
+            protocol::LiteralHierarchyCoverageState::SourceUnavailable
+        }
+        store::StoreLiteralHierarchyCoverageState::LocationMissing => {
+            protocol::LiteralHierarchyCoverageState::LocationMissing
+        }
+    }
 }
 
 const fn map_literal_hierarchy_entry_point(
@@ -1067,10 +1101,20 @@ mod tests {
                 offset: 0,
                 limit: 25,
                 total_rows: 2,
+                coverage: store::StoreLiteralHierarchyCoverage {
+                    state: store::StoreLiteralHierarchyCoverageState::Scanning,
+                    recursive_scope_complete: false,
+                    empty_result_authoritative: false,
+                    detail: Some("Still indexing.".to_string()),
+                },
                 rows: vec![directory_node(true, false, "scanning"), file_node()],
             }))
             .expect("map literal hierarchy reply");
         let window = reply.window.expect("window");
+        assert_eq!(
+            window.coverage.state,
+            protocol::LiteralHierarchyCoverageState::Scanning
+        );
 
         let directory = &window.rows[0];
         assert_eq!(directory.has_child_directories, Some(true));

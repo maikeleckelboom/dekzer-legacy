@@ -4,6 +4,7 @@ import {
   hierarchyReadChannels,
   type ReadErrorCode,
   type ChildRow,
+  type HierarchyCoverage,
   type ReadResult
 } from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
@@ -85,6 +86,7 @@ export async function readThroughHost(
         limit: reply.window.limit,
         sourceFileVisibility: normalizedRequest.sourceFileVisibility,
         totalRows: reply.window.totalRows,
+        coverage: mapCoverage(reply.window.coverage),
         nodes
       }
     }
@@ -94,6 +96,20 @@ export async function readThroughHost(
       'readFailed',
       'Unable to read library hierarchy children.'
     )
+  }
+}
+
+function mapCoverage(coverage: {
+  readonly state: HierarchyCoverage['state']
+  readonly recursiveScopeComplete: boolean
+  readonly emptyResultAuthoritative: boolean
+  readonly detail?: string | null
+}): HierarchyCoverage {
+  return {
+    state: coverage.state,
+    recursiveScopeComplete: coverage.recursiveScopeComplete,
+    emptyResultAuthoritative: coverage.emptyResultAuthoritative,
+    ...(coverage.detail == null ? {} : { detail: coverage.detail })
   }
 }
 

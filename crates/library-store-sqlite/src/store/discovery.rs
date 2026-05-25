@@ -4,10 +4,11 @@ use std::path::{Path, PathBuf};
 use rusqlite::OptionalExtension;
 
 use crate::authority::ingest::{
-    DiscoveredFileCommitResult, DiscoveredFileInput, DiscoveredLocationInput, DiscoveryBatch,
-    DiscoveryChunkCommitResult, DiscoveryCommitResult, DiscoveryFinalizeResult,
-    FilesystemWalkEntries, build_discovered_locations_from_files,
+    DirectoryEnumerationOutcome, DiscoveredFileCommitResult, DiscoveredFileInput,
+    DiscoveredLocationInput, DiscoveryBatch, DiscoveryChunkCommitResult, DiscoveryCommitResult,
+    DiscoveryFinalizeResult, FilesystemWalkEntries, build_discovered_locations_from_files,
 };
+use crate::authority::sources::{SourceAccessProbeResult, probe_source_access};
 use crate::time::unix_time_ms;
 use crate::work_control::{
     MountEpochStamp, ROOT_SCAN_SOURCE_MEDIA_WRITE_POLICY, admit_source_bound_work,
@@ -181,6 +182,15 @@ impl SqliteDurableStore {
     where
         F: FnMut(RootScanObservation),
     {
+        let access_checked_at_ms = unix_time_ms()?;
+        let access_probe = probe_source_access(root_path, access_checked_at_ms);
+        self.with_source_lifecycle_tx(|tx| {
+            tx.apply_root_access_probe_result(root_id, &access_probe)
+        })?;
+        if !access_probe.is_accessible() {
+            return Err(root_scan_access_error(root_id, &access_probe));
+        }
+
         let scan_stamp = self.read_mount_epoch_stamp_for_root(root_id)?;
         let scan_token = match admit_source_bound_work(&self.source_admission_gate, root_id) {
             Ok(token) => token,
@@ -207,7 +217,24 @@ impl SqliteDurableStore {
                 self.interrupt_root_bound_work(&[root_id], interrupted_at_ms)?;
                 return Err(LibrarySqliteError::RootWorkCancelled { root_id });
             }
-            let location = location.map_err(|error| root_scan_filesystem_error(root_id, error))?;
+            let location = match location {
+                Ok(location) => location,
+                Err(error) => {
+                    if !pending_chunk.is_empty() {
+                        let chunk_result =
+                            self.commit_discovery_chunk_tx(scan_run_id, root_id, &pending_chunk)?;
+                        extend_discovery_scan_progress(
+                            &mut discovered_files,
+                            &mut observed_file_paths,
+                            &mut observed_directory_paths,
+                            chunk_result,
+                        );
+                        pending_chunk.clear();
+                    }
+                    self.commit_directory_enumeration_outcome_tx(root_id, error.into_outcome())?;
+                    continue;
+                }
+            };
             pending_chunk.push(location);
             if pending_chunk.len() < DISCOVERY_LOCATION_CHUNK_SIZE {
                 continue;
@@ -310,10 +337,10 @@ impl SqliteDurableStore {
 
     fn read_root_scan_path(&self, root_id: i64) -> LibrarySqliteResult<PathBuf> {
         let connection = self.open_read_connection()?;
-        let Some((root_path, resolution_status)) = connection
+        let Some((root_path, access_state)) = connection
             .query_row(
                 "SELECT COALESCE(ss.effective_path, sl.absolute_path) AS root_path,
-                        ss.resolution_status
+                        ss.access_state
                  FROM sources s
                  JOIN source_locators sl
                    ON sl.source_id = s.source_id
@@ -328,12 +355,10 @@ impl SqliteDurableStore {
             return Err(LibrarySqliteError::MissingRoot(root_id));
         };
 
-        if resolution_status != "resolved" {
+        if access_state != "accessible" {
             return Err(LibrarySqliteError::Canonical(CanonicalError::new(
                 CanonicalErrorCode::NotFound,
-                format!(
-                    "root {root_id} is not resolved for scan: resolution_status={resolution_status}"
-                ),
+                format!("root {root_id} is not accessible for scan: access_state={access_state}"),
             )));
         }
 
@@ -373,6 +398,14 @@ impl SqliteDurableStore {
         self.with_discovery_tx(|tx| {
             tx.finalize_scan(root_id, observed_file_paths, observed_directory_paths)
         })
+    }
+
+    fn commit_directory_enumeration_outcome_tx(
+        &self,
+        root_id: i64,
+        outcome: DirectoryEnumerationOutcome,
+    ) -> LibrarySqliteResult<()> {
+        self.with_discovery_tx(|tx| tx.commit_directory_enumeration_outcome(root_id, &outcome))
     }
 
     fn commit_discovery_locations<I, F>(
@@ -453,10 +486,17 @@ fn extend_discovery_scan_progress(
     discovered_files.extend(chunk_result.files);
 }
 
-fn root_scan_filesystem_error(root_id: i64, error: std::io::Error) -> LibrarySqliteError {
+fn root_scan_access_error(root_id: i64, probe: &SourceAccessProbeResult) -> LibrarySqliteError {
+    let issue = probe
+        .issue_kind()
+        .map(|kind| kind.as_str())
+        .unwrap_or("unknown_io");
+    let detail = probe
+        .diagnostic_detail()
+        .unwrap_or("source root is not accessible");
     LibrarySqliteError::Canonical(CanonicalError::new(
         CanonicalErrorCode::NotFound,
-        format!("scan failed for root {root_id}: {error}"),
+        format!("scan blocked for root {root_id}: issue={issue}: {detail}"),
     ))
 }
 

@@ -30,7 +30,8 @@ pub use navigation::{
 pub use prep::{PrepAssignmentScopeKind, PrepScope, PrepTargetStabilityClass};
 pub use projection::ProjectionDomain;
 pub use source::{
-    SourceAvailabilityState, SourcePresenceState, SourceResolutionStatus, SourceScanPhase,
+    SourceAccessIssueKind, SourceAccessState, SourceAvailabilityState, SourcePresenceState,
+    SourceScanPhase,
 };
 pub use work::{
     MachineWorkKind, WorkItemState, WorkPriorityClass, WorkRunOutcome, WorkSubject, WorkSubjectKind,
@@ -95,12 +96,40 @@ mod tests {
             ]
         );
         assert_round_trip!(
-            SourceResolutionStatus,
+            SourceAccessState,
             [
-                (SourceResolutionStatus::Resolved, "resolved"),
-                (SourceResolutionStatus::Missing, "missing"),
-                (SourceResolutionStatus::Inaccessible, "inaccessible"),
-                (SourceResolutionStatus::Unknown, "unknown"),
+                (SourceAccessState::Accessible, "accessible"),
+                (SourceAccessState::Missing, "missing"),
+                (SourceAccessState::Blocked, "blocked"),
+                (SourceAccessState::Unknown, "unknown"),
+            ]
+        );
+        assert_round_trip!(
+            SourceAccessIssueKind,
+            [
+                (SourceAccessIssueKind::Missing, "missing"),
+                (SourceAccessIssueKind::NotDirectory, "not_directory"),
+                (SourceAccessIssueKind::PermissionDenied, "permission_denied"),
+                (
+                    SourceAccessIssueKind::PrivacyPermissionRequired,
+                    "privacy_permission_required"
+                ),
+                (SourceAccessIssueKind::UnavailableMount, "unavailable_mount"),
+                (SourceAccessIssueKind::ResourceBusy, "resource_busy"),
+                (
+                    SourceAccessIssueKind::StaleNetworkHandle,
+                    "stale_network_handle"
+                ),
+                (SourceAccessIssueKind::SymlinkLoop, "symlink_loop"),
+                (
+                    SourceAccessIssueKind::SymlinkEscapeBlocked,
+                    "symlink_escape_blocked"
+                ),
+                (SourceAccessIssueKind::UnsupportedPath, "unsupported_path"),
+                (SourceAccessIssueKind::InvalidPath, "invalid_path"),
+                (SourceAccessIssueKind::IoInterrupted, "io_interrupted"),
+                (SourceAccessIssueKind::TimedOut, "timed_out"),
+                (SourceAccessIssueKind::UnknownIo, "unknown_io"),
             ]
         );
         assert_round_trip!(

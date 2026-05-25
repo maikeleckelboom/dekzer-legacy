@@ -84,6 +84,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::NavigationRowSelectorKind>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyEntryPoint>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyWindow>(&cfg, &mut output);
+    push_ts_decl::<crate::LiteralHierarchyCoverage>(&cfg, &mut output);
+    push_ts_decl::<crate::LiteralHierarchyCoverageState>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyNode>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyNodeKind>(&cfg, &mut output);
     push_ts_decl::<crate::LiteralHierarchyFileMediaClass>(&cfg, &mut output);

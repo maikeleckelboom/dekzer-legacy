@@ -337,7 +337,7 @@ mod tests {
                 "has_primary_media_descendant",
                 "has_image_media_descendant",
                 "dir_scan_state",
-                "dir_scan_error_kind",
+                "dir_scan_issue_kind",
                 "dir_scan_error_detail",
                 "dir_scan_updated_at",
                 "scanned_at",

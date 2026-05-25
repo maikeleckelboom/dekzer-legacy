@@ -25,29 +25,88 @@ impl SourceAvailabilityState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SourceResolutionStatus {
-    Resolved,
+pub enum SourceAccessState {
+    Accessible,
     Missing,
-    Inaccessible,
+    Blocked,
     Unknown,
 }
 
-impl SourceResolutionStatus {
+impl SourceAccessState {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Resolved => "resolved",
+            Self::Accessible => "accessible",
             Self::Missing => "missing",
-            Self::Inaccessible => "inaccessible",
+            Self::Blocked => "blocked",
             Self::Unknown => "unknown",
         }
     }
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
-            "resolved" => Some(Self::Resolved),
+            "accessible" => Some(Self::Accessible),
             "missing" => Some(Self::Missing),
-            "inaccessible" => Some(Self::Inaccessible),
+            "blocked" => Some(Self::Blocked),
             "unknown" => Some(Self::Unknown),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceAccessIssueKind {
+    Missing,
+    NotDirectory,
+    PermissionDenied,
+    PrivacyPermissionRequired,
+    UnavailableMount,
+    ResourceBusy,
+    StaleNetworkHandle,
+    SymlinkLoop,
+    SymlinkEscapeBlocked,
+    UnsupportedPath,
+    InvalidPath,
+    IoInterrupted,
+    TimedOut,
+    UnknownIo,
+}
+
+impl SourceAccessIssueKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Missing => "missing",
+            Self::NotDirectory => "not_directory",
+            Self::PermissionDenied => "permission_denied",
+            Self::PrivacyPermissionRequired => "privacy_permission_required",
+            Self::UnavailableMount => "unavailable_mount",
+            Self::ResourceBusy => "resource_busy",
+            Self::StaleNetworkHandle => "stale_network_handle",
+            Self::SymlinkLoop => "symlink_loop",
+            Self::SymlinkEscapeBlocked => "symlink_escape_blocked",
+            Self::UnsupportedPath => "unsupported_path",
+            Self::InvalidPath => "invalid_path",
+            Self::IoInterrupted => "io_interrupted",
+            Self::TimedOut => "timed_out",
+            Self::UnknownIo => "unknown_io",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "missing" => Some(Self::Missing),
+            "not_directory" => Some(Self::NotDirectory),
+            "permission_denied" => Some(Self::PermissionDenied),
+            "privacy_permission_required" => Some(Self::PrivacyPermissionRequired),
+            "unavailable_mount" => Some(Self::UnavailableMount),
+            "resource_busy" => Some(Self::ResourceBusy),
+            "stale_network_handle" => Some(Self::StaleNetworkHandle),
+            "symlink_loop" => Some(Self::SymlinkLoop),
+            "symlink_escape_blocked" => Some(Self::SymlinkEscapeBlocked),
+            "unsupported_path" => Some(Self::UnsupportedPath),
+            "invalid_path" => Some(Self::InvalidPath),
+            "io_interrupted" => Some(Self::IoInterrupted),
+            "timed_out" => Some(Self::TimedOut),
+            "unknown_io" => Some(Self::UnknownIo),
             _ => None,
         }
     }

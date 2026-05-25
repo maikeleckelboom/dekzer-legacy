@@ -18,7 +18,7 @@ use crate::browse_media::{
 };
 use crate::time::unix_time_ms;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
-use library_domain::{SourceFileId, SourcePresenceState, WorkPriorityClass};
+use library_domain::{SourceAccessIssueKind, SourceFileId, SourcePresenceState, WorkPriorityClass};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DiscoveredLocationKind {
@@ -78,6 +78,23 @@ pub struct DiscoveredLocationInput {
     pub file_size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
     pub observed_at_ms: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectoryEnumerationOutcome {
+    pub relative_path: String,
+    pub outcome: DirectoryEnumerationOutcomeKind,
+    pub issue_kind: Option<SourceAccessIssueKind>,
+    pub diagnostic_detail: Option<String>,
+    pub observed_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DirectoryEnumerationOutcomeKind {
+    Enumerated,
+    Blocked,
+    Missing,
+    Failed,
 }
 
 impl DiscoveredLocationInput {
@@ -184,7 +201,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         let rows_changed = self.tx().execute(
             "UPDATE source_scan_state
              SET scan_phase = 'scanning',
-                 blocked_reason = NULL,
+                 scan_issue_kind = NULL,
                  error_detail = NULL,
                  last_scan_started_at = ?2,
                  updated_at = ?2
@@ -197,11 +214,12 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         self.tx().execute(
             "UPDATE source_directories
              SET dir_scan_state = 'pending',
-                 dir_scan_error_kind = NULL,
+                 dir_scan_issue_kind = NULL,
                  dir_scan_error_detail = NULL,
                  dir_scan_updated_at = ?2,
                  updated_at = ?2
-             WHERE source_id = ?1",
+             WHERE source_id = ?1
+               AND presence_state = 'present'",
             params![root_id, started_at_ms],
         )?;
 
@@ -223,6 +241,58 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         locations: &[DiscoveredLocationInput],
     ) -> LibrarySqliteResult<DiscoveryChunkCommitResult> {
         self.commit_chunk(root_id, locations, None)
+    }
+
+    pub(crate) fn commit_directory_enumeration_outcome(
+        &mut self,
+        root_id: i64,
+        outcome: &DirectoryEnumerationOutcome,
+    ) -> LibrarySqliteResult<()> {
+        self.require_root(root_id)?;
+        match outcome.outcome {
+            DirectoryEnumerationOutcomeKind::Enumerated => {
+                if outcome.relative_path.is_empty() {
+                    return Ok(());
+                }
+                self.ensure_source_directory_chain(
+                    root_id,
+                    &outcome.relative_path,
+                    None,
+                    outcome.observed_at_ms,
+                    Some("complete"),
+                )?;
+            }
+            DirectoryEnumerationOutcomeKind::Blocked | DirectoryEnumerationOutcomeKind::Failed => {
+                if outcome.relative_path.is_empty() {
+                    return Ok(());
+                }
+                let scan_state = match outcome.outcome {
+                    DirectoryEnumerationOutcomeKind::Blocked => "blocked",
+                    DirectoryEnumerationOutcomeKind::Failed => "failed",
+                    DirectoryEnumerationOutcomeKind::Enumerated
+                    | DirectoryEnumerationOutcomeKind::Missing => unreachable!(),
+                };
+                self.ensure_source_directory_chain_with_issue(
+                    root_id,
+                    &outcome.relative_path,
+                    outcome.observed_at_ms,
+                    scan_state,
+                    outcome.issue_kind,
+                    outcome.diagnostic_detail.clone(),
+                )?;
+            }
+            DirectoryEnumerationOutcomeKind::Missing => {
+                if outcome.relative_path.is_empty() {
+                    return Ok(());
+                }
+                self.mark_directory_missing(
+                    root_id,
+                    &outcome.relative_path,
+                    outcome.observed_at_ms,
+                )?;
+            }
+        }
+        Ok(())
     }
 
     fn commit_chunk(
@@ -320,7 +390,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
              SET scan_phase = 'complete',
                  last_scan_finished_at = ?2,
                  last_successful_scan_at = ?2,
-                 blocked_reason = NULL,
+                 scan_issue_kind = NULL,
                  error_detail = NULL,
                  updated_at = ?2
              WHERE source_id = ?1",
@@ -535,6 +605,8 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                         relative_path: running_relative_path.clone(),
                         presence_state: SourcePresenceState::Present,
                         dir_scan_state: directory_scan_state.map(str::to_string),
+                        dir_scan_issue_kind: None,
+                        dir_scan_error_detail: None,
                         scanned_at: None,
                         mtime_ns: if running_relative_path == relative_path {
                             directory_mtime_ns
@@ -549,6 +621,104 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         }
 
         Ok(parent_source_directory_id)
+    }
+
+    fn ensure_source_directory_chain_with_issue(
+        &self,
+        root_id: i64,
+        relative_path: &str,
+        changed_at: i64,
+        final_directory_scan_state: &str,
+        issue_kind: Option<SourceAccessIssueKind>,
+        error_detail: Option<String>,
+    ) -> LibrarySqliteResult<Option<i64>> {
+        if relative_path.is_empty() {
+            return Ok(None);
+        }
+
+        let mut parent_source_directory_id = None;
+        let mut running_relative_path = String::new();
+        for segment in relative_path.split('/') {
+            if running_relative_path.is_empty() {
+                running_relative_path.push_str(segment);
+            } else {
+                running_relative_path.push('/');
+                running_relative_path.push_str(segment);
+            }
+            let is_final_directory = running_relative_path == relative_path;
+            parent_source_directory_id = Some(
+                SourceDirectoriesAuthorityTx::new(self.tx).upsert_source_directory(
+                    &UpsertSourceDirectoryInput {
+                        source_directory_id: None,
+                        source_id: root_id,
+                        parent_source_directory_id,
+                        name: segment.to_string(),
+                        relative_path: running_relative_path.clone(),
+                        presence_state: SourcePresenceState::Present,
+                        dir_scan_state: Some(
+                            if is_final_directory {
+                                final_directory_scan_state
+                            } else {
+                                "complete"
+                            }
+                            .to_string(),
+                        ),
+                        dir_scan_issue_kind: is_final_directory.then_some(issue_kind).flatten(),
+                        dir_scan_error_detail: if is_final_directory {
+                            error_detail.clone()
+                        } else {
+                            None
+                        },
+                        scanned_at: None,
+                        mtime_ns: None,
+                        first_created_at: Some(changed_at),
+                        changed_at,
+                    },
+                )?,
+            );
+        }
+
+        Ok(parent_source_directory_id)
+    }
+
+    fn mark_directory_missing(
+        &self,
+        root_id: i64,
+        relative_path: &str,
+        observed_at_ms: i64,
+    ) -> LibrarySqliteResult<()> {
+        let rows_changed = self.tx().execute(
+            "UPDATE source_directories
+             SET presence_state = 'missing',
+                 dir_scan_state = 'complete',
+                 dir_scan_issue_kind = NULL,
+                 dir_scan_error_detail = NULL,
+                 dir_scan_updated_at = ?3,
+                 updated_at = ?3
+             WHERE source_id = ?1
+               AND relative_path = ?2",
+            params![root_id, relative_path, observed_at_ms],
+        )?;
+        if rows_changed == 0 {
+            self.ensure_source_directory_chain_with_issue(
+                root_id,
+                relative_path,
+                observed_at_ms,
+                "complete",
+                None,
+                None,
+            )?;
+            self.tx().execute(
+                "UPDATE source_directories
+                 SET presence_state = 'missing',
+                     dir_scan_updated_at = ?3,
+                     updated_at = ?3
+                 WHERE source_id = ?1
+                   AND relative_path = ?2",
+                params![root_id, relative_path, observed_at_ms],
+            )?;
+        }
+        Ok(())
     }
 
     fn upsert_directory_presence(
@@ -585,6 +755,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
              FROM source_directories
              WHERE source_id = ?1
                AND presence_state = 'present'
+               AND dir_scan_state NOT IN ('blocked', 'failed')
              ORDER BY relative_path DESC, source_directory_id DESC",
         )?;
         let rows = stmt
@@ -600,6 +771,9 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             self.tx().execute(
                 "UPDATE source_directories
                  SET presence_state = 'missing',
+                     dir_scan_state = 'complete',
+                     dir_scan_issue_kind = NULL,
+                     dir_scan_error_detail = NULL,
                      dir_scan_updated_at = ?2,
                      updated_at = ?2
                  WHERE source_directory_id = ?1",
@@ -710,7 +884,9 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
              SET has_child_directories = 0,
                  has_primary_media_descendant = 0,
                  has_image_media_descendant = 0
-             WHERE source_id = ?1",
+             WHERE source_id = ?1
+               AND presence_state = 'present'
+               AND dir_scan_state IN ('pending', 'scanning', 'complete')",
             [root_id],
         )?;
 
@@ -785,12 +961,14 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         self.tx().execute(
             "UPDATE source_directories
              SET dir_scan_state = 'complete',
-                 dir_scan_error_kind = NULL,
+                 dir_scan_issue_kind = NULL,
                  dir_scan_error_detail = NULL,
                  dir_scan_updated_at = ?2,
                  scanned_at = ?2,
                  updated_at = ?2
-             WHERE source_id = ?1",
+             WHERE source_id = ?1
+               AND presence_state = 'present'
+               AND dir_scan_state IN ('pending', 'scanning', 'complete')",
             params![root_id, completed_at_ms],
         )?;
 
@@ -949,7 +1127,9 @@ fn observation_basis_fingerprint(
 
 #[cfg(test)]
 mod tests {
-    use crate::authority::ingest::DiscoveryTx;
+    use crate::authority::ingest::{
+        DirectoryEnumerationOutcome, DirectoryEnumerationOutcomeKind, DiscoveryTx,
+    };
     use crate::authority::sources::{
         RecordSourceFileObservationInput, SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx,
         SourceLocatorsAuthorityTx, SourceStateAuthorityTx, SourcesAuthorityTx,
@@ -958,7 +1138,9 @@ mod tests {
     };
     use crate::authority::write_lane::admit_write;
     use crate::schema::install_baseline_schema_for_test;
-    use library_domain::{SourcePresenceState, SourceResolutionStatus, SourceScanPhase};
+    use library_domain::{
+        SourceAccessIssueKind, SourceAccessState, SourcePresenceState, SourceScanPhase,
+    };
 
     fn setup_source_with_directory(connection: &mut rusqlite::Connection) -> (i64, i64) {
         let source_id = admit_write(connection, |write| {
@@ -989,7 +1171,10 @@ mod tests {
                     source_id,
                     mount_status: "mounted".to_string(),
                     mount_epoch: 0,
-                    resolution_status: SourceResolutionStatus::Resolved,
+                    access_state: SourceAccessState::Accessible,
+                    access_issue_kind: None,
+                    access_error_detail: None,
+                    access_checked_at: Some(10),
                     mount_root: Some("/test/music".to_string()),
                     effective_path: Some("/test/music".to_string()),
                     observed_volume_label: None,
@@ -1005,7 +1190,7 @@ mod tests {
                     last_scan_started_at: Some(10),
                     last_scan_finished_at: Some(11),
                     last_successful_scan_at: Some(11),
-                    blocked_reason: None,
+                    scan_issue_kind: None,
                     error_detail: None,
                     updated_at: 11,
                 })
@@ -1024,6 +1209,8 @@ mod tests {
                     relative_path: "albums".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(12),
@@ -1128,6 +1315,36 @@ mod tests {
     }
 
     #[test]
+    fn blocked_directory_outcome_survives_scan_finalization() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, _parent_dir_id) = setup_source_with_directory(&mut connection);
+
+        admit_write(&mut connection, |write| {
+            DiscoveryTx::new(write)
+                .commit_directory_enumeration_outcome(
+                    source_id,
+                    &DirectoryEnumerationOutcome {
+                        relative_path: "albums/locked".to_string(),
+                        outcome: DirectoryEnumerationOutcomeKind::Blocked,
+                        issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                        diagnostic_detail: Some("permission denied".to_string()),
+                        observed_at_ms: 20,
+                    },
+                )
+                .expect("commit blocked directory outcome");
+            Ok(())
+        })
+        .expect("write blocked directory outcome");
+
+        run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
+
+        let facts = read_directory_facts(&connection, "albums/locked");
+        assert_eq!(facts.dir_scan_state, "blocked");
+    }
+
+    #[test]
     fn wma_file_stores_audio_media_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
@@ -1224,6 +1441,8 @@ mod tests {
                     relative_path: "nested".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(12),
@@ -1291,6 +1510,8 @@ mod tests {
                     relative_path: "docs".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(12),
@@ -1353,6 +1574,8 @@ mod tests {
                     relative_path: "misc".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(12),
@@ -1418,6 +1641,8 @@ mod tests {
                     relative_path: "albums/mid".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(12),
@@ -1433,6 +1658,8 @@ mod tests {
                     relative_path: "albums/mid/deep".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(12),
@@ -1497,6 +1724,8 @@ mod tests {
                     relative_path: "albums/1998".to_string(),
                     presence_state: SourcePresenceState::Present,
                     dir_scan_state: None,
+                    dir_scan_issue_kind: None,
+                    dir_scan_error_detail: None,
                     scanned_at: None,
                     mtime_ns: None,
                     first_created_at: Some(20),
