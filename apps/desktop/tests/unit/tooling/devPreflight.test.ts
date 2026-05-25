@@ -11,7 +11,7 @@ import {
   type DevPreflightDeps
 } from '../../../tooling/dev.mjs'
 import {
-  desktopLibraryUserDataEnvironmentVariable,
+  libraryUserDataPathEnvVar,
   parseDevArgs,
   type StorageSchemaState,
   type UserDataSource
@@ -525,7 +525,7 @@ describe('formatAbortCommands', () => {
 })
 
 describe('parseDevArgs', () => {
-  const envVar = desktopLibraryUserDataEnvironmentVariable
+  const envVar = libraryUserDataPathEnvVar
   let originalEnv: string | undefined
 
   beforeEach(() => {
@@ -639,7 +639,7 @@ describe('parseDevArgs', () => {
 })
 
 describe('createElectronViteDevEnvironment', () => {
-  const envVar = desktopLibraryUserDataEnvironmentVariable
+  const envVar = libraryUserDataPathEnvVar
   let originalEnv: string | undefined
 
   beforeEach(() => {

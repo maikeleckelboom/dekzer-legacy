@@ -6,8 +6,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { LibraryBoundaryStdioProcessExitError } from '@dekzer/library-boundary-stdio-transport'
 
 import {
-  desktopLibraryUserDataEnvironmentVariable,
-  libraryBoundaryStdioBinaryEnvironmentVariable,
+  libraryUserDataPathEnvVar,
+  boundaryStdioBinaryPathEnvVar,
   resolveLibraryBoundaryHostConfig,
   resolveLibraryBoundaryStdioBinaryPath,
   selectLibraryBoundaryHostEnvironment,
@@ -54,7 +54,7 @@ describe('library boundary host', () => {
       app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
       isDev: true,
       env: {
-        [libraryBoundaryStdioBinaryEnvironmentVariable]: fakeBinaryPath
+        [boundaryStdioBinaryPathEnvVar]: fakeBinaryPath
       },
       platform: 'linux'
     })
@@ -82,8 +82,8 @@ describe('library boundary host', () => {
         app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
         isDev: true,
         env: {
-          [libraryBoundaryStdioBinaryEnvironmentVariable]: fakeBinaryPath,
-          [desktopLibraryUserDataEnvironmentVariable]: overriddenUserDataPath
+          [boundaryStdioBinaryPathEnvVar]: fakeBinaryPath,
+          [libraryUserDataPathEnvVar]: overriddenUserDataPath
         },
         platform: 'linux'
       }).storageEnvironment
@@ -99,7 +99,7 @@ describe('library boundary host', () => {
           app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
           isDev: true,
           env: {
-            [desktopLibraryUserDataEnvironmentVariable]: 'relative-user-data'
+            [libraryUserDataPathEnvVar]: 'relative-user-data'
           },
           platform: 'linux'
         }),
@@ -430,7 +430,7 @@ function hostConfig(): LibraryBoundaryHostConfig {
     app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
     isDev: true,
     env: {
-      [libraryBoundaryStdioBinaryEnvironmentVariable]: fakeBinaryPath
+      [boundaryStdioBinaryPathEnvVar]: fakeBinaryPath
     },
     platform: 'linux'
   })

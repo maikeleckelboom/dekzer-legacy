@@ -43,7 +43,7 @@ type StorageStatusEnvelope = {
   production: StorageEnvironmentStatus
 }
 
-export const desktopLibraryUserDataEnvironmentVariable = 'DESKTOP_LIBRARY_USER_DATA_PATH'
+export const libraryUserDataPathEnvVar = 'DESKTOP_LIBRARY_USER_DATA_PATH'
 
 export function resolveWorkspaceRoot(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -53,7 +53,7 @@ export function resolveDefaultUserDataPath(): {
   path: string
   source: 'environmentOverride' | 'developmentDefault'
 } {
-  const envPath = process.env[desktopLibraryUserDataEnvironmentVariable]
+  const envPath = process.env[libraryUserDataPathEnvVar]
   if (envPath !== undefined && envPath !== '') {
     return { path: envPath, source: 'environmentOverride' }
   }

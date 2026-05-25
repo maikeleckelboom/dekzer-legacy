@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import {
-  libraryBoundaryStdioBinaryEnvironmentVariable,
+  boundaryStdioBinaryPathEnvVar,
   resolveLibraryBoundaryHostConfig,
   type LibraryBoundaryHostConfig
 } from '../../../src/main/libraryBoundary/config'
@@ -136,7 +136,7 @@ function hostConfig(): LibraryBoundaryHostConfig {
     app: testApp(tempRoot, { appPath: join(tempRoot, 'apps', 'desktop') }),
     isDev: true,
     env: {
-      [libraryBoundaryStdioBinaryEnvironmentVariable]: fakeBinaryPath
+      [boundaryStdioBinaryPathEnvVar]: fakeBinaryPath
     },
     platform: 'linux'
   })

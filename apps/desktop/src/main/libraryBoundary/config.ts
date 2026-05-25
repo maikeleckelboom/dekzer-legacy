@@ -4,8 +4,8 @@ import process from 'node:process'
 
 import { LibraryBoundaryHostError } from './errors'
 
-export const libraryBoundaryStdioBinaryEnvironmentVariable = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
-export const desktopLibraryUserDataEnvironmentVariable = 'DESKTOP_LIBRARY_USER_DATA_PATH'
+export const boundaryStdioBinaryPathEnvVar = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
+export const libraryUserDataPathEnvVar = 'DESKTOP_LIBRARY_USER_DATA_PATH'
 
 export type LibraryBoundaryHostEnvironment = 'development' | 'production'
 
@@ -95,7 +95,7 @@ export function resolveLibraryBoundaryStorageEnvironment(
   isDev?: boolean,
   desktopAppPath?: string
 ): LibraryBoundaryHostStorageEnvironment {
-  const overridePath = env[desktopLibraryUserDataEnvironmentVariable]?.trim()
+  const overridePath = env[libraryUserDataPathEnvVar]?.trim()
 
   if (overridePath !== undefined && overridePath.length > 0) {
     return normalizeStorageEnvironmentPath(overridePath, 'environmentOverride')
@@ -134,7 +134,7 @@ export function resolveLibraryBoundaryStdioBinaryPolicy(
   }
 
   const env = options.env ?? process.env
-  const overridePath = env[libraryBoundaryStdioBinaryEnvironmentVariable]?.trim()
+  const overridePath = env[boundaryStdioBinaryPathEnvVar]?.trim()
   if (overridePath !== undefined && overridePath.length > 0) {
     return {
       kind: 'developmentBinary',

@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline'
 
 import {
   checkDevelopmentStorage,
-  desktopLibraryUserDataEnvironmentVariable,
+  libraryUserDataPathEnvVar,
   parseDevArgs,
   spawnCargoStorageCommand,
   type ParsedStorageArgs,
@@ -213,7 +213,7 @@ export function createElectronViteDevEnvironment(
 ): NodeJS.ProcessEnv {
   return {
     ...parentEnv,
-    [desktopLibraryUserDataEnvironmentVariable]: userDataPath
+    [libraryUserDataPathEnvVar]: userDataPath
   }
 }
 
