@@ -23,8 +23,18 @@ export type LibraryBoundaryHostErrorDetails = {
   readonly resourceRoot?: string
   readonly state?: LibraryBoundaryHostState
   readonly startupDiagnostics?: readonly string[]
+  readonly startupSchemaDiagnostic?: string
   readonly userDataPath?: string
   readonly userDataSource?: string
+}
+
+export function isSchemaMismatchLine(line: string): boolean {
+  const lower = line.toLowerCase()
+  return (
+    (lower.includes('schema') && lower.includes('malformed')) ||
+    (lower.includes('schema') && lower.includes('does not match')) ||
+    (lower.includes('schema') && lower.includes('incompatible'))
+  )
 }
 
 export class LibraryBoundaryHostError extends Error {

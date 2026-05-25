@@ -15,6 +15,7 @@ describe('dev preflight evaluateDevPreflight', () => {
       'compatible',
       undefined,
       '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
       'developmentDefault',
       true
     )
@@ -27,6 +28,7 @@ describe('dev preflight evaluateDevPreflight', () => {
       'missing',
       undefined,
       '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
       'developmentDefault',
       true
     )
@@ -42,6 +44,7 @@ describe('dev preflight evaluateDevPreflight', () => {
       'incompatible',
       'table source_directories column count mismatch: canonical=17 live=16',
       '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
       'developmentDefault',
       true
     )
@@ -53,7 +56,8 @@ describe('dev preflight evaluateDevPreflight', () => {
     expect(result.lines).toContain(
       'Detail: table source_directories column count mismatch: canonical=17 live=16'
     )
-    expect(result.lines).toContain('Database: /dev-user-data/default/development')
+    expect(result.lines).toContain('Storage root: /dev-user-data/default/development')
+    expect(result.lines).toContain('Database: /dev-user-data/default/development/library.sqlite')
     expect(result.lines).toContain(
       'Reset development storage and start Dekzer? This deletes only the development storage root.'
     )
@@ -64,6 +68,7 @@ describe('dev preflight evaluateDevPreflight', () => {
       'incompatible',
       'schema does not match',
       '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
       'developmentDefault',
       false
     )
@@ -84,6 +89,7 @@ describe('dev preflight evaluateDevPreflight', () => {
       'unreadable',
       'file is not a database',
       '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
       'developmentDefault',
       true
     )
@@ -91,24 +97,64 @@ describe('dev preflight evaluateDevPreflight', () => {
     expect(result.kind).toBe('promptForReset')
   })
 
-  it('includes env var note when user data source is environmentOverride', () => {
+  it('includes env var note on storage root when user data source is environmentOverride', () => {
     const lines = formatIncompatibleMessage(
       '/custom/path/development',
+      '/custom/path/development/library.sqlite',
       undefined,
       'environmentOverride'
     )
 
+    expect(lines).toContain('Storage root: /custom/path/development')
     expect(lines).toContain('  (resolved via DESKTOP_LIBRARY_USER_DATA_PATH)')
+    expect(lines).toContain('Database: /custom/path/development/library.sqlite')
+
+    const storageRootIndex = lines.indexOf('Storage root: /custom/path/development')
+    const envNoteIndex = lines.indexOf('  (resolved via DESKTOP_LIBRARY_USER_DATA_PATH)')
+    const databaseIndex = lines.indexOf('Database: /custom/path/development/library.sqlite')
+    expect(storageRootIndex).toBeLessThan(envNoteIndex)
+    expect(envNoteIndex).toBeLessThan(databaseIndex)
   })
 
   it('omits env var note when user data source is developmentDefault', () => {
     const lines = formatIncompatibleMessage(
       '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
       undefined,
       'developmentDefault'
     )
 
     expect(lines).not.toContain('  (resolved via DESKTOP_LIBRARY_USER_DATA_PATH)')
+  })
+
+  it('shows both storage root and database in incompatible message', () => {
+    const lines = formatIncompatibleMessage(
+      '/dev-user-data/default/development',
+      '/dev-user-data/default/development/library.sqlite',
+      'schema version mismatch',
+      'developmentDefault'
+    )
+
+    expect(lines).toContain('Storage root: /dev-user-data/default/development')
+    expect(lines).toContain('Database: /dev-user-data/default/development/library.sqlite')
+  })
+
+  it('shows both storage root and database in unreadable schema message', () => {
+    const result = evaluateDevPreflight(
+      'unreadable',
+      'file is not a database',
+      '/custom/path/development',
+      '/custom/path/development/library.sqlite',
+      'environmentOverride',
+      true
+    )
+
+    expect(result.kind).toBe('promptForReset')
+    if (result.kind !== 'promptForReset') return
+
+    expect(result.lines).toContain('Storage root: /custom/path/development')
+    expect(result.lines).toContain('Database: /custom/path/development/library.sqlite')
+    expect(result.lines).toContain('  (resolved via DESKTOP_LIBRARY_USER_DATA_PATH)')
   })
 })
 
@@ -119,6 +165,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'compatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       resetStorage: async () => 0,
@@ -174,6 +221,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'missing' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       spawnDev: async () => {
@@ -193,6 +241,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'missing' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       spawnDev: async () => 1,
@@ -279,6 +328,7 @@ describe('dev preflight runDevPreflight', () => {
           detail: 'column count mismatch'
         },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       promptYesNo: async () => true,
@@ -304,6 +354,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       promptYesNo: async () => true,
@@ -329,6 +380,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       promptYesNo: async () => false,
@@ -363,6 +415,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       isInteractive: () => false,
@@ -400,6 +453,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       isInteractive: () => false,
@@ -430,6 +484,7 @@ describe('dev preflight runDevPreflight', () => {
         kind: 'checked' as const,
         schema: { state: 'incompatible' as StorageSchemaState },
         storageRootPath: '/dev-user-data/default/development',
+        durableStorePath: '/dev-user-data/default/development/library.sqlite',
         userDataSource: 'developmentDefault' as const
       }),
       promptYesNo: async () => true,

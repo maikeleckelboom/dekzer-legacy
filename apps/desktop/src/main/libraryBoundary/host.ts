@@ -13,7 +13,11 @@ import {
   resolveLibraryBoundaryStdioBinaryPath,
   type LibraryBoundaryHostConfig
 } from './config'
-import { LibraryBoundaryHostError, type LibraryBoundaryHostState } from './errors'
+import {
+  LibraryBoundaryHostError,
+  isSchemaMismatchLine,
+  type LibraryBoundaryHostState
+} from './errors'
 
 const MAX_STARTUP_DIAGNOSTIC_LINES = 8
 
@@ -65,6 +69,7 @@ export class LibraryBoundaryHost {
   #state: LibraryBoundaryHostState = 'idle'
   #stopPromise: Promise<void> | undefined
   #startupDiagnostics: string[] = []
+  #startupSchemaDiagnostic: string | undefined
   #transport: LibraryBoundaryHostTransport | undefined
 
   constructor(
@@ -130,6 +135,7 @@ export class LibraryBoundaryHost {
 
     this.#state = 'starting'
     this.#startupDiagnostics = []
+    this.#startupSchemaDiagnostic = undefined
     this.#startPromise = this.#start()
     return this.#startPromise
   }
@@ -173,6 +179,7 @@ export class LibraryBoundaryHost {
       return client
     } catch (cause) {
       const startupDiagnostics = this.#startupDiagnostics.slice()
+      const startupSchemaDiagnostic = this.#startupSchemaDiagnostic
       await this.#transport?.close().catch(() => undefined)
       this.#client = undefined
       this.#transport = undefined
@@ -189,7 +196,10 @@ export class LibraryBoundaryHost {
         'Failed to start the library boundary stdio transport.',
         {
           cause,
-          details: startupDiagnostics.length === 0 ? {} : { startupDiagnostics }
+          details: {
+            ...(startupDiagnostics.length === 0 ? {} : { startupDiagnostics }),
+            ...(startupSchemaDiagnostic === undefined ? {} : { startupSchemaDiagnostic })
+          }
         }
       )
     }
@@ -236,6 +246,10 @@ export class LibraryBoundaryHost {
           0,
           this.#startupDiagnostics.length - MAX_STARTUP_DIAGNOSTIC_LINES
         )
+      }
+
+      if (this.#startupSchemaDiagnostic === undefined && isSchemaMismatchLine(diagnostic.line)) {
+        this.#startupSchemaDiagnostic = diagnostic.line
       }
     }
 

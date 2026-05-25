@@ -379,6 +379,7 @@ function resetCommand(parsed: ParsedStorageArgs): string {
 export type DevelopmentStorageCheck = {
   readonly schema: StorageSchemaStatus
   readonly storageRootPath: string
+  readonly durableStorePath: string
   readonly userDataPath: string
   readonly userDataSource: 'environmentOverride' | 'developmentDefault'
 }
@@ -401,6 +402,7 @@ export async function checkDevelopmentStorage(
   return {
     schema,
     storageRootPath: envelope.development.storageRootPath,
+    durableStorePath: envelope.development.durableStorePath,
     userDataPath,
     userDataSource
   }

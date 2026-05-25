@@ -21,6 +21,7 @@ export type DevStorageCheckResult =
       readonly kind: 'checked'
       readonly schema: { readonly state: StorageSchemaState; readonly detail?: string }
       readonly storageRootPath: string
+      readonly durableStorePath: string
       readonly userDataSource: 'environmentOverride' | 'developmentDefault'
     }
   | {
@@ -32,6 +33,7 @@ export function evaluateDevPreflight(
   schemaState: StorageSchemaState,
   schemaDetail: string | undefined,
   storageRootPath: string,
+  durableStorePath: string,
   userDataSource: 'environmentOverride' | 'developmentDefault',
   isInteractive: boolean
 ): DevPreflightResult {
@@ -43,7 +45,12 @@ export function evaluateDevPreflight(
     return { kind: 'start' }
   }
 
-  const lines = formatIncompatibleMessage(storageRootPath, schemaDetail, userDataSource)
+  const lines = formatIncompatibleMessage(
+    storageRootPath,
+    durableStorePath,
+    schemaDetail,
+    userDataSource
+  )
 
   if (!isInteractive) {
     lines.push('')
@@ -63,6 +70,7 @@ export function evaluateDevPreflight(
 
 export function formatIncompatibleMessage(
   storageRootPath: string,
+  durableStorePath: string,
   schemaDetail: string | undefined,
   userDataSource: 'environmentOverride' | 'developmentDefault'
 ): string[] {
@@ -70,12 +78,14 @@ export function formatIncompatibleMessage(
     '',
     'Development storage is incompatible with the current schema.',
     '',
-    `Database: ${storageRootPath}`
+    `Storage root: ${storageRootPath}`
   ]
 
   if (userDataSource === 'environmentOverride') {
     lines.push('  (resolved via DESKTOP_LIBRARY_USER_DATA_PATH)')
   }
+
+  lines.push(`Database: ${durableStorePath}`)
 
   if (schemaDetail !== undefined) {
     lines.push(`Detail: ${schemaDetail}`)
@@ -132,6 +142,7 @@ export async function runDevPreflight(deps: DevPreflightDeps): Promise<void> {
     check.schema.state,
     check.schema.detail,
     check.storageRootPath,
+    check.durableStorePath,
     check.userDataSource,
     deps.isInteractive()
   )
@@ -239,6 +250,7 @@ async function main(): Promise<void> {
           kind: 'checked',
           schema: check.schema,
           storageRootPath: check.storageRootPath,
+          durableStorePath: check.durableStorePath,
           userDataSource: check.userDataSource
         }
       } catch (error: unknown) {

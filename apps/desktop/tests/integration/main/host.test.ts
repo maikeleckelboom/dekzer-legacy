@@ -284,7 +284,7 @@ describe('library boundary host', () => {
       state: 'failed',
       lastError: {
         code: 'stdioTransportStartupFailure',
-        message: 'The development library database is incompatible with the current schema.'
+        message: 'The library database is incompatible with the current schema.'
       }
     })
     expect(controller.getStatus().lastError?.detail).toBe(schemaDiagnostic)
@@ -385,6 +385,46 @@ describe('library boundary host', () => {
           'diagnostic 10',
           'diagnostic 11'
         ]
+      }
+    })
+  })
+
+  it('preserves schema diagnostic beyond recent diagnostics buffer', async () => {
+    const config = hostConfig()
+    const schemaLine =
+      'database schema state is malformed: database schema does not match the canonical substrate baseline: table source_directories column count mismatch: canonical=17 live=16'
+    const schemaMismatchHost = new LibraryBoundaryHost(config, silentLogger(), {
+      createTransport: (options) => {
+        const ready = deferred<void>()
+        options.diagnostics?.({ stream: 'stderr', line: schemaLine })
+        for (let i = 0; i < 12; i += 1) {
+          options.diagnostics?.({ stream: 'stderr', line: `noise ${i}` })
+        }
+        ready.reject(new LibraryBoundaryStdioProcessExitError(1, null))
+        return {
+          ready: ready.promise,
+          close: async () => undefined,
+          execute: async () => {
+            throw new Error('execute should not be called by schema diagnostic preservation tests')
+          }
+        } satisfies LibraryBoundaryHostTransport
+      },
+      createClient: () => createFakeClient()
+    })
+
+    const controller = new LibraryBoundaryHostStatusController(
+      schemaMismatchHost,
+      silentStatusLogger()
+    )
+
+    await controller.start()
+
+    expect(controller.getStatus()).toMatchObject({
+      state: 'failed',
+      lastError: {
+        code: 'stdioTransportStartupFailure',
+        message: 'The library database is incompatible with the current schema.',
+        detail: schemaLine
       }
     })
   })

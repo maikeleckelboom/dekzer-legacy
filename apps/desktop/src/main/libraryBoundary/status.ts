@@ -8,7 +8,11 @@ import {
 } from '../../shared/libraryBoundary/status'
 import type { LibraryBoundaryHost } from './host'
 import type { LibraryBoundaryHostBinaryPolicy } from './config'
-import { LibraryBoundaryHostError, type LibraryBoundaryHostErrorCode } from './errors'
+import {
+  LibraryBoundaryHostError,
+  isSchemaMismatchLine,
+  type LibraryBoundaryHostErrorCode
+} from './errors'
 
 export type LibraryBoundaryHostStatusLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
@@ -148,8 +152,8 @@ function createLibraryBoundaryHostStatusError(error: unknown): LibraryBoundaryHo
     const detail = schemaDiagnosticDetail ?? causeDetail
     const message =
       error.code === 'stdioTransportStartupFailure' &&
-      (schemaDiagnosticDetail !== undefined || isSchemaMismatchDetail(causeDetail))
-        ? 'The development library database is incompatible with the current schema.'
+      (schemaDiagnosticDetail !== undefined || isSchemaMismatchLine(causeDetail ?? ''))
+        ? 'The library database is incompatible with the current schema.'
         : statusMessageForHostError(error.code)
     return {
       code: error.code,
@@ -183,9 +187,17 @@ function extractHostErrorCauseDetail(error: LibraryBoundaryHostError): string | 
 function extractSchemaMismatchStartupDiagnostic(
   error: LibraryBoundaryHostError
 ): string | undefined {
+  const dedicated = error.details.startupSchemaDiagnostic
+  if (dedicated !== undefined) {
+    const detail = truncateFirstLine(dedicated)
+    if (detail !== undefined && isSchemaMismatchLine(detail)) {
+      return detail
+    }
+  }
+
   for (const diagnostic of error.details.startupDiagnostics ?? []) {
     const detail = truncateFirstLine(diagnostic)
-    if (isSchemaMismatchDetail(detail)) {
+    if (detail !== undefined && isSchemaMismatchLine(detail)) {
       return detail
     }
   }
@@ -201,19 +213,6 @@ function truncateFirstLine(text: string): string | undefined {
   }
 
   return firstLine.length <= 200 ? firstLine : `${firstLine.slice(0, 197)}...`
-}
-
-function isSchemaMismatchDetail(detail: string | undefined): boolean {
-  if (detail === undefined) {
-    return false
-  }
-
-  const lower = detail.toLowerCase()
-  return (
-    (lower.includes('schema') && lower.includes('malformed')) ||
-    (lower.includes('schema') && lower.includes('does not match')) ||
-    (lower.includes('schema') && lower.includes('incompatible'))
-  )
 }
 
 function statusMessageForHostError(code: LibraryBoundaryHostErrorCode): string {
