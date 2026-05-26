@@ -155,6 +155,7 @@ export type ContentsResult = {
   readonly recursion: ContentsRecursion
   readonly rows: readonly ContentsFileRow[]
   readonly coverage: ContentsCoverage
+  readonly nextCursor?: string
   readonly detail?: string
 }
 

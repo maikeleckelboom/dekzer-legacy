@@ -638,6 +638,7 @@ fn map_contents_result(
             empty_result_authoritative: result.coverage.empty_result_authoritative,
             detail: result.coverage.detail,
         },
+        next_cursor: result.next_cursor,
         detail: result.detail,
     })
 }

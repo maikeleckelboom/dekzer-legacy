@@ -133,6 +133,47 @@ describe('projectContents', () => {
     })
   })
 
+  it('shows load-more row and continuation detail when nextCursor exists', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      {
+        kind: 'ready',
+        requestKey: 'source:7',
+        nextCursor: 'c2Y6...',
+        accumulatedRows: [
+          primaryMediaRow('asset-1', 'track.wav', 'audio'),
+          primaryMediaRow('asset-2', 'clip.mp4', 'audio')
+        ],
+        result: {
+          state: 'ready',
+          result: {
+            state: 'ready',
+            scope: { kind: 'source', sourceId: '7' },
+            policy: contentsPolicyForVisibility('performance'),
+            recursion: 'recursive',
+            rows: [
+              primaryMediaRow('asset-1', 'track.wav', 'audio'),
+              primaryMediaRow('asset-2', 'clip.mp4', 'audio')
+            ],
+            coverage: { state: 'complete', recursiveScopeComplete: true, emptyResultAuthoritative: true },
+            nextCursor: 'c2Y6...'
+          }
+        }
+      }
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.detail).toBe('2 primary media items loaded. More available.')
+    expect(contents.rows).toHaveLength(3)
+    expect(contents.rows[2]).toMatchObject({
+      kind: 'more',
+      label: 'More primary media items available',
+      detail: 'Load more',
+      icon: 'more'
+    })
+  })
+
   it('projects loading, empty, partial, failed, and unsupported contents read states', () => {
     expect(projectForSelection(browserState({}), 'navigation-row:7').rows[0]).toMatchObject({
       kind: 'state',

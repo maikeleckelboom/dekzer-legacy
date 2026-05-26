@@ -146,7 +146,7 @@ export type DirectoryImageMediaState = { "kind": "unknown" } | { "kind": "hasIma
 
 export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
 
-export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, rows: Array<ContentsFileRow>, coverage: ContentsCoverage, detail?: string, };
+export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, rows: Array<ContentsFileRow>, coverage: ContentsCoverage, nextCursor?: string, detail?: string, };
 
 export type ContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed" | "policyConflict" | "cursorInvalid";
 

@@ -417,6 +417,9 @@ pub struct ContentsResult {
     pub coverage: ContentsCoverage,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
+    pub next_cursor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub detail: Option<String>,
 }
 

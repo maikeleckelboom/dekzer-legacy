@@ -257,7 +257,9 @@ function projectContentsState(options: {
   return projectContentsReadResult({
     ownerId: options.ownerId,
     title: options.title,
-    result: state.result
+    result: state.result,
+    ...(state.nextCursor !== undefined ? { nextCursor: state.nextCursor } : {}),
+    ...(state.accumulatedRows !== undefined ? { accumulatedRows: state.accumulatedRows } : {})
   })
 }
 
@@ -265,6 +267,8 @@ function projectContentsReadResult(options: {
   readonly ownerId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsReadResult
+  readonly nextCursor?: string
+  readonly accumulatedRows?: readonly ContentsFileRow[]
 }): ContentProjection {
   if (options.result.state !== 'ready') {
     return stateProjection({
@@ -280,7 +284,9 @@ function projectContentsReadResult(options: {
   return projectContentsResult({
     ownerId: options.ownerId,
     title: options.title,
-    result: options.result.result
+    result: options.result.result,
+    ...(options.nextCursor !== undefined ? { nextCursor: options.nextCursor } : {}),
+    ...(options.accumulatedRows !== undefined ? { accumulatedRows: options.accumulatedRows } : {})
   })
 }
 
@@ -288,9 +294,12 @@ function projectContentsResult(options: {
   readonly ownerId: BrowserTreeNodeId
   readonly title: string
   readonly result: ContentsResult
+  readonly nextCursor?: string
+  readonly accumulatedRows?: readonly ContentsFileRow[]
 }): ContentProjection {
   const result = options.result
-  const rows = result.rows.map(contentsRow)
+  const rows = (options.accumulatedRows ?? result.rows).map(contentsRow)
+  const hasMore = options.nextCursor !== undefined
 
   if (rows.length === 0) {
     return {
@@ -308,11 +317,15 @@ function projectContentsResult(options: {
     }
   }
 
+  const contentRows = hasMore
+    ? [...rows, loadMoreRow(options.ownerId, result)]
+    : rows
+
   return {
     kind: contentsProjectionKind(result),
     title: options.title,
-    detail: contentsDetail(result),
-    rows
+    detail: contentsDetailWithContinuation(result, hasMore),
+    rows: contentRows
   }
 }
 
@@ -472,6 +485,21 @@ function contentsDetail(result: ContentsResult): string {
   return prefix === undefined ? count : `${prefix} ${count}`
 }
 
+function contentsDetailWithContinuation(result: ContentsResult, hasMore: boolean): string {
+  if (result.detail !== undefined && !hasMore) {
+    return result.detail
+  }
+
+  if (hasMore) {
+    const subject = contentsCountSubject(result, result.rows.length)
+    const prefix = contentsCoveragePrefix(result)
+    const count = `${result.rows.length} ${subject} loaded. More available.`
+    return prefix === undefined ? count : `${prefix} ${count}`
+  }
+
+  return contentsDetail(result)
+}
+
 function contentsRowSubject(result: ContentsResult): 'primary media' | 'visible files' {
   return result.policy.rowProfile.kind === 'primaryMedia' ? 'primary media' : 'visible files'
 }
@@ -498,6 +526,22 @@ function contentsCoveragePrefix(result: ContentsResult): string | undefined {
   }
 
   return undefined
+}
+
+function loadMoreRow(ownerId: BrowserTreeNodeId, result: ContentsResult): ContentRow {
+  const subject = contentsCountSubject(result, result.rows.length)
+  return {
+    id: `contents-load-more:${ownerId}`,
+    kind: 'more',
+    label: `More ${subject} available`,
+    detail: `Load more`,
+    icon: 'more',
+    action: {
+      kind: 'loadMore',
+      nodeId: ownerId,
+      label: `Load more ${subject}`
+    }
+  }
 }
 
 function contentMoreRow(

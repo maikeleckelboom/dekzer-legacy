@@ -452,6 +452,12 @@
             "null"
           ]
         },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "policy": {
           "$ref": "#/$defs/ContentsReadPolicy"
         },

@@ -4,7 +4,8 @@ import type { Ref } from 'vue'
 import type {
   ContentsReadPolicy,
   ContentsReadResult,
-  ContentsRecursion
+  ContentsRecursion,
+  ContentsFileRow
 } from '../../../shared/libraryContents/read'
 import type { SourceFileVisibility } from '../../../shared/libraryHierarchy/readChildren'
 import type { RendererApi } from '../../../shared/rendererApi'
@@ -25,6 +26,8 @@ export type ContentsBoundaryState =
       readonly kind: 'ready'
       readonly requestKey: string
       readonly result: ContentsReadResult
+      readonly nextCursor?: string
+      readonly accumulatedRows?: readonly ContentsFileRow[]
     }
   | {
       readonly kind: 'failed'
@@ -46,6 +49,7 @@ export type ContentsReadController = {
 type ReadOptions = {
   readonly force?: boolean
   readonly sourceFileVisibility?: SourceFileVisibility
+  readonly cursor?: string
 }
 
 type LibraryContentsApi = RendererApi['library']['contents']
@@ -84,6 +88,7 @@ export function createContentsReadController(
   })
   let readSequence = 0
   let started = false
+  let accumulatedRows: readonly ContentsFileRow[] | undefined = undefined
 
   function start(): void {
     started = true
@@ -98,6 +103,7 @@ export function createContentsReadController(
       kind: 'idle',
       detail: 'No contents scope is active.'
     }
+    accumulatedRows = undefined
   }
 
   async function readForBinding(
@@ -116,21 +122,26 @@ export function createContentsReadController(
     )
     const requestKey = contentsRequestKey(scope, policy, contentsRecursion)
     const currentState = state.value
+    const cursor = options.cursor
 
     if (
       !options.force &&
+      !cursor &&
       (currentState.kind === 'loading' || currentState.kind === 'ready') &&
       currentState.requestKey === requestKey
     ) {
       return false
     }
 
+    const isSameRequest =
+      currentState.kind === 'ready' && currentState.requestKey === requestKey && cursor !== undefined
+
     const sequence = ++readSequence
     state.value = {
       kind: 'loading',
       requestKey,
       sequence,
-      detail: 'Loading contents.'
+      detail: options.cursor !== undefined ? 'Loading more contents.' : 'Loading contents.'
     }
 
     try {
@@ -138,18 +149,43 @@ export function createContentsReadController(
         scope,
         policy,
         recursion: contentsRecursion,
-        limit: readLimit
+        limit: readLimit,
+        ...(cursor === undefined ? {} : { cursor })
       })
 
       if (!started || !isCurrentLoading(requestKey, sequence)) {
         return false
       }
 
-      state.value = {
+      let rows: readonly ContentsFileRow[]
+      const readyResult = result.state === 'ready' ? result.result : undefined
+      if (isSameRequest && accumulatedRows !== undefined && readyResult !== undefined) {
+        rows = [...accumulatedRows, ...(readyResult.rows ?? [])]
+      } else if (readyResult !== undefined) {
+        rows = readyResult.rows ?? []
+      } else {
+        rows = []
+      }
+
+      const nextCursor = readyResult?.nextCursor
+      if (result.state === 'ready') {
+        accumulatedRows = nextCursor !== undefined ? rows : undefined
+      } else {
+        accumulatedRows = undefined
+      }
+
+      const stateUpdate: ContentsBoundaryState = {
         kind: 'ready',
         requestKey,
         result
       }
+      if (nextCursor !== undefined) {
+        (stateUpdate as { nextCursor?: string }).nextCursor = nextCursor
+      }
+      if (rows.length > 0) {
+        (stateUpdate as { accumulatedRows?: readonly ContentsFileRow[] }).accumulatedRows = rows
+      }
+      state.value = stateUpdate
       return true
     } catch {
       if (!started || !isCurrentLoading(requestKey, sequence)) {
@@ -161,6 +197,7 @@ export function createContentsReadController(
         requestKey,
         detail: safeContentsRequestFailure
       }
+      accumulatedRows = undefined
       return true
     }
   }

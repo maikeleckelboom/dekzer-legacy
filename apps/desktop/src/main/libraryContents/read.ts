@@ -416,6 +416,7 @@ function mapContentsResult(result: ContractContentsResult): ContentsResult | und
     recursion: result.recursion,
     rows,
     coverage: mapCoverage(result),
+    ...(result.nextCursor === undefined ? {} : { nextCursor: result.nextCursor }),
     ...(result.detail === undefined ? {} : { detail: result.detail })
   }
 }

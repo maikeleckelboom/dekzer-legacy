@@ -6,6 +6,336 @@ use crate::read_models::source_location_coverage::{
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
+const CONTENTS_CURSOR_VERSION: u8 = 1;
+const CONTENTS_CURSOR_KIND_SOURCE_FILE: &str = "sf";
+const CONTENTS_CURSOR_KIND_PRIMARY_MEDIA: &str = "pm";
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ContentsCursor {
+    version: u8,
+    kind: String,
+    scope: ContentsCursorScope,
+    media_classes: Vec<String>,
+    recursion: String,
+    position: ContentsCursorPosition,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+enum ContentsCursorScope {
+    Source { source_id: i64 },
+    SourceLocation { source_location_id: i64 },
+    Directory { source_id: i64, source_directory_id: i64 },
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+enum ContentsCursorPosition {
+    SourceFile {
+        relative_path_key: String,
+        source_file_id: i64,
+    },
+    PrimaryMedia {
+        availability_priority: i64,
+        title_key: String,
+        artist_key: String,
+        album_key: String,
+        relative_path_key: String,
+        source_file_id: i64,
+    },
+}
+
+fn encode_cursor(cursor: &ContentsCursor) -> Result<String, LibrarySqliteError> {
+    let json = serde_json::to_string(cursor).map_err(|e| {
+        LibrarySqliteError::MalformedSchemaState(format!("cursor encode failed: {e}"))
+    })?;
+    Ok(base64url_encode(json.as_bytes()))
+}
+
+fn decode_cursor(cursor: &str) -> Result<ContentsCursor, LibrarySqliteError> {
+    let bytes = base64url_decode(cursor).map_err(|e| {
+        LibrarySqliteError::MalformedSchemaState(format!("cursor decode failed: {e}"))
+    })?;
+    let json = String::from_utf8(bytes).map_err(|e| {
+        LibrarySqliteError::MalformedSchemaState(format!("cursor utf8 failed: {e}"))
+    })?;
+    serde_json::from_str(&json).map_err(|e| {
+        LibrarySqliteError::MalformedSchemaState(format!("cursor parse failed: {e}"))
+    })
+}
+
+fn base64url_encode(input: &[u8]) -> String {
+    const TABLE: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    let mut i = 0;
+    while i + 2 < input.len() {
+        let n = ((input[i] as u32) << 16) | ((input[i + 1] as u32) << 8) | (input[i + 2] as u32);
+        out.push(TABLE[((n >> 18) & 0x3F) as usize] as char);
+        out.push(TABLE[((n >> 12) & 0x3F) as usize] as char);
+        out.push(TABLE[((n >> 6) & 0x3F) as usize] as char);
+        out.push(TABLE[(n & 0x3F) as usize] as char);
+        i += 3;
+    }
+    if input.len() - i == 2 {
+        let n = ((input[i] as u32) << 16) | ((input[i + 1] as u32) << 8);
+        out.push(TABLE[((n >> 18) & 0x3F) as usize] as char);
+        out.push(TABLE[((n >> 12) & 0x3F) as usize] as char);
+        out.push(TABLE[((n >> 6) & 0x3F) as usize] as char);
+    } else if input.len() - i == 1 {
+        let n = (input[i] as u32) << 16;
+        out.push(TABLE[((n >> 18) & 0x3F) as usize] as char);
+        out.push(TABLE[((n >> 12) & 0x3F) as usize] as char);
+    }
+    out
+}
+
+fn base64url_decode(input: &str) -> Result<Vec<u8>, String> {
+    const TABLE: &[u8; 256] = &{
+        let mut table = [255u8; 256];
+        let mut i = 0;
+        while i < 26 {
+            table[(b'A' + i) as usize] = i as u8;
+            table[(b'a' + i) as usize] = (i + 26) as u8;
+            i += 1;
+        }
+        table[b'0' as usize] = 52;
+        table[b'1' as usize] = 53;
+        table[b'2' as usize] = 54;
+        table[b'3' as usize] = 55;
+        table[b'4' as usize] = 56;
+        table[b'5' as usize] = 57;
+        table[b'6' as usize] = 58;
+        table[b'7' as usize] = 59;
+        table[b'8' as usize] = 60;
+        table[b'9' as usize] = 61;
+        table[b'-' as usize] = 62;
+        table[b'_' as usize] = 63;
+        table
+    };
+    let input_bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(input.len() * 3 / 4);
+    let mut buf: u32 = 0;
+    let mut bits = 0u32;
+    for &b in input_bytes {
+        let v = TABLE[b as usize];
+        if v == 255 {
+            return Err(format!("invalid base64url character: {}", b as char));
+        }
+        buf = (buf << 6) | (v as u32);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+            buf &= (1 << bits) - 1;
+        }
+    }
+    Ok(out)
+}
+
+fn validate_cursor_identity(
+    cursor: &ContentsCursor,
+    scope: &StoreContentsScope,
+    policy: &StoreContentsReadPolicy,
+    recursion: StoreContentsRecursion,
+) -> bool {
+    if cursor.version != CONTENTS_CURSOR_VERSION {
+        return false;
+    }
+    let kind_matches = match (cursor.kind.as_str(), policy.row_profile) {
+        (CONTENTS_CURSOR_KIND_SOURCE_FILE, StoreContentsRowProfile::SourceFile) => true,
+        (CONTENTS_CURSOR_KIND_PRIMARY_MEDIA, StoreContentsRowProfile::PrimaryMedia) => true,
+        _ => false,
+    };
+    if !kind_matches {
+        return false;
+    }
+    let scope_matches = match (&cursor.scope, scope) {
+        (ContentsCursorScope::Source { source_id: a }, StoreContentsScope::Source { source_id: b }) => {
+            a == b
+        }
+        (
+            ContentsCursorScope::SourceLocation { source_location_id: a },
+            StoreContentsScope::SourceLocation { source_location_id: b },
+        ) => a == b,
+        (
+            ContentsCursorScope::Directory {
+                source_id: a,
+                source_directory_id: b_dir,
+            },
+            StoreContentsScope::Directory {
+                source_id: c,
+                source_directory_id: d,
+            },
+        ) => a == c && b_dir == d,
+        _ => false,
+    };
+    if !scope_matches {
+        return false;
+    }
+    let canonical_classes: Vec<String> = {
+        let mut classes: Vec<String> = policy
+            .media_classes
+            .iter()
+            .map(|mc| mc.as_str().to_string())
+            .collect();
+        let mut has_audio = false;
+        let mut has_video = false;
+        let mut has_image = false;
+        for c in &classes {
+            match c.as_str() {
+                "audio" => has_audio = true,
+                "video" => has_video = true,
+                "image" => has_image = true,
+                _ => {}
+            }
+        }
+        classes.clear();
+        if has_audio {
+            classes.push("audio".to_string());
+        }
+        if has_video {
+            classes.push("video".to_string());
+        }
+        if has_image {
+            classes.push("image".to_string());
+        }
+        classes
+    };
+    if cursor.media_classes != canonical_classes {
+        return false;
+    }
+    let expected_recursion = match recursion {
+        StoreContentsRecursion::Immediate => "immediate",
+        StoreContentsRecursion::Recursive => "recursive",
+    };
+    cursor.recursion == expected_recursion
+}
+
+fn compute_cursor_position(
+    row: &StoreContentsFileRow,
+    row_profile: StoreContentsRowProfile,
+) -> ContentsCursorPosition {
+    match row_profile {
+        StoreContentsRowProfile::SourceFile => ContentsCursorPosition::SourceFile {
+            relative_path_key: row.relative_path.to_lowercase(),
+            source_file_id: row.source_file_id,
+        },
+        StoreContentsRowProfile::PrimaryMedia => ContentsCursorPosition::PrimaryMedia {
+            availability_priority: availability_priority(&row.availability_state),
+            title_key: compute_title_key(row),
+            artist_key: compute_artist_key(row),
+            album_key: compute_album_key(row),
+            relative_path_key: row.relative_path.to_lowercase(),
+            source_file_id: row.source_file_id,
+        },
+    }
+}
+
+fn availability_priority(availability_state: &Option<String>) -> i64 {
+    match availability_state.as_deref() {
+        Some("available") => 0,
+        Some("degraded") => 1,
+        Some("unavailable") => 2,
+        _ => 3,
+    }
+}
+
+fn compute_title_key(row: &StoreContentsFileRow) -> String {
+    row.primary_media
+        .as_ref()
+        .and_then(|pm| pm.title.as_ref())
+        .map(|t| t.to_lowercase())
+        .unwrap_or_else(|| row.relative_path.to_lowercase())
+}
+
+fn compute_artist_key(row: &StoreContentsFileRow) -> String {
+    row.primary_media
+        .as_ref()
+        .and_then(|pm| pm.artist.as_ref())
+        .map(|a| a.to_lowercase())
+        .unwrap_or_default()
+}
+
+fn compute_album_key(row: &StoreContentsFileRow) -> String {
+    row.primary_media
+        .as_ref()
+        .and_then(|pm| pm.album.as_ref())
+        .map(|a| a.to_lowercase())
+        .unwrap_or_default()
+}
+
+fn build_next_cursor(
+    rows: &[StoreContentsFileRow],
+    scope: &StoreContentsScope,
+    policy: &StoreContentsReadPolicy,
+    recursion: StoreContentsRecursion,
+) -> Option<String> {
+    let last_row = rows.last()?;
+    let position = compute_cursor_position(last_row, policy.row_profile);
+    let kind = match policy.row_profile {
+        StoreContentsRowProfile::SourceFile => CONTENTS_CURSOR_KIND_SOURCE_FILE.to_string(),
+        StoreContentsRowProfile::PrimaryMedia => CONTENTS_CURSOR_KIND_PRIMARY_MEDIA.to_string(),
+    };
+    let cursor_scope = match scope {
+        StoreContentsScope::Source { source_id } => ContentsCursorScope::Source {
+            source_id: *source_id,
+        },
+        StoreContentsScope::SourceLocation { source_location_id } => {
+            ContentsCursorScope::SourceLocation {
+                source_location_id: *source_location_id,
+            }
+        }
+        StoreContentsScope::Directory {
+            source_id,
+            source_directory_id,
+        } => ContentsCursorScope::Directory {
+            source_id: *source_id,
+            source_directory_id: *source_directory_id,
+        },
+    };
+    let canonical_classes: Vec<String> = {
+        let mut classes: Vec<String> = policy
+            .media_classes
+            .iter()
+            .map(|mc| mc.as_str().to_string())
+            .collect();
+        let mut has_audio = false;
+        let mut has_video = false;
+        let mut has_image = false;
+        for c in &classes {
+            match c.as_str() {
+                "audio" => has_audio = true,
+                "video" => has_video = true,
+                "image" => has_image = true,
+                _ => {}
+            }
+        }
+        classes.clear();
+        if has_audio {
+            classes.push("audio".to_string());
+        }
+        if has_video {
+            classes.push("video".to_string());
+        }
+        if has_image {
+            classes.push("image".to_string());
+        }
+        classes
+    };
+    let recursion_str = match recursion {
+        StoreContentsRecursion::Immediate => "immediate".to_string(),
+        StoreContentsRecursion::Recursive => "recursive".to_string(),
+    };
+    let cursor = ContentsCursor {
+        version: CONTENTS_CURSOR_VERSION,
+        kind,
+        scope: cursor_scope,
+        media_classes: canonical_classes,
+        recursion: recursion_str,
+        position,
+    };
+    encode_cursor(&cursor).ok()
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoreContentsScope {
     Source {
@@ -61,6 +391,7 @@ pub struct StoreContentsResult {
     pub recursion: StoreContentsRecursion,
     pub rows: Vec<StoreContentsFileRow>,
     pub coverage: StoreContentsCoverage,
+    pub next_cursor: Option<String>,
     pub detail: Option<String>,
 }
 
@@ -228,30 +559,124 @@ pub(crate) fn read_contents(
         ));
     }
 
-    if cursor.is_some() {
-        return Ok(non_ready_result(
-            scope,
-            policy,
-            recursion,
-            StoreContentsState::CursorInvalid,
-            StoreContentsCoverageState::Failed,
-            "Contents cursor paging is not available in this first slice.",
-        ));
-    }
+    let cursor_position = if let Some(cursor_str) = cursor {
+        let decoded = match decode_cursor(cursor_str) {
+            Ok(cursor) => cursor,
+            Err(_) => {
+                return Ok(StoreContentsResult {
+                    state: StoreContentsState::CursorInvalid,
+                    scope,
+                    policy,
+                    recursion,
+                    rows: Vec::new(),
+                    coverage: StoreContentsCoverage {
+                        state: StoreContentsCoverageState::Failed,
+                        recursive_scope_complete: false,
+                        empty_result_authoritative: false,
+                        detail: Some(
+                            "The contents cursor could not be decoded.".to_string(),
+                        ),
+                    },
+                    next_cursor: None,
+                    detail: Some(
+                        "The contents cursor could not be decoded.".to_string(),
+                    ),
+                });
+            }
+        };
+        if !validate_cursor_identity(&decoded, &scope, &policy, recursion) {
+            return Ok(StoreContentsResult {
+                state: StoreContentsState::CursorInvalid,
+                scope,
+                policy,
+                recursion,
+                rows: Vec::new(),
+                coverage: StoreContentsCoverage {
+                    state: StoreContentsCoverageState::Failed,
+                    recursive_scope_complete: false,
+                    empty_result_authoritative: false,
+                    detail: Some(
+                        "The contents cursor does not match the current request.".to_string(),
+                    ),
+                },
+                next_cursor: None,
+                detail: Some(
+                    "The contents cursor does not match the current request.".to_string(),
+                ),
+            });
+        }
+        let position_matches_profile = match (&decoded.position, policy.row_profile) {
+            (ContentsCursorPosition::SourceFile { .. }, StoreContentsRowProfile::SourceFile) => true,
+            (ContentsCursorPosition::PrimaryMedia { .. }, StoreContentsRowProfile::PrimaryMedia) => {
+                true
+            }
+            _ => false,
+        };
+        if !position_matches_profile {
+            return Ok(StoreContentsResult {
+                state: StoreContentsState::CursorInvalid,
+                scope,
+                policy,
+                recursion,
+                rows: Vec::new(),
+                coverage: StoreContentsCoverage {
+                    state: StoreContentsCoverageState::Failed,
+                    recursive_scope_complete: false,
+                    empty_result_authoritative: false,
+                    detail: Some(
+                        "The contents cursor does not match the row profile.".to_string(),
+                    ),
+                },
+                next_cursor: None,
+                detail: Some(
+                    "The contents cursor does not match the row profile.".to_string(),
+                ),
+            });
+        }
+        Some(decoded.position)
+    } else {
+        None
+    };
 
     let Some((source_readiness, resolved_scope)) = resolve_scope(connection, &scope)? else {
-        return Ok(non_ready_result(
+        return Ok(StoreContentsResult {
+            state: StoreContentsState::LocationMissing,
             scope,
             policy,
             recursion,
-            StoreContentsState::LocationMissing,
-            StoreContentsCoverageState::LocationMissing,
-            "The library contents target is not available.",
-        ));
+            rows: Vec::new(),
+            coverage: StoreContentsCoverage {
+                state: StoreContentsCoverageState::LocationMissing,
+                recursive_scope_complete: false,
+                empty_result_authoritative: false,
+                detail: Some("The library contents target is not available.".to_string()),
+            },
+            next_cursor: None,
+            detail: Some("The library contents target is not available.".to_string()),
+        });
     };
 
     if let Some((state, coverage_state, detail)) = source_unavailable_state(&source_readiness) {
-        let rows = read_rows(connection, &resolved_scope, &policy, recursion, limit)?;
+        let rows = read_rows(
+            connection,
+            &resolved_scope,
+            &policy,
+            recursion,
+            limit,
+            cursor_position.as_ref(),
+        )?;
+        let next_cursor = if rows.len() > limit {
+            let next_cursor =
+                build_next_cursor(&rows[..limit], &scope, &policy, recursion);
+            next_cursor
+        } else {
+            None
+        };
+        let rows = if rows.len() > limit {
+            rows[..limit].to_vec()
+        } else {
+            rows
+        };
         return Ok(StoreContentsResult {
             state,
             scope,
@@ -264,12 +689,30 @@ pub(crate) fn read_contents(
                 empty_result_authoritative: false,
                 detail: Some(detail.to_string()),
             },
+            next_cursor,
             detail: Some(detail.to_string()),
         });
     }
 
     let coverage = read_coverage(connection, &source_readiness, &resolved_scope)?;
-    let rows = read_rows(connection, &resolved_scope, &policy, recursion, limit)?;
+    let rows = read_rows(
+        connection,
+        &resolved_scope,
+        &policy,
+        recursion,
+        limit,
+        cursor_position.as_ref(),
+    )?;
+    let next_cursor = if rows.len() > limit {
+        build_next_cursor(&rows[..limit], &scope, &policy, recursion)
+    } else {
+        None
+    };
+    let rows = if rows.len() > limit {
+        rows[..limit].to_vec()
+    } else {
+        rows
+    };
     let state = contents_state(&coverage, rows.is_empty());
     let detail = contents_detail(state, coverage.state, policy.row_profile);
 
@@ -286,6 +729,7 @@ pub(crate) fn read_contents(
             empty_result_authoritative,
             ..coverage
         },
+        next_cursor,
         detail: detail.map(str::to_string),
     })
 }
@@ -1045,8 +1489,9 @@ fn read_rows(
     policy: &StoreContentsReadPolicy,
     recursion: StoreContentsRecursion,
     limit: usize,
+    cursor_position: Option<&ContentsCursorPosition>,
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
-    let limit = i64::try_from(limit).map_err(|_| {
+    let limit_plus_one = i64::try_from(limit.saturating_add(1)).map_err(|_| {
         LibrarySqliteError::MalformedSchemaState(format!(
             "contents limit {limit} exceeds i64 range"
         ))
@@ -1068,7 +1513,8 @@ fn read_rows(
                 policy.row_profile,
                 *source_id,
                 None,
-                limit,
+                limit_plus_one,
+                cursor_position,
             )
         }
         ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
@@ -1089,7 +1535,7 @@ fn read_rows(
                          JOIN source_directories sd
                            ON sd.source_id = sf.source_id
                           AND sd.relative_path COLLATE BINARY = al.relative_path COLLATE BINARY
-                          AND sd.presence_state = 'present'
+                           AND sd.presence_state = 'present'
                          WHERE sf.parent_source_directory_id = sd.source_directory_id
                      )"
                 .to_string(),
@@ -1100,7 +1546,8 @@ fn read_rows(
                 &media_predicate,
                 policy.row_profile,
                 *source_id,
-                limit,
+                limit_plus_one,
+                cursor_position,
             )
         }
         ResolvedContentsScope::Prefix {
@@ -1115,7 +1562,8 @@ fn read_rows(
                 policy.row_profile,
                 *source_id,
                 Some(relative_path),
-                limit,
+                limit_plus_one,
+                cursor_position,
             )
         }
         ResolvedContentsScope::SourceLocationPrefix {
@@ -1130,7 +1578,8 @@ fn read_rows(
                 policy.row_profile,
                 *source_id,
                 Some(relative_path),
-                limit,
+                limit_plus_one,
+                cursor_position,
             )
         }
         ResolvedContentsScope::MissingLocation { .. } => Ok(Vec::new()),
@@ -1143,19 +1592,31 @@ fn read_rows_for_accepted_locations(
     media_predicate: &str,
     row_profile: StoreContentsRowProfile,
     source_id: i64,
-    limit: i64,
+    limit_plus_one: i64,
+    cursor_position: Option<&ContentsCursorPosition>,
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
     let sql = contents_rows_sql(
         Some(accepted_locations_cte()),
         source_predicate,
         media_predicate,
         row_profile,
+        cursor_position,
     );
     let mut statement = connection.prepare(&sql)?;
-    let rows = statement
-        .query_map(params![source_id, limit], contents_row_from_row)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(LibrarySqliteError::from)?;
+    let rows = if let Some(cursor) = cursor_position {
+        let mut params: Vec<rusqlite::types::Value> = vec![rusqlite::types::Value::Integer(source_id)];
+        push_cursor_params(cursor, &mut params);
+        params.push(rusqlite::types::Value::Integer(limit_plus_one));
+        statement
+            .query_map(rusqlite::params_from_iter(params.iter()), contents_row_from_row)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(LibrarySqliteError::from)?
+    } else {
+        statement
+            .query_map(params![source_id, limit_plus_one], contents_row_from_row)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(LibrarySqliteError::from)?
+    };
     Ok(rows)
 }
 
@@ -1166,21 +1627,40 @@ fn read_rows_with_source_predicate(
     row_profile: StoreContentsRowProfile,
     source_id: i64,
     relative_path: Option<&str>,
-    limit: i64,
+    limit_plus_one: i64,
+    cursor_position: Option<&ContentsCursorPosition>,
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
-    let sql = contents_rows_sql(None, source_predicate, media_predicate, row_profile);
+    let sql = contents_rows_sql(
+        None,
+        source_predicate,
+        media_predicate,
+        row_profile,
+        cursor_position,
+    );
     let mut statement = connection.prepare(&sql)?;
-    let rows = if let Some(relative_path) = relative_path {
+    let rows = if let Some(cursor) = cursor_position {
+        let mut params: Vec<rusqlite::types::Value> =
+            vec![rusqlite::types::Value::Integer(source_id)];
+        if let Some(relative_path) = relative_path {
+            params.push(rusqlite::types::Value::Text(relative_path.to_string()));
+        }
+        push_cursor_params(cursor, &mut params);
+        params.push(rusqlite::types::Value::Integer(limit_plus_one));
+        statement
+            .query_map(rusqlite::params_from_iter(params.iter()), contents_row_from_row)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(LibrarySqliteError::from)?
+    } else if let Some(relative_path) = relative_path {
         statement
             .query_map(
-                params![source_id, relative_path, limit],
+                params![source_id, relative_path, limit_plus_one],
                 contents_row_from_row,
             )?
             .collect::<Result<Vec<_>, _>>()
             .map_err(LibrarySqliteError::from)?
     } else {
         statement
-            .query_map(params![source_id, limit], contents_row_from_row)?
+            .query_map(params![source_id, limit_plus_one], contents_row_from_row)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(LibrarySqliteError::from)?
     };
@@ -1211,13 +1691,14 @@ fn contents_rows_sql(
     source_predicate: &str,
     media_predicate: &str,
     row_profile: StoreContentsRowProfile,
+    cursor_position: Option<&ContentsCursorPosition>,
 ) -> String {
     match row_profile {
         StoreContentsRowProfile::SourceFile => {
-            source_file_rows_sql(prefix_cte, source_predicate, media_predicate)
+            source_file_rows_sql(prefix_cte, source_predicate, media_predicate, cursor_position)
         }
         StoreContentsRowProfile::PrimaryMedia => {
-            primary_media_rows_sql(prefix_cte, source_predicate, media_predicate)
+            primary_media_rows_sql(prefix_cte, source_predicate, media_predicate, cursor_position)
         }
     }
 }
@@ -1226,41 +1707,55 @@ fn source_file_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
     media_predicate: &str,
+    cursor_position: Option<&ContentsCursorPosition>,
 ) -> String {
     let cte_prefix = prefix_cte
         .map(|cte| format!("WITH {cte} "))
         .unwrap_or_default();
+    let cursor_clause = match cursor_position {
+        Some(ContentsCursorPosition::SourceFile { .. }) => {
+            let rp_param = next_sql_param(prefix_cte, source_predicate, false);
+            let sid_param = next_sql_param_after(prefix_cte, source_predicate, false, 1);
+            format!(
+                "\n  AND (\n      lower(COALESCE(sf.relative_path, '')) > ?{rp_param}\n      OR (lower(COALESCE(sf.relative_path, '')) = ?{rp_param} AND sf.source_file_id > ?{sid_param})\n  )"
+            )
+        }
+        Some(ContentsCursorPosition::PrimaryMedia { .. }) => {
+            return String::new()
+        }
+        None => String::new(),
+    };
+let limit_param = cursor_limit_param_index(prefix_cte, source_predicate, cursor_position);
     format!(
-        "{cte_prefix}
-         SELECT sf.source_file_id,
-                sf.source_id,
-                sf.parent_source_directory_id,
-                sf.relative_path,
-                sf.name AS file_name,
-                sf.media_class,
-                sf.presence_state,
-                NULL AS library_asset_id,
-                NULL AS row_version,
-                NULL AS primary_source_file_id,
-                NULL AS availability_state,
-                NULL AS title,
-                NULL AS artist,
-                NULL AS album,
-                NULL AS duration_ms,
-                NULL AS musical_key,
-                NULL AS tempo_bpm,
-                NULL AS waveform_quality_current,
-                NULL AS waveform_quality_target,
-                NULL AS stems_state_summary,
-                NULL AS prep_readiness_summary,
-                sf.updated_at
-         FROM source_files sf
-         WHERE sf.presence_state = 'present'
-           AND {media_predicate}
-           AND {source_predicate}
-         ORDER BY {SOURCE_FILE_CONTENTS_ORDER_SQL}
-         LIMIT ?{}",
-        limit_parameter_index(prefix_cte, source_predicate)
+        "{cte_prefix} \
+SELECT sf.source_file_id, \
+       sf.source_id, \
+       sf.parent_source_directory_id, \
+       sf.relative_path, \
+       sf.name AS file_name, \
+       sf.media_class, \
+       sf.presence_state, \
+       NULL AS library_asset_id, \
+       NULL AS row_version, \
+       NULL AS primary_source_file_id, \
+       NULL AS availability_state, \
+       NULL AS title, \
+       NULL AS artist, \
+       NULL AS album, \
+       NULL AS duration_ms, \
+       NULL AS musical_key, \
+       NULL AS tempo_bpm, \
+       NULL AS waveform_quality_current, \
+       NULL AS waveform_quality_target, \
+       NULL AS stems_state_summary, \
+       NULL AS prep_readiness_summary, \
+       sf.updated_at \
+  FROM source_files sf \
+ WHERE sf.presence_state = 'present' \
+   AND {media_predicate} \
+   AND {source_predicate}{cursor_clause} \
+ ORDER BY {SOURCE_FILE_CONTENTS_ORDER_SQL} \
+ LIMIT ?{limit_param}"
     )
 }
 
@@ -1268,169 +1763,328 @@ fn primary_media_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
     media_predicate: &str,
+    cursor_position: Option<&ContentsCursorPosition>,
 ) -> String {
     let cte_prefix = prefix_cte
         .map(|cte| format!("WITH {cte},"))
         .unwrap_or_else(|| "WITH".to_string());
 
+    let cursor_clause = match cursor_position {
+        Some(ContentsCursorPosition::PrimaryMedia {
+            availability_priority,
+            title_key,
+            artist_key,
+            album_key,
+            relative_path_key,
+            source_file_id,
+        }) => {
+            let ap_param = next_sql_param(prefix_cte, source_predicate, false);
+            let tk_param = next_sql_param_after(prefix_cte, source_predicate, false, 1);
+            let ak_param = next_sql_param_after(prefix_cte, source_predicate, false, 2);
+            let bk_param = next_sql_param_after(prefix_cte, source_predicate, false, 3);
+            let rpk_param = next_sql_param_after(prefix_cte, source_predicate, false, 4);
+            let sid_param = next_sql_param_after(prefix_cte, source_predicate, false, 5);
+            let _ = (availability_priority, title_key, artist_key, album_key, relative_path_key, source_file_id);
+            format!(
+                "\n WHERE (\
+                    \n     CASE availability_state\
+                    \n         WHEN 'available' THEN 0\
+                    \n         WHEN 'degraded' THEN 1\
+                    \n         WHEN 'unavailable' THEN 2\
+                    \n         ELSE 3\
+                    \n     END > ?{ap_param}\
+                    \n     OR (CASE availability_state\
+                    \n         WHEN 'available' THEN 0\
+                    \n         WHEN 'degraded' THEN 1\
+                    \n         WHEN 'unavailable' THEN 2\
+                    \n         ELSE 3\
+                    \n     END = ?{ap_param}\
+                    \n         AND lower(COALESCE(title, relative_path, '')) > ?{tk_param})\
+                    \n     OR (CASE availability_state\
+                    \n         WHEN 'available' THEN 0\
+                    \n         WHEN 'degraded' THEN 1\
+                    \n         WHEN 'unavailable' THEN 2\
+                    \n         ELSE 3\
+                    \n     END = ?{ap_param}\
+                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_param}\
+                    \n         AND lower(COALESCE(artist, '')) > ?{ak_param})\
+                    \n     OR (CASE availability_state\
+                    \n         WHEN 'available' THEN 0\
+                    \n         WHEN 'degraded' THEN 1\
+                    \n         WHEN 'unavailable' THEN 2\
+                    \n         ELSE 3\
+                    \n     END = ?{ap_param}\
+                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_param}\
+                    \n         AND lower(COALESCE(artist, '')) = ?{ak_param}\
+                    \n         AND lower(COALESCE(album, '')) > ?{bk_param})\
+                    \n     OR (CASE availability_state\
+                    \n         WHEN 'available' THEN 0\
+                    \n         WHEN 'degraded' THEN 1\
+                    \n         WHEN 'unavailable' THEN 2\
+                    \n         ELSE 3\
+                    \n     END = ?{ap_param}\
+                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_param}\
+                    \n         AND lower(COALESCE(artist, '')) = ?{ak_param}\
+                    \n         AND lower(COALESCE(album, '')) = ?{bk_param}\
+                    \n         AND lower(COALESCE(relative_path, '')) > ?{rpk_param})\
+                    \n     OR (CASE availability_state\
+                    \n         WHEN 'available' THEN 0\
+                    \n         WHEN 'degraded' THEN 1\
+                    \n         WHEN 'unavailable' THEN 2\
+                    \n         ELSE 3\
+                    \n     END = ?{ap_param}\
+                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_param}\
+                    \n         AND lower(COALESCE(artist, '')) = ?{ak_param}\
+                    \n         AND lower(COALESCE(album, '')) = ?{bk_param}\
+                    \n         AND lower(COALESCE(relative_path, '')) = ?{rpk_param}\
+                    \n         AND source_file_id > ?{sid_param})\
+                    \n )"
+            )
+        }
+        Some(ContentsCursorPosition::SourceFile { .. }) => String::new(),
+        None => String::new(),
+    };
+
+    let limit_param = cursor_limit_param_index(prefix_cte, source_predicate, cursor_position);
+
     format!(
-        "{cte_prefix}
-         scope_files AS (
-             SELECT sf.source_file_id,
-                    sf.source_id,
-                    sf.parent_source_directory_id,
-                    sf.relative_path,
-                    sf.name,
-                    sf.media_class,
-                    sf.presence_state,
-                    sf.updated_at
-             FROM source_files sf
-             WHERE sf.presence_state = 'present'
-               AND {media_predicate}
-               AND {source_predicate}
-         ),
-         promoted_scope AS (
-             SELECT pbr.library_asset_id,
-                    pbr.row_version,
-                    pbr.primary_source_file_id,
-                    pbr.availability_state,
-                    pbr.title,
-                    pbr.artist,
-                    pbr.album,
-                    pbr.duration_ms,
-                    pbr.musical_key,
-                    pbr.tempo_bpm,
-                    pbr.waveform_quality_current,
-                    pbr.waveform_quality_target,
-                    pbr.stems_state_summary,
-                    pbr.prep_readiness_summary,
-                    pbr.updated_at,
-                    sf.source_file_id,
-                    sf.source_id,
-                    sf.parent_source_directory_id,
-                    sf.relative_path,
-                    sf.name,
-                    sf.media_class,
-                    sf.presence_state,
-                    pia.accepted_at,
-                    ss.ordinal,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY pbr.library_asset_id
-                        ORDER BY CASE
-                                     WHEN sf.source_file_id = pbr.primary_source_file_id THEN 0
-                                     ELSE 1
-                                 END ASC,
-                                 pia.accepted_at ASC,
-                                 ss.ordinal ASC,
-                                 sf.source_file_id ASC
-                    ) AS attachment_rank
-             FROM scope_files sf
-             JOIN SourceSegmentSets sss
-               ON sss.source_file_id = sf.source_file_id
-             JOIN SourceSegments ss
-               ON ss.source_segment_set_id = sss.source_segment_set_id
-             JOIN LibraryAssetAttachments pia
-               ON pia.source_segment_id = ss.source_segment_id
-             JOIN LibraryBrowserRows pbr
-               ON pbr.library_asset_id = pia.library_asset_id
-         ),
-         promoted AS (
-             SELECT source_file_id,
-                    source_id,
-                    parent_source_directory_id,
-                    relative_path,
-                    name AS file_name,
-                    media_class,
-                    presence_state,
-                    library_asset_id,
-                    row_version,
-                    primary_source_file_id,
-                    availability_state,
-                    title,
-                    artist,
-                    album,
-                    duration_ms,
-                    musical_key,
-                    tempo_bpm,
-                    waveform_quality_current,
-                    waveform_quality_target,
-                    stems_state_summary,
-                    prep_readiness_summary,
-                    updated_at
-             FROM promoted_scope
-             WHERE attachment_rank = 1
-         ),
-         source_file_rows AS (
-             SELECT sf.source_file_id,
-                    sf.source_id,
-                    sf.parent_source_directory_id,
-                    sf.relative_path,
-                    sf.name AS file_name,
-                    sf.media_class,
-                    sf.presence_state,
-                    NULL AS library_asset_id,
-                    NULL AS row_version,
-                    NULL AS primary_source_file_id,
-                    'available' AS availability_state,
-                    NULL AS title,
-                    NULL AS artist,
-                    NULL AS album,
-                    NULL AS duration_ms,
-                    NULL AS musical_key,
-                    NULL AS tempo_bpm,
-                    NULL AS waveform_quality_current,
-                    NULL AS waveform_quality_target,
-                    NULL AS stems_state_summary,
-                    'underprepared' AS prep_readiness_summary,
-                    sf.updated_at
-             FROM scope_files sf
-             WHERE NOT EXISTS (
-                 SELECT 1
-                 FROM promoted_scope ps
-                 WHERE ps.source_file_id = sf.source_file_id
-             )
-         )
-         SELECT source_file_id,
-                source_id,
-                parent_source_directory_id,
-                relative_path,
-                file_name,
-                media_class,
-                presence_state,
-                library_asset_id,
-                row_version,
-                primary_source_file_id,
-                availability_state,
-                title,
-                artist,
-                album,
-                duration_ms,
-                musical_key,
-                tempo_bpm,
-                waveform_quality_current,
-                waveform_quality_target,
-                stems_state_summary,
-                prep_readiness_summary,
-                updated_at
-         FROM (
-             SELECT * FROM promoted
-             UNION ALL
-             SELECT * FROM source_file_rows
-         )
-         ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL}
-         LIMIT ?{}",
-        limit_parameter_index(prefix_cte, source_predicate)
+        "{cte_prefix} \
+         scope_files AS ( \
+              SELECT sf.source_file_id, \
+                     sf.source_id, \
+                     sf.parent_source_directory_id, \
+                     sf.relative_path, \
+                     sf.name, \
+                     sf.media_class, \
+                     sf.presence_state, \
+                     sf.updated_at \
+              FROM source_files sf \
+              WHERE sf.presence_state = 'present' \
+                AND {media_predicate} \
+                AND {source_predicate} \
+          ), \
+          promoted_scope AS ( \
+              SELECT pbr.library_asset_id, \
+                     pbr.row_version, \
+                     pbr.primary_source_file_id, \
+                     pbr.availability_state, \
+                     pbr.title, \
+                     pbr.artist, \
+                     pbr.album, \
+                     pbr.duration_ms, \
+                     pbr.musical_key, \
+                     pbr.tempo_bpm, \
+                     pbr.waveform_quality_current, \
+                     pbr.waveform_quality_target, \
+                     pbr.stems_state_summary, \
+                     pbr.prep_readiness_summary, \
+                     pbr.updated_at, \
+                     sf.source_file_id, \
+                     sf.source_id, \
+                     sf.parent_source_directory_id, \
+                     sf.relative_path, \
+                     sf.name, \
+                     sf.media_class, \
+                     sf.presence_state, \
+                     pia.accepted_at, \
+                     ss.ordinal, \
+                     ROW_NUMBER() OVER ( \
+                         PARTITION BY pbr.library_asset_id \
+                         ORDER BY CASE \
+                                      WHEN sf.source_file_id = pbr.primary_source_file_id THEN 0 \
+                                      ELSE 1 \
+                                  END ASC, \
+                                  pia.accepted_at ASC, \
+                                  ss.ordinal ASC, \
+                                  sf.source_file_id ASC \
+                     ) AS attachment_rank \
+              FROM scope_files sf \
+              JOIN SourceSegmentSets sss \
+                ON sss.source_file_id = sf.source_file_id \
+              JOIN SourceSegments ss \
+                ON ss.source_segment_set_id = sss.source_segment_set_id \
+              JOIN LibraryAssetAttachments pia \
+                ON pia.source_segment_id = ss.source_segment_id \
+              JOIN LibraryBrowserRows pbr \
+                ON pbr.library_asset_id = pia.library_asset_id \
+          ), \
+          promoted AS ( \
+              SELECT source_file_id, \
+                     source_id, \
+                     parent_source_directory_id, \
+                     relative_path, \
+                     name AS file_name, \
+                     media_class, \
+                     presence_state, \
+                     library_asset_id, \
+                     row_version, \
+                     primary_source_file_id, \
+                     availability_state, \
+                     title, \
+                     artist, \
+                     album, \
+                     duration_ms, \
+                     musical_key, \
+                     tempo_bpm, \
+                     waveform_quality_current, \
+                     waveform_quality_target, \
+                     stems_state_summary, \
+                     prep_readiness_summary, \
+                     updated_at \
+              FROM promoted_scope \
+              WHERE attachment_rank = 1 \
+          ), \
+          source_file_rows AS ( \
+              SELECT sf.source_file_id, \
+                     sf.source_id, \
+                     sf.parent_source_directory_id, \
+                     sf.relative_path, \
+                     sf.name AS file_name, \
+                     sf.media_class, \
+                     sf.presence_state, \
+                     NULL AS library_asset_id, \
+                     NULL AS row_version, \
+                     NULL AS primary_source_file_id, \
+                     'available' AS availability_state, \
+                     NULL AS title, \
+                     NULL AS artist, \
+                     NULL AS album, \
+                     NULL AS duration_ms, \
+                     NULL AS musical_key, \
+                     NULL AS tempo_bpm, \
+                     NULL AS waveform_quality_current, \
+                     NULL AS waveform_quality_target, \
+                     NULL AS stems_state_summary, \
+                     'underprepared' AS prep_readiness_summary, \
+                     sf.updated_at \
+              FROM scope_files sf \
+              WHERE NOT EXISTS ( \
+                  SELECT 1 \
+                  FROM promoted_scope ps \
+                  WHERE ps.source_file_id = sf.source_file_id \
+              ) \
+          ) \
+          SELECT source_file_id, \
+                 source_id, \
+                 parent_source_directory_id, \
+                 relative_path, \
+                 file_name, \
+                 media_class, \
+                 presence_state, \
+                 library_asset_id, \
+                 row_version, \
+                 primary_source_file_id, \
+                 availability_state, \
+                 title, \
+                 artist, \
+                 album, \
+                 duration_ms, \
+                 musical_key, \
+                 tempo_bpm, \
+                 waveform_quality_current, \
+                 waveform_quality_target, \
+                 stems_state_summary, \
+                 prep_readiness_summary, \
+                 updated_at \
+          FROM ( \
+              SELECT * FROM promoted \
+              UNION ALL \
+              SELECT * FROM source_file_rows \
+          ){cursor_clause} \
+          ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL} \
+          LIMIT ?{limit_param}"
     )
 }
 
-fn limit_parameter_index(prefix_cte: Option<&str>, source_predicate: &str) -> &'static str {
-    if prefix_cte.is_some()
+fn next_sql_param(prefix_cte: Option<&str>, source_predicate: &str, has_relative_path: bool) -> &'static str {
+    if has_relative_path {
+        "3"
+    } else if prefix_cte.is_some()
         || source_predicate == "sf.source_id = ?1"
         || source_predicate == "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL"
     {
         "2"
     } else {
-        "3"
+        "2"
+    }
+}
+
+fn next_sql_param_after(
+    prefix_cte: Option<&str>,
+    source_predicate: &str,
+    has_relative_path: bool,
+    offset: usize,
+) -> String {
+    let base: usize = if has_relative_path {
+        if prefix_cte.is_some()
+            || source_predicate != "sf.source_id = ?1"
+                && source_predicate != "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL"
+        {
+            3
+        } else {
+            3
+        }
+    } else if prefix_cte.is_some()
+        || source_predicate == "sf.source_id = ?1"
+        || source_predicate == "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL"
+    {
+        2
+    } else {
+        3
+    };
+    (base + offset).to_string()
+}
+
+fn cursor_limit_param_index(
+    prefix_cte: Option<&str>,
+    source_predicate: &str,
+    cursor_position: Option<&ContentsCursorPosition>,
+) -> String {
+    let cursor_params = match cursor_position {
+        Some(ContentsCursorPosition::SourceFile { .. }) => 2,
+        Some(ContentsCursorPosition::PrimaryMedia { .. }) => 6,
+        None => 0,
+    };
+
+    let base: usize = if prefix_cte.is_some()
+        || source_predicate == "sf.source_id = ?1"
+        || source_predicate == "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL"
+    {
+        2
+    } else {
+        3
+    };
+
+    (base + cursor_params).to_string()
+}
+
+fn push_cursor_params(
+    cursor: &ContentsCursorPosition,
+    params: &mut Vec<rusqlite::types::Value>,
+) {
+    match cursor {
+        ContentsCursorPosition::SourceFile {
+            relative_path_key,
+            source_file_id,
+        } => {
+            params.push(rusqlite::types::Value::Text(relative_path_key.clone()));
+            params.push(rusqlite::types::Value::Integer(*source_file_id));
+        }
+        ContentsCursorPosition::PrimaryMedia {
+            availability_priority,
+            title_key,
+            artist_key,
+            album_key,
+            relative_path_key,
+            source_file_id,
+        } => {
+            params.push(rusqlite::types::Value::Integer(*availability_priority));
+            params.push(rusqlite::types::Value::Text(title_key.clone()));
+            params.push(rusqlite::types::Value::Text(artist_key.clone()));
+            params.push(rusqlite::types::Value::Text(album_key.clone()));
+            params.push(rusqlite::types::Value::Text(relative_path_key.clone()));
+            params.push(rusqlite::types::Value::Integer(*source_file_id));
+        }
     }
 }
 
@@ -1575,6 +2229,7 @@ fn non_ready_result(
             empty_result_authoritative: false,
             detail: Some(detail.to_string()),
         },
+        next_cursor: None,
         detail: Some(detail.to_string()),
     }
 }
@@ -2734,6 +3389,445 @@ mod tests {
     }
 
     #[test]
+    fn source_file_profile_returns_next_cursor_when_more_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_eq!(result.rows.len(), 3);
+        assert!(
+            result.next_cursor.is_some(),
+            "expected next_cursor when more rows exist"
+        );
+    }
+
+    #[test]
+    fn primary_media_profile_returns_next_cursor_when_more_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_eq!(result.rows.len(), 3);
+        assert!(
+            result.next_cursor.is_some(),
+            "expected next_cursor when more rows exist"
+        );
+    }
+
+    #[test]
+    fn source_file_cursor_page_two_returns_next_deterministic_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+
+        assert_eq!(page1.rows.len(), 3);
+        let cursor = page1.next_cursor.expect("expected cursor for page 2");
+
+        let page2 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read page 2");
+
+        assert_eq!(page2.rows.len(), 2);
+        assert!(
+            page2.next_cursor.is_none(),
+            "last page should have no next_cursor"
+        );
+        assert_eq!(
+            page1.rows[0].source_file_id, 1000,
+            "page 1 should start with source_file_id 1000"
+        );
+        assert_eq!(
+            page2.rows[0].source_file_id, 1003,
+            "page 2 should start with source_file_id 1003"
+        );
+    }
+
+    #[test]
+    fn primary_media_cursor_page_two_returns_next_deterministic_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+
+        assert_eq!(page1.rows.len(), 3);
+        let cursor = page1.next_cursor.expect("expected cursor for page 2");
+
+        let page2 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read page 2");
+
+        assert_eq!(page2.rows.len(), 2);
+        assert!(
+            page2.next_cursor.is_none(),
+            "last page should have no next_cursor"
+        );
+        assert_eq!(
+            page1.rows[0].source_file_id, 1000,
+            "page 1 should start with source_file_id 1000"
+        );
+        assert_eq!(
+            page2.rows[0].source_file_id, 1003,
+            "page 2 should start with source_file_id 1003"
+        );
+    }
+
+    #[test]
+    fn cursor_with_changed_media_classes_returns_cursor_invalid() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio, StoreContentsMediaClass::Video]),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read with changed media_classes");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn cursor_with_changed_row_profile_returns_cursor_invalid() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read with changed row_profile");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn cursor_with_changed_scope_returns_cursor_invalid() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_source(&connection, 2);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 20, 2, "Videos", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+            insert_scanned_file(
+                &connection,
+                2000 + i,
+                2,
+                20,
+                &format!("Videos/clip_{:02}.mp4", i),
+                "video",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 2 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read with changed scope");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn cursor_with_changed_recursion_returns_cursor_invalid() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Immediate,
+            3,
+            Some(&cursor),
+        )
+        .expect("read with changed recursion");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn malformed_cursor_returns_cursor_invalid() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            10,
+            Some("!invalid-base64url!"),
+        )
+        .expect("read with malformed cursor");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn source_file_last_page_emits_no_next_cursor() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..3 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read contents");
+
+        assert_eq!(result.rows.len(), 3);
+        assert!(
+            result.next_cursor.is_none(),
+            "last page should have no next_cursor when all rows fit in limit"
+        );
+    }
+
+    #[test]
+    fn primary_media_last_page_emits_no_next_cursor() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..3 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read contents");
+
+        assert_eq!(result.rows.len(), 3);
+        assert!(
+            result.next_cursor.is_none(),
+            "last page should have no next_cursor when all rows fit in limit"
+        );
+    }
+
+    #[test]
     fn contents_whole_source_uses_index_not_table_scan() {
         let connection = open_connection();
         insert_source(&connection, 1);
@@ -2753,7 +3847,7 @@ mod tests {
             "sf.media_class",
             &primary_media_policy().media_classes,
         );
-        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate);
+        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -2797,9 +3891,9 @@ mod tests {
         );
         let media_predicate = super::media_classes_predicate_sql(
             "sf.media_class",
-            &primary_media_policy().media_classes,
+&primary_media_policy().media_classes,
         );
-        let sql = super::primary_media_rows_sql(None, &source_predicate, &media_predicate);
+let sql = super::primary_media_rows_sql(None, &source_predicate, &media_predicate, None);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -2855,6 +3949,7 @@ mod tests {
             Some(super::accepted_locations_cte()),
             &predicate,
             &media_predicate,
+            None
         );
         let plan = dump_query_plan(
             &connection,
@@ -2909,7 +4004,7 @@ mod tests {
             "sf.media_class",
             &primary_media_policy().media_classes,
         );
-        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate);
+        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None);
         let plan = dump_query_plan(
             &connection,
             &sql,
