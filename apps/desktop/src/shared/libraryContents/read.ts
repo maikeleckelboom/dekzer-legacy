@@ -1,0 +1,169 @@
+export const contentsReadChannels = {
+  read: 'desktop:library-contents:read'
+} as const
+
+export type ContentsReadState =
+  | 'ready'
+  | 'hostUnavailable'
+  | 'noTarget'
+  | 'notFound'
+  | 'invalidRequest'
+  | 'policyConflict'
+  | 'cursorInvalid'
+  | 'readFailed'
+
+export type ContentsReadErrorCode =
+  | 'hostNotStarted'
+  | 'hostStopping'
+  | 'hostStopped'
+  | 'hostFailed'
+  | 'noTarget'
+  | 'notFound'
+  | 'invalidRequest'
+  | 'policyConflict'
+  | 'cursorInvalid'
+  | 'readFailed'
+
+export type ContentsReadError = {
+  readonly code: ContentsReadErrorCode
+  readonly message: string
+}
+
+export type ContentsReadErrorState = Exclude<ContentsReadState, 'ready'>
+
+export type ContentsScope =
+  | {
+      readonly kind: 'source'
+      readonly sourceId: string
+    }
+  | {
+      readonly kind: 'sourceLocation'
+      readonly sourceLocationId: string
+    }
+  | {
+      readonly kind: 'directory'
+      readonly sourceId: string
+      readonly sourceDirectoryId: string
+    }
+
+export type ContentsRecursion = 'immediate' | 'recursive'
+
+export type ContentsMediaClass = 'audio' | 'video' | 'image'
+
+export type ContentsRowProfile =
+  | {
+      readonly kind: 'sourceFile'
+    }
+  | {
+      readonly kind: 'primaryMedia'
+    }
+
+export type ContentsReadPolicy = {
+  readonly mediaClasses: readonly ContentsMediaClass[]
+  readonly rowProfile: ContentsRowProfile
+}
+
+export type ContentsReadRequest = {
+  readonly scope: ContentsScope
+  readonly policy: ContentsReadPolicy
+  readonly recursion: ContentsRecursion
+  readonly limit?: number
+  readonly cursor?: string
+}
+
+export type ContentsState =
+  | 'ready'
+  | 'empty'
+  | 'partial'
+  | 'sourceUnavailable'
+  | 'locationMissing'
+  | 'blocked'
+  | 'failed'
+
+export type ContentsCoverageState =
+  | 'complete'
+  | 'pending'
+  | 'scanning'
+  | 'blocked'
+  | 'failed'
+  | 'sourceUnavailable'
+  | 'locationMissing'
+  | 'incomplete'
+
+export type ContentsCoverage = {
+  readonly state: ContentsCoverageState
+  readonly recursiveScopeComplete: boolean
+  readonly emptyResultAuthoritative: boolean
+  readonly detail?: string
+}
+
+export type ContentsRowOrigin = 'libraryAsset' | 'sourceFile'
+export type ContentsPresence = 'present' | 'missing' | 'removed'
+export type ContentsAvailabilityState = 'available' | 'unavailable' | 'degraded'
+export type ContentsStemsStateSummary =
+  | 'missing'
+  | 'queued'
+  | 'leased'
+  | 'ready'
+  | 'stale'
+  | 'blocked'
+  | 'failed'
+export type ContentsPrepReadinessSummary =
+  | 'notRequired'
+  | 'ready'
+  | 'preparing'
+  | 'underprepared'
+  | 'blocked'
+  | 'failed'
+
+export type PrimaryMediaSummary = {
+  readonly origin: ContentsRowOrigin
+  readonly libraryAssetId?: string
+  readonly rowVersion?: string
+  readonly primarySourceFileId?: string
+  readonly title?: string
+  readonly artist?: string
+  readonly album?: string
+  readonly durationMs?: number
+  readonly musicalKey?: string
+  readonly tempoBpm?: number
+  readonly waveformQualityCurrent?: number
+  readonly waveformQualityTarget?: number
+  readonly stemsStateSummary?: ContentsStemsStateSummary
+  readonly prepReadinessSummary?: ContentsPrepReadinessSummary
+}
+
+export type ContentsFileRow = {
+  readonly id: string
+  readonly sourceId: string
+  readonly sourceFileId: string
+  readonly parentDirectoryId?: string
+  readonly label: string
+  readonly relativePath?: string
+  readonly fileName: string
+  readonly mediaClass: ContentsMediaClass
+  readonly presence: ContentsPresence
+  readonly availabilityState?: ContentsAvailabilityState
+  readonly primaryMedia?: PrimaryMediaSummary
+  readonly updatedAtMs?: number
+}
+
+export type ContentsResult = {
+  readonly state: ContentsState
+  readonly scope: ContentsScope
+  readonly policy: ContentsReadPolicy
+  readonly recursion: ContentsRecursion
+  readonly rows: readonly ContentsFileRow[]
+  readonly coverage: ContentsCoverage
+  readonly detail?: string
+}
+
+export type ContentsReadResult =
+  | {
+      readonly state: 'ready'
+      readonly result: ContentsResult
+    }
+  | {
+      readonly state: ContentsReadErrorState
+      readonly error: ContentsReadError
+    }

@@ -55,6 +55,12 @@ pub use error::{
     CanonicalError, CanonicalErrorCode, CanonicalErrorCodeParseError, DurableStoreOpenFailure,
     DurableStoreOpenFailureKind, LibrarySqliteError, LibrarySqliteResult,
 };
+pub use read_models::contents::{
+    StoreContentsCoverage, StoreContentsCoverageState, StoreContentsFileRow,
+    StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion, StoreContentsResult,
+    StoreContentsRowOrigin, StoreContentsRowProfile, StoreContentsScope, StoreContentsState,
+    StorePrimaryMediaSummary,
+};
 pub use read_models::library_asset_preparation_detail::{
     StoreLibraryAssetPreparationDetail, StoreLibraryAssetPreparationDetailGroup,
     StoreLibraryAssetPreparationDetailRow, StoreLibraryAssetPreparationProgress,
@@ -69,11 +75,6 @@ pub use read_models::literal_hierarchy::{
     StoreLiteralHierarchyEntryPoint, StoreLiteralHierarchyNode, StoreLiteralHierarchyWindow,
 };
 pub use read_models::navigation::NavigationRow;
-pub use read_models::selected_contents::{
-    StoreContentsCoverage, StoreContentsCoverageState, StoreSelectedContentsResult,
-    StoreSelectedContentsRow, StoreSelectedContentsRowOrigin, StoreSelectedContentsScope,
-    StoreSelectedContentsState,
-};
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
     DurableStoreSchemaCompatibilityState, LibraryStoreContext, LocalRoot, LocalRootAvailability,

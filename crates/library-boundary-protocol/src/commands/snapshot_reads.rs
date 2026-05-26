@@ -282,9 +282,13 @@ pub struct SearchNavigationNodeLibraryBrowserWindowReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadSelectedContentsRequest {
-    pub scope: SelectedContentsScope,
-    pub limit: usize,
+pub struct ContentsReadRequest {
+    pub scope: ContentsScope,
+    pub policy: ContentsReadPolicy,
+    pub recursion: ContentsRecursion,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub limit: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub cursor: Option<String>,
@@ -300,9 +304,64 @@ pub struct ReadSelectedContentsRequest {
     schemars::JsonSchema,
     ts_rs::TS,
 )]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ContentsReadPolicy {
+    pub media_classes: Vec<ContentsMediaClass>,
+    pub row_profile: ContentsRowProfile,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind", rename_all = "camelCase")]
+pub enum ContentsRowProfile {
+    SourceFile,
+    PrimaryMedia,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum ContentsRecursion {
+    Immediate,
+    Recursive,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
-pub enum SelectedContentsScope {
+pub enum ContentsScope {
     Source {
         #[serde(rename = "sourceId")]
         #[ts(rename = "sourceId")]
@@ -340,8 +399,8 @@ pub enum SelectedContentsScope {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadSelectedContentsReply {
-    pub result: SelectedContentsResult,
+pub struct ContentsReadReply {
+    pub result: ContentsResult,
 }
 
 #[derive(
@@ -349,14 +408,13 @@ pub struct ReadSelectedContentsReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SelectedContentsResult {
-    pub state: SelectedContentsState,
-    pub scope: SelectedContentsScope,
-    pub rows: Vec<SelectedContentsRow>,
+pub struct ContentsResult {
+    pub state: ContentsState,
+    pub scope: ContentsScope,
+    pub policy: ContentsReadPolicy,
+    pub recursion: ContentsRecursion,
+    pub rows: Vec<ContentsFileRow>,
     pub coverage: ContentsCoverage,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub next_cursor: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub detail: Option<String>,
@@ -376,7 +434,7 @@ pub struct SelectedContentsResult {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SelectedContentsState {
+pub enum ContentsState {
     Ready,
     Empty,
     Partial,
@@ -384,6 +442,8 @@ pub enum SelectedContentsState {
     LocationMissing,
     Blocked,
     Failed,
+    PolicyConflict,
+    CursorInvalid,
 }
 
 #[derive(
@@ -446,12 +506,12 @@ pub struct ContentsCoverage {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SelectedContentsRowOrigin {
+pub enum ContentsRowOrigin {
     LibraryAsset,
     SourceFile,
 }
 
-impl SelectedContentsRowOrigin {
+impl ContentsRowOrigin {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::LibraryAsset => "libraryAsset",
@@ -473,10 +533,47 @@ impl SelectedContentsRowOrigin {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SelectedContentsRow {
-    pub stable_id: String,
+pub struct ContentsFileRow {
+    pub id: String,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_file_id: i64,
+    #[serde(rename = "parentDirectoryId")]
+    #[ts(rename = "parentDirectoryId")]
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub parent_directory_id: Option<i64>,
     pub label: String,
-    pub origin: SelectedContentsRowOrigin,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub relative_path: Option<String>,
+    pub file_name: String,
+    pub media_class: ContentsMediaClass,
+    pub presence: ContentsPresenceState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub availability_state: Option<LibraryAssetAvailabilityState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub primary_media: Option<PrimaryMediaSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub updated_at_ms: Option<i64>,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct PrimaryMediaSummary {
+    pub origin: ContentsRowOrigin,
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
@@ -489,18 +586,6 @@ pub struct SelectedContentsRow {
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
     pub primary_source_file_id: Option<i64>,
-    #[serde(with = "crate::wire::i64_string")]
-    #[schemars(with = "String")]
-    #[ts(as = "String")]
-    pub scoped_source_file_id: i64,
-    #[serde(with = "crate::wire::i64_string")]
-    #[schemars(with = "String")]
-    #[ts(as = "String")]
-    pub source_id: i64,
-    pub relative_path: String,
-    pub file_name: String,
-    pub media_class: SelectedContentsMediaClass,
-    pub availability_state: LibraryAssetAvailabilityState,
     pub title: Option<String>,
     pub artist: Option<String>,
     pub album: Option<String>,
@@ -510,8 +595,7 @@ pub struct SelectedContentsRow {
     pub waveform_quality_current: Option<i64>,
     pub waveform_quality_target: Option<i64>,
     pub stems_state_summary: Option<LibraryAssetStemsStateSummary>,
-    pub prep_readiness_summary: LibraryAssetPrepReadinessSummary,
-    pub updated_at_ms: i64,
+    pub prep_readiness_summary: Option<LibraryAssetPrepReadinessSummary>,
 }
 
 #[derive(
@@ -528,16 +612,49 @@ pub struct SelectedContentsRow {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum SelectedContentsMediaClass {
-    Audio,
-    Video,
+pub enum ContentsPresenceState {
+    Present,
+    Missing,
+    Removed,
 }
 
-impl SelectedContentsMediaClass {
+impl ContentsPresenceState {
+    pub fn from_projection_value(value: &str) -> Option<Self> {
+        match value.as_bytes() {
+            b"present" => Some(Self::Present),
+            b"missing" => Some(Self::Missing),
+            b"removed" => Some(Self::Removed),
+            _ => None,
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum ContentsMediaClass {
+    Audio,
+    Video,
+    Image,
+}
+
+impl ContentsMediaClass {
     pub fn from_projection_value(value: &str) -> Option<Self> {
         match value.as_bytes() {
             b"audio" => Some(Self::Audio),
             b"video" => Some(Self::Video),
+            b"image" => Some(Self::Image),
             _ => None,
         }
     }
@@ -1474,7 +1591,7 @@ pub enum SnapshotReadCommand {
     ReadLiteralHierarchyChildren(ReadLiteralHierarchyChildrenRequest),
     ReadNavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowRequest),
     SearchNavigationNodeLibraryBrowserWindow(SearchNavigationNodeLibraryBrowserWindowRequest),
-    ReadSelectedContents(ReadSelectedContentsRequest),
+    ContentsRead(ContentsReadRequest),
     ReadLibraryAssetWaveformOverview(ReadLibraryAssetWaveformOverviewRequest),
     ReadLibraryAssetPreparationDetail(ReadLibraryAssetPreparationDetailRequest),
 }
@@ -1491,7 +1608,7 @@ pub enum SnapshotReadReply {
     LiteralHierarchyChildren(ReadLiteralHierarchyChildrenReply),
     NavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowReply),
     NavigationNodeLibraryBrowserSearch(SearchNavigationNodeLibraryBrowserWindowReply),
-    SelectedContents(ReadSelectedContentsReply),
+    Contents(ContentsReadReply),
     LibraryAssetWaveformOverview(ReadLibraryAssetWaveformOverviewReply),
     LibraryAssetPreparationDetail(ReadLibraryAssetPreparationDetailReply),
 }
@@ -1499,27 +1616,27 @@ pub enum SnapshotReadReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
-        LibraryAssetAvailabilityState, LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
-        LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
-        LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
-        LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
-        LibraryAssetPreparationOutcomeKind, LibraryAssetPreparationOutcomeState,
-        LibraryAssetPreparationRequirementClass, LibraryAssetPreparationSatisfactionState,
-        LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
-        LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
-        LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LiteralHierarchyCoverage, LiteralHierarchyCoverageState, LiteralHierarchyEntryPoint,
-        LiteralHierarchyFileMediaClass, LiteralHierarchyNode, LiteralHierarchyNodeKind,
-        LiteralHierarchyPresenceState, LiteralHierarchyWindow, LoadNavigationRowByStableKeyRequest,
-        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
-        NavigationRowSelectorKind, ReadLibraryAssetPreparationDetailRequest,
-        ReadLibraryAssetWaveformOverviewRequest, ReadLiteralHierarchyChildrenReply,
-        ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
-        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
-        SearchNavigationNodeLibraryBrowserWindowReply,
-        SearchNavigationNodeLibraryBrowserWindowRequest, SelectedContentsMediaClass,
-        SnapshotReadCommand, SnapshotReadReply, SourceFileVisibility,
+        ContentsMediaClass, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
+        LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
+        LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
+        LibraryAssetPreparationDetailGroup, LibraryAssetPreparationDetailGroupKey,
+        LibraryAssetPreparationDetailRow, LibraryAssetPreparationOutcomeKind,
+        LibraryAssetPreparationOutcomeState, LibraryAssetPreparationRequirementClass,
+        LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
+        LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
+        LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
+        LibraryAssetWaveformOverviewCapabilityState, LiteralHierarchyCoverage,
+        LiteralHierarchyCoverageState, LiteralHierarchyEntryPoint, LiteralHierarchyFileMediaClass,
+        LiteralHierarchyNode, LiteralHierarchyNodeKind, LiteralHierarchyPresenceState,
+        LiteralHierarchyWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
+        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
+        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
+        ReadLiteralHierarchyChildrenReply, ReadLiteralHierarchyChildrenRequest,
+        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
+        SourceFileVisibility,
     };
     use serde_json::json;
 
@@ -1621,18 +1738,18 @@ mod tests {
     }
 
     #[test]
-    fn selected_contents_media_class_is_primary_media_only() {
+    fn contents_media_class_includes_audio_video_and_image() {
         assert_eq!(
-            SelectedContentsMediaClass::from_projection_value("audio"),
-            Some(SelectedContentsMediaClass::Audio)
+            ContentsMediaClass::from_projection_value("audio"),
+            Some(ContentsMediaClass::Audio)
         );
         assert_eq!(
-            SelectedContentsMediaClass::from_projection_value("video"),
-            Some(SelectedContentsMediaClass::Video)
+            ContentsMediaClass::from_projection_value("video"),
+            Some(ContentsMediaClass::Video)
         );
         assert_eq!(
-            SelectedContentsMediaClass::from_projection_value("image"),
-            None
+            ContentsMediaClass::from_projection_value("image"),
+            Some(ContentsMediaClass::Image)
         );
     }
 

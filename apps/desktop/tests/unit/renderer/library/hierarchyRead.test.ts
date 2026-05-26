@@ -576,11 +576,7 @@ describe('createLibraryHierarchyReadController', () => {
     await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
 
     controller.setSourceFileVisibility('performanceAndImages', {
-      replayNodeIds: new Set([
-        'navigation-row:7',
-        'navigation-row:7',
-        'source-directory:12'
-      ])
+      replayNodeIds: new Set(['navigation-row:7', 'navigation-row:7', 'source-directory:12'])
     })
     await waitForReadRequestCount(readRequests, 4)
 

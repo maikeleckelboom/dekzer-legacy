@@ -161,9 +161,7 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
     aria-live="polite"
   >
     <header class="border-b border-(--color-border) px-4 py-3">
-      <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
-        Selected contents
-      </p>
+      <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">Contents</p>
       <h3
         id="library-contents-title"
         class="mt-1 text-base font-bold leading-6 text-(--color-text)"

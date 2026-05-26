@@ -1,11 +1,16 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { Ref } from 'vue'
 
-import type { SelectedContentsReadResult } from '../../../shared/librarySelectedContents/read'
+import type {
+  ContentsReadPolicy,
+  ContentsReadResult,
+  ContentsRecursion
+} from '../../../shared/libraryContents/read'
+import type { SourceFileVisibility } from '../../../shared/libraryHierarchy/readChildren'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { RowBinding } from '../state'
 
-export type SelectedContentsBoundaryState =
+export type ContentsBoundaryState =
   | {
       readonly kind: 'idle'
       readonly detail?: string
@@ -19,7 +24,7 @@ export type SelectedContentsBoundaryState =
   | {
       readonly kind: 'ready'
       readonly requestKey: string
-      readonly result: SelectedContentsReadResult
+      readonly result: ContentsReadResult
     }
   | {
       readonly kind: 'failed'
@@ -27,8 +32,8 @@ export type SelectedContentsBoundaryState =
       readonly detail: string
     }
 
-export type SelectedContentsReadController = {
-  readonly state: Ref<SelectedContentsBoundaryState>
+export type ContentsReadController = {
+  readonly state: Ref<ContentsBoundaryState>
   readonly readForBinding: (
     binding: RowBinding | undefined,
     options?: ReadOptions
@@ -40,17 +45,20 @@ export type SelectedContentsReadController = {
 
 type ReadOptions = {
   readonly force?: boolean
+  readonly sourceFileVisibility?: SourceFileVisibility
 }
 
-type LibrarySelectedContentsApi = RendererApi['library']['selectedContents']
+type LibraryContentsApi = RendererApi['library']['contents']
 
 const readLimit = 100
-const safeSelectedContentsRequestFailure = 'Unable to request selected library contents.'
+const safeContentsRequestFailure = 'Unable to request library contents.'
+const defaultSourceFileVisibility: SourceFileVisibility = 'performance'
+const contentsRecursion: ContentsRecursion = 'recursive'
 
-export function useSelectedContentsRead(
-  selectedContentsApi: LibrarySelectedContentsApi = getRendererApi().library.selectedContents
-): SelectedContentsReadController {
-  const controller = createSelectedContentsReadController(selectedContentsApi)
+export function useContentsRead(
+  contentsApi: LibraryContentsApi = getRendererApi().library.contents
+): ContentsReadController {
+  const controller = createContentsReadController(contentsApi)
 
   onMounted(() => {
     controller.start()
@@ -67,12 +75,12 @@ function getRendererApi(): RendererApi {
   return (window as unknown as { readonly dekzer: RendererApi }).dekzer
 }
 
-export function createSelectedContentsReadController(
-  selectedContentsApi: LibrarySelectedContentsApi
-): SelectedContentsReadController {
-  const state = ref<SelectedContentsBoundaryState>({
+export function createContentsReadController(
+  contentsApi: LibraryContentsApi
+): ContentsReadController {
+  const state = ref<ContentsBoundaryState>({
     kind: 'idle',
-    detail: 'No selected contents scope has been requested.'
+    detail: 'No contents scope has been requested.'
   })
   let readSequence = 0
   let started = false
@@ -88,7 +96,7 @@ export function createSelectedContentsReadController(
   function clear(): void {
     state.value = {
       kind: 'idle',
-      detail: 'No selected contents scope is active.'
+      detail: 'No contents scope is active.'
     }
   }
 
@@ -96,14 +104,17 @@ export function createSelectedContentsReadController(
     binding: RowBinding | undefined,
     options: ReadOptions = {}
   ): Promise<boolean> {
-    const scope = selectedContentsScopeForBinding(binding)
+    const scope = contentsScopeForBinding(binding)
 
     if (scope === undefined) {
       clear()
       return false
     }
 
-    const requestKey = selectedContentsRequestKey(scope)
+    const policy = contentsPolicyForVisibility(
+      options.sourceFileVisibility ?? defaultSourceFileVisibility
+    )
+    const requestKey = contentsRequestKey(scope, policy, contentsRecursion)
     const currentState = state.value
 
     if (
@@ -119,12 +130,14 @@ export function createSelectedContentsReadController(
       kind: 'loading',
       requestKey,
       sequence,
-      detail: 'Loading selected contents.'
+      detail: 'Loading contents.'
     }
 
     try {
-      const result = await selectedContentsApi.read({
+      const result = await contentsApi.read({
         scope,
+        policy,
+        recursion: contentsRecursion,
         limit: readLimit
       })
 
@@ -146,7 +159,7 @@ export function createSelectedContentsReadController(
       state.value = {
         kind: 'failed',
         requestKey,
-        detail: safeSelectedContentsRequestFailure
+        detail: safeContentsRequestFailure
       }
       return true
     }
@@ -170,9 +183,9 @@ export function createSelectedContentsReadController(
   }
 }
 
-function selectedContentsScopeForBinding(
+function contentsScopeForBinding(
   binding: RowBinding | undefined
-): Parameters<LibrarySelectedContentsApi['read']>[0]['scope'] | undefined {
+): Parameters<LibraryContentsApi['read']>[0]['scope'] | undefined {
   if (binding === undefined) {
     return undefined
   }
@@ -204,15 +217,36 @@ function selectedContentsScopeForBinding(
   }
 }
 
-function selectedContentsRequestKey(
-  scope: NonNullable<Parameters<LibrarySelectedContentsApi['read']>[0]['scope']>
+function contentsRequestKey(
+  scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>,
+  policy: ContentsReadPolicy,
+  recursion: ContentsRecursion
 ): string {
+  const policyKey = `${policy.rowProfile.kind}:${policy.mediaClasses.join(',')}:${recursion}`
+
   switch (scope.kind) {
     case 'source':
-      return `source:${scope.sourceId}`
+      return `source:${scope.sourceId}:${policyKey}`
     case 'sourceLocation':
-      return `source-location:${scope.sourceLocationId}`
+      return `source-location:${scope.sourceLocationId}:${policyKey}`
     case 'directory':
-      return `directory:${scope.sourceId}:${scope.sourceDirectoryId}`
+      return `directory:${scope.sourceId}:${scope.sourceDirectoryId}:${policyKey}`
+  }
+}
+
+export function contentsPolicyForVisibility(
+  sourceFileVisibility: SourceFileVisibility
+): ContentsReadPolicy {
+  switch (sourceFileVisibility) {
+    case 'performance':
+      return {
+        mediaClasses: ['audio', 'video'],
+        rowProfile: { kind: 'primaryMedia' }
+      }
+    case 'performanceAndImages':
+      return {
+        mediaClasses: ['audio', 'video', 'image'],
+        rowProfile: { kind: 'sourceFile' }
+      }
   }
 }

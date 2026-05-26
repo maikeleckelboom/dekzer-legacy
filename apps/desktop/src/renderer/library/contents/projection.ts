@@ -1,15 +1,13 @@
+import type { ChildRow, Presence } from '../../../shared/libraryHierarchy/readChildren'
 import type {
-  ChildRow,
-  Presence
-} from '../../../shared/libraryHierarchy/readChildren'
-import type {
-  SelectedContentsReadResult,
-  SelectedContentsResult,
-  SelectedContentsRow
-} from '../../../shared/librarySelectedContents/read'
-import type { SelectedContentsBoundaryState } from '../boundary/selectedContentsRead'
+  ContentsReadResult,
+  ContentsResult,
+  ContentsFileRow,
+  PrimaryMediaSummary
+} from '../../../shared/libraryContents/read'
+import type { ContentsBoundaryState } from '../boundary/contentsRead'
 import type { BrowserProjection } from '../tree/projection'
-import type { BrowserState, DirectoryState, RowBinding, SourceState } from '../state'
+import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { formatSourceDisplayName } from '../tree/sourcePresentation'
 
@@ -66,7 +64,7 @@ export type ProjectContentsOptions = {
   readonly state: BrowserState
   readonly selectedNodeId?: BrowserTreeNodeId
   readonly bindingsById?: BrowserProjection['bindingsById']
-  readonly selectedContentsState?: SelectedContentsBoundaryState
+  readonly contentsState?: ContentsBoundaryState
 }
 
 export function projectContents(options: ProjectContentsOptions): ContentProjection {
@@ -104,31 +102,17 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
 
   switch (binding.kind) {
     case 'source':
-      if (options.state.sourceFileVisibility === 'performanceAndImages') {
-        return projectSourceVisibleFiles({
-          state: options.state,
-          selectedNodeId,
-          binding
-        })
-      }
       return projectSourceContents({
         selectedNodeId,
         binding,
-        selectedContentsState: options.selectedContentsState
+        contentsState: options.contentsState
       })
     case 'directory':
-      if (options.state.sourceFileVisibility === 'performanceAndImages') {
-        return projectDirectoryVisibleFiles({
-          state: options.state,
-          selectedNodeId,
-          binding
-        })
-      }
       return projectDirectoryContents({
         state: options.state,
         selectedNodeId,
         binding,
-        selectedContentsState: options.selectedContentsState
+        contentsState: options.contentsState
       })
     case 'file':
       return projectFileContents({
@@ -205,13 +189,13 @@ function projectHostContents(
 function projectSourceContents(options: {
   readonly selectedNodeId: BrowserTreeNodeId
   readonly binding: Extract<RowBinding, { readonly kind: 'source' }>
-  readonly selectedContentsState: SelectedContentsBoundaryState | undefined
+  readonly contentsState: ContentsBoundaryState | undefined
 }): ContentProjection {
   const title = formatSourceDisplayName(options.binding.target.label)
-  return projectSelectedContentsState({
+  return projectContentsState({
     ownerId: options.selectedNodeId,
     title,
-    selectedContentsState: options.selectedContentsState
+    contentsState: options.contentsState
   })
 }
 
@@ -219,23 +203,23 @@ function projectDirectoryContents(options: {
   readonly state: BrowserState
   readonly selectedNodeId: BrowserTreeNodeId
   readonly binding: Extract<RowBinding, { readonly kind: 'directory' }>
-  readonly selectedContentsState: SelectedContentsBoundaryState | undefined
+  readonly contentsState: ContentsBoundaryState | undefined
 }): ContentProjection {
   const directoryRow = findLoadedChildRow(options.state, options.selectedNodeId)
   const title = directoryRow?.label ?? 'Selected folder'
-  return projectSelectedContentsState({
+  return projectContentsState({
     ownerId: options.selectedNodeId,
     title,
-    selectedContentsState: options.selectedContentsState
+    contentsState: options.contentsState
   })
 }
 
-function projectSelectedContentsState(options: {
+function projectContentsState(options: {
   readonly ownerId: BrowserTreeNodeId
   readonly title: string
-  readonly selectedContentsState: SelectedContentsBoundaryState | undefined
+  readonly contentsState: ContentsBoundaryState | undefined
 }): ContentProjection {
-  const state = options.selectedContentsState
+  const state = options.contentsState
 
   if (state === undefined || state.kind === 'idle') {
     return stateProjection({
@@ -243,8 +227,8 @@ function projectSelectedContentsState(options: {
       ownerId: options.ownerId,
       title: options.title,
       state: 'loading',
-      label: 'Loading selected contents',
-      detail: state?.detail ?? 'Loading selected contents.'
+      label: 'Loading contents',
+      detail: state?.detail ?? 'Loading contents.'
     })
   }
 
@@ -254,8 +238,8 @@ function projectSelectedContentsState(options: {
       ownerId: options.ownerId,
       title: options.title,
       state: 'loading',
-      label: 'Loading selected contents',
-      detail: state.detail ?? 'Loading selected contents.'
+      label: 'Loading contents',
+      detail: state.detail ?? 'Loading contents.'
     })
   }
 
@@ -270,17 +254,17 @@ function projectSelectedContentsState(options: {
     })
   }
 
-  return projectSelectedContentsReadResult({
+  return projectContentsReadResult({
     ownerId: options.ownerId,
     title: options.title,
     result: state.result
   })
 }
 
-function projectSelectedContentsReadResult(options: {
+function projectContentsReadResult(options: {
   readonly ownerId: BrowserTreeNodeId
   readonly title: string
-  readonly result: SelectedContentsReadResult
+  readonly result: ContentsReadResult
 }): ContentProjection {
   if (options.result.state !== 'ready') {
     return stateProjection({
@@ -293,41 +277,41 @@ function projectSelectedContentsReadResult(options: {
     })
   }
 
-  return projectSelectedContentsResult({
+  return projectContentsResult({
     ownerId: options.ownerId,
     title: options.title,
     result: options.result.result
   })
 }
 
-function projectSelectedContentsResult(options: {
+function projectContentsResult(options: {
   readonly ownerId: BrowserTreeNodeId
   readonly title: string
-  readonly result: SelectedContentsResult
+  readonly result: ContentsResult
 }): ContentProjection {
   const result = options.result
-  const rows = result.rows.map(selectedContentsRow)
+  const rows = result.rows.map(contentsRow)
 
   if (rows.length === 0) {
     return {
-      kind: selectedContentsProjectionKind(result),
+      kind: contentsProjectionKind(result),
       title: options.title,
-      detail: selectedContentsDetail(result),
+      detail: contentsDetail(result),
       rows: [
         stateRow({
           ownerId: options.ownerId,
-          state: selectedContentsStateRowState(result),
-          label: selectedContentsStateLabel(result),
-          detail: selectedContentsDetail(result)
+          state: contentsStateRowState(result),
+          label: contentsStateLabel(result),
+          detail: contentsDetail(result)
         })
       ]
     }
   }
 
   return {
-    kind: selectedContentsProjectionKind(result),
+    kind: contentsProjectionKind(result),
     title: options.title,
-    detail: selectedContentsDetail(result),
+    detail: contentsDetail(result),
     rows
   }
 }
@@ -351,38 +335,44 @@ function projectFileContents(options: {
   })
 }
 
-function selectedContentsRow(row: SelectedContentsRow): ContentRow {
-  const icon = row.mediaClass === 'video' ? 'video' : 'music'
+function contentsRow(row: ContentsFileRow): ContentRow {
+  const icon = row.mediaClass === 'image' ? 'image' : row.mediaClass === 'video' ? 'video' : 'music'
   const detail =
-    row.origin === 'sourceFile' ? selectedSourceFileRowDetail(row) : selectedContentsRowDetail(row)
+    row.primaryMedia === undefined
+      ? sourceFileRowDetail(row)
+      : primaryMediaRowDetail(row.primaryMedia, row)
   return {
-    id: row.stableId,
+    id: row.id,
     kind: 'file',
     label: row.label,
+    presence: row.presence,
     detail,
     icon,
     mediaClass: row.mediaClass,
-    availabilityState: row.availabilityState
+    ...(row.availabilityState === undefined ? {} : { availabilityState: row.availabilityState })
   }
 }
 
-function selectedSourceFileRowDetail(row: SelectedContentsRow): string {
-  const base = row.relativePath
-  switch (row.availabilityState) {
-    case 'available':
-      return base
-    case 'degraded':
-      return `Degraded - ${base}`
-    case 'unavailable':
-      return `Unavailable - ${base}`
+function sourceFileRowDetail(row: ContentsFileRow): string {
+  if (row.presence === 'missing') {
+    return 'File missing'
   }
+
+  if (row.presence === 'removed') {
+    return 'File removed'
+  }
+
+  return row.relativePath ?? sourceFileMediaLabel(row.mediaClass)
 }
 
-function selectedContentsRowDetail(row: SelectedContentsRow): string {
-  const parts = [row.artist, row.album].filter(
+function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsFileRow): string {
+  const parts = [primaryMedia.artist, primaryMedia.album].filter(
     (value): value is string => value !== undefined && value.trim().length > 0
   )
-  const base = parts.length > 0 ? parts.join(' - ') : row.relativePath
+  const base =
+    parts.length > 0
+      ? parts.join(' - ')
+      : (row.relativePath ?? sourceFileMediaLabel(row.mediaClass))
 
   switch (row.availabilityState) {
     case 'available':
@@ -391,10 +381,27 @@ function selectedContentsRowDetail(row: SelectedContentsRow): string {
       return `Degraded - ${base}`
     case 'unavailable':
       return `Unavailable - ${base}`
+    case undefined:
+      return base
   }
+
+  return base
 }
 
-function selectedContentsProjectionKind(result: SelectedContentsResult): ContentProjectionKind {
+function sourceFileMediaLabel(mediaClass: ContentsFileRow['mediaClass']): string {
+  switch (mediaClass) {
+    case 'audio':
+      return 'Audio file'
+    case 'video':
+      return 'Video file'
+    case 'image':
+      return 'Image file'
+  }
+
+  return 'File'
+}
+
+function contentsProjectionKind(result: ContentsResult): ContentProjectionKind {
   switch (result.state) {
     case 'ready':
     case 'empty':
@@ -409,9 +416,7 @@ function selectedContentsProjectionKind(result: SelectedContentsResult): Content
   }
 }
 
-function selectedContentsStateRowState(
-  result: SelectedContentsResult
-): Exclude<ContentRow['state'], undefined> {
+function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['state'], undefined> {
   switch (result.state) {
     case 'ready':
     case 'empty':
@@ -427,13 +432,15 @@ function selectedContentsStateRowState(
   }
 }
 
-function selectedContentsStateLabel(result: SelectedContentsResult): string {
+function contentsStateLabel(result: ContentsResult): string {
+  const rowSubject = contentsRowSubject(result)
+
   switch (result.state) {
     case 'ready':
     case 'empty':
       return result.coverage.emptyResultAuthoritative
-        ? 'No primary media found'
-        : 'No primary media found yet'
+        ? `No ${rowSubject} found`
+        : `No ${rowSubject} found yet`
     case 'partial':
       return 'Still indexing'
     case 'sourceUnavailable':
@@ -447,21 +454,37 @@ function selectedContentsStateLabel(result: SelectedContentsResult): string {
   }
 }
 
-function selectedContentsDetail(result: SelectedContentsResult): string {
+function contentsDetail(result: ContentsResult): string {
   if (result.detail !== undefined) {
     return result.detail
   }
 
-  if (result.rows.length === 1) {
-    return selectedContentsCoveragePrefix(result) ?? '1 primary media item loaded.'
+  if (result.rows.length === 0 && (result.state === 'ready' || result.state === 'empty')) {
+    return contentsStateLabel(result)
   }
 
-  const prefix = selectedContentsCoveragePrefix(result)
-  const count = `${result.rows.length} primary media items loaded.`
+  if (result.rows.length === 1) {
+    return contentsCoveragePrefix(result) ?? `1 ${contentsCountSubject(result, 1)} loaded.`
+  }
+
+  const prefix = contentsCoveragePrefix(result)
+  const count = `${result.rows.length} ${contentsCountSubject(result, result.rows.length)} loaded.`
   return prefix === undefined ? count : `${prefix} ${count}`
 }
 
-function selectedContentsCoveragePrefix(result: SelectedContentsResult): string | undefined {
+function contentsRowSubject(result: ContentsResult): 'primary media' | 'visible files' {
+  return result.policy.rowProfile.kind === 'primaryMedia' ? 'primary media' : 'visible files'
+}
+
+function contentsCountSubject(result: ContentsResult, count: number): string {
+  if (result.policy.rowProfile.kind === 'primaryMedia') {
+    return count === 1 ? 'primary media item' : 'primary media items'
+  }
+
+  return count === 1 ? 'visible file' : 'visible files'
+}
+
+function contentsCoveragePrefix(result: ContentsResult): string | undefined {
   if (result.state === 'partial') {
     return 'Still indexing. Results may be incomplete.'
   }
@@ -634,143 +657,5 @@ function contentStateIcon(state: Exclude<ContentRow['state'], undefined>): Conte
     case 'notLoaded':
     case 'file':
       return 'state'
-  }
-}
-
-function projectSourceVisibleFiles(options: {
-  readonly state: BrowserState
-  readonly selectedNodeId: BrowserTreeNodeId
-  readonly binding: Extract<RowBinding, { readonly kind: 'source' }>
-}): ContentProjection {
-  const sourceState = options.state.sourceReadStates.get(options.selectedNodeId)
-  const title = formatSourceDisplayName(options.binding.target.label)
-  return projectVisibleFilesFromHierarchyState({
-    state: sourceState,
-    title,
-    selectedNodeId: options.selectedNodeId
-  })
-}
-
-function projectDirectoryVisibleFiles(options: {
-  readonly state: BrowserState
-  readonly selectedNodeId: BrowserTreeNodeId
-  readonly binding: Extract<RowBinding, { readonly kind: 'directory' }>
-}): ContentProjection {
-  const directoryState = options.state.directoryReadStates.get(options.binding.directoryId)
-  const directoryRow = findLoadedChildRow(options.state, options.selectedNodeId)
-  const title = directoryRow?.label ?? 'Selected folder'
-  return projectVisibleFilesFromHierarchyState({
-    state: directoryState,
-    title,
-    selectedNodeId: options.selectedNodeId
-  })
-}
-
-function projectVisibleFilesFromHierarchyState(options: {
-  readonly state: SourceState | DirectoryState | undefined
-  readonly title: string
-  readonly selectedNodeId: BrowserTreeNodeId
-}): ContentProjection {
-  const state = options.state
-
-  if (state === undefined || state.kind === 'unloaded') {
-    return stateProjection({
-      kind: 'notLoaded',
-      ownerId: options.selectedNodeId,
-      title: options.title,
-      state: 'notLoaded',
-      label: 'Visible files are not loaded yet.',
-      detail: 'Select this item to load visible files.',
-      action: {
-        kind: 'loadChildren',
-        nodeId: options.selectedNodeId,
-        label: 'Load visible files'
-      }
-    })
-  }
-
-  if (state.kind === 'loading') {
-    return stateProjection({
-      kind: 'loading',
-      ownerId: options.selectedNodeId,
-      title: options.title,
-      state: 'loading',
-      label: 'Loading visible files.',
-      detail: state.detail ?? 'Loading visible files.'
-    })
-  }
-
-  if (state.kind === 'failed') {
-    return stateProjection({
-      kind: 'failed',
-      ownerId: options.selectedNodeId,
-      title: options.title,
-      state: 'failed',
-      label: 'Visible files unavailable',
-      detail: state.detail
-    })
-  }
-
-  const visibleFileRows = state.children.rows.filter(
-    (row): row is Extract<ChildRow, { readonly kind: 'file' }> =>
-      row.kind === 'file' &&
-      (row.mediaClass === 'audio' || row.mediaClass === 'video' || row.mediaClass === 'image')
-  )
-
-  if (visibleFileRows.length === 0) {
-    return {
-      kind: 'ready',
-      title: options.title,
-      detail: 'No visible files loaded.',
-      rows: [
-        stateRow({
-          ownerId: options.selectedNodeId,
-          state: 'empty',
-          label: 'No visible files loaded.',
-          detail: 'No visible files loaded.'
-        })
-      ]
-    }
-  }
-
-  return {
-    kind: 'ready',
-    title: options.title,
-    detail: `${visibleFileRows.length} visible file${visibleFileRows.length === 1 ? '' : 's'} loaded.`,
-    rows: visibleFileRows.map(visibleFileContentRow)
-  }
-}
-
-function visibleFileContentRow(row: Extract<ChildRow, { readonly kind: 'file' }>): ContentRow {
-  const mediaClass: ContentRow['mediaClass'] =
-    row.mediaClass === 'image' ? 'image' : row.mediaClass === 'video' ? 'video' : 'audio'
-  return {
-    id: row.id,
-    kind: 'file',
-    label: row.label,
-    presence: row.presence,
-    detail: formatVisibleFileDetail(row),
-    icon: mediaClass === 'audio' ? 'music' : mediaClass === 'video' ? 'video' : 'image',
-    mediaClass
-  }
-}
-
-function formatVisibleFileDetail(row: Extract<ChildRow, { readonly kind: 'file' }>): string {
-  switch (row.presence) {
-    case 'present':
-      switch (row.mediaClass) {
-        case 'audio':
-          return 'Audio file'
-        case 'video':
-          return 'Video file'
-        case 'image':
-          return 'Image file'
-        default:
-          return 'File'
-      }
-    case 'missing':
-      return 'File missing'
-    case 'removed':
-      return 'File removed'
   }
 }

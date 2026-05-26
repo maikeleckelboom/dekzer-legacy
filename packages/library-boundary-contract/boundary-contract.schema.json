@@ -281,6 +281,334 @@
         "incomplete"
       ]
     },
+    "ContentsFileRow": {
+      "type": "object",
+      "properties": {
+        "availabilityState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LibraryAssetAvailabilityState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "mediaClass": {
+          "$ref": "#/$defs/ContentsMediaClass"
+        },
+        "parentDirectoryId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "presence": {
+          "$ref": "#/$defs/ContentsPresenceState"
+        },
+        "primaryMedia": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrimaryMediaSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "relativePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceFileId": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "updatedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        }
+      },
+      "required": [
+        "id",
+        "sourceId",
+        "sourceFileId",
+        "label",
+        "fileName",
+        "mediaClass",
+        "presence"
+      ]
+    },
+    "ContentsMediaClass": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video",
+        "image"
+      ]
+    },
+    "ContentsPresenceState": {
+      "type": "string",
+      "enum": [
+        "present",
+        "missing",
+        "removed"
+      ]
+    },
+    "ContentsReadPolicy": {
+      "type": "object",
+      "properties": {
+        "mediaClasses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentsMediaClass"
+          }
+        },
+        "rowProfile": {
+          "$ref": "#/$defs/ContentsRowProfile"
+        }
+      },
+      "required": [
+        "mediaClasses",
+        "rowProfile"
+      ]
+    },
+    "ContentsReadReply": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/ContentsResult"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "ContentsReadRequest": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "policy": {
+          "$ref": "#/$defs/ContentsReadPolicy"
+        },
+        "recursion": {
+          "$ref": "#/$defs/ContentsRecursion"
+        },
+        "scope": {
+          "$ref": "#/$defs/ContentsScope"
+        }
+      },
+      "required": [
+        "scope",
+        "policy",
+        "recursion"
+      ]
+    },
+    "ContentsRecursion": {
+      "type": "string",
+      "enum": [
+        "immediate",
+        "recursive"
+      ]
+    },
+    "ContentsResult": {
+      "type": "object",
+      "properties": {
+        "coverage": {
+          "$ref": "#/$defs/ContentsCoverage"
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "policy": {
+          "$ref": "#/$defs/ContentsReadPolicy"
+        },
+        "recursion": {
+          "$ref": "#/$defs/ContentsRecursion"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentsFileRow"
+          }
+        },
+        "scope": {
+          "$ref": "#/$defs/ContentsScope"
+        },
+        "state": {
+          "$ref": "#/$defs/ContentsState"
+        }
+      },
+      "required": [
+        "state",
+        "scope",
+        "policy",
+        "recursion",
+        "rows",
+        "coverage"
+      ]
+    },
+    "ContentsRowOrigin": {
+      "type": "string",
+      "enum": [
+        "libraryAsset",
+        "sourceFile"
+      ]
+    },
+    "ContentsRowProfile": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "sourceFile"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "primaryMedia"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "ContentsScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "type": "object",
+              "properties": {
+                "sourceId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sourceId"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "source"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "type": "object",
+              "properties": {
+                "sourceLocationId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sourceLocationId"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceLocation"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "type": "object",
+              "properties": {
+                "sourceDirectoryId": {
+                  "type": "string"
+                },
+                "sourceId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sourceId",
+                "sourceDirectoryId"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "directory"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "ContentsState": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "empty",
+        "partial",
+        "sourceUnavailable",
+        "locationMissing",
+        "blocked",
+        "failed",
+        "policyConflict",
+        "cursorInvalid"
+      ]
+    },
     "CreatePlaylistReply": {
       "type": "object",
       "properties": {
@@ -1866,6 +2194,107 @@
         }
       ]
     },
+    "PrimaryMediaSummary": {
+      "type": "object",
+      "properties": {
+        "album": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "artist": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "durationMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "libraryAssetId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "musicalKey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "$ref": "#/$defs/ContentsRowOrigin"
+        },
+        "prepReadinessSummary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LibraryAssetPrepReadinessSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "primarySourceFileId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rowVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stemsStateSummary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LibraryAssetStemsStateSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tempoBpm": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "waveformQualityCurrent": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "waveformQualityTarget": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        }
+      },
+      "required": [
+        "origin"
+      ]
+    },
     "ProtocolError": {
       "oneOf": [
         {
@@ -2155,40 +2584,6 @@
         }
       }
     },
-    "ReadSelectedContentsReply": {
-      "type": "object",
-      "properties": {
-        "result": {
-          "$ref": "#/$defs/SelectedContentsResult"
-        }
-      },
-      "required": [
-        "result"
-      ]
-    },
-    "ReadSelectedContentsRequest": {
-      "type": "object",
-      "properties": {
-        "cursor": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "limit": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "scope": {
-          "$ref": "#/$defs/SelectedContentsScope"
-        }
-      },
-      "required": [
-        "scope",
-        "limit"
-      ]
-    },
     "RegisterLocalRootReply": {
       "type": "object",
       "properties": {
@@ -2348,282 +2743,6 @@
         "limit"
       ]
     },
-    "SelectedContentsMediaClass": {
-      "type": "string",
-      "enum": [
-        "audio",
-        "video"
-      ]
-    },
-    "SelectedContentsResult": {
-      "type": "object",
-      "properties": {
-        "coverage": {
-          "$ref": "#/$defs/ContentsCoverage"
-        },
-        "detail": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "nextCursor": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rows": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/SelectedContentsRow"
-          }
-        },
-        "scope": {
-          "$ref": "#/$defs/SelectedContentsScope"
-        },
-        "state": {
-          "$ref": "#/$defs/SelectedContentsState"
-        }
-      },
-      "required": [
-        "state",
-        "scope",
-        "rows",
-        "coverage"
-      ]
-    },
-    "SelectedContentsRow": {
-      "type": "object",
-      "properties": {
-        "album": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "artist": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "availabilityState": {
-          "$ref": "#/$defs/LibraryAssetAvailabilityState"
-        },
-        "durationMs": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "fileName": {
-          "type": "string"
-        },
-        "label": {
-          "type": "string"
-        },
-        "libraryAssetId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "mediaClass": {
-          "$ref": "#/$defs/SelectedContentsMediaClass"
-        },
-        "musicalKey": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "origin": {
-          "$ref": "#/$defs/SelectedContentsRowOrigin"
-        },
-        "prepReadinessSummary": {
-          "$ref": "#/$defs/LibraryAssetPrepReadinessSummary"
-        },
-        "primarySourceFileId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "relativePath": {
-          "type": "string"
-        },
-        "rowVersion": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "scopedSourceFileId": {
-          "type": "string"
-        },
-        "sourceId": {
-          "type": "string"
-        },
-        "stableId": {
-          "type": "string"
-        },
-        "stemsStateSummary": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetStemsStateSummary"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "tempoBpm": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "format": "double"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "updatedAtMs": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "waveformQualityCurrent": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "waveformQualityTarget": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        }
-      },
-      "required": [
-        "stableId",
-        "label",
-        "origin",
-        "scopedSourceFileId",
-        "sourceId",
-        "relativePath",
-        "fileName",
-        "mediaClass",
-        "availabilityState",
-        "prepReadinessSummary",
-        "updatedAtMs"
-      ]
-    },
-    "SelectedContentsRowOrigin": {
-      "type": "string",
-      "enum": [
-        "libraryAsset",
-        "sourceFile"
-      ]
-    },
-    "SelectedContentsScope": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "type": "object",
-              "properties": {
-                "sourceId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "sourceId"
-              ]
-            },
-            "type": {
-              "type": "string",
-              "const": "source"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "type": "object",
-              "properties": {
-                "sourceLocationId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "sourceLocationId"
-              ]
-            },
-            "type": {
-              "type": "string",
-              "const": "sourceLocation"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "type": "object",
-              "properties": {
-                "sourceDirectoryId": {
-                  "type": "string"
-                },
-                "sourceId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "sourceId",
-                "sourceDirectoryId"
-              ]
-            },
-            "type": {
-              "type": "string",
-              "const": "directory"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        }
-      ]
-    },
-    "SelectedContentsState": {
-      "type": "string",
-      "enum": [
-        "ready",
-        "empty",
-        "partial",
-        "sourceUnavailable",
-        "locationMissing",
-        "blocked",
-        "failed"
-      ]
-    },
     "SnapshotReadCommand": {
       "oneOf": [
         {
@@ -2726,11 +2845,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadSelectedContentsRequest"
+              "$ref": "#/$defs/ContentsReadRequest"
             },
             "type": {
               "type": "string",
-              "const": "readSelectedContents"
+              "const": "contentsRead"
             }
           },
           "required": [
@@ -2874,11 +2993,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadSelectedContentsReply"
+              "$ref": "#/$defs/ContentsReadReply"
             },
             "type": {
               "type": "string",
-              "const": "selectedContents"
+              "const": "contents"
             }
           },
           "required": [

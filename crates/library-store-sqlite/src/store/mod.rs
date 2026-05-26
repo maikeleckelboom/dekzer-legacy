@@ -11,6 +11,7 @@ use crate::work_control::SourceAdmissionGate;
 
 mod artifacts;
 mod bootstrap;
+mod contents_reads;
 mod context;
 mod discovery;
 mod library_asset_preparation_detail_reads;
@@ -22,7 +23,6 @@ mod playlists;
 mod projections;
 mod promotion;
 mod revisions;
-mod selected_contents_reads;
 mod sources;
 mod work_items;
 

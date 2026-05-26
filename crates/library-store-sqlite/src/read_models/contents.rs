@@ -1,6 +1,5 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::browse_media::{SourceFileVisibility, source_file_visibility_predicate_sql_for_column};
 use crate::read_models::source_location_coverage::{
     AcceptedSourceLocationCoverage, SourceLocationCoverage, aggregate_source_location_coverages,
     classify_source_location_coverage,
@@ -8,7 +7,7 @@ use crate::read_models::source_location_coverage::{
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StoreSelectedContentsScope {
+pub enum StoreContentsScope {
     Source {
         source_id: i64,
     },
@@ -22,7 +21,7 @@ pub enum StoreSelectedContentsScope {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreSelectedContentsState {
+pub enum StoreContentsState {
     Ready,
     Empty,
     Partial,
@@ -30,6 +29,8 @@ pub enum StoreSelectedContentsState {
     LocationMissing,
     Blocked,
     Failed,
+    PolicyConflict,
+    CursorInvalid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,34 +54,63 @@ pub struct StoreContentsCoverage {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct StoreSelectedContentsResult {
-    pub state: StoreSelectedContentsState,
-    pub scope: StoreSelectedContentsScope,
-    pub rows: Vec<StoreSelectedContentsRow>,
+pub struct StoreContentsResult {
+    pub state: StoreContentsState,
+    pub scope: StoreContentsScope,
+    pub policy: StoreContentsReadPolicy,
+    pub recursion: StoreContentsRecursion,
+    pub rows: Vec<StoreContentsFileRow>,
     pub coverage: StoreContentsCoverage,
-    pub next_cursor: Option<String>,
     pub detail: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum StoreContentsMediaClass {
+    Audio,
+    Video,
+    Image,
+}
+
+impl StoreContentsMediaClass {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Audio => "audio",
+            Self::Video => "video",
+            Self::Image => "image",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum StoreContentsRowProfile {
+    SourceFile,
+    PrimaryMedia,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum StoreContentsRecursion {
+    Immediate,
+    Recursive,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreContentsReadPolicy {
+    pub media_classes: Vec<StoreContentsMediaClass>,
+    pub row_profile: StoreContentsRowProfile,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreSelectedContentsRowOrigin {
+pub enum StoreContentsRowOrigin {
     LibraryAsset,
     SourceFile,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct StoreSelectedContentsRow {
-    pub stable_id: String,
-    pub label: String,
-    pub origin: StoreSelectedContentsRowOrigin,
+pub struct StorePrimaryMediaSummary {
+    pub origin: StoreContentsRowOrigin,
     pub library_asset_id: Option<i64>,
     pub row_version: Option<i64>,
     pub primary_source_file_id: Option<i64>,
-    pub scoped_source_file_id: i64,
-    pub source_id: i64,
-    pub relative_path: String,
-    pub file_name: String,
-    pub media_class: String,
     pub availability_state: String,
     pub title: Option<String>,
     pub artist: Option<String>,
@@ -92,11 +122,26 @@ pub struct StoreSelectedContentsRow {
     pub waveform_quality_target: Option<i64>,
     pub stems_state_summary: Option<String>,
     pub prep_readiness_summary: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct StoreContentsFileRow {
+    pub id: String,
+    pub source_id: i64,
+    pub source_file_id: i64,
+    pub parent_directory_id: Option<i64>,
+    pub label: String,
+    pub relative_path: String,
+    pub file_name: String,
+    pub media_class: String,
+    pub presence: String,
+    pub availability_state: Option<String>,
+    pub primary_media: Option<StorePrimaryMediaSummary>,
     pub updated_at: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum ResolvedSelectedContentsScope {
+enum ResolvedContentsScope {
     WholeSource {
         source_id: i64,
     },
@@ -143,7 +188,7 @@ enum DirectoryPresence {
 }
 
 const RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL: &str = "char(48)";
-const SELECTED_CONTENTS_ORDER_SQL: &str = "CASE availability_state
+const PRIMARY_MEDIA_CONTENTS_ORDER_SQL: &str = "CASE availability_state
         WHEN 'available' THEN 0
         WHEN 'degraded' THEN 1
         WHEN 'unavailable' THEN 2
@@ -153,37 +198,65 @@ const SELECTED_CONTENTS_ORDER_SQL: &str = "CASE availability_state
     lower(COALESCE(artist, '')) ASC,
     lower(COALESCE(album, '')) ASC,
     lower(COALESCE(relative_path, '')) ASC,
-    scoped_source_file_id ASC";
+    source_file_id ASC";
 
-pub(crate) fn read_selected_contents(
+const SOURCE_FILE_CONTENTS_ORDER_SQL: &str = "lower(COALESCE(relative_path, '')) ASC,
+    source_file_id ASC";
+
+pub(crate) fn read_contents(
     connection: &Connection,
-    scope: StoreSelectedContentsScope,
+    scope: StoreContentsScope,
+    policy: StoreContentsReadPolicy,
+    recursion: StoreContentsRecursion,
     limit: usize,
     cursor: Option<&str>,
-) -> LibrarySqliteResult<StoreSelectedContentsResult> {
+) -> LibrarySqliteResult<StoreContentsResult> {
+    let policy = canonicalize_policy(policy)?;
+
+    if policy.row_profile == StoreContentsRowProfile::PrimaryMedia
+        && policy
+            .media_classes
+            .contains(&StoreContentsMediaClass::Image)
+    {
+        return Ok(non_ready_result(
+            scope,
+            policy,
+            recursion,
+            StoreContentsState::PolicyConflict,
+            StoreContentsCoverageState::Failed,
+            "Primary media contents cannot include image rows.",
+        ));
+    }
+
     if cursor.is_some() {
         return Ok(non_ready_result(
             scope,
-            StoreSelectedContentsState::Failed,
+            policy,
+            recursion,
+            StoreContentsState::CursorInvalid,
             StoreContentsCoverageState::Failed,
-            "Selected contents cursor paging is not available in this first slice.",
+            "Contents cursor paging is not available in this first slice.",
         ));
     }
 
     let Some((source_readiness, resolved_scope)) = resolve_scope(connection, &scope)? else {
         return Ok(non_ready_result(
             scope,
-            StoreSelectedContentsState::LocationMissing,
+            policy,
+            recursion,
+            StoreContentsState::LocationMissing,
             StoreContentsCoverageState::LocationMissing,
-            "The selected library contents target is not available.",
+            "The library contents target is not available.",
         ));
     };
 
     if let Some((state, coverage_state, detail)) = source_unavailable_state(&source_readiness) {
-        let rows = read_rows(connection, &resolved_scope, limit)?;
-        return Ok(StoreSelectedContentsResult {
+        let rows = read_rows(connection, &resolved_scope, &policy, recursion, limit)?;
+        return Ok(StoreContentsResult {
             state,
             scope,
+            policy,
+            recursion,
             rows,
             coverage: StoreContentsCoverage {
                 state: coverage_state,
@@ -191,56 +264,106 @@ pub(crate) fn read_selected_contents(
                 empty_result_authoritative: false,
                 detail: Some(detail.to_string()),
             },
-            next_cursor: None,
             detail: Some(detail.to_string()),
         });
     }
 
     let coverage = read_coverage(connection, &source_readiness, &resolved_scope)?;
-    let rows = read_rows(connection, &resolved_scope, limit)?;
-    let state = selected_contents_state(&coverage, rows.is_empty());
-    let detail = selected_contents_detail(state, coverage.state);
+    let rows = read_rows(connection, &resolved_scope, &policy, recursion, limit)?;
+    let state = contents_state(&coverage, rows.is_empty());
+    let detail = contents_detail(state, coverage.state, policy.row_profile);
 
     let empty_result_authoritative =
-        state == StoreSelectedContentsState::Empty && coverage.recursive_scope_complete;
+        state == StoreContentsState::Empty && coverage.recursive_scope_complete;
 
-    Ok(StoreSelectedContentsResult {
+    Ok(StoreContentsResult {
         state,
         scope,
+        policy,
+        recursion,
         rows,
         coverage: StoreContentsCoverage {
             empty_result_authoritative,
             ..coverage
         },
-        next_cursor: None,
         detail: detail.map(str::to_string),
     })
 }
 
+pub(crate) fn canonicalize_policy(
+    policy: StoreContentsReadPolicy,
+) -> LibrarySqliteResult<StoreContentsReadPolicy> {
+    let mut has_audio = false;
+    let mut has_video = false;
+    let mut has_image = false;
+
+    for media_class in policy.media_classes {
+        match media_class {
+            StoreContentsMediaClass::Audio => has_audio = true,
+            StoreContentsMediaClass::Video => has_video = true,
+            StoreContentsMediaClass::Image => has_image = true,
+        }
+    }
+
+    let mut media_classes = Vec::new();
+    if has_audio {
+        media_classes.push(StoreContentsMediaClass::Audio);
+    }
+    if has_video {
+        media_classes.push(StoreContentsMediaClass::Video);
+    }
+    if has_image {
+        media_classes.push(StoreContentsMediaClass::Image);
+    }
+
+    if media_classes.is_empty() {
+        return Err(LibrarySqliteError::MalformedSchemaState(
+            "contents mediaClasses must not be empty".to_string(),
+        ));
+    }
+
+    Ok(StoreContentsReadPolicy {
+        media_classes,
+        row_profile: policy.row_profile,
+    })
+}
+
+fn media_classes_predicate_sql(
+    column_sql: &str,
+    media_classes: &[StoreContentsMediaClass],
+) -> String {
+    let values = media_classes
+        .iter()
+        .map(|media_class| format!("'{}'", media_class.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{column_sql} IN ({values})")
+}
+
 fn resolve_scope(
     connection: &Connection,
-    scope: &StoreSelectedContentsScope,
-) -> LibrarySqliteResult<Option<(SourceReadiness, ResolvedSelectedContentsScope)>> {
+    scope: &StoreContentsScope,
+) -> LibrarySqliteResult<Option<(SourceReadiness, ResolvedContentsScope)>> {
     match scope {
-        StoreSelectedContentsScope::Source { source_id } => {
+        StoreContentsScope::Source { source_id } => {
             let Some(source_readiness) = load_source_readiness(connection, *source_id)? else {
                 return Ok(None);
             };
 
             let accepted_count = accepted_source_location_count(connection, *source_id)?;
             let resolved_scope = if accepted_count == 0 {
-                ResolvedSelectedContentsScope::WholeSource {
+                ResolvedContentsScope::WholeSource {
                     source_id: *source_id,
                 }
             } else {
-                ResolvedSelectedContentsScope::AcceptedSourceLocations {
+                ResolvedContentsScope::AcceptedSourceLocations {
                     source_id: *source_id,
                 }
             };
 
             Ok(Some((source_readiness, resolved_scope)))
         }
-        StoreSelectedContentsScope::SourceLocation { source_location_id } => {
+        StoreContentsScope::SourceLocation { source_location_id } => {
             let Some((source_id, relative_path)) =
                 load_accepted_source_location(connection, *source_location_id)?
             else {
@@ -252,13 +375,13 @@ fn resolve_scope(
 
             Ok(Some((
                 source_readiness,
-                ResolvedSelectedContentsScope::SourceLocationPrefix {
+                ResolvedContentsScope::SourceLocationPrefix {
                     source_id,
                     relative_path,
                 },
             )))
         }
-        StoreSelectedContentsScope::Directory {
+        StoreContentsScope::Directory {
             source_id,
             source_directory_id,
         } => {
@@ -270,7 +393,7 @@ fn resolve_scope(
             else {
                 return Ok(Some((
                     source_readiness,
-                    ResolvedSelectedContentsScope::MissingLocation {
+                    ResolvedContentsScope::MissingLocation {
                         source_id: *source_id,
                     },
                 )));
@@ -278,7 +401,7 @@ fn resolve_scope(
 
             Ok(Some((
                 source_readiness,
-                ResolvedSelectedContentsScope::Prefix {
+                ResolvedContentsScope::Prefix {
                     source_id: *source_id,
                     relative_path,
                 },
@@ -421,16 +544,12 @@ fn load_present_directory_path(
 
 fn source_unavailable_state(
     source: &SourceReadiness,
-) -> Option<(
-    StoreSelectedContentsState,
-    StoreContentsCoverageState,
-    &'static str,
-)> {
+) -> Option<(StoreContentsState, StoreContentsCoverageState, &'static str)> {
     if source.source_class != "internal"
         && !matches!(source.mount_status.as_deref(), Some("mounted"))
     {
         return Some((
-            StoreSelectedContentsState::SourceUnavailable,
+            StoreContentsState::SourceUnavailable,
             StoreContentsCoverageState::SourceUnavailable,
             "The selected source is unavailable.",
         ));
@@ -439,7 +558,7 @@ fn source_unavailable_state(
     match source.access_state.as_deref() {
         Some("missing") => {
             return Some((
-                StoreSelectedContentsState::LocationMissing,
+                StoreContentsState::LocationMissing,
                 StoreContentsCoverageState::LocationMissing,
                 "The selected source root is missing.",
             ));
@@ -453,9 +572,9 @@ fn source_unavailable_state(
             };
             let state = match coverage_state {
                 StoreContentsCoverageState::SourceUnavailable => {
-                    StoreSelectedContentsState::SourceUnavailable
+                    StoreContentsState::SourceUnavailable
                 }
-                _ => StoreSelectedContentsState::Blocked,
+                _ => StoreContentsState::Blocked,
             };
             return Some((
                 state,
@@ -469,9 +588,9 @@ fn source_unavailable_state(
     match source.scan_phase.as_deref() {
         Some("blocked") => Some((
             if source.scan_issue_kind.as_deref() == Some("unavailable_mount") {
-                StoreSelectedContentsState::SourceUnavailable
+                StoreContentsState::SourceUnavailable
             } else {
-                StoreSelectedContentsState::Blocked
+                StoreContentsState::Blocked
             },
             if source.scan_issue_kind.as_deref() == Some("unavailable_mount") {
                 StoreContentsCoverageState::SourceUnavailable
@@ -481,7 +600,7 @@ fn source_unavailable_state(
             "The selected source scan is blocked.",
         )),
         Some("failed") => Some((
-            StoreSelectedContentsState::Failed,
+            StoreContentsState::Failed,
             StoreContentsCoverageState::Failed,
             "The selected source scan failed.",
         )),
@@ -493,13 +612,13 @@ fn source_unavailable_state(
 fn read_coverage(
     connection: &Connection,
     source: &SourceReadiness,
-    scope: &ResolvedSelectedContentsScope,
+    scope: &ResolvedContentsScope,
 ) -> LibrarySqliteResult<StoreContentsCoverage> {
     let counts = match scope {
-        ResolvedSelectedContentsScope::WholeSource { source_id } => {
+        ResolvedContentsScope::WholeSource { source_id } => {
             read_whole_source_coverage_counts(connection, *source_id)?
         }
-        ResolvedSelectedContentsScope::AcceptedSourceLocations { source_id } => {
+        ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
             let paths = load_accepted_source_location_paths(connection, *source_id)?;
             if paths.is_empty() {
                 return Ok(coverage(
@@ -565,14 +684,14 @@ fn read_coverage(
             }
             read_accepted_source_locations_coverage_counts(connection, *source_id)?
         }
-        ResolvedSelectedContentsScope::MissingLocation { .. } => {
+        ResolvedContentsScope::MissingLocation { .. } => {
             return Ok(coverage(
                 StoreContentsCoverageState::LocationMissing,
                 false,
                 "The selected folder is missing.",
             ));
         }
-        ResolvedSelectedContentsScope::SourceLocationPrefix {
+        ResolvedContentsScope::SourceLocationPrefix {
             source_id,
             relative_path,
         } => {
@@ -629,7 +748,7 @@ fn read_coverage(
             }
             read_prefix_coverage_counts(connection, *source_id, relative_path)?
         }
-        ResolvedSelectedContentsScope::Prefix {
+        ResolvedContentsScope::Prefix {
             source_id,
             relative_path,
         } => {
@@ -750,11 +869,11 @@ fn coverage_counts_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Coverag
 
 fn coverage_from_counts(
     source: &SourceReadiness,
-    scope: &ResolvedSelectedContentsScope,
+    scope: &ResolvedContentsScope,
     counts: CoverageCounts,
 ) -> StoreContentsCoverage {
     if counts.total_directories == 0 {
-        if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
+        if matches!(scope, ResolvedContentsScope::WholeSource { .. })
             && source.scan_phase.as_deref() == Some("complete")
         {
             return coverage(
@@ -764,7 +883,7 @@ fn coverage_from_counts(
             );
         }
 
-        if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. }) {
+        if matches!(scope, ResolvedContentsScope::WholeSource { .. }) {
             return coverage(
                 StoreContentsCoverageState::Pending,
                 false,
@@ -774,20 +893,20 @@ fn coverage_from_counts(
 
         if matches!(
             scope,
-            ResolvedSelectedContentsScope::AcceptedSourceLocations { .. }
-                | ResolvedSelectedContentsScope::SourceLocationPrefix { .. }
+            ResolvedContentsScope::AcceptedSourceLocations { .. }
+                | ResolvedContentsScope::SourceLocationPrefix { .. }
         ) {
             return coverage(
                 StoreContentsCoverageState::Complete,
                 true,
-                "The selected contents scope has complete scan coverage.",
+                "The contents scope has complete scan coverage.",
             );
         }
 
         return coverage(
             StoreContentsCoverageState::LocationMissing,
             false,
-            "The selected contents scope has no present directory coverage.",
+            "The contents scope has no present directory coverage.",
         );
     }
 
@@ -795,7 +914,7 @@ fn coverage_from_counts(
         return coverage(
             StoreContentsCoverageState::Blocked,
             false,
-            "Part of the selected contents scope is blocked.",
+            "Part of the contents scope is blocked.",
         );
     }
 
@@ -803,7 +922,7 @@ fn coverage_from_counts(
         return coverage(
             StoreContentsCoverageState::Failed,
             false,
-            "Part of the selected contents scope failed to scan.",
+            "Part of the contents scope failed to scan.",
         );
     }
 
@@ -811,7 +930,7 @@ fn coverage_from_counts(
         return coverage(
             StoreContentsCoverageState::Scanning,
             false,
-            "The selected contents scope is still scanning.",
+            "The contents scope is still scanning.",
         );
     }
 
@@ -819,11 +938,11 @@ fn coverage_from_counts(
         return coverage(
             StoreContentsCoverageState::Pending,
             false,
-            "The selected contents scope has pending scan coverage.",
+            "The contents scope has pending scan coverage.",
         );
     }
 
-    if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
+    if matches!(scope, ResolvedContentsScope::WholeSource { .. })
         && !matches!(
             source.scan_phase.as_deref(),
             Some("complete") | Some("partial")
@@ -836,7 +955,7 @@ fn coverage_from_counts(
         );
     }
 
-    if matches!(scope, ResolvedSelectedContentsScope::WholeSource { .. })
+    if matches!(scope, ResolvedContentsScope::WholeSource { .. })
         && source.scan_phase.as_deref() == Some("partial")
     {
         return coverage(
@@ -849,7 +968,7 @@ fn coverage_from_counts(
     coverage(
         StoreContentsCoverageState::Complete,
         true,
-        "The selected contents scope has complete scan coverage.",
+        "The contents scope has complete scan coverage.",
     )
 }
 
@@ -874,128 +993,167 @@ fn coverage(
     }
 }
 
-fn selected_contents_state(
-    coverage: &StoreContentsCoverage,
-    rows_empty: bool,
-) -> StoreSelectedContentsState {
+fn contents_state(coverage: &StoreContentsCoverage, rows_empty: bool) -> StoreContentsState {
     match coverage.state {
         StoreContentsCoverageState::Complete => {
             if rows_empty {
-                StoreSelectedContentsState::Empty
+                StoreContentsState::Empty
             } else {
-                StoreSelectedContentsState::Ready
+                StoreContentsState::Ready
             }
         }
         StoreContentsCoverageState::Pending
         | StoreContentsCoverageState::Scanning
-        | StoreContentsCoverageState::Incomplete => StoreSelectedContentsState::Partial,
-        StoreContentsCoverageState::Blocked => StoreSelectedContentsState::Blocked,
-        StoreContentsCoverageState::Failed => StoreSelectedContentsState::Failed,
-        StoreContentsCoverageState::SourceUnavailable => {
-            StoreSelectedContentsState::SourceUnavailable
-        }
-        StoreContentsCoverageState::LocationMissing => StoreSelectedContentsState::LocationMissing,
+        | StoreContentsCoverageState::Incomplete => StoreContentsState::Partial,
+        StoreContentsCoverageState::Blocked => StoreContentsState::Blocked,
+        StoreContentsCoverageState::Failed => StoreContentsState::Failed,
+        StoreContentsCoverageState::SourceUnavailable => StoreContentsState::SourceUnavailable,
+        StoreContentsCoverageState::LocationMissing => StoreContentsState::LocationMissing,
     }
 }
 
-fn selected_contents_detail(
-    state: StoreSelectedContentsState,
+fn contents_detail(
+    state: StoreContentsState,
     coverage_state: StoreContentsCoverageState,
+    row_profile: StoreContentsRowProfile,
 ) -> Option<&'static str> {
     match state {
-        StoreSelectedContentsState::Ready => None,
-        StoreSelectedContentsState::Empty => Some("No primary media found in this scope."),
-        StoreSelectedContentsState::Partial => Some(match coverage_state {
+        StoreContentsState::Ready => None,
+        StoreContentsState::Empty => Some(match row_profile {
+            StoreContentsRowProfile::PrimaryMedia => "No primary media found in this scope.",
+            StoreContentsRowProfile::SourceFile => "No visible files found in this scope.",
+        }),
+        StoreContentsState::Partial => Some(match coverage_state {
             StoreContentsCoverageState::Scanning => "Still indexing. Results may be incomplete.",
             StoreContentsCoverageState::Incomplete => {
                 "One or more accepted source locations are missing. Results may be incomplete."
             }
             _ => "Indexing is incomplete. Results may be incomplete.",
         }),
-        StoreSelectedContentsState::SourceUnavailable => {
-            Some("The selected source is unavailable.")
-        }
-        StoreSelectedContentsState::LocationMissing => Some("The selected folder is missing."),
-        StoreSelectedContentsState::Blocked => Some("The selected contents scope is blocked."),
-        StoreSelectedContentsState::Failed => Some("The selected contents scope failed to scan."),
+        StoreContentsState::SourceUnavailable => Some("The selected source is unavailable."),
+        StoreContentsState::LocationMissing => Some("The selected folder is missing."),
+        StoreContentsState::Blocked => Some("The contents scope is blocked."),
+        StoreContentsState::Failed => Some("The contents scope failed to scan."),
+        StoreContentsState::PolicyConflict => Some("The contents policy cannot be read."),
+        StoreContentsState::CursorInvalid => Some("The contents cursor is invalid."),
     }
 }
 
 fn read_rows(
     connection: &Connection,
-    scope: &ResolvedSelectedContentsScope,
+    scope: &ResolvedContentsScope,
+    policy: &StoreContentsReadPolicy,
+    recursion: StoreContentsRecursion,
     limit: usize,
-) -> LibrarySqliteResult<Vec<StoreSelectedContentsRow>> {
+) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
     let limit = i64::try_from(limit).map_err(|_| {
         LibrarySqliteError::MalformedSchemaState(format!(
-            "selected contents limit {limit} exceeds i64 range"
+            "contents limit {limit} exceeds i64 range"
         ))
     })?;
+    let media_predicate = media_classes_predicate_sql("sf.media_class", &policy.media_classes);
 
     match scope {
-        ResolvedSelectedContentsScope::WholeSource { source_id } => {
+        ResolvedContentsScope::WholeSource { source_id } => {
+            let source_predicate = match recursion {
+                StoreContentsRecursion::Recursive => "sf.source_id = ?1".to_string(),
+                StoreContentsRecursion::Immediate => {
+                    "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL".to_string()
+                }
+            };
             read_rows_with_source_predicate(
                 connection,
-                "sf.source_id = ?1",
+                &source_predicate,
+                &media_predicate,
+                policy.row_profile,
                 *source_id,
                 None,
                 limit,
             )
         }
-        ResolvedSelectedContentsScope::AcceptedSourceLocations { source_id } => {
-            let predicate = format!(
-                "sf.source_id = ?1
-                 AND EXISTS (
-                     SELECT 1
-                     FROM accepted_locations al
-                     WHERE {}
-                 )",
-                relative_path_scope_predicate("sf", "al.relative_path")
-            );
-            read_rows_for_accepted_locations(connection, &predicate, *source_id, limit)
+        ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
+            let predicate = match recursion {
+                StoreContentsRecursion::Recursive => format!(
+                    "sf.source_id = ?1
+                     AND EXISTS (
+                         SELECT 1
+                         FROM accepted_locations al
+                         WHERE {}
+                     )",
+                    relative_path_scope_predicate("sf", "al.relative_path")
+                ),
+                StoreContentsRecursion::Immediate => "sf.source_id = ?1
+                     AND EXISTS (
+                         SELECT 1
+                         FROM accepted_locations al
+                         JOIN source_directories sd
+                           ON sd.source_id = sf.source_id
+                          AND sd.relative_path COLLATE BINARY = al.relative_path COLLATE BINARY
+                          AND sd.presence_state = 'present'
+                         WHERE sf.parent_source_directory_id = sd.source_directory_id
+                     )"
+                .to_string(),
+            };
+            read_rows_for_accepted_locations(
+                connection,
+                &predicate,
+                &media_predicate,
+                policy.row_profile,
+                *source_id,
+                limit,
+            )
         }
-        ResolvedSelectedContentsScope::Prefix {
+        ResolvedContentsScope::Prefix {
             source_id,
             relative_path,
-        } => read_rows_with_source_predicate(
-            connection,
-            &format!(
-                "sf.source_id = ?1
-                 AND {}",
-                source_file_descendant_predicate("sf", "?2")
-            ),
-            *source_id,
-            Some(relative_path),
-            limit,
-        ),
-        ResolvedSelectedContentsScope::SourceLocationPrefix {
+        } => {
+            let predicate = scoped_path_predicate(recursion);
+            read_rows_with_source_predicate(
+                connection,
+                &predicate,
+                &media_predicate,
+                policy.row_profile,
+                *source_id,
+                Some(relative_path),
+                limit,
+            )
+        }
+        ResolvedContentsScope::SourceLocationPrefix {
             source_id,
             relative_path,
-        } => read_rows_with_source_predicate(
-            connection,
-            &format!(
-                "sf.source_id = ?1
-                 AND {}",
-                source_file_descendant_predicate("sf", "?2")
-            ),
-            *source_id,
-            Some(relative_path),
-            limit,
-        ),
-        ResolvedSelectedContentsScope::MissingLocation { .. } => Ok(Vec::new()),
+        } => {
+            let predicate = scoped_path_predicate(recursion);
+            read_rows_with_source_predicate(
+                connection,
+                &predicate,
+                &media_predicate,
+                policy.row_profile,
+                *source_id,
+                Some(relative_path),
+                limit,
+            )
+        }
+        ResolvedContentsScope::MissingLocation { .. } => Ok(Vec::new()),
     }
 }
 
 fn read_rows_for_accepted_locations(
     connection: &Connection,
     source_predicate: &str,
+    media_predicate: &str,
+    row_profile: StoreContentsRowProfile,
     source_id: i64,
     limit: i64,
-) -> LibrarySqliteResult<Vec<StoreSelectedContentsRow>> {
-    let sql = selected_rows_sql(Some(accepted_locations_cte()), source_predicate);
+) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
+    let sql = contents_rows_sql(
+        Some(accepted_locations_cte()),
+        source_predicate,
+        media_predicate,
+        row_profile,
+    );
     let mut statement = connection.prepare(&sql)?;
     let rows = statement
-        .query_map(params![source_id, limit], selected_contents_row_from_row)?
+        .query_map(params![source_id, limit], contents_row_from_row)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(LibrarySqliteError::from)?;
     Ok(rows)
@@ -1004,50 +1162,131 @@ fn read_rows_for_accepted_locations(
 fn read_rows_with_source_predicate(
     connection: &Connection,
     source_predicate: &str,
+    media_predicate: &str,
+    row_profile: StoreContentsRowProfile,
     source_id: i64,
     relative_path: Option<&str>,
     limit: i64,
-) -> LibrarySqliteResult<Vec<StoreSelectedContentsRow>> {
-    let sql = selected_rows_sql(None, source_predicate);
+) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
+    let sql = contents_rows_sql(None, source_predicate, media_predicate, row_profile);
     let mut statement = connection.prepare(&sql)?;
     let rows = if let Some(relative_path) = relative_path {
         statement
             .query_map(
                 params![source_id, relative_path, limit],
-                selected_contents_row_from_row,
+                contents_row_from_row,
             )?
             .collect::<Result<Vec<_>, _>>()
             .map_err(LibrarySqliteError::from)?
     } else {
         statement
-            .query_map(params![source_id, limit], selected_contents_row_from_row)?
+            .query_map(params![source_id, limit], contents_row_from_row)?
             .collect::<Result<Vec<_>, _>>()
             .map_err(LibrarySqliteError::from)?
     };
     Ok(rows)
 }
 
-fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String {
+fn scoped_path_predicate(recursion: StoreContentsRecursion) -> String {
+    match recursion {
+        StoreContentsRecursion::Recursive => format!(
+            "sf.source_id = ?1
+             AND {}",
+            source_file_descendant_predicate("sf", "?2")
+        ),
+        StoreContentsRecursion::Immediate => "sf.source_id = ?1
+             AND sf.parent_source_directory_id = (
+                 SELECT sd.source_directory_id
+                 FROM source_directories sd
+                 WHERE sd.source_id = ?1
+                   AND sd.relative_path COLLATE BINARY = ?2 COLLATE BINARY
+                   AND sd.presence_state = 'present'
+             )"
+        .to_string(),
+    }
+}
+
+fn contents_rows_sql(
+    prefix_cte: Option<&str>,
+    source_predicate: &str,
+    media_predicate: &str,
+    row_profile: StoreContentsRowProfile,
+) -> String {
+    match row_profile {
+        StoreContentsRowProfile::SourceFile => {
+            source_file_rows_sql(prefix_cte, source_predicate, media_predicate)
+        }
+        StoreContentsRowProfile::PrimaryMedia => {
+            primary_media_rows_sql(prefix_cte, source_predicate, media_predicate)
+        }
+    }
+}
+
+fn source_file_rows_sql(
+    prefix_cte: Option<&str>,
+    source_predicate: &str,
+    media_predicate: &str,
+) -> String {
+    let cte_prefix = prefix_cte
+        .map(|cte| format!("WITH {cte} "))
+        .unwrap_or_default();
+    format!(
+        "{cte_prefix}
+         SELECT sf.source_file_id,
+                sf.source_id,
+                sf.parent_source_directory_id,
+                sf.relative_path,
+                sf.name AS file_name,
+                sf.media_class,
+                sf.presence_state,
+                NULL AS library_asset_id,
+                NULL AS row_version,
+                NULL AS primary_source_file_id,
+                NULL AS availability_state,
+                NULL AS title,
+                NULL AS artist,
+                NULL AS album,
+                NULL AS duration_ms,
+                NULL AS musical_key,
+                NULL AS tempo_bpm,
+                NULL AS waveform_quality_current,
+                NULL AS waveform_quality_target,
+                NULL AS stems_state_summary,
+                NULL AS prep_readiness_summary,
+                sf.updated_at
+         FROM source_files sf
+         WHERE sf.presence_state = 'present'
+           AND {media_predicate}
+           AND {source_predicate}
+         ORDER BY {SOURCE_FILE_CONTENTS_ORDER_SQL}
+         LIMIT ?{}",
+        limit_parameter_index(prefix_cte, source_predicate)
+    )
+}
+
+fn primary_media_rows_sql(
+    prefix_cte: Option<&str>,
+    source_predicate: &str,
+    media_predicate: &str,
+) -> String {
     let cte_prefix = prefix_cte
         .map(|cte| format!("WITH {cte},"))
         .unwrap_or_else(|| "WITH".to_string());
-    let primary_media_predicate = source_file_visibility_predicate_sql_for_column(
-        SourceFileVisibility::Performance,
-        "sf.media_class",
-    );
 
     format!(
         "{cte_prefix}
          scope_files AS (
              SELECT sf.source_file_id,
                     sf.source_id,
+                    sf.parent_source_directory_id,
                     sf.relative_path,
                     sf.name,
                     sf.media_class,
+                    sf.presence_state,
                     sf.updated_at
              FROM source_files sf
              WHERE sf.presence_state = 'present'
-               AND {primary_media_predicate}
+               AND {media_predicate}
                AND {source_predicate}
          ),
          promoted_scope AS (
@@ -1068,9 +1307,11 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
                     pbr.updated_at,
                     sf.source_file_id,
                     sf.source_id,
+                    sf.parent_source_directory_id,
                     sf.relative_path,
                     sf.name,
                     sf.media_class,
+                    sf.presence_state,
                     pia.accepted_at,
                     ss.ordinal,
                     ROW_NUMBER() OVER (
@@ -1094,14 +1335,16 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
                ON pbr.library_asset_id = pia.library_asset_id
          ),
          promoted AS (
-             SELECT library_asset_id,
-                    row_version,
-                    primary_source_file_id,
-                    source_file_id AS scoped_source_file_id,
+             SELECT source_file_id,
                     source_id,
+                    parent_source_directory_id,
                     relative_path,
                     name AS file_name,
                     media_class,
+                    presence_state,
+                    library_asset_id,
+                    row_version,
+                    primary_source_file_id,
                     availability_state,
                     title,
                     artist,
@@ -1118,14 +1361,16 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
              WHERE attachment_rank = 1
          ),
          source_file_rows AS (
-             SELECT NULL AS library_asset_id,
-                    NULL AS row_version,
-                    NULL AS primary_source_file_id,
-                    sf.source_file_id AS scoped_source_file_id,
+             SELECT sf.source_file_id,
                     sf.source_id,
+                    sf.parent_source_directory_id,
                     sf.relative_path,
                     sf.name AS file_name,
                     sf.media_class,
+                    sf.presence_state,
+                    NULL AS library_asset_id,
+                    NULL AS row_version,
+                    NULL AS primary_source_file_id,
                     'available' AS availability_state,
                     NULL AS title,
                     NULL AS artist,
@@ -1145,14 +1390,16 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
                  WHERE ps.source_file_id = sf.source_file_id
              )
          )
-         SELECT library_asset_id,
-                row_version,
-                primary_source_file_id,
-                scoped_source_file_id,
+         SELECT source_file_id,
                 source_id,
+                parent_source_directory_id,
                 relative_path,
                 file_name,
                 media_class,
+                presence_state,
+                library_asset_id,
+                row_version,
+                primary_source_file_id,
                 availability_state,
                 title,
                 artist,
@@ -1170,14 +1417,21 @@ fn selected_rows_sql(prefix_cte: Option<&str>, source_predicate: &str) -> String
              UNION ALL
              SELECT * FROM source_file_rows
          )
-         ORDER BY {SELECTED_CONTENTS_ORDER_SQL}
+         ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL}
          LIMIT ?{}",
-        if prefix_cte.is_some() || source_predicate == "sf.source_id = ?1" {
-            "2"
-        } else {
-            "3"
-        }
+        limit_parameter_index(prefix_cte, source_predicate)
     )
+}
+
+fn limit_parameter_index(prefix_cte: Option<&str>, source_predicate: &str) -> &'static str {
+    if prefix_cte.is_some()
+        || source_predicate == "sf.source_id = ?1"
+        || source_predicate == "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL"
+    {
+        "2"
+    } else {
+        "3"
+    }
 }
 
 fn accepted_locations_cte() -> &'static str {
@@ -1206,77 +1460,81 @@ fn source_file_descendant_predicate(alias: &str, prefix_sql: &str) -> String {
     )
 }
 
-fn selected_contents_row_from_row(
-    row: &rusqlite::Row<'_>,
-) -> rusqlite::Result<StoreSelectedContentsRow> {
-    let library_asset_id: Option<i64> = row.get(0)?;
-    let row_version: Option<i64> = row.get(1)?;
-    let primary_source_file_id: Option<i64> = row.get(2)?;
-    let scoped_source_file_id: i64 = row.get(3)?;
-    let source_id: i64 = row.get(4)?;
-    let relative_path: String = row.get(5)?;
-    let file_name: String = row.get(6)?;
-    let media_class: String = row.get(7)?;
-    let availability_state: String = row.get(8)?;
-    let title: Option<String> = row.get(9)?;
-    let artist: Option<String> = row.get(10)?;
-    let album: Option<String> = row.get(11)?;
-    let duration_ms: Option<i64> = row.get(12)?;
-    let musical_key: Option<String> = row.get(13)?;
-    let tempo_bpm: Option<f64> = row.get(14)?;
-    let waveform_quality_current: Option<i64> = row.get(15)?;
-    let waveform_quality_target: Option<i64> = row.get(16)?;
-    let stems_state_summary: Option<String> = row.get(17)?;
-    let prep_readiness_summary: String = row.get(18)?;
-    let updated_at: i64 = row.get(19)?;
+fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreContentsFileRow> {
+    let source_file_id: i64 = row.get(0)?;
+    let source_id: i64 = row.get(1)?;
+    let parent_directory_id: Option<i64> = row.get(2)?;
+    let relative_path: String = row.get(3)?;
+    let file_name: String = row.get(4)?;
+    let media_class: String = row.get(5)?;
+    let presence: String = row.get(6)?;
+    let library_asset_id: Option<i64> = row.get(7)?;
+    let row_version: Option<i64> = row.get(8)?;
+    let primary_source_file_id: Option<i64> = row.get(9)?;
+    let availability_state: Option<String> = row.get(10)?;
+    let title: Option<String> = row.get(11)?;
+    let artist: Option<String> = row.get(12)?;
+    let album: Option<String> = row.get(13)?;
+    let duration_ms: Option<i64> = row.get(14)?;
+    let musical_key: Option<String> = row.get(15)?;
+    let tempo_bpm: Option<f64> = row.get(16)?;
+    let waveform_quality_current: Option<i64> = row.get(17)?;
+    let waveform_quality_target: Option<i64> = row.get(18)?;
+    let stems_state_summary: Option<String> = row.get(19)?;
+    let prep_readiness_summary: Option<String> = row.get(20)?;
+    let updated_at: i64 = row.get(21)?;
 
-    let origin = if library_asset_id.is_some() {
-        StoreSelectedContentsRowOrigin::LibraryAsset
-    } else {
-        StoreSelectedContentsRowOrigin::SourceFile
-    };
+    let primary_media = availability_state.as_ref().map(|availability_state| {
+        let origin = if library_asset_id.is_some() {
+            StoreContentsRowOrigin::LibraryAsset
+        } else {
+            StoreContentsRowOrigin::SourceFile
+        };
 
-    let stable_id = match &origin {
-        StoreSelectedContentsRowOrigin::LibraryAsset => {
-            let id =
-                library_asset_id.expect("library_asset_id must be present for LibraryAsset origin");
-            format!("library-asset:{id}")
+        StorePrimaryMediaSummary {
+            origin,
+            library_asset_id,
+            row_version,
+            primary_source_file_id,
+            availability_state: availability_state.clone(),
+            title: title.clone(),
+            artist: artist.clone(),
+            album: album.clone(),
+            duration_ms,
+            musical_key: musical_key.clone(),
+            tempo_bpm,
+            waveform_quality_current,
+            waveform_quality_target,
+            stems_state_summary: stems_state_summary.clone(),
+            prep_readiness_summary: prep_readiness_summary
+                .clone()
+                .unwrap_or_else(|| "underprepared".to_string()),
         }
-        StoreSelectedContentsRowOrigin::SourceFile => {
-            format!("source-file:{scoped_source_file_id}")
-        }
-    };
+    });
 
-    let label = selected_contents_label(title.as_deref(), &file_name, &relative_path);
+    let label = contents_label(title.as_deref(), &file_name, &relative_path);
 
-    Ok(StoreSelectedContentsRow {
-        stable_id,
-        label,
-        origin,
-        library_asset_id,
-        row_version,
-        primary_source_file_id,
-        scoped_source_file_id,
+    Ok(StoreContentsFileRow {
+        id: primary_media
+            .as_ref()
+            .and_then(|summary| summary.library_asset_id)
+            .map(|id| format!("library-asset:{id}"))
+            .unwrap_or_else(|| format!("source-file:{source_file_id}")),
         source_id,
+        source_file_id,
+        parent_directory_id,
+        label,
         relative_path,
         file_name,
         media_class,
+        presence,
         availability_state,
-        title,
-        artist,
-        album,
-        duration_ms,
-        musical_key,
-        tempo_bpm,
-        waveform_quality_current,
-        waveform_quality_target,
-        stems_state_summary,
-        prep_readiness_summary,
+        primary_media,
         updated_at,
     })
 }
 
-fn selected_contents_label(title: Option<&str>, file_name: &str, relative_path: &str) -> String {
+fn contents_label(title: Option<&str>, file_name: &str, relative_path: &str) -> String {
     title
         .filter(|value| !value.trim().is_empty())
         .or_else(|| {
@@ -1298,14 +1556,18 @@ fn selected_contents_label(title: Option<&str>, file_name: &str, relative_path: 
 }
 
 fn non_ready_result(
-    scope: StoreSelectedContentsScope,
-    state: StoreSelectedContentsState,
+    scope: StoreContentsScope,
+    policy: StoreContentsReadPolicy,
+    recursion: StoreContentsRecursion,
+    state: StoreContentsState,
     coverage_state: StoreContentsCoverageState,
     detail: &str,
-) -> StoreSelectedContentsResult {
-    StoreSelectedContentsResult {
+) -> StoreContentsResult {
+    StoreContentsResult {
         state,
         scope,
+        policy,
+        recursion,
         rows: Vec::new(),
         coverage: StoreContentsCoverage {
             state: coverage_state,
@@ -1313,7 +1575,6 @@ fn non_ready_result(
             empty_result_authoritative: false,
             detail: Some(detail.to_string()),
         },
-        next_cursor: None,
         detail: Some(detail.to_string()),
     }
 }
@@ -1323,8 +1584,9 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        StoreContentsCoverageState, StoreSelectedContentsRowOrigin, StoreSelectedContentsScope,
-        StoreSelectedContentsState, read_selected_contents,
+        StoreContentsCoverageState, StoreContentsMediaClass, StoreContentsReadPolicy,
+        StoreContentsRecursion, StoreContentsRowOrigin, StoreContentsRowProfile,
+        StoreContentsScope, StoreContentsState, read_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -1332,6 +1594,29 @@ mod tests {
         let mut connection = Connection::open_in_memory().expect("open test database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
         connection
+    }
+
+    fn primary_media_policy() -> StoreContentsReadPolicy {
+        StoreContentsReadPolicy {
+            media_classes: vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+            ],
+            row_profile: StoreContentsRowProfile::PrimaryMedia,
+        }
+    }
+
+    fn source_file_policy(media_classes: Vec<StoreContentsMediaClass>) -> StoreContentsReadPolicy {
+        StoreContentsReadPolicy {
+            media_classes,
+            row_profile: StoreContentsRowProfile::SourceFile,
+        }
+    }
+
+    fn primary_media(row: &super::StoreContentsFileRow) -> &super::StorePrimaryMediaSummary {
+        row.primary_media
+            .as_ref()
+            .expect("primary-media profile rows carry a summary")
     }
 
     fn insert_source(connection: &Connection, source_id: i64) {
@@ -1721,22 +2006,27 @@ mod tests {
             "Clip",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(
             result
                 .rows
                 .iter()
-                .map(|row| (row.origin, row.library_asset_id))
+                .map(|row| {
+                    let summary = primary_media(row);
+                    (summary.origin, summary.library_asset_id)
+                })
                 .collect::<Vec<_>>(),
-            vec![(StoreSelectedContentsRowOrigin::LibraryAsset, Some(1))]
+            vec![(StoreContentsRowOrigin::LibraryAsset, Some(1))]
         );
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
     }
@@ -1759,17 +2049,19 @@ mod tests {
             "Track",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::LocationMissing);
+        assert_eq!(result.state, StoreContentsState::LocationMissing);
         assert!(result.rows.is_empty());
     }
 
@@ -1812,29 +2104,34 @@ mod tests {
             "Cover",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(
             result
                 .rows
                 .iter()
-                .map(|row| (row.origin, row.library_asset_id, row.media_class.as_str()))
+                .map(|row| {
+                    let summary = primary_media(row);
+                    (
+                        summary.origin,
+                        summary.library_asset_id,
+                        row.media_class.as_str(),
+                    )
+                })
                 .collect::<Vec<_>>(),
-            vec![(
-                StoreSelectedContentsRowOrigin::LibraryAsset,
-                Some(1),
-                "audio"
-            )]
+            vec![(StoreContentsRowOrigin::LibraryAsset, Some(1), "audio")]
         );
     }
 
@@ -1845,18 +2142,20 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Pending", "pending");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Partial);
+        assert_eq!(result.state, StoreContentsState::Partial);
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Pending);
         assert!(!result.coverage.empty_result_authoritative);
     }
@@ -1867,15 +2166,17 @@ mod tests {
         insert_source(&connection, 1);
         set_source_access(&connection, 1, "blocked", Some("permission_denied"));
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Blocked);
+        assert_eq!(result.state, StoreContentsState::Blocked);
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
         assert!(result.rows.is_empty());
         assert!(!result.coverage.empty_result_authoritative);
@@ -1887,15 +2188,17 @@ mod tests {
         insert_source(&connection, 1);
         set_source_access(&connection, 1, "missing", Some("missing"));
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::LocationMissing);
+        assert_eq!(result.state, StoreContentsState::LocationMissing);
         assert_eq!(
             result.coverage.state,
             StoreContentsCoverageState::LocationMissing
@@ -1911,18 +2214,20 @@ mod tests {
         set_source_scan_phase(&connection, 1, "scanning", None);
         insert_directory(&connection, 10, 1, "Scanning", "scanning");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Partial);
+        assert_eq!(result.state, StoreContentsState::Partial);
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Scanning);
         assert!(result.rows.is_empty());
         assert!(!result.coverage.empty_result_authoritative);
@@ -1936,18 +2241,20 @@ mod tests {
         insert_directory(&connection, 11, 1, "Music/Locked", "complete");
         set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Blocked);
+        assert_eq!(result.state, StoreContentsState::Blocked);
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
         assert!(!result.coverage.recursive_scope_complete);
         assert!(!result.coverage.empty_result_authoritative);
@@ -1999,32 +2306,35 @@ mod tests {
         insert_scanned_file(&connection, 1000, 1, 10, "Music/track.wav", "audio");
         insert_scanned_file(&connection, 1001, 1, 10, "Music/clip.mp4", "video");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 2);
 
         for row in &result.rows {
-            assert_eq!(row.origin, StoreSelectedContentsRowOrigin::SourceFile);
-            assert!(row.library_asset_id.is_none());
-            assert!(row.row_version.is_none());
-            assert!(row.primary_source_file_id.is_none());
-            assert!(row.title.is_none());
-            assert!(row.artist.is_none());
-            assert!(row.album.is_none());
-            assert!(row.duration_ms.is_none());
-            assert_eq!(row.availability_state, "available");
-            assert_eq!(row.prep_readiness_summary, "underprepared");
+            let summary = primary_media(row);
+            assert_eq!(summary.origin, StoreContentsRowOrigin::SourceFile);
+            assert!(summary.library_asset_id.is_none());
+            assert!(summary.row_version.is_none());
+            assert!(summary.primary_source_file_id.is_none());
+            assert!(summary.title.is_none());
+            assert!(summary.artist.is_none());
+            assert!(summary.album.is_none());
+            assert!(summary.duration_ms.is_none());
+            assert_eq!(row.availability_state.as_deref(), Some("available"));
+            assert_eq!(summary.prep_readiness_summary, "underprepared");
             assert!(
-                row.stable_id.starts_with("source-file:"),
-                "source-file row stable_id must start with 'source-file:', got: {}",
-                row.stable_id
+                row.id.starts_with("source-file:"),
+                "source-file row id must start with 'source-file:', got: {}",
+                row.id
             );
         }
 
@@ -2054,25 +2364,25 @@ mod tests {
             "Track",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
-        assert_eq!(
-            result.rows[0].origin,
-            StoreSelectedContentsRowOrigin::LibraryAsset
-        );
-        assert_eq!(result.rows[0].library_asset_id, Some(1));
+        let summary = primary_media(&result.rows[0]);
+        assert_eq!(summary.origin, StoreContentsRowOrigin::LibraryAsset);
+        assert_eq!(summary.library_asset_id, Some(1));
         assert!(
-            result.rows[0].stable_id.starts_with("library-asset:"),
-            "promoted row stable_id must start with 'library-asset:', got: {}",
-            result.rows[0].stable_id
+            result.rows[0].id.starts_with("library-asset:"),
+            "promoted row id must start with 'library-asset:', got: {}",
+            result.rows[0].id
         );
     }
 
@@ -2083,22 +2393,24 @@ mod tests {
         insert_directory(&connection, 10, 1, "Music", "complete");
         insert_scanned_file(&connection, 1000, 1, 10, "Music/track.wav", "audio");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         assert_eq!(
-            result.rows[0].origin,
-            StoreSelectedContentsRowOrigin::SourceFile
+            primary_media(&result.rows[0]).origin,
+            StoreContentsRowOrigin::SourceFile
         );
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
     }
@@ -2111,18 +2423,20 @@ mod tests {
         insert_scanned_file(&connection, 1000, 1, 10, "Covers/front.jpg", "image");
         insert_scanned_file(&connection, 1001, 1, 10, "Covers/back.png", "image");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Empty);
+        assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
         assert!(result.coverage.empty_result_authoritative);
@@ -2142,18 +2456,20 @@ mod tests {
             "unsupported",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Empty);
+        assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
         assert!(result.coverage.empty_result_authoritative);
     }
@@ -2165,18 +2481,20 @@ mod tests {
         insert_directory(&connection, 10, 1, "Data", "complete");
         insert_scanned_file(&connection, 1000, 1, 10, "Data/notes", "none");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Empty);
+        assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
         assert!(result.coverage.empty_result_authoritative);
     }
@@ -2188,18 +2506,20 @@ mod tests {
         insert_directory(&connection, 10, 1, "Covers", "pending");
         insert_scanned_file(&connection, 1000, 1, 10, "Covers/front.jpg", "image");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Partial);
+        assert_eq!(result.state, StoreContentsState::Partial);
         assert!(result.rows.is_empty());
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Pending);
         assert!(!result.coverage.empty_result_authoritative);
@@ -2223,24 +2543,198 @@ mod tests {
         );
         insert_scanned_file(&connection, 1001, 1, 10, "Music/scanned.wav", "audio");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 2);
 
-        let origins: Vec<_> = result.rows.iter().map(|r| r.origin).collect();
-        assert!(origins.contains(&StoreSelectedContentsRowOrigin::LibraryAsset));
-        assert!(origins.contains(&StoreSelectedContentsRowOrigin::SourceFile));
+        let origins: Vec<_> = result
+            .rows
+            .iter()
+            .map(|row| primary_media(row).origin)
+            .collect();
+        assert!(origins.contains(&StoreContentsRowOrigin::LibraryAsset));
+        assert!(origins.contains(&StoreContentsRowOrigin::SourceFile));
     }
 
     #[test]
-    fn selected_contents_whole_source_uses_index_not_table_scan() {
+    fn source_file_profile_returns_audio_video_and_image_without_primary_media() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/clip.mp4", "video");
+        insert_scanned_file(&connection, 1002, 1, 10, "Media/cover.jpg", "image");
+        insert_scanned_file(&connection, 1003, 1, 10, "Media/readme.txt", "unsupported");
+        insert_scanned_file(&connection, 1004, 1, 10, "Media/mystery", "none");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+                StoreContentsMediaClass::Image,
+            ]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read source-file contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_eq!(
+            result
+                .policy
+                .media_classes
+                .iter()
+                .map(|media_class| media_class.as_str())
+                .collect::<Vec<_>>(),
+            vec!["audio", "video", "image"]
+        );
+        let mut media_classes = result
+            .rows
+            .iter()
+            .map(|row| row.media_class.as_str())
+            .collect::<Vec<_>>();
+        media_classes.sort_unstable();
+        assert_eq!(media_classes, vec!["audio", "image", "video"]);
+        assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
+        assert!(
+            result
+                .rows
+                .iter()
+                .all(|row| row.availability_state.is_none())
+        );
+    }
+
+    #[test]
+    fn source_file_profile_image_only_directory_returns_image_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Covers", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Covers/front.jpg", "image");
+        insert_scanned_file(&connection, 1001, 1, 10, "Covers/back.png", "image");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Image]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read source-file contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_eq!(result.rows.len(), 2);
+        assert!(result.rows.iter().all(|row| row.media_class == "image"));
+        assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
+    }
+
+    #[test]
+    fn duplicate_media_classes_are_canonicalized_deterministically() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![
+                StoreContentsMediaClass::Image,
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+            ]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read source-file contents");
+
+        assert_eq!(
+            result.policy.media_classes,
+            vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+                StoreContentsMediaClass::Image,
+            ]
+        );
+    }
+
+    #[test]
+    fn primary_media_policy_with_image_returns_policy_conflict() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Image]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read source-file contents");
+        assert_eq!(result.state, StoreContentsState::Empty);
+
+        let conflict = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            StoreContentsReadPolicy {
+                media_classes: vec![
+                    StoreContentsMediaClass::Audio,
+                    StoreContentsMediaClass::Image,
+                ],
+                row_profile: StoreContentsRowProfile::PrimaryMedia,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read conflicted contents");
+
+        assert_eq!(conflict.state, StoreContentsState::PolicyConflict);
+        assert!(conflict.rows.is_empty());
+    }
+
+    #[test]
+    fn provided_cursor_returns_cursor_invalid_without_next_cursor() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            Some("page-2"),
+        )
+        .expect("read contents with cursor");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn contents_whole_source_uses_index_not_table_scan() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -2255,7 +2749,11 @@ mod tests {
             );
         }
 
-        let sql = super::selected_rows_sql(None, "sf.source_id = ?1");
+        let media_predicate = super::media_classes_predicate_sql(
+            "sf.media_class",
+            &primary_media_policy().media_classes,
+        );
+        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -2275,7 +2773,7 @@ mod tests {
     }
 
     #[test]
-    fn selected_contents_directory_prefix_uses_binary_collation_index() {
+    fn contents_directory_prefix_uses_binary_collation_index() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -2297,7 +2795,11 @@ mod tests {
             "sf.source_id = ?1 AND {}",
             super::source_file_descendant_predicate("sf", "?2")
         );
-        let sql = super::selected_rows_sql(None, &source_predicate);
+        let media_predicate = super::media_classes_predicate_sql(
+            "sf.media_class",
+            &primary_media_policy().media_classes,
+        );
+        let sql = super::primary_media_rows_sql(None, &source_predicate, &media_predicate);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -2318,7 +2820,7 @@ mod tests {
     }
 
     #[test]
-    fn selected_contents_accepted_locations_avoids_source_files_table_scan() {
+    fn contents_accepted_locations_avoids_source_files_table_scan() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -2345,7 +2847,15 @@ mod tests {
              )",
             super::relative_path_scope_predicate("sf", "al.relative_path")
         );
-        let sql = super::selected_rows_sql(Some(super::accepted_locations_cte()), &predicate);
+        let media_predicate = super::media_classes_predicate_sql(
+            "sf.media_class",
+            &primary_media_policy().media_classes,
+        );
+        let sql = super::primary_media_rows_sql(
+            Some(super::accepted_locations_cte()),
+            &predicate,
+            &media_predicate,
+        );
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -2365,7 +2875,7 @@ mod tests {
     }
 
     #[test]
-    fn selected_contents_mixed_promotion_uses_join_indexes() {
+    fn contents_mixed_promotion_uses_join_indexes() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
@@ -2395,7 +2905,11 @@ mod tests {
             );
         }
 
-        let sql = super::selected_rows_sql(None, "sf.source_id = ?1");
+        let media_predicate = super::media_classes_predicate_sql(
+            "sf.media_class",
+            &primary_media_policy().media_classes,
+        );
+        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -2463,17 +2977,19 @@ mod tests {
             .expect("set partial scan phase");
         insert_directory(&connection, 10, 1, "Music", "complete");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert!(!result.coverage.empty_result_authoritative);
         assert!(!result.coverage.recursive_scope_complete);
-        assert_ne!(result.state, StoreSelectedContentsState::Empty);
+        assert_ne!(result.state, StoreContentsState::Empty);
     }
 
     #[test]
@@ -2491,13 +3007,15 @@ mod tests {
         insert_directory(&connection, 11, 1, "Music/Locked", "complete");
         set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert!(
             !result.rows.is_empty(),
@@ -2524,16 +3042,18 @@ mod tests {
         set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
         insert_scanned_file(&connection, 1000, 1, 11, "Music/Good/track.wav", "audio");
 
-        let dir_result = read_selected_contents(
+        let dir_result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 11,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for Good");
+        .expect("read contents for Good");
 
         assert_eq!(
             dir_result.coverage.state,
@@ -2541,16 +3061,18 @@ mod tests {
             "clean sibling directory under partial source must have complete coverage"
         );
         assert!(dir_result.coverage.recursive_scope_complete);
-        assert_eq!(dir_result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(dir_result.state, StoreContentsState::Ready);
         assert!(!dir_result.rows.is_empty());
 
-        let source_result = read_selected_contents(
+        let source_result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for source");
+        .expect("read contents for source");
 
         assert_ne!(
             source_result.coverage.state,
@@ -2575,16 +3097,18 @@ mod tests {
         insert_directory(&connection, 12, 1, "Music/Locked", "complete");
         set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
 
-        let dir_result = read_selected_contents(
+        let dir_result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 11,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for empty Good");
+        .expect("read contents for empty Good");
 
         assert_eq!(
             dir_result.coverage.state,
@@ -2593,7 +3117,7 @@ mod tests {
         );
         assert!(dir_result.coverage.recursive_scope_complete);
         assert!(dir_result.coverage.empty_result_authoritative);
-        assert_eq!(dir_result.state, StoreSelectedContentsState::Empty);
+        assert_eq!(dir_result.state, StoreContentsState::Empty);
     }
 
     #[test]
@@ -2610,16 +3134,18 @@ mod tests {
         insert_directory(&connection, 11, 1, "Music/Locked", "complete");
         set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
 
-        let dir_result = read_selected_contents(
+        let dir_result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Directory {
+            StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 11,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for Locked");
+        .expect("read contents for Locked");
 
         assert_eq!(
             dir_result.coverage.state,
@@ -2628,7 +3154,7 @@ mod tests {
         );
         assert!(!dir_result.coverage.recursive_scope_complete);
         assert!(!dir_result.coverage.empty_result_authoritative);
-        assert_eq!(dir_result.state, StoreSelectedContentsState::Blocked);
+        assert_eq!(dir_result.state, StoreContentsState::Blocked);
     }
 
     #[test]
@@ -2653,19 +3179,21 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_eq!(
             result.state,
-            StoreSelectedContentsState::LocationMissing,
+            StoreContentsState::LocationMissing,
             "Music/DeletedFolder must be classified missing, not unknown or pending"
         );
         assert_eq!(
@@ -2699,19 +3227,21 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_ne!(
             result.state,
-            StoreSelectedContentsState::Empty,
+            StoreContentsState::Empty,
             "blocked location must not produce authoritative empty"
         );
         assert_ne!(
@@ -2739,15 +3269,17 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_eq!(
             result.coverage.state,
@@ -2772,15 +3304,17 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_eq!(
             result.coverage.state,
@@ -2816,13 +3350,15 @@ mod tests {
         );
         insert_scanned_file(&connection, 1000, 1, 11, "Music/Good/track.wav", "audio");
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for source with accepted location");
+        .expect("read contents for source with accepted location");
 
         assert!(
             !result.rows.is_empty(),
@@ -2869,13 +3405,15 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_ne!(
             result.coverage.state,
@@ -2910,23 +3448,27 @@ mod tests {
             "registered_subpath",
         );
 
-        let location_result = read_selected_contents(
+        let location_result = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for SourceLocation");
+        .expect("read contents for SourceLocation");
 
-        let source_result = read_selected_contents(
+        let source_result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for Source");
+        .expect("read contents for Source");
 
         assert_eq!(
             location_result.coverage.state,
@@ -2948,23 +3490,27 @@ mod tests {
             "registered_subpath",
         );
 
-        let location_result_blocked = read_selected_contents(
+        let location_result_blocked = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 101,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for blocked SourceLocation");
+        .expect("read contents for blocked SourceLocation");
 
-        let source_result_blocked = read_selected_contents(
+        let source_result_blocked = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents for Source with blocked location");
+        .expect("read contents for Source with blocked location");
 
         assert_eq!(
             location_result_blocked.coverage.state,
@@ -3002,13 +3548,15 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert!(
             !result.rows.is_empty(),
@@ -3016,7 +3564,7 @@ mod tests {
         );
         assert_ne!(
             result.state,
-            StoreSelectedContentsState::LocationMissing,
+            StoreContentsState::LocationMissing,
             "mixed present + missing must not be LocationMissing"
         );
         assert_ne!(
@@ -3062,22 +3610,24 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_ne!(
             result.state,
-            StoreSelectedContentsState::Empty,
+            StoreContentsState::Empty,
             "mixed present + missing must not be Empty"
         );
         assert_ne!(
             result.state,
-            StoreSelectedContentsState::LocationMissing,
+            StoreContentsState::LocationMissing,
             "mixed present + missing must not be LocationMissing"
         );
         assert_eq!(
@@ -3111,17 +3661,19 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_eq!(
             result.state,
-            StoreSelectedContentsState::LocationMissing,
+            StoreContentsState::LocationMissing,
             "all missing accepted locations must be LocationMissing"
         );
         assert_eq!(
@@ -3170,13 +3722,15 @@ mod tests {
             "Track",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert!(
             !result.rows.is_empty(),
@@ -3184,7 +3738,7 @@ mod tests {
         );
         assert_ne!(
             result.state,
-            StoreSelectedContentsState::LocationMissing,
+            StoreContentsState::LocationMissing,
             "present + blocked must not be LocationMissing"
         );
         assert_eq!(
@@ -3231,13 +3785,15 @@ mod tests {
             "Track",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert!(
             !result.rows.is_empty(),
@@ -3245,7 +3801,7 @@ mod tests {
         );
         assert_ne!(
             result.state,
-            StoreSelectedContentsState::LocationMissing,
+            StoreContentsState::LocationMissing,
             "present + failed must not be LocationMissing"
         );
         assert_eq!(
@@ -3271,15 +3827,17 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Empty);
+        assert_eq!(result.state, StoreContentsState::Empty);
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
         assert!(result.coverage.recursive_scope_complete);
         assert!(result.coverage.empty_result_authoritative);
@@ -3311,15 +3869,17 @@ mod tests {
             "Track",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::Source { source_id: 1 },
+            StoreContentsScope::Source { source_id: 1 },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
-        assert_eq!(result.state, StoreSelectedContentsState::Ready);
+        assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
         assert!(result.coverage.recursive_scope_complete);
     }
@@ -3338,19 +3898,21 @@ mod tests {
             "registered_subpath",
         );
 
-        let result = read_selected_contents(
+        let result = read_contents(
             &connection,
-            StoreSelectedContentsScope::SourceLocation {
+            StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read selected contents");
+        .expect("read contents");
 
         assert_eq!(
             result.state,
-            StoreSelectedContentsState::LocationMissing,
+            StoreContentsState::LocationMissing,
             "direct SourceLocation missing must remain LocationMissing"
         );
         assert_eq!(

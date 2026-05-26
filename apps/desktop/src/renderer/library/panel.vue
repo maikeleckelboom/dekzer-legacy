@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import { CircleXIcon, Icon, ScanIcon } from '../icons'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
-import { useSelectedContentsRead } from './boundary/selectedContentsRead'
+import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
@@ -51,7 +51,7 @@ const visibleOperationFeedbackKinds = new Set<LibraryOperationFeedbackKind>([
 
 const viewStateStore = createViewStateStore()
 const hierarchyRead = useLibraryHierarchyRead()
-const selectedContentsRead = useSelectedContentsRead()
+const contentsRead = useContentsRead()
 const rootActions = useLocalRootActions()
 
 const rootLifecycle = useRootLifecycle({
@@ -121,7 +121,7 @@ const contentsProjection = computed(() => {
     state: browserState.value,
     ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
     ...(projection === undefined ? {} : { bindingsById: projection.bindingsById }),
-    selectedContentsState: selectedContentsRead.state.value
+    contentsState: contentsRead.state.value
   })
 })
 
@@ -196,10 +196,11 @@ watch(
   [
     selectedNodeId,
     () => hierarchyRead.browserProjection.value,
-    () => hierarchyRead.hostStatus.value?.state
+    () => hierarchyRead.hostStatus.value?.state,
+    () => hierarchyRead.sourceFileVisibility.value
   ],
   () => {
-    requestSelectedContentsForCurrentSelection()
+    requestContentsForCurrentSelection()
   },
   { immediate: true }
 )
@@ -398,7 +399,7 @@ function markUserInteraction(): void {
 function selectNode(nodeId: BrowserTreeNodeId): void {
   markUserInteraction()
   selectedNodeId.value = nodeId
-  requestSelectedContentsForCurrentSelection()
+  requestContentsForCurrentSelection()
   saveViewState()
 }
 
@@ -440,7 +441,7 @@ async function handleRemoveSource(): Promise<void> {
   }
 
   selectedNodeId.value = undefined
-  selectedContentsRead.clear()
+  contentsRead.clear()
   expandedNodeIds.value = new Set()
   pendingRestoreIds.value = new Set()
 
@@ -470,18 +471,19 @@ function activateContentRowAction(row: ContentRow): void {
   void hierarchyRead.requestNodeChildren(action.nodeId)
 }
 
-function requestSelectedContentsForCurrentSelection(
-  options: { readonly force?: boolean } = {}
-): void {
+function requestContentsForCurrentSelection(options: { readonly force?: boolean } = {}): void {
   const selectedId = selectedNodeId.value
   const projection = hierarchyRead.browserProjection.value
 
   if (selectedId === undefined || projection === undefined) {
-    selectedContentsRead.clear()
+    contentsRead.clear()
     return
   }
 
-  void selectedContentsRead.readForBinding(projection.bindingsById.get(selectedId), options)
+  void contentsRead.readForBinding(projection.bindingsById.get(selectedId), {
+    ...options,
+    sourceFileVisibility: hierarchyRead.sourceFileVisibility.value
+  })
 }
 </script>
 

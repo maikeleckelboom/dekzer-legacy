@@ -37,7 +37,7 @@ impl MaintainedSnapshotScope {
             SnapshotReadCommand::ReadLiteralHierarchyChildren(_)
             | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(_)
-            | SnapshotReadCommand::ReadSelectedContents(_)
+            | SnapshotReadCommand::ContentsRead(_)
             | SnapshotReadCommand::ReadLibraryAssetWaveformOverview(_)
             | SnapshotReadCommand::ReadLibraryAssetPreparationDetail(_) => Self::LibraryBrowser,
         }
@@ -157,11 +157,12 @@ mod tests {
         MaintainedSnapshotScope,
     };
     use crate::{
-        LiteralHierarchyEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
+        ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
+        ContentsRowProfile, ContentsScope, LiteralHierarchyEntryPoint,
+        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
         ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
         ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, ReadSelectedContentsRequest,
-        SearchNavigationNodeLibraryBrowserWindowRequest, SelectedContentsScope,
+        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowRequest,
         SnapshotReadCommand, SourceFileVisibility,
     };
     use serde_json::json;
@@ -214,12 +215,17 @@ mod tests {
                     limit: 100,
                 },
             ),
-            SnapshotReadCommand::ReadSelectedContents(ReadSelectedContentsRequest {
-                scope: SelectedContentsScope::Directory {
+            SnapshotReadCommand::ContentsRead(ContentsReadRequest {
+                scope: ContentsScope::Directory {
                     source_id: 8,
                     source_directory_id: 9,
                 },
-                limit: 100,
+                policy: ContentsReadPolicy {
+                    media_classes: vec![ContentsMediaClass::Audio, ContentsMediaClass::Video],
+                    row_profile: ContentsRowProfile::PrimaryMedia,
+                },
+                recursion: ContentsRecursion::Recursive,
+                limit: Some(100),
                 cursor: None,
             }),
             SnapshotReadCommand::ReadLibraryAssetWaveformOverview(

@@ -25,9 +25,9 @@ import type { ReadLocalRootsOutcome } from '../../../src/shared/libraryRoots/rea
 import type { LocalRootScanResult } from '../../../src/shared/libraryRoots/runScan'
 import type { UnregisterLocalRootResult } from '../../../src/shared/libraryRoots/unregisterLocalRoot'
 import {
-  selectedContentsReadChannels,
-  type SelectedContentsReadResult
-} from '../../../src/shared/librarySelectedContents/read'
+  contentsReadChannels,
+  type ContentsReadResult
+} from '../../../src/shared/libraryContents/read'
 import { emitStatus, testStatus } from '../../support/libraryBoundary'
 import { firstAvailableSourceReadRequest } from '../../support/libraryHierarchy'
 
@@ -36,11 +36,17 @@ describe('preload renderer API', () => {
     const status = testStatus()
     const hierarchyRequest = firstAvailableSourceReadRequest()
     const navigationRequest = { parentNavigationRowId: null }
-    const selectedContentsRequest = {
+    const contentsRequest = {
       scope: {
         kind: 'source' as const,
         sourceId: '7'
-      }
+      },
+      policy: {
+        mediaClasses: ['audio', 'video'] as const,
+        rowProfile: { kind: 'primaryMedia' as const }
+      },
+      recursion: 'recursive' as const,
+      limit: 100
     }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
@@ -74,11 +80,11 @@ describe('preload renderer API', () => {
         message: 'No library source is available for a literal hierarchy read.'
       }
     }
-    const selectedContentsResult: SelectedContentsReadResult = {
+    const contentsResult: ContentsReadResult = {
       state: 'noTarget',
       error: {
         code: 'noTarget',
-        message: 'No selected contents scope was provided.'
+        message: 'No contents scope was provided.'
       }
     }
     const choiceResult: LocalRootChoiceResult = {
@@ -122,7 +128,7 @@ describe('preload renderer API', () => {
     let receivedHierarchyRequest: unknown
     let receivedNavigationRequest: unknown
     let receivedScanRequest: unknown
-    let receivedSelectedContentsRequest: unknown
+    let receivedContentsRequest: unknown
     let receivedViewStatePayload: unknown
     const listeners = new Map<
       string,
@@ -145,9 +151,9 @@ describe('preload renderer API', () => {
           return hierarchyResult
         }
 
-        if (channel === selectedContentsReadChannels.read) {
-          receivedSelectedContentsRequest = args[0]
-          return selectedContentsResult
+        if (channel === contentsReadChannels.read) {
+          receivedContentsRequest = args[0]
+          return contentsResult
         }
 
         if (channel === rootChannels.chooseAndRegisterLocal) {
@@ -231,10 +237,8 @@ describe('preload renderer API', () => {
       hierarchyResult
     )
     expect(receivedHierarchyRequest).toBe(hierarchyRequest)
-    await expect(api.library.selectedContents.read(selectedContentsRequest)).resolves.toBe(
-      selectedContentsResult
-    )
-    expect(receivedSelectedContentsRequest).toBe(selectedContentsRequest)
+    await expect(api.library.contents.read(contentsRequest)).resolves.toBe(contentsResult)
+    expect(receivedContentsRequest).toBe(contentsRequest)
     await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)
     await expect(api.library.viewState.writeViewState(persistedViewState)).resolves.toBe(
       viewStateWriteResult

@@ -64,23 +64,62 @@ pub(crate) const fn store_source_file_visibility(
     }
 }
 
-pub(crate) fn store_selected_contents_scope(
-    scope: protocol::SelectedContentsScope,
-) -> store::StoreSelectedContentsScope {
+pub(crate) fn store_contents_scope(scope: protocol::ContentsScope) -> store::StoreContentsScope {
     match scope {
-        protocol::SelectedContentsScope::Source { source_id } => {
-            store::StoreSelectedContentsScope::Source { source_id }
+        protocol::ContentsScope::Source { source_id } => {
+            store::StoreContentsScope::Source { source_id }
         }
-        protocol::SelectedContentsScope::SourceLocation { source_location_id } => {
-            store::StoreSelectedContentsScope::SourceLocation { source_location_id }
+        protocol::ContentsScope::SourceLocation { source_location_id } => {
+            store::StoreContentsScope::SourceLocation { source_location_id }
         }
-        protocol::SelectedContentsScope::Directory {
+        protocol::ContentsScope::Directory {
             source_id,
             source_directory_id,
-        } => store::StoreSelectedContentsScope::Directory {
+        } => store::StoreContentsScope::Directory {
             source_id,
             source_directory_id,
         },
+    }
+}
+
+pub(crate) fn store_contents_policy(
+    policy: protocol::ContentsReadPolicy,
+) -> store::StoreContentsReadPolicy {
+    store::StoreContentsReadPolicy {
+        media_classes: policy
+            .media_classes
+            .into_iter()
+            .map(store_contents_media_class)
+            .collect(),
+        row_profile: store_contents_row_profile(policy.row_profile),
+    }
+}
+
+pub(crate) const fn store_contents_recursion(
+    recursion: protocol::ContentsRecursion,
+) -> store::StoreContentsRecursion {
+    match recursion {
+        protocol::ContentsRecursion::Immediate => store::StoreContentsRecursion::Immediate,
+        protocol::ContentsRecursion::Recursive => store::StoreContentsRecursion::Recursive,
+    }
+}
+
+const fn store_contents_media_class(
+    media_class: protocol::ContentsMediaClass,
+) -> store::StoreContentsMediaClass {
+    match media_class {
+        protocol::ContentsMediaClass::Audio => store::StoreContentsMediaClass::Audio,
+        protocol::ContentsMediaClass::Video => store::StoreContentsMediaClass::Video,
+        protocol::ContentsMediaClass::Image => store::StoreContentsMediaClass::Image,
+    }
+}
+
+const fn store_contents_row_profile(
+    row_profile: protocol::ContentsRowProfile,
+) -> store::StoreContentsRowProfile {
+    match row_profile {
+        protocol::ContentsRowProfile::SourceFile => store::StoreContentsRowProfile::SourceFile,
+        protocol::ContentsRowProfile::PrimaryMedia => store::StoreContentsRowProfile::PrimaryMedia,
     }
 }
 
@@ -108,11 +147,11 @@ pub(crate) fn map_search_navigation_node_library_browser_window_reply(
     })
 }
 
-pub(crate) fn map_read_selected_contents_reply(
-    result: store::StoreSelectedContentsResult,
-) -> store::LibrarySqliteResult<protocol::ReadSelectedContentsReply> {
-    Ok(protocol::ReadSelectedContentsReply {
-        result: map_selected_contents_result(result)?,
+pub(crate) fn map_read_contents_reply(
+    result: store::StoreContentsResult,
+) -> store::LibrarySqliteResult<protocol::ContentsReadReply> {
+    Ok(protocol::ContentsReadReply {
+        result: map_contents_result(result)?,
     })
 }
 
@@ -580,67 +619,101 @@ fn map_library_asset_browser_row(
     })
 }
 
-fn map_selected_contents_result(
-    result: store::StoreSelectedContentsResult,
-) -> store::LibrarySqliteResult<protocol::SelectedContentsResult> {
-    Ok(protocol::SelectedContentsResult {
-        state: map_selected_contents_state(result.state),
-        scope: map_selected_contents_scope(result.scope),
+fn map_contents_result(
+    result: store::StoreContentsResult,
+) -> store::LibrarySqliteResult<protocol::ContentsResult> {
+    Ok(protocol::ContentsResult {
+        state: map_contents_state(result.state),
+        scope: map_contents_scope(result.scope),
+        policy: map_contents_policy(result.policy),
+        recursion: map_contents_recursion(result.recursion),
         rows: result
             .rows
             .into_iter()
-            .map(map_selected_contents_row)
+            .map(map_contents_row)
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
         coverage: protocol::ContentsCoverage {
-            state: map_selected_contents_coverage_state(result.coverage.state),
+            state: map_contents_coverage_state(result.coverage.state),
             recursive_scope_complete: result.coverage.recursive_scope_complete,
             empty_result_authoritative: result.coverage.empty_result_authoritative,
             detail: result.coverage.detail,
         },
-        next_cursor: result.next_cursor,
         detail: result.detail,
     })
 }
 
-const fn map_selected_contents_scope(
-    scope: store::StoreSelectedContentsScope,
-) -> protocol::SelectedContentsScope {
+fn map_contents_policy(policy: store::StoreContentsReadPolicy) -> protocol::ContentsReadPolicy {
+    protocol::ContentsReadPolicy {
+        media_classes: policy
+            .media_classes
+            .into_iter()
+            .map(map_contents_media_class)
+            .collect(),
+        row_profile: map_contents_row_profile(policy.row_profile),
+    }
+}
+
+const fn map_contents_recursion(
+    recursion: store::StoreContentsRecursion,
+) -> protocol::ContentsRecursion {
+    match recursion {
+        store::StoreContentsRecursion::Immediate => protocol::ContentsRecursion::Immediate,
+        store::StoreContentsRecursion::Recursive => protocol::ContentsRecursion::Recursive,
+    }
+}
+
+const fn map_contents_row_profile(
+    row_profile: store::StoreContentsRowProfile,
+) -> protocol::ContentsRowProfile {
+    match row_profile {
+        store::StoreContentsRowProfile::SourceFile => protocol::ContentsRowProfile::SourceFile,
+        store::StoreContentsRowProfile::PrimaryMedia => protocol::ContentsRowProfile::PrimaryMedia,
+    }
+}
+
+const fn map_contents_media_class(
+    media_class: store::StoreContentsMediaClass,
+) -> protocol::ContentsMediaClass {
+    match media_class {
+        store::StoreContentsMediaClass::Audio => protocol::ContentsMediaClass::Audio,
+        store::StoreContentsMediaClass::Video => protocol::ContentsMediaClass::Video,
+        store::StoreContentsMediaClass::Image => protocol::ContentsMediaClass::Image,
+    }
+}
+
+const fn map_contents_scope(scope: store::StoreContentsScope) -> protocol::ContentsScope {
     match scope {
-        store::StoreSelectedContentsScope::Source { source_id } => {
-            protocol::SelectedContentsScope::Source { source_id }
+        store::StoreContentsScope::Source { source_id } => {
+            protocol::ContentsScope::Source { source_id }
         }
-        store::StoreSelectedContentsScope::SourceLocation { source_location_id } => {
-            protocol::SelectedContentsScope::SourceLocation { source_location_id }
+        store::StoreContentsScope::SourceLocation { source_location_id } => {
+            protocol::ContentsScope::SourceLocation { source_location_id }
         }
-        store::StoreSelectedContentsScope::Directory {
+        store::StoreContentsScope::Directory {
             source_id,
             source_directory_id,
-        } => protocol::SelectedContentsScope::Directory {
+        } => protocol::ContentsScope::Directory {
             source_id,
             source_directory_id,
         },
     }
 }
 
-const fn map_selected_contents_state(
-    state: store::StoreSelectedContentsState,
-) -> protocol::SelectedContentsState {
+const fn map_contents_state(state: store::StoreContentsState) -> protocol::ContentsState {
     match state {
-        store::StoreSelectedContentsState::Ready => protocol::SelectedContentsState::Ready,
-        store::StoreSelectedContentsState::Empty => protocol::SelectedContentsState::Empty,
-        store::StoreSelectedContentsState::Partial => protocol::SelectedContentsState::Partial,
-        store::StoreSelectedContentsState::SourceUnavailable => {
-            protocol::SelectedContentsState::SourceUnavailable
-        }
-        store::StoreSelectedContentsState::LocationMissing => {
-            protocol::SelectedContentsState::LocationMissing
-        }
-        store::StoreSelectedContentsState::Blocked => protocol::SelectedContentsState::Blocked,
-        store::StoreSelectedContentsState::Failed => protocol::SelectedContentsState::Failed,
+        store::StoreContentsState::Ready => protocol::ContentsState::Ready,
+        store::StoreContentsState::Empty => protocol::ContentsState::Empty,
+        store::StoreContentsState::Partial => protocol::ContentsState::Partial,
+        store::StoreContentsState::SourceUnavailable => protocol::ContentsState::SourceUnavailable,
+        store::StoreContentsState::LocationMissing => protocol::ContentsState::LocationMissing,
+        store::StoreContentsState::Blocked => protocol::ContentsState::Blocked,
+        store::StoreContentsState::Failed => protocol::ContentsState::Failed,
+        store::StoreContentsState::PolicyConflict => protocol::ContentsState::PolicyConflict,
+        store::StoreContentsState::CursorInvalid => protocol::ContentsState::CursorInvalid,
     }
 }
 
-const fn map_selected_contents_coverage_state(
+const fn map_contents_coverage_state(
     state: store::StoreContentsCoverageState,
 ) -> protocol::ContentsCoverageState {
     match state {
@@ -661,69 +734,84 @@ const fn map_selected_contents_coverage_state(
     }
 }
 
-fn map_selected_contents_row(
-    row: store::StoreSelectedContentsRow,
-) -> store::LibrarySqliteResult<protocol::SelectedContentsRow> {
-    let origin = map_selected_contents_row_origin(&row.origin);
-    let media_class = protocol::SelectedContentsMediaClass::from_projection_value(&row.media_class)
-        .ok_or_else(|| invalid_selected_contents_value("media_class", &row.media_class))?;
-    let availability_state =
-        protocol::LibraryAssetAvailabilityState::from_projection_value(&row.availability_state)
-            .ok_or_else(|| {
-                invalid_selected_contents_value("availability_state", &row.availability_state)
-            })?;
-    let stems_state_summary = row
+fn map_contents_row(
+    row: store::StoreContentsFileRow,
+) -> store::LibrarySqliteResult<protocol::ContentsFileRow> {
+    let media_class = protocol::ContentsMediaClass::from_projection_value(&row.media_class)
+        .ok_or_else(|| invalid_contents_value("media_class", &row.media_class))?;
+    let presence = protocol::ContentsPresenceState::from_projection_value(&row.presence)
+        .ok_or_else(|| invalid_contents_value("presence", &row.presence))?;
+    let availability_state = row
+        .availability_state
+        .as_deref()
+        .map(|value| {
+            protocol::LibraryAssetAvailabilityState::from_projection_value(value)
+                .ok_or_else(|| invalid_contents_value("availability_state", value))
+        })
+        .transpose()?;
+    let primary_media = row
+        .primary_media
+        .map(map_primary_media_summary)
+        .transpose()?;
+
+    Ok(protocol::ContentsFileRow {
+        id: row.id,
+        source_id: row.source_id,
+        source_file_id: row.source_file_id,
+        parent_directory_id: row.parent_directory_id,
+        label: row.label,
+        relative_path: Some(row.relative_path),
+        file_name: row.file_name,
+        media_class,
+        presence,
+        availability_state,
+        primary_media,
+        updated_at_ms: Some(row.updated_at),
+    })
+}
+
+fn map_primary_media_summary(
+    summary: store::StorePrimaryMediaSummary,
+) -> store::LibrarySqliteResult<protocol::PrimaryMediaSummary> {
+    let stems_state_summary = summary
         .stems_state_summary
         .as_deref()
         .map(|value| {
             protocol::LibraryAssetStemsStateSummary::from_projection_value(value)
-                .ok_or_else(|| invalid_selected_contents_value("stems_state_summary", value))
+                .ok_or_else(|| invalid_contents_value("stems_state_summary", value))
         })
         .transpose()?;
     let prep_readiness_summary = protocol::LibraryAssetPrepReadinessSummary::from_projection_value(
-        &row.prep_readiness_summary,
+        &summary.prep_readiness_summary,
     )
     .ok_or_else(|| {
-        invalid_selected_contents_value("prep_readiness_summary", &row.prep_readiness_summary)
+        invalid_contents_value("prep_readiness_summary", &summary.prep_readiness_summary)
     })?;
 
-    Ok(protocol::SelectedContentsRow {
-        stable_id: row.stable_id,
-        label: row.label,
-        origin,
-        library_asset_id: row.library_asset_id,
-        row_version: row.row_version,
-        primary_source_file_id: row.primary_source_file_id,
-        scoped_source_file_id: row.scoped_source_file_id,
-        source_id: row.source_id,
-        relative_path: row.relative_path,
-        file_name: row.file_name,
-        media_class,
-        availability_state,
-        title: row.title,
-        artist: row.artist,
-        album: row.album,
-        duration_ms: row.duration_ms,
-        musical_key: row.musical_key,
-        tempo_bpm: row.tempo_bpm,
-        waveform_quality_current: row.waveform_quality_current,
-        waveform_quality_target: row.waveform_quality_target,
+    Ok(protocol::PrimaryMediaSummary {
+        origin: map_contents_row_origin(&summary.origin),
+        library_asset_id: summary.library_asset_id,
+        row_version: summary.row_version,
+        primary_source_file_id: summary.primary_source_file_id,
+        title: summary.title,
+        artist: summary.artist,
+        album: summary.album,
+        duration_ms: summary.duration_ms,
+        musical_key: summary.musical_key,
+        tempo_bpm: summary.tempo_bpm,
+        waveform_quality_current: summary.waveform_quality_current,
+        waveform_quality_target: summary.waveform_quality_target,
         stems_state_summary,
-        prep_readiness_summary,
-        updated_at_ms: row.updated_at,
+        prep_readiness_summary: Some(prep_readiness_summary),
     })
 }
 
-const fn map_selected_contents_row_origin(
-    origin: &store::StoreSelectedContentsRowOrigin,
-) -> protocol::SelectedContentsRowOrigin {
+const fn map_contents_row_origin(
+    origin: &store::StoreContentsRowOrigin,
+) -> protocol::ContentsRowOrigin {
     match origin {
-        store::StoreSelectedContentsRowOrigin::LibraryAsset => {
-            protocol::SelectedContentsRowOrigin::LibraryAsset
-        }
-        store::StoreSelectedContentsRowOrigin::SourceFile => {
-            protocol::SelectedContentsRowOrigin::SourceFile
-        }
+        store::StoreContentsRowOrigin::LibraryAsset => protocol::ContentsRowOrigin::LibraryAsset,
+        store::StoreContentsRowOrigin::SourceFile => protocol::ContentsRowOrigin::SourceFile,
     }
 }
 
@@ -736,9 +824,9 @@ fn invalid_library_browser_projection_value(
     ))
 }
 
-fn invalid_selected_contents_value(field_name: &str, value: &str) -> store::LibrarySqliteError {
+fn invalid_contents_value(field_name: &str, value: &str) -> store::LibrarySqliteError {
     malformed_store_state(format!(
-        "selected contents field {field_name} contains unsupported value {value:?}"
+        "contents field {field_name} contains unsupported value {value:?}"
     ))
 }
 

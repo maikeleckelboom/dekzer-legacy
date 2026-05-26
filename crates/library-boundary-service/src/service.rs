@@ -14,11 +14,12 @@ use library_store_sqlite::{
 use crate::session_events::LibraryBoundaryEventStream;
 use crate::snapshot_read_protocol::{
     map_load_navigation_row_by_stable_key_reply, map_load_navigation_row_reply,
-    map_maintained_read_model_revisions, map_read_library_asset_preparation_detail_reply,
+    map_maintained_read_model_revisions, map_read_contents_reply,
+    map_read_library_asset_preparation_detail_reply,
     map_read_library_asset_waveform_overview_reply, map_read_literal_hierarchy_children_reply,
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
-    map_read_selected_contents_reply, map_search_navigation_node_library_browser_window_reply,
-    store_literal_hierarchy_entry_point, store_selected_contents_scope,
+    map_search_navigation_node_library_browser_window_reply, store_contents_policy,
+    store_contents_recursion, store_contents_scope, store_literal_hierarchy_entry_point,
     store_source_file_visibility,
 };
 use crate::storage_environment::resolve_library_storage_environment;
@@ -345,21 +346,25 @@ impl LibraryBoundaryService {
         map_search_navigation_node_library_browser_window_reply(window).map_err(map_store_error)
     }
 
-    pub fn read_selected_contents(
+    pub fn read_contents(
         &self,
-        request: protocol::ReadSelectedContentsRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadSelectedContentsReply> {
-        validate_selected_contents_scope(&request.scope)?;
-        validate_selected_contents_limit(request.limit)?;
+        request: protocol::ContentsReadRequest,
+    ) -> protocol::ProtocolResult<protocol::ContentsReadReply> {
+        validate_contents_scope(&request.scope)?;
+        validate_contents_policy(&request.policy)?;
+        let limit = request.limit.unwrap_or(100);
+        validate_contents_limit(limit)?;
         let result = self
             .durable_store
-            .read_selected_contents(
-                store_selected_contents_scope(request.scope),
-                request.limit,
+            .read_contents(
+                store_contents_scope(request.scope),
+                store_contents_policy(request.policy),
+                store_contents_recursion(request.recursion),
+                limit,
                 request.cursor.as_deref(),
             )
             .map_err(map_store_error)?;
-        map_read_selected_contents_reply(result).map_err(map_store_error)
+        map_read_contents_reply(result).map_err(map_store_error)
     }
 
     pub fn read_library_asset_waveform_overview(
@@ -504,9 +509,9 @@ impl LibraryBoundaryService {
                 self.search_navigation_node_library_browser_window(request)
                     .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserSearch)
             }
-            protocol::SnapshotReadCommand::ReadSelectedContents(request) => self
-                .read_selected_contents(request)
-                .map(protocol::SnapshotReadReply::SelectedContents),
+            protocol::SnapshotReadCommand::ContentsRead(request) => self
+                .read_contents(request)
+                .map(protocol::SnapshotReadReply::Contents),
             protocol::SnapshotReadCommand::ReadLibraryAssetWaveformOverview(request) => self
                 .read_library_asset_waveform_overview(request)
                 .map(protocol::SnapshotReadReply::LibraryAssetWaveformOverview),
@@ -552,34 +557,42 @@ fn require_positive_i64(value: i64, field_name: &str) -> protocol::ProtocolResul
     }
 }
 
-fn validate_selected_contents_scope(
-    scope: &protocol::SelectedContentsScope,
-) -> protocol::ProtocolResult<()> {
+fn validate_contents_scope(scope: &protocol::ContentsScope) -> protocol::ProtocolResult<()> {
     match scope {
-        protocol::SelectedContentsScope::Source { source_id } => {
-            require_positive_i64(*source_id, "selected contents sourceId")?;
+        protocol::ContentsScope::Source { source_id } => {
+            require_positive_i64(*source_id, "contents sourceId")?;
         }
-        protocol::SelectedContentsScope::SourceLocation { source_location_id } => {
-            require_positive_i64(*source_location_id, "selected contents sourceLocationId")?;
+        protocol::ContentsScope::SourceLocation { source_location_id } => {
+            require_positive_i64(*source_location_id, "contents sourceLocationId")?;
         }
-        protocol::SelectedContentsScope::Directory {
+        protocol::ContentsScope::Directory {
             source_id,
             source_directory_id,
         } => {
-            require_positive_i64(*source_id, "selected contents sourceId")?;
-            require_positive_i64(*source_directory_id, "selected contents sourceDirectoryId")?;
+            require_positive_i64(*source_id, "contents sourceId")?;
+            require_positive_i64(*source_directory_id, "contents sourceDirectoryId")?;
         }
     }
 
     Ok(())
 }
 
-fn validate_selected_contents_limit(limit: usize) -> protocol::ProtocolResult<()> {
+fn validate_contents_policy(policy: &protocol::ContentsReadPolicy) -> protocol::ProtocolResult<()> {
+    if policy.media_classes.is_empty() {
+        return Err(protocol::ProtocolError::InvalidRequest {
+            detail: "contents mediaClasses must not be empty".to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+fn validate_contents_limit(limit: usize) -> protocol::ProtocolResult<()> {
     if (1..=200).contains(&limit) {
         Ok(())
     } else {
         Err(protocol::ProtocolError::InvalidRequest {
-            detail: "selected contents limit must be between 1 and 200".to_string(),
+            detail: "contents limit must be between 1 and 200".to_string(),
         })
     }
 }
@@ -604,11 +617,11 @@ fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol:
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
-        CommandOutcome, CommandReply, CommandRequest, CreatePlaylistReply, CreatePlaylistRequest,
-        DeletePlaylistReply, DeletePlaylistRequest, DirectoryImageMediaState,
-        DirectoryPrimaryMediaState, DirectoryScanState, LibraryBoundaryEvent,
-        LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
-        LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
+        CommandOutcome, CommandReply, CommandRequest, ContentsReadPolicy, ContentsRowProfile,
+        CreatePlaylistReply, CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
+        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
+        LibraryBoundaryEvent, LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
+        LibraryRootCommand, LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
         LiteralHierarchyPresenceState, LoadNavigationRowByStableKeyReply,
         LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
         PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsReply,
@@ -622,7 +635,7 @@ mod tests {
 
     use library_store_sqlite::{LibraryStoreContext, StoreEnvironment, durable_store_path};
 
-    use super::LibraryBoundaryService;
+    use super::{LibraryBoundaryService, validate_contents_policy};
 
     fn open_service_with_context() -> (TempDir, LibraryStoreContext, LibraryBoundaryService) {
         let tempdir = TempDir::new().expect("create tempdir");
@@ -662,6 +675,18 @@ mod tests {
             Ok(_) => panic!("relative user data path should be rejected"),
             Err(error) => error,
         };
+
+        assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
+        assert_eq!(error.code(), "INVALID_REQUEST");
+    }
+
+    #[test]
+    fn contents_policy_validation_rejects_empty_media_classes() {
+        let error = validate_contents_policy(&ContentsReadPolicy {
+            media_classes: Vec::new(),
+            row_profile: ContentsRowProfile::SourceFile,
+        })
+        .expect_err("empty contents media classes should be rejected");
 
         assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
         assert_eq!(error.code(), "INVALID_REQUEST");
