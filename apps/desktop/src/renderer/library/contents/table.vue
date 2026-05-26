@@ -150,7 +150,7 @@ function labelClassForRow(row: ContentRow): string {
 }
 
 function resolveContentActionIcon(row: ContentRow): IconComponent {
-  return row.action?.kind === 'loadMore' ? MoreIcon : FolderOpenIcon
+  return row.action?.kind === 'loadChildren' ? FolderOpenIcon : MoreIcon
 }
 </script>
 

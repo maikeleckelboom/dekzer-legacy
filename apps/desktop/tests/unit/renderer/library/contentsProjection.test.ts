@@ -170,8 +170,65 @@ describe('projectContents', () => {
       kind: 'more',
       label: 'More primary media items available',
       detail: 'Load more',
-      icon: 'more'
+      icon: 'more',
+      action: {
+        kind: 'loadContentsPage',
+        nodeId: 'navigation-row:7',
+        label: 'Load more primary media items',
+        cursor: 'c2Y6...'
+      }
     })
+  })
+
+  it('shows accumulated row count in detail string when nextCursor exists', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      {
+        kind: 'ready',
+        requestKey: 'source:7',
+        nextCursor: 'c2Y6...',
+        accumulatedRows: [
+          primaryMediaRow('a', 'first.wav', 'audio'),
+          primaryMediaRow('b', 'second.wav', 'audio'),
+          primaryMediaRow('c', 'third.wav', 'audio')
+        ],
+        result: {
+          state: 'ready',
+          result: {
+            state: 'ready',
+            scope: { kind: 'source', sourceId: '7' },
+            policy: contentsPolicyForVisibility('performance'),
+            recursion: 'recursive',
+            rows: [primaryMediaRow('c', 'third.wav', 'audio')],
+            coverage: { state: 'complete', recursiveScopeComplete: true, emptyResultAuthoritative: true },
+            nextCursor: 'c2Y6...'
+          }
+        }
+      }
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.detail).toBe('3 primary media items loaded. More available.')
+    expect(contents.rows).toHaveLength(4)
+  })
+
+  it('shows page-local row count in detail string without nextCursor', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [
+          primaryMediaRow('a', 'first.wav', 'audio'),
+          primaryMediaRow('b', 'second.wav', 'audio'),
+          primaryMediaRow('c', 'third.wav', 'audio')
+        ]
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.detail).toBe('3 primary media items loaded.')
+    expect(contents.rows).toHaveLength(3)
   })
 
   it('projects loading, empty, partial, failed, and unsupported contents read states', () => {

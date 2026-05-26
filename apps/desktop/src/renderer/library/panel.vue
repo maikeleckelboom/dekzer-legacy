@@ -466,9 +466,13 @@ function activateContentRowAction(row: ContentRow): void {
   if (action.kind === 'loadChildren') {
     expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
     saveViewState()
+    void hierarchyRead.requestNodeChildren(action.nodeId)
+  } else if (action.kind === 'loadContentsPage') {
+    void contentsRead.readForBinding(
+      hierarchyRead.browserProjection.value?.bindingsById.get(action.nodeId),
+      { cursor: action.cursor, sourceFileVisibility: hierarchyRead.sourceFileVisibility.value }
+    )
   }
-
-  void hierarchyRead.requestNodeChildren(action.nodeId)
 }
 
 function requestContentsForCurrentSelection(options: { readonly force?: boolean } = {}): void {

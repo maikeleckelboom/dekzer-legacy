@@ -35,9 +35,14 @@ export type ContentRowIcon =
   | 'state'
 
 export type ContentRowAction = {
-  readonly kind: 'loadChildren' | 'loadMore'
+  readonly kind: 'loadChildren'
   readonly nodeId: BrowserTreeNodeId
   readonly label: string
+} | {
+  readonly kind: 'loadContentsPage'
+  readonly nodeId: BrowserTreeNodeId
+  readonly label: string
+  readonly cursor: string
 }
 
 export type ContentRow = {
@@ -305,26 +310,26 @@ function projectContentsResult(options: {
     return {
       kind: contentsProjectionKind(result),
       title: options.title,
-      detail: contentsDetail(result),
+      detail: contentsDetail(result, options.accumulatedRows),
       rows: [
         stateRow({
           ownerId: options.ownerId,
           state: contentsStateRowState(result),
           label: contentsStateLabel(result),
-          detail: contentsDetail(result)
+          detail: contentsDetail(result, options.accumulatedRows)
         })
       ]
     }
   }
 
   const contentRows = hasMore
-    ? [...rows, loadMoreRow(options.ownerId, result)]
+    ? [...rows, loadMoreRow(options.ownerId, result, options.nextCursor!)]
     : rows
 
   return {
     kind: contentsProjectionKind(result),
     title: options.title,
-    detail: contentsDetailWithContinuation(result, hasMore),
+    detail: contentsDetailWithContinuation(result, hasMore, options.accumulatedRows),
     rows: contentRows
   }
 }
@@ -467,37 +472,45 @@ function contentsStateLabel(result: ContentsResult): string {
   }
 }
 
-function contentsDetail(result: ContentsResult): string {
+function contentsDetail(result: ContentsResult, accumulatedRows?: readonly ContentsFileRow[]): string {
+  const rowCount = accumulatedRows?.length ?? result.rows.length
+
   if (result.detail !== undefined) {
     return result.detail
   }
 
-  if (result.rows.length === 0 && (result.state === 'ready' || result.state === 'empty')) {
+  if (rowCount === 0 && (result.state === 'ready' || result.state === 'empty')) {
     return contentsStateLabel(result)
   }
 
-  if (result.rows.length === 1) {
+  if (rowCount === 1) {
     return contentsCoveragePrefix(result) ?? `1 ${contentsCountSubject(result, 1)} loaded.`
   }
 
   const prefix = contentsCoveragePrefix(result)
-  const count = `${result.rows.length} ${contentsCountSubject(result, result.rows.length)} loaded.`
+  const count = `${rowCount} ${contentsCountSubject(result, rowCount)} loaded.`
   return prefix === undefined ? count : `${prefix} ${count}`
 }
 
-function contentsDetailWithContinuation(result: ContentsResult, hasMore: boolean): string {
+function contentsDetailWithContinuation(
+  result: ContentsResult,
+  hasMore: boolean,
+  accumulatedRows?: readonly ContentsFileRow[]
+): string {
+  const rowCount = accumulatedRows?.length ?? result.rows.length
+
   if (result.detail !== undefined && !hasMore) {
     return result.detail
   }
 
   if (hasMore) {
-    const subject = contentsCountSubject(result, result.rows.length)
+    const subject = contentsCountSubject(result, rowCount)
     const prefix = contentsCoveragePrefix(result)
-    const count = `${result.rows.length} ${subject} loaded. More available.`
+    const count = `${rowCount} ${subject} loaded. More available.`
     return prefix === undefined ? count : `${prefix} ${count}`
   }
 
-  return contentsDetail(result)
+  return contentsDetail(result, accumulatedRows)
 }
 
 function contentsRowSubject(result: ContentsResult): 'primary media' | 'visible files' {
@@ -528,7 +541,7 @@ function contentsCoveragePrefix(result: ContentsResult): string | undefined {
   return undefined
 }
 
-function loadMoreRow(ownerId: BrowserTreeNodeId, result: ContentsResult): ContentRow {
+function loadMoreRow(ownerId: BrowserTreeNodeId, result: ContentsResult, nextCursor: string): ContentRow {
   const subject = contentsCountSubject(result, result.rows.length)
   return {
     id: `contents-load-more:${ownerId}`,
@@ -537,9 +550,10 @@ function loadMoreRow(ownerId: BrowserTreeNodeId, result: ContentsResult): Conten
     detail: `Load more`,
     icon: 'more',
     action: {
-      kind: 'loadMore',
+      kind: 'loadContentsPage',
       nodeId: ownerId,
-      label: `Load more ${subject}`
+      label: `Load more ${subject}`,
+      cursor: nextCursor
     }
   }
 }
