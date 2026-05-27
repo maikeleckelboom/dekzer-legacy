@@ -34,20 +34,17 @@ final owner of selected scope contents.
 
 ## Inventory Findings
 
-The following facts are established by the Phase 0 inventory at
-`docs/reports/inventory-2026-05-26/05-main-report.md` and its supporting sub-reports:
+The following facts are established by the Phase 0 inventory:
 
 1. **selectedContentsRead has zero non-pane consumers.**
 
    It is scoped to the library contents pane path and has no deck, waveform, playlist, prep, or readiness consumers.
-   See `docs/reports/inventory-2026-05-26/01-selectedContents-call-sites.md`.
 
 2. **sourceLocation is supported end to end.**
 
    Support exists through SQL `source_locations`, Rust protocol, service validation/mapping, store
    `SourceLocationPrefix`
    resolution, main IPC normalization, shared TS, renderer binding mapping, and tests.
-   See `docs/reports/inventory-2026-05-26/02-sourceLocation-support.md`.
 
 3. **Recursive source/directory/sourceLocation contents queries are feasible with the current schema.**
 
@@ -58,7 +55,6 @@ The following facts are established by the Phase 0 inventory at
 
    Cursor is optional string only, has no encoding, no scope fingerprint, no query/order binding, no mismatch
    validation, `nextCursor` is never produced, store refuses provided cursors, and renderer does not send cursors.
-   See `docs/reports/inventory-2026-05-26/03-cursor-pagination.md`.
 
 5. **Hierarchy read is not the final owner for selected scope contents.**
 
@@ -70,9 +66,7 @@ The following facts are established by the Phase 0 inventory at
 ## Contract Vocabulary
 
 ```ts
-type ContentsRowProfile =
-  | { readonly kind: 'sourceFile' }
-  | { readonly kind: 'primaryMedia' }
+type ContentsRowProfile = { readonly kind: 'sourceFile' } | { readonly kind: 'primaryMedia' }
 ```
 
 **sourceFile:**
@@ -176,13 +170,3 @@ Real cursor support is a later slice:
 - reject mismatches with `cursorInvalid`
 
 This decision does not implement real cursor pagination.
-
----
-
-## Supporting Inventory Reports
-
-- `docs/reports/inventory-2026-05-26/05-main-report.md` — Phase 0 inventory summary
-- `docs/reports/inventory-2026-05-26/01-selectedContents-call-sites.md` — call-site inventory
-- `docs/reports/inventory-2026-05-26/02-sourceLocation-support.md` — sourceLocation end-to-end analysis
-- `docs/reports/inventory-2026-05-26/03-cursor-pagination.md` — cursor/pagination state
-- `docs/reports/inventory-2026-05-26/04-ipc-handlers-renderer-api.md` — IPC pipeline detail

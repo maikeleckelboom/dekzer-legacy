@@ -1,7 +1,7 @@
 # Workspace Topology Negotiation — Solver Sketch
 
 > This document describes one viable implementation family for the negotiation law defined in
-`workspace-topology-negotiation-law.md`. Nothing here is architectural canon. The law doc states what must be true. This
+> `workspace-topology-negotiation-law.md`. Nothing here is architectural canon. The law doc states what must be true. This
 > doc shows one way to make it true. Specific formulas, type shapes, and pseudocode may change without violating the law.
 >
 > Read the law doc first. Do not treat anything in this doc as a constraint on future implementations unless it has been
@@ -122,22 +122,20 @@ function solve(
   distribute(sizes, session.allLeft, +negotiatedShare, sizes)
   distribute(sizes, session.allRight, -negotiatedShare, sizes)
 
-  return {negotiatedSizes: sizes}
+  return { negotiatedSizes: sizes }
 }
 
 function distribute(
   sizes: SizeMap,
   participants: ResolvedParticipant[],
   delta: number,
-  currentSizes: SizeMap    // recomputed capacity source
+  currentSizes: SizeMap // recomputed capacity source
 ): void {
   let remaining = delta
 
   while (Math.abs(remaining) > 1e-9) {
-    const eligible = participants.filter(p =>
-      remaining > 0
-        ? canTake(p, currentSizes) > 1e-9
-        : canGive(p, currentSizes) > 1e-9
+    const eligible = participants.filter((p) =>
+      remaining > 0 ? canTake(p, currentSizes) > 1e-9 : canGive(p, currentSizes) > 1e-9
     )
     if (!eligible.length) break
 
@@ -152,7 +150,7 @@ function distribute(
       absorbed += next - before
     }
 
-    if (Math.abs(absorbed) < 1e-12) break   // fully constrained, no progress
+    if (Math.abs(absorbed) < 1e-12) break // fully constrained, no progress
     remaining -= absorbed
   }
 }
@@ -199,18 +197,18 @@ type FrozenDragSession = {
   dominanceCoeff: number
   band0Left: ResolvedParticipant[]
   band0Right: ResolvedParticipant[]
-  allLeft: ResolvedParticipant[]   // all bands, ordered outward
+  allLeft: ResolvedParticipant[] // all bands, ordered outward
   allRight: ResolvedParticipant[]
 }
 
 // One participant in the solve pool
 type ResolvedParticipant = {
   splitId: SplitId
-  index: number           // position in parent's sizes array
+  index: number // position in parent's sizes array
   band: number
-  effectiveWeight: number           // attenuation × participationPreference
-  minFrac: number           // authored constraint, stable
-  maxFrac: number           // authored constraint, stable
+  effectiveWeight: number // attenuation × participationPreference
+  minFrac: number // authored constraint, stable
+  maxFrac: number // authored constraint, stable
   // canGive / canTake are NOT stored here — derived from current preview each iteration
 }
 ```

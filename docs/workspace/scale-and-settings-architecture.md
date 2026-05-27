@@ -49,7 +49,7 @@ scale = 1.2 ^ level
 The persisted app setting is the zoom **level**, not an arbitrary factor.
 
 ```ts
-export type AppZoomLevel = -3 | -2 | -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type AppZoomLevel = -3 | -2 | -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6
 ```
 
 Notes:
@@ -68,7 +68,7 @@ It is not the owner of semantic density.
 This is the app-wide semantic density baseline.
 
 ```ts
-export type UiScalePreset = 'dense' | 'standard' | 'spacious';
+export type UiScalePreset = 'dense' | 'standard' | 'spacious'
 ```
 
 Purpose:
@@ -117,10 +117,12 @@ This is the sentence to preserve.
 The failure modes are:
 
 1. **Domain leakage into core**
-  - bad: the shared settings substrate knows what a mixer or deck is
+
+- bad: the shared settings substrate knows what a mixer or deck is
 
 2. **Fake abstraction**
-  - bad: the system uses meaningless generic numeric knobs with no semantic owner
+
+- bad: the system uses meaningless generic numeric knobs with no semantic owner
 
 The correct middle is:
 
@@ -174,15 +176,15 @@ Example shape:
 export type SettingScope =
   | { kind: 'app' }
   | { kind: 'module'; moduleKey: string }
-  | { kind: 'instance'; moduleKey: string; instanceKey: string };
+  | { kind: 'instance'; moduleKey: string; instanceKey: string }
 
-export type SettingNamespace = string;
+export type SettingNamespace = string
 
 export type SettingLayer<TSettings> = {
-  namespace: SettingNamespace;
-  scope: SettingScope;
-  values: Partial<TSettings>;
-};
+  namespace: SettingNamespace
+  scope: SettingScope
+  values: Partial<TSettings>
+}
 ```
 
 The core may own:
@@ -212,14 +214,14 @@ Examples:
 
 ```ts
 export type BrowserAppearanceSettings = {
-  density?: 'dense' | 'standard' | 'spacious';
-  columnHeaderStyle?: 'compact' | 'standard';
-};
+  density?: 'dense' | 'standard' | 'spacious'
+  columnHeaderStyle?: 'compact' | 'standard'
+}
 
 export type MixerAppearanceSettings = {
-  stripDensity?: 'compact' | 'standard' | 'performance';
-  meterLabelVisibility?: 'hidden' | 'compact' | 'full';
-};
+  stripDensity?: 'compact' | 'standard' | 'performance'
+  meterLabelVisibility?: 'hidden' | 'compact' | 'full'
+}
 ```
 
 This is correct ownership.
@@ -282,11 +284,11 @@ Good:
 
 ```ts
 export type ResolvedMixerViewConfig = {
-  stripWidthPx: number;
-  controlHeightPx: number;
-  meterLabelVisibility: 'hidden' | 'compact' | 'full';
-  typographyScale: number;
-};
+  stripWidthPx: number
+  controlHeightPx: number
+  meterLabelVisibility: 'hidden' | 'compact' | 'full'
+  typographyScale: number
+}
 ```
 
 One resolver owns the merge.
@@ -300,9 +302,9 @@ The cross-app display contract should stay small.
 
 ```ts
 export type DisplaySettings = {
-  appZoomLevel: AppZoomLevel;
-  uiScale: UiScalePreset;
-};
+  appZoomLevel: AppZoomLevel
+  uiScale: UiScalePreset
+}
 ```
 
 This is the app-owned baseline.
@@ -365,7 +367,7 @@ This destroys semantics.
 ### 2. Core registry of domain nouns
 
 ```ts
-type ModuleSettings = BrowserSettings | MixerSettings | DeckSettings;
+type ModuleSettings = BrowserSettings | MixerSettings | DeckSettings
 ```
 
 This couples the foundation to the current product surface list.
@@ -431,4 +433,3 @@ Harden these statements:
 - **The core owns composition. Modules own meaning.**
 
 That is the version worth building.
-

@@ -868,4 +868,3 @@ The implementation must now proceed inside the current Dekzer scaffold with:
 Build this exact thing.
 
 Do not start over again.
-

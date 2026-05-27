@@ -1,5 +1,7 @@
 # Media Role Classification
 
+**Status:** FUTURE ARCHITECTURE — This document describes the long-term media classification pipeline. The schema vocabulary (`library_items`, `library_item_roles`, `item_readiness`, `file_identities`) predates the v1 substrate decision at `docs/decisions/library-preparation-substrate-v1.md`. The v1 substrate uses `tracks`, `track_attachments`, `preparation_facets`, etc. Concepts such as role classification, the three-stage probe pipeline, and readiness evaluation are beyond the current v1 scope. Do not treat table shapes or column names in this document as current v1 implementation targets.
+
 _Canonical architecture note. Governs library substrate, classification pipeline, browser projection, and all
 file-to-product-object mapping in Dekzer._
 
@@ -68,7 +70,7 @@ A library item may hold multiple roles simultaneously.
 Valid roles:
 
 | Role                 | Meaning                                                                                                                                                                                                                                          |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `performance_item`   | Candidate for deck or transport use. Actual loadability is target-specific readiness.                                                                                                                                                            |
 | `visual_asset`       | Candidate for visual output or visual workflows. Actual use is target-specific readiness.                                                                                                                                                        |
 | `artwork_candidate`  | Candidate for attachment as artwork to a track, album, folder, or crate.                                                                                                                                                                         |

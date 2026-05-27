@@ -117,4 +117,4 @@ Workspace ownership:
 - `crates/*` is for Rust workspace ownership, starting with `crates/library-domain`.
 - `docs/*` is for product canon, decisions, and architecture documents.
 
-Only `apps/desktop`, its main-process library boundary host owner, the migrated Rust library domain, store, boundary protocol, boundary service, stdio server crate, generated TypeScript boundary contract, transport-agnostic TypeScript boundary client, and stdio transport package are present as product code after this slice. See `docs/decisions/repo-consolidation-plan.md` and `docs/decisions/migration-ledger.md` for the migration plan.
+Only `apps/desktop`, its main-process library boundary host owner, the migrated Rust library domain, store, boundary protocol, boundary service, stdio server crate, generated TypeScript boundary contract, transport-agnostic TypeScript boundary client, and stdio transport package are present as product code after this slice.

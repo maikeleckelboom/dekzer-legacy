@@ -285,7 +285,7 @@ projected by the runtime, not discovered by the renderer.
 ## Ownership boundaries
 
 | Concern                               | Owner                               |
-|---------------------------------------|-------------------------------------|
+| ------------------------------------- | ----------------------------------- |
 | Slot structural presence              | Runtime topology layer              |
 | Negotiation eligibility               | Runtime topology layer              |
 | Realization policy                    | Runtime topology layer              |
@@ -345,7 +345,7 @@ are not verifiable, the implementation is not correct — it is more active.
 Use this when reviewing an implementation or a proposed change.
 
 - [ ] Does a boundary drag in negotiated mode ever move a non-touched participant without a constraint-justified
-  same-axis reason?
+      same-axis reason?
 - [ ] Does any non-touched participant move in direct mode?
 - [ ] Does the solver read DOM geometry at any point during a drag?
 - [ ] Is directional capacity frozen at session creation rather than recomputed against current preview state?

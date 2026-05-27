@@ -72,7 +72,7 @@ glance.
 ## Mode × size-class topology matrix
 
 | Mode                   | Compact handheld          | Compact landscape / small tablet             | Laptop / standard desktop                       | Wide monitor / large desktop                                      |
-|------------------------|---------------------------|----------------------------------------------|-------------------------------------------------|-------------------------------------------------------------------|
+| ---------------------- | ------------------------- | -------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
 | Perform                | focused instrument view   | split support view                           | perform bench                                   | perform bench with persistent inspector or secondary support      |
 | Library                | focused instrument view   | split support view                           | library bench                                   | library bench with wider details or secondary preview support     |
 | Sleeves and routes     | focused instrument view   | split support view                           | route canvas                                    | route canvas with persistent inspector and commit lane            |

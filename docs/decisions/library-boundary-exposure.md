@@ -18,7 +18,7 @@ Do not add compatibility aliases or alternate renderer paths for host-internal o
 ## Current Exposure
 
 | Operation                | Exposure          | Owner / meaning                                                                                   |
-|--------------------------|-------------------|---------------------------------------------------------------------------------------------------|
+| ------------------------ | ----------------- | ------------------------------------------------------------------------------------------------- |
 | `chooseAndRegisterLocal` | renderer-callable | Desktop-host owned. Opens the native folder picker and has no `absolutePath` input.               |
 | `registerLocalRoot`      | host-internal     | Library-service registration path. `absolutePath` is allowed only after native desktop selection. |
 | `runScan`                | renderer-callable | Scan request accepts `rootId` only.                                                               |
