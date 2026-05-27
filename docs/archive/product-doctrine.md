@@ -1,3 +1,10 @@
+---
+status: superseded
+superseded-by: docs/product-doctrine-shortened.md
+purpose: longform source material only
+authority: not active product doctrine authority
+---
+
 # Dekzer Product Doctrine
 
 _Internal doctrine draft. This document defines product position, substrate obligations, system contracts, and modeling

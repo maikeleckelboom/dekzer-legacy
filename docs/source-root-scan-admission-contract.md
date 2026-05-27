@@ -5,10 +5,12 @@ doctrine-version: 0.3
 last-reviewed: 2026-05-27
 owner: music-library-substrate
 canonical-context:
-  - product-doctrine
-  - doctrine-support-pack-v2
-  - first-slice-substrate-map
-  - source-hierarchy-contract
+  - product-doctrine-shortened
+  - source-access-and-scan-coverage
+  - source-locations-lifecycle-contract
+  - library-preparation-substrate-v1
+  - source-hierarchy-contract (TODO: not yet written)
+  - first-slice-substrate-map (TODO: not yet written)
 scope:
   - source-root-registration
   - root-identity

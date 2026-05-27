@@ -1,6 +1,15 @@
+---
+authority: support-map
+purpose: Target implementation structure map. Not architecture authority.
+canonical-context:
+  - product-doctrine-shortened
+  - library-preparation-substrate-v1
+  - source-root-scan-admission-contract
+---
+
 # Dekzer Code Structure — Future Implementation Spec
 
-_Authoritative target shape for the library subsystem. All layers: Rust crates, TypeScript packages, Electron main, preload, shared types, renderer domain owners, Vue presentation._
+_Support map for the library subsystem. All layers: Rust crates, TypeScript packages, Electron main, preload, shared types, renderer domain owners, Vue presentation._
 
 _Naming conventions: Rust files use snake_case. TypeScript and Vue files use camelCase. Doc filenames use kebab-case._
 

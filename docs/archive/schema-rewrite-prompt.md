@@ -1,3 +1,10 @@
+---
+status: superseded
+superseded-by: docs/decisions/library-preparation-substrate-v1.md
+purpose: historical source material only
+authority: not active architecture authority
+---
+
 # Schema Rewrite: V1 Library + Preparation Substrate
 
 **Decision authority:** `docs/decisions/library-preparation-substrate-v1.md`

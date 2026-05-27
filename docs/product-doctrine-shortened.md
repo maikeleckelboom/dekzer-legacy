@@ -1,3 +1,14 @@
+---
+status: candidate
+canonical: true
+doctrine-version: 0.3
+last-reviewed: 2026-05-28
+owner: product-architecture
+authority: canonical product doctrine
+supersedes:
+  - docs/archive/product-doctrine.md
+---
+
 # Dekzer Product Doctrine
 
 _Internal doctrine draft. Shortened version. Defines Dekzer's product position, substrate obligations, system contracts,

@@ -1,0 +1,86 @@
+# Dekzer Documentation Authority Map
+
+_This is the canonical index of Dekzer documentation authority. Every doc in this repo must have one clear role.
+No two active docs may define the same authority._
+
+## Product doctrine
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/product-doctrine-shortened.md` | **Canonical product doctrine** | Active doctrine. Owns product position, identity stack, claims, readiness, conflict resolution, modeling laws, first slice boundaries. |
+| `docs/archive/product-doctrine.md` | Superseded archive | Long-form v2 draft. Superseded by `product-doctrine-shortened.md`. Historical source material only. |
+
+## Source and scan contracts
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/source-root-scan-admission-contract.md` | **Canonical scan admission contract** | Owns root registration, root identity, scan preflight, traversal policy, candidate admission, magic reads, work budgets, observation persistence. |
+| `docs/source-root-scan-reconnaissance-2026-05-27.md` | Archived evidence report | Evidence only. Do not use as architecture authority. Canonical contract: `source-root-scan-admission-contract.md`. |
+| `docs/decisions/source-access-and-scan-coverage.md` | Valid architectural decision | Source access and scan coverage rules. Complements scan admission contract at lower detail level. Does not supersede the admission contract. |
+| `docs/decisions/source-locations-lifecycle-contract.md` | Valid architectural decision | Source location lifecycle and aggregate scope. Complements scan admission contract for source-location specifics. |
+
+## Library browser contracts
+
+| Doc | Role | Owns |
+|-----|------|------|
+| `docs/library/library-tree-frame-stability-contract.md` | **Canonical library contract** | Branch rendering continuity, cache behavior, node identity, response guards, prefetch bounds, drag stability. |
+| `docs/library/library-row-profile-contract.md` | **Canonical library contract** | Row-kind projection policy, profile definitions, profile-to-cache-key relationship, profile change propagation. |
+| `docs/library/library-tree-selection-contents-contract.md` | **Canonical library contract** | Selected-node scope derivation, contents panel read-model, selection survival under source state changes, first-page law, scan update invalidation for selected scope. |
+| `docs/library/library-tree-track-segment-rows-contract.md` | **Canonical library contract** | Node-kind taxonomy, track/segment/companion row authority and interaction rules, child count semantics per kind. |
+| `docs/library/source-lifecycle-visible-state-contract.md` | **Canonical library contract** | Source visible availability states, unavailability UX, relocation UX, cloud placeholder behavior, source removal vs forgetting. |
+| `docs/library/library-browser-workspace-surface-contract.md` | **Canonical library contract** | Library Browser workspace surface identity, topology handoff, geometry/viewport hints, internal layout presets, authority partition. |
+
+## Contents read boundary docs
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/decisions/library-contents-read-boundary.md` | Canonical contents read boundary | Defines the single parameterized contents read boundary. Complements `library-tree-selection-contents-contract.md` (which governs renderer coupling). |
+| `docs/decisions/recursive-selected-contents-rule.md` | Valid architectural decision | CURRENT WITH LEGACY VOCABULARY. Schema-specific references predate v1 substrate. Architectural rules remain valid. For current v1 vocabulary see `docs/decisions/library-preparation-substrate-v1.md`. |
+
+## Implementation discipline
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/substrate-implementation-discipline.md` | Reusable implementation discipline | Mined from superseded V1 Substrate Port brief. Preserves durable process laws only. Not architecture authority. Supersedes `code_change_brief_v_1_substrate_port.md` (deleted). |
+
+## Evidence reports
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/source-root-scan-reconnaissance-2026-05-27.md` | Archived evidence report | Evidence only. Canonical contract: `source-root-scan-admission-contract.md`. |
+
+## Superseded / archive material
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/archive/product-doctrine.md` | Superseded archive | Superseded by `product-doctrine-shortened.md`. |
+| `docs/archive/schema-rewrite-prompt.md` | Superseded archive | Implementation prompt, not canonical doc. Superseded by current schema baseline and `docs/decisions/library-preparation-substrate-v1.md`. |
+
+## Support maps
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/implementation-structure.md` | Support map | Future implementation target shape. Not architecture authority. Guides crate/package/domain structure. |
+| `docs/local-source-icon-doctrine.md` | Icon doctrine | Canonical for iconography rules. Depends on scan admission contract for root classification vocabulary. |
+
+## Schema and substrate decisions
+
+| Doc | Role | Notes |
+|-----|------|-------|
+| `docs/decisions/library-preparation-substrate-v1.md` | Canonical schema decision (ACCEPTED) | v1 substrate schema authority. Replaces `LibraryAssets`-based schema. |
+| `docs/decisions/library-boundary-exposure.md` | Valid architectural decision | IPC boundary exposure rules for library operations. |
+| `docs/decisions/library-to-deck-performance-boundary.md` | Future architecture boundary | FUTURE ARCHITECTURE. Authority boundaries valid; table names predate v1 substrate. |
+| `docs/decisions/media-role-classification.md` | Future architecture boundary | FUTURE ARCHITECTURE. Classification pipeline valid; table names predate v1 substrate. |
+| `docs/decisions/work-scheduling.md` | Future architecture boundary | FUTURE ARCHITECTURE. Scheduler design valid; table names predate v1 substrate. |
+
+## Workspace docs
+
+Self-contained under `docs/workspace/`. See individual files. The primary entry is `docs/workspace/visual-workspace-doctrine.md`.
+
+## Known forward references (intentionally do not exist yet)
+
+| Referenced name | Used by | Reason |
+|-----------------|---------|--------|
+| `source-hierarchy-contract` | Several library contracts, scan admission contract | TODO: Not yet written. Library contracts carry forward references to it. |
+| `first-slice-substrate-map` | Several library contracts, scan admission contract | TODO: Not yet written. First slice scope document. |
+| `workspace-layout-contract` | Library browser workspace surface contract | TODO: Not yet written. Workspace topology contracts exist but specific layout contract not yet separate. |
