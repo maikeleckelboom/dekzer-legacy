@@ -1,20 +1,26 @@
 # Dekzer Product Doctrine
 
-_Internal doctrine draft. This document defines product position, substrate obligations, system contracts, and modeling laws for Dekzer._
+_Internal doctrine draft. This document defines product position, substrate obligations, system contracts, and modeling
+laws for Dekzer._
 
-_Version 2. Expanded from v1 to include identity stack, claim lifecycle, readiness state model, evidence grades, conflict resolution, catalog governance, performance mode, recovery doctrine, privacy laws, job system doctrine, and RT Flight Deck connection._
+_Version 2. Expanded from v1 to include identity stack, claim lifecycle, readiness state model, evidence grades,
+conflict resolution, catalog governance, performance mode, recovery doctrine, privacy laws, job system doctrine, and RT
+Flight Deck connection._
 
 ---
 
 ## 1. The Spine
 
-Most DJ software competes at the performance surface: decks, waveforms, effects, skins, mixer workflows, and controller mappings.
+Most DJ software competes at the performance surface: decks, waveforms, effects, skins, mixer workflows, and controller
+mappings.
 
 The durable pain lives below that surface.
 
-DJs lose trust when libraries decay, preparation becomes trapped, metadata drifts, streaming behaves differently from local files, exports fail, devices disagree, and the system cannot explain what is actually ready.
+DJs lose trust when libraries decay, preparation becomes trapped, metadata drifts, streaming behaves differently from
+local files, exports fail, devices disagree, and the system cannot explain what is actually ready.
 
-The DJ app space does not only compete on the wrong layer. It also traps the right layer inside the wrong product boundary.
+The DJ app space does not only compete on the wrong layer. It also traps the right layer inside the wrong product
+boundary.
 
 - Rekordbox has preparation, but it is welded to the Pioneer and AlphaTheta booth path.
 - Serato has crates and performance speed, but not a serious long-term library substrate.
@@ -24,7 +30,8 @@ The DJ app space does not only compete on the wrong layer. It also traps the rig
 
 Each platform hard-codes a worldview. The unresolved pain lives underneath.
 
-**Dekzer owns that lower layer: a local-first, inspectable library and preparation substrate that treats a DJ's collection and prep work as long-lived professional assets.**
+**Dekzer owns that lower layer: a local-first, inspectable library and preparation substrate that treats a DJ's
+collection and prep work as long-lived professional assets.**
 
 The fader is not where readiness begins. The gig is won or lost in the music room before the first track loads.
 
@@ -34,17 +41,20 @@ The fader is not where readiness begins. The gig is won or lost in the music roo
 
 Dekzer is a local-first preparation and performance-readiness OS for DJs.
 
-It treats the library as a long-term musical asset, preparation as durable work, compatibility as something to prove before the gig, and live trust as a product requirement rather than a lucky outcome.
+It treats the library as a long-term musical asset, preparation as durable work, compatibility as something to prove
+before the gig, and live trust as a product requirement rather than a lucky outcome.
 
 More precisely:
 
 > Dekzer is a local-first, inspectable preparation ledger for live performance.
 
-Ledger does not mean blockchain. It means durable record, provenance, change history, evidence, auditability, reversibility, and accountable state.
+Ledger does not mean blockchain. It means durable record, provenance, change history, evidence, auditability,
+reversibility, and accountable state.
 
 A normal DJ app stores what the current value is.
 
-Dekzer must know why that value exists, where it came from, whether it still applies, and whether it can be trusted tonight.
+Dekzer must know why that value exists, where it came from, whether it still applies, and whether it can be trusted
+tonight.
 
 The plain promise:
 
@@ -60,7 +70,8 @@ That sentence is the whole product in human language. Everything else must serve
 
 This is the design test.
 
-Every schema decision, UI surface, preparation model, export path, compatibility check, and runtime behavior must answer to it.
+Every schema decision, UI surface, preparation model, export path, compatibility check, and runtime behavior must answer
+to it.
 
 - Does this schema help answer it?
 - Does this UI make it visible?
@@ -82,7 +93,8 @@ Dekzer substrate       Where DJs become ready.
 
 The deck is the cockpit. The aircraft is underneath.
 
-Waveforms, decks, mixers, skins, pads, effects, gestures, and controller workflows matter. They are downstream of the substrate. They must not become the place where the system first discovers whether the music is safe.
+Waveforms, decks, mixers, skins, pads, effects, gestures, and controller workflows matter. They are downstream of the
+substrate. They must not become the place where the system first discovers whether the music is safe.
 
 Dekzer owns four substrate layers.
 
@@ -90,25 +102,33 @@ Dekzer owns four substrate layers.
 
 What do I have? Where is it? What is it? Which version is it? What is missing? What changed? What can still be trusted?
 
-The library is not a list of files. It is a durable representation of musical assets, source locations, attachments, identities, versions, fingerprints, and collection structure.
+The library is not a list of files. It is a durable representation of musical assets, source locations, attachments,
+identities, versions, fingerprints, and collection structure.
 
 ### 4.2 Preparation
 
-What work have I done? What was inferred? What did I approve? What changed? What is ready? What is stale? What is still suspect?
+What work have I done? What was inferred? What did I approve? What changed? What is ready? What is stale? What is still
+suspect?
 
-Preparation is not one object, one mode, or one status. It is a workflow plane made of independent facets: grids, cues, loops, phrases, key, BPM, loudness, stems, sleeves, tags, notes, crates, transition candidates, practice history, export readiness, and source readiness.
+Preparation is not one object, one mode, or one status. It is a workflow plane made of independent facets: grids, cues,
+loops, phrases, key, BPM, loudness, stems, sleeves, tags, notes, crates, transition candidates, practice history, export
+readiness, and source readiness.
 
 ### 4.3 Compatibility
 
-Will this work on this device, export target, streaming source, operating system, controller, firmware version, room, or event setup?
+Will this work on this device, export target, streaming source, operating system, controller, firmware version, room, or
+event setup?
 
-Compatibility is not a boolean. It is an evaluated result against a target profile, produced from local state plus versioned external knowledge.
+Compatibility is not a boolean. It is an evaluated result against a target profile, produced from local state plus
+versioned external knowledge.
 
 ### 4.4 Live Trust
 
-Can I depend on this under pressure? Can the system explain risk before it hurts me? Can it say what it knows, what it does not know, and what changed since the last trusted state?
+Can I depend on this under pressure? Can the system explain risk before it hurts me? Can it say what it knows, what it
+does not know, and what changed since the last trusted state?
 
-Live trust begins before performance. Runtime surfaces inherit confidence from preparation, compatibility, and verified media state. They must not manufacture it.
+Live trust begins before performance. Runtime surfaces inherit confidence from preparation, compatibility, and verified
+media state. They must not manufacture it.
 
 ---
 
@@ -116,7 +136,8 @@ Live trust begins before performance. Runtime surfaces inherit confidence from p
 
 Many future bugs hide inside vague use of the word "track."
 
-Dekzer must maintain a canonical identity ladder. Each rung is distinct. Confusing them is not a naming error — it is a data integrity error.
+Dekzer must maintain a canonical identity ladder. Each rung is distinct. Confusing them is not a naming error — it is a
+data integrity error.
 
 ```text
 musical work          The abstract song or composition. May have many recordings.
@@ -142,13 +163,15 @@ A file instance is not an identity. It is a location claim about a specific mome
 A runtime use is a projection, not a source of authority about library state.
 ```
 
-The question "Is this cue attached to the song?" has no single answer until the rung is specified. The system must always know which rung a claim belongs to.
+The question "Is this cue attached to the song?" has no single answer until the rung is specified. The system must
+always know which rung a claim belongs to.
 
 ---
 
 ## 6. Claim Lifecycle
 
-The doctrine says facts are claims with provenance. That is correct. But a claim without a lifecycle is just a row with extra columns.
+The doctrine says facts are claims with provenance. That is correct. But a claim without a lifecycle is just a row with
+extra columns.
 
 Every claim in the Dekzer substrate has a defined lifecycle phase.
 
@@ -170,11 +193,14 @@ The key law:
 
 > A claim is not native authority until its source, scope, confidence, and acceptance state are known.
 
-A Rekordbox cue, an AI-detected cue candidate, a user-set cue, and a drift-invalidated cue cannot all live as morally equal facts. They occupy different phases of the lifecycle and carry different authority.
+A Rekordbox cue, an AI-detected cue candidate, a user-set cue, and a drift-invalidated cue cannot all live as morally
+equal facts. They occupy different phases of the lifecycle and carry different authority.
 
 Collapsing phases into one flat table loses the ledger.
 
-The lifecycle also defines what audit means. A rejected claim is not garbage. It is evidence. A superseded claim is not an error. It is history. The system must retain lifecycle phase transitions as part of its record — not just the current phase.
+The lifecycle also defines what audit means. A rejected claim is not garbage. It is evidence. A superseded claim is not
+an error. It is history. The system must retain lifecycle phase transitions as part of its record — not just the current
+phase.
 
 ---
 
@@ -184,7 +210,9 @@ The lifecycle also defines what audit means. A rejected claim is not garbage. It
 
 **Readiness is not stored as belief. Readiness is projected from evidence.**
 
-A track does not have a readiness value stamped on it. Readiness is computed from the current state of its identity, attachments, analysis baselines, preparation artifacts, compatibility evaluations, and export projections — against a specific target context.
+A track does not have a readiness value stamped on it. Readiness is computed from the current state of its identity,
+attachments, analysis baselines, preparation artifacts, compatibility evaluations, and export projections — against a
+specific target context.
 
 This means readiness can change without any user action, because the evidence underneath it changed.
 
@@ -221,11 +249,13 @@ verified -> stale          when any verified dependency changes
 failed -> blocked          when failure is confirmed as irrecoverable without user action
 ```
 
-Without defined transitions, readiness becomes a label the system applies optimistically. That is the failure mode Dekzer exists to prevent.
+Without defined transitions, readiness becomes a label the system applies optimistically. That is the failure mode
+Dekzer exists to prevent.
 
 ### 7.4 Evidence grades
 
-"Will it work tonight?" requires proof. Not all proof is equal. Dekzer must track the grade of evidence behind any readiness verdict.
+"Will it work tonight?" requires proof. Not all proof is equal. Dekzer must track the grade of evidence behind any
+readiness verdict.
 
 ```text
 declared      The file extension or container says it. No verification performed.
@@ -237,7 +267,9 @@ exported      The value or file was committed to a specific export projection.
 confirmed     The output was loaded and confirmed on the actual target device.
 ```
 
-These are not interchangeable. A file extension declaring MP3 is not equivalent to decoding the audio. A successful export is not equivalent to loading on a CDJ. A compatibility catalog saying "supported" is not equivalent to a device test.
+These are not interchangeable. A file extension declaring MP3 is not equivalent to decoding the audio. A successful
+export is not equivalent to loading on a CDJ. A compatibility catalog saying "supported" is not equivalent to a device
+test.
 
 Every readiness verdict must record its evidence grade. The UI may simplify that for the user, but the substrate cannot.
 
@@ -271,7 +303,8 @@ Dekzer's behavior in this situation must be defined, not improvised.
 
 **A conflict is a fact about disagreement. It is not an error to be hidden.**
 
-This is ledger behavior. The ledger does not forget that a disagreement existed. It records what the user decided, when, and against what evidence state.
+This is ledger behavior. The ledger does not forget that a disagreement existed. It records what the user decided, when,
+and against what evidence state.
 
 The system may propose resolutions. It may rank candidates by confidence. It must not apply resolutions silently.
 
@@ -297,19 +330,26 @@ This is not decorative language. It describes how DJs actually work.
 
 Each zone has a defined meaning.
 
-**Cold archive** — Known material. Not necessarily performance-ready. May include unanalyzed files, archived sets, reference material, or music under consideration. The system knows it exists. It does not claim it is ready.
+**Cold archive** — Known material. Not necessarily performance-ready. May include unanalyzed files, archived sets,
+reference material, or music under consideration. The system knows it exists. It does not claim it is ready.
 
-**Nearby reserve** — Material intentionally kept close. Curated for potential use. Not necessarily prepared. The DJ has made a proximity decision, not a readiness decision.
+**Nearby reserve** — Material intentionally kept close. Curated for potential use. Not necessarily prepared. The DJ has
+made a proximity decision, not a readiness decision.
 
-**Prepared room** — Material that has been inspected, analyzed, organized, and made useful. Readiness is visible. Drift is surfaced. This is the primary working space.
+**Prepared room** — Material that has been inspected, analyzed, organized, and made useful. Readiness is visible. Drift
+is surfaced. This is the primary working space.
 
-**Prepared crate** — A deliberate, purpose-bound subset of prepared material. May be scoped to an event, a venue, a genre, a client, or a mood. Has an explicit reason for existing.
+**Prepared crate** — A deliberate, purpose-bound subset of prepared material. May be scoped to an event, a venue, a
+genre, a client, or a mood. Has an explicit reason for existing.
 
-**Hot table** — A near-immediate candidate pool. Material close to actual use. May feed a live path. Ephemeral by default, but snapshottable.
+**Hot table** — A near-immediate candidate pool. Material close to actual use. May feed a live path. Ephemeral by
+default, but snapshottable.
 
-**Live path** — The actual or planned performance sequence. What is playing and what is next. May be improvised or pre-ordered. Has real-time state.
+**Live path** — The actual or planned performance sequence. What is playing and what is next. May be improvised or
+pre-ordered. Has real-time state.
 
-**Shadow paths** — Plausible alternatives, recovery routes, and transition branches maintained alongside the live path. Not hypotheticals — actionable options the DJ has chosen to keep available.
+**Shadow paths** — Plausible alternatives, recovery routes, and transition branches maintained alongside the live path.
+Not hypotheticals — actionable options the DJ has chosen to keep available.
 
 ### 9.2 Rules
 
@@ -317,7 +357,8 @@ A hot table is ephemeral by default. It may be promoted to a snapshot.
 
 A prepared crate is durable. It persists across sessions.
 
-A smartlist may feed a prepared crate, but the crate's membership is its own — not automatically replaced by query changes.
+A smartlist may feed a prepared crate, but the crate's membership is its own — not automatically replaced by query
+changes.
 
 A shadow path may become a live path at any moment. The system must support promotion without friction.
 
@@ -327,7 +368,8 @@ A request queue is not a live path. It is incoming intent. It may influence a li
 
 ### 9.3 Organization taxonomy
 
-Dekzer must not collapse all organizational objects into one type with a kind field. That is how the substrate loses meaning.
+Dekzer must not collapse all organizational objects into one type with a kind field. That is how the substrate loses
+meaning.
 
 ```text
 manual collection       user-authored membership, explicitly maintained
@@ -339,7 +381,8 @@ performance path        actual or planned runtime play route with live state
 export projection       target-specific representation of a collection or sequence
 ```
 
-Each of these is a different thing. Each has different durability, mutability, authority, and semantic weight. The schema must reflect that.
+Each of these is a different thing. Each has different durability, mutability, authority, and semantic weight. The
+schema must reflect that.
 
 ---
 
@@ -371,7 +414,9 @@ Can it survive the selected export target?
 
 Many important facts in Dekzer are not just values. They are claims.
 
-A cue point may be: an engine-detected candidate, a user-created marker, an imported marker from another system, an edited marker, an accepted marker, a stale marker, a rejected marker, an exported marker, or a marker that applies only to a previous media version.
+A cue point may be: an engine-detected candidate, a user-created marker, an imported marker from another system, an
+edited marker, an accepted marker, a stale marker, a rejected marker, an exported marker, or a marker that applies only
+to a previous media version.
 
 Collapsing those into one flat `cue_points` table loses the product.
 
@@ -386,9 +431,11 @@ Also: observations, claims, approvals, edits, invalidations, readiness projectio
 
 A track is not one eternal object.
 
-It can have versions, attachments, masters, edits, exports, remasters, streaming substitutions, corrupted copies, transcoded copies, moved files, duration drift, and analysis baselines that no longer apply.
+It can have versions, attachments, masters, edits, exports, remasters, streaming substitutions, corrupted copies,
+transcoded copies, moved files, duration drift, and analysis baselines that no longer apply.
 
-Dekzer must distinguish: musical work identity, track identity inside the user's collection, media attachment, file fingerprint, audio fingerprint, analysis baseline, preparation state, export state, and target compatibility state.
+Dekzer must distinguish: musical work identity, track identity inside the user's collection, media attachment, file
+fingerprint, audio fingerprint, analysis baseline, preparation state, export state, and target compatibility state.
 
 The failure case:
 
@@ -398,7 +445,8 @@ Cue points survive, but the file changed by 8 ms.
 
 Current tools treat this as fine. Dekzer must treat it as a possible readiness downgrade.
 
-The model must leave room for drift detection across: duration, audio fingerprint, file hash, container metadata, sample rate, channel layout, loudness, waveform alignment, analysis baseline, and streaming source substitution.
+The model must leave room for drift detection across: duration, audio fingerprint, file hash, container metadata, sample
+rate, channel layout, loudness, waveform alignment, analysis baseline, and streaming source substitution.
 
 Not all of this belongs in the MVP. All of it belongs in the runway.
 
@@ -408,15 +456,19 @@ A visual bug is a bug.
 
 A silent readiness lie is betrayal.
 
-Trust is slow to build and fast to destroy. One silent export error can erase months of confidence in the tool. The substrate layer carries a higher correctness obligation than the performance surface.
+Trust is slow to build and fast to destroy. One silent export error can erase months of confidence in the tool. The
+substrate layer carries a higher correctness obligation than the performance surface.
 
-Dekzer must express uncertainty without shame. Most software hides uncertainty. Dekzer exposes uncertainty early, while it is still fixable.
+Dekzer must express uncertainty without shame. Most software hides uncertainty. Dekzer exposes uncertainty early, while
+it is still fixable.
 
 ### IV. Local-first and externally aware are both required
 
-Local-first means: the library is the user's, preparation is the user's, the app works without cloud dependency, and durable state does not disappear because a service changes terms.
+Local-first means: the library is the user's, preparation is the user's, the app works without cloud dependency, and
+durable state does not disappear because a service changes terms.
 
-Externally aware means: Dekzer models CDJ firmware behavior, export format constraints, streaming restrictions, controller capabilities, OS audio behavior, driver caveats, known broken versions, and target-device media limitations.
+Externally aware means: Dekzer models CDJ firmware behavior, export format constraints, streaming restrictions,
+controller capabilities, OS audio behavior, driver caveats, known broken versions, and target-device media limitations.
 
 These external facts cannot be hard-coded as eternal truths. They rot. The resolution:
 
@@ -437,13 +489,17 @@ Importing from Rekordbox XML, Serato crates, Traktor NML, VirtualDJ, Engine DJ, 
 
 > Bring your trapped work home.
 
-A Rekordbox cue is not instantly Dekzer authority. It is an imported claim that can become accepted preparation after mapping, verification, and conflict resolution. Import sessions are provenance events, not magical conversions.
+A Rekordbox cue is not instantly Dekzer authority. It is an imported claim that can become accepted preparation after
+mapping, verification, and conflict resolution. Import sessions are provenance events, not magical conversions.
 
 ### VI. The deck must never be the first safety check
 
-By the time a track reaches the hot table or live path, Dekzer should already know: source state, file readability, format support, analysis presence, grid confidence, cue readiness, stem availability, sleeve state, metadata provenance, streaming limitations, target-device compatibility, export status, and known degraded conditions.
+By the time a track reaches the hot table or live path, Dekzer should already know: source state, file readability,
+format support, analysis presence, grid confidence, cue readiness, stem availability, sleeve state, metadata provenance,
+streaming limitations, target-device compatibility, export status, and known degraded conditions.
 
-Current tools reveal failure at the worst possible moment. Dekzer drags failure into preparation time, where it can be understood, fixed, accepted, or rejected.
+Current tools reveal failure at the worst possible moment. Dekzer drags failure into preparation time, where it can be
+understood, fixed, accepted, or rejected.
 
 ### VII. Runtime surfaces are projections, not authorities
 
@@ -451,29 +507,41 @@ The performance surface may show readiness. It may consume readiness. It may exp
 
 It must not invent readiness.
 
-The renderer is not the owner of library state, preparation state, compatibility state, or runtime evidence. It presents bounded projections from authoritative local state and live runtime publications.
+The renderer is not the owner of library state, preparation state, compatibility state, or runtime evidence. It presents
+bounded projections from authoritative local state and live runtime publications.
 
 ---
 
 ## 11. Compatibility Catalog Governance
 
-The doctrine requires versioned, updateable compatibility catalogs. That raises a governance question the doctrine must answer explicitly.
+The doctrine requires versioned, updateable compatibility catalogs. That raises a governance question the doctrine must
+answer explicitly.
 
-**Who publishes catalogs?** Catalogs are published by Dekzer. They are not crowd-sourced, community-contributed, or automatically generated from third-party sources without curation. This maintains accountability.
+**Who publishes catalogs?** Catalogs are published by Dekzer. They are not crowd-sourced, community-contributed, or
+automatically generated from third-party sources without curation. This maintains accountability.
 
-**Can users pin catalog versions?** Yes. A DJ must be able to freeze the compatibility knowledge set used for a specific gig. A catalog update that arrives the night before a performance cannot be allowed to silently downgrade a prepared crate.
+**Can users pin catalog versions?** Yes. A DJ must be able to freeze the compatibility knowledge set used for a specific
+gig. A catalog update that arrives the night before a performance cannot be allowed to silently downgrade a prepared
+crate.
 
-**Can users run offline with stale catalogs?** Yes. The system must operate without external network access. Offline use with a pinned or cached catalog version is a supported mode, not a degraded one.
+**Can users run offline with stale catalogs?** Yes. The system must operate without external network access. Offline use
+with a pinned or cached catalog version is a supported mode, not a degraded one.
 
-**How are known-bad catalog entries corrected?** Catalog corrections arrive as versioned updates. When a correction affects a previously evaluated verdict, the system flags affected tracks and readiness projections as stale — it does not silently re-evaluate and reassign status.
+**How are known-bad catalog entries corrected?** Catalog corrections arrive as versioned updates. When a correction
+affects a previously evaluated verdict, the system flags affected tracks and readiness projections as stale — it does
+not silently re-evaluate and reassign status.
 
-**Are catalog updates automatic?** Updates are not applied automatically during performance mode. Outside performance mode, the user controls when catalog updates are applied and can preview what would change.
+**Are catalog updates automatic?** Updates are not applied automatically during performance mode. Outside performance
+mode, the user controls when catalog updates are applied and can preview what would change.
 
-**Can a gig freeze a compatibility knowledge set?** Yes. This is the Gig Pin. When a DJ locks a gig configuration, the catalog version in use at that moment is recorded alongside it. Verdicts from that evaluation remain stable for the gig regardless of subsequent catalog updates.
+**Can a gig freeze a compatibility knowledge set?** Yes. This is the Gig Pin. When a DJ locks a gig configuration, the
+catalog version in use at that moment is recorded alongside it. Verdicts from that evaluation remain stable for the gig
+regardless of subsequent catalog updates.
 
 The hard rule:
 
-> Compatibility catalogs are updateable, but compatibility state used for a gig must be pin-able, inspectable, and not subject to silent mutation.
+> Compatibility catalogs are updateable, but compatibility state used for a gig must be pin-able, inspectable, and not
+> subject to silent mutation.
 
 If external knowledge can silently update and downgrade tonight's crate, Dekzer becomes the thing it warned against.
 
@@ -481,7 +549,8 @@ If external knowledge can silently update and downgrade tonight's crate, Dekzer 
 
 ## 12. Performance Mode and Stable Mode
 
-Given the "Will it work tonight?" flag, Dekzer must explicitly define what the system will and will not do during performance.
+Given the "Will it work tonight?" flag, Dekzer must explicitly define what the system will and will not do during
+performance.
 
 **Performance mode is a substrate commitment, not a UI mode.**
 
@@ -498,9 +567,11 @@ No schema migration runs that could affect in-flight state.
 
 The live path, hot table, and shadow paths are protected from silent mutation.
 
-The system may continue passive observations (noting that a file changed, noting that a catalog update is available). It must not act on those observations until the DJ exits performance mode.
+The system may continue passive observations (noting that a file changed, noting that a catalog update is available). It
+must not act on those observations until the DJ exits performance mode.
 
-DJs distrust automatic change for good reason. Every major DJ software failure story involves something the system did that the DJ did not ask for. Dekzer names this and refuses it.
+DJs distrust automatic change for good reason. Every major DJ software failure story involves something the system did
+that the DJ did not ask for. Dekzer names this and refuses it.
 
 ---
 
@@ -508,7 +579,8 @@ DJs distrust automatic change for good reason. Every major DJ software failure s
 
 A preparation ledger without recovery is only half a ledger.
 
-Reversibility is a core property — not a nice-to-have. Every operation that modifies accepted preparation state must have a defined recovery story.
+Reversibility is a core property — not a nice-to-have. Every operation that modifies accepted preparation state must
+have a defined recovery story.
 
 **Operations that require recovery coverage:**
 
@@ -530,17 +602,21 @@ Destructive operations require explicit user confirmation.
 
 Background operations that could affect accepted preparation state must be staged and surfaced before commit.
 
-Every backup must carry a manifest of what it contains, when it was created, and what catalog and schema version it was made against.
+Every backup must carry a manifest of what it contains, when it was created, and what catalog and schema version it was
+made against.
 
 The system must be able to restore a known-good state without requiring the user to reconstruct context from memory.
 
-A DJ who loses a night of prep work because a background job ran silently will not trust Dekzer again. Recovery is not a feature. It is a trust requirement.
+A DJ who loses a night of prep work because a background job ran silently will not trust Dekzer again. Recovery is not a
+feature. It is a trust requirement.
 
 ---
 
 ## 14. Privacy and Local Sovereignty
 
-The DJ's library is sensitive professional material. It contains unreleased promos, private edits, setlists, gig history, client or event requests, play history, purchase sources, folder structure, and organizational logic that reflects real professional relationships and work.
+The DJ's library is sensitive professional material. It contains unreleased promos, private edits, setlists, gig
+history, client or event requests, play history, purchase sources, folder structure, and organizational logic that
+reflects real professional relationships and work.
 
 **Dekzer's sovereignty commitments:**
 
@@ -554,13 +630,15 @@ Revoking cloud connectivity must not degrade the user's local library state.
 
 **The local-first guarantee is not a marketing claim. It is an architectural constraint.**
 
-External features — catalog updates, streaming integration, cloud backup, collaborative features — are additive. They extend local authority. They do not replace it or hold it hostage.
+External features — catalog updates, streaming integration, cloud backup, collaborative features — are additive. They
+extend local authority. They do not replace it or hold it hostage.
 
 ---
 
 ## 15. Job System Doctrine
 
-Preparation implies substantial background work: scanning, fingerprinting, audio analysis, import processing, drift detection, stem generation, compatibility evaluation, export operations, backup, and preflight generation.
+Preparation implies substantial background work: scanning, fingerprinting, audio analysis, import processing, drift
+detection, stem generation, compatibility evaluation, export operations, backup, and preflight generation.
 
 Jobs are not implementation detail. They are substrate actors. Their behavior must be governed.
 
@@ -570,34 +648,42 @@ Jobs are not implementation detail. They are substrate actors. Their behavior mu
 
 **Jobs are observable.** The user can see what is running, what it is doing, what it has found, and what it has changed.
 
-**Jobs are cancelable.** The user can stop a job. A canceled job leaves the substrate in a valid partial state, not in mystery.
+**Jobs are cancelable.** The user can stop a job. A canceled job leaves the substrate in a valid partial state, not in
+mystery.
 
-**Jobs are attributable.** Every piece of evidence or claim produced by a job records which job produced it, at what time, against which substrate version.
+**Jobs are attributable.** Every piece of evidence or claim produced by a job records which job produced it, at what
+time, against which substrate version.
 
-**Failed jobs leave diagnostic evidence, not mystery state.** A job that encounters a problem records what it found, what it attempted, and where it stopped. It does not silently produce partial results that look complete.
+**Failed jobs leave diagnostic evidence, not mystery state.** A job that encounters a problem records what it found,
+what it attempted, and where it stopped. It does not silently produce partial results that look complete.
 
-**Jobs respect performance mode.** No job that could mutate accepted preparation state runs during performance mode without explicit promotion.
+**Jobs respect performance mode.** No job that could mutate accepted preparation state runs during performance mode
+without explicit promotion.
 
-**Job authority is bounded.** A job that detects drift does not resolve it. It produces a drift observation. Resolution requires either user action or an explicitly configured policy that the user has approved.
+**Job authority is bounded.** A job that detects drift does not resolve it. It produces a drift observation. Resolution
+requires either user action or an explicitly configured policy that the user has approved.
 
 ---
 
 ## 16. RT Flight Deck
 
-The doctrine so far addresses preparation — the work done before performance. The Prepared Room model answers: is the music ready?
+The doctrine so far addresses preparation — the work done before performance. The Prepared Room model answers: is the
+music ready?
 
 RT Flight Deck is the live-runtime sibling of the Prepared Room.
 
 It answers a different question: **What happened during performance, why, and what evidence proves it?**
 
-RT Flight Deck is not the deck surface. It is the runtime evidence layer — the system that observes, records, and makes sense of what occurs when preparation meets live execution.
+RT Flight Deck is not the deck surface. It is the runtime evidence layer — the system that observes, records, and makes
+sense of what occurs when preparation meets live execution.
 
 ```text
 Prepared Room        Was the music ready before the first track loaded?
 RT Flight Deck       What happened after it did?
 ```
 
-RT Flight Deck does not invent performance data. It captures it from the live path, runtime events, and performance surface activity, and relates that evidence back to the preparation state.
+RT Flight Deck does not invent performance data. It captures it from the live path, runtime events, and performance
+surface activity, and relates that evidence back to the preparation state.
 
 A DJ should be able to ask, after a gig:
 
@@ -614,7 +700,9 @@ Which transitions came from prepared crates, and which were improvised?
 
 That is the audit trail a professional preparation ledger should produce.
 
-RT Flight Deck is not a MVP concern. It is a doctrine concern. Its existence must be accounted for in the substrate design now — even if its UI surfaces come later. Runtime evidence must not be an afterthought bolted onto a system not built to carry it.
+RT Flight Deck is not a MVP concern. It is a doctrine concern. Its existence must be accounted for in the substrate
+design now — even if its UI surfaces come later. Runtime evidence must not be an afterthought bolted onto a system not
+built to carry it.
 
 ---
 
@@ -638,7 +726,8 @@ Do not let streaming sources masquerade as local attachments.
 
 Do not hide drift.
 
-Do not flatten candidates, accepted facts, rejected facts, stale facts, and exported facts into the same semantic bucket.
+Do not flatten candidates, accepted facts, rejected facts, stale facts, and exported facts into the same semantic
+bucket.
 
 Do not make the deck responsible for discovering substrate failure.
 
@@ -782,7 +871,8 @@ No RT Flight Deck runtime layer.
 No cloud sync.
 ```
 
-These are not abandoned. They are sequenced. The substrate must be provably sound before the surfaces above it carry weight.
+These are not abandoned. They are sequenced. The substrate must be provably sound before the surfaces above it carry
+weight.
 
 The dragon stays in the cave until the foundation can hold its bones.
 
