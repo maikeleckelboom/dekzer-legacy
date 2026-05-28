@@ -257,12 +257,6 @@ describe('createLibraryHierarchyReadController', () => {
     controller.setSourceFileVisibility('performanceAndImages', {
       replayNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
     })
-    expect(controller.sourceReadStates.value.get('navigation-row:7')).toMatchObject({
-      kind: 'refreshing'
-    })
-    expect(controller.directoryReadStates.value.get('12')).toMatchObject({
-      kind: 'loaded'
-    })
 
     await waitForReadRequestCount(readRequests, 4)
 
@@ -799,7 +793,6 @@ describe('createLibraryHierarchyReadController', () => {
     })
     await waitForMicrotasks()
 
-    expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('refreshing')
     const duringChildren = firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')
     expect(duringChildren).toEqual(['source-file:11'])
 
@@ -889,6 +882,146 @@ describe('createLibraryHierarchyReadController', () => {
       'source-directory:14'
     ])
     expect(controller.sourceReadStates.value.get('navigation-row:9')?.kind).toBe('loaded')
+  })
+
+  it('retains loaded source and directory children when a replay read fails', async () => {
+    let readCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readCount += 1
+
+          if (readCount === 1) {
+            return directoryRootHierarchyReadResult()
+          }
+
+          if (readCount === 2 && request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResult('12')
+          }
+
+          if (request.sourceFileVisibility === 'performanceAndImages') {
+            return {
+              state: 'readFailed',
+              error: { code: 'readFailed', message: 'Replay read failed.' }
+            } as ReadResult
+          }
+
+          return directoryRootHierarchyReadResult()
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
+
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
+    ])
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
+      'source-file:12-track',
+      'source-directory:99'
+    ])
+
+    controller.setSourceFileVisibility('performanceAndImages', {
+      replayNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+    await waitForMicrotasks()
+    await waitForMicrotasks()
+
+    const sourceChildren = firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')
+    expect(sourceChildren).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
+    ])
+    const directoryChildren = firstLoadedChildIds(treeNodes(controller), 'source-directory:12')
+    expect(directoryChildren).toEqual(['source-file:12-track', 'source-directory:99'])
+  })
+
+  it('normal single directory expand resolves immediately after replay batch completes', async () => {
+    const readRequests: ReadRequest[] = []
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          if (request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResultForVisibility(
+              '12',
+              request.sourceFileVisibility ?? 'performance'
+            )
+          }
+
+          return directoryRootHierarchyReadResultForVisibility(
+            request.sourceFileVisibility ?? 'performance'
+          )
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    expect(readRequests).toHaveLength(1)
+
+    controller.setSourceFileVisibility('performanceAndImages', {
+      replayNodeIds: new Set(['navigation-row:7'])
+    })
+    await waitForReadRequestCount(readRequests, 2)
+
+    await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
+    expect(readRequests).toHaveLength(3)
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('loaded')
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
+      'source-file:12-track',
+      'source-directory:99'
+    ])
+  })
+
+  it('multiple branch visibility replay commits final source and directory states cohesively', async () => {
+    const readRequests: ReadRequest[] = []
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          if (request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResultForVisibility(
+              '12',
+              request.sourceFileVisibility ?? 'performance'
+            )
+          }
+
+          return directoryRootHierarchyReadResultForVisibility(
+            request.sourceFileVisibility ?? 'performance'
+          )
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
+
+    controller.setSourceFileVisibility('performanceAndImages', {
+      replayNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+    await waitForReadRequestCount(readRequests, 4)
+    await waitForMicrotasks()
+
+    expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('loaded')
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('loaded')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
+    ])
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
+      'source-file:12-track',
+      'source-directory:99'
+    ])
   })
 })
 
