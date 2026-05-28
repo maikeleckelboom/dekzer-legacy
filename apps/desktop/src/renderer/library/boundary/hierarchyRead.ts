@@ -303,6 +303,10 @@ export function createLibraryHierarchyReadController(
         }
       }
 
+      if (replaySequence !== visibilityReplaySequence) {
+        return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
+      }
+
       commitReplayBatch()
     } catch {
       abortReplayBatch(preReplaySourceStates, preReplayDirectoryStates)
