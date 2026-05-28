@@ -11,10 +11,7 @@ import type {
   ChildWindow,
   SourceFileVisibility
 } from '../../../shared/libraryHierarchy/readChildren'
-import type {
-  NavigationReadRowsResult,
-  NavigationRow
-} from '../../../shared/libraryNavigation/readRows'
+import type { NavigationReadRowsResult } from '../../../shared/libraryNavigation/readRows'
 import type { RendererApi } from '../../../shared/rendererApi'
 import { projectState, type BrowserProjection } from '../tree/projection'
 import type {
@@ -35,7 +32,6 @@ const safeNavigationReadRequestFailure = 'Unable to request library navigation r
 const safeSourceReadRequestFailure = 'Unable to request library source hierarchy children.'
 const safeChildReadRequestFailure = 'Unable to request library hierarchy directory children.'
 const safeUnexpectedChildWindowFailure = 'The hierarchy read returned an unexpected child window.'
-const positiveOpaqueIdPattern = /^[1-9]\d*$/
 
 export type LibraryHierarchyReadApi = Pick<
   RendererApi['library'],
@@ -185,11 +181,6 @@ export function createLibraryHierarchyReadController(
     hierarchyReadResult.value = undefined
     sourceReadSequence++
     directoryReadSequence++
-    sourceReadStates.value =
-      navigationReadResult.value?.state === 'ready'
-        ? withDiscoveredUnloadedSourceStates(navigationReadResult.value.rows)
-        : new Map()
-    directoryReadStates.value = new Map()
 
     if (intent.sourceTargets.size === 0 && intent.directoryTargets.size === 0) {
       void loadFirstSource()
@@ -342,9 +333,6 @@ export function createLibraryHierarchyReadController(
 
       navigationReadResult.value = result
       hierarchyReadResult.value = undefined
-      sourceReadStates.value =
-        result.state === 'ready' ? withDiscoveredUnloadedSourceStates(result.rows) : new Map()
-      directoryReadStates.value = new Map()
 
       return result.state === 'ready'
     } catch {
@@ -434,19 +422,31 @@ export function createLibraryHierarchyReadController(
       return false
     }
 
-    if (currentState?.kind === 'loaded') {
+    if (currentState?.kind === 'refreshing' && currentState.requestKey === requestKey) {
       return false
     }
 
+    const hadPriorChildren = currentState?.kind === 'loaded'
     const sequence = ++sourceReadSequence
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
-    setSourceReadState(nodeId, {
-      kind: 'loading',
-      requestKey,
-      sequence,
-      detail: 'Loading literal hierarchy children.'
-    })
+
+    if (hadPriorChildren) {
+      setSourceReadState(nodeId, {
+        kind: 'refreshing',
+        children: currentState.children,
+        requestKey,
+        sequence,
+        detail: 'Refreshing hierarchy children.'
+      })
+    } else {
+      setSourceReadState(nodeId, {
+        kind: 'loading',
+        requestKey,
+        sequence,
+        detail: 'Loading literal hierarchy children.'
+      })
+    }
 
     try {
       const result = await libraryApi.hierarchy.readChildren(
@@ -460,18 +460,32 @@ export function createLibraryHierarchyReadController(
       hierarchyReadResult.value = result
 
       if (result.state !== 'ready') {
-        setSourceReadState(nodeId, {
-          kind: 'failed',
-          detail: result.error.message
-        })
+        if (hadPriorChildren) {
+          setSourceReadState(nodeId, {
+            kind: 'loaded',
+            children: currentState.children
+          })
+        } else {
+          setSourceReadState(nodeId, {
+            kind: 'failed',
+            detail: result.error.message
+          })
+        }
         return true
       }
 
       if (!isExpectedWindow(result.window, 0, undefined, target.entryPoint, requestedVisibility)) {
-        setSourceReadState(nodeId, {
-          kind: 'failed',
-          detail: safeUnexpectedChildWindowFailure
-        })
+        if (hadPriorChildren) {
+          setSourceReadState(nodeId, {
+            kind: 'loaded',
+            children: currentState.children
+          })
+        } else {
+          setSourceReadState(nodeId, {
+            kind: 'failed',
+            detail: safeUnexpectedChildWindowFailure
+          })
+        }
         return true
       }
 
@@ -489,11 +503,19 @@ export function createLibraryHierarchyReadController(
       return true
     } catch {
       if (isCurrentSourceLoading(nodeId, requestKey, sequence)) {
-        hierarchyReadRequestError.value = safeSourceReadRequestFailure
-        setSourceReadState(nodeId, {
-          kind: 'failed',
-          detail: safeSourceReadRequestFailure
-        })
+        if (hadPriorChildren) {
+          hierarchyReadRequestError.value = safeSourceReadRequestFailure
+          setSourceReadState(nodeId, {
+            kind: 'loaded',
+            children: currentState.children
+          })
+        } else {
+          hierarchyReadRequestError.value = safeSourceReadRequestFailure
+          setSourceReadState(nodeId, {
+            kind: 'failed',
+            detail: safeSourceReadRequestFailure
+          })
+        }
         return true
       }
 
@@ -518,19 +540,31 @@ export function createLibraryHierarchyReadController(
       return false
     }
 
-    if (currentState?.kind === 'loaded') {
+    if (currentState?.kind === 'refreshing' && currentState.requestKey === requestKey) {
       return false
     }
 
+    const hadPriorChildren = currentState?.kind === 'loaded'
     const sequence = ++directoryReadSequence
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
-    setDirectoryReadState(target.directoryId, {
-      kind: 'loading',
-      requestKey,
-      sequence,
-      detail: 'Loading children.'
-    })
+
+    if (hadPriorChildren) {
+      setDirectoryReadState(target.directoryId, {
+        kind: 'refreshing',
+        children: currentState.children,
+        requestKey,
+        sequence,
+        detail: 'Refreshing children.'
+      })
+    } else {
+      setDirectoryReadState(target.directoryId, {
+        kind: 'loading',
+        requestKey,
+        sequence,
+        detail: 'Loading children.'
+      })
+    }
 
     try {
       const result = await libraryApi.hierarchy.readChildren(
@@ -542,10 +576,17 @@ export function createLibraryHierarchyReadController(
       }
 
       if (result.state !== 'ready') {
-        setDirectoryReadState(target.directoryId, {
-          kind: 'failed',
-          detail: result.error.message
-        })
+        if (hadPriorChildren) {
+          setDirectoryReadState(target.directoryId, {
+            kind: 'loaded',
+            children: currentState.children
+          })
+        } else {
+          setDirectoryReadState(target.directoryId, {
+            kind: 'failed',
+            detail: result.error.message
+          })
+        }
         return true
       }
 
@@ -558,10 +599,17 @@ export function createLibraryHierarchyReadController(
           requestedVisibility
         )
       ) {
-        setDirectoryReadState(target.directoryId, {
-          kind: 'failed',
-          detail: safeUnexpectedChildWindowFailure
-        })
+        if (hadPriorChildren) {
+          setDirectoryReadState(target.directoryId, {
+            kind: 'loaded',
+            children: currentState.children
+          })
+        } else {
+          setDirectoryReadState(target.directoryId, {
+            kind: 'failed',
+            detail: safeUnexpectedChildWindowFailure
+          })
+        }
         return true
       }
 
@@ -579,10 +627,17 @@ export function createLibraryHierarchyReadController(
       return true
     } catch {
       if (isCurrentDirectoryLoading(target.directoryId, requestKey, sequence)) {
-        setDirectoryReadState(target.directoryId, {
-          kind: 'failed',
-          detail: safeChildReadRequestFailure
-        })
+        if (hadPriorChildren) {
+          setDirectoryReadState(target.directoryId, {
+            kind: 'loaded',
+            children: currentState.children
+          })
+        } else {
+          setDirectoryReadState(target.directoryId, {
+            kind: 'failed',
+            detail: safeChildReadRequestFailure
+          })
+        }
         return true
       }
 
@@ -851,7 +906,9 @@ export function createLibraryHierarchyReadController(
   function isCurrentSourceLoading(nodeId: string, requestKey: string, sequence: number): boolean {
     const state = sourceReadStates.value.get(nodeId)
     return (
-      state?.kind === 'loading' && state.requestKey === requestKey && state.sequence === sequence
+      (state?.kind === 'loading' || state?.kind === 'refreshing') &&
+      state.requestKey === requestKey &&
+      state.sequence === sequence
     )
   }
 
@@ -862,7 +919,9 @@ export function createLibraryHierarchyReadController(
   ): boolean {
     const state = directoryReadStates.value.get(directoryId)
     return (
-      state?.kind === 'loading' && state.requestKey === requestKey && state.sequence === sequence
+      (state?.kind === 'loading' || state?.kind === 'refreshing') &&
+      state.requestKey === requestKey &&
+      state.sequence === sequence
     )
   }
 
@@ -1132,27 +1191,6 @@ function canReadMore(
   )
 }
 
-function isPositiveOpaqueId(value: unknown): value is string {
-  return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
-}
-
-function withDiscoveredUnloadedSourceStates(
-  rows: readonly NavigationRow[]
-): ReadonlyMap<string, SourceState> {
-  const states = new Map<string, SourceState>()
-
-  for (const row of rows) {
-    if (sourceReadEntryPointFor(row) !== undefined) {
-      states.set(`navigation-row:${row.navigationRowId}`, {
-        kind: 'unloaded',
-        detail: 'Literal hierarchy not loaded yet.'
-      })
-    }
-  }
-
-  return states
-}
-
 function addDiscoveredUnloadedDirectoryStates(
   states: Map<string, DirectoryState>,
   window: ChildWindow
@@ -1165,24 +1203,6 @@ function addDiscoveredUnloadedDirectoryStates(
       })
     }
   }
-}
-
-function sourceReadEntryPointFor(row: NavigationRow): EntryPoint | undefined {
-  if (row.selectorKind === 'source' && isPositiveOpaqueId(row.selectorPayload)) {
-    return {
-      kind: 'source',
-      sourceId: row.selectorPayload
-    }
-  }
-
-  if (row.selectorKind === 'sourceLocation' && isPositiveOpaqueId(row.selectorPayload)) {
-    return {
-      kind: 'sourceLocation',
-      sourceLocationId: row.selectorPayload
-    }
-  }
-
-  return undefined
 }
 
 function createEntryPointRequestKey(

@@ -34,16 +34,18 @@ export type ContentRowIcon =
   | 'warning'
   | 'state'
 
-export type ContentRowAction = {
-  readonly kind: 'loadChildren'
-  readonly nodeId: BrowserTreeNodeId
-  readonly label: string
-} | {
-  readonly kind: 'loadContentsPage'
-  readonly nodeId: BrowserTreeNodeId
-  readonly label: string
-  readonly cursor: string
-}
+export type ContentRowAction =
+  | {
+      readonly kind: 'loadChildren'
+      readonly nodeId: BrowserTreeNodeId
+      readonly label: string
+    }
+  | {
+      readonly kind: 'loadContentsPage'
+      readonly nodeId: BrowserTreeNodeId
+      readonly label: string
+      readonly cursor: string
+    }
 
 export type ContentRow = {
   readonly id: string
@@ -472,7 +474,10 @@ function contentsStateLabel(result: ContentsResult): string {
   }
 }
 
-function contentsDetail(result: ContentsResult, accumulatedRows?: readonly ContentsFileRow[]): string {
+function contentsDetail(
+  result: ContentsResult,
+  accumulatedRows?: readonly ContentsFileRow[]
+): string {
   const rowCount = accumulatedRows?.length ?? result.rows.length
 
   if (result.detail !== undefined) {
@@ -541,7 +546,11 @@ function contentsCoveragePrefix(result: ContentsResult): string | undefined {
   return undefined
 }
 
-function loadMoreRow(ownerId: BrowserTreeNodeId, result: ContentsResult, nextCursor: string): ContentRow {
+function loadMoreRow(
+  ownerId: BrowserTreeNodeId,
+  result: ContentsResult,
+  nextCursor: string
+): ContentRow {
   const subject = contentsCountSubject(result, result.rows.length)
   return {
     id: `contents-load-more:${ownerId}`,

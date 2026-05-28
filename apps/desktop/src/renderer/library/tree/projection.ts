@@ -243,15 +243,21 @@ function projectSourceChildren(options: {
     }
   }
 
+  if (state.kind === 'refreshing' || state.kind === 'loaded') {
+    return {
+      children: childrenForProjectedNodes(
+        projectLoadedHierarchyChildren({
+          ownerId: options.ownerId,
+          children: state.children,
+          directoryReadStates: options.directoryReadStates,
+          bindingsById: options.bindingsById
+        })
+      )
+    }
+  }
+
   return {
-    children: childrenForProjectedNodes(
-      projectLoadedHierarchyChildren({
-        ownerId: options.ownerId,
-        children: state.children,
-        directoryReadStates: options.directoryReadStates,
-        bindingsById: options.bindingsById
-      })
-    )
+    children: childrenForProjectedNodes([])
   }
 }
 
@@ -613,15 +619,21 @@ function projectDirectoryChildren(options: {
     }
   }
 
+  if (state.kind === 'refreshing' || state.kind === 'loaded') {
+    return {
+      children: childrenForProjectedNodes(
+        projectLoadedHierarchyChildren({
+          ownerId: options.ownerId,
+          children: state.children,
+          directoryReadStates: options.directoryReadStates,
+          bindingsById: options.bindingsById
+        })
+      )
+    }
+  }
+
   return {
-    children: childrenForProjectedNodes(
-      projectLoadedHierarchyChildren({
-        ownerId: options.ownerId,
-        children: state.children,
-        directoryReadStates: options.directoryReadStates,
-        bindingsById: options.bindingsById
-      })
-    )
+    children: childrenForProjectedNodes([])
   }
 }
 

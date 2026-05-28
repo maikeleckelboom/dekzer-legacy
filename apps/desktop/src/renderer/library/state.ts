@@ -73,6 +73,13 @@ export type DirectoryState =
       readonly children: LoadedChildren
     }
   | {
+      readonly kind: 'refreshing'
+      readonly children: LoadedChildren
+      readonly requestKey: string
+      readonly sequence: number
+      readonly detail?: string
+    }
+  | {
       readonly kind: 'failed'
       readonly detail: string
     }
@@ -91,6 +98,13 @@ export type SourceState =
   | {
       readonly kind: 'loaded'
       readonly children: LoadedChildren
+    }
+  | {
+      readonly kind: 'refreshing'
+      readonly children: LoadedChildren
+      readonly requestKey: string
+      readonly sequence: number
+      readonly detail?: string
     }
   | {
       readonly kind: 'failed'

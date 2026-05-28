@@ -134,7 +134,9 @@ export function createContentsReadController(
     }
 
     const isSameRequest =
-      currentState.kind === 'ready' && currentState.requestKey === requestKey && cursor !== undefined
+      currentState.kind === 'ready' &&
+      currentState.requestKey === requestKey &&
+      cursor !== undefined
 
     const sequence = ++readSequence
     state.value = {
@@ -180,10 +182,10 @@ export function createContentsReadController(
         result
       }
       if (nextCursor !== undefined) {
-        (stateUpdate as { nextCursor?: string }).nextCursor = nextCursor
+        ;(stateUpdate as { nextCursor?: string }).nextCursor = nextCursor
       }
       if (rows.length > 0) {
-        (stateUpdate as { accumulatedRows?: readonly ContentsFileRow[] }).accumulatedRows = rows
+        ;(stateUpdate as { accumulatedRows?: readonly ContentsFileRow[] }).accumulatedRows = rows
       }
       state.value = stateUpdate
       return true

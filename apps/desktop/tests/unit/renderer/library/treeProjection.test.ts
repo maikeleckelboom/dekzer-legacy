@@ -416,6 +416,63 @@ describe('projectState', () => {
       isExpanded: false
     })
   })
+
+  it('refreshing directory renders loaded children and remains a branch', () => {
+    const priorChildren = loadedChildren([fileNode('15', 'prior-track.wav')])
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([directoryNode('12', 'Album')]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'refreshing',
+              children: priorChildren,
+              requestKey: 'source:7/directory:12/v:images',
+              sequence: 2,
+              detail: 'Refreshing children.'
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('loaded')
+    if (node.children.kind === 'loaded') {
+      expect(node.children.nodes.map((n) => n.id)).toEqual(['source-file:15'])
+    }
+    expect(isBrowserTreeBranch(node)).toBe(true)
+    expect(canRevealBrowserTreeChildren(node)).toBe(true)
+  })
+
+  it('refreshing source renders loaded children', () => {
+    const projection = projectTree(
+      browserState({
+        sourceFileVisibility: 'performanceAndImages',
+        sourceStates: new Map([
+          [
+            'navigation-row:7',
+            {
+              kind: 'refreshing',
+              children: loadedChildren([fileNode('11', 'cover.mp3', { mediaClass: 'image' })], {
+                sourceFileVisibility: 'performanceAndImages'
+              }),
+              requestKey: 'source:7/v:images',
+              sequence: 1,
+              detail: 'Refreshing hierarchy children.'
+            }
+          ]
+        ])
+      })
+    )
+    const sourceNode = projection.nodes[0]
+
+    expect(sourceNode.children.kind).toBe('loaded')
+    if (sourceNode.children.kind === 'loaded') {
+      expect(sourceNode.children.nodes.map((n) => n.id)).toEqual(['source-file:11'])
+    }
+  })
 })
 
 function projectTree(state: BrowserState): BrowserProjection {
@@ -454,6 +511,7 @@ function browserState(
   options: {
     readonly rows?: readonly NavigationRow[]
     readonly sourceChildren?: LoadedChildren
+    readonly sourceStates?: BrowserState['sourceReadStates']
     readonly directoryStates?: BrowserState['directoryReadStates']
     readonly sourceFileVisibility?: SourceFileVisibility
   } = {}
@@ -461,7 +519,8 @@ function browserState(
   return {
     navigationReadResult: readyNavigation(options.rows ?? [sourceNavigationRow()]),
     sourceReadStates:
-      options.sourceChildren === undefined
+      options.sourceStates ??
+      (options.sourceChildren === undefined
         ? new Map()
         : new Map([
             [
@@ -471,7 +530,7 @@ function browserState(
                 children: options.sourceChildren
               }
             ]
-          ]),
+          ])),
     directoryReadStates: options.directoryStates ?? new Map(),
     sourceFileVisibility: options.sourceFileVisibility ?? 'performance'
   }

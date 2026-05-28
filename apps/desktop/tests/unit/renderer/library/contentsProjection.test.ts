@@ -134,34 +134,34 @@ describe('projectContents', () => {
   })
 
   it('shows load-more row and continuation detail when nextCursor exists', () => {
-    const contents = projectForSelection(
-      browserState({}),
-      'navigation-row:7',
-      {
-        kind: 'ready',
-        requestKey: 'source:7',
-        nextCursor: 'c2Y6...',
-        accumulatedRows: [
-          primaryMediaRow('asset-1', 'track.wav', 'audio'),
-          primaryMediaRow('asset-2', 'clip.mp4', 'audio')
-        ],
+    const contents = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'ready',
+      requestKey: 'source:7',
+      nextCursor: 'c2Y6...',
+      accumulatedRows: [
+        primaryMediaRow('asset-1', 'track.wav', 'audio'),
+        primaryMediaRow('asset-2', 'clip.mp4', 'audio')
+      ],
+      result: {
+        state: 'ready',
         result: {
           state: 'ready',
-          result: {
-            state: 'ready',
-            scope: { kind: 'source', sourceId: '7' },
-            policy: contentsPolicyForVisibility('performance'),
-            recursion: 'recursive',
-            rows: [
-              primaryMediaRow('asset-1', 'track.wav', 'audio'),
-              primaryMediaRow('asset-2', 'clip.mp4', 'audio')
-            ],
-            coverage: { state: 'complete', recursiveScopeComplete: true, emptyResultAuthoritative: true },
-            nextCursor: 'c2Y6...'
-          }
+          scope: { kind: 'source', sourceId: '7' },
+          policy: contentsPolicyForVisibility('performance'),
+          recursion: 'recursive',
+          rows: [
+            primaryMediaRow('asset-1', 'track.wav', 'audio'),
+            primaryMediaRow('asset-2', 'clip.mp4', 'audio')
+          ],
+          coverage: {
+            state: 'complete',
+            recursiveScopeComplete: true,
+            emptyResultAuthoritative: true
+          },
+          nextCursor: 'c2Y6...'
         }
       }
-    )
+    })
 
     expect(contents.kind).toBe('ready')
     expect(contents.detail).toBe('2 primary media items loaded. More available.')
@@ -181,32 +181,32 @@ describe('projectContents', () => {
   })
 
   it('shows accumulated row count in detail string when nextCursor exists', () => {
-    const contents = projectForSelection(
-      browserState({}),
-      'navigation-row:7',
-      {
-        kind: 'ready',
-        requestKey: 'source:7',
-        nextCursor: 'c2Y6...',
-        accumulatedRows: [
-          primaryMediaRow('a', 'first.wav', 'audio'),
-          primaryMediaRow('b', 'second.wav', 'audio'),
-          primaryMediaRow('c', 'third.wav', 'audio')
-        ],
+    const contents = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'ready',
+      requestKey: 'source:7',
+      nextCursor: 'c2Y6...',
+      accumulatedRows: [
+        primaryMediaRow('a', 'first.wav', 'audio'),
+        primaryMediaRow('b', 'second.wav', 'audio'),
+        primaryMediaRow('c', 'third.wav', 'audio')
+      ],
+      result: {
+        state: 'ready',
         result: {
           state: 'ready',
-          result: {
-            state: 'ready',
-            scope: { kind: 'source', sourceId: '7' },
-            policy: contentsPolicyForVisibility('performance'),
-            recursion: 'recursive',
-            rows: [primaryMediaRow('c', 'third.wav', 'audio')],
-            coverage: { state: 'complete', recursiveScopeComplete: true, emptyResultAuthoritative: true },
-            nextCursor: 'c2Y6...'
-          }
+          scope: { kind: 'source', sourceId: '7' },
+          policy: contentsPolicyForVisibility('performance'),
+          recursion: 'recursive',
+          rows: [primaryMediaRow('c', 'third.wav', 'audio')],
+          coverage: {
+            state: 'complete',
+            recursiveScopeComplete: true,
+            emptyResultAuthoritative: true
+          },
+          nextCursor: 'c2Y6...'
         }
       }
-    )
+    })
 
     expect(contents.kind).toBe('ready')
     expect(contents.detail).toBe('3 primary media items loaded. More available.')
