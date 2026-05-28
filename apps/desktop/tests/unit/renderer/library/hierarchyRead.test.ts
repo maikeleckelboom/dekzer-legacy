@@ -337,10 +337,10 @@ describe('createLibraryHierarchyReadController', () => {
     controller.setSourceFileVisibility('performanceAndImages', {
       replayNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
     })
-    await waitForReadRequestCount(readRequests, 3)
+    await waitForReadRequestCount(readRequests, 2)
     await waitForMicrotasks()
 
-    expect(readRequests).toHaveLength(3)
+    expect(readRequests).toHaveLength(2)
     expect(controller.directoryReadStates.value.get('12')).toMatchObject({
       kind: 'unloaded'
     })
@@ -1021,6 +1021,177 @@ describe('createLibraryHierarchyReadController', () => {
     expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
       'source-file:12-track',
       'source-directory:99'
+    ])
+  })
+
+  it('visibility replay does not commit source states before directory reads complete', async () => {
+    const sourceReplayDeferred = deferred<Extract<ReadResult, { state: 'ready' }>>()
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          const isReplayVisibility = request.sourceFileVisibility === 'performanceAndImages'
+
+          if (isReplayVisibility && request.parentDirectoryId === undefined) {
+            return sourceReplayDeferred.promise
+          }
+
+          if (isReplayVisibility && request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResultForVisibility('12', 'performanceAndImages')
+          }
+
+          if (request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResult('12')
+          }
+
+          return directoryRootHierarchyReadResult()
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
+
+    controller.setSourceFileVisibility('performanceAndImages', {
+      replayNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+    await waitForMicrotasks()
+
+    const sourceStateBeforeCommit = controller.sourceReadStates.value.get('navigation-row:7')
+    expect(sourceStateBeforeCommit?.kind).toBe('loaded')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
+    ])
+
+    sourceReplayDeferred.resolve(
+      directoryRootHierarchyReadResultForVisibility('performanceAndImages') as Extract<
+        ReadResult,
+        { state: 'ready' }
+      >
+    )
+    await waitForMicrotasks()
+    await waitForMicrotasks()
+
+    expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('loaded')
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('loaded')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
+    ])
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
+      'source-file:12-track',
+      'source-directory:99'
+    ])
+  })
+
+  it('state placeholder node ID remains stable across state transitions', async () => {
+    const deferredDirRead = deferred<Extract<ReadResult, { state: 'ready' }>>()
+    let readCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readCount += 1
+
+          if (readCount === 1) {
+            return directoryRootHierarchyReadResult()
+          }
+
+          if (request.parentDirectoryId === '12') {
+            return deferredDirRead.promise
+          }
+
+          return directoryRootHierarchyReadResult()
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+
+    const deferredNode = findProjectedNode(treeNodes(controller), 'source-directory:12')
+    expect(deferredNode?.children.kind).toBe('deferred')
+    if (deferredNode?.children.kind === 'deferred') {
+      expect(deferredNode.children.stateNode.id).toBe('read-state:source-directory:12')
+    }
+
+    const readPromise = controller.requestDirectoryChildren('source-directory:12')
+    await waitForMicrotasks()
+
+    const loadingNode = findProjectedNode(treeNodes(controller), 'source-directory:12')
+    expect(loadingNode?.children.kind).toBe('loading')
+    if (loadingNode?.children.kind === 'loading') {
+      expect(loadingNode.children.stateNode.id).toBe('read-state:source-directory:12')
+    }
+
+    deferredDirRead.resolve(
+      loadedDirectoryReadResult('12') as Extract<ReadResult, { state: 'ready' }>
+    )
+    await readPromise
+
+    const loadedNode = findProjectedNode(treeNodes(controller), 'source-directory:12')
+    expect(loadedNode?.children.kind).toBe('loaded')
+  })
+
+  it('replay abort restores pre-replay states when replay becomes stale', async () => {
+    const firstReplaySourceRead = deferred<Extract<ReadResult, { state: 'ready' }>>()
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          const isReplayVisibility = request.sourceFileVisibility === 'performanceAndImages'
+
+          if (isReplayVisibility && request.parentDirectoryId === undefined) {
+            return firstReplaySourceRead.promise
+          }
+
+          if (isReplayVisibility && request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResultForVisibility('12', 'performanceAndImages')
+          }
+
+          if (request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResult('12')
+          }
+
+          return directoryRootHierarchyReadResult()
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
+
+    controller.setSourceFileVisibility('performanceAndImages', {
+      replayNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+    await waitForMicrotasks()
+
+    controller.setSourceFileVisibility('performance')
+
+    await waitForMicrotasks()
+
+    expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('loaded')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
+    ])
+
+    firstReplaySourceRead.resolve(
+      directoryRootHierarchyReadResultForVisibility('performanceAndImages') as Extract<
+        ReadResult,
+        { state: 'ready' }
+      >
+    )
+    await waitForMicrotasks()
+
+    expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('loaded')
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
     ])
   })
 })

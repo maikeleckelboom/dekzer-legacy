@@ -229,6 +229,8 @@ export function createLibraryHierarchyReadController(
     replaySequence: number
   ): Promise<void> {
     let loadedAnyReplayTarget = false
+    const preReplaySourceStates = new Map(sourceReadStates.value)
+    const preReplayDirectoryStates = new Map(directoryReadStates.value)
     isBatchedReplay = true
     hierarchyReadIsLoading.value = true
     hierarchyReadRequestError.value = undefined
@@ -238,7 +240,7 @@ export function createLibraryHierarchyReadController(
 
       for (const [nodeId, target] of intent.sourceTargets) {
         if (replaySequence !== visibilityReplaySequence) {
-          return cleanupReplay()
+          return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
         }
 
         const loaded = await readSource(nodeId, target)
@@ -247,24 +249,31 @@ export function createLibraryHierarchyReadController(
         }
       }
 
-      commitReplayBatch()
-
-      beginReplayBatch()
-
       for (const [nodeId, directoryTarget] of intent.directoryTargets) {
         if (replaySequence !== visibilityReplaySequence) {
-          return cleanupReplay()
+          return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
         }
 
         const projection = browserProjection.value
 
         if (projection?.kind !== 'tree') {
-          return cleanupReplay()
+          return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
         }
 
         const directoryBinding = projection.bindingsById.get(nodeId)
 
         if (directoryBinding?.kind === 'directory') {
+          const owningSource = findSourceByEntryPoint(
+            projection.bindingsById,
+            directoryBinding.entryPoint
+          )
+          if (
+            owningSource !== undefined &&
+            intent.sourceTargets.has(owningSource.nodeId) &&
+            !batchedSourceHasChildDirectory(owningSource.nodeId, nodeId)
+          ) {
+            continue
+          }
           const loaded = await readDirectory(directoryTarget)
           if (loaded) {
             loadedAnyReplayTarget = true
@@ -286,23 +295,17 @@ export function createLibraryHierarchyReadController(
           loadedAnyReplayTarget = true
         }
 
-        const retryProjection = browserProjection.value
-
-        if (retryProjection?.kind === 'tree') {
-          const retryBinding = retryProjection.bindingsById.get(nodeId)
-
-          if (retryBinding?.kind === 'directory') {
-            const loaded = await readDirectory(directoryTarget)
-            if (loaded) {
-              loadedAnyReplayTarget = true
-            }
+        if (batchedSourceHasChildDirectory(owningSource.nodeId, nodeId)) {
+          const loaded = await readDirectory(directoryTarget)
+          if (loaded) {
+            loadedAnyReplayTarget = true
           }
         }
       }
 
       commitReplayBatch()
     } catch {
-      abortReplayBatch()
+      abortReplayBatch(preReplaySourceStates, preReplayDirectoryStates)
     }
 
     isBatchedReplay = false
@@ -318,7 +321,14 @@ export function createLibraryHierarchyReadController(
     }
   }
 
-  function cleanupReplay(): void {
+  function cleanupReplay(
+    preReplaySourceStates?: ReadonlyMap<string, SourceState>,
+    preReplayDirectoryStates?: ReadonlyMap<string, DirectoryState>
+  ): void {
+    if (preReplaySourceStates !== undefined && preReplayDirectoryStates !== undefined) {
+      sourceReadStates.value = preReplaySourceStates
+      directoryReadStates.value = preReplayDirectoryStates
+    }
     abortReplayBatch()
     isBatchedReplay = false
     hierarchyReadIsLoading.value = false
@@ -335,6 +345,24 @@ export function createLibraryHierarchyReadController(
     }
 
     return undefined
+  }
+
+  function batchedSourceHasChildDirectory(
+    sourceNodeId: BrowserTreeNodeId,
+    directoryNodeId: BrowserTreeNodeId
+  ): boolean {
+    const sourceState = resolveSourceState(sourceNodeId)
+
+    if (
+      sourceState === undefined ||
+      (sourceState.kind !== 'loaded' && sourceState.kind !== 'refreshing')
+    ) {
+      return false
+    }
+
+    return sourceState.children.rows.some(
+      (row) => row.kind === 'directory' && row.id === directoryNodeId
+    )
   }
 
   async function refresh(): Promise<boolean> {
@@ -1043,7 +1071,14 @@ export function createLibraryHierarchyReadController(
     batchedDirectoryReadStates = undefined
   }
 
-  function abortReplayBatch(): void {
+  function abortReplayBatch(
+    preReplaySourceStates?: ReadonlyMap<string, SourceState>,
+    preReplayDirectoryStates?: ReadonlyMap<string, DirectoryState>
+  ): void {
+    if (preReplaySourceStates !== undefined && preReplayDirectoryStates !== undefined) {
+      sourceReadStates.value = preReplaySourceStates
+      directoryReadStates.value = preReplayDirectoryStates
+    }
     batchedSourceReadStates = undefined
     batchedDirectoryReadStates = undefined
   }

@@ -660,7 +660,7 @@ function readStateNode(options: {
   readonly detail: string
 }): BrowserTreeNode {
   return {
-    id: `read-state:${options.ownerId}:${options.state}`,
+    id: `read-state:${options.ownerId}`,
     role: 'state',
     label: options.label,
     detail: options.detail,
