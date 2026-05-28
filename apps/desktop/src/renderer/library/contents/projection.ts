@@ -571,15 +571,6 @@ function contentMoreRow(
   nodeId: BrowserTreeNodeId,
   binding: Extract<RowBinding, { readonly kind: 'more' }>
 ): ContentRow {
-  const action =
-    binding.state === 'loading'
-      ? undefined
-      : {
-          kind: 'loadMore' as const,
-          nodeId,
-          label: binding.state === 'error' ? 'Retry' : 'Load more'
-        }
-
   return {
     id: nodeId,
     kind: 'more',
@@ -590,8 +581,7 @@ function contentMoreRow(
           ? 'Loading more'
           : 'Load more',
     detail: binding.detail,
-    icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more',
-    ...(action === undefined ? {} : { action })
+    icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more'
   }
 }
 
