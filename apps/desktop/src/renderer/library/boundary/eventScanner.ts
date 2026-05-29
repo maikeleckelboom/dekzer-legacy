@@ -42,6 +42,8 @@ export type BoundaryEventScannerController = {
   readonly scanProgress: Ref<ReadonlyMap<string, ScanProgressState>>
   readonly lastReadFailed: Ref<boolean>
   readonly gapDetected: Ref<boolean>
+  readonly recoveryNeeded: Ref<boolean>
+  readonly acknowledgedGap: () => void
   readonly start: () => void
   readonly stop: () => void
 }
@@ -73,6 +75,7 @@ export function createBoundaryEventScannerController(
   const scanProgress = shallowRef<ReadonlyMap<string, ScanProgressState>>(new Map())
   const lastReadFailed = shallowRef(false)
   const gapDetected = shallowRef(false)
+  const recoveryNeeded = shallowRef(false)
   let lastSeenEventSequence: number | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let running = false
@@ -103,6 +106,7 @@ export function createBoundaryEventScannerController(
 
       if (reply.gapDetected) {
         gapDetected.value = true
+        recoveryNeeded.value = true
       }
 
       if (reply.latestEventSequence !== null) {
@@ -128,6 +132,10 @@ export function createBoundaryEventScannerController(
     scanProgress.value = nextProgress
   }
 
+  function acknowledgedGap(): void {
+    recoveryNeeded.value = false
+  }
+
   function start(): void {
     if (running) {
       return
@@ -151,6 +159,8 @@ export function createBoundaryEventScannerController(
     scanProgress,
     lastReadFailed,
     gapDetected,
+    recoveryNeeded,
+    acknowledgedGap,
     start,
     stop
   }

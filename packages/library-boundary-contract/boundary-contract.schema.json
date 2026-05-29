@@ -2506,7 +2506,7 @@
           "type": "boolean"
         },
         "latestEventSequence": {
-          "description": "The highest event sequence available at the time of the read,\nso the caller can store it for the next read-after call.\nAlways returned after the first published event,\neven when no new events are returned in this reply.",
+          "description": "The cursor the consumer should pass as `lastSeenEventSequence` in\nthe next read-after call.  It is the event sequence of the last\nevent delivered in this reply, or the previously supplied\n`lastSeenEventSequence` when no new events were returned, or\n`None` when no events have been published yet.",
           "type": [
             "integer",
             "null"

@@ -44,7 +44,8 @@ const visibleOperationFeedbackKinds = new Set<LibraryOperationFeedbackKind>([
   'scanFailed',
   'scanComplete',
   'removingSource',
-  'removeFailed'
+  'removeFailed',
+  'eventGapDetected'
 ])
 
 const viewStateStore = createViewStateStore()
@@ -152,6 +153,7 @@ const operationFeedback = computed(() =>
     scanStatus: rootActions.scanStatus.value,
     scanSummary: rootActions.scanSummary.value,
     scanProgressFromEvents: scanProgressForRegisteredRoot.value,
+    eventGapDetected: eventScanner.recoveryNeeded.value,
     ...(rootActions.scanFailureMessage.value === undefined
       ? {}
       : { scanFailureMessage: rootActions.scanFailureMessage.value }),

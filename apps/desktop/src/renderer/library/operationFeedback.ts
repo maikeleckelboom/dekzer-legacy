@@ -28,6 +28,7 @@ export type LibraryOperationFeedbackKind =
   | 'noSources'
   | 'removingSource'
   | 'removeFailed'
+  | 'eventGapDetected'
   | 'ready'
 
 export type LibraryOperationFeedbackTone = 'idle' | 'loading' | 'success' | 'warning' | 'error'
@@ -46,6 +47,7 @@ export type OperationFeedbackInputs = {
   readonly scanStatus: LocalRootScanStatus
   readonly scanSummary: LocalRootScanSummary | undefined
   readonly scanProgressFromEvents: ScanProgressState | undefined
+  readonly eventGapDetected: boolean
   readonly scanFailureMessage?: string
   readonly scanFailureDetail?: string
   readonly refreshStatus: RootLifecycleRefreshStatus
@@ -155,6 +157,11 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
     title: 'Unable to remove source',
     detail: 'The source could not be removed. Try again.'
   },
+  eventGapDetected: {
+    tone: 'warning',
+    title: 'Event stream gap detected',
+    detail: 'Some library events were missed. The library view may be stale. Rescan the source or re-add the folder to refresh.'
+  },
   ready: {
     tone: 'success',
     title: 'Library ready',
@@ -171,6 +178,10 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
 
   if (host.state !== 'started') {
     return hostNotReadyFeedback(host)
+  }
+
+  if (inputs.eventGapDetected) {
+    return build('eventGapDetected')
   }
 
   if (inputs.registeredRootPath === undefined && inputs.navigationReadResult?.state !== 'ready') {

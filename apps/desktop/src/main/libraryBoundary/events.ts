@@ -21,12 +21,27 @@ export type BoundaryEventIpcMain = {
 function isBoundaryEventReadAfterRequest(
   request: unknown
 ): request is BoundaryEventReadAfterRequest {
-  return (
-    typeof request === 'object' &&
-    request !== null &&
-    'maxEvents' in request &&
-    'lastSeenEventSequence' in request
-  )
+  if (typeof request !== 'object' || request === null) {
+    return false
+  }
+
+  const req = request as Record<string, unknown>
+
+  if (typeof req.maxEvents !== 'number' || !Number.isSafeInteger(req.maxEvents) || req.maxEvents <= 0) {
+    return false
+  }
+
+  if (req.lastSeenEventSequence !== null && req.lastSeenEventSequence !== undefined) {
+    if (
+      typeof req.lastSeenEventSequence !== 'number' ||
+      !Number.isSafeInteger(req.lastSeenEventSequence) ||
+      req.lastSeenEventSequence < 0
+    ) {
+      return false
+    }
+  }
+
+  return true
 }
 
 export function registerBoundaryEventIpc(

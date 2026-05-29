@@ -1169,6 +1169,87 @@ mod tests {
     }
 
     #[test]
+    fn cursor_batch_truncation_does_not_skip_events() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let _created = create_playlist(&service, "Trunc A");
+        let _created = create_playlist(&service, "Trunc B");
+        let _created = create_playlist(&service, "Trunc C");
+
+        let first = read_after_events(&service, None, 1);
+        assert_eq!(first.events.len(), 1);
+        assert!(first.latest_event_sequence.is_some());
+        let cursor0 = first.latest_event_sequence;
+
+        let second = read_after_events(&service, cursor0, 1);
+        assert_eq!(second.events.len(), 1);
+        assert!(second.latest_event_sequence.is_some());
+        let cursor1 = second.latest_event_sequence;
+
+        let third = read_after_events(&service, cursor1, 1);
+        assert_eq!(third.events.len(), 1);
+        assert!(third.latest_event_sequence.is_some());
+
+        assert!(!first.gap_detected);
+        assert!(!second.gap_detected);
+        assert!(!third.gap_detected);
+    }
+
+    #[test]
+    fn first_empty_read_does_not_skip_future_events() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let first = read_after_events(&service, None, 16);
+        assert!(first.events.is_empty());
+        assert!(first.latest_event_sequence.is_none());
+
+        let _created = create_playlist(&service, "Late event");
+        let second = read_after_events(&service, first.latest_event_sequence, 16);
+        assert!(!second.events.is_empty());
+        assert!(!second.gap_detected);
+    }
+
+    #[test]
+    fn multiple_consumers_advance_independently() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let _created = create_playlist(&service, "Indy A");
+        let _created = create_playlist(&service, "Indy B");
+
+        let consumer1_first = read_after_events(&service, None, 16);
+        assert!(!consumer1_first.events.is_empty());
+        let c1_cursor = consumer1_first.latest_event_sequence;
+
+        let consumer2_first = read_after_events(&service, None, 16);
+        assert_eq!(consumer2_first.events.len(), consumer1_first.events.len());
+        assert_eq!(consumer2_first.latest_event_sequence, c1_cursor);
+
+        let _created = create_playlist(&service, "Indy C");
+        let consumer1_second = read_after_events(&service, c1_cursor, 16);
+        assert!(!consumer1_second.events.is_empty());
+
+        let consumer2_second = read_after_events(&service, consumer2_first.latest_event_sequence, 16);
+        assert!(!consumer2_second.events.is_empty());
+    }
+
+    #[test]
+    fn cursor_older_than_earliest_retained_reports_gap() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("gap-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, _registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+
+        for i in 0..300 {
+            let _created = create_playlist(&service, &format!("Flood {}", i));
+        }
+
+        let reply = read_after_events(&service, Some(0), 16);
+        assert!(reply.gap_detected);
+    }
+
+    #[test]
     fn protocol_playlist_write_commands_create_rename_and_delete_real_playlists() {
         let (_tempdir, _context, service) = open_service_with_context();
 

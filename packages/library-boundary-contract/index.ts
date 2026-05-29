@@ -77,10 +77,11 @@ export type LibraryBoundaryEventStreamReply = { "type": "readAfter", "payload": 
 
 export type ReadLibraryBoundaryEventsAfterReply = { events: Array<LibraryBoundaryEvent>, 
 /**
- * The highest event sequence available at the time of the read,
- * so the caller can store it for the next read-after call.
- * Always returned after the first published event,
- * even when no new events are returned in this reply.
+ * The cursor the consumer should pass as `lastSeenEventSequence` in
+ * the next read-after call.  It is the event sequence of the last
+ * event delivered in this reply, or the previously supplied
+ * `lastSeenEventSequence` when no new events were returned, or
+ * `None` when no events have been published yet.
  */
 latestEventSequence: number | null, 
 /**

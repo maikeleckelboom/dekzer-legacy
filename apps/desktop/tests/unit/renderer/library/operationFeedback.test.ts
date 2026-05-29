@@ -221,6 +221,18 @@ describe('deriveOperationFeedback', () => {
     ).toBe('scanComplete')
   })
 
+  it('reports event gap detected when scanner flags gap', () => {
+    const base = startedInputs({})
+
+    const gap = deriveOperationFeedback({ ...base, eventGapDetected: true })
+    expect(gap).toMatchObject({
+      kind: 'eventGapDetected',
+      tone: 'warning'
+    })
+    expect(gap.title).not.toBe('')
+    expect(gap.detail).not.toBe('')
+  })
+
   it('allows persisted navigation to satisfy readiness without a session root', () => {
     const base = startedInputs({
       registeredRootPath: undefined,
@@ -259,6 +271,7 @@ function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): Operat
     scanStatus: 'idle',
     scanSummary: undefined,
     scanProgressFromEvents: undefined,
+    eventGapDetected: false,
     refreshStatus: 'idle',
     navigationReadIsLoading: false,
     hierarchyReadIsLoading: false,

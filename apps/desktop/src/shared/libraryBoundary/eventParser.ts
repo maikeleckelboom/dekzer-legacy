@@ -62,20 +62,41 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
     if (!isAppSourceScanEventKind(payload.kind)) {
       return { type: 'unsupported', payload: raw }
     }
+    const eventSequence = requireNonNegativeSafeInteger(payload.eventSequence)
+    if (eventSequence === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
+    const occurredAtMs = requireNonNegativeSafeNumber(payload.occurredAtMs)
+    if (occurredAtMs === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
+    const rootId = requireNonEmptyString(payload.rootId)
+    if (rootId === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
+    const scanRunId = requireNonEmptyString(payload.scanRunId)
+    if (scanRunId === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
+    const directoriesVisited = requireNonNegativeSafeInteger(payload.directoriesVisited) ?? 0
+    const filesVisited = requireNonNegativeSafeInteger(payload.filesVisited) ?? 0
+    const filesDiscovered = requireNonNegativeSafeInteger(payload.filesDiscovered) ?? 0
+    const mediaCandidates = requireNonNegativeSafeInteger(payload.mediaCandidates) ?? 0
+    const queuedWorkItems = requireNonNegativeSafeInteger(payload.queuedWorkItems) ?? 0
     return {
       type: 'sourceScanEvent',
       payload: {
-        eventSequence: safeNumber(payload.eventSequence),
-        occurredAtMs: safeNumber(payload.occurredAtMs),
+        eventSequence,
+        occurredAtMs,
         kind: payload.kind as AppSourceScanEventKind,
-        rootId: safeString(payload.rootId),
-        scanRunId: safeString(payload.scanRunId),
-        phase: safeString(payload.phase),
-        directoriesVisited: safeNumber(payload.directoriesVisited),
-        filesVisited: safeNumber(payload.filesVisited),
-        filesDiscovered: safeNumber(payload.filesDiscovered),
-        mediaCandidates: safeNumber(payload.mediaCandidates),
-        queuedWorkItems: safeNumber(payload.queuedWorkItems),
+        rootId,
+        scanRunId,
+        phase: typeof payload.phase === 'string' ? payload.phase : '',
+        directoriesVisited,
+        filesVisited,
+        filesDiscovered,
+        mediaCandidates,
+        queuedWorkItems,
         detail: payload.detail === null || payload.detail === undefined ? null : String(payload.detail)
       }
     }
@@ -86,14 +107,26 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
     if (payload === undefined || payload === null || typeof payload !== 'object') {
       return { type: 'unsupported', payload: raw }
     }
+    const eventSequence = requireNonNegativeSafeInteger(payload.eventSequence)
+    if (eventSequence === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
+    const occurredAtMs = requireNonNegativeSafeNumber(payload.occurredAtMs)
+    if (occurredAtMs === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
     const invalidation = payload.invalidation as Record<string, unknown> | undefined
+    const scope = requireNonEmptyString(invalidation?.scope)
+    if (scope === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
     return {
       type: 'maintainedSnapshotInvalidated',
       payload: {
-        eventSequence: safeNumber(payload.eventSequence),
-        occurredAtMs: safeNumber(payload.occurredAtMs),
+        eventSequence,
+        occurredAtMs,
         invalidation: {
-          scope: safeString(invalidation?.scope),
+          scope,
           revision:
             invalidation?.revision === null || invalidation?.revision === undefined
               ? null
@@ -106,20 +139,29 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
   return { type: 'unsupported', payload: raw }
 }
 
-function safeNumber(value: unknown): number {
-  if (typeof value === 'number') {
+function requireNonNegativeSafeInteger(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) {
     return value
   }
   if (typeof value === 'string') {
     const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : 0
+    if (Number.isSafeInteger(parsed) && parsed >= 0) {
+      return parsed
+    }
   }
-  return 0
+  return undefined
 }
 
-function safeString(value: unknown): string {
-  if (typeof value === 'string') {
+function requireNonNegativeSafeNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
     return value
   }
-  return String(value ?? '')
+  return undefined
+}
+
+function requireNonEmptyString(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.length > 0) {
+    return value
+  }
+  return undefined
 }
