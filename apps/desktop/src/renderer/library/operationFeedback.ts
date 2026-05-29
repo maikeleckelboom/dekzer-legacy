@@ -158,9 +158,9 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
     detail: 'The source could not be removed. Try again.'
   },
   eventGapDetected: {
-    tone: 'warning',
-    title: 'Event stream gap detected',
-    detail: 'Some library events were missed. The library view may be stale. Rescan the source or re-add the folder to refresh.'
+    tone: 'loading',
+    title: 'Refreshing library view',
+    detail: 'Some updates were missed; refreshing from the library store.'
   },
   ready: {
     tone: 'success',

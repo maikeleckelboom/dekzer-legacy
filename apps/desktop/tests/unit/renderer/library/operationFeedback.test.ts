@@ -221,16 +221,19 @@ describe('deriveOperationFeedback', () => {
     ).toBe('scanComplete')
   })
 
-  it('reports event gap detected when scanner flags gap', () => {
+  it('reports event gap detected with non-blaming internal copy', () => {
     const base = startedInputs({})
 
     const gap = deriveOperationFeedback({ ...base, eventGapDetected: true })
     expect(gap).toMatchObject({
       kind: 'eventGapDetected',
-      tone: 'warning'
+      tone: 'loading'
     })
-    expect(gap.title).not.toBe('')
-    expect(gap.detail).not.toBe('')
+    expect(gap.title).toBe('Refreshing library view')
+    expect(gap.detail).toBe('Some updates were missed; refreshing from the library store.')
+    expect(gap.title).not.toMatch(/event stream gap/i)
+    expect(gap.detail).not.toMatch(/re-add|readd|rescan/i)
+    expect(gap.detail).not.toMatch(/Event stream gap detected/i)
   })
 
   it('allows persisted navigation to satisfy readiness without a session root', () => {

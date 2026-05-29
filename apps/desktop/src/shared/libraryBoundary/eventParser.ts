@@ -1,3 +1,5 @@
+import type { ScanRunPhase } from '@dekzer/library-boundary-contract'
+
 export type AppSourceScanEventKind =
   | 'sourceScanStarted'
   | 'sourceScanProgressed'
@@ -11,7 +13,7 @@ export type AppSourceScanEvent = {
   readonly kind: AppSourceScanEventKind
   readonly rootId: string
   readonly scanRunId: string
-  readonly phase: string
+  readonly phase: ScanRunPhase
   readonly directoriesVisited: number
   readonly filesVisited: number
   readonly filesDiscovered: number
@@ -34,6 +36,8 @@ export type AppBoundaryEvent =
   | { readonly type: 'maintainedSnapshotInvalidated'; readonly payload: AppMaintainedSnapshotInvalidatedEvent }
   | { readonly type: 'unsupported'; readonly payload: unknown }
 
+const SCAN_RUN_PHASES: ReadonlySet<string> = new Set(['scanning', 'blocked', 'interrupted'])
+
 function isAppSourceScanEventKind(value: unknown): value is AppSourceScanEventKind {
   return (
     typeof value === 'string' &&
@@ -45,6 +49,10 @@ function isAppSourceScanEventKind(value: unknown): value is AppSourceScanEventKi
       'sourceScanBlocked'
     ].includes(value)
   )
+}
+
+function isScanRunPhase(value: unknown): value is ScanRunPhase {
+  return typeof value === 'string' && SCAN_RUN_PHASES.has(value)
 }
 
 export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
@@ -66,7 +74,7 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
     if (eventSequence === undefined) {
       return { type: 'unsupported', payload: raw }
     }
-    const occurredAtMs = requireNonNegativeSafeNumber(payload.occurredAtMs)
+    const occurredAtMs = requireNonNegativeSafeInteger(payload.occurredAtMs)
     if (occurredAtMs === undefined) {
       return { type: 'unsupported', payload: raw }
     }
@@ -76,6 +84,9 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
     }
     const scanRunId = requireNonEmptyString(payload.scanRunId)
     if (scanRunId === undefined) {
+      return { type: 'unsupported', payload: raw }
+    }
+    if (!isScanRunPhase(payload.phase)) {
       return { type: 'unsupported', payload: raw }
     }
     const directoriesVisited = requireNonNegativeSafeInteger(payload.directoriesVisited) ?? 0
@@ -91,7 +102,7 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
         kind: payload.kind as AppSourceScanEventKind,
         rootId,
         scanRunId,
-        phase: typeof payload.phase === 'string' ? payload.phase : '',
+        phase: payload.phase as ScanRunPhase,
         directoriesVisited,
         filesVisited,
         filesDiscovered,
@@ -111,7 +122,7 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
     if (eventSequence === undefined) {
       return { type: 'unsupported', payload: raw }
     }
-    const occurredAtMs = requireNonNegativeSafeNumber(payload.occurredAtMs)
+    const occurredAtMs = requireNonNegativeSafeInteger(payload.occurredAtMs)
     if (occurredAtMs === undefined) {
       return { type: 'unsupported', payload: raw }
     }
@@ -148,13 +159,6 @@ function requireNonNegativeSafeInteger(value: unknown): number | undefined {
     if (Number.isSafeInteger(parsed) && parsed >= 0) {
       return parsed
     }
-  }
-  return undefined
-}
-
-function requireNonNegativeSafeNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
-    return value
   }
   return undefined
 }

@@ -390,6 +390,171 @@ describe('parseBoundaryEvent', () => {
     })
   })
 
+  it('rejects sourceScanEvent with missing phase', () => {
+    expect(
+      parseBoundaryEvent({
+        type: 'sourceScanEvent',
+        payload: {
+          eventSequence: 0,
+          occurredAtMs: 1000,
+          kind: 'sourceScanStarted',
+          rootId: '1',
+          scanRunId: '1',
+          directoriesVisited: 0,
+          filesVisited: 0,
+          filesDiscovered: 0,
+          mediaCandidates: 0,
+          queuedWorkItems: 0
+        }
+      })
+    ).toMatchObject({ type: 'unsupported' })
+  })
+
+  it('rejects sourceScanEvent with empty phase', () => {
+    expect(
+      parseBoundaryEvent({
+        type: 'sourceScanEvent',
+        payload: {
+          eventSequence: 0,
+          occurredAtMs: 1000,
+          kind: 'sourceScanStarted',
+          rootId: '1',
+          scanRunId: '1',
+          phase: '',
+          directoriesVisited: 0,
+          filesVisited: 0,
+          filesDiscovered: 0,
+          mediaCandidates: 0,
+          queuedWorkItems: 0
+        }
+      })
+    ).toMatchObject({ type: 'unsupported' })
+  })
+
+  it('rejects sourceScanEvent with unknown phase', () => {
+    expect(
+      parseBoundaryEvent({
+        type: 'sourceScanEvent',
+        payload: {
+          eventSequence: 0,
+          occurredAtMs: 1000,
+          kind: 'sourceScanStarted',
+          rootId: '1',
+          scanRunId: '1',
+          phase: 'unknown',
+          directoriesVisited: 0,
+          filesVisited: 0,
+          filesDiscovered: 0,
+          mediaCandidates: 0,
+          queuedWorkItems: 0
+        }
+      })
+    ).toMatchObject({ type: 'unsupported' })
+  })
+
+  it('accepts sourceScanEvent with phase scanning', () => {
+    const result = parseBoundaryEvent({
+      type: 'sourceScanEvent',
+      payload: {
+        eventSequence: 0,
+        occurredAtMs: 1000,
+        kind: 'sourceScanStarted',
+        rootId: '1',
+        scanRunId: '1',
+        phase: 'scanning',
+        directoriesVisited: 0,
+        filesVisited: 0,
+        filesDiscovered: 0,
+        mediaCandidates: 0,
+        queuedWorkItems: 0
+      }
+    })
+    expect(result).toMatchObject({ type: 'sourceScanEvent' })
+    if (result.type === 'sourceScanEvent') {
+      expect(result.payload.phase).toBe('scanning')
+    }
+  })
+
+  it('accepts sourceScanEvent with phase blocked', () => {
+    const result = parseBoundaryEvent({
+      type: 'sourceScanEvent',
+      payload: {
+        eventSequence: 0,
+        occurredAtMs: 1000,
+        kind: 'sourceScanBlocked',
+        rootId: '1',
+        scanRunId: '1',
+        phase: 'blocked',
+        directoriesVisited: 0,
+        filesVisited: 0,
+        filesDiscovered: 0,
+        mediaCandidates: 0,
+        queuedWorkItems: 0
+      }
+    })
+    expect(result).toMatchObject({ type: 'sourceScanEvent' })
+    if (result.type === 'sourceScanEvent') {
+      expect(result.payload.phase).toBe('blocked')
+    }
+  })
+
+  it('accepts sourceScanEvent with phase interrupted', () => {
+    const result = parseBoundaryEvent({
+      type: 'sourceScanEvent',
+      payload: {
+        eventSequence: 0,
+        occurredAtMs: 1000,
+        kind: 'sourceScanFailed',
+        rootId: '1',
+        scanRunId: '1',
+        phase: 'interrupted',
+        directoriesVisited: 0,
+        filesVisited: 0,
+        filesDiscovered: 0,
+        mediaCandidates: 0,
+        queuedWorkItems: 0
+      }
+    })
+    expect(result).toMatchObject({ type: 'sourceScanEvent' })
+    if (result.type === 'sourceScanEvent') {
+      expect(result.payload.phase).toBe('interrupted')
+    }
+  })
+
+  it('rejects sourceScanEvent with fractional occurredAtMs', () => {
+    expect(
+      parseBoundaryEvent({
+        type: 'sourceScanEvent',
+        payload: {
+          eventSequence: 0,
+          occurredAtMs: 1700000000000.5,
+          kind: 'sourceScanStarted',
+          rootId: '1',
+          scanRunId: '1',
+          phase: 'scanning',
+          directoriesVisited: 0,
+          filesVisited: 0,
+          filesDiscovered: 0,
+          mediaCandidates: 0,
+          queuedWorkItems: 0
+        }
+      })
+    ).toMatchObject({ type: 'unsupported' })
+  })
+
+  it('rejects maintainedSnapshotInvalidated with fractional occurredAtMs', () => {
+    expect(
+      parseBoundaryEvent({
+        type: 'maintainedSnapshotInvalidated',
+        payload: {
+          eventSequence: 0,
+          occurredAtMs: 1700000000000.5,
+          invalidation: { scope: 'libraryBrowser', revision: null }
+        }
+      })
+    ).toMatchObject({ type: 'unsupported' })
+  })
+
   it('handles unknown event families as unsupported', () => {
     expect(
       parseBoundaryEvent({ type: 'futureEventKind', payload: {} })

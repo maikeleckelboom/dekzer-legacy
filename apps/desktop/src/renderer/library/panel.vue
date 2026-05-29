@@ -44,8 +44,7 @@ const visibleOperationFeedbackKinds = new Set<LibraryOperationFeedbackKind>([
   'scanFailed',
   'scanComplete',
   'removingSource',
-  'removeFailed',
-  'eventGapDetected'
+  'removeFailed'
 ])
 
 const viewStateStore = createViewStateStore()
@@ -239,6 +238,18 @@ watch(
     void rootLifecycle.hydrateLocalRoots()
   },
   { immediate: true }
+)
+
+watch(
+  () => eventScanner.recoveryNeeded.value,
+  async (needed) => {
+    if (!needed) {
+      return
+    }
+
+    await hierarchyRead.refresh()
+    eventScanner.acknowledgedGap()
+  }
 )
 
 function operationFeedbackToneClass(tone: LibraryOperationFeedbackTone): string {
