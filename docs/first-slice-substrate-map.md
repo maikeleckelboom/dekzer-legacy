@@ -72,7 +72,7 @@ The first slice explicitly excludes the following. None of these are first-slice
 | RT Flight Deck                        | Future architecture boundary only.                        |
 | Prepared Room UI                      | Future surface.                                           |
 | Smart crates / playlists              | Future organization domain.                               |
-| Full user-defined filters             | Not first slice. Basic visibility modes only.             |
+| Full user-defined filters             | Not first slice. Library tree row admission is product/boundary-owned, not renderer-configurable. |
 | Column browser                        | Phase 3 in implementation sequence, not current.          |
 | Source relocation UX                  | Beyond root identity slots; defined in lifecycle contract. |
 | Broad icon expansion                  | First minimal icon set only.                              |
@@ -106,7 +106,7 @@ Two distinct read boundaries are active in the first slice:
 
 | Read boundary   | Pagination model                  | Action names                          | Owns                              |
 |-----------------|-----------------------------------|---------------------------------------|-----------------------------------|
-| Hierarchy read  | Offset-based (`offset`/`limit`)   | Tree `loadMore` / `loadChildren`      | Literal source hierarchy children. |
+| Hierarchy read  | Offset-based (`offset`/`limit`)   | Tree `loadMore` / `loadChildren`      | Library tree children admitted by the product/boundary surface. |
 | Contents read   | Cursor-based (`cursor`/`cursor`)  | Contents pane `loadContentsPage`      | Selected scope file rows.         |
 
 The hierarchy read returns `LibraryTreeWindow` rows with `totalRows`, `nextOffset`, and a
@@ -155,9 +155,9 @@ The following names are canonical first-slice vocabulary:
 
 | Canonical name          | Location / owner                              | Meaning                                       |
 |-------------------------|-----------------------------------------------|-----------------------------------------------|
-| `readLiteralHierarchyChildren` | Rust protocol → TS contract            | Hierarchy read command.                       |
-| `LiteralHierarchyWindow` | Rust protocol → TS contract                   | Single page of hierarchy children.            |
-| `LiteralHierarchyCoverage` | Rust protocol → TS contract                 | Coverage for a hierarchy window.              |
+| `readLibraryTreeChildren` | Rust protocol → TS contract            | Product-facing hierarchy read command.        |
+| `LibraryTreeWindow` | Rust protocol → TS contract                   | Single page of hierarchy children.            |
+| `LibraryTreeCoverage` | Rust protocol → TS contract                 | Coverage for a hierarchy window.              |
 | `ContentsReadRequest`   | Rust protocol → TS contract                   | Single contents read request.                 |
 | `ContentsResult`        | Rust protocol → TS contract                   | Single contents read result page.             |
 | `ContentsReadPolicy`    | Shared TS → Rust service                      | Policy parameter for contents reads.          |

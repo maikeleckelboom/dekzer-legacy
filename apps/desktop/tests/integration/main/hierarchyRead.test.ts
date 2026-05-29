@@ -22,7 +22,7 @@ import {
   hierarchyReadChannels,
   type ReadResult
 } from '../../../src/shared/libraryHierarchy/readChildren'
-import type { LiteralHierarchyCoverage } from '@dekzer/library-boundary-contract'
+import type { LibraryTreeCoverage } from '@dekzer/library-boundary-contract'
 import {
   navigationReadChannels,
   type NavigationReadRowsResult
@@ -196,6 +196,50 @@ describe('hierarchy and navigation reads through the host', () => {
       state: 'readFailed',
       error: { code: 'readFailed' }
     })
+
+    const dirWithoutChildRowState = await readThroughHost(
+      await startedHostWithClient(
+        config,
+        createFakeClient({
+          readNavigationRows: async () => ({ rows: [sourceNavigationRow()] }),
+          readLibraryTreeChildren: async (request) => ({
+            window: {
+              entryPoint: request.entryPoint,
+              parentSourceDirectoryId: null,
+              offset: request.offset,
+              limit: request.limit,
+              totalRows: 1,
+              coverage: completeCoverage(),
+              rows: [
+                {
+                  nodeKind: 'directory',
+                  sourceId: '7',
+                  sourceDirectoryId: '12',
+                  sourceFileId: null,
+                  parentSourceDirectoryId: null,
+                  relativePath: 'Album',
+                  displayName: 'Album',
+                  presenceState: 'present',
+                  sizeBytes: null,
+                  modifiedAtNs: null,
+                  updatedAtMs: 100,
+                  hasChildDirectories: true,
+                  directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+                  directoryImageMediaState: { kind: 'noImageMediaDescendants' },
+                  directoryScanState: 'scanning'
+                }
+              ]
+            }
+          })
+        })
+      ),
+      firstAvailableSourceReadRequest()
+    )
+
+    expect(dirWithoutChildRowState).toMatchObject({
+      state: 'readFailed',
+      error: { code: 'readFailed' }
+    })
   })
 
   it('maps navigation reads and registers read IPC channels', async () => {
@@ -304,7 +348,7 @@ function sourceNavigationRow(): Awaited<
   }
 }
 
-function completeCoverage(): LiteralHierarchyCoverage {
+function completeCoverage(): LibraryTreeCoverage {
   return {
     state: 'complete' as const,
     recursiveScopeComplete: true,

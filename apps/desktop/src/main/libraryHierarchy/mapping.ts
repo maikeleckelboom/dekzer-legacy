@@ -50,7 +50,8 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
       row.hasChildDirectories === undefined ||
       row.directoryPrimaryMediaState === undefined ||
       row.directoryImageMediaState === undefined ||
-      row.directoryScanState === undefined
+      row.directoryScanState === undefined ||
+      row.childRowState === undefined
     ) {
       return undefined
     }
@@ -69,7 +70,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
       directoryPrimaryMediaState: row.directoryPrimaryMediaState,
       directoryImageMediaState: row.directoryImageMediaState,
       directoryScanState: row.directoryScanState,
-      childRowState: row.childRowState ?? 'unknown',
+      childRowState: row.childRowState,
       updatedAtMs: row.updatedAtMs
     }
   }
