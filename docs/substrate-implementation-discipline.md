@@ -131,20 +131,19 @@ If the renderer still needs old names, report the follow-up. Do not preserve the
 
 ## 7. Contents boundary pagination law
 
-The old brief contained one highly specific rule worth preserving.
-
-For the current first-page-only contents boundary:
+Contents reads support cursor pagination. The following rules apply:
 
 | Rule                                          | Requirement                                                    |
 |-----------------------------------------------|----------------------------------------------------------------|
-| Contents reads remain first-page-only         | Cursor pagination is deferred.                                 |
-| Cursor field may exist only as deferred shape | It is not active pagination support.                           |
-| Provided cursor must fail explicitly          | Return a non-success cursor-invalid result.                    |
+| Contents reads support cursor pagination      | Cursor identity is encoded, validated, and used for continuation. |
+| Cursor field is active                        | It is real pagination support, not a deferred shape.           |
+| Provided cursor must fail explicitly          | Return a non-success `cursorInvalid` result.                   |
 | Do not silently restart                       | A provided cursor must not be ignored and treated as page one. |
-| Successful v1 read emits no next cursor       | No nextCursor until cursor identity is designed.               |
-| Renderer must not accumulate pages            | No Load More row or page accumulation state in v1.             |
+| Successful read may emit next cursor          | `nextCursor` is produced when more rows exist.                 |
+| Renderer may accumulate pages                 | The contents boundary accumulates rows and sends cursors through `loadContentsPage`. |
+| Tree load-more is separate                    | Tree load-more (`loadChildren`) and contents pagination (`loadContentsPage`) are distinct. |
 
-The later cursor slice must bind cursor identity to:
+Cursor identity is bound to:
 
 | Cursor identity input | Why it matters                                                   |
 |-----------------------|------------------------------------------------------------------|
@@ -157,7 +156,7 @@ The later cursor slice must bind cursor identity to:
 | query/order identity  | Cursor depends on the exact result order.                        |
 | last-row key tuple    | Continuation must resume from a deterministic ordering key.      |
 
-Do not let unrelated substrate work accidentally smuggle cursor pagination back into the contents boundary.
+Do not let unrelated substrate work break cursor pagination in the contents boundary.
 
 ## 8. Stop conditions for coding agents
 

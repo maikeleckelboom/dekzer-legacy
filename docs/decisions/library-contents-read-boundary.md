@@ -51,10 +51,16 @@ The following facts are established by the Phase 0 inventory:
    Current selected contents already uses binary-collation descendant predicates. No schema migration is required for
    recursive sourceFile/profile media-class filtering.
 
-4. **Cursor is typed but not implemented.**
+4. **Cursor pagination is implemented for contents reads.**
 
-   Cursor is optional string only, has no encoding, no scope fingerprint, no query/order binding, no mismatch
-   validation, `nextCursor` is never produced, store refuses provided cursors, and renderer does not send cursors.
+   Cursor identity is encoded (base64url-encoded JSON, version 1) and validated. Cursor binds to scope, policy
+   (media classes and row profile), recursion, and ordering; it carries a last-row position tuple specific to each
+   row profile (sourceFile: `relative_path_key` + `source_file_id`; primaryMedia: `availability_priority`,
+   `title_key`, `artist_key`, `album_key`, `relative_path_key`, `source_file_id`). The store validates cursor
+   identity against the current request. Mismatched or un-decodable cursors return `CursorInvalid` with no
+   `nextCursor`. Successful reads return `nextCursor` when more rows exist. The renderer sends cursors through the
+   `loadContentsPage` action and accumulates pages in the contents boundary. Contents pagination is distinct from
+   tree load-more (`loadChildren`).
 
 5. **Hierarchy read is not the final owner for selected scope contents.**
 
@@ -138,35 +144,39 @@ type ContentsReadPolicy = {
 - `mediaClasses` are deterministic arrays, not Set.
 - `mediaClasses` are canonicalized in deterministic order: audio, video, image.
 - Unsupported and `none` files are excluded from normal contents policy.
-- Cursor remains first-page-only until real cursor identity is implemented.
+- Cursor pagination is implemented; `nextCursor` is produced when more rows exist.
 - Provided cursor must not be silently ignored or treated as page one.
+- Invalid or mismatched cursor returns `cursorInvalid` with no `nextCursor`.
 
 ---
 
 ## Migration Decision
 
-Use one implementation migration:
+One implementation migration was used:
 
-- introduce `contentsRead`
-- migrate the pane
-- remove `selectedContentsRead` public path before final report
+- `contentsRead` was introduced
+- the pane was migrated
+- `selectedContentsRead` was removed from the implementation
 
-Do not leave both `selectedContentsRead` and `contentsRead` as permanent public APIs.
+Do not reintroduce `selectedContentsRead` as a public API.
 Do not add aliases or compatibility wrappers.
 Do not widen `SelectedContentsMediaClass` to image.
 Define new `Contents*` contract names instead.
 
 ---
 
-## Future Cursor Work
+## Cursor Pagination
 
-Real cursor support is a later slice:
+Cursor pagination is implemented for contents reads:
 
-- encode cursor with version
-- bind to scope fingerprint
-- bind to policy, media classes, and row profile
-- bind to recursion and ordering
-- carry last-row key tuple
-- reject mismatches with `cursorInvalid`
+- Cursor is encoded (base64url-encoded JSON, version 1) with scope, policy, recursion, row profile, media classes,
+  and last-row ordering position.
+- Cursor identity is validated against the current request; mismatches return `cursorInvalid`.
+- `nextCursor` is produced when more rows exist beyond the limit.
+- The renderer sends cursors through `loadContentsPage` and accumulates pages in the contents boundary.
+- Contents pagination (`loadContentsPage`) is distinct from tree load-more (`loadChildren`).
 
-This decision does not implement real cursor pagination.
+Future cursor work, if any, should extend cursor identity fields rather than replace the encoding or validation
+mechanism.
+
+This decision does not defer cursor pagination.
