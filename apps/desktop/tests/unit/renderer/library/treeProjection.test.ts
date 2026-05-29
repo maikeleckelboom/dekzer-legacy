@@ -449,6 +449,136 @@ describe('projectState', () => {
       expect(sourceNode.children.nodes.map((n) => n.id)).toEqual(['source-file:11'])
     }
   })
+
+  it('read failure does not project as source unavailable badge or label', () => {
+    const projection = projectTree(
+      browserState({
+        sourceStates: new Map([
+          [
+            'navigation-row:7',
+            {
+              kind: 'failed',
+              detail: 'Unable to read library hierarchy children.',
+              errorCode: 'readFailed'
+            }
+          ]
+        ])
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.badge).toBeUndefined()
+
+    const children = sourceNode.children
+    expect(children.kind).toBe('failed')
+    if (children.kind === 'failed') {
+      expect(children.stateNode.label).toBe('Hierarchy read failed')
+    }
+    expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({
+      kind: 'source'
+    })
+  })
+
+  it('notFound error projects as source unavailable with badge', () => {
+    const projection = projectTree(
+      browserState({
+        sourceStates: new Map([
+          [
+            'navigation-row:7',
+            {
+              kind: 'failed',
+              detail: 'The requested library hierarchy target is not available.',
+              errorCode: 'notFound'
+            }
+          ]
+        ])
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.badge).toMatchObject({ value: 'Unavailable', tone: 'warning' })
+
+    const children = sourceNode.children
+    expect(children.kind).toBe('failed')
+    if (children.kind === 'failed') {
+      expect(children.stateNode.label).toBe('Source unavailable')
+    }
+  })
+
+  it('loaded source with sourceUnavailable coverage projects unavailable badge', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: makeCoverageChildren({
+          coverageState: 'sourceUnavailable',
+          emptyResultAuthoritative: false,
+          detail: 'The selected source is unavailable.'
+        })
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.badge).toMatchObject({ value: 'Unavailable', tone: 'warning' })
+    expect(sourceNode.children.kind).toBe('loaded')
+
+    const children = sourceNode.children
+    expect(children.kind).toBe('loaded')
+    if (children.kind === 'loaded') {
+      expect(children.nodes).toHaveLength(1)
+      expect(children.nodes[0]?.label).toBe('Source unavailable')
+    }
+  })
+
+  it('loaded source with locationMissing coverage projects unavailable badge', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: makeCoverageChildren({
+          coverageState: 'locationMissing',
+          emptyResultAuthoritative: false,
+          detail: 'The selected source location is missing.'
+        })
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.badge).toMatchObject({ value: 'Unavailable', tone: 'warning' })
+  })
+
+  it('complete empty library tree window does not project as source unavailable', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: makeCoverageChildren({
+          coverageState: 'complete',
+          emptyResultAuthoritative: true,
+          detail: 'No visible items in this scope.'
+        })
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.badge).toBeUndefined()
+  })
+
+  it('contents loaded state is independent from tree branch cache', () => {
+    const failState = browserState({
+      sourceStates: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'failed',
+            detail: 'Unable to read library hierarchy children.',
+            errorCode: 'readFailed'
+          }
+        ]
+      ])
+    })
+
+    const projection = projectTree(failState)
+    const sourceBinding = projection.bindingsById.get('navigation-row:7')
+    expect(sourceBinding).toMatchObject({ kind: 'source' })
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.badge).toBeUndefined()
+  })
 })
 
 function projectTree(state: BrowserState): BrowserProjection {
@@ -703,4 +833,25 @@ function findNode(
   }
 
   return undefined
+}
+
+function makeCoverageChildren(options: {
+  readonly coverageState: HierarchyCoverage['state']
+  readonly emptyResultAuthoritative: boolean
+  readonly detail: string
+  readonly rows?: readonly ChildRow[]
+}): LoadedChildren {
+  return {
+    entryPoint: sourceEntryPoint(),
+    label: 'Source Fixture',
+    rows: options.rows ?? [],
+    totalRows: options.rows?.length ?? 0,
+    coverage: {
+      state: options.coverageState,
+      recursiveScopeComplete: options.coverageState === 'complete',
+      emptyResultAuthoritative: options.emptyResultAuthoritative,
+      ...(options.detail === undefined ? {} : { detail: options.detail })
+    },
+    limit: 50
+  }
 }

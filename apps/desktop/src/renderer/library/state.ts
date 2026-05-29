@@ -79,6 +79,7 @@ export type DirectoryState =
   | {
       readonly kind: 'failed'
       readonly detail: string
+      readonly errorCode: string
     }
 
 export type SourceState =
@@ -106,6 +107,7 @@ export type SourceState =
   | {
       readonly kind: 'failed'
       readonly detail: string
+      readonly errorCode: string
     }
 
 export type RowBinding =

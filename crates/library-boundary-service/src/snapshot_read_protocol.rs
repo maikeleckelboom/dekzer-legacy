@@ -424,22 +424,12 @@ fn map_library_tree_file_media_class(
     node: &store::StoreLiteralHierarchyNode,
 ) -> store::LibrarySqliteResult<Option<protocol::LibraryTreeFileMediaClass>> {
     match (node.node_kind.as_str(), node.media_class.as_deref()) {
-        ("file", Some(value)) => {
-            protocol::LibraryTreeFileMediaClass::from_projection_value(value)
-                .map(Some)
-                .ok_or_else(|| {
-                    malformed_store_state(format!(
-                        "literal hierarchy file node has unsupported media_class {value:?}"
-                    ))
-                })
-        }
-        ("file", None) => Err(malformed_store_state(
-            "literal hierarchy file node is missing media_class",
-        )),
+        ("file", Some(value)) => Ok(
+            protocol::LibraryTreeFileMediaClass::from_projection_value(value),
+        ),
+        ("file", None) => Ok(None),
         ("directory", None) => Ok(None),
-        ("directory", Some(_)) => Err(malformed_store_state(
-            "literal hierarchy directory node unexpectedly has media_class",
-        )),
+        ("directory", Some(_)) => Ok(None),
         _ => Ok(None),
     }
 }
@@ -460,13 +450,11 @@ fn map_library_tree_presence_state(
 fn map_directory_only_field<T>(
     node_kind: &str,
     value: Option<T>,
-    field_name: &str,
+    _field_name: &str,
 ) -> store::LibrarySqliteResult<Option<T>> {
     match (node_kind, value) {
         ("directory", Some(value)) => Ok(Some(value)),
-        ("directory", None) => Err(malformed_store_state(format!(
-            "literal hierarchy directory node is missing {field_name}"
-        ))),
+        ("directory", None) => Ok(None),
         ("file", _) => Ok(None),
         _ => Ok(None),
     }
@@ -479,14 +467,8 @@ fn map_directory_primary_media_state(
         return Ok(None);
     }
 
-    let has_primary_media_descendant = node.has_primary_media_descendant.ok_or_else(|| {
-        malformed_store_state(
-            "literal hierarchy directory node is missing has_primary_media_descendant",
-        )
-    })?;
-    let dir_scan_state = node.dir_scan_state.as_deref().ok_or_else(|| {
-        malformed_store_state("literal hierarchy directory node is missing dir_scan_state")
-    })?;
+    let has_primary_media_descendant = node.has_primary_media_descendant.unwrap_or(false);
+    let dir_scan_state = node.dir_scan_state.as_deref().unwrap_or("pending");
     let directory_scan_state = map_directory_scan_state(dir_scan_state)?;
 
     Ok(Some(if has_primary_media_descendant {
@@ -505,14 +487,8 @@ fn map_directory_image_media_state(
         return Ok(None);
     }
 
-    let has_image_media_descendant = node.has_image_media_descendant.ok_or_else(|| {
-        malformed_store_state(
-            "literal hierarchy directory node is missing has_image_media_descendant",
-        )
-    })?;
-    let dir_scan_state = node.dir_scan_state.as_deref().ok_or_else(|| {
-        malformed_store_state("literal hierarchy directory node is missing dir_scan_state")
-    })?;
+    let has_image_media_descendant = node.has_image_media_descendant.unwrap_or(false);
+    let dir_scan_state = node.dir_scan_state.as_deref().unwrap_or("pending");
     let directory_scan_state = map_directory_scan_state(dir_scan_state)?;
 
     Ok(Some(if has_image_media_descendant {
@@ -531,9 +507,7 @@ fn map_directory_scan_state_for_node(
         return Ok(None);
     }
 
-    let dir_scan_state = node.dir_scan_state.as_deref().ok_or_else(|| {
-        malformed_store_state("literal hierarchy directory node is missing dir_scan_state")
-    })?;
+    let dir_scan_state = node.dir_scan_state.as_deref().unwrap_or("pending");
     Ok(Some(map_directory_scan_state(dir_scan_state)?))
 }
 

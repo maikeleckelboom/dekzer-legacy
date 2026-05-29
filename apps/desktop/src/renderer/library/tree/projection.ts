@@ -149,7 +149,7 @@ function projectNavigationRow(options: {
 
   if (sourceTarget !== undefined) {
     const sourceState = options.sourceReadStates.get(nodeId)
-    const sourceFailed = sourceState?.kind === 'failed'
+    const sourceUnavailableBadge = sourceUnavailableBadgeForState(sourceState)
 
     options.bindingsById.set(nodeId, {
       kind: 'source',
@@ -161,9 +161,9 @@ function projectNavigationRow(options: {
       id: nodeId,
       role: browserRowRoleForNavigationRow(options.row),
       label: formatSourceDisplayName(options.row.displayName),
-      ...(sourceFailed
-        ? { badge: { value: 'Unavailable', tone: 'warning' } as BrowserTreeBadge }
-        : {}),
+      ...(sourceUnavailableBadge === undefined
+        ? {}
+        : { badge: sourceUnavailableBadge }),
       icon: 'source',
       detail: formatNavigationSourceDetail(options.row),
       ...projectSourceChildren({
@@ -234,7 +234,7 @@ function projectSourceChildren(options: {
       children: failedChildren(
         {
           ownerId: options.ownerId,
-          label: 'Source contents unavailable',
+          label: sourceFailedLabel(state.errorCode),
           detail: state.detail
         },
         options.bindingsById
@@ -464,6 +464,71 @@ function isConfirmedDirectoryLeaf(
   return node.childRowState === 'noChildRows'
 }
 
+const sourceUnavailableErrorCodes = new Set([
+  'notFound',
+  'hostUnavailable',
+  'hostStopped',
+  'hostStopping',
+  'hostFailed',
+  'hostNotStarted'
+])
+
+function sourceUnavailableBadgeForState(
+  state: SourceState | undefined
+): BrowserTreeBadge | undefined {
+  if (state === undefined) {
+    return undefined
+  }
+
+  if (state.kind === 'failed') {
+    if (sourceUnavailableErrorCodes.has(state.errorCode)) {
+      return { value: 'Unavailable', tone: 'warning' }
+    }
+    return undefined
+  }
+
+  if (state.kind === 'loaded' || state.kind === 'refreshing') {
+    const coverage = state.children.coverage.state
+    if (coverage === 'sourceUnavailable' || coverage === 'locationMissing') {
+      return { value: 'Unavailable', tone: 'warning' }
+    }
+  }
+
+  return undefined
+}
+
+function sourceFailedLabel(errorCode: string): string {
+  if (sourceUnavailableErrorCodes.has(errorCode)) {
+    return 'Source unavailable'
+  }
+
+  switch (errorCode) {
+    case 'readFailed':
+    case 'windowMismatch':
+      return 'Hierarchy read failed'
+    case 'noTarget':
+      return 'No source available'
+    case 'invalidRequest':
+      return 'Invalid read request'
+    default:
+      return 'Read error'
+  }
+}
+
+function directoryFailedLabel(errorCode: string): string {
+  if (sourceUnavailableErrorCodes.has(errorCode)) {
+    return 'Folder unavailable'
+  }
+
+  switch (errorCode) {
+    case 'readFailed':
+    case 'windowMismatch':
+      return 'Directory read failed'
+    default:
+      return 'Read error'
+  }
+}
+
 function browserTreeIconForMediaClass(
   mediaClass: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
 ): BrowserTreeIcon {
@@ -586,7 +651,7 @@ function projectDirectoryChildren(options: {
       children: failedChildren(
         {
           ownerId: options.ownerId,
-          label: 'Contents unavailable',
+          label: directoryFailedLabel(state.errorCode),
           detail: state.detail
         },
         options.bindingsById

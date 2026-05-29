@@ -308,7 +308,8 @@ export function createLibraryHierarchyReadController(
         } else {
           setSourceReadState(nodeId, {
             kind: 'failed',
-            detail: result.error.message
+            detail: result.error.message,
+            errorCode: result.error.code
           })
         }
         return true
@@ -323,7 +324,8 @@ export function createLibraryHierarchyReadController(
         } else {
           setSourceReadState(nodeId, {
             kind: 'failed',
-            detail: safeUnexpectedChildWindowFailure
+            detail: safeUnexpectedChildWindowFailure,
+            errorCode: 'windowMismatch'
           })
         }
         return true
@@ -350,7 +352,8 @@ export function createLibraryHierarchyReadController(
           hierarchyReadRequestError.value = safeSourceReadRequestFailure
           setSourceReadState(nodeId, {
             kind: 'failed',
-            detail: safeSourceReadRequestFailure
+            detail: safeSourceReadRequestFailure,
+            errorCode: 'readFailed'
           })
         }
         return true
@@ -417,7 +420,8 @@ export function createLibraryHierarchyReadController(
         } else {
           setDirectoryReadState(target.directoryId, {
             kind: 'failed',
-            detail: result.error.message
+            detail: result.error.message,
+            errorCode: result.error.code
           })
         }
         return true
@@ -439,7 +443,8 @@ export function createLibraryHierarchyReadController(
         } else {
           setDirectoryReadState(target.directoryId, {
             kind: 'failed',
-            detail: safeUnexpectedChildWindowFailure
+            detail: safeUnexpectedChildWindowFailure,
+            errorCode: 'windowMismatch'
           })
         }
         return true
@@ -467,7 +472,8 @@ export function createLibraryHierarchyReadController(
         } else {
           setDirectoryReadState(target.directoryId, {
             kind: 'failed',
-            detail: safeChildReadRequestFailure
+            detail: safeChildReadRequestFailure,
+            errorCode: 'readFailed'
           })
         }
         return true

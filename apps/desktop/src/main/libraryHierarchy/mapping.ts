@@ -47,7 +47,6 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
 
     if (
       sourceDirectoryId === null ||
-      row.hasChildDirectories === undefined ||
       row.directoryPrimaryMediaState === undefined ||
       row.directoryImageMediaState === undefined ||
       row.directoryScanState === undefined ||
@@ -66,7 +65,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
         ? {}
         : { parentDirectoryId: row.parentSourceDirectoryId }),
       presence: row.presenceState,
-      hasChildDirectories: row.hasChildDirectories,
+      hasChildDirectories: row.hasChildDirectories ?? false,
       directoryPrimaryMediaState: row.directoryPrimaryMediaState,
       directoryImageMediaState: row.directoryImageMediaState,
       directoryScanState: row.directoryScanState,
@@ -76,9 +75,9 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
   }
 
   const sourceFileId = row.sourceFileId
-  const mediaClass = row.mediaClass
+  const mediaClass = row.mediaClass ?? 'none'
 
-  if (sourceFileId === null || mediaClass === undefined) {
+  if (sourceFileId === null) {
     return undefined
   }
 

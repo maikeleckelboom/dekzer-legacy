@@ -104,12 +104,15 @@ describe('mapLibraryTreeNode', () => {
     expect(result).toBeUndefined()
   })
 
-  it('rejects a directory node without hasChildDirectories', () => {
+  it('defaults missing hasChildDirectories to false for directory nodes', () => {
     const result = mapLibraryTreeNode(
       makeDirectoryNode({ hasChildDirectories: undefined })
     )
 
-    expect(result).toBeUndefined()
+    expect(result).not.toBeUndefined()
+    if (result?.kind === 'directory') {
+      expect(result.hasChildDirectories).toBe(false)
+    }
   })
 
   it('maps a well-formed file node', () => {
@@ -136,11 +139,14 @@ describe('mapLibraryTreeNode', () => {
     expect(result).toBeUndefined()
   })
 
-  it('rejects a file node without mediaClass', () => {
+  it('defaults missing mediaClass to none for file nodes', () => {
     const result = mapLibraryTreeNode(
       makeFileNode({ mediaClass: undefined })
     )
 
-    expect(result).toBeUndefined()
+    expect(result).not.toBeUndefined()
+    if (result?.kind === 'file') {
+      expect(result.mediaClass).toBe('none')
+    }
   })
 })
