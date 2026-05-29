@@ -20,7 +20,6 @@ import type {
   DirectoryTarget,
   MoreState,
   LoadedChildren,
-  RowBinding,
   SourceState,
   SourceTarget
 } from '../state'
@@ -28,6 +27,7 @@ import type { BrowserTreeNodeId } from '../tree/types'
 import { copyEntryPoint, sameEntryPoint } from '../runtime/entryPoint'
 
 const readLimit = 50
+const hierarchyReadPolicy = 'performance' satisfies SourceFileVisibility
 const safeNavigationReadRequestFailure = 'Unable to request library navigation rows.'
 const safeSourceReadRequestFailure = 'Unable to request library source hierarchy children.'
 const safeChildReadRequestFailure = 'Unable to request library hierarchy directory children.'
@@ -48,28 +48,14 @@ export type LibraryHierarchyReadController = {
   readonly hierarchyReadIsLoading: Ref<boolean>
   readonly sourceReadStates: Ref<ReadonlyMap<string, SourceState>>
   readonly directoryReadStates: Ref<ReadonlyMap<string, DirectoryState>>
-  readonly sourceFileVisibility: Ref<SourceFileVisibility>
   readonly browserProjection: ComputedRef<BrowserProjection | undefined>
   readonly currentRoot: ComputedRef<ReadRoot | undefined>
   readonly refresh: () => Promise<boolean>
   readonly loadFirstSource: () => Promise<boolean>
   readonly requestNodeChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
   readonly requestDirectoryChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
-  readonly setSourceFileVisibility: (
-    sourceFileVisibility: SourceFileVisibility,
-    options?: SourceFileVisibilityOptions
-  ) => void
   readonly start: () => void
   readonly stop: () => void
-}
-
-export type SourceFileVisibilityOptions = {
-  readonly replayNodeIds?: Iterable<BrowserTreeNodeId>
-}
-
-type VisibilityReplayIntent = {
-  readonly sourceTargets: ReadonlyMap<BrowserTreeNodeId, SourceTarget>
-  readonly directoryTargets: ReadonlyMap<BrowserTreeNodeId, DirectoryTarget>
 }
 
 export function useLibraryHierarchyRead(
@@ -104,16 +90,11 @@ export function createLibraryHierarchyReadController(
   const hierarchyReadIsLoading = ref(false)
   const sourceReadStates = shallowRef<ReadonlyMap<string, SourceState>>(new Map())
   const directoryReadStates = shallowRef<ReadonlyMap<string, DirectoryState>>(new Map())
-  const sourceFileVisibility = ref<SourceFileVisibility>('performance')
   let hasRequestedNavigationRead = false
   let unsubscribeFromHostStatus: (() => void) | undefined
   let navigationReadSequence = 0
   let sourceReadSequence = 0
   let directoryReadSequence = 0
-  let visibilityReplaySequence = 0
-  let isBatchedReplay = false
-  let batchedSourceReadStates: Map<string, SourceState> | undefined
-  let batchedDirectoryReadStates: Map<string, DirectoryState> | undefined
 
   const currentRoot = computed(() => {
     const result = hierarchyReadResult.value
@@ -124,7 +105,6 @@ export function createLibraryHierarchyReadController(
     projectState({
       sourceReadStates: sourceReadStates.value,
       directoryReadStates: directoryReadStates.value,
-      sourceFileVisibility: sourceFileVisibility.value,
       ...(hostStatus.value === undefined ? {} : { hostStatus: hostStatus.value }),
       ...(navigationReadResult.value === undefined
         ? {}
@@ -165,208 +145,6 @@ export function createLibraryHierarchyReadController(
 
     hasRequestedNavigationRead = true
     void refresh()
-  }
-
-  function setSourceFileVisibility(
-    nextVisibility: SourceFileVisibility,
-    options: SourceFileVisibilityOptions = {}
-  ): void {
-    if (sourceFileVisibility.value === nextVisibility) {
-      return
-    }
-
-    const replayNodeIds = new Set(options.replayNodeIds ?? [])
-    const replaySequence = ++visibilityReplaySequence
-
-    const intent = captureVisibilityReplayIntent(replayNodeIds)
-
-    sourceFileVisibility.value = nextVisibility
-    hierarchyReadResult.value = undefined
-    sourceReadSequence++
-    directoryReadSequence++
-
-    if (intent.sourceTargets.size === 0 && intent.directoryTargets.size === 0) {
-      void loadFirstSource()
-      return
-    }
-
-    void replayVisibilityIntent(intent, replaySequence)
-  }
-
-  function captureVisibilityReplayIntent(
-    nodeIds: ReadonlySet<BrowserTreeNodeId>
-  ): VisibilityReplayIntent {
-    const sourceTargets = new Map<BrowserTreeNodeId, SourceTarget>()
-    const directoryTargets = new Map<BrowserTreeNodeId, DirectoryTarget>()
-
-    const projection = browserProjection.value
-
-    if (projection?.kind !== 'tree') {
-      return { sourceTargets, directoryTargets }
-    }
-
-    const bindingsById = projection.bindingsById
-
-    for (const nodeId of nodeIds) {
-      const binding = bindingsById.get(nodeId)
-
-      if (binding?.kind === 'source') {
-        sourceTargets.set(nodeId, binding.target)
-      } else if (binding?.kind === 'directory') {
-        directoryTargets.set(nodeId, {
-          entryPoint: copyEntryPoint(binding.entryPoint),
-          ...(binding.label === undefined ? {} : { label: binding.label }),
-          directoryId: binding.directoryId
-        })
-      }
-    }
-
-    return { sourceTargets, directoryTargets }
-  }
-
-  async function replayVisibilityIntent(
-    intent: VisibilityReplayIntent,
-    replaySequence: number
-  ): Promise<void> {
-    let loadedAnyReplayTarget = false
-    const preReplaySourceStates = new Map(sourceReadStates.value)
-    const preReplayDirectoryStates = new Map(directoryReadStates.value)
-    isBatchedReplay = true
-    hierarchyReadIsLoading.value = true
-    hierarchyReadRequestError.value = undefined
-
-    try {
-      beginReplayBatch()
-
-      for (const [nodeId, target] of intent.sourceTargets) {
-        if (replaySequence !== visibilityReplaySequence) {
-          return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
-        }
-
-        const loaded = await readSource(nodeId, target)
-        if (loaded) {
-          loadedAnyReplayTarget = true
-        }
-      }
-
-      for (const [nodeId, directoryTarget] of intent.directoryTargets) {
-        if (replaySequence !== visibilityReplaySequence) {
-          return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
-        }
-
-        const projection = browserProjection.value
-
-        if (projection?.kind !== 'tree') {
-          return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
-        }
-
-        const directoryBinding = projection.bindingsById.get(nodeId)
-
-        if (directoryBinding?.kind === 'directory') {
-          const owningSource = findSourceByEntryPoint(
-            projection.bindingsById,
-            directoryBinding.entryPoint
-          )
-          if (
-            owningSource !== undefined &&
-            intent.sourceTargets.has(owningSource.nodeId) &&
-            !batchedSourceHasChildDirectory(owningSource.nodeId, nodeId)
-          ) {
-            continue
-          }
-          const loaded = await readDirectory(directoryTarget)
-          if (loaded) {
-            loadedAnyReplayTarget = true
-          }
-          continue
-        }
-
-        const owningSource = findSourceByEntryPoint(
-          projection.bindingsById,
-          directoryTarget.entryPoint
-        )
-
-        if (owningSource === undefined) {
-          continue
-        }
-
-        const sourceLoaded = await readSource(owningSource.nodeId, owningSource.target)
-        if (sourceLoaded) {
-          loadedAnyReplayTarget = true
-        }
-
-        if (batchedSourceHasChildDirectory(owningSource.nodeId, nodeId)) {
-          const loaded = await readDirectory(directoryTarget)
-          if (loaded) {
-            loadedAnyReplayTarget = true
-          }
-        }
-      }
-
-      if (replaySequence !== visibilityReplaySequence) {
-        return cleanupReplay(preReplaySourceStates, preReplayDirectoryStates)
-      }
-
-      commitReplayBatch()
-    } catch {
-      abortReplayBatch(preReplaySourceStates, preReplayDirectoryStates)
-    }
-
-    isBatchedReplay = false
-
-    if (replaySequence === visibilityReplaySequence) {
-      hierarchyReadIsLoading.value = false
-
-      if (!loadedAnyReplayTarget) {
-        await loadFirstSource()
-      }
-    } else {
-      hierarchyReadIsLoading.value = false
-    }
-  }
-
-  function cleanupReplay(
-    preReplaySourceStates?: ReadonlyMap<string, SourceState>,
-    preReplayDirectoryStates?: ReadonlyMap<string, DirectoryState>
-  ): void {
-    if (preReplaySourceStates !== undefined && preReplayDirectoryStates !== undefined) {
-      sourceReadStates.value = preReplaySourceStates
-      directoryReadStates.value = preReplayDirectoryStates
-    }
-    abortReplayBatch()
-    isBatchedReplay = false
-    hierarchyReadIsLoading.value = false
-  }
-
-  function findSourceByEntryPoint(
-    bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>,
-    entryPoint: EntryPoint
-  ): { readonly nodeId: BrowserTreeNodeId; readonly target: SourceTarget } | undefined {
-    for (const [nodeId, binding] of bindingsById) {
-      if (binding.kind === 'source' && sameEntryPoint(binding.target.entryPoint, entryPoint)) {
-        return { nodeId, target: binding.target }
-      }
-    }
-
-    return undefined
-  }
-
-  function batchedSourceHasChildDirectory(
-    sourceNodeId: BrowserTreeNodeId,
-    directoryNodeId: BrowserTreeNodeId
-  ): boolean {
-    const sourceState = resolveSourceState(sourceNodeId)
-
-    if (
-      sourceState === undefined ||
-      (sourceState.kind !== 'loaded' && sourceState.kind !== 'refreshing')
-    ) {
-      return false
-    }
-
-    return sourceState.children.rows.some(
-      (row) => row.kind === 'directory' && row.id === directoryNodeId
-    )
   }
 
   async function refresh(): Promise<boolean> {
@@ -478,8 +256,7 @@ export function createLibraryHierarchyReadController(
   }
 
   async function readSource(nodeId: BrowserTreeNodeId, target: SourceTarget): Promise<boolean> {
-    const requestedVisibility = sourceFileVisibility.value
-    const requestKey = createEntryPointRequestKey(target.entryPoint, requestedVisibility)
+    const requestKey = createEntryPointRequestKey(target.entryPoint)
     const currentState = resolveSourceState(nodeId)
 
     if (currentState?.kind === 'loading' && currentState.requestKey === requestKey) {
@@ -493,10 +270,8 @@ export function createLibraryHierarchyReadController(
     const hadPriorChildren = currentState?.kind === 'loaded'
     const sequence = ++sourceReadSequence
 
-    if (!isBatchedReplay) {
-      hierarchyReadIsLoading.value = true
-      hierarchyReadRequestError.value = undefined
-    }
+    hierarchyReadIsLoading.value = true
+    hierarchyReadRequestError.value = undefined
 
     if (hadPriorChildren) {
       setSourceReadState(nodeId, {
@@ -541,7 +316,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (!isExpectedWindow(result.window, 0, undefined, target.entryPoint, requestedVisibility)) {
+      if (!isExpectedWindow(result.window, 0, undefined, target.entryPoint)) {
         if (hadPriorChildren) {
           setSourceReadState(nodeId, {
             kind: 'loaded',
@@ -560,10 +335,7 @@ export function createLibraryHierarchyReadController(
         nodeId,
         {
           kind: 'loaded',
-          children: loadedChildrenFromWindow(
-            result.window,
-            sourceLoadedTarget(target, requestedVisibility)
-          )
+          children: loadedChildrenFromWindow(result.window, sourceLoadedTarget(target))
         },
         result.window
       )
@@ -588,19 +360,14 @@ export function createLibraryHierarchyReadController(
 
       return false
     } finally {
-      if (!isBatchedReplay && sequence === sourceReadSequence) {
+      if (sequence === sourceReadSequence) {
         hierarchyReadIsLoading.value = false
       }
     }
   }
 
   async function readDirectory(target: DirectoryTarget): Promise<boolean> {
-    const requestedVisibility = sourceFileVisibility.value
-    const requestKey = createDirectoryRequestKey(
-      target.entryPoint,
-      target.directoryId,
-      requestedVisibility
-    )
+    const requestKey = createDirectoryRequestKey(target.entryPoint, target.directoryId)
     const currentState = resolveDirectoryState(target.directoryId)
 
     if (currentState?.kind === 'loading' && currentState.requestKey === requestKey) {
@@ -614,10 +381,8 @@ export function createLibraryHierarchyReadController(
     const hadPriorChildren = currentState?.kind === 'loaded'
     const sequence = ++directoryReadSequence
 
-    if (!isBatchedReplay) {
-      hierarchyReadIsLoading.value = true
-      hierarchyReadRequestError.value = undefined
-    }
+    hierarchyReadIsLoading.value = true
+    hierarchyReadRequestError.value = undefined
 
     if (hadPriorChildren) {
       setDirectoryReadState(target.directoryId, {
@@ -665,8 +430,7 @@ export function createLibraryHierarchyReadController(
           result.window,
           0,
           target.directoryId,
-          target.entryPoint,
-          requestedVisibility
+          target.entryPoint
         )
       ) {
         if (hadPriorChildren) {
@@ -689,7 +453,7 @@ export function createLibraryHierarchyReadController(
           kind: 'loaded',
           children: loadedChildrenFromWindow(
             result.window,
-            directoryLoadedTarget(target, requestedVisibility)
+            directoryLoadedTarget(target)
           )
         },
         result.window
@@ -713,7 +477,7 @@ export function createLibraryHierarchyReadController(
 
       return false
     } finally {
-      if (!isBatchedReplay && sequence === directoryReadSequence) {
+      if (sequence === directoryReadSequence) {
         hierarchyReadIsLoading.value = false
       }
     }
@@ -772,8 +536,7 @@ export function createLibraryHierarchyReadController(
           result.window,
           target.offset,
           target.parentDirectoryId,
-          target.entryPoint,
-          target.sourceFileVisibility
+          target.entryPoint
         )
       ) {
         setSourceMoreState(target, {
@@ -867,8 +630,7 @@ export function createLibraryHierarchyReadController(
           result.window,
           target.offset,
           directoryId,
-          target.entryPoint,
-          target.sourceFileVisibility
+          target.entryPoint
         )
       ) {
         setDirectoryMoreState(target, {
@@ -915,16 +677,6 @@ export function createLibraryHierarchyReadController(
     state: SourceState,
     discoveredWindow?: ChildWindow
   ): void {
-    if (isBatchedReplay && batchedSourceReadStates !== undefined) {
-      batchedSourceReadStates.set(nodeId, state)
-
-      if (discoveredWindow !== undefined && batchedDirectoryReadStates !== undefined) {
-        addDiscoveredUnloadedDirectoryStates(batchedDirectoryReadStates, discoveredWindow)
-      }
-
-      return
-    }
-
     const nextStates = new Map(sourceReadStates.value)
     nextStates.set(nodeId, state)
     sourceReadStates.value = nextStates
@@ -941,16 +693,6 @@ export function createLibraryHierarchyReadController(
     state: DirectoryState,
     discoveredWindow?: ChildWindow
   ): void {
-    if (isBatchedReplay && batchedDirectoryReadStates !== undefined) {
-      batchedDirectoryReadStates.set(directoryId, state)
-
-      if (discoveredWindow !== undefined) {
-        addDiscoveredUnloadedDirectoryStates(batchedDirectoryReadStates, discoveredWindow)
-      }
-
-      return
-    }
-
     const nextStates = new Map(directoryReadStates.value)
     nextStates.set(directoryId, state)
 
@@ -1044,47 +786,11 @@ export function createLibraryHierarchyReadController(
   }
 
   function resolveSourceState(nodeId: string): SourceState | undefined {
-    if (isBatchedReplay && batchedSourceReadStates !== undefined) {
-      return batchedSourceReadStates.get(nodeId)
-    }
-
     return sourceReadStates.value.get(nodeId)
   }
 
   function resolveDirectoryState(directoryId: string): DirectoryState | undefined {
-    if (isBatchedReplay && batchedDirectoryReadStates !== undefined) {
-      return batchedDirectoryReadStates.get(directoryId)
-    }
-
     return directoryReadStates.value.get(directoryId)
-  }
-
-  function beginReplayBatch(): void {
-    batchedSourceReadStates = new Map(sourceReadStates.value)
-    batchedDirectoryReadStates = new Map(directoryReadStates.value)
-  }
-
-  function commitReplayBatch(): void {
-    if (batchedSourceReadStates !== undefined) {
-      sourceReadStates.value = new Map(batchedSourceReadStates)
-    }
-    if (batchedDirectoryReadStates !== undefined) {
-      directoryReadStates.value = new Map(batchedDirectoryReadStates)
-    }
-    batchedSourceReadStates = undefined
-    batchedDirectoryReadStates = undefined
-  }
-
-  function abortReplayBatch(
-    preReplaySourceStates?: ReadonlyMap<string, SourceState>,
-    preReplayDirectoryStates?: ReadonlyMap<string, DirectoryState>
-  ): void {
-    if (preReplaySourceStates !== undefined && preReplayDirectoryStates !== undefined) {
-      sourceReadStates.value = preReplaySourceStates
-      directoryReadStates.value = preReplayDirectoryStates
-    }
-    batchedSourceReadStates = undefined
-    batchedDirectoryReadStates = undefined
   }
 
   return {
@@ -1097,14 +803,12 @@ export function createLibraryHierarchyReadController(
     hierarchyReadIsLoading,
     sourceReadStates,
     directoryReadStates,
-    sourceFileVisibility,
     browserProjection,
     currentRoot,
     refresh,
     loadFirstSource,
     requestNodeChildren,
     requestDirectoryChildren,
-    setSourceFileVisibility,
     start,
     stop
   }
@@ -1151,8 +855,7 @@ function moreReadRequest(target: MoreTarget): ReadRequest {
 }
 
 function sourceLoadedTarget(
-  target: SourceTarget,
-  sourceFileVisibility: SourceFileVisibility
+  target: SourceTarget
 ): {
   readonly entryPoint: EntryPoint
   readonly label?: string
@@ -1162,13 +865,12 @@ function sourceLoadedTarget(
   return {
     entryPoint: copyEntryPoint(target.entryPoint),
     label: target.label,
-    sourceFileVisibility
+    sourceFileVisibility: hierarchyReadPolicy
   }
 }
 
 function directoryLoadedTarget(
-  target: DirectoryTarget,
-  sourceFileVisibility: SourceFileVisibility
+  target: DirectoryTarget
 ): {
   readonly entryPoint: EntryPoint
   readonly label?: string
@@ -1179,7 +881,7 @@ function directoryLoadedTarget(
     entryPoint: copyEntryPoint(target.entryPoint),
     ...(target.label === undefined ? {} : { label: target.label }),
     parentDirectoryId: target.directoryId,
-    sourceFileVisibility
+    sourceFileVisibility: hierarchyReadPolicy
   }
 }
 
@@ -1273,8 +975,7 @@ function isExpectedWindow(
   window: ChildWindow,
   expectedOffset: number,
   expectedParentDirectoryId: string | undefined,
-  expectedEntryPoint: EntryPoint,
-  expectedSourceFileVisibility: SourceFileVisibility
+  expectedEntryPoint: EntryPoint
 ): boolean {
   if (window.offset !== expectedOffset) {
     return false
@@ -1288,7 +989,7 @@ function isExpectedWindow(
     return false
   }
 
-  if (window.sourceFileVisibility !== expectedSourceFileVisibility) {
+  if (window.sourceFileVisibility !== hierarchyReadPolicy) {
     return false
   }
 
@@ -1311,8 +1012,7 @@ function canReadMore(
     state?.kind === 'loaded' &&
     state.children.nextOffset === target.offset &&
     sameEntryPoint(state.children.entryPoint, target.entryPoint) &&
-    (state.children.parentDirectoryId ?? undefined) === target.parentDirectoryId &&
-    state.children.sourceFileVisibility === target.sourceFileVisibility
+    (state.children.parentDirectoryId ?? undefined) === target.parentDirectoryId
   )
 }
 
@@ -1331,27 +1031,25 @@ function addDiscoveredUnloadedDirectoryStates(
 }
 
 function createEntryPointRequestKey(
-  entryPoint: EntryPoint,
-  sourceFileVisibility: SourceFileVisibility
+  entryPoint: EntryPoint
 ): string {
   switch (entryPoint.kind) {
     case 'source':
-      return `source:${entryPoint.sourceId}/source-file-visibility:${sourceFileVisibility}`
+      return `source:${entryPoint.sourceId}`
     case 'sourceLocation':
-      return `source-location:${entryPoint.sourceLocationId}/source-file-visibility:${sourceFileVisibility}`
+      return `source-location:${entryPoint.sourceLocationId}`
   }
 }
 
 function createDirectoryRequestKey(
   entryPoint: EntryPoint,
-  directoryId: string,
-  sourceFileVisibility: SourceFileVisibility
+  directoryId: string
 ): string {
-  return `${createEntryPointRequestKey(entryPoint, sourceFileVisibility)}/directory:${directoryId}`
+  return `${createEntryPointRequestKey(entryPoint)}/directory:${directoryId}`
 }
 
 function createMoreRequestKey(target: MoreTarget): string {
-  return `${createEntryPointRequestKey(target.entryPoint, target.sourceFileVisibility)}/directory:${
+  return `${createEntryPointRequestKey(target.entryPoint)}/directory:${
     target.parentDirectoryId ?? 'root'
   }/offset:${target.offset}`
 }

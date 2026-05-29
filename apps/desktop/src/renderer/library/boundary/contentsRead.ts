@@ -48,7 +48,6 @@ export type ContentsReadController = {
 
 type ReadOptions = {
   readonly force?: boolean
-  readonly sourceFileVisibility?: SourceFileVisibility
   readonly cursor?: string
 }
 
@@ -56,7 +55,10 @@ type LibraryContentsApi = RendererApi['library']['contents']
 
 const readLimit = 100
 const safeContentsRequestFailure = 'Unable to request library contents.'
-const defaultSourceFileVisibility: SourceFileVisibility = 'performance'
+const defaultContentsPolicy: ContentsReadPolicy = {
+  mediaClasses: ['audio', 'video'],
+  rowProfile: { kind: 'primaryMedia' }
+}
 const contentsRecursion: ContentsRecursion = 'recursive'
 
 export function useContentsRead(
@@ -117,9 +119,7 @@ export function createContentsReadController(
       return false
     }
 
-    const policy = contentsPolicyForVisibility(
-      options.sourceFileVisibility ?? defaultSourceFileVisibility
-    )
+    const policy = defaultContentsPolicy
     const requestKey = contentsRequestKey(scope, policy, contentsRecursion)
     const currentState = state.value
     const cursor = options.cursor

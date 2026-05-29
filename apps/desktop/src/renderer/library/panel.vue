@@ -15,7 +15,6 @@ import {
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
 import type { BrowserState, RowBinding } from './state'
-import type { SourceFileVisibility } from '../../shared/libraryHierarchy/readChildren'
 import { createViewStateStore } from './runtime/viewState'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
@@ -34,8 +33,6 @@ const buttonBaseClass =
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
 const secondaryButtonClass = `${buttonBaseClass} min-w-31.5 border border-(--color-border) bg-(--color-background) text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 const dangerButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-(--color-background) text-(--color-accent) hover:brightness-110`
-const visibilityButtonBaseClass =
-  'inline-flex min-h-8 items-center justify-center border border-(--color-border) px-3 py-1.5 text-sm font-bold transition first:rounded-l-sm last:rounded-r-sm focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)'
 const visibleOperationFeedbackKinds = new Set<LibraryOperationFeedbackKind>([
   'choosingRoot',
   'rootChoiceFailed',
@@ -105,7 +102,6 @@ const treeRootProps = computed(() => ({
 const browserState = computed<BrowserState>(() => ({
   sourceReadStates: hierarchyRead.sourceReadStates.value,
   directoryReadStates: hierarchyRead.directoryReadStates.value,
-  sourceFileVisibility: hierarchyRead.sourceFileVisibility.value,
   ...(hierarchyRead.hostStatus.value === undefined
     ? {}
     : { hostStatus: hierarchyRead.hostStatus.value }),
@@ -196,8 +192,7 @@ watch(
   [
     selectedNodeId,
     () => hierarchyRead.browserProjection.value,
-    () => hierarchyRead.hostStatus.value?.state,
-    () => hierarchyRead.sourceFileVisibility.value
+    () => hierarchyRead.hostStatus.value?.state
   ],
   () => {
     requestContentsForCurrentSelection()
@@ -246,24 +241,6 @@ function operationFeedbackToneClass(tone: LibraryOperationFeedbackTone): string 
     case 'idle':
       return 'border-(--color-border) bg-(--color-background) text-(--color-text-muted)'
   }
-}
-
-function sourceFileVisibilityButtonClass(value: SourceFileVisibility): string {
-  return hierarchyRead.sourceFileVisibility.value === value
-    ? `${visibilityButtonBaseClass} bg-(--color-accent) text-(--color-background)`
-    : `${visibilityButtonBaseClass} bg-(--color-background) text-(--color-text-muted) hover:border-(--color-accent) hover:text-(--color-accent)`
-}
-
-function setSourceFileVisibility(value: SourceFileVisibility): void {
-  markUserInteraction()
-
-  const replayNodeIds = new Set<BrowserTreeNodeId>(expandedNodeIds.value)
-
-  if (selectedNodeId.value !== undefined) {
-    replayNodeIds.add(selectedNodeId.value)
-  }
-
-  hierarchyRead.setSourceFileVisibility(value, { replayNodeIds })
 }
 
 function saveViewState(): void {
@@ -470,7 +447,7 @@ function activateContentRowAction(row: ContentRow): void {
   } else if (action.kind === 'loadContentsPage') {
     void contentsRead.readForBinding(
       hierarchyRead.browserProjection.value?.bindingsById.get(action.nodeId),
-      { cursor: action.cursor, sourceFileVisibility: hierarchyRead.sourceFileVisibility.value }
+      { cursor: action.cursor }
     )
   }
 }
@@ -485,8 +462,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
   }
 
   void contentsRead.readForBinding(projection.bindingsById.get(selectedId), {
-    ...options,
-    sourceFileVisibility: hierarchyRead.sourceFileVisibility.value
+    ...options
   })
 }
 </script>
@@ -502,25 +478,6 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       </h2>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
-        <div class="inline-flex" role="group" aria-label="Source-file visibility">
-          <button
-            type="button"
-            :class="sourceFileVisibilityButtonClass('performance')"
-            :aria-pressed="hierarchyRead.sourceFileVisibility.value === 'performance'"
-            @click="setSourceFileVisibility('performance')"
-          >
-            Performance
-          </button>
-          <button
-            type="button"
-            :class="sourceFileVisibilityButtonClass('performanceAndImages')"
-            :aria-pressed="hierarchyRead.sourceFileVisibility.value === 'performanceAndImages'"
-            @click="setSourceFileVisibility('performanceAndImages')"
-          >
-            Performance + Images
-          </button>
-        </div>
-
         <button
           type="button"
           :class="primaryButtonClass"

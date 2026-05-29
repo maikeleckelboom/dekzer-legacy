@@ -110,14 +110,12 @@ describe('projectState', () => {
   it('projects literal file presentation from backend media class', () => {
     const projection = projectTree(
       browserState({
-        sourceFileVisibility: 'performanceAndImages',
         sourceChildren: loadedChildren(
           [
             fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
             fileNode('13', 'clip.wav', { mediaClass: 'video' }),
             fileNode('14', 'track.raw', { mediaClass: 'audio' })
-          ],
-          { sourceFileVisibility: 'performanceAndImages' }
+          ]
         )
       })
     )
@@ -344,30 +342,6 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
   })
 
-  it('keeps image-only directories expandable in performance-and-images visibility', () => {
-    const projection = projectTree(
-      browserState({
-        sourceFileVisibility: 'performanceAndImages',
-        sourceChildren: loadedChildren(
-          [
-            directoryNode('50', 'Covers', {
-              hasChildDirectories: false,
-              directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
-              directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
-              directoryScanState: 'complete'
-            })
-          ],
-          { sourceFileVisibility: 'performanceAndImages' }
-        )
-      })
-    )
-    const node = requiredNode(projection.nodes, 'source-directory:50')
-
-    expect(node.children.kind).toBe('deferred')
-    expect(isBrowserTreeBranch(node)).toBe(true)
-    expect(canRevealBrowserTreeChildren(node)).toBe(true)
-  })
-
   it('state-only child rows do not accidentally decide branch identity', () => {
     const node: BrowserTreeNode = {
       id: 'state-only-owner',
@@ -453,16 +427,13 @@ describe('projectState', () => {
   it('refreshing source renders loaded children', () => {
     const projection = projectTree(
       browserState({
-        sourceFileVisibility: 'performanceAndImages',
         sourceStates: new Map([
           [
             'navigation-row:7',
             {
               kind: 'refreshing',
-              children: loadedChildren([fileNode('11', 'cover.mp3', { mediaClass: 'image' })], {
-                sourceFileVisibility: 'performanceAndImages'
-              }),
-              requestKey: 'source:7/v:images',
+              children: loadedChildren([fileNode('11', 'cover.mp3', { mediaClass: 'audio' })]),
+              requestKey: 'source:7',
               sequence: 1,
               detail: 'Refreshing hierarchy children.'
             }
@@ -517,7 +488,6 @@ function browserState(
     readonly sourceChildren?: LoadedChildren
     readonly sourceStates?: BrowserState['sourceReadStates']
     readonly directoryStates?: BrowserState['directoryReadStates']
-    readonly sourceFileVisibility?: SourceFileVisibility
   } = {}
 ): BrowserState {
   return {
@@ -535,8 +505,7 @@ function browserState(
               }
             ]
           ])),
-    directoryReadStates: options.directoryStates ?? new Map(),
-    sourceFileVisibility: options.sourceFileVisibility ?? 'performance'
+    directoryReadStates: options.directoryStates ?? new Map()
   }
 }
 
