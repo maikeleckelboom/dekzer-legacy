@@ -517,7 +517,7 @@ export function createLibraryHierarchyReadController(
 
     try {
       const result = await libraryApi.hierarchy.readChildren(
-        sourceReadRequest(target, requestedVisibility)
+        sourceReadRequest(target)
       )
 
       if (!isCurrentSourceLoading(nodeId, requestKey, sequence)) {
@@ -638,7 +638,7 @@ export function createLibraryHierarchyReadController(
 
     try {
       const result = await libraryApi.hierarchy.readChildren(
-        directoryReadRequest(target, requestedVisibility)
+        directoryReadRequest(target)
       )
 
       if (!isCurrentDirectoryLoading(target.directoryId, requestKey, sequence)) {
@@ -1110,10 +1110,7 @@ export function createLibraryHierarchyReadController(
   }
 }
 
-function sourceReadRequest(
-  target: SourceTarget,
-  sourceFileVisibility: SourceFileVisibility
-): ReadRequest {
+function sourceReadRequest(target: SourceTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -1121,15 +1118,11 @@ function sourceReadRequest(
       label: target.label
     },
     offset: 0,
-    limit: readLimit,
-    sourceFileVisibility
+    limit: readLimit
   }
 }
 
-function directoryReadRequest(
-  target: DirectoryTarget,
-  sourceFileVisibility: SourceFileVisibility
-): ReadRequest {
+function directoryReadRequest(target: DirectoryTarget): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -1138,8 +1131,7 @@ function directoryReadRequest(
     },
     parentDirectoryId: target.directoryId,
     offset: 0,
-    limit: readLimit,
-    sourceFileVisibility
+    limit: readLimit
   }
 }
 
@@ -1154,8 +1146,7 @@ function moreReadRequest(target: MoreTarget): ReadRequest {
       ? {}
       : { parentDirectoryId: target.parentDirectoryId }),
     offset: target.offset,
-    limit: target.limit,
-    sourceFileVisibility: target.sourceFileVisibility
+    limit: target.limit
   }
 }
 

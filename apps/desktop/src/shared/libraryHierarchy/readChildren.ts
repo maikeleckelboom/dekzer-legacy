@@ -54,7 +54,6 @@ export type ReadRequest = {
   readonly parentDirectoryId?: string
   readonly offset?: number
   readonly limit?: number
-  readonly sourceFileVisibility?: SourceFileVisibility
 }
 
 export type ReadRoot = {

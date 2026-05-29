@@ -3,8 +3,12 @@ use std::path::Path;
 
 use library_boundary_protocol::{
     CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, LibraryRootCommand,
-    LibraryRootReply, RegisterLocalRootReply, RegisterLocalRootRequest, RunRootScanReply,
-    RunRootScanRequest,
+    LibraryRootReply, LiteralHierarchyCoverageState, LiteralHierarchyEntryPoint,
+    LiteralHierarchyNodeKind, LiteralHierarchyPresenceState, NavigationRow,
+    NavigationRowFamily, NavigationRowKind, ReadLiteralHierarchyChildrenReply,
+    ReadLiteralHierarchyChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
+    RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
+    SnapshotReadReply, SourceFileVisibility,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -59,6 +63,59 @@ fn expect_command_error(outcome: CommandOutcome) -> CommandErrorEnvelope {
     match outcome {
         CommandOutcome::Success(env) => panic!("Expected command error, got {:?}", env.reply),
         CommandOutcome::Error(env) => env,
+    }
+}
+
+fn read_navigation_rows(
+    service: &LibraryBoundaryService,
+    parent_id: Option<i64>,
+) -> Vec<NavigationRow> {
+    let outcome = service.handle_command(CommandRequest::SnapshotRead(
+        SnapshotReadCommand::ReadNavigationRows(ReadNavigationRowsRequest {
+            parent_navigation_row_id: parent_id,
+        }),
+    ));
+    let reply = expect_command_reply(outcome, "read navigation rows");
+    match reply {
+        CommandReply::SnapshotRead(SnapshotReadReply::NavigationRows(r)) => r.rows,
+        other => panic!("Expected navigation rows reply, got {other:?}"),
+    }
+}
+
+fn read_literal_hierarchy(
+    service: &LibraryBoundaryService,
+    source_id: i64,
+    parent_source_directory_id: Option<i64>,
+) -> ReadLiteralHierarchyChildrenReply {
+    read_literal_hierarchy_with_visibility(
+        service,
+        source_id,
+        parent_source_directory_id,
+        SourceFileVisibility::PerformanceAndImages,
+    )
+}
+
+fn read_literal_hierarchy_with_visibility(
+    service: &LibraryBoundaryService,
+    source_id: i64,
+    parent_source_directory_id: Option<i64>,
+    visibility: SourceFileVisibility,
+) -> ReadLiteralHierarchyChildrenReply {
+    let outcome = service.handle_command(CommandRequest::SnapshotRead(
+        SnapshotReadCommand::ReadLiteralHierarchyChildren(
+            ReadLiteralHierarchyChildrenRequest {
+                entry_point: LiteralHierarchyEntryPoint::Source { source_id },
+                parent_source_directory_id,
+                offset: 0,
+                limit: 50,
+                source_file_visibility: Some(visibility),
+            },
+        ),
+    ));
+    let reply = expect_command_reply(outcome, "read literal hierarchy");
+    match reply {
+        CommandReply::SnapshotRead(SnapshotReadReply::LiteralHierarchyChildren(r)) => r,
+        other => panic!("Expected literal hierarchy reply, got {other:?}"),
     }
 }
 
@@ -171,5 +228,320 @@ fn scan_with_unknown_root_id_returns_current_store_error() {
         error.error.to_string().contains("does not exist"),
         "Current store error should mention root does not exist, got: {}",
         error.error,
+    );
+}
+
+#[test]
+fn scanned_literal_hierarchy_survives_service_reopen() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(
+        &music_root
+            .join("artists")
+            .join("alpha")
+            .join("track_one.flac"),
+        b"not-real-flac",
+    );
+    write_file(
+        &music_root
+            .join("artists")
+            .join("alpha")
+            .join("track_two.wav"),
+        b"not-real-wav",
+    );
+    write_file(&music_root.join("loose.mp3"), b"not-real-mp3");
+    write_file(
+        &music_root.join("artwork").join("cover.png"),
+        b"fake-png",
+    );
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    assert!(registered.root_id > 0);
+
+    let scanned = run_scan(&service, registered.root_id);
+    assert_eq!(scanned.root_id, registered.root_id);
+    assert!(scanned.scan_run_id > 0);
+    assert_eq!(scanned.discovered_file_count, 4);
+
+    let root_nav_rows = read_navigation_rows(&service, None);
+    root_nav_rows
+        .iter()
+        .find(|row| {
+            matches!(row.family, Some(NavigationRowFamily::Sources))
+                && row.row_kind == NavigationRowKind::Source
+        })
+        .expect("registered source appears in navigation at root level");
+
+    let root_reply = read_literal_hierarchy(&service, registered.root_id, None);
+    let root_window = root_reply
+        .window
+        .as_ref()
+        .expect("source root resolves to hierarchy window");
+    assert!(
+        root_window.total_rows >= 2,
+        "root window must contain at least artists/ and loose.mp3"
+    );
+
+    let artists_dir = root_window
+        .rows
+        .iter()
+        .find(|row| row.display_name == "artists" && row.node_kind == LiteralHierarchyNodeKind::Directory)
+        .expect("artists directory in root hierarchy");
+
+    root_window
+        .rows
+        .iter()
+        .find(|row| row.display_name == "loose.mp3" && row.node_kind == LiteralHierarchyNodeKind::File)
+        .expect("loose.mp3 file in root hierarchy");
+
+    for row in &root_window.rows {
+        assert_eq!(
+            row.parent_source_directory_id, None,
+            "root-level row '{}' must have parent_source_directory_id == None",
+            row.display_name,
+        );
+    }
+
+    for row in &root_window.rows {
+        assert!(
+            matches!(
+                row.node_kind,
+                LiteralHierarchyNodeKind::Directory | LiteralHierarchyNodeKind::File,
+            ),
+            "root row '{}' has unexpected node_kind {:?}",
+            row.display_name,
+            row.node_kind,
+        );
+    }
+
+    for row in &root_window.rows {
+        assert_eq!(
+            row.presence_state,
+            LiteralHierarchyPresenceState::Present,
+            "root row '{}' must be Present, got {:?}",
+            row.display_name,
+            row.presence_state,
+        );
+    }
+
+    for row in &root_window.rows {
+        match row.node_kind {
+            LiteralHierarchyNodeKind::Directory => {
+                assert!(
+                    row.directory_scan_state.is_some(),
+                    "directory '{}' must have directory_scan_state",
+                    row.display_name,
+                );
+                assert!(
+                    row.has_child_directories.is_some(),
+                    "directory '{}' must have has_child_directories",
+                    row.display_name,
+                );
+            }
+            LiteralHierarchyNodeKind::File => {
+                assert!(
+                    row.directory_scan_state.is_none(),
+                    "file '{}' must not have directory_scan_state",
+                    row.display_name,
+                );
+                assert!(
+                    row.has_child_directories.is_none(),
+                    "file '{}' must not have has_child_directories",
+                    row.display_name,
+                );
+                assert!(
+                    row.directory_primary_media_state.is_none(),
+                    "file '{}' must not have directory_primary_media_state",
+                    row.display_name,
+                );
+                assert!(
+                    row.directory_image_media_state.is_none(),
+                    "file '{}' must not have directory_image_media_state",
+                    row.display_name,
+                );
+            }
+        }
+    }
+
+    let artists_dir_id = artists_dir
+        .source_directory_id
+        .expect("artists directory has source_directory_id");
+    let artists_reply =
+        read_literal_hierarchy(&service, registered.root_id, Some(artists_dir_id));
+    let artists_window = artists_reply
+        .window
+        .as_ref()
+        .expect("artists directory resolves to hierarchy window");
+    let alpha_dir = artists_window
+        .rows
+        .iter()
+        .find(|row| row.display_name == "alpha")
+        .expect("alpha directory inside artists");
+
+    let alpha_dir_id = alpha_dir
+        .source_directory_id
+        .expect("alpha directory has source_directory_id");
+    let alpha_reply =
+        read_literal_hierarchy(&service, registered.root_id, Some(alpha_dir_id));
+    let alpha_window = alpha_reply
+        .window
+        .as_ref()
+        .expect("alpha directory resolves to hierarchy window");
+    assert!(
+        alpha_window
+            .rows
+            .iter()
+            .any(|r| r.display_name == "track_one.flac"),
+        "track_one.flac in alpha directory"
+    );
+    assert!(
+        alpha_window
+            .rows
+            .iter()
+            .any(|r| r.display_name == "track_two.wav"),
+        "track_two.wav in alpha directory"
+    );
+
+    let original_root_total = root_window.total_rows;
+    let original_artists_row_count = artists_window.rows.len();
+    let original_alpha_row_count = alpha_window.rows.len();
+
+    drop(service);
+
+    let reopened = open_service(&tempdir);
+
+    let reopened_root_nav = read_navigation_rows(&reopened, None);
+    reopened_root_nav
+        .iter()
+        .find(|row| {
+            matches!(row.family, Some(NavigationRowFamily::Sources))
+                && row.row_kind == NavigationRowKind::Source
+        })
+        .expect("registered source survives in navigation after reopen");
+
+    let reopened_root_reply = read_literal_hierarchy(&reopened, registered.root_id, None);
+    let reopened_root_window = reopened_root_reply
+        .window
+        .as_ref()
+        .expect("root hierarchy survives service reopen");
+    assert_eq!(
+        reopened_root_window.total_rows, original_root_total,
+        "root-level row count must survive reopen",
+    );
+
+    reopened_root_window
+        .rows
+        .iter()
+        .find(|row| row.display_name == "artists")
+        .expect("artists directory survives reopen");
+    reopened_root_window
+        .rows
+        .iter()
+        .find(|row| row.display_name == "loose.mp3")
+        .expect("loose.mp3 file survives reopen");
+
+    let reopened_artists_reply =
+        read_literal_hierarchy(&reopened, registered.root_id, Some(artists_dir_id));
+    let reopened_artists_window = reopened_artists_reply
+        .window
+        .as_ref()
+        .expect("artists directory survives reopen");
+    assert_eq!(
+        reopened_artists_window.rows.len(),
+        original_artists_row_count,
+        "artists directory child count must survive reopen",
+    );
+
+    let reopened_alpha_reply =
+        read_literal_hierarchy(&reopened, registered.root_id, Some(alpha_dir_id));
+    let reopened_alpha_window = reopened_alpha_reply
+        .window
+        .as_ref()
+        .expect("alpha directory survives reopen");
+    assert_eq!(
+        reopened_alpha_window.rows.len(),
+        original_alpha_row_count,
+        "alpha directory child count must survive reopen",
+    );
+
+    for window in [&root_reply.window, &reopened_root_reply.window] {
+        let w = window.as_ref().expect("hierarchy window exists");
+        assert_eq!(
+            w.coverage.state,
+            LiteralHierarchyCoverageState::Complete,
+            "post-scan coverage state must be Complete",
+        );
+        assert!(
+            w.coverage.recursive_scope_complete,
+            "post-scan recursive scope must be complete",
+        );
+    }
+}
+
+#[test]
+fn performance_visibility_excludes_image_files_and_directories() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(
+        &music_root
+            .join("artists")
+            .join("alpha")
+            .join("track_one.wav"),
+        b"not-real-wav",
+    );
+    write_file(
+        &music_root.join("artwork").join("cover.png"),
+        b"fake-png",
+    );
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    run_scan(&service, registered.root_id);
+
+    let perf_reply = read_literal_hierarchy_with_visibility(
+        &service,
+        registered.root_id,
+        None,
+        SourceFileVisibility::Performance,
+    );
+    let perf_window = perf_reply
+        .window
+        .as_ref()
+        .expect("Performance visibility resolves hierarchy");
+
+    let has_artists = perf_window
+        .rows
+        .iter()
+        .any(|row| row.display_name == "artists");
+    assert!(has_artists, "artists directory must appear under Performance visibility");
+
+    let has_artwork = perf_window
+        .rows
+        .iter()
+        .any(|row| row.display_name == "artwork");
+    assert!(
+        !has_artwork,
+        "artwork directory must NOT appear under Performance visibility (contains only images)"
+    );
+
+    let both_reply = read_literal_hierarchy_with_visibility(
+        &service,
+        registered.root_id,
+        None,
+        SourceFileVisibility::PerformanceAndImages,
+    );
+    let both_window = both_reply
+        .window
+        .as_ref()
+        .expect("PerformanceAndImages visibility resolves hierarchy");
+
+    let has_artwork_both = both_window
+        .rows
+        .iter()
+        .any(|row| row.display_name == "artwork");
+    assert!(
+        has_artwork_both,
+        "artwork directory must appear under PerformanceAndImages visibility"
     );
 }

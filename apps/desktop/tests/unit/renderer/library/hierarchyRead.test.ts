@@ -10,7 +10,8 @@ import type {
   HierarchyCoverage,
   ReadErrorCode,
   ReadRequest,
-  ReadResult
+  ReadResult,
+  SourceFileVisibility
 } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type { NavigationReadRowsResult } from '../../../../src/shared/libraryNavigation/readRows'
 
@@ -49,8 +50,7 @@ describe('createLibraryHierarchyReadController', () => {
         label: 'Source Fixture'
       },
       offset: 0,
-      limit: 50,
-      sourceFileVisibility: 'performance'
+      limit: 50
     })
     expect(controller.currentRoot.value?.id).toBe('source:7')
     expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('loaded')
@@ -72,8 +72,7 @@ describe('createLibraryHierarchyReadController', () => {
       },
       parentDirectoryId: '12',
       offset: 0,
-      limit: 50,
-      sourceFileVisibility: 'performance'
+      limit: 50
     })
     expect(controller.directoryReadStates.value.get('12')).toMatchObject({
       kind: 'loaded'
@@ -1383,7 +1382,7 @@ function directoryRootHierarchyReadResult(): Extract<ReadResult, { state: 'ready
 }
 
 function directoryRootHierarchyReadResultForVisibility(
-  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+  sourceFileVisibility: SourceFileVisibility
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1441,7 +1440,7 @@ function loadedDirectoryReadResult(
 
 function loadedDirectoryReadResultForVisibility(
   parentDirectoryId: string,
-  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+  sourceFileVisibility: SourceFileVisibility
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1462,7 +1461,7 @@ function loadedDirectoryReadResultForVisibility(
 }
 
 function directoryRootHierarchyReadResultForSource9(
-  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+  sourceFileVisibility: SourceFileVisibility
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1483,7 +1482,7 @@ function directoryRootHierarchyReadResultForSource9(
 
 function loadedDirectoryReadResultForSource9(
   parentDirectoryId: string,
-  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+  sourceFileVisibility: SourceFileVisibility
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1670,7 +1669,7 @@ function fileNode(
 }
 
 function audioHierarchyReadResult(
-  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+  sourceFileVisibility: SourceFileVisibility
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',
@@ -1687,7 +1686,7 @@ function audioHierarchyReadResult(
 }
 
 function imageHierarchyReadResult(
-  sourceFileVisibility: NonNullable<ReadRequest['sourceFileVisibility']>
+  sourceFileVisibility: SourceFileVisibility
 ): Extract<ReadResult, { state: 'ready' }> {
   return {
     state: 'ready',

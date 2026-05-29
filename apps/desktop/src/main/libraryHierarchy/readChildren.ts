@@ -54,7 +54,7 @@ export async function readThroughHost(
       parentSourceDirectoryId: normalizedRequest.parentDirectoryId ?? null,
       offset: normalizedRequest.offset,
       limit: normalizedRequest.limit,
-      sourceFileVisibility: normalizedRequest.sourceFileVisibility
+      sourceFileVisibility: 'performance'
     } satisfies ReadLiteralHierarchyChildrenRequest)
 
     if (reply.window === null) {
@@ -84,7 +84,7 @@ export async function readThroughHost(
           : { parentDirectoryId: reply.window.parentSourceDirectoryId }),
         offset: reply.window.offset,
         limit: reply.window.limit,
-        sourceFileVisibility: normalizedRequest.sourceFileVisibility,
+        sourceFileVisibility: 'performance',
         totalRows: reply.window.totalRows,
         coverage: mapCoverage(reply.window.coverage),
         nodes

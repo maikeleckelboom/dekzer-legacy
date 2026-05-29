@@ -3,8 +3,7 @@ import {
   type ReadErrorCode,
   type ReadErrorState,
   type ReadResult,
-  type ReadTarget,
-  type SourceFileVisibility
+  type ReadTarget
 } from '../../shared/libraryHierarchy/readChildren'
 
 const defaultLiteralHierarchyReadLimit = 50
@@ -16,7 +15,6 @@ export type NormalizedRequest = {
   readonly parentDirectoryId?: string
   readonly offset: number
   readonly limit: number
-  readonly sourceFileVisibility: SourceFileVisibility
 }
 
 export function normalizeRequest(request: unknown): NormalizedRequest | ReadResult {
@@ -55,18 +53,11 @@ export function normalizeRequest(request: unknown): NormalizedRequest | ReadResu
     return limit
   }
 
-  const sourceFileVisibility = normalizeSourceFileVisibility(request.sourceFileVisibility)
-
-  if (isReadResult(sourceFileVisibility)) {
-    return sourceFileVisibility
-  }
-
   return {
     target,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     offset,
-    limit,
-    sourceFileVisibility
+    limit
   }
 }
 
@@ -223,22 +214,6 @@ function normalizeLimit(value: unknown): number | ReadResult {
     'invalidRequest',
     'invalidRequest',
     'Library hierarchy read limit is invalid.'
-  )
-}
-
-function normalizeSourceFileVisibility(value: unknown): SourceFileVisibility | ReadResult {
-  if (value === undefined) {
-    return 'performance'
-  }
-
-  if (value === 'performance' || value === 'performanceAndImages') {
-    return value
-  }
-
-  return createHierarchyReadErrorResult(
-    'invalidRequest',
-    'invalidRequest',
-    'Library hierarchy source-file visibility is invalid.'
   )
 }
 
