@@ -7,8 +7,8 @@ owner: renderer-substrate-boundary
 canonical-context:
   - product-doctrine-shortened
   - source-root-scan-admission-contract
-  - source-hierarchy-contract (TODO: not yet written)
-  - first-slice-substrate-map (TODO: not yet written)
+  - source-hierarchy-contract
+  - first-slice-substrate-map
 scope:
   - library-tree-rendering
   - hierarchy-projection-reads

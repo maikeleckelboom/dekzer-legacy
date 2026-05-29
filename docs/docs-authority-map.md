@@ -62,6 +62,8 @@ No two active docs may define the same authority._
 |-----|------|-------|
 | `docs/implementation-structure.md` | Support map | Future implementation target shape. Not architecture authority. Guides crate/package/domain structure. |
 | `docs/local-source-icon-doctrine.md` | Icon doctrine | Canonical for iconography rules. Depends on scan admission contract for root classification vocabulary. |
+| `docs/first-slice-substrate-map.md` | First slice authority map | Defines the first product slice. Not architecture authority. |
+| `docs/source-hierarchy-contract.md` | Source hierarchy contract | Defines hierarchy read boundary, pagination, coverage, and renderer cache permissions. |
 
 ## Schema and substrate decisions
 
@@ -81,6 +83,4 @@ Self-contained under `docs/workspace/`. See individual files. The primary entry 
 
 | Referenced name | Used by | Reason |
 |-----------------|---------|--------|
-| `source-hierarchy-contract` | Several library contracts, scan admission contract | TODO: Not yet written. Library contracts carry forward references to it. |
-| `first-slice-substrate-map` | Several library contracts, scan admission contract | TODO: Not yet written. First slice scope document. |
 | `workspace-layout-contract` | Library browser workspace surface contract | TODO: Not yet written. Workspace topology contracts exist but specific layout contract not yet separate. |

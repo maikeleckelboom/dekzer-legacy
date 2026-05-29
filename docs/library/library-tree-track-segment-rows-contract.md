@@ -7,8 +7,8 @@ canonical-context:
   - product-doctrine-shortened
   - library-tree-frame-stability-contract
   - library-row-profile-contract
-  - source-hierarchy-contract (TODO: not yet written)
-  - first-slice-substrate-map (TODO: not yet written)
+  - source-hierarchy-contract
+  - first-slice-substrate-map
 scope:
   - track-rows-in-tree
   - segment-rows-in-tree

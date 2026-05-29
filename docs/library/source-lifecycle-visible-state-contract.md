@@ -7,8 +7,8 @@ canonical-context:
   - product-doctrine-shortened
   - library-tree-frame-stability-contract
   - source-root-scan-admission-contract
-  - source-hierarchy-contract (TODO: not yet written)
-  - first-slice-substrate-map (TODO: not yet written)
+  - source-hierarchy-contract
+  - first-slice-substrate-map
 scope:
   - source-visible-state
   - source-unavailability-ux

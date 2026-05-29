@@ -9,8 +9,8 @@ canonical-context:
   - source-access-and-scan-coverage
   - source-locations-lifecycle-contract
   - library-preparation-substrate-v1
-  - source-hierarchy-contract (TODO: not yet written)
-  - first-slice-substrate-map (TODO: not yet written)
+  - source-hierarchy-contract
+  - first-slice-substrate-map
 scope:
   - source-root-registration
   - root-identity

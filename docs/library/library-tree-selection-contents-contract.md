@@ -8,7 +8,7 @@ canonical-context:
   - library-row-profile-contract
   - library-contents-read-boundary
   - recursive-selected-contents-rule
-  - source-hierarchy-contract (TODO: not yet written)
+  - source-hierarchy-contract
 scope:
   - tree-selection-authority
   - contents-scope-derivation

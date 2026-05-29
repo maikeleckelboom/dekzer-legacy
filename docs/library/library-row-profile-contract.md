@@ -6,7 +6,7 @@ owner: renderer-substrate-boundary
 canonical-context:
   - library-tree-frame-stability-contract
   - library-tree-track-segment-rows-contract
-  - source-hierarchy-contract (TODO: not yet written)
+  - source-hierarchy-contract
 scope:
   - hierarchy-projection-policy
   - row-profile-definitions

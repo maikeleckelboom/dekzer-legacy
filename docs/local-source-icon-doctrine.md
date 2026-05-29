@@ -8,7 +8,7 @@ owner: library-browser-architecture
 canonical-context:
   - product-doctrine-shortened
   - source-root-scan-admission-contract
-  - first-slice-substrate-map (TODO: not yet written)
+  - first-slice-substrate-map
 scope:
   - local-source-iconography
   - source-browser-presentation
