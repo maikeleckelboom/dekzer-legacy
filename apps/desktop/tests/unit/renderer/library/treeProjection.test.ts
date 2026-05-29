@@ -39,7 +39,7 @@ describe('projectState', () => {
       })
     )
 
-    const sourceNode = projection.nodes[0]
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
     expect(sourceNode).toMatchObject({
       id: 'navigation-row:7',
       label: 'Music'
@@ -91,8 +91,10 @@ describe('projectState', () => {
       })
     )
 
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+
     expect(projection.nodes.map((node) => node.id)).toEqual(['navigation-row:7'])
-    expect(loadedChildIds(projection.nodes[0])).toEqual(['source-file:11', 'source-file:99'])
+    expect(loadedChildIds(sourceNode)).toEqual(['source-file:11', 'source-file:99'])
     expect(projection.bindingsById.has('navigation-row:100')).toBe(false)
     expect(projection.bindingsById.has('navigation-row:99')).toBe(false)
 
@@ -120,7 +122,7 @@ describe('projectState', () => {
       })
     )
 
-    const sourceNode = projection.nodes[0]
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
     expect(loadedChildIds(sourceNode)).toEqual([
       'source-file:11',
       'source-file:13',
@@ -150,7 +152,9 @@ describe('projectState', () => {
       })
     )
 
-    expect(loadedChildIds(projection.nodes[0])).toEqual(['source-file:12', 'source-file:15'])
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+
+    expect(loadedChildIds(sourceNode)).toEqual(['source-file:12', 'source-file:15'])
     expect(requiredNode(projection.nodes, 'source-file:12')).toMatchObject({
       icon: 'file',
       detail: 'File'
@@ -466,7 +470,7 @@ describe('projectState', () => {
         ])
       })
     )
-    const sourceNode = projection.nodes[0]
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
 
     expect(sourceNode.children.kind).toBe('loaded')
     if (sourceNode.children.kind === 'loaded') {

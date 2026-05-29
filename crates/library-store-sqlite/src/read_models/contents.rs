@@ -22,9 +22,16 @@ struct ContentsCursor {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum ContentsCursorScope {
-    Source { source_id: i64 },
-    SourceLocation { source_location_id: i64 },
-    Directory { source_id: i64, source_directory_id: i64 },
+    Source {
+        source_id: i64,
+    },
+    SourceLocation {
+        source_location_id: i64,
+    },
+    Directory {
+        source_id: i64,
+        source_directory_id: i64,
+    },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -57,15 +64,13 @@ fn decode_cursor(cursor: &str) -> Result<ContentsCursor, LibrarySqliteError> {
     let json = String::from_utf8(bytes).map_err(|e| {
         LibrarySqliteError::MalformedSchemaState(format!("cursor utf8 failed: {e}"))
     })?;
-    serde_json::from_str(&json).map_err(|e| {
-        LibrarySqliteError::MalformedSchemaState(format!("cursor parse failed: {e}"))
-    })
+    serde_json::from_str(&json)
+        .map_err(|e| LibrarySqliteError::MalformedSchemaState(format!("cursor parse failed: {e}")))
 }
 
 fn base64url_encode(input: &[u8]) -> String {
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     let mut i = 0;
     while i + 2 < input.len() {
         let n = ((input[i] as u32) << 16) | ((input[i + 1] as u32) << 8) | (input[i + 2] as u32);
@@ -93,8 +98,8 @@ fn base64url_decode(input: &str) -> Result<Vec<u8>, String> {
         let mut table = [255u8; 256];
         let mut i = 0;
         while i < 26 {
-            table[(b'A' + i) as usize] = i as u8;
-            table[(b'a' + i) as usize] = (i + 26) as u8;
+            table[(b'A' + i) as usize] = i;
+            table[(b'a' + i) as usize] = i + 26;
             i += 1;
         }
         table[b'0' as usize] = 52;
@@ -140,21 +145,31 @@ fn validate_cursor_identity(
     if cursor.version != CONTENTS_CURSOR_VERSION {
         return false;
     }
-    let kind_matches = match (cursor.kind.as_str(), policy.row_profile) {
-        (CONTENTS_CURSOR_KIND_SOURCE_FILE, StoreContentsRowProfile::SourceFile) => true,
-        (CONTENTS_CURSOR_KIND_PRIMARY_MEDIA, StoreContentsRowProfile::PrimaryMedia) => true,
-        _ => false,
-    };
+    let kind_matches = matches!(
+        (cursor.kind.as_str(), policy.row_profile),
+        (
+            CONTENTS_CURSOR_KIND_SOURCE_FILE,
+            StoreContentsRowProfile::SourceFile
+        ) | (
+            CONTENTS_CURSOR_KIND_PRIMARY_MEDIA,
+            StoreContentsRowProfile::PrimaryMedia
+        )
+    );
     if !kind_matches {
         return false;
     }
     let scope_matches = match (&cursor.scope, scope) {
-        (ContentsCursorScope::Source { source_id: a }, StoreContentsScope::Source { source_id: b }) => {
-            a == b
-        }
         (
-            ContentsCursorScope::SourceLocation { source_location_id: a },
-            StoreContentsScope::SourceLocation { source_location_id: b },
+            ContentsCursorScope::Source { source_id: a },
+            StoreContentsScope::Source { source_id: b },
+        ) => a == b,
+        (
+            ContentsCursorScope::SourceLocation {
+                source_location_id: a,
+            },
+            StoreContentsScope::SourceLocation {
+                source_location_id: b,
+            },
         ) => a == b,
         (
             ContentsCursorScope::Directory {
@@ -573,14 +588,10 @@ pub(crate) fn read_contents(
                         state: StoreContentsCoverageState::Failed,
                         recursive_scope_complete: false,
                         empty_result_authoritative: false,
-                        detail: Some(
-                            "The contents cursor could not be decoded.".to_string(),
-                        ),
+                        detail: Some("The contents cursor could not be decoded.".to_string()),
                     },
                     next_cursor: None,
-                    detail: Some(
-                        "The contents cursor could not be decoded.".to_string(),
-                    ),
+                    detail: Some("The contents cursor could not be decoded.".to_string()),
                 });
             }
         };
@@ -600,18 +611,19 @@ pub(crate) fn read_contents(
                     ),
                 },
                 next_cursor: None,
-                detail: Some(
-                    "The contents cursor does not match the current request.".to_string(),
-                ),
+                detail: Some("The contents cursor does not match the current request.".to_string()),
             });
         }
-        let position_matches_profile = match (&decoded.position, policy.row_profile) {
-            (ContentsCursorPosition::SourceFile { .. }, StoreContentsRowProfile::SourceFile) => true,
-            (ContentsCursorPosition::PrimaryMedia { .. }, StoreContentsRowProfile::PrimaryMedia) => {
-                true
-            }
-            _ => false,
-        };
+        let position_matches_profile = matches!(
+            (&decoded.position, policy.row_profile),
+            (
+                ContentsCursorPosition::SourceFile { .. },
+                StoreContentsRowProfile::SourceFile
+            ) | (
+                ContentsCursorPosition::PrimaryMedia { .. },
+                StoreContentsRowProfile::PrimaryMedia,
+            )
+        );
         if !position_matches_profile {
             return Ok(StoreContentsResult {
                 state: StoreContentsState::CursorInvalid,
@@ -623,14 +635,10 @@ pub(crate) fn read_contents(
                     state: StoreContentsCoverageState::Failed,
                     recursive_scope_complete: false,
                     empty_result_authoritative: false,
-                    detail: Some(
-                        "The contents cursor does not match the row profile.".to_string(),
-                    ),
+                    detail: Some("The contents cursor does not match the row profile.".to_string()),
                 },
                 next_cursor: None,
-                detail: Some(
-                    "The contents cursor does not match the row profile.".to_string(),
-                ),
+                detail: Some("The contents cursor does not match the row profile.".to_string()),
             });
         }
         Some(decoded.position)
@@ -666,9 +674,7 @@ pub(crate) fn read_contents(
             cursor_position.as_ref(),
         )?;
         let next_cursor = if rows.len() > limit {
-            let next_cursor =
-                build_next_cursor(&rows[..limit], &scope, &policy, recursion);
-            next_cursor
+            build_next_cursor(&rows[..limit], &scope, &policy, recursion)
         } else {
             None
         };
@@ -1508,13 +1514,15 @@ fn read_rows(
             };
             read_rows_with_source_predicate(
                 connection,
-                &source_predicate,
-                &media_predicate,
-                policy.row_profile,
-                *source_id,
-                None,
-                limit_plus_one,
-                cursor_position,
+                SourcePredicateReadInput {
+                    source_predicate: &source_predicate,
+                    media_predicate: &media_predicate,
+                    row_profile: policy.row_profile,
+                    source_id: *source_id,
+                    relative_path: None,
+                    limit_plus_one,
+                    cursor_position,
+                },
             )
         }
         ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
@@ -1557,13 +1565,15 @@ fn read_rows(
             let predicate = scoped_path_predicate(recursion);
             read_rows_with_source_predicate(
                 connection,
-                &predicate,
-                &media_predicate,
-                policy.row_profile,
-                *source_id,
-                Some(relative_path),
-                limit_plus_one,
-                cursor_position,
+                SourcePredicateReadInput {
+                    source_predicate: &predicate,
+                    media_predicate: &media_predicate,
+                    row_profile: policy.row_profile,
+                    source_id: *source_id,
+                    relative_path: Some(relative_path),
+                    limit_plus_one,
+                    cursor_position,
+                },
             )
         }
         ResolvedContentsScope::SourceLocationPrefix {
@@ -1573,13 +1583,15 @@ fn read_rows(
             let predicate = scoped_path_predicate(recursion);
             read_rows_with_source_predicate(
                 connection,
-                &predicate,
-                &media_predicate,
-                policy.row_profile,
-                *source_id,
-                Some(relative_path),
-                limit_plus_one,
-                cursor_position,
+                SourcePredicateReadInput {
+                    source_predicate: &predicate,
+                    media_predicate: &media_predicate,
+                    row_profile: policy.row_profile,
+                    source_id: *source_id,
+                    relative_path: Some(relative_path),
+                    limit_plus_one,
+                    cursor_position,
+                },
             )
         }
         ResolvedContentsScope::MissingLocation { .. } => Ok(Vec::new()),
@@ -1618,11 +1630,15 @@ fn read_rows_for_accepted_locations(
     );
     let mut statement = connection.prepare(&sql)?;
     let rows = if let Some(cursor) = cursor_position {
-        let mut params: Vec<rusqlite::types::Value> = vec![rusqlite::types::Value::Integer(source_id)];
+        let mut params: Vec<rusqlite::types::Value> =
+            vec![rusqlite::types::Value::Integer(source_id)];
         push_cursor_params(cursor, &mut params);
         params.push(rusqlite::types::Value::Integer(limit_plus_one));
         statement
-            .query_map(rusqlite::params_from_iter(params.iter()), contents_row_from_row)?
+            .query_map(
+                rusqlite::params_from_iter(params.iter()),
+                contents_row_from_row,
+            )?
             .collect::<Result<Vec<_>, _>>()
             .map_err(LibrarySqliteError::from)?
     } else {
@@ -1634,18 +1650,22 @@ fn read_rows_for_accepted_locations(
     Ok(rows)
 }
 
-fn read_rows_with_source_predicate(
-    connection: &Connection,
-    source_predicate: &str,
-    media_predicate: &str,
+struct SourcePredicateReadInput<'a> {
+    source_predicate: &'a str,
+    media_predicate: &'a str,
     row_profile: StoreContentsRowProfile,
     source_id: i64,
-    relative_path: Option<&str>,
+    relative_path: Option<&'a str>,
     limit_plus_one: i64,
-    cursor_position: Option<&ContentsCursorPosition>,
+    cursor_position: Option<&'a ContentsCursorPosition>,
+}
+
+fn read_rows_with_source_predicate(
+    connection: &Connection,
+    input: SourcePredicateReadInput<'_>,
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
-    let scope_param_count: usize = if relative_path.is_some() { 2 } else { 1 };
-    let cursor_param_count: usize = match cursor_position {
+    let scope_param_count: usize = if input.relative_path.is_some() { 2 } else { 1 };
+    let cursor_param_count: usize = match input.cursor_position {
         Some(ContentsCursorPosition::SourceFile { .. }) => 2,
         Some(ContentsCursorPosition::PrimaryMedia { .. }) => 6,
         None => 0,
@@ -1659,36 +1679,42 @@ fn read_rows_with_source_predicate(
 
     let sql = contents_rows_sql(
         None,
-        source_predicate,
-        media_predicate,
-        row_profile,
+        input.source_predicate,
+        input.media_predicate,
+        input.row_profile,
         cursor_start,
         limit_param,
     );
     let mut statement = connection.prepare(&sql)?;
-    let rows = if let Some(cursor) = cursor_position {
+    let rows = if let Some(cursor) = input.cursor_position {
         let mut params: Vec<rusqlite::types::Value> =
-            vec![rusqlite::types::Value::Integer(source_id)];
-        if let Some(relative_path) = relative_path {
+            vec![rusqlite::types::Value::Integer(input.source_id)];
+        if let Some(relative_path) = input.relative_path {
             params.push(rusqlite::types::Value::Text(relative_path.to_string()));
         }
         push_cursor_params(cursor, &mut params);
-        params.push(rusqlite::types::Value::Integer(limit_plus_one));
-        statement
-            .query_map(rusqlite::params_from_iter(params.iter()), contents_row_from_row)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(LibrarySqliteError::from)?
-    } else if let Some(relative_path) = relative_path {
+        params.push(rusqlite::types::Value::Integer(input.limit_plus_one));
         statement
             .query_map(
-                params![source_id, relative_path, limit_plus_one],
+                rusqlite::params_from_iter(params.iter()),
+                contents_row_from_row,
+            )?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(LibrarySqliteError::from)?
+    } else if let Some(relative_path) = input.relative_path {
+        statement
+            .query_map(
+                params![input.source_id, relative_path, input.limit_plus_one],
                 contents_row_from_row,
             )?
             .collect::<Result<Vec<_>, _>>()
             .map_err(LibrarySqliteError::from)?
     } else {
         statement
-            .query_map(params![source_id, limit_plus_one], contents_row_from_row)?
+            .query_map(
+                params![input.source_id, input.limit_plus_one],
+                contents_row_from_row,
+            )?
             .collect::<Result<Vec<_>, _>>()
             .map_err(LibrarySqliteError::from)?
     };
@@ -1723,12 +1749,20 @@ fn contents_rows_sql(
     limit_param: usize,
 ) -> String {
     match row_profile {
-        StoreContentsRowProfile::SourceFile => {
-            source_file_rows_sql(prefix_cte, source_predicate, media_predicate, cursor_start, limit_param)
-        }
-        StoreContentsRowProfile::PrimaryMedia => {
-            primary_media_rows_sql(prefix_cte, source_predicate, media_predicate, cursor_start, limit_param)
-        }
+        StoreContentsRowProfile::SourceFile => source_file_rows_sql(
+            prefix_cte,
+            source_predicate,
+            media_predicate,
+            cursor_start,
+            limit_param,
+        ),
+        StoreContentsRowProfile::PrimaryMedia => primary_media_rows_sql(
+            prefix_cte,
+            source_predicate,
+            media_predicate,
+            cursor_start,
+            limit_param,
+        ),
     }
 }
 
@@ -2012,12 +2046,7 @@ fn primary_media_rows_sql(
     )
 }
 
-
-
-fn push_cursor_params(
-    cursor: &ContentsCursorPosition,
-    params: &mut Vec<rusqlite::types::Value>,
-) {
+fn push_cursor_params(cursor: &ContentsCursorPosition, params: &mut Vec<rusqlite::types::Value>) {
     match cursor {
         ContentsCursorPosition::SourceFile {
             relative_path_key,
@@ -3551,7 +3580,10 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio, StoreContentsMediaClass::Video]),
+            source_file_policy(vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+            ]),
             StoreContentsRecursion::Recursive,
             3,
             Some(&cursor),
@@ -4042,7 +4074,8 @@ mod tests {
             "sf.media_class",
             &primary_media_policy().media_classes,
         );
-        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
+        let sql =
+            super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -4086,7 +4119,7 @@ mod tests {
         );
         let media_predicate = super::media_classes_predicate_sql(
             "sf.media_class",
-&primary_media_policy().media_classes,
+            &primary_media_policy().media_classes,
         );
         let sql = super::primary_media_rows_sql(None, &source_predicate, &media_predicate, None, 3);
         let plan = dump_query_plan(
@@ -4200,7 +4233,8 @@ mod tests {
             "sf.media_class",
             &primary_media_policy().media_classes,
         );
-        let sql = super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
+        let sql =
+            super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
         let plan = dump_query_plan(
             &connection,
             &sql,
