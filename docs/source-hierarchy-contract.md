@@ -50,21 +50,42 @@ Source hierarchy rows represent a literal filesystem-source tree projected into 
 
 | Field                        | Meaning                                                             |
 |------------------------------|---------------------------------------------------------------------|
-| `node_kind`                  | `directory`, `file`, `source_root`.                                 |
-| `source_id`                  | Substrate source identity.                                          |
-| `source_directory_id`        | Directory identity, when the row is a directory node.               |
-| `source_file_id`             | File identity, when the row is a file node.                         |
-| `parent_source_directory_id` | Parent directory identity. `null` for source root children.         |
-| `relative_path`              | Path relative to the source root.                                   |
-| `display_name`               | Name for display.                                                   |
-| `media_class`                | `audio`, `video`, `image`, `unsupported`, or `null`.                |
-| `presence_state`             | `present`, `missing`, `removed`, `pending`.                         |
-| `size_bytes`                 | File size, if known.                                                |
-| `modified_at_ns`             | Modification timestamp, if known.                                   |
-| `has_child_directories`      | Whether the directory has child directories.                        |
-| `has_primary_media_descendant` | Whether the directory subtree contains primary media.              |
-| `has_image_media_descendant` | Whether the directory subtree contains image media.                 |
-| `dir_scan_state`             | `pending`, `scanning`, `complete`, `blocked`, `failed`, or `null`.  |
+| `node_kind`                     | `directory`, `file`.                                                |
+| `source_id`                     | Substrate source identity.                                          |
+| `source_directory_id`           | Directory identity, when the row is a directory node.               |
+| `source_file_id`                | File identity, when the row is a file node.                         |
+| `parent_source_directory_id`    | Parent directory identity. `null` when the row's parent is the window root. |
+| `relative_path`                 | Path relative to the source root.                                   |
+| `display_name`                  | Name for display.                                                   |
+| `media_class`                   | `audio`, `video`, `image`, `unsupported`, `none`, or absent.        |
+| `presence_state`                | `present`, `missing`, `removed`.                                    |
+| `size_bytes`                    | File size, if known.                                                |
+| `modified_at_ns`                | Modification timestamp, if known.                                   |
+| `updated_at_ms`                 | Last update timestamp.                                              |
+| `has_child_directories`         | Whether the directory has child directories, if directory.          |
+| `directory_primary_media_state` | Primary media descendant state for directories. Tagged union; see below. |
+| `directory_image_media_state`   | Image media descendant state for directories. Tagged union; see below. |
+| `directory_scan_state`          | Scan state for directories. Enum; see below.                        |
+
+### Tagged-union directory fields
+
+The `directory_primary_media_state`, `directory_image_media_state`, and `directory_scan_state` fields are
+protocol-level representations derived from store-level raw fields at mapping time:
+
+| Protocol field                     | Variants                                                                      | Store-level source                        |
+|------------------------------------|-------------------------------------------------------------------------------|-------------------------------------------|
+| `directory_primary_media_state`    | `Unknown`, `HasPrimaryMediaDescendants`, `NoPrimaryMediaDescendants`          | `has_primary_media_descendant` bool + `dir_scan_state` |
+| `directory_image_media_state`      | `Unknown`, `HasImageMediaDescendants`, `NoImageMediaDescendants`              | `has_image_media_descendant` bool + `dir_scan_state` |
+| `directory_scan_state`             | `Pending`, `Scanning`, `Complete`, `Failed`, `Blocked`                        | `dir_scan_state` string                   |
+
+At the store layer, `has_primary_media_descendant` and `has_image_media_descendant` are `Option<bool>` and
+`dir_scan_state` is `Option<String>`. The service mapping converts these into protocol-level tagged-union
+and enum values: if the boolean is `true`, the state is `Has*Descendants`; if the scan is `Complete` and
+the boolean is not `true`, the state is `No*Descendants`; otherwise `Unknown`. The `directory_scan_state`
+maps from the store string to the protocol enum. All three fields are absent on file nodes.
+
+Directory scan pending (`directory_scan_state = Pending`) belongs to `directory_scan_state` only;
+`presence_state` may only describe `present`, `missing`, or `removed`.
 
 Rows are grouped into a `LiteralHierarchyWindow` per page:
 
@@ -80,14 +101,24 @@ Rows are grouped into a `LiteralHierarchyWindow` per page:
 
 ### Row kinds in current implementation
 
-| Row kind       | Represents                                                   | Expandable |
-|----------------|--------------------------------------------------------------|------------|
-| `source_root`  | Registered source root.                                      | Yes        |
-| `directory`    | Source directory within a source.                            | Yes        |
-| `file`         | Source file (admitted candidate or inventory file).          | No         |
+| Row kind     | Represents                                                   | Expandable |
+|--------------|--------------------------------------------------------------|------------|
+| `directory`  | Source directory within a source.                            | Yes        |
+| `file`       | Source file (admitted candidate or inventory file).          | No         |
 
 `primary_media`, `segment`, `companion`, `blocked`, `excluded`, and `unsupported` are tree-projection concepts
 (surface by row profile) but the literal hierarchy row kind from the substrate is `file` or `directory`.
+
+Source roots are navigation entities, not hierarchy child rows. They connect to hierarchy reads through the
+`entry_point` on `LiteralHierarchyWindow` and the `ReadRoot` / `EntryPoint` on `ChildWindow` in shared TS.
+The window's `parent_source_directory_id = null` signals that the returned rows are root-level children.
+
+### Field naming across layers
+
+snake_case names are Rust/protocol field names (e.g., `directory_primary_media_state`). Generated TypeScript
+receives camelCase equivalents (e.g., `directoryPrimaryMediaState`). Shared renderer types use post-mapping
+app-facing names: `ChildWindow` for the window, `ChildRow` for the row, `NodeKind` for the kind, and
+`Presence` for the presence state.
 
 ## Read boundary
 

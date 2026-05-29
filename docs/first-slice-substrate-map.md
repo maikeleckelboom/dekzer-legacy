@@ -55,7 +55,7 @@ The first slice includes the following capabilities, whether fully implemented o
 | Root classification                   | Defined in scan admission contract; partial implementation.             |
 | Scan admission                        | Defined in scan admission contract; not yet fully implemented.          |
 | Persisted literal source hierarchy    | Active. SQLite `source_directories`, `source_files` with scan coverage. |
-| Attachment/media inventory            | Defined; partially implemented alongside scan.                          |
+| Attachment/media inventory            | Attachment data model active via promotion; scan-integrated inventory stage deferred. |
 | Source hierarchy read boundary        | Active. `readLiteralHierarchyChildren` with offset/limit pagination.    |
 | Contents read boundary                | Active. Single parameterized `contentsRead` with cursor pagination.     |
 | Renderer tree projection              | Active. Tree with root, directory, file rows under sourceFileVisibility. |
@@ -109,8 +109,9 @@ Two distinct read boundaries are active in the first slice:
 | Hierarchy read  | Offset-based (`offset`/`limit`)   | Tree `loadMore` / `loadChildren`      | Literal source hierarchy children. |
 | Contents read   | Cursor-based (`cursor`/`cursor`)  | Contents pane `loadContentsPage`      | Selected scope file rows.         |
 
-The hierarchy read returns `SourceLiteralHierarchyWindow` rows with `totalRows`, `nextOffset`, and a
-`LiteralHierarchyCoverage` containing `emptyResultAuthoritative`. The contents read returns `ContentsResult`
+The hierarchy read returns `LiteralHierarchyWindow` rows with `totalRows`, `nextOffset`, and a
+`LiteralHierarchyCoverage` containing `emptyResultAuthoritative`. In shared TS, the post-mapping
+equivalents are `ChildWindow` for the window and `ChildRow` for individual child rows. The contents read returns `ContentsResult`
 rows with `nextCursor` and `ContentsCoverage` containing `emptyResultAuthoritative`.
 
 These two boundaries must not share pagination state, cursor/offset tokens, cache entries, or row accumulators.
