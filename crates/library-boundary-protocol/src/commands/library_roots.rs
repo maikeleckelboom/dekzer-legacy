@@ -47,7 +47,7 @@ pub struct RegisterLocalRootReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RunRootScanRequest {
+pub struct StartRootScanRequest {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
     #[ts(as = "String")]
@@ -67,19 +67,14 @@ pub struct RunRootScanRequest {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-/// Summary returned after synchronous root-scan materialization reaches the
-/// first-slice hierarchy commit/finalization boundary.
-pub struct RunRootScanReply {
-    #[serde(with = "crate::wire::i64_string")]
-    #[schemars(with = "String")]
-    #[ts(as = "String")]
-    pub root_id: i64,
+/// Returned immediately after a root scan job is admitted.
+/// The scan continues in the background and publishes progress
+/// through `SourceScanEvent` lifecycle events.
+pub struct StartRootScanReply {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
     #[ts(as = "String")]
     pub scan_run_id: i64,
-    pub discovered_file_count: usize,
-    pub queued_source_work_items: usize,
 }
 
 #[derive(
@@ -201,7 +196,7 @@ pub struct LocalRoot {
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum LibraryRootCommand {
     RegisterLocalRoot(RegisterLocalRootRequest),
-    RunRootScan(RunRootScanRequest),
+    StartRootScan(StartRootScanRequest),
     ReadLocalRoots(ReadLocalRootsRequest),
     UnregisterLocalRoot(UnregisterLocalRootRequest),
 }
@@ -220,7 +215,7 @@ pub enum LibraryRootCommand {
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum LibraryRootReply {
     RegisterLocalRoot(RegisterLocalRootReply),
-    RunRootScan(RunRootScanReply),
+    StartRootScan(StartRootScanReply),
     ReadLocalRoots(ReadLocalRootsReply),
     UnregisterLocalRoot(UnregisterLocalRootReply),
 }
@@ -230,7 +225,7 @@ mod tests {
     use super::{
         LibraryRootCommand, LibraryRootReply, LocalRoot, LocalRootAvailability,
         ReadLocalRootsReply, ReadLocalRootsRequest, RegisterLocalRootReply,
-        RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest, UnregisterLocalRootReply,
+        RegisterLocalRootRequest, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
         UnregisterLocalRootRequest,
     };
     use serde_json::json;
@@ -240,7 +235,7 @@ mod tests {
         let register = LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest {
             absolute_path: "C:/Music".to_string(),
         });
-        let scan = LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 7 });
+        let scan = LibraryRootCommand::StartRootScan(StartRootScanRequest { root_id: 7 });
         let read_local = LibraryRootCommand::ReadLocalRoots(ReadLocalRootsRequest);
         let unregister =
             LibraryRootCommand::UnregisterLocalRoot(UnregisterLocalRootRequest { root_id: 42 });
@@ -257,7 +252,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&scan).expect("serialize scan command"),
             json!({
-                "type": "runRootScan",
+                "type": "startRootScan",
                 "payload": {
                     "rootId": "7"
                 }
@@ -301,11 +296,8 @@ mod tests {
             root_id: 7,
             canonical_path: "C:/Music".to_string(),
         });
-        let scanned = LibraryRootReply::RunRootScan(RunRootScanReply {
-            root_id: 7,
+        let scanned = LibraryRootReply::StartRootScan(StartRootScanReply {
             scan_run_id: 1000,
-            discovered_file_count: 2,
-            queued_source_work_items: 1,
         });
         let read_local = LibraryRootReply::ReadLocalRoots(ReadLocalRootsReply {
             roots: vec![LocalRoot {
@@ -330,12 +322,9 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&scanned).expect("serialize scan reply"),
             json!({
-                "type": "runRootScan",
+                "type": "startRootScan",
                 "payload": {
-                    "rootId": "7",
-                    "scanRunId": "1000",
-                    "discoveredFileCount": 2,
-                    "queuedSourceWorkItems": 1
+                    "scanRunId": "1000"
                 }
             })
         );

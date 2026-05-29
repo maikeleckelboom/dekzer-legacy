@@ -83,11 +83,11 @@ export function createRootLifecycleController(
 
     const scanWasRequested = await dependencies.rootActions.runRegisteredRootScan()
 
-    if (!scanWasRequested || dependencies.rootActions.scanStatus.value !== 'scanned') {
+    if (!scanWasRequested) {
       return false
     }
 
-    return runRefresh()
+    return true
   }
 
   async function removeSource(rootId?: string): Promise<boolean> {

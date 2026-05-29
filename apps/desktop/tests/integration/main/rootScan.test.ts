@@ -81,13 +81,10 @@ describe('local root scan boundary', () => {
         await startedHostWithClient(
           config,
           createFakeClient({
-            runRootScan: async (request) => {
+            startRootScan: async (request) => {
               receivedRootId = request.rootId
               return {
-                rootId: 'root-1',
-                scanRunId: 'scan-1',
-                discoveredFileCount: 12,
-                queuedSourceWorkItems: 8
+                scanRunId: 'scan-1'
               }
             }
           })
@@ -96,11 +93,8 @@ describe('local root scan boundary', () => {
         noLog
       )
     ).resolves.toEqual({
-      state: 'scanned',
-      rootId: 'root-1',
-      scanRunId: 'scan-1',
-      discoveredFileCount: 12,
-      queuedSourceWorkItems: 8
+      state: 'started',
+      scanRunId: 'scan-1'
     } satisfies LocalRootScanResult)
     expect(receivedRootId).toBe('root-1')
 
@@ -109,7 +103,7 @@ describe('local root scan boundary', () => {
         await startedHostWithClient(
           config,
           createFakeClient({
-            runRootScan: async () => {
+            startRootScan: async () => {
               throw new Error('fixture scan failure')
             }
           })
@@ -130,7 +124,7 @@ describe('local root scan boundary', () => {
       await startedHostWithClient(
         config,
         createFakeClient({
-          runRootScan: async () => {
+          startRootScan: async () => {
             throw new LibraryBoundaryProtocolError({
               type: 'durableStoreFailure',
               payload: { detail: 'database is locked' }
@@ -151,7 +145,7 @@ describe('local root scan boundary', () => {
       await startedHostWithClient(
         config,
         createFakeClient({
-          runRootScan: async () => {
+          startRootScan: async () => {
             throw 'unexpected string error'
           }
         })
@@ -173,7 +167,7 @@ describe('local root scan boundary', () => {
       await startedHostWithClient(
         config,
         createFakeClient({
-          runRootScan: async () => {
+          startRootScan: async () => {
             throw new Error('diagnostic fixture')
           }
         })

@@ -77,7 +77,7 @@ mod tests {
         LibraryBoundaryEventStreamReply, LibraryRootCommand, LibraryRootReply,
         PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
         ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsReply, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
+        ReadNavigationRowsReply, StartRootScanReply, StartRootScanRequest, SnapshotReadCommand,
         SnapshotReadReply,
     };
     use serde_json::json;
@@ -97,7 +97,7 @@ mod tests {
             },
         ));
         let library_roots =
-            CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(RunRootScanRequest {
+            CommandRequest::LibraryRoots(LibraryRootCommand::StartRootScan(StartRootScanRequest {
                 root_id: 9,
             }));
         let snapshot = CommandRequest::SnapshotRead(
@@ -168,11 +168,8 @@ mod tests {
 
     #[test]
     fn command_reply_uses_same_tagged_family_shape() {
-        let reply = CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(RunRootScanReply {
-            root_id: 7,
+        let reply = CommandReply::LibraryRoots(LibraryRootReply::StartRootScan(StartRootScanReply {
             scan_run_id: 9,
-            discovered_file_count: 3,
-            queued_source_work_items: 2,
         }));
 
         let json = serde_json::to_value(&reply).expect("serialize reply");
@@ -181,12 +178,9 @@ mod tests {
             json!({
                 "type": "libraryRoots",
                 "payload": {
-                    "type": "runRootScan",
+                    "type": "startRootScan",
                     "payload": {
-                        "rootId": "7",
                         "scanRunId": "9",
-                        "discoveredFileCount": 3,
-                        "queuedSourceWorkItems": 2
                     }
                 }
             })

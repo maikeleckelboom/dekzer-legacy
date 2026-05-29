@@ -344,7 +344,7 @@ mod tests {
         assert!(ts.contains("export type ProtocolError"));
         assert!(ts.contains("libraryBoundaryEvents"));
         assert!(ts.contains("registerLocalRoot"));
-        assert!(ts.contains("runRootScan"));
+        assert!(ts.contains("startRootScan"));
         assert!(ts.contains("readLibraryTreeChildren"));
     }
 

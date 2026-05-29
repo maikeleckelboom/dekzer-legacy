@@ -186,19 +186,20 @@ describe('deriveOperationFeedback', () => {
     expect(scanned.title).not.toMatch(/%|\d+\s+files?/i)
     expect(scanned.detail).not.toMatch(/%/)
 
-    const scanWithSummary = deriveOperationFeedback(
+    const scanWithEventProgress = deriveOperationFeedback(
       startedInputs({
         scanStatus: 'scanned',
-        scanSummary: {
+        scanProgressFromEvents: {
+          kind: 'completed',
           rootId: 'r1',
           scanRunId: 's1',
-          discoveredFileCount: 42,
-          queuedSourceWorkItems: 3
+          filesDiscovered: 42,
+          queuedWorkItems: 3
         }
       })
     )
-    expect(scanWithSummary.detail).toMatch(/42 files/)
-    expect(scanWithSummary.detail).toMatch(/3 items/)
+    expect(scanWithEventProgress.detail).toMatch(/42 files/)
+    expect(scanWithEventProgress.detail).toMatch(/3 items/)
 
     expect(
       deriveOperationFeedback({

@@ -25,8 +25,8 @@ import type {
   RegisterLocalRootRequest,
   RenamePlaylistReply,
   RenamePlaylistRequest,
-  RunRootScanReply,
-  RunRootScanRequest,
+  StartRootScanReply,
+  StartRootScanRequest,
   SearchNavigationNodeLibraryBrowserWindowReply,
   SearchNavigationNodeLibraryBrowserWindowRequest,
   UnregisterLocalRootReply,
@@ -65,14 +65,14 @@ export class LibraryBoundaryClient {
     );
   }
 
-  runRootScan(request: RunRootScanRequest): Promise<RunRootScanReply> {
+  startRootScan(request: StartRootScanRequest): Promise<StartRootScanReply> {
     return this.sendAndExpect(
       {
         type: "libraryRoots",
-        payload: { type: "runRootScan", payload: request }
+        payload: { type: "startRootScan", payload: request }
       },
       "libraryRoots",
-      "runRootScan"
+      "startRootScan"
     );
   }
 

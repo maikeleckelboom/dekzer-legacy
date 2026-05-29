@@ -189,9 +189,8 @@ export function createLocalRootActionsController(
         return false
       }
 
-      if (result.state === 'scanned') {
-        scanStatus.value = 'scanned'
-        scanSummary.value = scanSummaryFromResult(result)
+      if (result.state === 'started') {
+        scanStatus.value = 'scanning'
         return true
       }
 
@@ -460,24 +459,13 @@ function scanFailureMessageFor(
 }
 
 function scanFailureFor(
-  state: Exclude<LocalRootScanResult['state'], 'scanned' | 'scanFailed'>
+  state: Exclude<LocalRootScanResult['state'], 'started' | 'scanFailed'>
 ): string {
   switch (state) {
     case 'hostUnavailable':
       return 'Library service is not ready. Try again when it has started.'
     case 'invalidRequest':
       return safeRootScanFailure
-  }
-}
-
-function scanSummaryFromResult(
-  result: Extract<LocalRootScanResult, { state: 'scanned' }>
-): LocalRootScanSummary {
-  return {
-    rootId: result.rootId,
-    scanRunId: result.scanRunId,
-    discoveredFileCount: result.discoveredFileCount,
-    queuedSourceWorkItems: result.queuedSourceWorkItems
   }
 }
 

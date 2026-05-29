@@ -2,13 +2,17 @@ use std::fs;
 use std::path::Path;
 
 use library_boundary_protocol::{
-    CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, LibraryRootCommand,
+    CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest,
+    LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
+    LibraryRootCommand,
     LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint,
-    LibraryTreeNodeKind, LibraryTreePresenceState, NavigationRow,
-    NavigationRowFamily, NavigationRowKind, ReadLibraryTreeChildrenReply,
+    LibraryTreeNodeKind, LibraryTreePresenceState, MaintainedSnapshotScope,
+    NavigationRow,
+    NavigationRowFamily, NavigationRowKind, ReadLibraryBoundaryEventsAfterRequest,
+    ReadLibraryTreeChildrenReply,
     ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
-    RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
-    SnapshotReadReply,
+    RegisterLocalRootRequest, StartRootScanReply, StartRootScanRequest, SnapshotReadCommand,
+    SnapshotReadReply, LibraryBoundaryEvent, SourceScanEventKind,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -41,15 +45,50 @@ fn register_root(service: &LibraryBoundaryService, path: &Path) -> RegisterLocal
     }
 }
 
-fn run_scan(service: &LibraryBoundaryService, root_id: i64) -> RunRootScanReply {
+fn start_scan(service: &LibraryBoundaryService, root_id: i64) -> StartRootScanReply {
     let outcome = service.handle_command(CommandRequest::LibraryRoots(
-        LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id }),
+        LibraryRootCommand::StartRootScan(StartRootScanRequest { root_id }),
     ));
-    let reply = expect_command_reply(outcome, "run root scan");
+    let reply = expect_command_reply(outcome, "start root scan");
     match reply {
-        CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(reply)) => reply,
-        other => panic!("Expected scan reply, got {other:?}"),
+        CommandReply::LibraryRoots(LibraryRootReply::StartRootScan(reply)) => reply,
+        other => panic!("Expected start scan reply, got {other:?}"),
     }
+}
+
+fn wait_for_scan_completion(service: &LibraryBoundaryService, root_id: i64) -> bool {
+    let mut cursor: Option<i64> = None;
+    for _ in 0..30 {
+        let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
+            LibraryBoundaryEventStreamCommand::ReadAfter(
+                ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence: cursor,
+                    max_events: 32,
+                },
+            ),
+        ));
+        let reply = match outcome {
+            CommandOutcome::Success(env) => match env.reply {
+                CommandReply::LibraryBoundaryEvents(
+                    library_boundary_protocol::LibraryBoundaryEventStreamReply::ReadAfter(r),
+                ) => r,
+                other => panic!("Expected event stream reply, got {other:?}"),
+            },
+            CommandOutcome::Error(_) => continue,
+        };
+        cursor = reply.latest_event_sequence;
+        let completed = reply.events.iter().any(|e| {
+            let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
+                return false;
+            };
+            se.kind == SourceScanEventKind::SourceScanCompleted && se.root_id == root_id
+        });
+        if completed {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    false
 }
 
 fn expect_command_reply(outcome: CommandOutcome, context: &str) -> CommandReply {
@@ -122,22 +161,19 @@ fn register_and_scan_mixed_nested_folder_succeeds() {
             .join("track_two.flac"),
         b"not-real-audio-data",
     );
-    write_file(
-        &music_root.join("artwork").join("cover.png"),
-        b"fake-png-data",
-    );
+    write_file(&music_root.join("artwork").join("cover.png"), b"fake-png-data");
     write_file(&music_root.join("loose.mp3"), b"fake-mp3-data");
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &music_root);
-    let scanned = run_scan(&service, registered.root_id);
+    let scanned = start_scan(&service, registered.root_id);
 
     assert!(registered.root_id > 0);
     assert!(!registered.canonical_path.is_empty());
-    assert_eq!(scanned.root_id, registered.root_id);
     assert!(scanned.scan_run_id > 0);
-    assert_eq!(scanned.discovered_file_count, 4);
-    assert!(scanned.queued_source_work_items > 0);
+
+    let completed = wait_for_scan_completion(&service, registered.root_id);
+    assert!(completed, "scan should finish on a small directory");
 }
 
 #[test]
@@ -148,12 +184,12 @@ fn scan_empty_folder_succeeds() {
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &empty_root);
-    let scanned = run_scan(&service, registered.root_id);
+    let scanned = start_scan(&service, registered.root_id);
 
-    assert_eq!(scanned.root_id, registered.root_id);
     assert!(scanned.scan_run_id > 0);
-    assert_eq!(scanned.discovered_file_count, 0);
-    assert_eq!(scanned.queued_source_work_items, 0);
+
+    let completed = wait_for_scan_completion(&service, registered.root_id);
+    assert!(completed, "scan of empty folder should complete");
 }
 
 #[test]
@@ -165,15 +201,16 @@ fn rescan_after_successful_scan_succeeds() {
     let service = open_service(&tempdir);
     let registered = register_root(&service, &music_root);
 
-    let first_scan = run_scan(&service, registered.root_id);
-    assert_eq!(first_scan.root_id, registered.root_id);
+    let first_scan = start_scan(&service, registered.root_id);
     assert!(first_scan.scan_run_id > 0);
-    assert_eq!(first_scan.discovered_file_count, 1);
+    let first_completed = wait_for_scan_completion(&service, registered.root_id);
+    assert!(first_completed, "first scan should complete");
 
-    let rescan = run_scan(&service, registered.root_id);
-    assert_eq!(rescan.root_id, registered.root_id);
+    let rescan = start_scan(&service, registered.root_id);
     assert!(rescan.scan_run_id > 0);
-    assert_eq!(rescan.discovered_file_count, 1);
+    assert_ne!(rescan.scan_run_id, first_scan.scan_run_id);
+    let second_completed = wait_for_scan_completion(&service, registered.root_id);
+    assert!(second_completed, "rescan should complete");
 }
 
 #[test]
@@ -183,7 +220,7 @@ fn scan_with_invalid_root_id_rejects() {
 
     let zero_root_error =
         expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
-            LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 0 }),
+            LibraryRootCommand::StartRootScan(StartRootScanRequest { root_id: 0 }),
         )));
     assert_eq!(zero_root_error.error.code(), "INVALID_REQUEST");
     assert!(
@@ -194,7 +231,7 @@ fn scan_with_invalid_root_id_rejects() {
 
     let negative_root_error =
         expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
-            LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: -5 }),
+            LibraryRootCommand::StartRootScan(StartRootScanRequest { root_id: -5 }),
         )));
     assert_eq!(negative_root_error.error.code(), "INVALID_REQUEST");
 }
@@ -205,7 +242,7 @@ fn scan_with_unknown_root_id_returns_current_store_error() {
     let service = open_service(&tempdir);
 
     let error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
-        LibraryRootCommand::RunRootScan(RunRootScanRequest { root_id: 99999 }),
+        LibraryRootCommand::StartRootScan(StartRootScanRequest { root_id: 99999 }),
     )));
 
     assert_eq!(error.error.code(), "DURABLE_STORE_FAILURE");
@@ -244,10 +281,11 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     let registered = register_root(&service, &music_root);
     assert!(registered.root_id > 0);
 
-    let scanned = run_scan(&service, registered.root_id);
-    assert_eq!(scanned.root_id, registered.root_id);
+    let scanned = start_scan(&service, registered.root_id);
     assert!(scanned.scan_run_id > 0);
-    assert_eq!(scanned.discovered_file_count, 4);
+
+    let completed = wait_for_scan_completion(&service, registered.root_id);
+    assert!(completed, "scan should complete on a small directory");
 
     let root_nav_rows = read_navigation_rows(&service, None);
     root_nav_rows
@@ -482,7 +520,8 @@ fn library_tree_children_excludes_image_only_directories() {
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &music_root);
-    run_scan(&service, registered.root_id);
+    start_scan(&service, registered.root_id);
+    wait_for_scan_completion(&service, registered.root_id);
 
     let reply = read_library_tree(&service, registered.root_id, None);
     let window = reply
@@ -503,5 +542,159 @@ fn library_tree_children_excludes_image_only_directories() {
     assert!(
         !has_artwork,
         "artwork directory must NOT appear in library tree children (contains only images)"
+    );
+}
+
+#[test]
+fn start_root_scan_publishes_started_and_completed_events_in_order() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(&music_root.join("track.wav"), b"data");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+
+    let start_reply = start_scan(&service, registered.root_id);
+    assert!(start_reply.scan_run_id > 0);
+
+    let mut cursor: Option<i64> = None;
+    let mut started = false;
+    let mut completed = false;
+
+    for _ in 0..30 {
+        let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
+            LibraryBoundaryEventStreamCommand::ReadAfter(
+                ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence: cursor,
+                    max_events: 32,
+                },
+            ),
+        ));
+        let reply = match outcome {
+            CommandOutcome::Success(env) => match env.reply {
+                CommandReply::LibraryBoundaryEvents(
+                    LibraryBoundaryEventStreamReply::ReadAfter(r),
+                ) => r,
+                other => panic!("Expected event stream reply, got {other:?}"),
+            },
+            CommandOutcome::Error(_) => continue,
+        };
+        cursor = reply.latest_event_sequence;
+
+        for event in &reply.events {
+            let LibraryBoundaryEvent::SourceScanEvent(se) = event else {
+                continue;
+            };
+            if se.root_id != registered.root_id {
+                continue;
+            }
+            match se.kind {
+                SourceScanEventKind::SourceScanStarted => started = true,
+                SourceScanEventKind::SourceScanCompleted => {
+                    assert!(started, "completed must appear after started");
+                    completed = true;
+                }
+                _ => {}
+            }
+        }
+
+        if completed {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    assert!(started, "SourceScanStarted must be published");
+    assert!(completed, "SourceScanCompleted must be published");
+}
+
+#[test]
+fn duplicate_start_root_scan_rejects_with_already_running_error() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(&music_root.join("track.wav"), b"data");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+
+    let first = start_scan(&service, registered.root_id);
+    assert!(first.scan_run_id > 0);
+
+    let error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::StartRootScan(StartRootScanRequest {
+            root_id: registered.root_id,
+        }),
+    )));
+
+    assert_eq!(error.error.code(), "INVALID_REQUEST");
+    assert!(
+        error.error.to_string().contains("already running"),
+        "Error should mention already running, got: {}",
+        error.error
+    );
+}
+
+#[test]
+fn scan_publishes_maintained_snapshot_invalidations_on_completion() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(&music_root.join("track.wav"), b"data");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+
+    start_scan(&service, registered.root_id);
+
+    let mut cursor: Option<i64> = None;
+    let mut has_navigation_invalidation = false;
+    let mut scan_completed = false;
+
+    for _ in 0..30 {
+        let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
+            LibraryBoundaryEventStreamCommand::ReadAfter(
+                ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence: cursor,
+                    max_events: 32,
+                },
+            ),
+        ));
+        let reply = match outcome {
+            CommandOutcome::Success(env) => match env.reply {
+                CommandReply::LibraryBoundaryEvents(
+                    LibraryBoundaryEventStreamReply::ReadAfter(r),
+                ) => r,
+                other => panic!("Expected event stream reply, got {other:?}"),
+            },
+            CommandOutcome::Error(_) => continue,
+        };
+        cursor = reply.latest_event_sequence;
+
+        for event in &reply.events {
+            match event {
+                LibraryBoundaryEvent::SourceScanEvent(se) => {
+                    if se.kind == SourceScanEventKind::SourceScanCompleted
+                        && se.root_id == registered.root_id
+                    {
+                        scan_completed = true;
+                    }
+                }
+                LibraryBoundaryEvent::MaintainedSnapshotInvalidated(inv) => {
+                    if inv.invalidation.scope == MaintainedSnapshotScope::NavigationRows {
+                        has_navigation_invalidation = true;
+                    }
+                }
+            }
+        }
+
+        if scan_completed && has_navigation_invalidation {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+
+    assert!(scan_completed, "SourceScanCompleted must be published");
+    assert!(
+        has_navigation_invalidation,
+        "MaintainedSnapshotInvalidated for NavigationRows must be published after scan"
     );
 }

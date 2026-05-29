@@ -103,7 +103,7 @@ export function createFakeClient(
 ): LibraryBoundaryHostClient {
   return {
     registerLocalRoot: rejectUnexpectedClientCall,
-    runRootScan: rejectUnexpectedClientCall,
+    startRootScan: rejectUnexpectedClientCall,
     readNavigationRows: rejectUnexpectedClientCall,
     loadNavigationRow: rejectUnexpectedClientCall,
     loadNavigationRowByStableKey: rejectUnexpectedClientCall,

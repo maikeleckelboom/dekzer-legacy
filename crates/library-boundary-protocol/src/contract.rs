@@ -29,7 +29,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadLibraryBoundaryEventsAfterRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryRootCommand>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootRequest>(&cfg, &mut output);
-    push_ts_decl::<crate::RunRootScanRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::StartRootScanRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalRootsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::UnregisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LocalRootAvailability>(&cfg, &mut output);
@@ -61,7 +61,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadLibraryBoundaryEventsAfterReply>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootReply>(&cfg, &mut output);
-    push_ts_decl::<crate::RunRootScanReply>(&cfg, &mut output);
+    push_ts_decl::<crate::StartRootScanReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalRootsReply>(&cfg, &mut output);
     push_ts_decl::<crate::UnregisterLocalRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::PlaylistWriteReply>(&cfg, &mut output);
@@ -181,7 +181,7 @@ mod tests {
         assert!(ts.contains("export type CommandOutcome"));
         assert!(ts.contains("export type ProtocolError"));
         assert!(ts.contains("registerLocalRoot"));
-        assert!(ts.contains("runRootScan"));
+        assert!(ts.contains("startRootScan"));
         assert!(ts.contains("readLocalRoots"));
         assert!(ts.contains("unregisterLocalRoot"));
         assert!(ts.contains("readLibraryTreeChildren"));

@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, VecDeque};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use library_boundary_protocol::{
     LibraryBoundaryEvent, MaintainedSnapshotEvent, MaintainedSnapshotInvalidation,
@@ -9,9 +9,9 @@ use library_boundary_protocol::{
 
 const MAX_STORED_EVENTS: usize = 256;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct LibraryBoundaryEventStream {
-    state: Mutex<LibraryBoundaryEventStreamState>,
+    state: Arc<Mutex<LibraryBoundaryEventStreamState>>,
 }
 
 impl LibraryBoundaryEventStream {
@@ -25,10 +25,10 @@ impl LibraryBoundaryEventStream {
         }
 
         Self {
-            state: Mutex::new(LibraryBoundaryEventStreamState {
+            state: Arc::new(Mutex::new(LibraryBoundaryEventStreamState {
                 observed_revisions,
                 ..LibraryBoundaryEventStreamState::default()
-            }),
+            })),
         }
     }
 

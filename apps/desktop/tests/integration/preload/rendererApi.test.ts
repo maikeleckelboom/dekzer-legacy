@@ -95,11 +95,8 @@ describe('preload renderer API', () => {
       }
     }
     const scanResult: LocalRootScanResult = {
-      state: 'scanned',
-      rootId: 'root-1',
-      scanRunId: 'scan-1',
-      discoveredFileCount: 12,
-      queuedSourceWorkItems: 8
+      state: 'started',
+      scanRunId: 'scan-1'
     }
     const readLocalRootsResult: ReadLocalRootsOutcome = {
       state: 'read',

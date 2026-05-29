@@ -197,7 +197,32 @@ watch(
     expandedNodeIds.value = new Set([nodeId])
     restoreState.initialNodeApplied = true
   },
-  { immediate: true }
+)
+
+watch(
+  scanProgressForRegisteredRoot,
+  (progress) => {
+    if (progress === undefined) {
+      return
+    }
+
+    switch (progress.kind) {
+      case 'completed':
+        rootActions.scanStatus.value = 'scanned'
+        rootActions.scanSummary.value = {
+          rootId: progress.rootId,
+          scanRunId: progress.scanRunId,
+          discoveredFileCount: progress.filesDiscovered,
+          queuedSourceWorkItems: progress.queuedWorkItems
+        }
+        break
+      case 'failed':
+      case 'blocked':
+        rootActions.scanStatus.value = 'failed'
+        rootActions.scanFailureMessage.value = progress.detail ?? 'Scan failed.'
+        break
+    }
+  },
 )
 
 watch(

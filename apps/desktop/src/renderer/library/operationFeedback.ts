@@ -248,9 +248,8 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
   }
 
   if (inputs.scanStatus === 'scanned') {
-    return build('scanComplete', {
-      detail: scanDetail(inputs.scanSummary)
-    })
+    const completedDetail = scanCompletedDetailFromEvents(inputs.scanProgressFromEvents)
+    return build('scanComplete', completedDetail === undefined ? {} : { detail: completedDetail })
   }
 
   if (inputs.navigationReadResult?.state === 'ready') {
@@ -295,16 +294,28 @@ function build(
   }
 }
 
-function scanDetail(summary: LocalRootScanSummary | undefined): string {
-  if (summary === undefined) {
+function scanCompletedDetailFromEvents(
+  progress: ScanProgressState | undefined
+): string | undefined {
+  if (progress === undefined || progress.kind !== 'completed') {
     return 'Music folder scanned successfully.'
   }
 
-  return [
-    'Scan complete.',
-    `${summary.discoveredFileCount} ${summary.discoveredFileCount === 1 ? 'file' : 'files'} discovered.`,
-    `${summary.queuedSourceWorkItems} ${summary.queuedSourceWorkItems === 1 ? 'item' : 'items'} queued.`
-  ].join(' ')
+  const parts: string[] = ['Scan complete.']
+
+  if (progress.filesDiscovered > 0) {
+    parts.push(
+      `${progress.filesDiscovered} ${progress.filesDiscovered === 1 ? 'file' : 'files'} discovered.`
+    )
+  }
+
+  if (progress.queuedWorkItems > 0) {
+    parts.push(
+      `${progress.queuedWorkItems} ${progress.queuedWorkItems === 1 ? 'item' : 'items'} queued.`
+    )
+  }
+
+  return parts.join(' ')
 }
 
 function scanFailureDetail(

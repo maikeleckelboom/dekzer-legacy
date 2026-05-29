@@ -247,12 +247,9 @@ async function validatesReplyVariantMismatch(): Promise<void> {
     success({
       type: "libraryRoots",
       payload: {
-        type: "runRootScan",
+        type: "startRootScan",
         payload: {
-          rootId: "root-1",
-          scanRunId: "scan-1",
-          discoveredFileCount: 0,
-          queuedSourceWorkItems: 0
+          scanRunId: "scan-1"
         }
       }
     })
@@ -270,7 +267,7 @@ async function validatesReplyVariantMismatch(): Promise<void> {
     "registerLocalRoot",
     "expected variant is captured"
   );
-  equal(error.actualVariant, "runRootScan", "actual variant is captured");
+  equal(error.actualVariant, "startRootScan", "actual variant is captured");
 }
 
 async function validatesExecutorRejectionBecomesTransportFailure(): Promise<void> {

@@ -15,7 +15,7 @@ import type { LocalRootScanResult } from '../../../../src/shared/libraryRoots/ru
 
 describe('local root scan lifecycle', () => {
   it('keeps scan unavailable before registration', async () => {
-    const runScan = vi.fn(async () => scannedRootResult())
+    const runScan = vi.fn(async () => startedRootResult())
     const controller = createLocalRootActionsController(testRootApi({ runScan }))
 
     expect(controller.canRunRegisteredRootScan.value).toBe(false)
@@ -26,12 +26,7 @@ describe('local root scan lifecycle', () => {
 
   it('scans the root id returned by registration', async () => {
     const runScan = vi.fn(async () =>
-      scannedRootResult({
-        rootId: 'root-from-main',
-        scanRunId: 'scan-42',
-        discoveredFileCount: 42,
-        queuedSourceWorkItems: 8
-      })
+      startedRootResult('scan-42')
     )
     const controller = createLocalRootActionsController(
       testRootApi({
@@ -49,26 +44,15 @@ describe('local root scan lifecycle', () => {
 
     await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
     expect(runScan).toHaveBeenCalledWith({ rootId: 'root-from-main' })
-    expect(controller.scanSummary.value).toEqual({
-      rootId: 'root-from-main',
-      scanRunId: 'scan-42',
-      discoveredFileCount: 42,
-      queuedSourceWorkItems: 8
-    })
-    expect(controller.scanStatus.value).toBe('scanned')
+    expect(controller.scanStatus.value).toBe('scanning')
   })
 
-  it('refreshes after registration before scanning and refreshes again after scan completion', async () => {
+  it('refreshes after registration before scanning', async () => {
     const events: string[] = []
     const runScan = vi.fn(async (request) => {
       events.push('scan')
       expect(request).toEqual({ rootId: 'root-from-main' })
-      return scannedRootResult({
-        rootId: 'root-from-main',
-        scanRunId: 'scan-42',
-        discoveredFileCount: 42,
-        queuedSourceWorkItems: 8
-      })
+      return startedRootResult('scan-42')
     })
     const { rootActions, lifecycle } = testRootLifecycle(
       testRootApi({
@@ -88,10 +72,10 @@ describe('local root scan lifecycle', () => {
     )
 
     await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
-    expect(events).toEqual(['choose', 'refresh', 'scan', 'refresh'])
-    expect(rootActions.scanStatus.value).toBe('scanned')
-    expect(lifecycle.refreshStatus.value).toBe('refreshed')
-    expect(rootActions.scanButtonLabel.value).toBe('Rescan folder')
+    expect(events).toEqual(['choose', 'refresh', 'scan'])
+    expect(rootActions.scanStatus.value).toBe('scanning')
+    expect(lifecycle.refreshStatus.value).toBe('idle')
+    expect(rootActions.scanButtonLabel.value).toBe('Scanning folder')
   })
 
   it('does not let refresh failure overwrite scan success', async () => {
@@ -99,26 +83,15 @@ describe('local root scan lifecycle', () => {
       testRootApi({
         chooseAndRegisterLocal: async () => registeredChoice(),
         runScan: async () =>
-          scannedRootResult({
-            rootId: 'root-1',
-            scanRunId: 'scan-1',
-            discoveredFileCount: 12,
-            queuedSourceWorkItems: 8
-          })
+          startedRootResult('scan-1')
       }),
       async () => false
     )
 
     await expect(lifecycle.addMusicFolder()).resolves.toBe(false)
     expect(rootActions.rootChoiceStatus.value).toBe('registered')
-    expect(rootActions.scanStatus.value).toBe('scanned')
-    expect(rootActions.scanSummary.value).toEqual({
-      rootId: 'root-1',
-      scanRunId: 'scan-1',
-      discoveredFileCount: 12,
-      queuedSourceWorkItems: 8
-    })
-    expect(lifecycle.refreshStatus.value).toBe('failed')
+    expect(rootActions.scanStatus.value).toBe('scanning')
+    expect(lifecycle.refreshStatus.value).toBe('idle')
   })
 
   it('prevents duplicate scan requests with explicit pending work', async () => {
@@ -139,9 +112,9 @@ describe('local root scan lifecycle', () => {
     await expect(controller.runRegisteredRootScan()).resolves.toBe(false)
     expect(runScan).toHaveBeenCalledTimes(1)
 
-    pendingScan.resolve(scannedRootResult())
+    pendingScan.resolve(startedRootResult())
     await expect(firstScan).resolves.toBe(true)
-    expect(controller.scanStatus.value).toBe('scanned')
+    expect(controller.scanStatus.value).toBe('scanning')
   })
 
   it('ignores stale scan completion after hydrated roots clear the active root', async () => {
@@ -165,7 +138,7 @@ describe('local root scan lifecycle', () => {
     expect(controller.registeredRoot.value).toBeUndefined()
     expect(controller.scanStatus.value).toBe('idle')
 
-    pendingScan.resolve(scannedRootResult())
+    pendingScan.resolve(startedRootResult())
     await expect(scan).resolves.toBe(false)
     expect(controller.scanStatus.value).toBe('idle')
     expect(controller.scanSummary.value).toBeUndefined()
@@ -181,34 +154,29 @@ describe('local root scan lifecycle', () => {
       testRootApi({
         chooseAndRegisterLocal: async () => nextChoice(choices),
         runScan: async () =>
-          scannedRootResult({
-            rootId: 'root-1',
-            scanRunId: 'scan-1',
-            discoveredFileCount: 12,
-            queuedSourceWorkItems: 8
-          })
+          startedRootResult('scan-1')
       })
     )
 
     await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(true)
     await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('scanning')
 
     const pendingChoice = controller.chooseAndRegisterLocalRoot()
-    expect(controller.rootChoiceStatus.value).toBe('choosing')
+    expect(controller.rootChoiceStatus.value).toBe('registered')
     expect(controller.registeredRootPath.value).toBe('C:/Music/One')
-    expect(controller.scanStatus.value).toBe('scanned')
+    expect(controller.scanStatus.value).toBe('scanning')
 
     secondChoice.resolve({ state: 'canceled' })
     await expect(pendingChoice).resolves.toBe(false)
-    expect(controller.rootChoiceStatus.value).toBe('canceled')
+    expect(controller.rootChoiceStatus.value).toBe('registered')
     expect(controller.registeredRootPath.value).toBe('C:/Music/One')
-    expect(controller.scanSummary.value?.scanRunId).toBe('scan-1')
 
     choices.push(failedChoice('registrationFailed'))
     await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(false)
-    expect(controller.rootChoiceStatus.value).toBe('failed')
+    expect(controller.rootChoiceStatus.value).toBe('registered')
     expect(controller.registeredRootPath.value).toBe('C:/Music/One')
-    expect(controller.scanStatus.value).toBe('scanned')
+    expect(controller.scanStatus.value).toBe('scanning')
   })
 
   it('replaces the root and resets scan state before scanning a second successful registration', async () => {
@@ -230,19 +198,15 @@ describe('local root scan lifecycle', () => {
             return secondScan.promise
           }
 
-          return scannedRootResult({
-            rootId: 'root-1',
-            scanRunId: 'scan-1',
-            discoveredFileCount: 12,
-            queuedSourceWorkItems: 8
-          })
+          return startedRootResult('scan-1')
         }
       }),
       async () => true
     )
 
     await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
-    expect(rootActions.scanSummary.value?.rootId).toBe('root-1')
+
+    rootActions.scanStatus.value = 'scanned'
 
     const pendingSecondAdd = lifecycle.addMusicFolder()
     await secondScanStarted.promise
@@ -252,20 +216,9 @@ describe('local root scan lifecycle', () => {
     expect(scanRequests[1]).toEqual({ rootId: 'root-2' })
 
     secondScan.resolve(
-      scannedRootResult({
-        rootId: 'root-2',
-        scanRunId: 'scan-2',
-        discoveredFileCount: 4,
-        queuedSourceWorkItems: 2
-      })
+      startedRootResult('scan-2')
     )
     await expect(pendingSecondAdd).resolves.toBe(true)
-    expect(rootActions.scanSummary.value).toEqual({
-      rootId: 'root-2',
-      scanRunId: 'scan-2',
-      discoveredFileCount: 4,
-      queuedSourceWorkItems: 2
-    })
   })
 
   it('hydrates local roots without silently picking multiple roots', async () => {
@@ -421,7 +374,7 @@ describe('local root scan failure detail preservation', () => {
               }
             }
           }
-          return scannedRootResult()
+          return startedRootResult()
         }
       })
     )
@@ -433,7 +386,7 @@ describe('local root scan failure detail preservation', () => {
     expect(controller.scanFailureDetail.value).toBe('transport error')
 
     await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
-    expect(controller.scanStatus.value).toBe('scanned')
+    expect(controller.scanStatus.value).toBe('scanning')
     expect(controller.scanFailureMessage.value).toBeUndefined()
     expect(controller.scanFailureDetail.value).toBeUndefined()
   })
@@ -499,17 +452,15 @@ describe('local root remove lifecycle', () => {
         chooseAndRegisterLocal: async () =>
           registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
         runScan: async () =>
-          scannedRootResult({
-            rootId: 'root-1',
-            scanRunId: 'scan-1',
-            discoveredFileCount: 12,
-            queuedSourceWorkItems: 8
-          })
+          startedRootResult('scan-1')
       })
     )
 
     await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(true)
     await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('scanning')
+
+    controller.scanStatus.value = 'scanned'
 
     await expect(controller.unregisterLocalRoot()).resolves.toBe(true)
     expect(controller.removeSourceStatus.value).toBe('removing')
@@ -528,7 +479,7 @@ describe('local root remove lifecycle', () => {
       testRootApi({
         chooseAndRegisterLocal: async () =>
           registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
-        runScan: async () => scannedRootResult(),
+        runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => ({
           state: 'hostUnavailable',
           error: { code: 'hostFailed', message: 'backend detail' }
@@ -538,6 +489,10 @@ describe('local root remove lifecycle', () => {
 
     await expect(controller.chooseAndRegisterLocalRoot()).resolves.toBe(true)
     await expect(controller.runRegisteredRootScan()).resolves.toBe(true)
+    expect(controller.scanStatus.value).toBe('scanning')
+
+    controller.scanStatus.value = 'scanned'
+
     await expect(controller.unregisterLocalRoot()).resolves.toBe(false)
     expect(controller.removeSourceStatus.value).toBe('failed')
     expect(controller.registeredRootPath.value).toBe('C:/Music')
@@ -568,7 +523,7 @@ describe('local root remove lifecycle', () => {
           events.push('choose')
           return registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' })
         },
-        runScan: async () => scannedRootResult(),
+        runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => {
           events.push('unregister')
           return { state: 'unregistered', unregistered: true }
@@ -582,6 +537,8 @@ describe('local root remove lifecycle', () => {
 
     await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
     events.length = 0
+
+    rootActions.scanStatus.value = 'scanned'
 
     await expect(lifecycle.removeSource()).resolves.toBe(true)
     expect(events).toEqual(['unregister', 'refresh'])
@@ -599,7 +556,7 @@ describe('local root remove lifecycle', () => {
       testRootApi({
         chooseAndRegisterLocal: async () =>
           registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
-        runScan: async () => scannedRootResult(),
+        runScan: async () => startedRootResult(),
         unregisterLocalRoot
       }),
       async () => true,
@@ -607,6 +564,7 @@ describe('local root remove lifecycle', () => {
     )
 
     await expect(blocked.lifecycle.addMusicFolder()).resolves.toBe(true)
+    blocked.rootActions.scanStatus.value = 'scanned'
     await expect(blocked.lifecycle.removeSource()).resolves.toBe(false)
     expect(unregisterLocalRoot).not.toHaveBeenCalled()
 
@@ -614,7 +572,7 @@ describe('local root remove lifecycle', () => {
       testRootApi({
         chooseAndRegisterLocal: async () =>
           registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }),
-        runScan: async () => scannedRootResult(),
+        runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => ({ state: 'unregistered', unregistered: true })
       }),
       async () => true,
@@ -623,6 +581,7 @@ describe('local root remove lifecycle', () => {
     )
 
     await expect(visibleAfterRefresh.lifecycle.addMusicFolder()).resolves.toBe(true)
+    visibleAfterRefresh.rootActions.scanStatus.value = 'scanned'
     await expect(visibleAfterRefresh.lifecycle.removeSource()).resolves.toBe(false)
     expect(visibleAfterRefresh.rootActions.registeredRoot.value?.rootId).toBe('root-2')
     expect(visibleAfterRefresh.rootActions.removeSourceStatus.value).toBe('failed')
@@ -704,22 +663,12 @@ function failedChoice(
   }
 }
 
-function scannedRootResult(
-  result: {
-    readonly rootId: string
-    readonly scanRunId: string
-    readonly discoveredFileCount: number
-    readonly queuedSourceWorkItems: number
-  } = {
-    rootId: 'root-1',
-    scanRunId: 'scan-1',
-    discoveredFileCount: 12,
-    queuedSourceWorkItems: 8
-  }
+function startedRootResult(
+  scanRunId: string = 'scan-1'
 ): LocalRootScanResult {
   return {
-    state: 'scanned',
-    ...result
+    state: 'started',
+    scanRunId
   }
 }
 

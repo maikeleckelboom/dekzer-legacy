@@ -1,4 +1,4 @@
-export type LocalRootScanState = 'scanned' | 'hostUnavailable' | 'invalidRequest' | 'scanFailed'
+export type LocalRootScanState = 'started' | 'hostUnavailable' | 'invalidRequest' | 'scanFailed'
 
 export type LocalRootScanErrorCode =
   | 'hostNotStarted'
@@ -14,7 +14,7 @@ export type LocalRootScanError = {
   readonly detail?: string
 }
 
-export type LocalRootScanErrorState = Exclude<LocalRootScanState, 'scanned'>
+export type LocalRootScanErrorState = Exclude<LocalRootScanState, 'started'>
 
 export type LocalRootScanRequest = {
   readonly rootId: string
@@ -22,11 +22,8 @@ export type LocalRootScanRequest = {
 
 export type LocalRootScanResult =
   | {
-      readonly state: 'scanned'
-      readonly rootId: string
+      readonly state: 'started'
       readonly scanRunId: string
-      readonly discoveredFileCount: number
-      readonly queuedSourceWorkItems: number
     }
   | {
       readonly state: LocalRootScanErrorState

@@ -351,7 +351,7 @@ impl SqliteDurableStore {
         self.with_discovery_tx(|tx| tx.root_display_name(root_id))
     }
 
-    fn read_root_scan_path(&self, root_id: i64) -> LibrarySqliteResult<PathBuf> {
+    pub fn read_root_scan_path(&self, root_id: i64) -> LibrarySqliteResult<PathBuf> {
         let connection = self.open_read_connection()?;
         let Some(root_path) = connection
             .query_row(

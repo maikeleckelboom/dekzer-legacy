@@ -13,11 +13,11 @@ export type ReadLibraryBoundaryEventsAfterRequest = {
  */
 lastSeenEventSequence: number | null, maxEvents: number, };
 
-export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "runRootScan", "payload": RunRootScanRequest } | { "type": "readLocalRoots", "payload": ReadLocalRootsRequest } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootRequest };
+export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "startRootScan", "payload": StartRootScanRequest } | { "type": "readLocalRoots", "payload": ReadLocalRootsRequest } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootRequest };
 
 export type RegisterLocalRootRequest = { absolutePath: string, };
 
-export type RunRootScanRequest = { rootId: string, };
+export type StartRootScanRequest = { rootId: string, };
 
 export type ReadLocalRootsRequest = null;
 
@@ -96,11 +96,11 @@ earliestRetainedSequence: number | null,
  */
 gapDetected: boolean, };
 
-export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "runRootScan", "payload": RunRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootReply };
+export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "startRootScan", "payload": StartRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootReply };
 
 export type RegisterLocalRootReply = { rootId: string, canonicalPath: string, };
 
-export type RunRootScanReply = { rootId: string, scanRunId: string, discoveredFileCount: number, queuedSourceWorkItems: number, };
+export type StartRootScanReply = { scanRunId: string, };
 
 export type ReadLocalRootsReply = { roots: Array<LocalRoot>, };
 

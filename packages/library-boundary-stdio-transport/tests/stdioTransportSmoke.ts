@@ -44,12 +44,29 @@ try {
   });
   must(/^[1-9]\d*$/.test(registered.rootId), "rootId is a positive string id");
 
-  const scan = await first.client.runRootScan({
+  const scan = await first.client.startRootScan({
     rootId: registered.rootId
   });
-  equal(scan.rootId, registered.rootId, "scan echoes root id");
-  equal(scan.discoveredFileCount, 1, "scan discovers one file");
-  equal(scan.queuedSourceWorkItems, 1, "scan queues one source work item");
+  must(/^[1-9]\d*$/.test(scan.scanRunId), "scanRunId is a positive string id");
+
+  let scanCompleted = false;
+  let cursor: number | null = null;
+  for (let i = 0; i < 30; i++) {
+    const eventsReply = await first.client.readAfterBoundaryEvents({
+      lastSeenEventSequence: cursor,
+      maxEvents: 32
+    });
+    cursor = eventsReply.latestEventSequence;
+    scanCompleted = eventsReply.events.some(
+      (e) =>
+        e.type === "sourceScanEvent" &&
+        e.payload.kind === "sourceScanCompleted" &&
+        e.payload.rootId === registered.rootId
+    );
+    if (scanCompleted) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  must(scanCompleted, "scan completes on a tiny directory");
 
   const rootWindow = await first.client.readLibraryTreeChildren({
     entryPoint: {

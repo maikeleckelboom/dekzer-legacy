@@ -1390,11 +1390,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/RunRootScanRequest"
+              "$ref": "#/$defs/StartRootScanRequest"
             },
             "type": {
               "type": "string",
-              "const": "runRootScan"
+              "const": "startRootScan"
             }
           },
           "required": [
@@ -1458,11 +1458,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/RunRootScanReply"
+              "$ref": "#/$defs/StartRootScanReply"
             },
             "type": {
               "type": "string",
-              "const": "runRootScan"
+              "const": "startRootScan"
             }
           },
           "required": [
@@ -2742,45 +2742,6 @@
         "displayName"
       ]
     },
-    "RunRootScanReply": {
-      "description": "Summary returned after synchronous root-scan materialization reaches the\nfirst-slice hierarchy commit/finalization boundary.",
-      "type": "object",
-      "properties": {
-        "discoveredFileCount": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "queuedSourceWorkItems": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "rootId": {
-          "type": "string"
-        },
-        "scanRunId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "rootId",
-        "scanRunId",
-        "discoveredFileCount",
-        "queuedSourceWorkItems"
-      ]
-    },
-    "RunRootScanRequest": {
-      "type": "object",
-      "properties": {
-        "rootId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "rootId"
-      ]
-    },
     "ScanRunPhase": {
       "oneOf": [
         {
@@ -3215,6 +3176,29 @@
         "sourceScanCompleted",
         "sourceScanFailed",
         "sourceScanBlocked"
+      ]
+    },
+    "StartRootScanReply": {
+      "description": "Returned immediately after a root scan job is admitted.\nThe scan continues in the background and publishes progress\nthrough `SourceScanEvent` lifecycle events.",
+      "type": "object",
+      "properties": {
+        "scanRunId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scanRunId"
+      ]
+    },
+    "StartRootScanRequest": {
+      "type": "object",
+      "properties": {
+        "rootId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rootId"
       ]
     },
     "UnregisterLocalRootReply": {

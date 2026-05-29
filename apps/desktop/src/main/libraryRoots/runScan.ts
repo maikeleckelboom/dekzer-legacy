@@ -1,4 +1,4 @@
-import type { RunRootScanRequest } from '@dekzer/library-boundary-contract'
+import type { StartRootScanRequest } from '@dekzer/library-boundary-contract'
 
 import {
   LibraryBoundaryProtocolError,
@@ -55,16 +55,13 @@ export async function runLocalRootScanThroughHost(
   }
 
   try {
-    const reply = await client.runRootScan({
+    const reply = await client.startRootScan({
       rootId: normalizedRequest.rootId
-    } satisfies RunRootScanRequest)
+    } satisfies StartRootScanRequest)
 
     return {
-      state: 'scanned',
-      rootId: reply.rootId,
-      scanRunId: reply.scanRunId,
-      discoveredFileCount: reply.discoveredFileCount,
-      queuedSourceWorkItems: reply.queuedSourceWorkItems
+      state: 'started',
+      scanRunId: reply.scanRunId
     }
   } catch (error: unknown) {
     logger.error('[local-root-scan] failed', { rootId: normalizedRequest.rootId, error })

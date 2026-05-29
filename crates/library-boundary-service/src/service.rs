@@ -1,5 +1,8 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use library_boundary_protocol as protocol;
@@ -24,9 +27,35 @@ use crate::snapshot_read_protocol::{
 };
 use crate::storage_environment::resolve_library_storage_environment;
 
+struct ActiveScanJob {
+    #[allow(dead_code)]
+    root_id: i64,
+    #[allow(dead_code)]
+    scan_run_id: i64,
+    _handle: JoinHandle<()>,
+}
+
+#[derive(Default)]
+struct ScanJobRegistry {
+    jobs: HashMap<i64, ActiveScanJob>,
+    next_scan_run_id: i64,
+}
+
+impl ScanJobRegistry {
+    fn next_scan_run_id(&mut self) -> i64 {
+        if self.next_scan_run_id == 0 {
+            self.next_scan_run_id = 1;
+        }
+        let id = self.next_scan_run_id;
+        self.next_scan_run_id += 1;
+        id
+    }
+}
+
 pub struct LibraryBoundaryService {
     durable_store: SqliteDurableStore,
     session_events: LibraryBoundaryEventStream,
+    scan_registry: Mutex<ScanJobRegistry>,
 }
 
 impl LibraryBoundaryService {
@@ -58,6 +87,7 @@ impl LibraryBoundaryService {
         Ok(Self {
             durable_store,
             session_events,
+            scan_registry: Mutex::new(ScanJobRegistry::default()),
         })
     }
 
@@ -136,144 +166,63 @@ impl LibraryBoundaryService {
         })
     }
 
-    pub fn run_root_scan(
+    pub fn start_root_scan(
         &self,
-        request: protocol::RunRootScanRequest,
-    ) -> protocol::ProtocolResult<protocol::RunRootScanReply> {
+        request: protocol::StartRootScanRequest,
+    ) -> protocol::ProtocolResult<protocol::StartRootScanReply> {
         let root_id = require_positive_i64(request.root_id, "rootId")?;
         let scan_started_at_ms = unix_time_ms()?;
 
-        self.publish_scan_started(root_id, scan_started_at_ms);
+        let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
 
-        let event_stream = &self.session_events;
-        let result = self.durable_store.run_root_scan_with_observer(
-            root_id,
-            scan_started_at_ms,
-            |observation| match observation {
-                RootScanObservation::HierarchyPublished {
-                    root_id: obs_root_id,
-                    scan_run_id,
-                    reason: _reason,
-                } => {
-                    event_stream.publish_scan_event(
-                        library_boundary_protocol::SourceScanEventKind::SourceScanProgressed,
-                        obs_root_id,
-                        scan_run_id,
-                        library_boundary_protocol::ScanRunPhase::Scanning,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        None,
-                    );
-                }
-                RootScanObservation::SourceWorkQueued { .. } => {}
-            },
-        );
-
-        match result {
-            Ok(scan) => {
-                self.publish_scan_completed(
-                    root_id,
-                    scan.scan_run_id,
-                    scan.discovered_file_count,
-                    scan.queued_source_work_items,
-                );
-                self.publish_maintained_snapshot_invalidations()?;
-                Ok(protocol::RunRootScanReply {
-                    root_id,
-                    scan_run_id: scan.scan_run_id,
-                    discovered_file_count: scan.discovered_file_count,
-                    queued_source_work_items: scan.queued_source_work_items,
-                })
-            }
-            Err(error) => {
-                self.publish_scan_failed_or_blocked(root_id, &error);
-                Err(map_store_error(error))
+        if let Some(existing) = registry.jobs.get(&root_id) {
+            if existing._handle.is_finished() {
+                registry.jobs.remove(&root_id);
+            } else {
+                return Err(protocol::ProtocolError::InvalidRequest {
+                    detail: "A scan is already running for this root".to_string(),
+                });
             }
         }
-    }
 
-    fn publish_scan_started(&self, root_id: i64, _scan_started_at_ms: i64) {
-        self.session_events.publish_scan_event(
+        self.durable_store
+            .read_root_scan_path(root_id)
+            .map_err(|e| protocol::ProtocolError::DurableStoreFailure {
+                detail: e.to_string(),
+            })?;
+
+        let scan_run_id = registry.next_scan_run_id();
+
+        let store = self.durable_store.clone();
+        let events = self.session_events.clone();
+
+        events.publish_scan_event(
             library_boundary_protocol::SourceScanEventKind::SourceScanStarted,
-            root_id,
-            0,
-            library_boundary_protocol::ScanRunPhase::Scanning,
-            0,
-            0,
-            0,
-            0,
-            0,
-            None,
-        );
-    }
-
-    fn publish_scan_completed(
-        &self,
-        root_id: i64,
-        scan_run_id: i64,
-        discovered_file_count: usize,
-        queued_source_work_items: usize,
-    ) {
-        self.session_events.publish_scan_event(
-            library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
             root_id,
             scan_run_id,
             library_boundary_protocol::ScanRunPhase::Scanning,
             0,
-            discovered_file_count,
-            discovered_file_count,
-            discovered_file_count,
-            queued_source_work_items,
+            0,
+            0,
+            0,
+            0,
             None,
         );
-    }
 
-    fn publish_scan_failed_or_blocked(
-        &self,
-        root_id: i64,
-        error: &library_store_sqlite::LibrarySqliteError,
-    ) {
-        use library_store_sqlite::{CanonicalErrorCode, LibrarySqliteError};
+        let handle = std::thread::spawn(move || {
+            execute_scan_job(store, events, root_id, scan_run_id, scan_started_at_ms);
+        });
 
-        let detail = error.to_string();
-        let is_blocked = match error {
-            LibrarySqliteError::Canonical(canonical) => {
-                matches!(canonical.code, CanonicalErrorCode::NotFound)
-            }
-            LibrarySqliteError::RootWorkCancelled { .. } => true,
-            _ => false,
-        };
-
-        if is_blocked {
-            self.session_events.publish_scan_event(
-                library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
+        registry.jobs.insert(
+            root_id,
+            ActiveScanJob {
                 root_id,
-                0,
-                library_boundary_protocol::ScanRunPhase::Blocked,
-                0,
-                0,
-                0,
-                0,
-                0,
-                Some(detail),
-            );
-        } else {
-            self.session_events.publish_scan_event(
-                library_boundary_protocol::SourceScanEventKind::SourceScanFailed,
-                root_id,
-                0,
-                library_boundary_protocol::ScanRunPhase::Scanning,
-                0,
-                0,
-                0,
-                0,
-                0,
-                Some(detail),
-            );
-        }
+                scan_run_id,
+                _handle: handle,
+            },
+        );
+
+        Ok(protocol::StartRootScanReply { scan_run_id })
     }
 
     pub fn create_playlist(
@@ -574,9 +523,9 @@ impl LibraryBoundaryService {
             protocol::LibraryRootCommand::RegisterLocalRoot(request) => self
                 .register_local_root(request)
                 .map(protocol::LibraryRootReply::RegisterLocalRoot),
-            protocol::LibraryRootCommand::RunRootScan(request) => self
-                .run_root_scan(request)
-                .map(protocol::LibraryRootReply::RunRootScan),
+            protocol::LibraryRootCommand::StartRootScan(request) => self
+                .start_root_scan(request)
+                .map(protocol::LibraryRootReply::StartRootScan),
             protocol::LibraryRootCommand::ReadLocalRoots(_) => self
                 .read_local_roots()
                 .map(protocol::LibraryRootReply::ReadLocalRoots),
@@ -656,6 +605,115 @@ impl LibraryBoundaryService {
         self.session_events
             .publish_revisions(map_maintained_read_model_revisions(revisions));
         Ok(())
+    }
+}
+
+fn execute_scan_job(
+    store: SqliteDurableStore,
+    events: LibraryBoundaryEventStream,
+    root_id: i64,
+    scan_run_id: i64,
+    scan_started_at_ms: i64,
+) {
+    let result = store.run_root_scan_with_observer(
+        root_id,
+        scan_started_at_ms,
+        |observation| match observation {
+            RootScanObservation::HierarchyPublished {
+                root_id: obs_root_id,
+                scan_run_id: obs_scan_run_id,
+                reason: _reason,
+            } => {
+                events.publish_scan_event(
+                    library_boundary_protocol::SourceScanEventKind::SourceScanProgressed,
+                    obs_root_id,
+                    obs_scan_run_id,
+                    library_boundary_protocol::ScanRunPhase::Scanning,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    None,
+                );
+            }
+            RootScanObservation::SourceWorkQueued { .. } => {}
+        },
+    );
+
+    match result {
+        Ok(scan) => {
+            events.publish_scan_event(
+                library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
+                root_id,
+                scan_run_id,
+                library_boundary_protocol::ScanRunPhase::Scanning,
+                0,
+                scan.discovered_file_count,
+                scan.discovered_file_count,
+                scan.discovered_file_count,
+                scan.queued_source_work_items,
+                None,
+            );
+            publish_job_maintained_invalidations(&store, &events);
+        }
+        Err(error) => {
+            publish_job_scan_failed_or_blocked(&events, root_id, &error);
+        }
+    }
+}
+
+fn publish_job_maintained_invalidations(
+    store: &SqliteDurableStore,
+    events: &LibraryBoundaryEventStream,
+) {
+    if let Ok(revisions) = store.read_maintained_read_model_revisions() {
+        events.publish_revisions(map_maintained_read_model_revisions(revisions));
+    }
+}
+
+fn publish_job_scan_failed_or_blocked(
+    events: &LibraryBoundaryEventStream,
+    root_id: i64,
+    error: &library_store_sqlite::LibrarySqliteError,
+) {
+    use library_store_sqlite::{CanonicalErrorCode, LibrarySqliteError};
+
+    let detail = error.to_string();
+    let is_blocked = match error {
+        LibrarySqliteError::Canonical(canonical) => {
+            matches!(canonical.code, CanonicalErrorCode::NotFound)
+        }
+        LibrarySqliteError::RootWorkCancelled { .. } => true,
+        _ => false,
+    };
+
+    if is_blocked {
+        events.publish_scan_event(
+            library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
+            root_id,
+            0,
+            library_boundary_protocol::ScanRunPhase::Blocked,
+            0,
+            0,
+            0,
+            0,
+            0,
+            Some(detail),
+        );
+    } else {
+        events.publish_scan_event(
+            library_boundary_protocol::SourceScanEventKind::SourceScanFailed,
+            root_id,
+            0,
+            library_boundary_protocol::ScanRunPhase::Scanning,
+            0,
+            0,
+            0,
+            0,
+            0,
+            Some(detail),
+        );
     }
 }
 
@@ -754,7 +812,7 @@ mod tests {
         PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsAfterReply,
         ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
         RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
-        RenamePlaylistRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
+        RenamePlaylistRequest, StartRootScanReply, StartRootScanRequest, SnapshotReadCommand,
         SnapshotReadReply, UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use serde_json::json;
@@ -842,10 +900,10 @@ mod tests {
         }
     }
 
-    fn expect_run_root_scan_reply(reply: CommandReply) -> RunRootScanReply {
+    fn expect_start_root_scan_reply(reply: CommandReply) -> StartRootScanReply {
         match reply {
-            CommandReply::LibraryRoots(LibraryRootReply::RunRootScan(reply)) => reply,
-            other => panic!("expected run root scan reply, got {other:?}"),
+            CommandReply::LibraryRoots(LibraryRootReply::StartRootScan(reply)) => reply,
+            other => panic!("expected start root scan reply, got {other:?}"),
         }
     }
 
@@ -955,9 +1013,9 @@ mod tests {
         )))
     }
 
-    fn run_root_scan(service: &LibraryBoundaryService, root_id: i64) -> RunRootScanReply {
-        expect_run_root_scan_reply(expect_success(service.handle_command(
-            CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(RunRootScanRequest {
+    fn start_root_scan(service: &LibraryBoundaryService, root_id: i64) -> StartRootScanReply {
+        expect_start_root_scan_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryRoots(LibraryRootCommand::StartRootScan(StartRootScanRequest {
                 root_id,
             })),
         )))
@@ -1026,11 +1084,25 @@ mod tests {
             Some(&json!(registered.canonical_path.clone()))
         );
 
-        let scan = run_root_scan(&service, registered.root_id);
-        assert_eq!(scan.root_id, registered.root_id);
+        let scan = start_root_scan(&service, registered.root_id);
         assert!(scan.scan_run_id > 0);
-        assert_eq!(scan.discovered_file_count, 1);
-        assert_eq!(scan.queued_source_work_items, 1);
+
+        let mut scan_completed = false;
+        for _ in 0..20 {
+            let events_reply = read_after_events(&service, None, 32);
+            scan_completed = events_reply.events.iter().any(|e| {
+                let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
+                    return false;
+                };
+                se.kind == library_boundary_protocol::SourceScanEventKind::SourceScanCompleted
+                    && se.root_id == registered.root_id
+            });
+            if scan_completed {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        assert!(scan_completed, "scan should complete on a tiny directory");
 
         let root_reply = read_library_tree_children(
             &service,
@@ -1323,7 +1395,7 @@ mod tests {
     fn invalid_command_input_maps_to_protocol_error_outcome() {
         let (_tempdir, _context, service) = open_service_with_context();
         let command =
-            CommandRequest::LibraryRoots(LibraryRootCommand::RunRootScan(RunRootScanRequest {
+            CommandRequest::LibraryRoots(LibraryRootCommand::StartRootScan(StartRootScanRequest {
                 root_id: 0,
             }));
 
