@@ -108,9 +108,12 @@ function eventsReply(events: readonly LibraryBoundaryEvent[]): CommandOutcome {
   return success({
     type: "libraryBoundaryEvents",
     payload: {
-      type: "readPending",
+      type: "readAfter",
       payload: {
-        events: [...events]
+        events: [...events],
+        latestEventSequence: null,
+        earliestRetainedSequence: null,
+        gapDetected: false
       }
     }
   });
@@ -304,11 +307,11 @@ async function validatesSessionPumpFlow(): Promise<void> {
     {
       type: "libraryBoundaryEvents",
       payload: {
-        type: "readPending",
-        payload: { maxEvents: 8 }
+        type: "readAfter",
+        payload: { lastSeenEventSequence: null, maxEvents: 8 }
       }
     } satisfies CommandRequest,
-    "session pump sends the explicit event drain command"
+    "session pump sends the explicit event cursor read command"
   );
   deepEqual(
     batch.changedScopes,

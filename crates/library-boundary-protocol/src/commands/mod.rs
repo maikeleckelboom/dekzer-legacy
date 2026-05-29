@@ -75,17 +75,21 @@ mod tests {
         CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, CommandSuccessEnvelope,
         CreatePlaylistReply, CreatePlaylistRequest, LibraryBoundaryEventStreamCommand,
         LibraryBoundaryEventStreamReply, LibraryRootCommand, LibraryRootReply,
-        PlaylistWriteCommand, PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsRequest,
-        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsReply, RunRootScanReply,
-        RunRootScanRequest, SnapshotReadCommand, SnapshotReadReply,
+        PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
+        ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsReply, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
+        SnapshotReadReply,
     };
     use serde_json::json;
 
     #[test]
     fn command_center_routes_maintained_and_playlist_command_families() {
         let session_events =
-            CommandRequest::LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand::ReadPending(
-                ReadLibraryBoundaryEventsRequest { max_events: 32 },
+            CommandRequest::LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand::ReadAfter(
+                ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence: None,
+                    max_events: 32,
+                },
             ));
         let playlist_write = CommandRequest::PlaylistWrite(PlaylistWriteCommand::CreatePlaylist(
             CreatePlaylistRequest {
@@ -196,8 +200,13 @@ mod tests {
     #[test]
     fn event_stream_reply_round_trips_through_outer_reply_family() {
         let reply =
-            CommandReply::LibraryBoundaryEvents(LibraryBoundaryEventStreamReply::ReadPending(
-                super::ReadLibraryBoundaryEventsReply { events: Vec::new() },
+            CommandReply::LibraryBoundaryEvents(LibraryBoundaryEventStreamReply::ReadAfter(
+                super::ReadLibraryBoundaryEventsAfterReply {
+                    events: Vec::new(),
+                    latest_event_sequence: Some(0),
+                    earliest_retained_sequence: Some(0),
+                    gap_detected: false,
+                },
             ));
 
         let json = serde_json::to_value(&reply).expect("serialize event reply");
@@ -206,9 +215,12 @@ mod tests {
             json!({
                 "type": "libraryBoundaryEvents",
                 "payload": {
-                    "type": "readPending",
+                    "type": "readAfter",
                     "payload": {
-                        "events": []
+                        "events": [],
+                        "latestEventSequence": 0,
+                        "earliestRetainedSequence": 0,
+                        "gapDetected": false
                     }
                 }
             })

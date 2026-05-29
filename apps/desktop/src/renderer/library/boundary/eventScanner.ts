@@ -2,36 +2,11 @@ import { onMounted, onUnmounted, shallowRef } from 'vue'
 import type { Ref } from 'vue'
 
 import type { RendererApi } from '../../../shared/rendererApi'
-
-// Minimal local event types to avoid cross-package dependency in web build.
-type SourceScanEventKind =
-  | 'sourceScanStarted'
-  | 'sourceScanProgressed'
-  | 'sourceScanCompleted'
-  | 'sourceScanFailed'
-  | 'sourceScanBlocked'
-
-type SourceScanEvent = {
-  readonly eventSequence: number
-  readonly occurredAtMs: number
-  readonly kind: SourceScanEventKind
-  readonly rootId: string
-  readonly scanRunId: string
-  readonly phase: string
-  readonly directoriesVisited: number
-  readonly filesVisited: number
-  readonly filesDiscovered: number
-  readonly mediaCandidates: number
-  readonly queuedWorkItems: number
-  readonly detail: string | null
-}
-
-type LibraryBoundaryEvent =
-  | { readonly type: 'sourceScanEvent'; readonly payload: SourceScanEvent }
-  | {
-      readonly type: 'maintainedSnapshotInvalidated'
-      readonly payload: unknown
-    }
+import {
+  parseBoundaryEvent,
+  type AppBoundaryEvent,
+  type AppSourceScanEvent
+} from '../../../shared/libraryBoundary/eventParser'
 
 export type ScanProgressState =
   | { readonly kind: 'idle' }
@@ -65,6 +40,8 @@ export type ScanProgressState =
 
 export type BoundaryEventScannerController = {
   readonly scanProgress: Ref<ReadonlyMap<string, ScanProgressState>>
+  readonly lastReadFailed: Ref<boolean>
+  readonly gapDetected: Ref<boolean>
   readonly start: () => void
   readonly stop: () => void
 }
@@ -94,6 +71,8 @@ export function createBoundaryEventScannerController(
   eventApi: BoundaryEventApi
 ): BoundaryEventScannerController {
   const scanProgress = shallowRef<ReadonlyMap<string, ScanProgressState>>(new Map())
+  const lastReadFailed = shallowRef(false)
+  const gapDetected = shallowRef(false)
   let lastSeenEventSequence: number | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
   let running = false
@@ -109,21 +88,32 @@ export function createBoundaryEventScannerController(
         maxEvents: MAX_EVENTS_PER_POLL
       })
 
-      const events = reply.events as readonly LibraryBoundaryEvent[]
+      lastReadFailed.value = false
 
-      if (events.length > 0) {
-        applyEvents(events)
+      const parsed = (reply.events as readonly unknown[])
+        .map(parseBoundaryEvent)
+        .filter(
+          (event): event is Exclude<AppBoundaryEvent, { type: 'unsupported' }> =>
+            event.type !== 'unsupported'
+        )
+
+      if (parsed.length > 0) {
+        applyEvents(parsed)
+      }
+
+      if (reply.gapDetected) {
+        gapDetected.value = true
       }
 
       if (reply.latestEventSequence !== null) {
         lastSeenEventSequence = reply.latestEventSequence
       }
     } catch {
-      // Silently ignore poll errors
+      lastReadFailed.value = true
     }
   }
 
-  function applyEvents(events: readonly LibraryBoundaryEvent[]): void {
+  function applyEvents(events: ReadonlyArray<AppBoundaryEvent>): void {
     const nextProgress = new Map(scanProgress.value)
 
     for (const event of events) {
@@ -159,12 +149,14 @@ export function createBoundaryEventScannerController(
 
   return {
     scanProgress,
+    lastReadFailed,
+    gapDetected,
     start,
     stop
   }
 }
 
-function scanProgressFromEvent(event: SourceScanEvent): ScanProgressState {
+function scanProgressFromEvent(event: AppSourceScanEvent): ScanProgressState {
   switch (event.kind) {
     case 'sourceScanStarted':
     case 'sourceScanProgressed':

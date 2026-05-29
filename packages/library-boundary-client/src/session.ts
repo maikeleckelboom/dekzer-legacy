@@ -189,7 +189,8 @@ export class LibraryBoundarySession {
   ): Promise<LibraryBoundaryInvalidationBatch> {
     let batch: LibraryBoundaryInvalidationBatch;
     try {
-      const reply = await this.client.readPendingBoundaryEvents({
+      const reply = await this.client.readAfterBoundaryEvents({
+        lastSeenEventSequence: null,
         maxEvents
       });
       batch = this.collectInvalidations(reply.events);

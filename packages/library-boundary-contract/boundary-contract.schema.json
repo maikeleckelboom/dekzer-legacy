@@ -1302,22 +1302,6 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadLibraryBoundaryEventsRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "readPending"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
               "$ref": "#/$defs/ReadLibraryBoundaryEventsAfterRequest"
             },
             "type": {
@@ -1334,22 +1318,6 @@
     },
     "LibraryBoundaryEventStreamReply": {
       "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/ReadLibraryBoundaryEventsReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "readPending"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
         {
           "type": "object",
           "properties": {
@@ -2519,14 +2487,26 @@
     "ReadLibraryBoundaryEventsAfterReply": {
       "type": "object",
       "properties": {
+        "earliestRetainedSequence": {
+          "description": "The earliest sequence still retained in the event ring buffer.\nIf the caller asks for events after a sequence lower than this,\nsome events have been compacted away.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
         "events": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/LibraryBoundaryEvent"
           }
         },
+        "gapDetected": {
+          "description": "True when the caller's `lastSeenEventSequence` is older than the\nearliest retained event, meaning events were compacted away.",
+          "type": "boolean"
+        },
         "latestEventSequence": {
-          "description": "The highest event sequence included in this reply,\nso the caller can store it for the next read-after call.",
+          "description": "The highest event sequence available at the time of the read,\nso the caller can store it for the next read-after call.\nAlways returned after the first published event,\neven when no new events are returned in this reply.",
           "type": [
             "integer",
             "null"
@@ -2535,47 +2515,21 @@
         }
       },
       "required": [
-        "events"
+        "events",
+        "gapDetected"
       ]
     },
     "ReadLibraryBoundaryEventsAfterRequest": {
       "type": "object",
       "properties": {
         "lastSeenEventSequence": {
-          "description": "The last event sequence the caller has already observed.\n`None` means start from the current tail.",
+          "description": "The last event sequence the caller has already observed.\n`None` means start from the beginning.",
           "type": [
             "integer",
             "null"
           ],
           "format": "int64"
         },
-        "maxEvents": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "maxEvents"
-      ]
-    },
-    "ReadLibraryBoundaryEventsReply": {
-      "type": "object",
-      "properties": {
-        "events": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/LibraryBoundaryEvent"
-          }
-        }
-      },
-      "required": [
-        "events"
-      ]
-    },
-    "ReadLibraryBoundaryEventsRequest": {
-      "type": "object",
-      "properties": {
         "maxEvents": {
           "type": "integer",
           "format": "uint",

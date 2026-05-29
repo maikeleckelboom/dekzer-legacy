@@ -113,7 +113,6 @@ export function createFakeClient(
     createPlaylist: rejectUnexpectedClientCall,
     renamePlaylist: rejectUnexpectedClientCall,
     deletePlaylist: rejectUnexpectedClientCall,
-    readPendingBoundaryEvents: rejectUnexpectedClientCall,
     ...overrides
   } as LibraryBoundaryHostClient
 }

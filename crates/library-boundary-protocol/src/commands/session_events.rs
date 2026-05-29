@@ -12,25 +12,9 @@ use crate::events::LibraryBoundaryEvent;
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLibraryBoundaryEventsRequest {
-    pub max_events: usize,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    ts_rs::TS,
-)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
 pub struct ReadLibraryBoundaryEventsAfterRequest {
     /// The last event sequence the caller has already observed.
-    /// `None` means start from the current tail.
+    /// `None` means start from the beginning.
     pub last_seen_event_sequence: Option<i64>,
     pub max_events: usize,
 }
@@ -47,27 +31,20 @@ pub struct ReadLibraryBoundaryEventsAfterRequest {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLibraryBoundaryEventsReply {
-    pub events: Vec<LibraryBoundaryEvent>,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    ts_rs::TS,
-)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
 pub struct ReadLibraryBoundaryEventsAfterReply {
     pub events: Vec<LibraryBoundaryEvent>,
-    /// The highest event sequence included in this reply,
+    /// The highest event sequence available at the time of the read,
     /// so the caller can store it for the next read-after call.
+    /// Always returned after the first published event,
+    /// even when no new events are returned in this reply.
     pub latest_event_sequence: Option<i64>,
+    /// The earliest sequence still retained in the event ring buffer.
+    /// If the caller asks for events after a sequence lower than this,
+    /// some events have been compacted away.
+    pub earliest_retained_sequence: Option<i64>,
+    /// True when the caller's `lastSeenEventSequence` is older than the
+    /// earliest retained event, meaning events were compacted away.
+    pub gap_detected: bool,
 }
 
 #[derive(
@@ -83,7 +60,6 @@ pub struct ReadLibraryBoundaryEventsAfterReply {
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum LibraryBoundaryEventStreamCommand {
-    ReadPending(ReadLibraryBoundaryEventsRequest),
     ReadAfter(ReadLibraryBoundaryEventsAfterRequest),
 }
 
@@ -100,31 +76,15 @@ pub enum LibraryBoundaryEventStreamCommand {
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum LibraryBoundaryEventStreamReply {
-    ReadPending(ReadLibraryBoundaryEventsReply),
     ReadAfter(ReadLibraryBoundaryEventsAfterReply),
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        LibraryBoundaryEventStreamCommand, ReadLibraryBoundaryEventsAfterRequest,
-        ReadLibraryBoundaryEventsRequest,
-    };
+    use super::{LibraryBoundaryEventStreamCommand, ReadLibraryBoundaryEventsAfterRequest};
 
     #[test]
-    fn library_boundary_event_stream_supports_both_read_pending_and_read_after() {
-        let pending =
-            LibraryBoundaryEventStreamCommand::ReadPending(ReadLibraryBoundaryEventsRequest {
-                max_events: 16,
-            });
-
-        match pending {
-            LibraryBoundaryEventStreamCommand::ReadPending(request) => {
-                assert_eq!(request.max_events, 16);
-            }
-            _ => panic!("expected read pending"),
-        }
-
+    fn read_after_with_cursor_requests_next_events() {
         let after =
             LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
                 last_seen_event_sequence: Some(42),
@@ -136,12 +96,11 @@ mod tests {
                 assert_eq!(request.last_seen_event_sequence, Some(42));
                 assert_eq!(request.max_events, 16);
             }
-            _ => panic!("expected read after"),
         }
     }
 
     #[test]
-    fn read_after_with_none_sequence_starts_from_tail() {
+    fn read_after_with_none_sequence_starts_from_beginning() {
         let after =
             LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
                 last_seen_event_sequence: None,
@@ -153,7 +112,6 @@ mod tests {
                 assert_eq!(request.last_seen_event_sequence, None);
                 assert_eq!(request.max_events, 8);
             }
-            _ => panic!("expected read after"),
         }
     }
 }

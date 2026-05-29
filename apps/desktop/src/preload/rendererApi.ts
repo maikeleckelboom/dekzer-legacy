@@ -28,8 +28,7 @@ import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
   BoundaryEventReadAfterReply,
   BoundaryEventReadAfterRequest,
-  BoundaryEventReadPendingReply,
-  BoundaryEventReadPendingRequest
+  BoundaryEventReadResult
 } from '../shared/libraryBoundary/events'
 import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../shared/libraryRoots/readLocalRoots'
@@ -150,21 +149,17 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         }
       },
       events: {
-        async readPending(
-          request: BoundaryEventReadPendingRequest
-        ): Promise<BoundaryEventReadPendingReply> {
-          return (await ipcRenderer.invoke(
-            boundaryEventChannels.readPending,
-            request
-          )) as BoundaryEventReadPendingReply
-        },
         async readAfter(
           request: BoundaryEventReadAfterRequest
         ): Promise<BoundaryEventReadAfterReply> {
-          return (await ipcRenderer.invoke(
+          const result = (await ipcRenderer.invoke(
             boundaryEventChannels.readAfter,
             request
-          )) as BoundaryEventReadAfterReply
+          )) as BoundaryEventReadResult
+          if (result.kind === 'failed') {
+            throw new Error(result.detail)
+          }
+          return result.reply
         }
       }
     }

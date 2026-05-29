@@ -1,34 +1,21 @@
 import type {
-  ReadLibraryBoundaryEventsAfterReply,
-  ReadLibraryBoundaryEventsReply
+  ReadLibraryBoundaryEventsAfterReply
 } from '@dekzer/library-boundary-contract'
 
 import type { LibraryBoundaryHost } from '../libraryBoundary/host'
 import {
   boundaryEventChannels,
   type BoundaryEventReadAfterRequest,
-  type BoundaryEventReadPendingRequest
+  type BoundaryEventReadResult
 } from '../../shared/libraryBoundary/events'
 
-export type { BoundaryEventReadAfterRequest, BoundaryEventReadPendingRequest }
+export type { BoundaryEventReadAfterRequest }
 
 export type BoundaryEventIpcMain = {
   handle(
     channel: string,
     listener: (event: unknown, request: unknown) => Promise<unknown>
   ): void
-}
-
-function isBoundaryEventReadPendingRequest(
-  request: unknown
-): request is BoundaryEventReadPendingRequest {
-  return (
-    typeof request === 'object' &&
-    request !== null &&
-    'maxEvents' in request &&
-    typeof (request as BoundaryEventReadPendingRequest).maxEvents === 'number' &&
-    !('lastSeenEventSequence' in request)
-  )
 }
 
 function isBoundaryEventReadAfterRequest(
@@ -47,38 +34,32 @@ export function registerBoundaryEventIpc(
   host: LibraryBoundaryHost
 ): void {
   ipcMain.handle(
-    boundaryEventChannels.readPending,
-    async (_event, request): Promise<ReadLibraryBoundaryEventsReply> => {
-      if (!isBoundaryEventReadPendingRequest(request)) {
-        return { events: [] }
-      }
-
-      try {
-        const client = host.client
-        return await client.readPendingBoundaryEvents({
-          maxEvents: request.maxEvents
-        })
-      } catch {
-        return { events: [] }
-      }
-    }
-  )
-
-  ipcMain.handle(
     boundaryEventChannels.readAfter,
-    async (_event, request): Promise<ReadLibraryBoundaryEventsAfterReply> => {
+    async (_event, request): Promise<BoundaryEventReadResult> => {
       if (!isBoundaryEventReadAfterRequest(request)) {
-        return { events: [], latestEventSequence: null }
+        return { kind: 'failed', detail: 'invalid request shape' }
       }
 
       try {
         const client = host.client
-        return await client.readAfterBoundaryEvents({
-          lastSeenEventSequence: request.lastSeenEventSequence,
-          maxEvents: request.maxEvents
-        })
-      } catch {
-        return { events: [], latestEventSequence: null }
+        const reply: ReadLibraryBoundaryEventsAfterReply =
+          await client.readAfterBoundaryEvents({
+            lastSeenEventSequence: request.lastSeenEventSequence,
+            maxEvents: request.maxEvents
+          })
+        return {
+          kind: 'ready',
+          reply: {
+            events: reply.events,
+            latestEventSequence: reply.latestEventSequence,
+            earliestRetainedSequence: reply.earliestRetainedSequence,
+            gapDetected: reply.gapDetected
+          }
+        }
+      } catch (error) {
+        const detail =
+          error instanceof Error ? error.message : 'boundary event read failed'
+        return { kind: 'failed', detail }
       }
     }
   )

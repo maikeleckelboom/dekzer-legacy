@@ -4,9 +4,7 @@ import type {
 } from './libraryBoundary/status'
 import type {
   BoundaryEventReadAfterRequest,
-  BoundaryEventReadAfterReply,
-  BoundaryEventReadPendingRequest,
-  BoundaryEventReadPendingReply
+  BoundaryEventReadAfterReply
 } from './libraryBoundary/events'
 import type {
   LibraryViewStateReadResult,
@@ -42,7 +40,6 @@ export type LibraryApi = {
 }
 
 export type LibraryBoundaryEventApi = {
-  readPending(request: BoundaryEventReadPendingRequest): Promise<BoundaryEventReadPendingReply>
   readAfter(request: BoundaryEventReadAfterRequest): Promise<BoundaryEventReadAfterReply>
 }
 

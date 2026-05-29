@@ -4,14 +4,12 @@
 
 export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "playlistWrite", "payload": PlaylistWriteCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
 
-export type LibraryBoundaryEventStreamCommand = { "type": "readPending", "payload": ReadLibraryBoundaryEventsRequest } | { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterRequest };
-
-export type ReadLibraryBoundaryEventsRequest = { maxEvents: number, };
+export type LibraryBoundaryEventStreamCommand = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterRequest };
 
 export type ReadLibraryBoundaryEventsAfterRequest = { 
 /**
  * The last event sequence the caller has already observed.
- * `None` means start from the current tail.
+ * `None` means start from the beginning.
  */
 lastSeenEventSequence: number | null, maxEvents: number, };
 
@@ -75,16 +73,27 @@ export type ReadLibraryAssetPreparationDetailRequest = { libraryAssetId: string,
 
 export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "playlistWrite", "payload": PlaylistWriteReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
 
-export type LibraryBoundaryEventStreamReply = { "type": "readPending", "payload": ReadLibraryBoundaryEventsReply } | { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterReply };
-
-export type ReadLibraryBoundaryEventsReply = { events: Array<LibraryBoundaryEvent>, };
+export type LibraryBoundaryEventStreamReply = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterReply };
 
 export type ReadLibraryBoundaryEventsAfterReply = { events: Array<LibraryBoundaryEvent>, 
 /**
- * The highest event sequence included in this reply,
+ * The highest event sequence available at the time of the read,
  * so the caller can store it for the next read-after call.
+ * Always returned after the first published event,
+ * even when no new events are returned in this reply.
  */
-latestEventSequence: number | null, };
+latestEventSequence: number | null, 
+/**
+ * The earliest sequence still retained in the event ring buffer.
+ * If the caller asks for events after a sequence lower than this,
+ * some events have been compacted away.
+ */
+earliestRetainedSequence: number | null, 
+/**
+ * True when the caller's `lastSeenEventSequence` is older than the
+ * earliest retained event, meaning events were compacted away.
+ */
+gapDetected: boolean, };
 
 export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "runRootScan", "payload": RunRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootReply };
 

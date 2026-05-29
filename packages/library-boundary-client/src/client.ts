@@ -11,8 +11,6 @@ import type {
   LoadNavigationRowRequest,
   ReadLibraryBoundaryEventsAfterReply,
   ReadLibraryBoundaryEventsAfterRequest,
-  ReadLibraryBoundaryEventsReply,
-  ReadLibraryBoundaryEventsRequest,
   ReadLibraryTreeChildrenReply,
   ReadLibraryTreeChildrenRequest,
   ReadLocalRootsReply,
@@ -243,19 +241,6 @@ export class LibraryBoundaryClient {
       },
       "playlistWrite",
       "deletePlaylist"
-    );
-  }
-
-  readPendingBoundaryEvents(
-    request: ReadLibraryBoundaryEventsRequest
-  ): Promise<ReadLibraryBoundaryEventsReply> {
-    return this.sendAndExpect(
-      {
-        type: "libraryBoundaryEvents",
-        payload: { type: "readPending", payload: request }
-      },
-      "libraryBoundaryEvents",
-      "readPending"
     );
   }
 

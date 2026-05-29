@@ -26,7 +26,6 @@ pub fn generated_contract_index_ts() -> String {
 
     push_ts_decl::<CommandRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBoundaryEventStreamCommand>(&cfg, &mut output);
-    push_ts_decl::<crate::ReadLibraryBoundaryEventsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryBoundaryEventsAfterRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryRootCommand>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootRequest>(&cfg, &mut output);
@@ -59,7 +58,6 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadLibraryAssetPreparationDetailRequest>(&cfg, &mut output);
     push_ts_decl::<crate::CommandReply>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBoundaryEventStreamReply>(&cfg, &mut output);
-    push_ts_decl::<crate::ReadLibraryBoundaryEventsReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryBoundaryEventsAfterReply>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootReply>(&cfg, &mut output);

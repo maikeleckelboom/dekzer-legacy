@@ -70,16 +70,11 @@ impl LibraryBoundaryEventStream {
         );
     }
 
-    pub(crate) fn drain(&self, max_events: usize) -> Vec<LibraryBoundaryEvent> {
-        let mut state = self.state.lock().expect("boundary event stream poisoned");
-        state.drain(max_events)
-    }
-
     pub(crate) fn read_after(
         &self,
         last_seen_event_sequence: Option<i64>,
         max_events: usize,
-    ) -> (Vec<LibraryBoundaryEvent>, Option<i64>) {
+    ) -> (Vec<LibraryBoundaryEvent>, Option<i64>, Option<i64>, bool) {
         let state = self.state.lock().expect("boundary event stream poisoned");
         state.read_after(last_seen_event_sequence, max_events)
     }
@@ -88,10 +83,9 @@ impl LibraryBoundaryEventStream {
 #[derive(Debug, Default)]
 struct LibraryBoundaryEventStreamState {
     next_sequence: i64,
+    latest_published_sequence: Option<i64>,
     stored_events: VecDeque<LibraryBoundaryEvent>,
     observed_revisions: BTreeMap<MaintainedSnapshotScope, MaintainedSnapshotRevision>,
-    pending_order: VecDeque<MaintainedSnapshotScope>,
-    pending_invalidations: BTreeMap<MaintainedSnapshotScope, MaintainedSnapshotInvalidation>,
 }
 
 impl LibraryBoundaryEventStreamState {
@@ -128,8 +122,9 @@ impl LibraryBoundaryEventStreamState {
         queued_work_items: usize,
         detail: Option<String>,
     ) {
+        let sequence = self.next_sequence();
         let event = LibraryBoundaryEvent::SourceScanEvent(SourceScanEvent {
-            event_sequence: self.next_sequence(),
+            event_sequence: sequence,
             occurred_at_ms: Self::current_time_ms(),
             kind,
             root_id,
@@ -142,6 +137,7 @@ impl LibraryBoundaryEventStreamState {
             queued_work_items,
             detail,
         });
+        self.latest_published_sequence = Some(sequence);
         self.push_event(event);
     }
 
@@ -162,55 +158,36 @@ impl LibraryBoundaryEventStreamState {
     }
 
     fn publish_invalidation(&mut self, invalidation: MaintainedSnapshotInvalidation) {
-        if let Some(pending) = self.pending_invalidations.get_mut(&invalidation.scope) {
-            pending.revision = coalesce_revision(pending.revision, invalidation.revision);
-            return;
-        }
-
-        self.pending_order.push_back(invalidation.scope);
-        self.pending_invalidations
-            .insert(invalidation.scope, invalidation);
-    }
-
-    fn drain(&mut self, max_events: usize) -> Vec<LibraryBoundaryEvent> {
-        let mut events = Vec::with_capacity(max_events.min(self.pending_order.len()));
-
-        while events.len() < max_events {
-            let Some(scope) = self.pending_order.pop_front() else {
-                break;
-            };
-            let Some(invalidation) = self.pending_invalidations.remove(&scope) else {
-                continue;
-            };
-
-            let sequence = self.next_sequence();
-            let event = LibraryBoundaryEvent::MaintainedSnapshotInvalidated(
-                MaintainedSnapshotEvent {
-                    event_sequence: sequence,
-                    occurred_at_ms: Self::current_time_ms(),
-                    invalidation,
-                },
-            );
-            self.push_event(event.clone());
-            events.push(event);
-        }
-        events
+        let sequence = self.next_sequence();
+        let event = LibraryBoundaryEvent::MaintainedSnapshotInvalidated(
+            MaintainedSnapshotEvent {
+                event_sequence: sequence,
+                occurred_at_ms: Self::current_time_ms(),
+                invalidation,
+            },
+        );
+        self.latest_published_sequence = Some(sequence);
+        self.push_event(event);
     }
 
     fn read_after(
         &self,
         last_seen_event_sequence: Option<i64>,
         max_events: usize,
-    ) -> (Vec<LibraryBoundaryEvent>, Option<i64>) {
+    ) -> (Vec<LibraryBoundaryEvent>, Option<i64>, Option<i64>, bool) {
         let start_from = match last_seen_event_sequence {
             Some(seq) => seq + 1,
-            None => {
-                let latest = self
-                    .stored_events
-                    .back()
-                    .map(|e| Self::event_sequence(e));
-                return (Vec::new(), latest);
-            }
+            None => 0,
+        };
+
+        let earliest_retained = self
+            .stored_events
+            .front()
+            .map(|e| Self::event_sequence(e));
+
+        let gap_detected = match (last_seen_event_sequence, earliest_retained) {
+            (Some(last_seen), Some(earliest)) => last_seen + 1 < earliest,
+            _ => false,
         };
 
         let events: Vec<LibraryBoundaryEvent> = self
@@ -224,9 +201,10 @@ impl LibraryBoundaryEventStreamState {
         let latest = events
             .last()
             .map(|e| Self::event_sequence(e))
-            .or(last_seen_event_sequence);
+            .or(last_seen_event_sequence)
+            .or(self.latest_published_sequence);
 
-        (events, latest)
+        (events, latest, earliest_retained, gap_detected)
     }
 
     fn event_sequence(event: &LibraryBoundaryEvent) -> i64 {
@@ -234,15 +212,5 @@ impl LibraryBoundaryEventStreamState {
             LibraryBoundaryEvent::SourceScanEvent(e) => e.event_sequence,
             LibraryBoundaryEvent::MaintainedSnapshotInvalidated(e) => e.event_sequence,
         }
-    }
-}
-
-fn coalesce_revision(
-    left: Option<MaintainedSnapshotRevision>,
-    right: Option<MaintainedSnapshotRevision>,
-) -> Option<MaintainedSnapshotRevision> {
-    match (left, right) {
-        (Some(left), Some(right)) => Some(left.max(right)),
-        (None, _) | (_, None) => None,
     }
 }

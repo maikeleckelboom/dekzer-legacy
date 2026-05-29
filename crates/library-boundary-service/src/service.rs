@@ -90,23 +90,6 @@ impl LibraryBoundaryService {
         }
     }
 
-    pub fn read_library_boundary_events(
-        &self,
-        request: protocol::ReadLibraryBoundaryEventsRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadLibraryBoundaryEventsReply> {
-        if request.max_events == 0 {
-            return Err(protocol::ProtocolError::InvalidRequest {
-                detail: "libraryBoundaryEvents.readPending maxEvents must be greater than zero"
-                    .to_string(),
-            });
-        }
-
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::ReadLibraryBoundaryEventsReply {
-            events: self.session_events.drain(request.max_events),
-        })
-    }
-
     pub fn read_library_boundary_events_after(
         &self,
         request: protocol::ReadLibraryBoundaryEventsAfterRequest,
@@ -119,12 +102,14 @@ impl LibraryBoundaryService {
         }
 
         self.publish_maintained_snapshot_invalidations()?;
-        let (events, latest_event_sequence) = self
+        let (events, latest_event_sequence, earliest_retained_sequence, gap_detected) = self
             .session_events
             .read_after(request.last_seen_event_sequence, request.max_events);
         Ok(protocol::ReadLibraryBoundaryEventsAfterReply {
             events,
             latest_event_sequence,
+            earliest_retained_sequence,
+            gap_detected,
         })
     }
 
@@ -536,9 +521,6 @@ impl LibraryBoundaryService {
         command: protocol::LibraryBoundaryEventStreamCommand,
     ) -> protocol::ProtocolResult<protocol::LibraryBoundaryEventStreamReply> {
         match command {
-            protocol::LibraryBoundaryEventStreamCommand::ReadPending(request) => self
-                .read_library_boundary_events(request)
-                .map(protocol::LibraryBoundaryEventStreamReply::ReadPending),
             protocol::LibraryBoundaryEventStreamCommand::ReadAfter(request) => self
                 .read_library_boundary_events_after(request)
                 .map(protocol::LibraryBoundaryEventStreamReply::ReadAfter),
@@ -769,8 +751,8 @@ mod tests {
         LibraryRootCommand, LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind,
         LibraryTreePresenceState, LoadNavigationRowByStableKeyReply,
         LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
-        PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsReply,
-        ReadLibraryBoundaryEventsRequest, ReadLibraryTreeChildrenRequest,
+        PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsAfterReply,
+        ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
         RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
         RenamePlaylistRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
         SnapshotReadReply, UnregisterLocalRootReply, UnregisterLocalRootRequest,
@@ -883,14 +865,14 @@ mod tests {
         }
     }
 
-    fn expect_event_stream_read_pending_reply(
+    fn expect_event_stream_read_after_reply(
         reply: CommandReply,
-    ) -> ReadLibraryBoundaryEventsReply {
+    ) -> ReadLibraryBoundaryEventsAfterReply {
         match reply {
-            CommandReply::LibraryBoundaryEvents(LibraryBoundaryEventStreamReply::ReadPending(
+            CommandReply::LibraryBoundaryEvents(LibraryBoundaryEventStreamReply::ReadAfter(
                 reply,
             )) => reply,
-            other => panic!("expected event stream readPending reply, got {other:?}"),
+            other => panic!("expected event stream readAfter reply, got {other:?}"),
         }
     }
 
@@ -981,13 +963,17 @@ mod tests {
         )))
     }
 
-    fn read_pending_events(
+    fn read_after_events(
         service: &LibraryBoundaryService,
+        last_seen_event_sequence: Option<i64>,
         max_events: usize,
-    ) -> ReadLibraryBoundaryEventsReply {
-        expect_event_stream_read_pending_reply(expect_success(service.handle_command(
-            CommandRequest::LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand::ReadPending(
-                ReadLibraryBoundaryEventsRequest { max_events },
+    ) -> ReadLibraryBoundaryEventsAfterReply {
+        expect_event_stream_read_after_reply(expect_success(service.handle_command(
+            CommandRequest::LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand::ReadAfter(
+                ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence,
+                    max_events,
+                },
             )),
         )))
     }
@@ -1018,27 +1004,6 @@ mod tests {
                 LoadNavigationRowByStableKeyRequest { stable_key },
             )),
         )))
-    }
-
-    fn assert_maintained_invalidation_for_scope(
-        event: &LibraryBoundaryEvent,
-        expected_scope: MaintainedSnapshotScope,
-    ) {
-        let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(payload) = event else {
-            panic!("expected maintained snapshot invalidated event");
-        };
-        assert!(payload.event_sequence >= 0);
-        assert!(payload.occurred_at_ms > 0);
-        assert_eq!(payload.invalidation.scope, expected_scope);
-        assert!(
-            payload
-                .invalidation
-                .revision
-                .map(|revision| revision.value() > 0)
-                .unwrap_or(false),
-            "expected positive maintained snapshot revision, got {:?}",
-            payload.invalidation.revision
-        );
     }
 
     #[test]
@@ -1142,38 +1107,59 @@ mod tests {
     }
 
     #[test]
-    fn protocol_commands_read_and_drain_real_snapshot_invalidation_events() {
+    fn protocol_commands_read_snapshot_invalidation_events_via_cursor() {
         let (_tempdir, _context, service) = open_service_with_context();
-        let initially_empty = read_pending_events(&service, 1);
-        assert!(initially_empty.events.is_empty());
+
+        let first_read = read_after_events(&service, None, 16);
+        assert!(first_read.events.is_empty());
+        assert!(
+            first_read.latest_event_sequence.is_none(),
+            "no events published yet, cursor must be None"
+        );
+        assert!(!first_read.gap_detected);
 
         let (_create_json, created) = create_playlist(&service, "Event Test");
         let deleted = delete_playlist(&service, created.playlist_id);
         assert!(deleted.deleted);
 
-        let first_drain = read_pending_events(&service, 1);
-        assert_eq!(first_drain.events.len(), 1);
-        assert_maintained_invalidation_for_scope(
-            &first_drain.events[0],
-            MaintainedSnapshotScope::NavigationRows,
-        );
-
-        let second_drain = read_pending_events(&service, 1);
-        assert_eq!(second_drain.events.len(), 1);
-        assert_maintained_invalidation_for_scope(
-            &second_drain.events[0],
-            MaintainedSnapshotScope::LibraryBrowser,
-        );
-
-        let drained_again = read_pending_events(&service, 1);
+        let second_read = read_after_events(&service, first_read.latest_event_sequence, 16);
         assert!(
-            drained_again.events.is_empty(),
-            "drained events must not replay forever"
+            !second_read.events.is_empty(),
+            "create and delete must produce invalidation events"
         );
+        assert!(
+            second_read.events.iter().any(|e| {
+                let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(payload) = e else {
+                    return false;
+                };
+                payload.invalidation.scope == MaintainedSnapshotScope::NavigationRows
+            }),
+            "events must include NavigationRows invalidation"
+        );
+        assert!(
+            second_read.events.iter().any(|e| {
+                let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(payload) = e else {
+                    return false;
+                };
+                payload.invalidation.scope == MaintainedSnapshotScope::LibraryBrowser
+            }),
+            "events must include LibraryBrowser invalidation"
+        );
+        assert!(second_read.latest_event_sequence.is_some());
+        assert!(!second_read.gap_detected);
+
+        let third_read =
+            read_after_events(&service, second_read.latest_event_sequence, 16);
+        assert!(
+            third_read.events.is_empty(),
+            "cursor advance must not replay consumed events"
+        );
+        assert!(!third_read.gap_detected);
 
         let error = service
             .try_handle_command(CommandRequest::LibraryBoundaryEvents(
-                LibraryBoundaryEventStreamCommand::ReadPending(ReadLibraryBoundaryEventsRequest {
+                LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence: None,
                     max_events: 0,
                 }),
             ))

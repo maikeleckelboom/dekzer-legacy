@@ -1,16 +1,6 @@
 export const boundaryEventChannels = {
-  readPending: 'desktop:library-boundary:read-pending-events',
-  readAfter: 'desktop:library-boundary:read-after-events',
-  eventsChanged: 'desktop:library-boundary:events-changed'
+  readAfter: 'desktop:library-boundary:read-after-events'
 } as const
-
-export type BoundaryEventReadPendingRequest = {
-  readonly maxEvents: number
-}
-
-export type BoundaryEventReadPendingReply = {
-  readonly events: readonly unknown[]
-}
 
 export type BoundaryEventReadAfterRequest = {
   readonly lastSeenEventSequence: number | null
@@ -20,4 +10,10 @@ export type BoundaryEventReadAfterRequest = {
 export type BoundaryEventReadAfterReply = {
   readonly events: readonly unknown[]
   readonly latestEventSequence: number | null
+  readonly earliestRetainedSequence: number | null
+  readonly gapDetected: boolean
 }
+
+export type BoundaryEventReadResult =
+  | { readonly kind: 'ready'; readonly reply: BoundaryEventReadAfterReply }
+  | { readonly kind: 'failed'; readonly detail: string }
