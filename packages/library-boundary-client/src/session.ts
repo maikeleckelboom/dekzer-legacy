@@ -1,5 +1,6 @@
 import type {
   LibraryBoundaryEvent,
+  MaintainedSnapshotEvent,
   MaintainedSnapshotInvalidation,
   MaintainedSnapshotRevision,
   MaintainedSnapshotScope,
@@ -216,8 +217,8 @@ export class LibraryBoundarySession {
         continue;
       }
 
-      const invalidation = event.payload;
-      const accepted = this.acceptInvalidation(invalidation);
+      const envelope = event.payload as MaintainedSnapshotEvent;
+      const accepted = this.acceptInvalidation(envelope.invalidation);
       if (accepted === null) {
         continue;
       }

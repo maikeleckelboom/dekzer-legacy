@@ -8,7 +8,8 @@ use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
     LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
     RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
-    SqliteDurableStore, UnregisterLocalRootInput,
+    RootScanObservation, SqliteDurableStore,
+    UnregisterLocalRootInput,
 };
 
 use crate::session_events::LibraryBoundaryEventStream;
@@ -106,6 +107,27 @@ impl LibraryBoundaryService {
         })
     }
 
+    pub fn read_library_boundary_events_after(
+        &self,
+        request: protocol::ReadLibraryBoundaryEventsAfterRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadLibraryBoundaryEventsAfterReply> {
+        if request.max_events == 0 {
+            return Err(protocol::ProtocolError::InvalidRequest {
+                detail: "libraryBoundaryEvents.readAfter maxEvents must be greater than zero"
+                    .to_string(),
+            });
+        }
+
+        self.publish_maintained_snapshot_invalidations()?;
+        let (events, latest_event_sequence) = self
+            .session_events
+            .read_after(request.last_seen_event_sequence, request.max_events);
+        Ok(protocol::ReadLibraryBoundaryEventsAfterReply {
+            events,
+            latest_event_sequence,
+        })
+    }
+
     pub fn register_local_root(
         &self,
         request: protocol::RegisterLocalRootRequest,
@@ -135,17 +157,138 @@ impl LibraryBoundaryService {
     ) -> protocol::ProtocolResult<protocol::RunRootScanReply> {
         let root_id = require_positive_i64(request.root_id, "rootId")?;
         let scan_started_at_ms = unix_time_ms()?;
-        let scan = self
-            .durable_store
-            .run_root_scan(root_id, scan_started_at_ms)
-            .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::RunRootScanReply {
+
+        self.publish_scan_started(root_id, scan_started_at_ms);
+
+        let event_stream = &self.session_events;
+        let result = self.durable_store.run_root_scan_with_observer(
             root_id,
-            scan_run_id: scan.scan_run_id,
-            discovered_file_count: scan.discovered_file_count,
-            queued_source_work_items: scan.queued_source_work_items,
-        })
+            scan_started_at_ms,
+            |observation| match observation {
+                RootScanObservation::HierarchyPublished {
+                    root_id: obs_root_id,
+                    scan_run_id,
+                    reason: _reason,
+                } => {
+                    event_stream.publish_scan_event(
+                        library_boundary_protocol::SourceScanEventKind::SourceScanProgressed,
+                        obs_root_id,
+                        scan_run_id,
+                        library_boundary_protocol::ScanRunPhase::Scanning,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        None,
+                    );
+                }
+                RootScanObservation::SourceWorkQueued { .. } => {}
+            },
+        );
+
+        match result {
+            Ok(scan) => {
+                self.publish_scan_completed(
+                    root_id,
+                    scan.scan_run_id,
+                    scan.discovered_file_count,
+                    scan.queued_source_work_items,
+                );
+                self.publish_maintained_snapshot_invalidations()?;
+                Ok(protocol::RunRootScanReply {
+                    root_id,
+                    scan_run_id: scan.scan_run_id,
+                    discovered_file_count: scan.discovered_file_count,
+                    queued_source_work_items: scan.queued_source_work_items,
+                })
+            }
+            Err(error) => {
+                self.publish_scan_failed_or_blocked(root_id, &error);
+                Err(map_store_error(error))
+            }
+        }
+    }
+
+    fn publish_scan_started(&self, root_id: i64, _scan_started_at_ms: i64) {
+        self.session_events.publish_scan_event(
+            library_boundary_protocol::SourceScanEventKind::SourceScanStarted,
+            root_id,
+            0,
+            library_boundary_protocol::ScanRunPhase::Scanning,
+            0,
+            0,
+            0,
+            0,
+            0,
+            None,
+        );
+    }
+
+    fn publish_scan_completed(
+        &self,
+        root_id: i64,
+        scan_run_id: i64,
+        discovered_file_count: usize,
+        queued_source_work_items: usize,
+    ) {
+        self.session_events.publish_scan_event(
+            library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
+            root_id,
+            scan_run_id,
+            library_boundary_protocol::ScanRunPhase::Scanning,
+            0,
+            discovered_file_count,
+            discovered_file_count,
+            discovered_file_count,
+            queued_source_work_items,
+            None,
+        );
+    }
+
+    fn publish_scan_failed_or_blocked(
+        &self,
+        root_id: i64,
+        error: &library_store_sqlite::LibrarySqliteError,
+    ) {
+        use library_store_sqlite::{CanonicalErrorCode, LibrarySqliteError};
+
+        let detail = error.to_string();
+        let is_blocked = match error {
+            LibrarySqliteError::Canonical(canonical) => {
+                matches!(canonical.code, CanonicalErrorCode::NotFound)
+            }
+            LibrarySqliteError::RootWorkCancelled { .. } => true,
+            _ => false,
+        };
+
+        if is_blocked {
+            self.session_events.publish_scan_event(
+                library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
+                root_id,
+                0,
+                library_boundary_protocol::ScanRunPhase::Blocked,
+                0,
+                0,
+                0,
+                0,
+                0,
+                Some(detail),
+            );
+        } else {
+            self.session_events.publish_scan_event(
+                library_boundary_protocol::SourceScanEventKind::SourceScanFailed,
+                root_id,
+                0,
+                library_boundary_protocol::ScanRunPhase::Scanning,
+                0,
+                0,
+                0,
+                0,
+                0,
+                Some(detail),
+            );
+        }
     }
 
     pub fn create_playlist(
@@ -396,6 +539,9 @@ impl LibraryBoundaryService {
             protocol::LibraryBoundaryEventStreamCommand::ReadPending(request) => self
                 .read_library_boundary_events(request)
                 .map(protocol::LibraryBoundaryEventStreamReply::ReadPending),
+            protocol::LibraryBoundaryEventStreamCommand::ReadAfter(request) => self
+                .read_library_boundary_events_after(request)
+                .map(protocol::LibraryBoundaryEventStreamReply::ReadAfter),
         }
     }
 
@@ -878,15 +1024,20 @@ mod tests {
         event: &LibraryBoundaryEvent,
         expected_scope: MaintainedSnapshotScope,
     ) {
-        let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(invalidation) = event;
-        assert_eq!(invalidation.scope, expected_scope);
+        let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(payload) = event else {
+            panic!("expected maintained snapshot invalidated event");
+        };
+        assert!(payload.event_sequence >= 0);
+        assert!(payload.occurred_at_ms > 0);
+        assert_eq!(payload.invalidation.scope, expected_scope);
         assert!(
-            invalidation
+            payload
+                .invalidation
                 .revision
                 .map(|revision| revision.value() > 0)
                 .unwrap_or(false),
             "expected positive maintained snapshot revision, got {:?}",
-            invalidation.revision
+            payload.invalidation.revision
         );
     }
 

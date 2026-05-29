@@ -9,6 +9,8 @@ import type {
   LoadNavigationRowByStableKeyRequest,
   LoadNavigationRowReply,
   LoadNavigationRowRequest,
+  ReadLibraryBoundaryEventsAfterReply,
+  ReadLibraryBoundaryEventsAfterRequest,
   ReadLibraryBoundaryEventsReply,
   ReadLibraryBoundaryEventsRequest,
   ReadLibraryTreeChildrenReply,
@@ -254,6 +256,19 @@ export class LibraryBoundaryClient {
       },
       "libraryBoundaryEvents",
       "readPending"
+    );
+  }
+
+  readAfterBoundaryEvents(
+    request: ReadLibraryBoundaryEventsAfterRequest
+  ): Promise<ReadLibraryBoundaryEventsAfterReply> {
+    return this.sendAndExpect(
+      {
+        type: "libraryBoundaryEvents",
+        payload: { type: "readAfter", payload: request }
+      },
+      "libraryBoundaryEvents",
+      "readAfter"
     );
   }
 

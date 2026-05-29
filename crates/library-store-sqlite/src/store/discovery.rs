@@ -35,8 +35,7 @@ pub struct RootScanMaterializationResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
-pub(crate) enum RootScanObservation {
+pub enum RootScanObservation {
     HierarchyPublished {
         root_id: i64,
         scan_run_id: i64,
@@ -49,7 +48,7 @@ pub(crate) enum RootScanObservation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RootScanHierarchyObservationReason {
+pub enum RootScanHierarchyObservationReason {
     ChunkCommitted,
     Finalized,
 }
@@ -62,6 +61,24 @@ impl SqliteDurableStore {
     ) -> LibrarySqliteResult<RootScanMaterializationResult> {
         let root_path = self.read_root_scan_path(root_id)?;
         self.execute_root_scan_materialization(root_id, root_path, scan_started_at_ms)
+    }
+
+    pub fn run_root_scan_with_observer<F>(
+        &self,
+        root_id: i64,
+        scan_started_at_ms: i64,
+        observe: F,
+    ) -> LibrarySqliteResult<RootScanMaterializationResult>
+    where
+        F: FnMut(RootScanObservation),
+    {
+        let root_path = self.read_root_scan_path(root_id)?;
+        self.execute_root_scan_materialization_with_observer(
+            root_id,
+            &root_path,
+            scan_started_at_ms,
+            observe,
+        )
     }
 
     pub(crate) fn read_mount_epoch_stamp_for_root(
@@ -171,8 +188,7 @@ impl SqliteDurableStore {
         )
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn execute_root_scan_materialization_with_observer<F>(
+    pub fn execute_root_scan_materialization_with_observer<F>(
         &self,
         root_id: i64,
         root_path: &Path,

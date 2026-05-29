@@ -3,6 +3,12 @@ import type {
   LibraryBoundaryHostStatusChangedCallback
 } from './libraryBoundary/status'
 import type {
+  BoundaryEventReadAfterRequest,
+  BoundaryEventReadAfterReply,
+  BoundaryEventReadPendingRequest,
+  BoundaryEventReadPendingReply
+} from './libraryBoundary/events'
+import type {
   LibraryViewStateReadResult,
   LibraryViewStateWriteResult,
   PersistedLibraryViewState
@@ -32,6 +38,12 @@ export type LibraryApi = {
   readonly contents: LibraryContentsApi
   readonly roots: LibraryRootsApi
   readonly viewState: LibraryViewStateApi
+  readonly events: LibraryBoundaryEventApi
+}
+
+export type LibraryBoundaryEventApi = {
+  readPending(request: BoundaryEventReadPendingRequest): Promise<BoundaryEventReadPendingReply>
+  readAfter(request: BoundaryEventReadAfterRequest): Promise<BoundaryEventReadAfterReply>
 }
 
 export type LibraryHostApi = {

@@ -5,6 +5,7 @@ import { CircleXIcon, Icon, ScanIcon } from '../icons'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
+import { useBoundaryEventScanner, type ScanProgressState } from './boundary/eventScanner'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import {
@@ -50,6 +51,15 @@ const viewStateStore = createViewStateStore()
 const hierarchyRead = useLibraryHierarchyRead()
 const contentsRead = useContentsRead()
 const rootActions = useLocalRootActions()
+const eventScanner = useBoundaryEventScanner()
+
+const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
+  const root = rootActions.registeredRoot.value
+  if (root === undefined) {
+    return undefined
+  }
+  return eventScanner.scanProgress.value.get(root.rootId)
+})
 
 const rootLifecycle = useRootLifecycle({
   rootActions,
@@ -141,6 +151,7 @@ const operationFeedback = computed(() =>
     registeredRootPath: rootActions.registeredRootPath.value,
     scanStatus: rootActions.scanStatus.value,
     scanSummary: rootActions.scanSummary.value,
+    scanProgressFromEvents: scanProgressForRegisteredRoot.value,
     ...(rootActions.scanFailureMessage.value === undefined
       ? {}
       : { scanFailureMessage: rootActions.scanFailureMessage.value }),

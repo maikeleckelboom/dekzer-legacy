@@ -11,6 +11,7 @@ import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
 import { registerUnregisterLocalRootIpc } from './libraryRoots/unregisterLocalRoot'
 import { registerLibraryViewStateIpc } from './libraryViewState/viewState'
+import { registerBoundaryEventIpc } from './libraryBoundary/events'
 import { HostStatusController, registerHostStatusIpc } from './libraryBoundary/status'
 import { hostStatusChannels } from '../shared/libraryBoundary/status'
 
@@ -72,6 +73,7 @@ app.whenReady().then(() => {
   registerReadLocalRootsIpc(ipcMain, host)
   registerUnregisterLocalRootIpc(ipcMain, host)
   registerLibraryViewStateIpc(ipcMain, host)
+  registerBoundaryEventIpc(ipcMain, host)
   hostStatusController.onStatusChanged((status) => {
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(hostStatusChannels.statusChanged, status)

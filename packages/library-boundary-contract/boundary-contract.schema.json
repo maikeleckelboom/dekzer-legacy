@@ -1266,7 +1266,23 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/MaintainedSnapshotInvalidation"
+              "$ref": "#/$defs/SourceScanEvent"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceScanEvent"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MaintainedSnapshotEvent"
             },
             "type": {
               "type": "string",
@@ -1297,6 +1313,22 @@
             "type",
             "payload"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadLibraryBoundaryEventsAfterRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readAfter"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
         }
       ]
     },
@@ -1311,6 +1343,22 @@
             "type": {
               "type": "string",
               "const": "readPending"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadLibraryBoundaryEventsAfterReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "readAfter"
             }
           },
           "required": [
@@ -1844,6 +1892,27 @@
       "enum": [
         "available",
         "unavailable"
+      ]
+    },
+    "MaintainedSnapshotEvent": {
+      "type": "object",
+      "properties": {
+        "eventSequence": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "invalidation": {
+          "$ref": "#/$defs/MaintainedSnapshotInvalidation"
+        },
+        "occurredAtMs": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "eventSequence",
+        "occurredAtMs",
+        "invalidation"
       ]
     },
     "MaintainedSnapshotInvalidation": {
@@ -2447,6 +2516,49 @@
         "libraryAssetId"
       ]
     },
+    "ReadLibraryBoundaryEventsAfterReply": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LibraryBoundaryEvent"
+          }
+        },
+        "latestEventSequence": {
+          "description": "The highest event sequence included in this reply,\nso the caller can store it for the next read-after call.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        }
+      },
+      "required": [
+        "events"
+      ]
+    },
+    "ReadLibraryBoundaryEventsAfterRequest": {
+      "type": "object",
+      "properties": {
+        "lastSeenEventSequence": {
+          "description": "The last event sequence the caller has already observed.\n`None` means start from the current tail.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "maxEvents": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "maxEvents"
+      ]
+    },
     "ReadLibraryBoundaryEventsReply": {
       "type": "object",
       "properties": {
@@ -2713,6 +2825,25 @@
       },
       "required": [
         "rootId"
+      ]
+    },
+    "ScanRunPhase": {
+      "oneOf": [
+        {
+          "description": "Ordered: the scan has been admitted and traversal is beginning.",
+          "type": "string",
+          "const": "scanning"
+        },
+        {
+          "description": "The scan could not finish because the source root became unavailable\nor the mount changed during traversal.",
+          "type": "string",
+          "const": "blocked"
+        },
+        {
+          "description": "The scan was interrupted by an explicit cancellation.",
+          "type": "string",
+          "const": "interrupted"
+        }
       ]
     },
     "SearchNavigationNodeLibraryBrowserWindowReply": {
@@ -3051,6 +3182,85 @@
             "payload"
           ]
         }
+      ]
+    },
+    "SourceScanEvent": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "directoriesVisited": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "eventSequence": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "filesDiscovered": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "filesVisited": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceScanEventKind"
+        },
+        "mediaCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "occurredAtMs": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "phase": {
+          "$ref": "#/$defs/ScanRunPhase"
+        },
+        "queuedWorkItems": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "rootId": {
+          "type": "string"
+        },
+        "scanRunId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "eventSequence",
+        "occurredAtMs",
+        "kind",
+        "rootId",
+        "scanRunId",
+        "phase",
+        "directoriesVisited",
+        "filesVisited",
+        "filesDiscovered",
+        "mediaCandidates",
+        "queuedWorkItems"
+      ]
+    },
+    "SourceScanEventKind": {
+      "type": "string",
+      "enum": [
+        "sourceScanStarted",
+        "sourceScanProgressed",
+        "sourceScanCompleted",
+        "sourceScanFailed",
+        "sourceScanBlocked"
       ]
     },
     "UnregisterLocalRootReply": {

@@ -137,6 +137,105 @@ pub struct MaintainedSnapshotInvalidation {
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum ScanRunPhase {
+    /// Ordered: the scan has been admitted and traversal is beginning.
+    Scanning,
+    /// The scan could not finish because the source root became unavailable
+    /// or the mount changed during traversal.
+    Blocked,
+    /// The scan was interrupted by an explicit cancellation.
+    Interrupted,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceScanEventKind {
+    SourceScanStarted,
+    SourceScanProgressed,
+    SourceScanCompleted,
+    SourceScanFailed,
+    SourceScanBlocked,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceScanEvent {
+    pub event_sequence: i64,
+    pub occurred_at_ms: i64,
+    pub kind: SourceScanEventKind,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub root_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub scan_run_id: i64,
+    pub phase: ScanRunPhase,
+    pub directories_visited: usize,
+    pub files_visited: usize,
+    pub files_discovered: usize,
+    pub media_candidates: usize,
+    pub queued_work_items: usize,
+    pub detail: Option<String>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct MaintainedSnapshotEvent {
+    pub event_sequence: i64,
+    pub occurred_at_ms: i64,
+    pub invalidation: MaintainedSnapshotInvalidation,
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -147,14 +246,15 @@ pub struct MaintainedSnapshotInvalidation {
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum LibraryBoundaryEvent {
-    MaintainedSnapshotInvalidated(MaintainedSnapshotInvalidation),
+    SourceScanEvent(SourceScanEvent),
+    MaintainedSnapshotInvalidated(MaintainedSnapshotEvent),
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        LibraryBoundaryEvent, MaintainedSnapshotInvalidation, MaintainedSnapshotRevision,
-        MaintainedSnapshotScope,
+        LibraryBoundaryEvent, MaintainedSnapshotEvent, MaintainedSnapshotInvalidation,
+        MaintainedSnapshotRevision, MaintainedSnapshotScope,
     };
     use crate::{
         ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
@@ -249,28 +349,44 @@ mod tests {
 
     #[test]
     fn maintained_invalidation_events_are_scope_based_and_payload_lightweight() {
-        let event =
-            LibraryBoundaryEvent::MaintainedSnapshotInvalidated(MaintainedSnapshotInvalidation {
+        let event = LibraryBoundaryEvent::MaintainedSnapshotInvalidated(MaintainedSnapshotEvent {
+            event_sequence: 1,
+            occurred_at_ms: 1700000000000,
+            invalidation: MaintainedSnapshotInvalidation {
                 scope: MaintainedSnapshotScope::LibraryBrowser,
                 revision: Some(MaintainedSnapshotRevision::new(42)),
-            });
+            },
+        });
 
-        let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(invalidation) = event;
+        let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(payload) = event else {
+            panic!("expected maintained snapshot invalidated event");
+        };
 
-        assert_eq!(invalidation.scope, MaintainedSnapshotScope::LibraryBrowser);
+        assert_eq!(payload.event_sequence, 1);
+        assert_eq!(payload.occurred_at_ms, 1700000000000);
         assert_eq!(
-            invalidation.revision.map(|revision| revision.value()),
+            payload.invalidation.scope,
+            MaintainedSnapshotScope::LibraryBrowser
+        );
+        assert_eq!(
+            payload
+                .invalidation
+                .revision
+                .map(|revision| revision.value()),
             Some(42)
         );
     }
 
     #[test]
     fn maintained_invalidation_event_serializes_with_tagged_shape() {
-        let event =
-            LibraryBoundaryEvent::MaintainedSnapshotInvalidated(MaintainedSnapshotInvalidation {
+        let event = LibraryBoundaryEvent::MaintainedSnapshotInvalidated(MaintainedSnapshotEvent {
+            event_sequence: 1,
+            occurred_at_ms: 1700000000000,
+            invalidation: MaintainedSnapshotInvalidation {
                 scope: MaintainedSnapshotScope::LibraryBrowser,
                 revision: Some(MaintainedSnapshotRevision::new(42)),
-            });
+            },
+        });
 
         let json = serde_json::to_value(&event).expect("serialize event");
         assert_eq!(
@@ -278,14 +394,126 @@ mod tests {
             json!({
                 "type": "maintainedSnapshotInvalidated",
                 "payload": {
-                    "scope": "libraryBrowser",
-                    "revision": "42"
+                    "eventSequence": 1,
+                    "occurredAtMs": 1700000000000i64,
+                    "invalidation": {
+                        "scope": "libraryBrowser",
+                        "revision": "42"
+                    }
                 }
             })
         );
         assert_eq!(
             serde_json::from_value::<LibraryBoundaryEvent>(json).expect("deserialize event"),
             event
+        );
+    }
+
+    #[test]
+    fn source_scan_event_has_all_required_bounded_counters() {
+        use super::{ScanRunPhase, SourceScanEvent, SourceScanEventKind};
+
+        let event = LibraryBoundaryEvent::SourceScanEvent(SourceScanEvent {
+            event_sequence: 3,
+            occurred_at_ms: 1700000000000,
+            kind: SourceScanEventKind::SourceScanProgressed,
+            root_id: 7,
+            scan_run_id: 14,
+            phase: ScanRunPhase::Scanning,
+            directories_visited: 42,
+            files_visited: 100,
+            files_discovered: 95,
+            media_candidates: 12,
+            queued_work_items: 8,
+            detail: None,
+        });
+
+        let LibraryBoundaryEvent::SourceScanEvent(payload) = event else {
+            panic!("expected source scan event");
+        };
+        assert_eq!(payload.event_sequence, 3);
+        assert_eq!(payload.root_id, 7);
+        assert_eq!(payload.scan_run_id, 14);
+        assert_eq!(payload.directories_visited, 42);
+        assert_eq!(payload.files_visited, 100);
+        assert_eq!(payload.files_discovered, 95);
+        assert_eq!(payload.media_candidates, 12);
+        assert_eq!(payload.queued_work_items, 8);
+        assert_eq!(payload.detail, None);
+    }
+
+    #[test]
+    fn source_scan_event_serializes_with_tagged_shape() {
+        use super::{ScanRunPhase, SourceScanEvent, SourceScanEventKind};
+
+        let event = LibraryBoundaryEvent::SourceScanEvent(SourceScanEvent {
+            event_sequence: 3,
+            occurred_at_ms: 1700000000000,
+            kind: SourceScanEventKind::SourceScanCompleted,
+            root_id: 7,
+            scan_run_id: 14,
+            phase: ScanRunPhase::Scanning,
+            directories_visited: 42,
+            files_visited: 100,
+            files_discovered: 95,
+            media_candidates: 12,
+            queued_work_items: 8,
+            detail: None,
+        });
+
+        let json = serde_json::to_value(&event).expect("serialize event");
+        assert_eq!(
+            json,
+            json!({
+                "type": "sourceScanEvent",
+                "payload": {
+                    "eventSequence": 3,
+                    "occurredAtMs": 1700000000000i64,
+                    "kind": "sourceScanCompleted",
+                    "rootId": "7",
+                    "scanRunId": "14",
+                    "phase": "scanning",
+                    "directoriesVisited": 42,
+                    "filesVisited": 100,
+                    "filesDiscovered": 95,
+                    "mediaCandidates": 12,
+                    "queuedWorkItems": 8,
+                    "detail": null
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<LibraryBoundaryEvent>(json).expect("deserialize event"),
+            event
+        );
+    }
+
+    #[test]
+    fn source_scan_blocked_event_carries_detail() {
+        use super::{ScanRunPhase, SourceScanEvent, SourceScanEventKind};
+
+        let event = LibraryBoundaryEvent::SourceScanEvent(SourceScanEvent {
+            event_sequence: 5,
+            occurred_at_ms: 1700000000000,
+            kind: SourceScanEventKind::SourceScanBlocked,
+            root_id: 7,
+            scan_run_id: 14,
+            phase: ScanRunPhase::Blocked,
+            directories_visited: 10,
+            files_visited: 30,
+            files_discovered: 25,
+            media_candidates: 3,
+            queued_work_items: 0,
+            detail: Some("source root is not accessible".to_string()),
+        });
+
+        let LibraryBoundaryEvent::SourceScanEvent(payload) = event else {
+            panic!("expected source scan event");
+        };
+        assert_eq!(payload.phase, ScanRunPhase::Blocked);
+        assert_eq!(
+            payload.detail.as_deref(),
+            Some("source root is not accessible")
         );
     }
 

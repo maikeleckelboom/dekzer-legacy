@@ -6,6 +6,7 @@ import type {
   LocalRootScanSummary,
   RemoveSourceStatus
 } from './boundary/localRootActions'
+import type { ScanProgressState } from './boundary/eventScanner'
 import type { RootLifecycleRefreshStatus } from './runtime/rootLifecycle'
 
 export type LibraryOperationFeedbackKind =
@@ -44,6 +45,7 @@ export type OperationFeedbackInputs = {
   readonly registeredRootPath: string | undefined
   readonly scanStatus: LocalRootScanStatus
   readonly scanSummary: LocalRootScanSummary | undefined
+  readonly scanProgressFromEvents: ScanProgressState | undefined
   readonly scanFailureMessage?: string
   readonly scanFailureDetail?: string
   readonly refreshStatus: RootLifecycleRefreshStatus
@@ -180,7 +182,8 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
   }
 
   if (inputs.scanStatus === 'scanning') {
-    return build('scanningRoot')
+    const progressDetail = scanProgressDetailFromEvents(inputs.scanProgressFromEvents)
+    return build('scanningRoot', progressDetail === undefined ? {} : { detail: progressDetail })
   }
 
   if (inputs.removeSourceStatus === 'removing') {
@@ -306,4 +309,28 @@ function scanFailureDetail(
   }
 
   return undefined
+}
+
+function scanProgressDetailFromEvents(
+  progress: ScanProgressState | undefined
+): string | undefined {
+  if (progress === undefined || progress.kind !== 'scanning') {
+    return undefined
+  }
+
+  const parts: string[] = []
+
+  if (progress.filesDiscovered > 0) {
+    parts.push(`${progress.filesDiscovered} ${progress.filesDiscovered === 1 ? 'file' : 'files'}`)
+  }
+
+  if (progress.directoriesVisited > 0) {
+    parts.push(`${progress.directoriesVisited} ${progress.directoriesVisited === 1 ? 'directory' : 'directories'} visited`)
+  }
+
+  if (parts.length === 0) {
+    return 'Scanning your music folder for files.'
+  }
+
+  return `Scanning: ${parts.join(', ')}.`
 }

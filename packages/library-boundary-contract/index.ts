@@ -4,9 +4,16 @@
 
 export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "playlistWrite", "payload": PlaylistWriteCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
 
-export type LibraryBoundaryEventStreamCommand = { "type": "readPending", "payload": ReadLibraryBoundaryEventsRequest };
+export type LibraryBoundaryEventStreamCommand = { "type": "readPending", "payload": ReadLibraryBoundaryEventsRequest } | { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterRequest };
 
 export type ReadLibraryBoundaryEventsRequest = { maxEvents: number, };
+
+export type ReadLibraryBoundaryEventsAfterRequest = { 
+/**
+ * The last event sequence the caller has already observed.
+ * `None` means start from the current tail.
+ */
+lastSeenEventSequence: number | null, maxEvents: number, };
 
 export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "runRootScan", "payload": RunRootScanRequest } | { "type": "readLocalRoots", "payload": ReadLocalRootsRequest } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootRequest };
 
@@ -68,9 +75,16 @@ export type ReadLibraryAssetPreparationDetailRequest = { libraryAssetId: string,
 
 export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "playlistWrite", "payload": PlaylistWriteReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
 
-export type LibraryBoundaryEventStreamReply = { "type": "readPending", "payload": ReadLibraryBoundaryEventsReply };
+export type LibraryBoundaryEventStreamReply = { "type": "readPending", "payload": ReadLibraryBoundaryEventsReply } | { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterReply };
 
 export type ReadLibraryBoundaryEventsReply = { events: Array<LibraryBoundaryEvent>, };
+
+export type ReadLibraryBoundaryEventsAfterReply = { events: Array<LibraryBoundaryEvent>, 
+/**
+ * The highest event sequence included in this reply,
+ * so the caller can store it for the next read-after call.
+ */
+latestEventSequence: number | null, };
 
 export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "runRootScan", "payload": RunRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootReply };
 
@@ -219,7 +233,15 @@ export type CommandErrorEnvelope = { error: ProtocolError, };
 
 export type ProtocolError = { "type": "invalidRequest", "payload": { detail: string, } } | { "type": "durableStoreFailure", "payload": { detail: string, } } | { "type": "hostFailure", "payload": { detail: string, } };
 
-export type LibraryBoundaryEvent = { "type": "maintainedSnapshotInvalidated", "payload": MaintainedSnapshotInvalidation };
+export type LibraryBoundaryEvent = { "type": "sourceScanEvent", "payload": SourceScanEvent } | { "type": "maintainedSnapshotInvalidated", "payload": MaintainedSnapshotEvent };
+
+export type SourceScanEvent = { eventSequence: number, occurredAtMs: number, kind: SourceScanEventKind, rootId: string, scanRunId: string, phase: ScanRunPhase, directoriesVisited: number, filesVisited: number, filesDiscovered: number, mediaCandidates: number, queuedWorkItems: number, detail: string | null, };
+
+export type SourceScanEventKind = "sourceScanStarted" | "sourceScanProgressed" | "sourceScanCompleted" | "sourceScanFailed" | "sourceScanBlocked";
+
+export type ScanRunPhase = "scanning" | "blocked" | "interrupted";
+
+export type MaintainedSnapshotEvent = { eventSequence: number, occurredAtMs: number, invalidation: MaintainedSnapshotInvalidation, };
 
 export type MaintainedSnapshotInvalidation = { scope: MaintainedSnapshotScope, revision: MaintainedSnapshotRevision | null, };
 

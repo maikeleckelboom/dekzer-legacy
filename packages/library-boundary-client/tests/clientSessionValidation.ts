@@ -3,6 +3,7 @@ import type {
   CommandReply,
   CommandRequest,
   LibraryBoundaryEvent,
+  MaintainedSnapshotEvent,
   MaintainedSnapshotInvalidation,
   ProtocolError,
   RegisterLocalRootReply
@@ -95,7 +96,11 @@ function event(
 ): LibraryBoundaryEvent {
   return {
     type: "maintainedSnapshotInvalidated",
-    payload: invalidation
+    payload: {
+      eventSequence: 0,
+      occurredAtMs: 0,
+      invalidation
+    } satisfies MaintainedSnapshotEvent
   };
 }
 

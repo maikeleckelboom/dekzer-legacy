@@ -31,7 +31,9 @@ pub use context::{
     DurableStoreSchemaCompatibilityState, LibraryStoreContext, SqliteDurableStoreAppOwnedState,
     StoreEnvironment, durable_store_path,
 };
-pub use discovery::RootScanMaterializationResult;
+pub use discovery::{
+    RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
+};
 pub use revisions::{MaintainedReadModelRevision, MaintainedReadModelScope};
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,

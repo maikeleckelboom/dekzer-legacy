@@ -258,6 +258,7 @@ function startedInputs(overrides: Partial<OperationFeedbackInputs> = {}): Operat
     registeredRootPath: '/Music',
     scanStatus: 'idle',
     scanSummary: undefined,
+    scanProgressFromEvents: undefined,
     refreshStatus: 'idle',
     navigationReadIsLoading: false,
     hierarchyReadIsLoading: false,

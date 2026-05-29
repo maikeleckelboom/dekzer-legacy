@@ -24,6 +24,13 @@ import {
   type ContentsReadRequest
 } from '../shared/libraryContents/read'
 import { rootChannels } from '../shared/libraryRoots/channels'
+import { boundaryEventChannels } from '../shared/libraryBoundary/events'
+import type {
+  BoundaryEventReadAfterReply,
+  BoundaryEventReadAfterRequest,
+  BoundaryEventReadPendingReply,
+  BoundaryEventReadPendingRequest
+} from '../shared/libraryBoundary/events'
 import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
@@ -140,6 +147,24 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             libraryViewStateChannels.writeViewState,
             viewState
           )) as LibraryViewStateWriteResult
+        }
+      },
+      events: {
+        async readPending(
+          request: BoundaryEventReadPendingRequest
+        ): Promise<BoundaryEventReadPendingReply> {
+          return (await ipcRenderer.invoke(
+            boundaryEventChannels.readPending,
+            request
+          )) as BoundaryEventReadPendingReply
+        },
+        async readAfter(
+          request: BoundaryEventReadAfterRequest
+        ): Promise<BoundaryEventReadAfterReply> {
+          return (await ipcRenderer.invoke(
+            boundaryEventChannels.readAfter,
+            request
+          )) as BoundaryEventReadAfterReply
         }
       }
     }

@@ -27,6 +27,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<CommandRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBoundaryEventStreamCommand>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryBoundaryEventsRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadLibraryBoundaryEventsAfterRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryRootCommand>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::RunRootScanRequest>(&cfg, &mut output);
@@ -59,6 +60,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::CommandReply>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBoundaryEventStreamReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryBoundaryEventsReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadLibraryBoundaryEventsAfterReply>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RunRootScanReply>(&cfg, &mut output);
@@ -131,6 +133,10 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::CommandErrorEnvelope>(&cfg, &mut output);
     push_ts_decl::<ProtocolError>(&cfg, &mut output);
     push_ts_decl::<LibraryBoundaryEvent>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceScanEvent>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceScanEventKind>(&cfg, &mut output);
+    push_ts_decl::<crate::ScanRunPhase>(&cfg, &mut output);
+    push_ts_decl::<crate::MaintainedSnapshotEvent>(&cfg, &mut output);
     push_ts_decl::<crate::MaintainedSnapshotInvalidation>(&cfg, &mut output);
     push_ts_decl::<crate::MaintainedSnapshotScopeRevision>(&cfg, &mut output);
     push_ts_decl::<crate::MaintainedSnapshotScope>(&cfg, &mut output);
