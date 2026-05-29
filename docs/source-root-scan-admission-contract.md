@@ -3,6 +3,7 @@ status: candidate
 ratification-target: source-scan-contract-v1
 doctrine-version: 0.3
 last-reviewed: 2026-05-27
+amended: 2026-05-30
 owner: music-library-substrate
 canonical-context:
   - product-doctrine-shortened
@@ -22,6 +23,25 @@ scope:
 ---
 
 # Source Root Scan Admission Contract
+
+## Implementation status note
+
+This contract defines the desired scan architecture. The following are not yet fully implemented
+and must not be presented as current implementation reality:
+
+| Aspect                                | Current state                                                                                  |
+|---------------------------------------|------------------------------------------------------------------------------------------------|
+| Source root classification            | Defined in contract; partial implementation. Classification into `system_volume_root`, `broad_drive_root`, etc. is not yet applied before traversal. |
+| Density sampling / preflight          | Not yet implemented. Current `runRootScan` begins traversal without prior density sampling.     |
+| Scan plan model                       | Desired architecture. Current implementation has no formal scan plan stage.                    |
+| Work budget per scan unit             | Desired architecture. Current implementation lacks bounded work units with yield points.        |
+| Magic signature reads                 | Not yet implemented. No 8–16 byte signature read exists before inspection work queueing.       |
+| Candidate admission gating persistence | Desired architecture. Current implementation persists `source_files` before candidate admission. |
+| Background scan jobs                  | **Next implementation frontier.** Current `runRootScan` is synchronous and runs on the blocking command path. Background scan job lifecycle (non-blocking `StartRootScan` → progress events → terminal events) is not yet implemented. |
+
+The contract's product ambition remains authoritative. Implementation must not water down
+the ambition. Each future implementation slice should move closer to the full contract,
+not replace it with a minimal interpretation.
 
 ## Core law
 

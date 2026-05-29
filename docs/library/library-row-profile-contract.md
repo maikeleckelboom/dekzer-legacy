@@ -1,7 +1,8 @@
 ---
-status: candidate
+status: future-architecture
 doctrine-version: 0.1
 last-reviewed: 2026-05-28
+amended: 2026-05-30
 owner: renderer-substrate-boundary
 canonical-context:
   - library-tree-frame-stability-contract
@@ -16,14 +17,20 @@ scope:
 
 # Library Row Profile Contract
 
-## Core law
+**Status:** FUTURE ARCHITECTURE — This document describes product-owned tree row profiles for a future
+implementation stage. The current first-slice `readLibraryTreeChildren` command does not accept a
+`rowProfile` parameter. Row admission is an internal product/boundary surface concern. The renderer
+does not pass a row profile into the current hierarchy tree read. The profile concepts below are valid
+future architecture but must not be treated as current implementation targets.
+
+## Core law (future)
 
 **A row profile is a projection policy, not a renderer preference.**
 
 The profile is owned by the projection read model. It determines which node kinds
 appear in a read result, what child counts include, and what coverage state means.
-The renderer passes a profile as a read parameter. It does not transform results
-to match a different profile after the fact.
+When implemented, row profiles are product/boundary-owned surfaces, not arbitrary
+renderer request parameters.
 
 ## What a row profile governs
 
@@ -99,9 +106,9 @@ A directory with 14 audio files and 3 companion files:
 A renderer must not reuse a child summary produced under one profile to satisfy
 a request under another.
 
-## Profile and the read API
+## Profile and the read API (future)
 
-All child read surfaces accept `rowProfile` as a required parameter.
+In the future architecture, child read surfaces accept `rowProfile` as a required parameter.
 
 ```
 readChildren(parentNodeId, rowProfile, sortPolicy, limit, cursor)
@@ -112,6 +119,10 @@ readVisibleFrontier(rootNodeId, expandedNodeIds, viewportHint, rowProfile, sortP
 
 The projection substrate produces different row sets per profile. The renderer
 never post-filters profile output.
+
+**Current implementation:** `readLibraryTreeChildren` does not accept a `rowProfile` parameter.
+Row admission is an internal product/boundary surface concern. The renderer receives admitted
+rows and does not choose a profile.
 
 ## Profile and the stale response guard
 

@@ -61,6 +61,10 @@ The first slice includes the following capabilities, whether fully implemented o
 | Renderer tree projection              | Active. Tree with root, directory, file rows under library tree row admission. |
 | Renderer contents pane projection     | Active. Contents table with `loadContentsPage` cursor pagination.       |
 | Renderer library browser shell        | Active. Panel, source toolbar, browser, split pane.                     |
+| Cursor-only boundary event stream     | Active. `ReadAfter` polled event ring with `eventSequence` cursors.     |
+| Source scan event family              | Active. `SourceScanEvent` with lifecycle kinds and bounded counters.    |
+| Maintained snapshot invalidations     | Active. Scope-based invalidation events trigger authoritative rereads.  |
+| Event gap recovery                    | Active. `gapDetected` triggers reread, not user re-add/rescan blame.    |
 
 ## Explicit exclusions
 
@@ -90,7 +94,7 @@ Each domain surface in the first slice has an owning layer:
 |-------------------------|-----------------------------------------------------------|-------------------------------------------|
 | Rust / SQLite substrate | Durable source identity, hierarchy nodes, scan coverage.  | Renderer state, DOM, expansion state.     |
 | Boundary protocol       | Typed command/event shapes, generated TS contracts.       | Domain logic, business rules.             |
-| Boundary service        | Command dispatch, store orchestration, validation.        | Presentation, UI decisions.               |
+| Boundary service        | Command dispatch, store orchestration, event publishing.  | Presentation, UI decisions.               |
 | Shared TS types         | Types shared between main and renderer. No logic.         | Domain state, persistence.                |
 | Main IPC                | Host-side wiring; Rust service → renderer bridge.         | Renderer state, projection logic.         |
 | Renderer                | Tree projection, contents projection, view state, cache.  | Durable substrate state, source scanning. |
@@ -144,6 +148,10 @@ The following are true of the current repo as of this writing:
 | `emptyResultAuthoritative` exists in hierarchy and contents coverage.  | Active coverage field.                  |
 | `HierarchyCoverage` states include `Complete`, `Pending`, `Scanning`, `Blocked`, `Failed`, `SourceUnavailable`, `LocationMissing`. | Active protocol. |
 | Cursor docs are already repaired and describe active contents cursor pagination. | Do not treat as stale. |
+| Cursor-only boundary events are active (`ReadAfter` with `eventSequence` cursors). | No `ReadPending`/`drain`/`eventsChanged`. Event ring: max 256 in-memory. |
+| `SourceScanEvent` and `MaintainedSnapshotInvalidated` are distinct event families. | Both share the same event ring and `eventSequence` space. |
+| `runRootScan` is synchronous. True live scan progress is not yet implemented. | Background scan jobs are the next implementation frontier. |
+| `gapDetected` triggers authoritative snapshot reread, not user re-add/rescan blame. | Internal consistency mechanism, not product-facing error. |
 
 ## Provisional vocabulary
 

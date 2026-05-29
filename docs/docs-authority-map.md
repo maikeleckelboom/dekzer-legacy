@@ -14,7 +14,7 @@ No two active docs may define the same authority._
 
 | Doc | Role | Notes |
 |-----|------|-------|
-| `docs/source-root-scan-admission-contract.md` | **Canonical scan admission contract** | Owns root registration, root identity, scan preflight, traversal policy, candidate admission, magic reads, work budgets, observation persistence. |
+| `docs/source-root-scan-admission-contract.md` | **Canonical scan admission contract** (with marked implementation status) | Owns root registration, root identity, scan preflight, traversal policy, candidate admission, magic reads, work budgets, observation persistence. Implementation status note distinguishes desired architecture from current incomplete implementation. |
 | `docs/source-root-scan-reconnaissance-2026-05-27.md` | Archived evidence report | Evidence only. Do not use as architecture authority. Canonical contract: `source-root-scan-admission-contract.md`. |
 | `docs/decisions/source-access-and-scan-coverage.md` | Valid architectural decision | Source access and scan coverage rules. Complements scan admission contract at lower detail level. Does not supersede the admission contract. |
 | `docs/decisions/source-locations-lifecycle-contract.md` | Valid architectural decision | Source location lifecycle and aggregate scope. Complements scan admission contract for source-location specifics. |
@@ -23,18 +23,19 @@ No two active docs may define the same authority._
 
 | Doc | Role | Owns |
 |-----|------|------|
-| `docs/library/library-tree-frame-stability-contract.md` | **Canonical library contract** | Branch rendering continuity, cache behavior, node identity, response guards, prefetch bounds, drag stability. |
-| `docs/library/library-row-profile-contract.md` | **Canonical library contract** | Row-kind projection policy, profile definitions, profile-to-cache-key relationship, profile change propagation. |
+| `docs/library/library-tree-frame-stability-contract.md` | **Canonical library contract** (with marked future sections) | Branch rendering continuity, cache behavior, node identity, response guards, prefetch bounds, drag stability. Future sections marked for row profiles, batch reads, child summaries, targeted scan invalidation. |
+| `docs/library/library-row-profile-contract.md` | **Future architecture** | Row-kind projection policy for future product-owned tree profiles. Current `readLibraryTreeChildren` does not accept `rowProfile`. |
 | `docs/library/library-tree-selection-contents-contract.md` | **Canonical library contract** | Selected-node scope derivation, contents panel read-model, selection survival under source state changes, first-page law, scan update invalidation for selected scope. |
-| `docs/library/library-tree-track-segment-rows-contract.md` | **Canonical library contract** | Node-kind taxonomy, track/segment/companion row authority and interaction rules, child count semantics per kind. |
+| `docs/library/library-tree-track-segment-rows-contract.md` | **Future architecture** | Node-kind taxonomy for future tree-projection row kinds (`primary_media`, `segment`, `companion`, etc.). Current first-slice tree row kinds are `file` and `directory`. |
 | `docs/library/source-lifecycle-visible-state-contract.md` | **Canonical library contract** | Source visible availability states, unavailability UX, relocation UX, cloud placeholder behavior, source removal vs forgetting. |
 | `docs/library/library-browser-workspace-surface-contract.md` | **Canonical library contract** | Library Browser workspace surface identity, topology handoff, geometry/viewport hints, internal layout presets, authority partition. |
+| `docs/library/library-boundary-event-stream-contract.md` | **Canonical library contract** | Cursor-only boundary event model, `ReadAfter` semantics, event ring, gap recovery, scan event family, maintained snapshot invalidation, event parser contract. |
 
 ## Contents read boundary docs
 
 | Doc | Role | Notes |
 |-----|------|-------|
-| `docs/decisions/library-contents-read-boundary.md` | Canonical contents read boundary | Defines the single parameterized contents read boundary. Complements `library-tree-selection-contents-contract.md` (which governs renderer coupling). |
+| `docs/decisions/library-contents-read-boundary.md` | Canonical contents read boundary | Defines the single parameterized contents read boundary. Stale `sourceFileVisibility`-aware claim removed (historical note preserved). Complements `library-tree-selection-contents-contract.md` (which governs renderer coupling). |
 | `docs/decisions/recursive-selected-contents-rule.md` | Valid architectural decision | CURRENT WITH LEGACY VOCABULARY. Schema-specific references predate v1 substrate. Architectural rules remain valid. For current v1 vocabulary see `docs/decisions/library-preparation-substrate-v1.md`. |
 
 ## Implementation discipline

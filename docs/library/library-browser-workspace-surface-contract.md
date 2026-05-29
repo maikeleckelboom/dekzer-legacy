@@ -53,9 +53,9 @@ layout algorithm decided.
 | Owner              | Owns                                                                                                  | Must not own                                                 |
 |--------------------|-------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|
 | Workspace topology | Surface existence, placement, sizing, visibility, tab/split/dock composition.                         | Scan state, row authority, source identity, selection.       |
-| Library Browser    | Tree state, contents state, selection, row profile, sort, filter, source visible state, branch cache. | Surface placement, workspace slot identity, layout geometry. |
-| Library substrate  | Hierarchy node IDs, source records, track identity, preparation evidence.                             | DOM realization, renderer state.                             |
-| Renderer           | Frame-stable painting of tree and contents rows inside the surface bounds.                            | Source meaning, hierarchy authority.                         |
+| Library Browser    | Tree state, contents state, selection, source visible projection/presentation state, branch cache.    | Surface placement, workspace slot identity, layout geometry, source lifecycle authority. |
+| Library substrate  | Hierarchy node IDs, source records, source lifecycle state, track identity, preparation evidence.    | DOM realization, renderer state.                             |
+| Renderer           | Frame-stable painting of tree and contents rows inside the surface bounds.                            | Source meaning, hierarchy authority, source lifecycle.       |
 
 ## Surface identity
 

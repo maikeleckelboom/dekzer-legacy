@@ -64,8 +64,11 @@ The following facts are established by the Phase 0 inventory:
 
 5. **Hierarchy read is not the final owner for selected scope contents.**
 
-   It provides immediate tree children and `sourceFileVisibility`-aware rows. It does not own recursive selected
+   It provides immediate children admitted by the product/boundary surface. It does not own recursive selected
    contents, aggregated contents coverage, or primary-media summary joins.
+   
+   **Historical note:** `sourceFileVisibility` was implementation debt that has been removed from renderer-facing
+   contracts. Library tree row admission is now a product/boundary surface concern, not a renderer-facing parameter.
 
 ---
 

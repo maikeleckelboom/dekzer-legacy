@@ -1,7 +1,8 @@
 ---
-status: candidate
+status: future-architecture
 doctrine-version: 0.1
 last-reviewed: 2026-05-28
+amended: 2026-05-30
 owner: renderer-substrate-boundary
 canonical-context:
   - product-doctrine-shortened
@@ -19,7 +20,13 @@ scope:
 
 # Library Tree Track and Segment Rows Contract
 
-## Core law
+**Status:** FUTURE ARCHITECTURE — This document describes tree row kinds beyond the current first-slice
+implementation. The current first-slice library tree row kind from the substrate is `file` or `directory`.
+`primary_media`, `segment`, `companion`, `blocked`, `excluded`, and `unsupported` are future tree-projection
+row kinds that are not active in the current tree. The product rules below remain valid for future
+implementation. Do not use them as current first-slice implementation targets.
+
+## Core law (future)
 
 **Tree children may be hierarchy nodes, media rows, companion rows, or segment rows. Each kind declares its own
 authority, interaction rules, and contribution to child counts.**

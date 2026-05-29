@@ -229,12 +229,13 @@ Directory-level `dir_scan_state` values:
 primary-media content. Primary media currently means audio/video. Image files are source companion/image media, not
 normal selected contents rows.
 
-Tree source-file visibility and selected contents scope are separate concepts. `performance` tree mode exposes primary
-media; `performanceAndImages` tree mode may reveal image rows and image-only folders. Switching tree source-file
-visibility must not redefine the selected contents scope.
+Tree row admission and selected contents scope are separate concepts. The product/boundary surface owns tree row
+admission policy. Image-only directories may not satisfy primary media descendant facts. Tree row admission is a
+product/boundary surface concern, not a renderer-chosen mode.
 
-Image-only folders do not satisfy primary media descendant facts in `performance` mode. `performanceAndImages` tree mode
-may reveal those folders through image media descendant facts.
+**Historical note:** `performance` and `performanceAndImages` were interim tree mode names from a period when the
+renderer chose visibility policy. Those terms are superseded by product/boundary-owned row admission and must not
+be used as current design vocabulary.
 
 ## Query execution contract
 
@@ -542,11 +543,17 @@ The renderer does not need to hold recursive descendant contents inside the tree
 The contents table uses its own cursor, page size, order key, and virtual scroll state. Its pagination must not depend
 on tree scroll position or tree expansion state.
 
-Virtual tree chevrons are driven by substrate affordance signals:
+### Tree expandability affordance (current implementation)
 
-- `has_child_directories`
-- `has_primary_media_descendant`
-- `has_image_media_descendant`
+The renderer derives directory expandability from `childRowState` (`unknown`, `hasChildRows`, `noChildRows`).
+The product boundary contract (`source-hierarchy-contract.md`) owns this rule: the renderer must not derive
+expandability from `directoryPrimaryMediaState` or `directoryImageMediaState`.
+
+### Substrate descendant facts (store-level evidence)
+
+The store may maintain `has_child_directories`, `has_primary_media_descendant`, and `has_image_media_descendant`
+as substrate evidence for scan coverage and query optimization. These are internal store-level facts, not
+renderer affordance authority. The renderer does not use these fields to decide whether to show a chevron.
 
 The renderer must not fetch depth+1 children for every visible row just to decide whether to show a chevron.
 

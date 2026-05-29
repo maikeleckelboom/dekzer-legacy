@@ -43,6 +43,9 @@ empty merely because a projection read is pending.
 
 This document governs the renderer and substrate boundary for source hierarchy tree expansion.
 
+Future implementation stages are marked explicitly. Concepts such as row profiles, batch reads, child summaries,
+visible-frontier reads, and targeted scan invalidation by parent IDs are future architecture.
+
 It covers:
 
 | Area                   | Included                                                                   |
@@ -196,15 +199,20 @@ Forbidden behavior:
 | Treating unknown as empty                         | Hides incomplete discovery.                      |
 | Triggering filesystem traversal from expand click | Couples UI interaction to source scan mechanics. |
 
-## Child projection reads
+## Child projection reads (partial: single-parent reads active; batch/summary/frontier reads are future)
 
 The substrate should expose child projection reads that are shaped for branch patching and batching.
 
-Recommended read surfaces:
+Current read surface:
+
+| Read                                                   | Purpose                                                      |
+|--------------------------------------------------------|--------------------------------------------------------------|
+| readChildren(parentNodeId, offset, limit)             | Read child rows for one parent.                              |
+
+Future recommended read surfaces:
 
 | Read                                                                               | Purpose                                                      |
 |------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| readChildren(parentNodeId, rowProfile, policy, limit)                              | Read child rows for one parent.                              |
 | readChildrenBatch(parentNodeIds, rowProfile, policy, limit)                        | Batch multiple branch reads into one boundary call.          |
 | readChildSummary(parentNodeIds, rowProfile, policy)                                | Read chevron/count/coverage summary without full child rows. |
 | readVisibleFrontier(rootNodeId, expandedNodeIds, viewportHint, rowProfile, policy) | Read the currently visible and near-visible branch frontier. |
@@ -225,21 +233,27 @@ Child summary shape:
 
 A partial count must render as provisional, such as 14+.
 
-## Request guards and stale responses
+## Request guards and stale responses (partial: request guards active; projection policy key and sort policy are future)
 
 Every child read request must carry the projection context under which it was issued.
 
-Request guard fields:
+Request guard fields (current):
 
 | Field                  | Meaning                                         |
 |------------------------|-------------------------------------------------|
 | requestId              | Renderer-generated unique request identity.     |
 | parentNodeId           | Branch being read.                              |
-| rowProfile             | Row profile/filter policy for the request.      |
-| sortPolicy             | Sort order in effect when request was issued.   |
 | scanEpochAtIssue       | Scan epoch known when request was issued.       |
 | projectionEpochAtIssue | Projection epoch known when request was issued. |
 | cacheGenerationAtIssue | Renderer cache generation for this policy/root. |
+
+Request guard fields (future — not active in current implementation):
+
+| Field                  | Meaning                                         |
+|------------------------|-------------------------------------------------|
+| rowProfile             | Row profile/filter policy for the request.      |
+| sortPolicy             | Sort order in effect when request was issued.   |
+| projectionPolicyKey    | Filter/media policy key for the request.        |
 
 Response acceptance rule:
 
@@ -255,20 +269,25 @@ this parent was not touched.
 Stale response handling must be silent and stable: do not flash empty rows, do not collapse, and do not replace current
 children with older data.
 
-## Renderer branch cache
+## Renderer branch cache (future: projectionPolicyKey is future)
 
 The renderer may maintain a non-authoritative branch cache.
 
-Cache key:
+Cache key (current):
 
 | Component           | Reason                                                                                                                                                    |
 |---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | sourceRootNodeId    | Separate source roots.                                                                                                                                    |
 | parentNodeId        | Branch identity.                                                                                                                                          |
+| projectionEpoch     | Guards against incompatible projection changes.                                                                                                           |
+
+Cache key (future — not active in current implementation):
+
+| Component           | Reason                                                                                                                                                    |
+|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | rowProfile          | Different row shapes may produce different children.                                                                                                      |
 | sortPolicyKey       | Different sort orders produce different row order. A cache entry produced under one sort policy must not satisfy a request under a different sort policy. |
 | projectionPolicyKey | Filter/media policy affect child rows.                                                                                                                    |
-| projectionEpoch     | Guards against incompatible projection changes.                                                                                                           |
 
 Sort policy is not part of `rowProfile`, but it is part of the cache key and request identity. They are different axes:
 profile governs which node kinds appear; sort governs their order.
@@ -306,11 +325,21 @@ Do not treat all epoch changes as full cache clears.
 
 Scan updates invalidate affected parent IDs, not the entire tree. Cache invalidation must follow the same rule.
 
-## Scan progress integration
+## Scan progress integration (partial implementation)
 
-Scan progress should not thrash the visible tree.
+Scan progress must not thrash the visible tree.
 
-Scan event should ideally include:
+Current implementation reality:
+
+- Cursor-only boundary events exist (`ReadAfter` with `eventSequence` cursors).
+- `SourceScanEvent` and `MaintainedSnapshotInvalidated` are distinct event families.
+- The renderer polls events and updates scan progress state per root.
+- Scan events do not currently provide `affectedParentNodeIds` for targeted invalidation.
+- Event gaps (`gapDetected`) trigger authoritative snapshot refresh/recovery, not user re-add/rescan blame.
+- True live scan progress requires background scan jobs (not yet implemented; `runRootScan` is synchronous).
+- The renderer consumes scan events through the event scanner but does not author scan progress.
+
+Future scan event fields (not yet implemented):
 
 | Field                  | Meaning                                                |
 |------------------------|--------------------------------------------------------|
@@ -434,19 +463,19 @@ in the substrate and must be reflected in the UI. The source row communicates un
 
 Fix frame stability before prefetch.
 
-Recommended order:
+Recommended order (items marked "(future)" are not current implementation targets):
 
 1. Ensure tree rows use substrate-assigned node IDs as renderer keys.
 2. Add explicit childState, coverageState, knownChildCount, and isCountComplete to tree row/summary projections.
 3. Change expand behavior so it never clears current children while a read is pending.
 4. Patch one branch at a time instead of rebuilding the whole visible tree.
-5. Add request guards with requestId, scanEpochAtIssue, projectionEpochAtIssue, rowProfile, and policy key.
+5. Add request guards with requestId, scanEpochAtIssue, projectionEpochAtIssue. (future: rowProfile, projectionPolicyKey)
 6. Add stale-response rejection.
-7. Add branch cache keyed by parent node ID plus row profile and policy.
-8. Add targeted cache invalidation from affected parent IDs.
-9. Add batch child-summary/children reads for visible branches.
-10. Add bounded visible-frontier prefetch.
-11. Add queued child state if the scan/work queue can expose it.
+7. Add branch cache keyed by parent node ID. (future: row profile and projectionPolicyKey)
+8. Add targeted cache invalidation from affected parent IDs. (future: affected-parent metadata not yet provided by scan events)
+9. Add batch child-summary/children reads for visible branches. (future)
+10. Add bounded visible-frontier prefetch. (future)
+11. Add queued child state if the scan/work queue can expose it. (future)
 
 Prefetch before frame stability is fixed is caching a bug.
 
