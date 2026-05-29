@@ -34,7 +34,7 @@ impl MaintainedSnapshotScope {
             SnapshotReadCommand::ReadNavigationRows(_)
             | SnapshotReadCommand::LoadNavigationRow(_)
             | SnapshotReadCommand::LoadNavigationRowByStableKey(_) => Self::NavigationRows,
-            SnapshotReadCommand::ReadLiteralHierarchyChildren(_)
+            SnapshotReadCommand::ReadLibraryTreeChildren(_)
             | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::ContentsRead(_)
@@ -158,12 +158,12 @@ mod tests {
     };
     use crate::{
         ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
-        ContentsRowProfile, ContentsScope, LiteralHierarchyEntryPoint,
+        ContentsRowProfile, ContentsScope, LibraryTreeEntryPoint,
         LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
         ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLiteralHierarchyChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowRequest,
-        SnapshotReadCommand, SourceFileVisibility,
+        SnapshotReadCommand,
     };
     use serde_json::json;
 
@@ -191,13 +191,12 @@ mod tests {
         }
 
         let library_asset_reads = [
-            SnapshotReadCommand::ReadLiteralHierarchyChildren(
-                ReadLiteralHierarchyChildrenRequest {
-                    entry_point: LiteralHierarchyEntryPoint::Source { source_id: 8 },
+            SnapshotReadCommand::ReadLibraryTreeChildren(
+                ReadLibraryTreeChildrenRequest {
+                    entry_point: LibraryTreeEntryPoint::Source { source_id: 8 },
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 100,
-                    source_file_visibility: Some(SourceFileVisibility::Performance),
                 },
             ),
             SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(

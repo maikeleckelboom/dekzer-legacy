@@ -16,11 +16,10 @@ use crate::snapshot_read_protocol::{
     map_load_navigation_row_by_stable_key_reply, map_load_navigation_row_reply,
     map_maintained_read_model_revisions, map_read_contents_reply,
     map_read_library_asset_preparation_detail_reply,
-    map_read_library_asset_waveform_overview_reply, map_read_literal_hierarchy_children_reply,
+    map_read_library_asset_waveform_overview_reply, map_read_library_tree_children_reply,
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
     map_search_navigation_node_library_browser_window_reply, store_contents_policy,
-    store_contents_recursion, store_contents_scope, store_literal_hierarchy_entry_point,
-    store_source_file_visibility,
+    store_contents_recursion, store_contents_scope, store_library_tree_entry_point,
 };
 use crate::storage_environment::resolve_library_storage_environment;
 
@@ -298,21 +297,21 @@ impl LibraryBoundaryService {
         map_load_navigation_row_by_stable_key_reply(row).map_err(map_store_error)
     }
 
-    pub fn read_literal_hierarchy_children(
+    pub fn read_library_tree_children(
         &self,
-        request: protocol::ReadLiteralHierarchyChildrenRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadLiteralHierarchyChildrenReply> {
+        request: protocol::ReadLibraryTreeChildrenRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadLibraryTreeChildrenReply> {
         let window = self
             .durable_store
             .read_literal_hierarchy_children(
-                store_literal_hierarchy_entry_point(request.entry_point),
+                store_library_tree_entry_point(request.entry_point),
                 request.parent_source_directory_id,
                 request.offset,
                 request.limit,
-                store_source_file_visibility(request.source_file_visibility.unwrap_or_default()),
+                library_store_sqlite::LibraryTreeRowAdmission::Performance,
             )
             .map_err(map_store_error)?;
-        map_read_literal_hierarchy_children_reply(window).map_err(map_store_error)
+        map_read_library_tree_children_reply(window).map_err(map_store_error)
     }
 
     pub fn read_navigation_node_library_browser_window(
@@ -499,9 +498,9 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::LoadNavigationRowByStableKey(request) => self
                 .load_navigation_row_by_stable_key(request)
                 .map(protocol::SnapshotReadReply::NavigationRowByStableKey),
-            protocol::SnapshotReadCommand::ReadLiteralHierarchyChildren(request) => self
-                .read_literal_hierarchy_children(request)
-                .map(protocol::SnapshotReadReply::LiteralHierarchyChildren),
+            protocol::SnapshotReadCommand::ReadLibraryTreeChildren(request) => self
+                .read_library_tree_children(request)
+                .map(protocol::SnapshotReadReply::LibraryTreeChildren),
             protocol::SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(request) => self
                 .read_navigation_node_library_browser_window(request)
                 .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserWindow),
@@ -621,11 +620,11 @@ mod tests {
         CreatePlaylistReply, CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
         LibraryBoundaryEvent, LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
-        LibraryRootCommand, LibraryRootReply, LiteralHierarchyEntryPoint, LiteralHierarchyNodeKind,
-        LiteralHierarchyPresenceState, LoadNavigationRowByStableKeyReply,
+        LibraryRootCommand, LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind,
+        LibraryTreePresenceState, LoadNavigationRowByStableKeyReply,
         LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
         PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsReply,
-        ReadLibraryBoundaryEventsRequest, ReadLiteralHierarchyChildrenRequest,
+        ReadLibraryBoundaryEventsRequest, ReadLibraryTreeChildrenRequest,
         RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
         RenamePlaylistRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
         SnapshotReadReply, UnregisterLocalRootReply, UnregisterLocalRootRequest,
@@ -729,12 +728,12 @@ mod tests {
         }
     }
 
-    fn expect_literal_hierarchy_reply(
+    fn expect_library_tree_reply(
         reply: CommandReply,
-    ) -> library_boundary_protocol::ReadLiteralHierarchyChildrenReply {
+    ) -> library_boundary_protocol::ReadLibraryTreeChildrenReply {
         match reply {
-            CommandReply::SnapshotRead(SnapshotReadReply::LiteralHierarchyChildren(reply)) => reply,
-            other => panic!("expected literal hierarchy reply, got {other:?}"),
+            CommandReply::SnapshotRead(SnapshotReadReply::LibraryTreeChildren(reply)) => reply,
+            other => panic!("expected library tree reply, got {other:?}"),
         }
     }
 
@@ -847,21 +846,18 @@ mod tests {
         )))
     }
 
-    fn read_literal_hierarchy_children(
+    fn read_library_tree_children(
         service: &LibraryBoundaryService,
-        entry_point: LiteralHierarchyEntryPoint,
+        entry_point: LibraryTreeEntryPoint,
         parent_source_directory_id: Option<i64>,
-    ) -> library_boundary_protocol::ReadLiteralHierarchyChildrenReply {
-        expect_literal_hierarchy_reply(expect_success(service.handle_command(
-            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadLiteralHierarchyChildren(
-                ReadLiteralHierarchyChildrenRequest {
+    ) -> library_boundary_protocol::ReadLibraryTreeChildrenReply {
+        expect_library_tree_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadLibraryTreeChildren(
+                ReadLibraryTreeChildrenRequest {
                     entry_point,
                     parent_source_directory_id,
                     offset: 0,
                     limit: 10,
-                    source_file_visibility: Some(
-                        library_boundary_protocol::SourceFileVisibility::Performance,
-                    ),
                 },
             )),
         )))
@@ -920,26 +916,26 @@ mod tests {
         assert_eq!(scan.discovered_file_count, 1);
         assert_eq!(scan.queued_source_work_items, 1);
 
-        let root_reply = read_literal_hierarchy_children(
+        let root_reply = read_library_tree_children(
             &service,
-            LiteralHierarchyEntryPoint::Source {
+            LibraryTreeEntryPoint::Source {
                 source_id: registered.root_id,
             },
             None,
         );
         let root_window = root_reply
             .window
-            .expect("registered source resolves to literal hierarchy window");
+            .expect("registered source resolves to library tree window");
         assert_eq!(root_window.total_rows, 1);
         let crate_row = root_window
             .rows
             .iter()
             .find(|row| row.display_name == "Crate")
             .expect("top-level folder is browsable");
-        assert_eq!(crate_row.node_kind, LiteralHierarchyNodeKind::Directory);
+        assert_eq!(crate_row.node_kind, LibraryTreeNodeKind::Directory);
         assert_eq!(
             crate_row.presence_state,
-            LiteralHierarchyPresenceState::Present
+            LibraryTreePresenceState::Present
         );
         assert_eq!(crate_row.has_child_directories, Some(false));
         assert_eq!(
@@ -958,19 +954,19 @@ mod tests {
             .source_directory_id
             .expect("directory rows carry durable ids");
 
-        let crate_reply = read_literal_hierarchy_children(
+        let crate_reply = read_library_tree_children(
             &service,
-            LiteralHierarchyEntryPoint::Source {
+            LibraryTreeEntryPoint::Source {
                 source_id: registered.root_id,
             },
             Some(crate_directory_id),
         );
         let crate_window = crate_reply
             .window
-            .expect("nested directory resolves to literal hierarchy window");
+            .expect("nested directory resolves to library tree window");
         assert_eq!(crate_window.total_rows, 1);
         let file_row = crate_window.rows.first().expect("scanned file row exists");
-        assert_eq!(file_row.node_kind, LiteralHierarchyNodeKind::File);
+        assert_eq!(file_row.node_kind, LibraryTreeNodeKind::File);
         assert_eq!(file_row.display_name, "amen.wav");
         assert_eq!(file_row.relative_path, "Crate/amen.wav");
         assert!(file_row.source_file_id.is_some());
@@ -981,9 +977,9 @@ mod tests {
 
         drop(service);
         let reopened = LibraryBoundaryService::open(context).expect("reopen boundary service");
-        let reopened_crate_reply = read_literal_hierarchy_children(
+        let reopened_crate_reply = read_library_tree_children(
             &reopened,
-            LiteralHierarchyEntryPoint::Source {
+            LibraryTreeEntryPoint::Source {
                 source_id: registered.root_id,
             },
             Some(crate_directory_id),

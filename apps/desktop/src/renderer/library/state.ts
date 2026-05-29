@@ -4,7 +4,6 @@ import type {
   ChildRow,
   HierarchyCoverage
 } from '../../shared/libraryHierarchy/readChildren'
-import type { SourceFileVisibility } from '../../shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
   NavigationRow
@@ -27,7 +26,6 @@ export type MoreTarget = {
   readonly entryPoint: EntryPoint
   readonly parentDirectoryId?: string
   readonly label?: string
-  readonly sourceFileVisibility: SourceFileVisibility
   readonly offset: number
   readonly limit: number
 }
@@ -48,7 +46,6 @@ export type LoadedChildren = {
   readonly entryPoint: EntryPoint
   readonly parentDirectoryId?: string
   readonly label?: string
-  readonly sourceFileVisibility: SourceFileVisibility
   readonly rows: readonly ChildRow[]
   readonly totalRows: number
   readonly coverage: HierarchyCoverage

@@ -1,6 +1,6 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::browse_media::{SourceFileVisibility, source_file_visibility_predicate_sql};
+use crate::browse_media::{LibraryTreeRowAdmission, library_tree_row_admission_predicate_sql};
 use crate::read_models::source_location_coverage::{
     SourceLocationCoverage, classify_source_location_coverage,
 };
@@ -103,7 +103,7 @@ pub(crate) fn read_children(
     parent_source_directory_id: Option<i64>,
     offset: usize,
     limit: usize,
-    source_file_visibility: SourceFileVisibility,
+    row_admission: LibraryTreeRowAdmission,
 ) -> LibrarySqliteResult<Option<StoreLiteralHierarchyWindow>> {
     let Some(anchor) = resolve_read_anchor(connection, entry_point, parent_source_directory_id)?
     else {
@@ -143,7 +143,7 @@ pub(crate) fn read_children(
         connection,
         anchor.source_id,
         anchor.effective_parent_source_directory_id,
-        source_file_visibility,
+        row_admission,
     )?;
     coverage.empty_result_authoritative =
         coverage.state == StoreLiteralHierarchyCoverageState::Complete && total_rows == 0;
@@ -153,7 +153,7 @@ pub(crate) fn read_children(
         anchor.effective_parent_source_directory_id,
         offset,
         limit,
-        source_file_visibility,
+        row_admission,
     )?;
 
     Ok(Some(StoreLiteralHierarchyWindow {
@@ -676,10 +676,10 @@ fn read_child_count(
     connection: &Connection,
     source_id: i64,
     parent_source_directory_id: Option<i64>,
-    source_file_visibility: SourceFileVisibility,
+    row_admission: LibraryTreeRowAdmission,
 ) -> LibrarySqliteResult<usize> {
-    let directory_visibility_predicate = directory_visibility_predicate_sql(source_file_visibility);
-    let file_visibility_predicate = source_file_visibility_predicate_sql(source_file_visibility);
+    let directory_visibility_predicate = directory_visibility_predicate_sql(row_admission);
+    let file_visibility_predicate = library_tree_row_admission_predicate_sql(row_admission);
     let count = connection.query_row(
         &format!(
             "SELECT (
@@ -720,7 +720,7 @@ fn read_child_rows(
     parent_source_directory_id: Option<i64>,
     offset: usize,
     limit: usize,
-    source_file_visibility: SourceFileVisibility,
+    row_admission: LibraryTreeRowAdmission,
 ) -> LibrarySqliteResult<Vec<StoreLiteralHierarchyNode>> {
     let offset = i64::try_from(offset).map_err(|_| {
         LibrarySqliteError::WriteInvariant("literal hierarchy offset does not fit i64".to_string())
@@ -728,8 +728,8 @@ fn read_child_rows(
     let limit = i64::try_from(limit).map_err(|_| {
         LibrarySqliteError::WriteInvariant("literal hierarchy limit does not fit i64".to_string())
     })?;
-    let directory_visibility_predicate = directory_visibility_predicate_sql(source_file_visibility);
-    let file_visibility_predicate = source_file_visibility_predicate_sql(source_file_visibility);
+    let directory_visibility_predicate = directory_visibility_predicate_sql(row_admission);
+    let file_visibility_predicate = library_tree_row_admission_predicate_sql(row_admission);
     let mut statement = connection.prepare(&format!(
         "SELECT node_kind,
                 source_id,
@@ -835,10 +835,10 @@ fn read_child_rows(
     Ok(rows)
 }
 
-fn directory_visibility_predicate_sql(source_file_visibility: SourceFileVisibility) -> String {
-    let revealable_descendant_predicate = match source_file_visibility {
-        SourceFileVisibility::Performance => "has_primary_media_descendant = 1",
-        SourceFileVisibility::PerformanceAndImages => {
+fn directory_visibility_predicate_sql(row_admission: LibraryTreeRowAdmission) -> String {
+    let revealable_descendant_predicate = match row_admission {
+        LibraryTreeRowAdmission::Performance => "has_primary_media_descendant = 1",
+        LibraryTreeRowAdmission::PerformanceAndImages => {
             "(has_primary_media_descendant = 1 OR has_image_media_descendant = 1)"
         }
     };
@@ -863,7 +863,7 @@ mod tests {
     use super::{
         StoreLiteralHierarchyCoverageState, StoreLiteralHierarchyEntryPoint, read_children,
     };
-    use crate::SourceFileVisibility;
+    use crate::LibraryTreeRowAdmission;
     use crate::schema::install_baseline_schema_for_test;
     use rusqlite::{Connection, params};
 
@@ -1056,7 +1056,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1108,7 +1108,7 @@ mod tests {
             Some(20),
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1142,7 +1142,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1179,7 +1179,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::PerformanceAndImages,
+            LibraryTreeRowAdmission::PerformanceAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1215,7 +1215,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1240,7 +1240,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::PerformanceAndImages,
+            LibraryTreeRowAdmission::PerformanceAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1272,7 +1272,7 @@ mod tests {
             None,
             0,
             1,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read first literal hierarchy page")
         .expect("source window");
@@ -1282,7 +1282,7 @@ mod tests {
             None,
             1,
             1,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read second literal hierarchy page")
         .expect("source window");
@@ -1338,7 +1338,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1348,7 +1348,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy directory")
         .expect("directory window");
@@ -1391,7 +1391,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1425,7 +1425,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::PerformanceAndImages,
+            LibraryTreeRowAdmission::PerformanceAndImages,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1435,7 +1435,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileVisibility::PerformanceAndImages,
+            LibraryTreeRowAdmission::PerformanceAndImages,
         )
         .expect("read literal hierarchy directory")
         .expect("directory window");
@@ -1479,7 +1479,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1533,7 +1533,7 @@ mod tests {
             Some(20),
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1607,7 +1607,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read Music/Good hierarchy")
         .expect("Music/Good window");
@@ -1632,7 +1632,7 @@ mod tests {
             Some(22),
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read Music/Locked hierarchy")
         .expect("Music/Locked window");
@@ -1651,7 +1651,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read whole source hierarchy")
         .expect("whole source window");
@@ -1722,7 +1722,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read Music/Good hierarchy")
         .expect("Music/Good window");
@@ -1744,7 +1744,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read whole source hierarchy")
         .expect("whole source window");
@@ -1843,7 +1843,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source location window");
@@ -1910,7 +1910,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileVisibility::Performance,
+            LibraryTreeRowAdmission::Performance,
         )
         .expect("read literal hierarchy")
         .expect("source location window");

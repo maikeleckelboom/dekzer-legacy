@@ -24,7 +24,7 @@ impl BrowseMediaClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SourceFileVisibility {
+pub enum LibraryTreeRowAdmission {
     Performance,
     PerformanceAndImages,
 }
@@ -37,24 +37,24 @@ pub(crate) fn is_image_media_class(media_class: &str) -> bool {
     media_class == "image"
 }
 
-pub(crate) fn source_file_visibility_predicate_sql(
-    source_file_visibility: SourceFileVisibility,
+pub(crate) fn library_tree_row_admission_predicate_sql(
+    library_tree_row_admission: LibraryTreeRowAdmission,
 ) -> &'static str {
-    match source_file_visibility {
-        SourceFileVisibility::Performance => "media_class IN ('audio', 'video')",
-        SourceFileVisibility::PerformanceAndImages => "media_class IN ('audio', 'video', 'image')",
+    match library_tree_row_admission {
+        LibraryTreeRowAdmission::Performance => "media_class IN ('audio', 'video')",
+        LibraryTreeRowAdmission::PerformanceAndImages => "media_class IN ('audio', 'video', 'image')",
     }
 }
 
-pub(crate) fn source_file_visibility_predicate_sql_for_column(
-    source_file_visibility: SourceFileVisibility,
+pub(crate) fn library_tree_row_admission_predicate_sql_for_column(
+    library_tree_row_admission: LibraryTreeRowAdmission,
     column_sql: &str,
 ) -> String {
-    match source_file_visibility {
-        SourceFileVisibility::Performance => {
+    match library_tree_row_admission {
+        LibraryTreeRowAdmission::Performance => {
             format!("{column_sql} IN ('audio', 'video')")
         }
-        SourceFileVisibility::PerformanceAndImages => {
+        LibraryTreeRowAdmission::PerformanceAndImages => {
             format!("{column_sql} IN ('audio', 'video', 'image')")
         }
     }

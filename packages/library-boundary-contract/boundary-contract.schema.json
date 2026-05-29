@@ -49,6 +49,14 @@
         "libraryAssetId"
       ]
     },
+    "ChildRowState": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "hasChildRows",
+        "noChildRows"
+      ]
+    },
     "CommandErrorEnvelope": {
       "type": "object",
       "properties": {
@@ -1480,7 +1488,7 @@
         }
       ]
     },
-    "LiteralHierarchyCoverage": {
+    "LibraryTreeCoverage": {
       "type": "object",
       "properties": {
         "detail": {
@@ -1496,7 +1504,7 @@
           "type": "boolean"
         },
         "state": {
-          "$ref": "#/$defs/LiteralHierarchyCoverageState"
+          "$ref": "#/$defs/LibraryTreeCoverageState"
         }
       },
       "required": [
@@ -1505,7 +1513,7 @@
         "emptyResultAuthoritative"
       ]
     },
-    "LiteralHierarchyCoverageState": {
+    "LibraryTreeCoverageState": {
       "type": "string",
       "enum": [
         "complete",
@@ -1517,7 +1525,7 @@
         "locationMissing"
       ]
     },
-    "LiteralHierarchyEntryPoint": {
+    "LibraryTreeEntryPoint": {
       "oneOf": [
         {
           "type": "object",
@@ -1569,7 +1577,7 @@
         }
       ]
     },
-    "LiteralHierarchyFileMediaClass": {
+    "LibraryTreeFileMediaClass": {
       "type": "string",
       "enum": [
         "audio",
@@ -1579,9 +1587,19 @@
         "none"
       ]
     },
-    "LiteralHierarchyNode": {
+    "LibraryTreeNode": {
       "type": "object",
       "properties": {
+        "childRowState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChildRowState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "directoryImageMediaState": {
           "anyOf": [
             {
@@ -1624,7 +1642,7 @@
         "mediaClass": {
           "anyOf": [
             {
-              "$ref": "#/$defs/LiteralHierarchyFileMediaClass"
+              "$ref": "#/$defs/LibraryTreeFileMediaClass"
             },
             {
               "type": "null"
@@ -1639,7 +1657,7 @@
           "format": "int64"
         },
         "nodeKind": {
-          "$ref": "#/$defs/LiteralHierarchyNodeKind"
+          "$ref": "#/$defs/LibraryTreeNodeKind"
         },
         "parentSourceDirectoryId": {
           "type": [
@@ -1648,7 +1666,7 @@
           ]
         },
         "presenceState": {
-          "$ref": "#/$defs/LiteralHierarchyPresenceState"
+          "$ref": "#/$defs/LibraryTreePresenceState"
         },
         "relativePath": {
           "type": "string"
@@ -1689,14 +1707,14 @@
         "updatedAtMs"
       ]
     },
-    "LiteralHierarchyNodeKind": {
+    "LibraryTreeNodeKind": {
       "type": "string",
       "enum": [
         "directory",
         "file"
       ]
     },
-    "LiteralHierarchyPresenceState": {
+    "LibraryTreePresenceState": {
       "type": "string",
       "enum": [
         "present",
@@ -1704,14 +1722,14 @@
         "removed"
       ]
     },
-    "LiteralHierarchyWindow": {
+    "LibraryTreeWindow": {
       "type": "object",
       "properties": {
         "coverage": {
-          "$ref": "#/$defs/LiteralHierarchyCoverage"
+          "$ref": "#/$defs/LibraryTreeCoverage"
         },
         "entryPoint": {
-          "$ref": "#/$defs/LiteralHierarchyEntryPoint"
+          "$ref": "#/$defs/LibraryTreeEntryPoint"
         },
         "limit": {
           "type": "integer",
@@ -1732,7 +1750,7 @@
         "rows": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/LiteralHierarchyNode"
+            "$ref": "#/$defs/LibraryTreeNode"
           }
         },
         "totalRows": {
@@ -2456,13 +2474,13 @@
         "maxEvents"
       ]
     },
-    "ReadLiteralHierarchyChildrenReply": {
+    "ReadLibraryTreeChildrenReply": {
       "type": "object",
       "properties": {
         "window": {
           "anyOf": [
             {
-              "$ref": "#/$defs/LiteralHierarchyWindow"
+              "$ref": "#/$defs/LibraryTreeWindow"
             },
             {
               "type": "null"
@@ -2471,11 +2489,11 @@
         }
       }
     },
-    "ReadLiteralHierarchyChildrenRequest": {
+    "ReadLibraryTreeChildrenRequest": {
       "type": "object",
       "properties": {
         "entryPoint": {
-          "$ref": "#/$defs/LiteralHierarchyEntryPoint"
+          "$ref": "#/$defs/LibraryTreeEntryPoint"
         },
         "limit": {
           "type": "integer",
@@ -2491,16 +2509,6 @@
           "type": [
             "string",
             "null"
-          ]
-        },
-        "sourceFileVisibility": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/SourceFileVisibility"
-            },
-            {
-              "type": "null"
-            }
           ]
         }
       },
@@ -2803,11 +2811,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadLiteralHierarchyChildrenRequest"
+              "$ref": "#/$defs/ReadLibraryTreeChildrenRequest"
             },
             "type": {
               "type": "string",
-              "const": "readLiteralHierarchyChildren"
+              "const": "readLibraryTreeChildren"
             }
           },
           "required": [
@@ -2951,11 +2959,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadLiteralHierarchyChildrenReply"
+              "$ref": "#/$defs/ReadLibraryTreeChildrenReply"
             },
             "type": {
               "type": "string",
-              "const": "literalHierarchyChildren"
+              "const": "libraryTreeChildren"
             }
           },
           "required": [
@@ -3043,13 +3051,6 @@
             "payload"
           ]
         }
-      ]
-    },
-    "SourceFileVisibility": {
-      "type": "string",
-      "enum": [
-        "performance",
-        "performanceAndImages"
       ]
     },
     "UnregisterLocalRootReply": {

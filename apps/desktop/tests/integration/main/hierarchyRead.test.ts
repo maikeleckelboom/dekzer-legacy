@@ -74,7 +74,7 @@ describe('hierarchy and navigation reads through the host', () => {
       config,
       createFakeClient({
         readNavigationRows: async () => ({ rows: [sourceNavigationRow()] }),
-        readLiteralHierarchyChildren: async (request) => {
+        readLibraryTreeChildren: async (request) => {
           expect(request).toMatchObject({
             entryPoint: {
               type: 'source',
@@ -82,8 +82,7 @@ describe('hierarchy and navigation reads through the host', () => {
             },
             parentSourceDirectoryId: null,
             offset: 0,
-            limit: 50,
-            sourceFileVisibility: 'performance'
+            limit: 50
           })
 
           return {
@@ -110,7 +109,8 @@ describe('hierarchy and navigation reads through the host', () => {
                   hasChildDirectories: true,
                   directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
                   directoryImageMediaState: { kind: 'noImageMediaDescendants' },
-                  directoryScanState: 'scanning'
+                  directoryScanState: 'scanning',
+                  childRowState: 'hasChildRows'
                 },
                 {
                   nodeKind: 'file',
@@ -163,7 +163,7 @@ describe('hierarchy and navigation reads through the host', () => {
           config,
           createFakeClient({
             readNavigationRows: async () => ({ rows: [sourceNavigationRow()] }),
-            readLiteralHierarchyChildren: async (request) => ({
+            readLibraryTreeChildren: async (request) => ({
               window: {
                 entryPoint: request.entryPoint,
                 parentSourceDirectoryId: null,

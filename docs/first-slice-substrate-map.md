@@ -56,9 +56,9 @@ The first slice includes the following capabilities, whether fully implemented o
 | Scan admission                        | Defined in scan admission contract; not yet fully implemented.          |
 | Persisted literal source hierarchy    | Active. SQLite `source_directories`, `source_files` with scan coverage. |
 | Attachment/media inventory            | Attachment data model active via promotion; scan-integrated inventory stage deferred. |
-| Source hierarchy read boundary        | Active. `readLiteralHierarchyChildren` with offset/limit pagination.    |
+| Source hierarchy read boundary        | Active. `readLibraryTreeChildren` with offset/limit pagination.         |
 | Contents read boundary                | Active. Single parameterized `contentsRead` with cursor pagination.     |
-| Renderer tree projection              | Active. Tree with root, directory, file rows under sourceFileVisibility. |
+| Renderer tree projection              | Active. Tree with root, directory, file rows under library tree row admission. |
 | Renderer contents pane projection     | Active. Contents table with `loadContentsPage` cursor pagination.       |
 | Renderer library browser shell        | Active. Panel, source toolbar, browser, split pane.                     |
 
@@ -109,8 +109,8 @@ Two distinct read boundaries are active in the first slice:
 | Hierarchy read  | Offset-based (`offset`/`limit`)   | Tree `loadMore` / `loadChildren`      | Literal source hierarchy children. |
 | Contents read   | Cursor-based (`cursor`/`cursor`)  | Contents pane `loadContentsPage`      | Selected scope file rows.         |
 
-The hierarchy read returns `LiteralHierarchyWindow` rows with `totalRows`, `nextOffset`, and a
-`LiteralHierarchyCoverage` containing `emptyResultAuthoritative`. In shared TS, the post-mapping
+The hierarchy read returns `LibraryTreeWindow` rows with `totalRows`, `nextOffset`, and a
+`LibraryTreeCoverage` containing `emptyResultAuthoritative`. In shared TS, the post-mapping
 equivalents are `ChildWindow` for the window and `ChildRow` for individual child rows. The contents read returns `ContentsResult`
 rows with `nextCursor` and `ContentsCoverage` containing `emptyResultAuthoritative`.
 
@@ -125,7 +125,6 @@ The renderer owns:
 |----------------|-----------------------------------------------------|-----------------------------------------------------|
 | Hierarchy tree | `renderer/library/boundary/hierarchyRead.ts`        | Expansion state, branch cache, row projection.      |
 | Contents pane  | `renderer/library/boundary/contentsRead.ts`         | Pagination state, row accumulation, sort.           |
-| Browse policy  | `renderer/library/browsePolicy/`                    | Visibility mode → policy mapping (renderer concept). |
 | Selection      | `renderer/library/selection/`                       | Selected node → contents scope derivation.          |
 | View state     | `renderer/library/viewState/`                       | Expanded node IDs, split position, session state.   |
 
@@ -138,11 +137,8 @@ The following are true of the current repo as of this writing:
 
 | Fact                                                                 | Observation                              |
 |----------------------------------------------------------------------|------------------------------------------|
-| `sourceFileVisibility` is the current hierarchy-read vocabulary.     | Provisional naming debt, not doctrine.   |
-| `sourceFileVisibility` = `Performance` / `PerformanceAndImages`.     | Active across all layers.                |
-| `SourceFileVisibility` is generated in Rust protocol and TS contract. | Full stack support.                     |
-| `browsePolicy/` is a renderer folder domain, not a canonical contract. | Renderer concept only.                 |
-| `rowAdmission` does not exist as an implemented concept.              | Must not be made canonical accidentally. |
+| `sourceFileVisibility` was implementation debt and has been removed from renderer-facing contracts. | Library tree row admission is now a product/boundary surface concern. |
+| Library tree row admission is owned by the product/boundary surface, not the renderer. | Renderer no longer chooses visibility or policy. |
 | Tree `loadMore` feeds `nextOffset` into subsequent hierarchy reads.   | Active pagination.                      |
 | Contents `loadContentsPage` feeds `nextCursor` into subsequent reads.  | Active pagination.                      |
 | `emptyResultAuthoritative` exists in hierarchy and contents coverage.  | Active coverage field.                  |
@@ -151,17 +147,7 @@ The following are true of the current repo as of this writing:
 
 ## Provisional vocabulary
 
-The following names are current implementation vocabulary that are provisional and subject to future renaming:
-
-| Current name            | What it actually does                             | Provisional status                          |
-|-------------------------|---------------------------------------------------|---------------------------------------------|
-| `sourceFileVisibility`  | Filters hierarchy children by media class.        | Provisional naming debt. Not product doctrine. |
-| `Performance`           | Show audio and video only.                        | Provisional value name.                     |
-| `PerformanceAndImages`  | Show audio, video, and image.                     | Provisional value name.                     |
-| `browsePolicy/`         | Renderer folder mapping mode to policy values.    | Renderer concept, not a canonical contract. |
-
-Do not make `sourceFileVisibility` into a canonical product concept. Do not treat the renderer `browsePolicy/`
-folder as a canonical architecture contract. These names may change in a later vocabulary cleanup.
+The provisional `sourceFileVisibility` vocabulary has been removed. Library tree row admission is now an internal product-boundary concern, not a renderer-facing parameter.
 
 ## Canonical vocabulary
 
@@ -179,7 +165,7 @@ The following names are canonical first-slice vocabulary:
 | `ContentsRowProfile`    | Shared TS → Rust store                        | `sourceFile` or `primaryMedia` row profile.   |
 | `StoreLiteralHierarchyWindow` | Rust store                            | Store-level hierarchy window.                 |
 | `StoreLiteralHierarchyCoverage` | Rust store                          | Store-level hierarchy coverage.               |
-| `SourceFileVisibility`  | Rust protocol → TS contract                   | Provisional hierarchy visibility filter.      |
+
 
 ## Deferred work
 
@@ -187,10 +173,8 @@ The following work is acknowledged but deferred beyond the first slice:
 
 | Deferred work                              | Why deferred                                       |
 |--------------------------------------------|----------------------------------------------------|
-| Rename `sourceFileVisibility` vocabulary   | Stable first-slice names first; rename as follow-up. |
 | Full scan admission implementation         | Contract exists; implementation is ongoing.         |
 | Durable root identity resolver             | Schema slots exist; path-only handling is current.  |
-| Replay/visibility-change replay correctness | Renderer replay paths exist for visibility changes. |
 | Column browser                             | Phase 3 in implementation sequence.                 |
 | Search, organization, prep, imports, etc.  | Phases 4–10 in implementation sequence.             |
 
@@ -202,8 +186,7 @@ A change fails this map if it does any of the following:
 |-------------------------------------------------------------------------|----------------------------------------------------------------------|
 | Implements deck runtime, Prepared Room, or RT Flight Deck as first slice | Explicitly excluded.                                                 |
 | Adds smart crates, playlists, or broad filter systems                    | Explicitly excluded.                                                 |
-| Makes `browsePolicy` canonical as an architecture contract               | Renderer folder concept only.                                        |
-| Makes `sourceFileVisibility` into canonical product doctrine             | Provisional naming debt, not product concept.                        |
+| Exposes `sourceFileVisibility` or renderer-chosen policy in the library tree product boundary | Visibility/policy is an internal row admission concern, not a renderer parameter. |
 | Blurs hierarchy reads with contents reads                                | Distinct pagination models, owners, and result shapes.               |
 | Claims hierarchy cache is an authoritative contents source               | Contents reads own selected scope; hierarchy owns tree children only. |
 | Treats empty hierarchy rows as meaning nothing exists                    | `emptyResultAuthoritative` must be false when coverage is incomplete. |

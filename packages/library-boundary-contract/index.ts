@@ -36,7 +36,7 @@ export type RemoveLibraryAssetFromPlaylistRequest = { playlistId: string, librar
 
 export type MovePlaylistEntryRequest = { playlistId: string, playlistEntryId: string, newPosition: number, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLiteralHierarchyChildren", "payload": ReadLiteralHierarchyChildrenRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -44,9 +44,9 @@ export type LoadNavigationRowRequest = { navigationRowId: string, };
 
 export type LoadNavigationRowByStableKeyRequest = { stableKey: string, };
 
-export type ReadLiteralHierarchyChildrenRequest = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, sourceFileVisibility?: SourceFileVisibility, };
+export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, };
 
-export type SourceFileVisibility = "performance" | "performanceAndImages";
+export type ChildRowState = "unknown" | "hasChildRows" | "noChildRows";
 
 export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
 
@@ -96,7 +96,7 @@ export type RemoveLibraryAssetFromPlaylistReply = { removed: boolean, };
 
 export type MovePlaylistEntryReply = { moved: boolean, };
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "literalHierarchyChildren", "payload": ReadLiteralHierarchyChildrenReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -104,7 +104,7 @@ export type LoadNavigationRowReply = { row: NavigationRow | null, };
 
 export type LoadNavigationRowByStableKeyReply = { row: NavigationRow | null, };
 
-export type ReadLiteralHierarchyChildrenReply = { window: LiteralHierarchyWindow | null, };
+export type ReadLibraryTreeChildrenReply = { window: LibraryTreeWindow | null, };
 
 export type ReadNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
 
@@ -124,21 +124,21 @@ export type NavigationRowKind = "view" | "collectionGroup" | "playlist" | "prepP
 
 export type NavigationRowSelectorKind = "allMedia" | "allAudio" | "allVideos" | "recentlyAdded" | "needsPreparation" | "playlistGroup" | "source" | "sourceLocation" | "playlist" | "prepPolicyScope";
 
-export type LiteralHierarchyEntryPoint = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } };
+export type LibraryTreeEntryPoint = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } };
 
-export type LiteralHierarchyWindow = { entryPoint: LiteralHierarchyEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LiteralHierarchyNode>, coverage: LiteralHierarchyCoverage, };
+export type LibraryTreeWindow = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LibraryTreeNode>, coverage: LibraryTreeCoverage, };
 
-export type LiteralHierarchyCoverage = { state: LiteralHierarchyCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail: string | null, };
+export type LibraryTreeCoverage = { state: LibraryTreeCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail: string | null, };
 
-export type LiteralHierarchyCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
+export type LibraryTreeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
 
-export type LiteralHierarchyNode = { nodeKind: LiteralHierarchyNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, mediaClass?: LiteralHierarchyFileMediaClass, presenceState: LiteralHierarchyPresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, };
+export type LibraryTreeNode = { nodeKind: LibraryTreeNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, mediaClass?: LibraryTreeFileMediaClass, presenceState: LibraryTreePresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, childRowState?: ChildRowState, };
 
-export type LiteralHierarchyNodeKind = "directory" | "file";
+export type LibraryTreeNodeKind = "directory" | "file";
 
-export type LiteralHierarchyFileMediaClass = "audio" | "video" | "image" | "unsupported" | "none";
+export type LibraryTreeFileMediaClass = "audio" | "video" | "image" | "unsupported" | "none";
 
-export type LiteralHierarchyPresenceState = "present" | "missing" | "removed";
+export type LibraryTreePresenceState = "present" | "missing" | "removed";
 
 export type DirectoryPrimaryMediaState = { "kind": "unknown" } | { "kind": "hasPrimaryMediaDescendants" } | { "kind": "noPrimaryMediaDescendants" };
 

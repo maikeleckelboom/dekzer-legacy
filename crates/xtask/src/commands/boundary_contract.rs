@@ -345,7 +345,7 @@ mod tests {
         assert!(ts.contains("libraryBoundaryEvents"));
         assert!(ts.contains("registerLocalRoot"));
         assert!(ts.contains("runRootScan"));
-        assert!(ts.contains("readLiteralHierarchyChildren"));
+        assert!(ts.contains("readLibraryTreeChildren"));
     }
 
     #[test]

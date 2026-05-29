@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { LibraryBoundaryHostStatus } from '../../../../src/shared/libraryBoundary/status'
 import type {
   ChildRow,
+  ChildRowState,
   EntryPoint,
-  HierarchyCoverage,
-  SourceFileVisibility
+  HierarchyCoverage
 } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
@@ -67,8 +67,7 @@ describe('projectState', () => {
       ownerNodeId: 'navigation-row:7',
       entryPoint: sourceEntryPoint(),
       offset: 2,
-      limit: 50,
-      sourceFileVisibility: 'performance'
+      limit: 50
     })
     expect(findNode(projection.nodes, 'more:navigation-row:7:2')?.action).toMatchObject({
       kind: 'loadMore',
@@ -330,7 +329,8 @@ describe('projectState', () => {
             hasChildDirectories: false,
             directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
-            directoryScanState: 'complete'
+            directoryScanState: 'complete',
+            childRowState: 'noChildRows'
           })
         ])
       })
@@ -377,7 +377,8 @@ describe('projectState', () => {
             hasChildDirectories: false,
             directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
-            directoryScanState: 'complete'
+            directoryScanState: 'complete',
+            childRowState: 'noChildRows'
           })
         ])
       })
@@ -520,7 +521,6 @@ function loadedChildren(
   rows: readonly ChildRow[],
   options: {
     readonly totalRows?: number
-    readonly sourceFileVisibility?: SourceFileVisibility
   } = {}
 ): LoadedChildren {
   const totalRows = options.totalRows ?? rows.length
@@ -529,7 +529,6 @@ function loadedChildren(
   return {
     entryPoint: sourceEntryPoint(),
     label: 'Source Fixture',
-    sourceFileVisibility: options.sourceFileVisibility ?? 'performance',
     rows,
     totalRows,
     coverage: {
@@ -621,6 +620,7 @@ function directoryNode(
       ChildRow,
       { readonly kind: 'directory' }
     >['directoryScanState']
+    readonly childRowState?: ChildRowState
   } = {}
 ): Extract<ChildRow, { readonly kind: 'directory' }> {
   return {
@@ -638,6 +638,7 @@ function directoryNode(
       kind: 'noImageMediaDescendants'
     },
     directoryScanState: options.directoryScanState ?? 'scanning',
+    childRowState: options.childRowState ?? 'hasChildRows',
     updatedAtMs: 100
   }
 }

@@ -11,8 +11,8 @@ import type {
   LoadNavigationRowRequest,
   ReadLibraryBoundaryEventsReply,
   ReadLibraryBoundaryEventsRequest,
-  ReadLiteralHierarchyChildrenReply,
-  ReadLiteralHierarchyChildrenRequest,
+  ReadLibraryTreeChildrenReply,
+  ReadLibraryTreeChildrenRequest,
   ReadLocalRootsReply,
   ReadLocalRootsRequest,
   ReadNavigationNodeLibraryBrowserWindowReply,
@@ -141,19 +141,19 @@ export class LibraryBoundaryClient {
     );
   }
 
-  readLiteralHierarchyChildren(
-    request: ReadLiteralHierarchyChildrenRequest
-  ): Promise<ReadLiteralHierarchyChildrenReply> {
+  readLibraryTreeChildren(
+    request: ReadLibraryTreeChildrenRequest
+  ): Promise<ReadLibraryTreeChildrenReply> {
     return this.sendAndExpect(
       {
         type: "snapshotRead",
         payload: {
-          type: "readLiteralHierarchyChildren",
+          type: "readLibraryTreeChildren",
           payload: request
         }
       },
       "snapshotRead",
-      "literalHierarchyChildren"
+      "libraryTreeChildren"
     );
   }
 

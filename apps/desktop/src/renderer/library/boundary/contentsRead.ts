@@ -7,7 +7,6 @@ import type {
   ContentsRecursion,
   ContentsFileRow
 } from '../../../shared/libraryContents/read'
-import type { SourceFileVisibility } from '../../../shared/libraryHierarchy/readChildren'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { RowBinding } from '../state'
 
@@ -270,22 +269,5 @@ function contentsRequestKey(
       return `source-location:${scope.sourceLocationId}:${policyKey}`
     case 'directory':
       return `directory:${scope.sourceId}:${scope.sourceDirectoryId}:${policyKey}`
-  }
-}
-
-export function contentsPolicyForVisibility(
-  sourceFileVisibility: SourceFileVisibility
-): ContentsReadPolicy {
-  switch (sourceFileVisibility) {
-    case 'performance':
-      return {
-        mediaClasses: ['audio', 'video'],
-        rowProfile: { kind: 'primaryMedia' }
-      }
-    case 'performanceAndImages':
-      return {
-        mediaClasses: ['audio', 'video', 'image'],
-        rowProfile: { kind: 'sourceFile' }
-      }
   }
 }

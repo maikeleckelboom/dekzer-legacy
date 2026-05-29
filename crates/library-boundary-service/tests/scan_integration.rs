@@ -3,12 +3,12 @@ use std::path::Path;
 
 use library_boundary_protocol::{
     CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, LibraryRootCommand,
-    LibraryRootReply, LiteralHierarchyCoverageState, LiteralHierarchyEntryPoint,
-    LiteralHierarchyNodeKind, LiteralHierarchyPresenceState, NavigationRow,
-    NavigationRowFamily, NavigationRowKind, ReadLiteralHierarchyChildrenReply,
-    ReadLiteralHierarchyChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
+    LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint,
+    LibraryTreeNodeKind, LibraryTreePresenceState, NavigationRow,
+    NavigationRowFamily, NavigationRowKind, ReadLibraryTreeChildrenReply,
+    ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
     RegisterLocalRootRequest, RunRootScanReply, RunRootScanRequest, SnapshotReadCommand,
-    SnapshotReadReply, SourceFileVisibility,
+    SnapshotReadReply,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -82,40 +82,25 @@ fn read_navigation_rows(
     }
 }
 
-fn read_literal_hierarchy(
+fn read_library_tree(
     service: &LibraryBoundaryService,
     source_id: i64,
     parent_source_directory_id: Option<i64>,
-) -> ReadLiteralHierarchyChildrenReply {
-    read_literal_hierarchy_with_visibility(
-        service,
-        source_id,
-        parent_source_directory_id,
-        SourceFileVisibility::PerformanceAndImages,
-    )
-}
-
-fn read_literal_hierarchy_with_visibility(
-    service: &LibraryBoundaryService,
-    source_id: i64,
-    parent_source_directory_id: Option<i64>,
-    visibility: SourceFileVisibility,
-) -> ReadLiteralHierarchyChildrenReply {
+) -> ReadLibraryTreeChildrenReply {
     let outcome = service.handle_command(CommandRequest::SnapshotRead(
-        SnapshotReadCommand::ReadLiteralHierarchyChildren(
-            ReadLiteralHierarchyChildrenRequest {
-                entry_point: LiteralHierarchyEntryPoint::Source { source_id },
+        SnapshotReadCommand::ReadLibraryTreeChildren(
+            ReadLibraryTreeChildrenRequest {
+                entry_point: LibraryTreeEntryPoint::Source { source_id },
                 parent_source_directory_id,
                 offset: 0,
                 limit: 50,
-                source_file_visibility: Some(visibility),
             },
         ),
     ));
-    let reply = expect_command_reply(outcome, "read literal hierarchy");
+    let reply = expect_command_reply(outcome, "read library tree");
     match reply {
-        CommandReply::SnapshotRead(SnapshotReadReply::LiteralHierarchyChildren(r)) => r,
-        other => panic!("Expected literal hierarchy reply, got {other:?}"),
+        CommandReply::SnapshotRead(SnapshotReadReply::LibraryTreeChildren(r)) => r,
+        other => panic!("Expected library tree reply, got {other:?}"),
     }
 }
 
@@ -273,7 +258,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         })
         .expect("registered source appears in navigation at root level");
 
-    let root_reply = read_literal_hierarchy(&service, registered.root_id, None);
+    let root_reply = read_library_tree(&service, registered.root_id, None);
     let root_window = root_reply
         .window
         .as_ref()
@@ -286,13 +271,13 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     let artists_dir = root_window
         .rows
         .iter()
-        .find(|row| row.display_name == "artists" && row.node_kind == LiteralHierarchyNodeKind::Directory)
+        .find(|row| row.display_name == "artists" && row.node_kind == LibraryTreeNodeKind::Directory)
         .expect("artists directory in root hierarchy");
 
     root_window
         .rows
         .iter()
-        .find(|row| row.display_name == "loose.mp3" && row.node_kind == LiteralHierarchyNodeKind::File)
+        .find(|row| row.display_name == "loose.mp3" && row.node_kind == LibraryTreeNodeKind::File)
         .expect("loose.mp3 file in root hierarchy");
 
     for row in &root_window.rows {
@@ -307,7 +292,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         assert!(
             matches!(
                 row.node_kind,
-                LiteralHierarchyNodeKind::Directory | LiteralHierarchyNodeKind::File,
+                LibraryTreeNodeKind::Directory | LibraryTreeNodeKind::File,
             ),
             "root row '{}' has unexpected node_kind {:?}",
             row.display_name,
@@ -318,7 +303,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     for row in &root_window.rows {
         assert_eq!(
             row.presence_state,
-            LiteralHierarchyPresenceState::Present,
+            LibraryTreePresenceState::Present,
             "root row '{}' must be Present, got {:?}",
             row.display_name,
             row.presence_state,
@@ -327,7 +312,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
 
     for row in &root_window.rows {
         match row.node_kind {
-            LiteralHierarchyNodeKind::Directory => {
+            LibraryTreeNodeKind::Directory => {
                 assert!(
                     row.directory_scan_state.is_some(),
                     "directory '{}' must have directory_scan_state",
@@ -339,7 +324,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
                     row.display_name,
                 );
             }
-            LiteralHierarchyNodeKind::File => {
+            LibraryTreeNodeKind::File => {
                 assert!(
                     row.directory_scan_state.is_none(),
                     "file '{}' must not have directory_scan_state",
@@ -368,7 +353,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .source_directory_id
         .expect("artists directory has source_directory_id");
     let artists_reply =
-        read_literal_hierarchy(&service, registered.root_id, Some(artists_dir_id));
+        read_library_tree(&service, registered.root_id, Some(artists_dir_id));
     let artists_window = artists_reply
         .window
         .as_ref()
@@ -383,7 +368,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .source_directory_id
         .expect("alpha directory has source_directory_id");
     let alpha_reply =
-        read_literal_hierarchy(&service, registered.root_id, Some(alpha_dir_id));
+        read_library_tree(&service, registered.root_id, Some(alpha_dir_id));
     let alpha_window = alpha_reply
         .window
         .as_ref()
@@ -420,7 +405,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         })
         .expect("registered source survives in navigation after reopen");
 
-    let reopened_root_reply = read_literal_hierarchy(&reopened, registered.root_id, None);
+    let reopened_root_reply = read_library_tree(&reopened, registered.root_id, None);
     let reopened_root_window = reopened_root_reply
         .window
         .as_ref()
@@ -442,7 +427,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .expect("loose.mp3 file survives reopen");
 
     let reopened_artists_reply =
-        read_literal_hierarchy(&reopened, registered.root_id, Some(artists_dir_id));
+        read_library_tree(&reopened, registered.root_id, Some(artists_dir_id));
     let reopened_artists_window = reopened_artists_reply
         .window
         .as_ref()
@@ -454,7 +439,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     );
 
     let reopened_alpha_reply =
-        read_literal_hierarchy(&reopened, registered.root_id, Some(alpha_dir_id));
+        read_library_tree(&reopened, registered.root_id, Some(alpha_dir_id));
     let reopened_alpha_window = reopened_alpha_reply
         .window
         .as_ref()
@@ -469,7 +454,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         let w = window.as_ref().expect("hierarchy window exists");
         assert_eq!(
             w.coverage.state,
-            LiteralHierarchyCoverageState::Complete,
+            LibraryTreeCoverageState::Complete,
             "post-scan coverage state must be Complete",
         );
         assert!(
@@ -480,7 +465,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
 }
 
 #[test]
-fn performance_visibility_excludes_image_files_and_directories() {
+fn library_tree_children_excludes_image_only_directories() {
     let tempdir = TempDir::new().expect("create tempdir");
     let music_root = tempdir.path().join("music-root");
     write_file(
@@ -499,49 +484,24 @@ fn performance_visibility_excludes_image_files_and_directories() {
     let registered = register_root(&service, &music_root);
     run_scan(&service, registered.root_id);
 
-    let perf_reply = read_literal_hierarchy_with_visibility(
-        &service,
-        registered.root_id,
-        None,
-        SourceFileVisibility::Performance,
-    );
-    let perf_window = perf_reply
+    let reply = read_library_tree(&service, registered.root_id, None);
+    let window = reply
         .window
         .as_ref()
-        .expect("Performance visibility resolves hierarchy");
+        .expect("Library tree children resolves hierarchy");
 
-    let has_artists = perf_window
+    let has_artists = window
         .rows
         .iter()
         .any(|row| row.display_name == "artists");
-    assert!(has_artists, "artists directory must appear under Performance visibility");
+    assert!(has_artists, "artists directory must appear in library tree children");
 
-    let has_artwork = perf_window
+    let has_artwork = window
         .rows
         .iter()
         .any(|row| row.display_name == "artwork");
     assert!(
         !has_artwork,
-        "artwork directory must NOT appear under Performance visibility (contains only images)"
-    );
-
-    let both_reply = read_literal_hierarchy_with_visibility(
-        &service,
-        registered.root_id,
-        None,
-        SourceFileVisibility::PerformanceAndImages,
-    );
-    let both_window = both_reply
-        .window
-        .as_ref()
-        .expect("PerformanceAndImages visibility resolves hierarchy");
-
-    let has_artwork_both = both_window
-        .rows
-        .iter()
-        .any(|row| row.display_name == "artwork");
-    assert!(
-        has_artwork_both,
-        "artwork directory must appear under PerformanceAndImages visibility"
+        "artwork directory must NOT appear in library tree children (contains only images)"
     );
 }

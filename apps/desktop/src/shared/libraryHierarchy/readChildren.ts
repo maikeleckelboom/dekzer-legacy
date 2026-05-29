@@ -47,7 +47,7 @@ export type ReadTarget =
       readonly label?: string
     }
 
-export type SourceFileVisibility = 'performance' | 'performanceAndImages'
+export type ChildRowState = 'unknown' | 'hasChildRows' | 'noChildRows'
 
 export type ReadRequest = {
   readonly target?: ReadTarget
@@ -121,6 +121,7 @@ export type ChildRow =
       readonly directoryPrimaryMediaState: DirectoryPrimaryMediaState
       readonly directoryImageMediaState: DirectoryImageMediaState
       readonly directoryScanState: DirectoryScanState
+      readonly childRowState: ChildRowState
       readonly updatedAtMs: number
     }
   | {
@@ -140,7 +141,6 @@ export type ChildWindow = {
   readonly parentDirectoryId?: string
   readonly offset: number
   readonly limit: number
-  readonly sourceFileVisibility: SourceFileVisibility
   readonly totalRows: number
   readonly coverage: HierarchyCoverage
   readonly nodes: readonly ChildRow[]

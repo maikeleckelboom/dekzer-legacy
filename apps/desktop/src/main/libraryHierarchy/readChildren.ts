@@ -1,4 +1,4 @@
-import type { ReadLiteralHierarchyChildrenRequest } from '@dekzer/library-boundary-contract'
+import type { ReadLibraryTreeChildrenRequest } from '@dekzer/library-boundary-contract'
 
 import {
   hierarchyReadChannels,
@@ -9,7 +9,7 @@ import {
 } from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
-import { mapLiteralHierarchyNode } from './mapping'
+import { mapLibraryTreeNode } from './mapping'
 import { createHierarchyReadErrorResult, isReadResult, normalizeRequest } from './request'
 import { resolveTarget } from './target'
 
@@ -49,13 +49,12 @@ export async function readThroughHost(
       return resolvedTarget
     }
 
-    const reply = await client.readLiteralHierarchyChildren({
+    const reply = await client.readLibraryTreeChildren({
       entryPoint: resolvedTarget.entryPoint,
       parentSourceDirectoryId: normalizedRequest.parentDirectoryId ?? null,
       offset: normalizedRequest.offset,
-      limit: normalizedRequest.limit,
-      sourceFileVisibility: 'performance'
-    } satisfies ReadLiteralHierarchyChildrenRequest)
+      limit: normalizedRequest.limit
+    } satisfies ReadLibraryTreeChildrenRequest)
 
     if (reply.window === null) {
       return createHierarchyReadErrorResult(
@@ -65,7 +64,7 @@ export async function readThroughHost(
       )
     }
 
-    const nodes = mapLiteralHierarchyNodes(reply.window.rows)
+    const nodes = mapLibraryTreeNodes(reply.window.rows)
 
     if (nodes === undefined) {
       return createHierarchyReadErrorResult(
@@ -84,7 +83,6 @@ export async function readThroughHost(
           : { parentDirectoryId: reply.window.parentSourceDirectoryId }),
         offset: reply.window.offset,
         limit: reply.window.limit,
-        sourceFileVisibility: 'performance',
         totalRows: reply.window.totalRows,
         coverage: mapCoverage(reply.window.coverage),
         nodes
@@ -129,13 +127,13 @@ function getStartedClient(host: LibraryBoundaryHost): LibraryBoundaryHostClient 
   }
 }
 
-function mapLiteralHierarchyNodes(
-  rows: Parameters<typeof mapLiteralHierarchyNode>[0][]
+function mapLibraryTreeNodes(
+  rows: Parameters<typeof mapLibraryTreeNode>[0][]
 ): readonly ChildRow[] | undefined {
   const nodes: ChildRow[] = []
 
   for (const row of rows) {
-    const node = mapLiteralHierarchyNode(row)
+    const node = mapLibraryTreeNode(row)
 
     if (node === undefined) {
       return undefined

@@ -1,13 +1,13 @@
 import type {
-  LiteralHierarchyEntryPoint,
-  LiteralHierarchyNode
+  LibraryTreeEntryPoint,
+  LibraryTreeNode
 } from '@dekzer/library-boundary-contract'
 
 import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
 
-export function mapReadEntryPointToLiteralEntryPoint(
+export function mapReadEntryPointToLibraryTreeEntryPoint(
   entryPoint: EntryPoint
-): LiteralHierarchyEntryPoint {
+): LibraryTreeEntryPoint {
   if (entryPoint.kind === 'source') {
     return {
       type: 'source',
@@ -33,7 +33,7 @@ export function rootNodeIdForReadEntryPoint(entryPoint: EntryPoint): string {
   return `source-location:${entryPoint.sourceLocationId}`
 }
 
-export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | undefined {
+export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
   if (row.nodeKind === 'directory' && row.sourceDirectoryId === null) {
     return undefined
   }
@@ -69,6 +69,7 @@ export function mapLiteralHierarchyNode(row: LiteralHierarchyNode): ChildRow | u
       directoryPrimaryMediaState: row.directoryPrimaryMediaState,
       directoryImageMediaState: row.directoryImageMediaState,
       directoryScanState: row.directoryScanState,
+      childRowState: row.childRowState ?? 'unknown',
       updatedAtMs: row.updatedAtMs
     }
   }

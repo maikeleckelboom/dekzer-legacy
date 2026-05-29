@@ -7,11 +7,11 @@ import {
 import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
 import type {
   ChildRow,
+  ChildRowState,
   HierarchyCoverage,
   ReadErrorCode,
   ReadRequest,
-  ReadResult,
-  SourceFileVisibility
+  ReadResult
 } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type { NavigationReadRowsResult } from '../../../../src/shared/libraryNavigation/readRows'
 
@@ -187,7 +187,7 @@ describe('createLibraryHierarchyReadController', () => {
     }
   })
 
-  it('read requests do not include sourceFileVisibility', async () => {
+  it('read requests have the correct shape with target, offset, and limit', async () => {
     const readRequests: ReadRequest[] = []
     const controller = createLibraryHierarchyReadController(
       testLibraryApi({
@@ -200,7 +200,18 @@ describe('createLibraryHierarchyReadController', () => {
     )
 
     await expect(controller.refresh()).resolves.toBe(true)
-    expect(readRequests[0]).not.toHaveProperty('sourceFileVisibility')
+    expect(readRequests[0]).toEqual({
+      target: {
+        kind: 'entryPoint',
+        entryPoint: {
+          kind: 'source',
+          sourceId: '7'
+        },
+        label: 'Source Fixture'
+      },
+      offset: 0,
+      limit: 50
+    })
   })
 
   it('refresh re-reads navigation and first source after initial load', async () => {
@@ -268,16 +279,13 @@ describe('createLibraryHierarchyReadController', () => {
     })
   })
 
-  it('controller does not expose sourceFileVisibility or setSourceFileVisibility', () => {
+  it('controller does not expose setSourceFileVisibility', () => {
     const controller = createLibraryHierarchyReadController(
       testLibraryApi({
         readChildren: async () => directoryRootHierarchyReadResult()
       })
     )
 
-    expect(
-      (controller as Record<string, unknown>).sourceFileVisibility
-    ).toBeUndefined()
     expect(
       (controller as Record<string, unknown>).setSourceFileVisibility
     ).toBeUndefined()
@@ -653,7 +661,6 @@ function directoryRootHierarchyReadResult(): Extract<ReadResult, { state: 'ready
       root: sourceRoot(),
       offset: 0,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 3,
       coverage: completeCoverage(),
       nodes: [
@@ -672,7 +679,6 @@ function partialSourceHierarchyReadResult(): Extract<ReadResult, { state: 'ready
       root: sourceRoot(),
       offset: 0,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 2,
       coverage: completeCoverage(),
       nodes: [directoryNode('12', 'Album')]
@@ -687,7 +693,6 @@ function sourceMoreReadResult(): Extract<ReadResult, { state: 'ready' }> {
       root: sourceRoot(),
       offset: 1,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 2,
       coverage: completeCoverage(),
       nodes: [fileNode('99', 'root-track.wav')]
@@ -705,7 +710,6 @@ function loadedDirectoryReadResult(
       parentDirectoryId,
       offset: 0,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 2,
       coverage: completeCoverage(),
       nodes: [
@@ -723,7 +727,6 @@ function directoryRootHierarchyReadResultForSource9(): Extract<ReadResult, { sta
       root: sourceRoot9(),
       offset: 0,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 2,
       coverage: completeCoverage(),
       nodes: [
@@ -744,7 +747,6 @@ function partialDirectoryHierarchyReadResult(
       parentDirectoryId,
       offset: 0,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 2,
       coverage: completeCoverage(),
       nodes: [fileNode(`${parentDirectoryId}-a`, 'a.wav', parentDirectoryId)]
@@ -762,7 +764,6 @@ function directoryMoreReadResult(
       parentDirectoryId,
       offset: 1,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 2,
       coverage: completeCoverage(),
       nodes: [fileNode(`${parentDirectoryId}-b`, 'b.wav', parentDirectoryId)]
@@ -780,7 +781,6 @@ function emptyDirectoryReadResult(
       parentDirectoryId,
       offset: 0,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 0,
       coverage: completeEmptyCoverage(),
       nodes: []
@@ -799,7 +799,6 @@ function wrongSourceContinuationResult(): Extract<ReadResult, { state: 'ready' }
       },
       offset: 1,
       limit: 50,
-      sourceFileVisibility: 'performance',
       totalRows: 2,
       coverage: completeCoverage(),
       nodes: [fileNode('999', 'intruder.wav')]
@@ -858,6 +857,7 @@ function directoryNode(
     directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
     directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'scanning',
+    childRowState: 'hasChildRows',
     updatedAtMs: 100
   }
 }

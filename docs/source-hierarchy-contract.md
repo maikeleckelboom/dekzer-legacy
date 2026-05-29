@@ -16,7 +16,6 @@ scope:
   - renderer-hierarchy-cache-permissions
   - hierarchy-versus-contents-reads
   - hierarchy-versus-scan-admission
-  - source-file-visibility-vocabulary
 ---
 
 # Source Hierarchy Contract
@@ -28,25 +27,41 @@ admission. It governs how the renderer reads literal source hierarchy children, 
 pagination works, what coverage and empty-result semantics mean, what the renderer may cache, and how hierarchy reads
 differ from contents reads.
 
-This contract is implementation-grounded. It describes the current `readLiteralHierarchyChildren` boundary and its
+This contract is implementation-grounded. It describes the current `ReadLibraryTreeChildren` boundary and its
 consumers, not a future ideal.
 
 ## Contract role
 
-The source hierarchy contract exists because hierarchy reads and contents reads are separate systems with different
-pagination strategies, different row models, different coverage semantics, and different renderer controllers.
-Scan admission is a third system. They must not blur.
+The source hierarchy contract exists because the systems below are separate with different
+pagination strategies, different row models, different coverage semantics, and different controllers.
+They must not blur.
 
-| System                    | Owns                                                       | Must not own                                  |
-|---------------------------|------------------------------------------------------------|-----------------------------------------------|
-| Source hierarchy reads    | Immediate children of a hierarchy directory or source root. | Recursive selected contents.                  |
-| Contents reads            | Flat/recursive file rows for a selected scope.             | Hierarchy structure, directory nesting.       |
-| Scan admission            | Traversal, candidate gate, media inventory.                | Renderer projection of hierarchy or contents. |
+### Literal source hierarchy
+
+Persisted substrate/read-model semantics. The Rust/SQLite store owns the durable source identity,
+hierarchy nodes, and scan coverage. This is the authoritative source of truth for what exists on disk.
+
+### Library tree children
+
+Product-facing renderer read surface. The `ReadLibraryTreeChildren` command returns admitted rows
+through the library tree product boundary. Row admission is an internal product-boundary concern;
+the command exposes no visibility or policy parameter to the renderer.
+
+### Contents read
+
+Selected-scope file rows. Contents reads return flat or recursive file rows for a selected scope,
+using cursor-based pagination. Contents reads must not use hierarchy pagination state.
+
+### Scan admission
+
+Traversal, candidate gate, media inventory. Scan admission walks the filesystem, admits or rejects
+candidates, records observations, and updates scan coverage. It does not project hierarchy or contents
+to the renderer.
 
 ## Row model
 
 Source hierarchy rows represent a literal filesystem-source tree projected into the renderer. The current row model uses
-`LiteralHierarchyNode`:
+`LibraryTreeNode`:
 
 | Field                        | Meaning                                                             |
 |------------------------------|---------------------------------------------------------------------|
@@ -63,6 +78,7 @@ Source hierarchy rows represent a literal filesystem-source tree projected into 
 | `modified_at_ns`                | Modification timestamp, if known.                                   |
 | `updated_at_ms`                 | Last update timestamp.                                              |
 | `has_child_directories`         | Whether the directory has child directories, if directory.          |
+| `child_row_state`               | Directory expandability signal. `unknown`, `hasChildRows`, `noChildRows`. Directory-only. |
 | `directory_primary_media_state` | Primary media descendant state for directories. Tagged union; see below. |
 | `directory_image_media_state`   | Image media descendant state for directories. Tagged union; see below. |
 | `directory_scan_state`          | Scan state for directories. Enum; see below.                        |
@@ -87,7 +103,7 @@ maps from the store string to the protocol enum. All three fields are absent on 
 Directory scan pending (`directory_scan_state = Pending`) belongs to `directory_scan_state` only;
 `presence_state` may only describe `present`, `missing`, or `removed`.
 
-Rows are grouped into a `LiteralHierarchyWindow` per page:
+Rows are grouped into a `LibraryTreeWindow` per page:
 
 | Field                    | Meaning                                                    |
 |--------------------------|------------------------------------------------------------|
@@ -96,8 +112,8 @@ Rows are grouped into a `LiteralHierarchyWindow` per page:
 | `offset`                 | Page offset (zero-based).                                  |
 | `limit`                  | Page size.                                                 |
 | `total_rows`             | Total child rows known for this parent under current policy. |
-| `rows`                   | Page of `LiteralHierarchyNode` rows.                       |
-| `coverage`               | `LiteralHierarchyCoverage` for this window.                |
+| `rows`                   | Page of `LibraryTreeNode` rows.                            |
+| `coverage`               | `LibraryTreeCoverage` for this window.                     |
 
 ### Row kinds in current implementation
 
@@ -110,7 +126,7 @@ Rows are grouped into a `LiteralHierarchyWindow` per page:
 (surface by row profile) but the literal hierarchy row kind from the substrate is `file` or `directory`.
 
 Source roots are navigation entities, not hierarchy child rows. They connect to hierarchy reads through the
-`entry_point` on `LiteralHierarchyWindow` and the `ReadRoot` / `EntryPoint` on `ChildWindow` in shared TS.
+`entry_point` on `LibraryTreeWindow` and the `ReadRoot` / `EntryPoint` on `ChildWindow` in shared TS.
 The window's `parent_source_directory_id = null` signals that the returned rows are root-level children.
 
 ### Field naming across layers
@@ -125,15 +141,15 @@ app-facing names: `ChildWindow` for the window, `ChildRow` for the row, `NodeKin
 The hierarchy read boundary is a single command:
 
 ```
-ReadLiteralHierarchyChildren(entryPoint, parentSourceDirectoryId?, offset, limit, sourceFileVisibility?)
-  → ReadLiteralHierarchyChildrenReply(window: LiteralHierarchyWindow?)
+ReadLibraryTreeChildren(entryPoint, parentSourceDirectoryId?, offset, limit)
+  → ReadLibraryTreeChildrenReply(window: LibraryTreeWindow?)
 ```
 
 This boundary is implemented through:
 
 | Layer                         | Location                                                              |
 |-------------------------------|-----------------------------------------------------------------------|
-| Rust protocol                 | `crates/library-boundary-protocol/src/commands/snapshot_reads.rs`     |
+| Rust protocol                 | `ReadLibraryTreeChildrenRequest`, `ReadLibraryTreeChildrenReply`, `LibraryTreeWindow`, `LibraryTreeNode`, `LibraryTreeCoverage`, `ChildRowState` |
 | Rust service                  | `crates/library-boundary-service/src/snapshot_read_protocol.rs`       |
 | Rust store                    | `crates/library-store-sqlite/src/read_models/literal_hierarchy.rs`    |
 | TS boundary contract          | `packages/library-boundary-contract/index.ts`                         |
@@ -164,7 +180,7 @@ Load-more in the tree:
 User clicks load-more row
   → tree projection emits { kind: 'loadMore', state }
   → panel dispatches to hierarchy read controller
-  → controller issues ReadLiteralHierarchyChildren with target.offset
+  → controller issues ReadLibraryTreeChildren with target.offset
   → result is appended to existing children via appendHierarchyChildrenWindow()
 ```
 
@@ -174,13 +190,13 @@ Load-children on expand:
 User expands directory
   → tree projection emits { kind: 'loadChildren', state }
   → panel calls requestNodeChildren / requestDirectoryChildren
-  → controller issues ReadLiteralHierarchyChildren with offset: 0
+  → controller issues ReadLibraryTreeChildren with offset: 0
   → result replaces (or initializes) the branch's children via loadedChildrenFromWindow()
 ```
 
 ## Coverage and empty-result semantics
 
-Every hierarchy window carries a `LiteralHierarchyCoverage`:
+Every hierarchy window carries a `LibraryTreeCoverage`:
 
 | Field                      | Meaning                                                                 |
 |----------------------------|-------------------------------------------------------------------------|
@@ -225,11 +241,6 @@ The renderer must not:
 - Use hierarchy cache as an authoritative contents source for the contents pane.
 - Assume `emptyResultAuthoritative` is true when coverage is not `Complete`.
 
-When `sourceFileVisibility` changes, the renderer may replay existing state by re-requesting children under the new
-visibility. The current implementation supports this through `setSourceFileVisibility(visibility, { replayNodeIds })`.
-The replay reads each affected branch under the new visibility and replaces the cached children. It must not clear
-children before the new read completes (frame stability rule).
-
 ## Stale response behavior
 
 The renderer hierarchy controller preserves existing children while a new read is in flight. Key behaviors:
@@ -239,10 +250,9 @@ The renderer hierarchy controller preserves existing children while a new read i
 | Read in flight; prior children exist            | Keep existing children; mark branch refreshing.              |
 | Read completes with new data                    | Replace branch children.                                     |
 | Read fails; prior children still valid          | Keep prior children; do not flash empty.                     |
-| Visibility changes during read                  | Expectation: response is validated against current visibility before acceptance. |
-| Window does not match expected offset/visibility | Window is discarded.                                         |
+| Window does not match expected offset/entry     | Window is discarded.                                         |
 
-Window validation (`isExpectedWindow`) checks: `offset`, `parentDirectoryId`, `entryPoint`, `sourceFileVisibility`,
+Window validation (`isExpectedWindow`) checks: `offset`, `parentDirectoryId`, `entryPoint`,
 `nodes.length <= limit`, `offset + nodes.length <= totalRows`, and non-empty when offset < totalRows.
 
 ## Relationship to contents reads
@@ -256,9 +266,9 @@ Hierarchy reads and contents reads are separate systems. The following table sum
 | Pagination        | Offset-based.                                     | Cursor-based.                           |
 | Next-page signal  | `nextOffset` (integer).                           | `nextCursor` (encoded string).          |
 | Load action       | Tree `loadMore` / `loadChildren`.                 | Pane `loadContentsPage`.                |
-| Result shape      | `LiteralHierarchyWindow`.                         | `ContentsResult`.                       |
-| Coverage shape    | `LiteralHierarchyCoverage`.                       | `ContentsCoverage`.                     |
-| Profile parameter | `sourceFileVisibility`.                           | `ContentsReadPolicy` (row profile + media classes). |
+| Result shape      | `LibraryTreeWindow`.                              | `ContentsResult`.                       |
+| Coverage shape    | `LibraryTreeCoverage`.                            | `ContentsCoverage`.                     |
+| Profile parameter | None (internal row admission).                    | `ContentsReadPolicy` (row profile + media classes). |
 | Recursion         | Not supported; children are immediate.            | Supported via `ContentsRecursion`.       |
 | Renderer owner    | `boundary/hierarchyRead.ts`.                      | `boundary/contentsRead.ts`.             |
 
@@ -274,7 +284,7 @@ admission, or media candidate inspection.
 | Scan admission system              | Hierarchy read system                                 |
 |------------------------------------|-------------------------------------------------------|
 | Walks the filesystem.              | Reads persisted SQLite rows.                          |
-| Admits or rejects candidates.      | Filters rows by `sourceFileVisibility` profile.       |
+| Admits or rejects candidates.      | Applies internal library tree row admission policy.       |
 | Records observations.              | Returns rows and coverage.                            |
 | Updates scan coverage.             | Consumes coverage state already persisted.            |
 | Produces `source_files` inventory. | Projects inventory as hierarchy rows.                 |
@@ -282,37 +292,22 @@ admission, or media candidate inspection.
 A directory that has not been scanned shows `coverage.state = Pending` or `Scanning` in the hierarchy read result.
 The hierarchy read does not trigger a scan to fill in the gap. That is the scan admission system's responsibility.
 
-## Current vocabulary debt
+## Product boundary vocabulary
 
-The hierarchy read boundary uses `SourceFileVisibility` as a protocol-level parameter. This is current implementation
-vocabulary, not final product doctrine:
+The library tree children boundary uses `ReadLibraryTreeChildren` as the product-facing command. Library tree row
+admission is an internal product-boundary concern: the renderer does not choose a visibility or policy parameter.
 
-| Current term            | What it actually does                      | Notes                                   |
-|-------------------------|--------------------------------------------|-----------------------------------------|
-| `sourceFileVisibility`  | Selects which media classes appear in hierarchy children. | Provisional naming debt.             |
-| `Performance`           | Show audio and video children.             | Filters by `media_class IN ('audio','video')`. |
-| `PerformanceAndImages`  | Show audio, video, and image children.     | Filters by `media_class IN ('audio','video','image')`. |
+`ChildRowState` (`unknown`, `hasChildRows`, `noChildRows`) is the product-surface signal for directory expandability.
+The renderer must use `childRowState` to determine whether a directory row should show an expand affordance, rather
+than deriving expandability from `directoryPrimaryMediaState` or `directoryImageMediaState`.
 
-This vocabulary is present in all layers:
-
-- Rust protocol: `SourceFileVisibility` enum
-- Rust store: `browse_media::SourceFileVisibility` and `source_file_visibility_predicate_sql`
-- TS boundary contract: generated from Rust protocol
-- Shared TS types: `shared/libraryHierarchy/readChildren.ts`
-- Renderer controller: `boundary/hierarchyRead.ts` with `setSourceFileVisibility()`
-- Renderer tree projection: `tree/projection.ts` consumes visibility
-
-Do not rename `sourceFileVisibility` in this task. It is current naming debt, not product doctrine.
-A future vocabulary cleanup may rename it to something more descriptive of its actual role (hierarchy child
-media-class filter), but the first slice stabilizes the current names first.
+The current product policy admits audio/video rows and excludes image-only files/directories from the library tree.
 
 ## Non-goals
 
 This contract does not:
 
-- Make `rowAdmission` canonical (not an implemented concept).
-- Make `browsePolicy` canonical (renderer folder concept only).
-- Rename `sourceFileVisibility`.
+- Make `rowAdmission` canonical as a renderer-facing parameter (it is an internal product-boundary concern).
 - Claim source hierarchy owns recursive selected contents.
 - Claim hierarchy cache is an authoritative contents source.
 - Claim scan admission is fully implemented.
@@ -328,7 +323,7 @@ The following invariants hold for the source hierarchy read boundary:
 
 | Invariant                                                                | Enforcement                                               |
 |--------------------------------------------------------------------------|-----------------------------------------------------------|
-| Hierarchy reads use offset/limit pagination, not cursor pagination.      | Protocol shape; `ReadLiteralHierarchyChildrenRequest` uses `offset`. |
+| Hierarchy reads use offset/limit pagination, not cursor pagination.      | Protocol shape; `ReadLibraryTreeChildrenRequest` uses `offset`. |
 | Contents reads use cursor pagination, not offset pagination.             | Protocol shape; `ContentsReadRequest` uses `cursor`.       |
 | Hierarchy `loadMore` / `loadChildren` must not use `loadContentsPage`.   | Renderer dispatch in `panel.vue`.                         |
 | Contents `loadContentsPage` must not use `loadMore` / `loadChildren`.    | Renderer dispatch in `panel.vue`.                         |
@@ -336,7 +331,6 @@ The following invariants hold for the source hierarchy read boundary:
 | Zero rows with incomplete coverage must not be rendered as "empty."      | Tree projection respects `emptyResultAuthoritative`.      |
 | Renderer must not clear visible children while a hierarchy read is pending. | Frame stability contract.                              |
 | Hierarchy cache is not an authoritative contents source.                 | Contents reads are independent of hierarchy controller.   |
-| `sourceFileVisibility` change replays children under new visibility.     | Renderer `setSourceFileVisibility` with `replayNodeIds`.  |
 | Hierarchy reads never trigger filesystem traversal.                      | Reads are from persisted SQLite state.                    |
-| `rowAdmission` is not an implemented hierarchy concept.                  | Must not be made canonical accidentally.                  |
-| `browsePolicy` is a renderer folder, not a canonical contract.           | Must not be made canonical accidentally.                  |
+| Library tree children command exposes no visibility or policy parameter. | `ReadLibraryTreeChildren` has no visibility/policy arg.   |
+| Renderer must not derive expandability from `directoryPrimaryMediaState` or `directoryImageMediaState`; use `childRowState` instead. | Product boundary contract. |

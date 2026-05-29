@@ -1257,7 +1257,7 @@ pub struct LibraryAssetWaveformOverview {
 )]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
-pub enum LiteralHierarchyEntryPoint {
+pub enum LibraryTreeEntryPoint {
     Source {
         #[serde(rename = "sourceId")]
         #[ts(rename = "sourceId")]
@@ -1288,38 +1288,14 @@ pub enum LiteralHierarchyEntryPoint {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLiteralHierarchyChildrenRequest {
-    pub entry_point: LiteralHierarchyEntryPoint,
+pub struct ReadLibraryTreeChildrenRequest {
+    pub entry_point: LibraryTreeEntryPoint,
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
     pub parent_source_directory_id: Option<i64>,
     pub offset: usize,
     pub limit: usize,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub source_file_visibility: Option<SourceFileVisibility>,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    ts_rs::TS,
-)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-pub enum SourceFileVisibility {
-    #[default]
-    Performance,
-    PerformanceAndImages,
 }
 
 #[derive(
@@ -1327,8 +1303,8 @@ pub enum SourceFileVisibility {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ReadLiteralHierarchyChildrenReply {
-    pub window: Option<LiteralHierarchyWindow>,
+pub struct ReadLibraryTreeChildrenReply {
+    pub window: Option<LibraryTreeWindow>,
 }
 
 #[derive(
@@ -1336,8 +1312,8 @@ pub struct ReadLiteralHierarchyChildrenReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LiteralHierarchyWindow {
-    pub entry_point: LiteralHierarchyEntryPoint,
+pub struct LibraryTreeWindow {
+    pub entry_point: LibraryTreeEntryPoint,
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
@@ -1345,8 +1321,8 @@ pub struct LiteralHierarchyWindow {
     pub offset: usize,
     pub limit: usize,
     pub total_rows: usize,
-    pub rows: Vec<LiteralHierarchyNode>,
-    pub coverage: LiteralHierarchyCoverage,
+    pub rows: Vec<LibraryTreeNode>,
+    pub coverage: LibraryTreeCoverage,
 }
 
 #[derive(
@@ -1363,7 +1339,7 @@ pub struct LiteralHierarchyWindow {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LiteralHierarchyCoverageState {
+pub enum LibraryTreeCoverageState {
     Complete,
     Pending,
     Scanning,
@@ -1378,8 +1354,8 @@ pub enum LiteralHierarchyCoverageState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LiteralHierarchyCoverage {
-    pub state: LiteralHierarchyCoverageState,
+pub struct LibraryTreeCoverage {
+    pub state: LibraryTreeCoverageState,
     pub recursive_scope_complete: bool,
     pub empty_result_authoritative: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1400,7 +1376,7 @@ pub struct LiteralHierarchyCoverage {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LiteralHierarchyNodeKind {
+pub enum LibraryTreeNodeKind {
     Directory,
     File,
 }
@@ -1419,7 +1395,7 @@ pub enum LiteralHierarchyNodeKind {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LiteralHierarchyPresenceState {
+pub enum LibraryTreePresenceState {
     Present,
     Missing,
     Removed,
@@ -1501,7 +1477,7 @@ pub enum DirectoryImageMediaState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LiteralHierarchyFileMediaClass {
+pub enum LibraryTreeFileMediaClass {
     Audio,
     Video,
     Image,
@@ -1509,7 +1485,7 @@ pub enum LiteralHierarchyFileMediaClass {
     None,
 }
 
-impl LiteralHierarchyFileMediaClass {
+impl LibraryTreeFileMediaClass {
     pub fn from_projection_value(value: &str) -> Option<Self> {
         match value.as_bytes() {
             b"audio" => Some(Self::Audio),
@@ -1534,8 +1510,8 @@ impl LiteralHierarchyFileMediaClass {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LiteralHierarchyNode {
-    pub node_kind: LiteralHierarchyNodeKind,
+pub struct LibraryTreeNode {
+    pub node_kind: LibraryTreeNodeKind,
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
     #[ts(as = "String")]
@@ -1556,8 +1532,8 @@ pub struct LiteralHierarchyNode {
     pub display_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub media_class: Option<LiteralHierarchyFileMediaClass>,
-    pub presence_state: LiteralHierarchyPresenceState,
+    pub media_class: Option<LibraryTreeFileMediaClass>,
+    pub presence_state: LibraryTreePresenceState,
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
     pub updated_at_ms: i64,
@@ -1573,6 +1549,29 @@ pub struct LiteralHierarchyNode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub directory_scan_state: Option<DirectoryScanState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub child_row_state: Option<ChildRowState>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum ChildRowState {
+    Unknown,
+    HasChildRows,
+    NoChildRows,
 }
 
 #[derive(
@@ -1591,7 +1590,7 @@ pub enum SnapshotReadCommand {
     ReadNavigationRows(ReadNavigationRowsRequest),
     LoadNavigationRow(LoadNavigationRowRequest),
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
-    ReadLiteralHierarchyChildren(ReadLiteralHierarchyChildrenRequest),
+    ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
     ReadNavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowRequest),
     SearchNavigationNodeLibraryBrowserWindow(SearchNavigationNodeLibraryBrowserWindowRequest),
     ContentsRead(ContentsReadRequest),
@@ -1608,7 +1607,7 @@ pub enum SnapshotReadReply {
     NavigationRows(ReadNavigationRowsReply),
     NavigationRow(LoadNavigationRowReply),
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
-    LiteralHierarchyChildren(ReadLiteralHierarchyChildrenReply),
+    LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     NavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowReply),
     NavigationNodeLibraryBrowserSearch(SearchNavigationNodeLibraryBrowserWindowReply),
     Contents(ContentsReadReply),
@@ -1619,7 +1618,7 @@ pub enum SnapshotReadReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        ContentsMediaClass, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        ChildRowState, ContentsMediaClass, DirectoryImageMediaState, DirectoryPrimaryMediaState,
         DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
         LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
         LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
@@ -1629,17 +1628,16 @@ mod tests {
         LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
         LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
         LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
-        LibraryAssetWaveformOverviewCapabilityState, LiteralHierarchyCoverage,
-        LiteralHierarchyCoverageState, LiteralHierarchyEntryPoint, LiteralHierarchyFileMediaClass,
-        LiteralHierarchyNode, LiteralHierarchyNodeKind, LiteralHierarchyPresenceState,
-        LiteralHierarchyWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
+        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage,
+        LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeFileMediaClass,
+        LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
+        LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
         NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
         ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLiteralHierarchyChildrenReply, ReadLiteralHierarchyChildrenRequest,
+        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
         ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
-        SourceFileVisibility,
     };
     use serde_json::json;
 
@@ -1648,13 +1646,12 @@ mod tests {
         let navigation = SnapshotReadCommand::ReadNavigationRows(ReadNavigationRowsRequest {
             parent_navigation_row_id: Some(7),
         });
-        let literal_hierarchy = SnapshotReadCommand::ReadLiteralHierarchyChildren(
-            ReadLiteralHierarchyChildrenRequest {
-                entry_point: LiteralHierarchyEntryPoint::Source { source_id: 7 },
+        let library_tree = SnapshotReadCommand::ReadLibraryTreeChildren(
+            ReadLibraryTreeChildrenRequest {
+                entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
                 parent_source_directory_id: None,
                 offset: 0,
                 limit: 50,
-                source_file_visibility: Some(SourceFileVisibility::Performance),
             },
         );
         let navigation_node = SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
@@ -1690,14 +1687,13 @@ mod tests {
             })
         ));
         assert!(matches!(
-            literal_hierarchy,
-            SnapshotReadCommand::ReadLiteralHierarchyChildren(
-                ReadLiteralHierarchyChildrenRequest {
-                    entry_point: LiteralHierarchyEntryPoint::Source { source_id: 7 },
+            library_tree,
+            SnapshotReadCommand::ReadLibraryTreeChildren(
+                ReadLibraryTreeChildrenRequest {
+                    entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 50,
-                    source_file_visibility: Some(SourceFileVisibility::Performance),
                 },
             )
         ));
@@ -1822,23 +1818,23 @@ mod tests {
     }
 
     #[test]
-    fn literal_hierarchy_children_are_not_asset_browser_rows() {
+    fn library_tree_children_are_not_asset_browser_rows() {
         let reply =
-            SnapshotReadReply::LiteralHierarchyChildren(ReadLiteralHierarchyChildrenReply {
-                window: Some(LiteralHierarchyWindow {
-                    entry_point: LiteralHierarchyEntryPoint::Source { source_id: 7 },
+            SnapshotReadReply::LibraryTreeChildren(ReadLibraryTreeChildrenReply {
+                window: Some(LibraryTreeWindow {
+                    entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 25,
                     total_rows: 1,
-                    coverage: LiteralHierarchyCoverage {
-                        state: LiteralHierarchyCoverageState::Scanning,
+                    coverage: LibraryTreeCoverage {
+                        state: LibraryTreeCoverageState::Scanning,
                         recursive_scope_complete: false,
                         empty_result_authoritative: false,
                         detail: Some("Still indexing.".to_string()),
                     },
-                    rows: vec![LiteralHierarchyNode {
-                        node_kind: LiteralHierarchyNodeKind::Directory,
+                    rows: vec![LibraryTreeNode {
+                        node_kind: LibraryTreeNodeKind::Directory,
                         source_id: 7,
                         source_directory_id: Some(11),
                         source_file_id: None,
@@ -1846,7 +1842,7 @@ mod tests {
                         relative_path: "Albums".to_string(),
                         display_name: "Albums".to_string(),
                         media_class: None,
-                        presence_state: LiteralHierarchyPresenceState::Present,
+                        presence_state: LibraryTreePresenceState::Present,
                         size_bytes: None,
                         modified_at_ns: None,
                         updated_at_ms: 100,
@@ -1856,15 +1852,16 @@ mod tests {
                         ),
                         directory_image_media_state: Some(DirectoryImageMediaState::Unknown),
                         directory_scan_state: Some(DirectoryScanState::Scanning),
+                        child_row_state: Some(ChildRowState::Unknown),
                     }],
                 }),
             });
 
-        let json = serde_json::to_value(&reply).expect("serialize literal hierarchy reply");
+        let json = serde_json::to_value(&reply).expect("serialize library tree reply");
         assert_eq!(
             json,
             json!({
-                "type": "literalHierarchyChildren",
+                "type": "libraryTreeChildren",
                 "payload": {
                     "window": {
                         "entryPoint": {
@@ -1902,7 +1899,8 @@ mod tests {
                             "directoryImageMediaState": {
                                 "kind": "unknown"
                             },
-                            "directoryScanState": "scanning"
+                            "directoryScanState": "scanning",
+                            "childRowState": "unknown"
                         }]
                     }
                 }
@@ -1915,31 +1913,31 @@ mod tests {
     }
 
     #[test]
-    fn literal_hierarchy_file_media_class_serializes_as_media_class() {
+    fn library_tree_file_media_class_serializes_as_media_class() {
         let reply =
-            SnapshotReadReply::LiteralHierarchyChildren(ReadLiteralHierarchyChildrenReply {
-                window: Some(LiteralHierarchyWindow {
-                    entry_point: LiteralHierarchyEntryPoint::Source { source_id: 7 },
+            SnapshotReadReply::LibraryTreeChildren(ReadLibraryTreeChildrenReply {
+                window: Some(LibraryTreeWindow {
+                    entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 25,
                     total_rows: 1,
-                    coverage: LiteralHierarchyCoverage {
-                        state: LiteralHierarchyCoverageState::Complete,
+                    coverage: LibraryTreeCoverage {
+                        state: LibraryTreeCoverageState::Complete,
                         recursive_scope_complete: true,
                         empty_result_authoritative: false,
                         detail: Some("Complete.".to_string()),
                     },
-                    rows: vec![LiteralHierarchyNode {
-                        node_kind: LiteralHierarchyNodeKind::File,
+                    rows: vec![LibraryTreeNode {
+                        node_kind: LibraryTreeNodeKind::File,
                         source_id: 7,
                         source_directory_id: None,
                         source_file_id: Some(31),
                         parent_source_directory_id: None,
                         relative_path: "cover.mp3".to_string(),
                         display_name: "cover.mp3".to_string(),
-                        media_class: Some(LiteralHierarchyFileMediaClass::Image),
-                        presence_state: LiteralHierarchyPresenceState::Present,
+                        media_class: Some(LibraryTreeFileMediaClass::Image),
+                        presence_state: LibraryTreePresenceState::Present,
                         size_bytes: Some(10),
                         modified_at_ns: Some(20),
                         updated_at_ms: 100,
@@ -1947,6 +1945,7 @@ mod tests {
                         directory_primary_media_state: None,
                         directory_image_media_state: None,
                         directory_scan_state: None,
+                        child_row_state: None,
                     }],
                 }),
             });
@@ -2014,13 +2013,12 @@ mod tests {
                     stable_key: "view:all_media".to_string(),
                 },
             ),
-            SnapshotReadCommand::ReadLiteralHierarchyChildren(
-                ReadLiteralHierarchyChildrenRequest {
-                    entry_point: LiteralHierarchyEntryPoint::Source { source_id: 1 },
+            SnapshotReadCommand::ReadLibraryTreeChildren(
+                ReadLibraryTreeChildrenRequest {
+                    entry_point: LibraryTreeEntryPoint::Source { source_id: 1 },
                     parent_source_directory_id: None,
                     offset: 0,
                     limit: 50,
-                    source_file_visibility: Some(SourceFileVisibility::Performance),
                 },
             ),
             SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(

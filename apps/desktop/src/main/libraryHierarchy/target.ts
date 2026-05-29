@@ -1,4 +1,4 @@
-import type { LiteralHierarchyEntryPoint } from '@dekzer/library-boundary-contract'
+import type { LibraryTreeEntryPoint } from '@dekzer/library-boundary-contract'
 
 import type {
   EntryPoint,
@@ -7,12 +7,12 @@ import type {
   ReadTarget
 } from '../../shared/libraryHierarchy/readChildren'
 import type { LibraryBoundaryHostClient } from '../libraryBoundary/host'
-import { mapReadEntryPointToLiteralEntryPoint, rootNodeIdForReadEntryPoint } from './mapping'
+import { mapReadEntryPointToLibraryTreeEntryPoint, rootNodeIdForReadEntryPoint } from './mapping'
 import { createHierarchyReadErrorResult, isPositiveOpaqueId } from './request'
 
 export type ResolvedTarget = {
   readonly root: ReadRoot
-  readonly entryPoint: LiteralHierarchyEntryPoint
+  readonly entryPoint: LibraryTreeEntryPoint
 }
 
 export async function resolveTarget(
@@ -36,7 +36,7 @@ function resolveEntryPointTarget(
       ...optionalLabelProperty(label),
       entryPoint
     },
-    entryPoint: mapReadEntryPointToLiteralEntryPoint(entryPoint)
+    entryPoint: mapReadEntryPointToLibraryTreeEntryPoint(entryPoint)
   }
 }
 
@@ -69,7 +69,7 @@ async function resolveFirstAvailableSourceTarget(
       label: sourceRow.displayName,
       entryPoint
     },
-    entryPoint: mapReadEntryPointToLiteralEntryPoint(entryPoint)
+    entryPoint: mapReadEntryPointToLibraryTreeEntryPoint(entryPoint)
   }
 }
 

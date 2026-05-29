@@ -51,7 +51,7 @@ try {
   equal(scan.discoveredFileCount, 1, "scan discovers one file");
   equal(scan.queuedSourceWorkItems, 1, "scan queues one source work item");
 
-  const rootWindow = await first.client.readLiteralHierarchyChildren({
+  const rootWindow = await first.client.readLibraryTreeChildren({
     entryPoint: {
       type: "source",
       payload: {
@@ -72,7 +72,7 @@ try {
     "directory row carries durable sourceDirectoryId"
   );
 
-  const fileWindow = await first.client.readLiteralHierarchyChildren({
+  const fileWindow = await first.client.readLibraryTreeChildren({
     entryPoint: {
       type: "source",
       payload: {
@@ -91,7 +91,7 @@ try {
   await first.transport.close();
 
   const reopened = await openClient();
-  const reopenedWindow = await reopened.client.readLiteralHierarchyChildren({
+  const reopenedWindow = await reopened.client.readLibraryTreeChildren({
     entryPoint: {
       type: "source",
       payload: {

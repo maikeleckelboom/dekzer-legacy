@@ -1,8 +1,7 @@
 import type {
   EntryPoint,
   ChildRow,
-  HierarchyCoverage,
-  SourceFileVisibility
+  HierarchyCoverage
 } from '../../../shared/libraryHierarchy/readChildren'
 import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
 import type {
@@ -280,7 +279,6 @@ function projectLoadedHierarchyChildren(options: {
     nodes: options.children.rows,
     entryPoint: options.children.entryPoint,
     ...(options.children.label === undefined ? {} : { label: options.children.label }),
-    sourceFileVisibility: options.children.sourceFileVisibility,
     directoryReadStates: options.directoryReadStates,
     bindingsById: options.bindingsById
   })
@@ -369,7 +367,6 @@ function projectLiteralNodes(options: {
   readonly nodes: readonly ChildRow[]
   readonly entryPoint: EntryPoint
   readonly label?: string
-  readonly sourceFileVisibility: SourceFileVisibility
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
@@ -378,7 +375,6 @@ function projectLiteralNodes(options: {
       node,
       entryPoint: options.entryPoint,
       ...(options.label === undefined ? {} : { label: options.label }),
-      sourceFileVisibility: options.sourceFileVisibility,
       directoryReadStates: options.directoryReadStates,
       bindingsById: options.bindingsById
     })
@@ -389,7 +385,6 @@ function projectLiteralNode(options: {
   readonly node: ChildRow
   readonly entryPoint: EntryPoint
   readonly label?: string
-  readonly sourceFileVisibility: SourceFileVisibility
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode {
@@ -410,7 +405,7 @@ function projectLiteralNode(options: {
     const directoryState = options.directoryReadStates.get(node.directoryId)
     const dirBadge = presenceBadge(node.presence)
 
-    if (isConfirmedDirectoryLeaf(node, directoryState, options.sourceFileVisibility)) {
+    if (isConfirmedDirectoryLeaf(node, directoryState)) {
       return {
         id: node.id,
         role: 'literalDirectory',
@@ -461,32 +456,12 @@ function projectLiteralNode(options: {
 
 function isConfirmedDirectoryLeaf(
   node: Extract<ChildRow, { readonly kind: 'directory' }>,
-  state: DirectoryState | undefined,
-  sourceFileVisibility: SourceFileVisibility
+  state: DirectoryState | undefined
 ): boolean {
   if (state !== undefined && state.kind !== 'unloaded') {
     return false
   }
-
-  return (
-    !node.hasChildDirectories &&
-    directoryHasNoRevealableMediaDescendants(node, sourceFileVisibility) &&
-    node.directoryScanState === 'complete'
-  )
-}
-
-function directoryHasNoRevealableMediaDescendants(
-  node: Extract<ChildRow, { readonly kind: 'directory' }>,
-  sourceFileVisibility: SourceFileVisibility
-): boolean {
-  if (node.directoryPrimaryMediaState.kind !== 'noPrimaryMediaDescendants') {
-    return false
-  }
-
-  return (
-    sourceFileVisibility === 'performance' ||
-    node.directoryImageMediaState.kind === 'noImageMediaDescendants'
-  )
+  return node.childRowState === 'noChildRows'
 }
 
 function browserTreeIconForMediaClass(
@@ -728,7 +703,6 @@ function moreNode(options: { readonly ownerId: string; readonly children: Loaded
       ? {}
       : { parentDirectoryId: options.children.parentDirectoryId }),
     ...(options.children.label === undefined ? {} : { label: options.children.label }),
-    sourceFileVisibility: options.children.sourceFileVisibility,
     offset,
     limit: options.children.limit
   }

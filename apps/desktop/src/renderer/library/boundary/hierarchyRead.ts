@@ -8,8 +8,7 @@ import type {
   ReadRequest,
   ReadResult,
   ReadRoot,
-  ChildWindow,
-  SourceFileVisibility
+  ChildWindow
 } from '../../../shared/libraryHierarchy/readChildren'
 import type { NavigationReadRowsResult } from '../../../shared/libraryNavigation/readRows'
 import type { RendererApi } from '../../../shared/rendererApi'
@@ -27,7 +26,6 @@ import type { BrowserTreeNodeId } from '../tree/types'
 import { copyEntryPoint, sameEntryPoint } from '../runtime/entryPoint'
 
 const readLimit = 50
-const hierarchyReadPolicy = 'performance' satisfies SourceFileVisibility
 const safeNavigationReadRequestFailure = 'Unable to request library navigation rows.'
 const safeSourceReadRequestFailure = 'Unable to request library source hierarchy children.'
 const safeChildReadRequestFailure = 'Unable to request library hierarchy directory children.'
@@ -860,12 +858,10 @@ function sourceLoadedTarget(
   readonly entryPoint: EntryPoint
   readonly label?: string
   readonly parentDirectoryId?: string
-  readonly sourceFileVisibility: SourceFileVisibility
 } {
   return {
     entryPoint: copyEntryPoint(target.entryPoint),
-    label: target.label,
-    sourceFileVisibility: hierarchyReadPolicy
+    label: target.label
   }
 }
 
@@ -875,13 +871,11 @@ function directoryLoadedTarget(
   readonly entryPoint: EntryPoint
   readonly label?: string
   readonly parentDirectoryId?: string
-  readonly sourceFileVisibility: SourceFileVisibility
 } {
   return {
     entryPoint: copyEntryPoint(target.entryPoint),
     ...(target.label === undefined ? {} : { label: target.label }),
-    parentDirectoryId: target.directoryId,
-    sourceFileVisibility: hierarchyReadPolicy
+    parentDirectoryId: target.directoryId
   }
 }
 
@@ -891,16 +885,12 @@ function loadedChildrenFromWindow(
     readonly entryPoint: EntryPoint
     readonly label?: string
     readonly parentDirectoryId?: string
-    readonly sourceFileVisibility: SourceFileVisibility
   }
 ): LoadedChildren {
   return makeLoadedChildren({
     entryPoint: target.entryPoint,
     ...(target.label === undefined ? {} : { label: target.label }),
-    ...(target.parentDirectoryId === undefined
-      ? {}
-      : { parentDirectoryId: target.parentDirectoryId }),
-    sourceFileVisibility: target.sourceFileVisibility,
+    ...(target.parentDirectoryId === undefined ? {} : { parentDirectoryId: target.parentDirectoryId }),
     rows: window.nodes,
     totalRows: window.totalRows,
     coverage: window.coverage,
@@ -915,10 +905,7 @@ function appendHierarchyChildrenWindow(
   return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
-    ...(children.parentDirectoryId === undefined
-      ? {}
-      : { parentDirectoryId: children.parentDirectoryId }),
-    sourceFileVisibility: children.sourceFileVisibility,
+    ...(children.parentDirectoryId === undefined ? {} : { parentDirectoryId: children.parentDirectoryId }),
     rows: [...children.rows, ...window.nodes],
     totalRows: window.totalRows,
     coverage: window.coverage,
@@ -930,10 +917,7 @@ function withMoreState(children: LoadedChildren, more: MoreState): LoadedChildre
   return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
-    ...(children.parentDirectoryId === undefined
-      ? {}
-      : { parentDirectoryId: children.parentDirectoryId }),
-    sourceFileVisibility: children.sourceFileVisibility,
+    ...(children.parentDirectoryId === undefined ? {} : { parentDirectoryId: children.parentDirectoryId }),
     rows: children.rows,
     totalRows: children.totalRows,
     coverage: children.coverage,
@@ -946,7 +930,6 @@ function makeLoadedChildren(options: {
   readonly entryPoint: EntryPoint
   readonly parentDirectoryId?: string
   readonly label?: string
-  readonly sourceFileVisibility: SourceFileVisibility
   readonly rows: readonly ChildRow[]
   readonly totalRows: number
   readonly coverage: LoadedChildren['coverage']
@@ -961,7 +944,6 @@ function makeLoadedChildren(options: {
       ? {}
       : { parentDirectoryId: options.parentDirectoryId }),
     ...(options.label === undefined ? {} : { label: options.label }),
-    sourceFileVisibility: options.sourceFileVisibility,
     rows: options.rows,
     totalRows: options.totalRows,
     coverage: options.coverage,
@@ -986,10 +968,6 @@ function isExpectedWindow(
   }
 
   if (!sameEntryPoint(window.root.entryPoint, expectedEntryPoint)) {
-    return false
-  }
-
-  if (window.sourceFileVisibility !== hierarchyReadPolicy) {
     return false
   }
 

@@ -40,26 +40,15 @@ pub(crate) fn map_load_navigation_row_by_stable_key_reply(
     })
 }
 
-pub(crate) fn store_literal_hierarchy_entry_point(
-    entry_point: protocol::LiteralHierarchyEntryPoint,
+pub(crate) fn store_library_tree_entry_point(
+    entry_point: protocol::LibraryTreeEntryPoint,
 ) -> store::StoreLiteralHierarchyEntryPoint {
     match entry_point {
-        protocol::LiteralHierarchyEntryPoint::Source { source_id } => {
+        protocol::LibraryTreeEntryPoint::Source { source_id } => {
             store::StoreLiteralHierarchyEntryPoint::Source { source_id }
         }
-        protocol::LiteralHierarchyEntryPoint::SourceLocation { source_location_id } => {
+        protocol::LibraryTreeEntryPoint::SourceLocation { source_location_id } => {
             store::StoreLiteralHierarchyEntryPoint::SourceLocation { source_location_id }
-        }
-    }
-}
-
-pub(crate) const fn store_source_file_visibility(
-    source_file_visibility: protocol::SourceFileVisibility,
-) -> store::SourceFileVisibility {
-    match source_file_visibility {
-        protocol::SourceFileVisibility::Performance => store::SourceFileVisibility::Performance,
-        protocol::SourceFileVisibility::PerformanceAndImages => {
-            store::SourceFileVisibility::PerformanceAndImages
         }
     }
 }
@@ -123,11 +112,11 @@ const fn store_contents_row_profile(
     }
 }
 
-pub(crate) fn map_read_literal_hierarchy_children_reply(
+pub(crate) fn map_read_library_tree_children_reply(
     window: Option<store::StoreLiteralHierarchyWindow>,
-) -> store::LibrarySqliteResult<protocol::ReadLiteralHierarchyChildrenReply> {
-    Ok(protocol::ReadLiteralHierarchyChildrenReply {
-        window: window.map(map_literal_hierarchy_window).transpose()?,
+) -> store::LibrarySqliteResult<protocol::ReadLibraryTreeChildrenReply> {
+    Ok(protocol::ReadLibraryTreeChildrenReply {
+        window: window.map(map_library_tree_window).transpose()?,
     })
 }
 
@@ -310,17 +299,17 @@ const fn map_navigation_row_selector_kind(
     }
 }
 
-fn map_literal_hierarchy_window(
+fn map_library_tree_window(
     window: store::StoreLiteralHierarchyWindow,
-) -> store::LibrarySqliteResult<protocol::LiteralHierarchyWindow> {
-    Ok(protocol::LiteralHierarchyWindow {
-        entry_point: map_literal_hierarchy_entry_point(window.entry_point),
+) -> store::LibrarySqliteResult<protocol::LibraryTreeWindow> {
+    Ok(protocol::LibraryTreeWindow {
+        entry_point: map_library_tree_entry_point(window.entry_point),
         parent_source_directory_id: window.parent_source_directory_id,
         offset: window.offset,
         limit: window.limit,
         total_rows: window.total_rows,
-        coverage: protocol::LiteralHierarchyCoverage {
-            state: map_literal_hierarchy_coverage_state(window.coverage.state),
+        coverage: protocol::LibraryTreeCoverage {
+            state: map_library_tree_coverage_state(window.coverage.state),
             recursive_scope_complete: window.coverage.recursive_scope_complete,
             empty_result_authoritative: window.coverage.empty_result_authoritative,
             detail: window.coverage.detail,
@@ -328,55 +317,55 @@ fn map_literal_hierarchy_window(
         rows: window
             .rows
             .into_iter()
-            .map(map_literal_hierarchy_node)
+            .map(map_library_tree_node)
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
     })
 }
 
-const fn map_literal_hierarchy_coverage_state(
+const fn map_library_tree_coverage_state(
     state: store::StoreLiteralHierarchyCoverageState,
-) -> protocol::LiteralHierarchyCoverageState {
+) -> protocol::LibraryTreeCoverageState {
     match state {
         store::StoreLiteralHierarchyCoverageState::Complete => {
-            protocol::LiteralHierarchyCoverageState::Complete
+            protocol::LibraryTreeCoverageState::Complete
         }
         store::StoreLiteralHierarchyCoverageState::Pending => {
-            protocol::LiteralHierarchyCoverageState::Pending
+            protocol::LibraryTreeCoverageState::Pending
         }
         store::StoreLiteralHierarchyCoverageState::Scanning => {
-            protocol::LiteralHierarchyCoverageState::Scanning
+            protocol::LibraryTreeCoverageState::Scanning
         }
         store::StoreLiteralHierarchyCoverageState::Blocked => {
-            protocol::LiteralHierarchyCoverageState::Blocked
+            protocol::LibraryTreeCoverageState::Blocked
         }
         store::StoreLiteralHierarchyCoverageState::Failed => {
-            protocol::LiteralHierarchyCoverageState::Failed
+            protocol::LibraryTreeCoverageState::Failed
         }
         store::StoreLiteralHierarchyCoverageState::SourceUnavailable => {
-            protocol::LiteralHierarchyCoverageState::SourceUnavailable
+            protocol::LibraryTreeCoverageState::SourceUnavailable
         }
         store::StoreLiteralHierarchyCoverageState::LocationMissing => {
-            protocol::LiteralHierarchyCoverageState::LocationMissing
+            protocol::LibraryTreeCoverageState::LocationMissing
         }
     }
 }
 
-const fn map_literal_hierarchy_entry_point(
+const fn map_library_tree_entry_point(
     entry_point: store::StoreLiteralHierarchyEntryPoint,
-) -> protocol::LiteralHierarchyEntryPoint {
+) -> protocol::LibraryTreeEntryPoint {
     match entry_point {
         store::StoreLiteralHierarchyEntryPoint::Source { source_id } => {
-            protocol::LiteralHierarchyEntryPoint::Source { source_id }
+            protocol::LibraryTreeEntryPoint::Source { source_id }
         }
         store::StoreLiteralHierarchyEntryPoint::SourceLocation { source_location_id } => {
-            protocol::LiteralHierarchyEntryPoint::SourceLocation { source_location_id }
+            protocol::LibraryTreeEntryPoint::SourceLocation { source_location_id }
         }
     }
 }
 
-fn map_literal_hierarchy_node(
+fn map_library_tree_node(
     node: store::StoreLiteralHierarchyNode,
-) -> store::LibrarySqliteResult<protocol::LiteralHierarchyNode> {
+) -> store::LibrarySqliteResult<protocol::LibraryTreeNode> {
     let has_child_directories = map_directory_only_field(
         &node.node_kind,
         node.has_child_directories,
@@ -385,10 +374,21 @@ fn map_literal_hierarchy_node(
     let directory_primary_media_state = map_directory_primary_media_state(&node)?;
     let directory_image_media_state = map_directory_image_media_state(&node)?;
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
-    let media_class = map_literal_hierarchy_file_media_class(&node)?;
+    let media_class = map_library_tree_file_media_class(&node)?;
+    let child_row_state = match node.node_kind.as_str() {
+        "directory" => {
+            match (directory_primary_media_state.as_ref(), directory_scan_state.as_ref()) {
+                (Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants), _) => Some(protocol::ChildRowState::HasChildRows),
+                (Some(protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants), Some(protocol::DirectoryScanState::Complete)) => Some(protocol::ChildRowState::NoChildRows),
+                _ => Some(protocol::ChildRowState::Unknown),
+            }
+        }
+        "file" => None,
+        _ => None,
+    };
 
-    Ok(protocol::LiteralHierarchyNode {
-        node_kind: map_literal_hierarchy_node_kind(&node.node_kind)?,
+    Ok(protocol::LibraryTreeNode {
+        node_kind: map_library_tree_node_kind(&node.node_kind)?,
         source_id: node.source_id,
         source_directory_id: node.source_directory_id,
         source_file_id: node.source_file_id,
@@ -396,7 +396,7 @@ fn map_literal_hierarchy_node(
         relative_path: node.relative_path,
         display_name: node.display_name,
         media_class,
-        presence_state: map_literal_hierarchy_presence_state(&node.presence_state)?,
+        presence_state: map_library_tree_presence_state(&node.presence_state)?,
         size_bytes: node.size_bytes,
         modified_at_ns: node.modified_at_ns,
         updated_at_ms: node.updated_at,
@@ -404,27 +404,28 @@ fn map_literal_hierarchy_node(
         directory_primary_media_state,
         directory_image_media_state,
         directory_scan_state,
+        child_row_state,
     })
 }
 
-fn map_literal_hierarchy_node_kind(
+fn map_library_tree_node_kind(
     value: &str,
-) -> store::LibrarySqliteResult<protocol::LiteralHierarchyNodeKind> {
+) -> store::LibrarySqliteResult<protocol::LibraryTreeNodeKind> {
     match value {
-        "directory" => Ok(protocol::LiteralHierarchyNodeKind::Directory),
-        "file" => Ok(protocol::LiteralHierarchyNodeKind::File),
+        "directory" => Ok(protocol::LibraryTreeNodeKind::Directory),
+        "file" => Ok(protocol::LibraryTreeNodeKind::File),
         other => Err(malformed_store_state(format!(
             "literal hierarchy node has unsupported kind {other:?}"
         ))),
     }
 }
 
-fn map_literal_hierarchy_file_media_class(
+fn map_library_tree_file_media_class(
     node: &store::StoreLiteralHierarchyNode,
-) -> store::LibrarySqliteResult<Option<protocol::LiteralHierarchyFileMediaClass>> {
+) -> store::LibrarySqliteResult<Option<protocol::LibraryTreeFileMediaClass>> {
     match (node.node_kind.as_str(), node.media_class.as_deref()) {
         ("file", Some(value)) => {
-            protocol::LiteralHierarchyFileMediaClass::from_projection_value(value)
+            protocol::LibraryTreeFileMediaClass::from_projection_value(value)
                 .map(Some)
                 .ok_or_else(|| {
                     malformed_store_state(format!(
@@ -443,13 +444,13 @@ fn map_literal_hierarchy_file_media_class(
     }
 }
 
-fn map_literal_hierarchy_presence_state(
+fn map_library_tree_presence_state(
     value: &str,
-) -> store::LibrarySqliteResult<protocol::LiteralHierarchyPresenceState> {
+) -> store::LibrarySqliteResult<protocol::LibraryTreePresenceState> {
     match value {
-        "present" => Ok(protocol::LiteralHierarchyPresenceState::Present),
-        "missing" => Ok(protocol::LiteralHierarchyPresenceState::Missing),
-        "removed" => Ok(protocol::LiteralHierarchyPresenceState::Removed),
+        "present" => Ok(protocol::LibraryTreePresenceState::Present),
+        "missing" => Ok(protocol::LibraryTreePresenceState::Missing),
+        "removed" => Ok(protocol::LibraryTreePresenceState::Removed),
         other => Err(malformed_store_state(format!(
             "literal hierarchy node has unsupported presence_state {other:?}"
         ))),
@@ -1110,8 +1111,7 @@ fn malformed_store_state(detail: impl Into<String>) -> store::LibrarySqliteError
 #[cfg(test)]
 mod tests {
     use super::{
-        map_literal_hierarchy_node, map_read_literal_hierarchy_children_reply,
-        store_source_file_visibility,
+        map_library_tree_node, map_read_library_tree_children_reply,
     };
     use library_boundary_protocol as protocol;
     use library_store_sqlite as store;
@@ -1163,21 +1163,9 @@ mod tests {
     }
 
     #[test]
-    fn source_file_visibility_maps_to_store_policy() {
-        assert_eq!(
-            store_source_file_visibility(protocol::SourceFileVisibility::Performance),
-            store::SourceFileVisibility::Performance
-        );
-        assert_eq!(
-            store_source_file_visibility(protocol::SourceFileVisibility::PerformanceAndImages),
-            store::SourceFileVisibility::PerformanceAndImages
-        );
-    }
-
-    #[test]
-    fn literal_hierarchy_mapping_returns_directory_coverage_facts_and_omits_them_for_files() {
+    fn library_tree_mapping_returns_directory_coverage_facts_and_omits_them_for_files() {
         let reply =
-            map_read_literal_hierarchy_children_reply(Some(store::StoreLiteralHierarchyWindow {
+            map_read_library_tree_children_reply(Some(store::StoreLiteralHierarchyWindow {
                 entry_point: store::StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
                 parent_source_directory_id: None,
                 offset: 0,
@@ -1191,11 +1179,11 @@ mod tests {
                 },
                 rows: vec![directory_node(true, false, "scanning"), file_node()],
             }))
-            .expect("map literal hierarchy reply");
+            .expect("map library tree reply");
         let window = reply.window.expect("window");
         assert_eq!(
             window.coverage.state,
-            protocol::LiteralHierarchyCoverageState::Scanning
+            protocol::LibraryTreeCoverageState::Scanning
         );
 
         let directory = &window.rows[0];
@@ -1212,35 +1200,40 @@ mod tests {
             directory.directory_scan_state,
             Some(protocol::DirectoryScanState::Scanning)
         );
+        assert_eq!(
+            directory.child_row_state,
+            Some(protocol::ChildRowState::HasChildRows)
+        );
 
         let file = &window.rows[1];
         assert_eq!(
             file.media_class,
-            Some(protocol::LiteralHierarchyFileMediaClass::Audio)
+            Some(protocol::LibraryTreeFileMediaClass::Audio)
         );
         assert_eq!(file.has_child_directories, None);
         assert_eq!(file.directory_primary_media_state, None);
         assert_eq!(file.directory_image_media_state, None);
         assert_eq!(file.directory_scan_state, None);
+        assert_eq!(file.child_row_state, None);
     }
 
     #[test]
-    fn literal_hierarchy_mapping_preserves_file_media_class_values() {
+    fn library_tree_mapping_preserves_file_media_class_values() {
         for (stored, expected) in [
-            ("audio", protocol::LiteralHierarchyFileMediaClass::Audio),
-            ("video", protocol::LiteralHierarchyFileMediaClass::Video),
-            ("image", protocol::LiteralHierarchyFileMediaClass::Image),
+            ("audio", protocol::LibraryTreeFileMediaClass::Audio),
+            ("video", protocol::LibraryTreeFileMediaClass::Video),
+            ("image", protocol::LibraryTreeFileMediaClass::Image),
             (
                 "unsupported",
-                protocol::LiteralHierarchyFileMediaClass::Unsupported,
+                protocol::LibraryTreeFileMediaClass::Unsupported,
             ),
-            ("none", protocol::LiteralHierarchyFileMediaClass::None),
+            ("none", protocol::LibraryTreeFileMediaClass::None),
         ] {
             let mut node = file_node();
             node.display_name = format!("fixture-{stored}");
             node.media_class = Some(stored.to_string());
 
-            let mapped = map_literal_hierarchy_node(node).expect("map file node");
+            let mapped = map_library_tree_node(node).expect("map file node");
 
             assert_eq!(mapped.media_class, Some(expected), "{stored}");
         }
@@ -1248,7 +1241,7 @@ mod tests {
 
     #[test]
     fn directory_media_states_require_complete_coverage_for_negative_knowledge() {
-        let complete = map_literal_hierarchy_node(directory_node(false, false, "complete"))
+        let complete = map_library_tree_node(directory_node(false, false, "complete"))
             .expect("map complete directory");
         assert_eq!(
             complete.directory_primary_media_state,
@@ -1258,9 +1251,13 @@ mod tests {
             complete.directory_image_media_state,
             Some(protocol::DirectoryImageMediaState::NoImageMediaDescendants)
         );
+        assert_eq!(
+            complete.child_row_state,
+            Some(protocol::ChildRowState::NoChildRows)
+        );
 
         for scan_state in ["pending", "scanning", "blocked", "failed"] {
-            let mapped = map_literal_hierarchy_node(directory_node(false, false, scan_state))
+            let mapped = map_library_tree_node(directory_node(false, false, scan_state))
                 .expect("map incomplete directory");
             assert_eq!(
                 mapped.directory_primary_media_state,
@@ -1272,12 +1269,17 @@ mod tests {
                 Some(protocol::DirectoryImageMediaState::Unknown),
                 "{scan_state} must not map to confirmed no-media"
             );
+            assert_eq!(
+                mapped.child_row_state,
+                Some(protocol::ChildRowState::Unknown),
+                "{scan_state} must not map to confirmed no-child-rows"
+            );
         }
     }
 
     #[test]
     fn malformed_directory_scan_state_is_rejected() {
-        let error = map_literal_hierarchy_node(directory_node(false, false, "unsupported"))
+        let error = map_library_tree_node(directory_node(false, false, "unsupported"))
             .expect_err("unsupported scan state must fail");
         let detail = match error {
             store::LibrarySqliteError::MalformedSchemaState(detail) => detail,
