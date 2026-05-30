@@ -23,6 +23,7 @@ import { rootChannels } from '../../../src/shared/libraryRoots/channels'
 import type { LocalRootChoiceResult } from '../../../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../../../src/shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../../../src/shared/libraryRoots/runScan'
+import type { CancelRootScanResult } from '../../../src/shared/libraryRoots/cancelScan'
 import type { UnregisterLocalRootResult } from '../../../src/shared/libraryRoots/unregisterLocalRoot'
 import {
   contentsReadChannels,
@@ -98,6 +99,10 @@ describe('preload renderer API', () => {
       state: 'started',
       scanRunId: 'scan-1'
     }
+    const cancelScanResult: CancelRootScanResult = {
+      state: 'accepted',
+      status: 'accepted'
+    }
     const readLocalRootsResult: ReadLocalRootsOutcome = {
       state: 'read',
       roots: [
@@ -125,6 +130,7 @@ describe('preload renderer API', () => {
     let receivedHierarchyRequest: unknown
     let receivedNavigationRequest: unknown
     let receivedScanRequest: unknown
+    let receivedCancelScanRequest: unknown
     let receivedContentsRequest: unknown
     let receivedViewStatePayload: unknown
     const listeners = new Map<
@@ -161,6 +167,11 @@ describe('preload renderer API', () => {
         if (channel === rootChannels.runScan) {
           receivedScanRequest = args[0]
           return scanResult
+        }
+
+        if (channel === rootChannels.cancelScan) {
+          receivedCancelScanRequest = args[0]
+          return cancelScanResult
         }
 
         if (channel === rootChannels.readLocalRoots) {
@@ -224,6 +235,10 @@ describe('preload renderer API', () => {
     expect(receivedChoiceArgs).toEqual([])
     await expect(api.library.roots.runScan(scanRequest)).resolves.toBe(scanResult)
     expect(receivedScanRequest).toBe(scanRequest)
+    await expect(api.library.roots.cancelScan({ scanRunId: 'scan-1' })).resolves.toBe(
+      cancelScanResult
+    )
+    expect(receivedCancelScanRequest).toEqual({ scanRunId: 'scan-1' })
     await expect(api.library.roots.readLocalRoots()).resolves.toBe(readLocalRootsResult)
     await expect(api.library.roots.unregisterLocalRoot({ rootId: '7' })).resolves.toBe(
       unregisterLocalRootResult

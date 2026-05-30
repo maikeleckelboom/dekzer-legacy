@@ -8,6 +8,7 @@ import { registerReadNavigationRowsIpc } from './libraryNavigation/readRows'
 import { registerContentsReadIpc } from './libraryContents/read'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
+import { registerCancelRootScanIpc } from './libraryRoots/cancelScan'
 import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
 import { registerUnregisterLocalRootIpc } from './libraryRoots/unregisterLocalRoot'
 import { registerLibraryViewStateIpc } from './libraryViewState/viewState'
@@ -70,6 +71,7 @@ app.whenReady().then(() => {
     getParentWindow: getLibraryRootChoiceParentWindow
   })
   registerLocalRootScanIpc(ipcMain, host)
+  registerCancelRootScanIpc(ipcMain, host)
   registerReadLocalRootsIpc(ipcMain, host)
   registerUnregisterLocalRootIpc(ipcMain, host)
   registerLibraryViewStateIpc(ipcMain, host)

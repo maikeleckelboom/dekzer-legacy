@@ -34,6 +34,10 @@ import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegi
 import type { ReadLocalRootsOutcome } from '../shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
 import type {
+  CancelRootScanRequest,
+  CancelRootScanResult
+} from '../shared/libraryRoots/cancelScan'
+import type {
   UnregisterLocalRootRequest,
   UnregisterLocalRootResult
 } from '../shared/libraryRoots/unregisterLocalRoot'
@@ -120,6 +124,14 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         },
         async runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult> {
           return (await ipcRenderer.invoke(rootChannels.runScan, request)) as LocalRootScanResult
+        },
+        async cancelScan(
+          request: CancelRootScanRequest
+        ): Promise<CancelRootScanResult> {
+          return (await ipcRenderer.invoke(
+            rootChannels.cancelScan,
+            request
+          )) as CancelRootScanResult
         },
         async readLocalRoots(): Promise<ReadLocalRootsOutcome> {
           return (await ipcRenderer.invoke(rootChannels.readLocalRoots)) as ReadLocalRootsOutcome

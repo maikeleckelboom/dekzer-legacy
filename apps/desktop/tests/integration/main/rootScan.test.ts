@@ -17,8 +17,13 @@ import {
   registerLocalRootScanIpc,
   runLocalRootScanThroughHost
 } from '../../../src/main/libraryRoots/runScan'
+import {
+  registerCancelRootScanIpc,
+  cancelRootScanThroughHost
+} from '../../../src/main/libraryRoots/cancelScan'
 import { rootChannels } from '../../../src/shared/libraryRoots/channels'
 import type { LocalRootScanResult } from '../../../src/shared/libraryRoots/runScan'
+import type { CancelRootScanResult } from '../../../src/shared/libraryRoots/cancelScan'
 import {
   createFakeClient,
   silentLogger,
@@ -202,6 +207,196 @@ describe('local root scan boundary', () => {
     )
 
     expect(registration.channel).toBe(rootChannels.runScan)
+    expect(typeof registration.handler).toBe('function')
+  })
+})
+
+describe('local root scan cancellation boundary', () => {
+  it('returns notFound for unknown scanRunId', async () => {
+    const config = hostConfig()
+
+    await expect(
+      cancelRootScanThroughHost(
+        await startedHostWithClient(
+          config,
+          createFakeClient({
+            cancelRootScan: async () => ({
+              status: 'notFound'
+            })
+          })
+        ),
+        { scanRunId: 'unknown-999' },
+        noLog
+      )
+    ).resolves.toMatchObject({
+      state: 'notFound',
+      status: 'notFound'
+    } satisfies Partial<CancelRootScanResult>)
+  })
+
+  it('returns invalidRequest for invalid scanRunId', async () => {
+    const config = hostConfig()
+
+    await expect(
+      cancelRootScanThroughHost(
+        await startedHostWithClient(config, createFakeClient()),
+        {},
+        noLog
+      )
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    } satisfies Partial<CancelRootScanResult>)
+
+    await expect(
+      cancelRootScanThroughHost(
+        await startedHostWithClient(config, createFakeClient()),
+        { scanRunId: '   ' },
+        noLog
+      )
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    } satisfies Partial<CancelRootScanResult>)
+
+    await expect(
+      cancelRootScanThroughHost(
+        await startedHostWithClient(config, createFakeClient()),
+        null,
+        noLog
+      )
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    } satisfies Partial<CancelRootScanResult>)
+  })
+
+  it('returns alreadyTerminal for already-finished scan run', async () => {
+    const config = hostConfig()
+
+    let receivedScanRunId = ''
+    await expect(
+      cancelRootScanThroughHost(
+        await startedHostWithClient(
+          config,
+          createFakeClient({
+            cancelRootScan: async (request) => {
+              receivedScanRunId = request.scanRunId
+              return { status: 'alreadyTerminal' }
+            }
+          })
+        ),
+        { scanRunId: 'scan-1' },
+        noLog
+      )
+    ).resolves.toEqual({
+      state: 'alreadyTerminal',
+      status: 'alreadyTerminal'
+    } satisfies CancelRootScanResult)
+    expect(receivedScanRunId).toBe('scan-1')
+  })
+
+  it('returns accepted for active scan cancellation', async () => {
+    const config = hostConfig()
+
+    let receivedScanRunId = ''
+    await expect(
+      cancelRootScanThroughHost(
+        await startedHostWithClient(
+          config,
+          createFakeClient({
+            cancelRootScan: async (request) => {
+              receivedScanRunId = request.scanRunId
+              return { status: 'accepted' }
+            }
+          })
+        ),
+        { scanRunId: 'scan-active' },
+        noLog
+      )
+    ).resolves.toEqual({
+      state: 'accepted',
+      status: 'accepted'
+    } satisfies CancelRootScanResult)
+    expect(receivedScanRunId).toBe('scan-active')
+  })
+
+  it('returns notCancelable when the service signals notCancelable', async () => {
+    const config = hostConfig()
+
+    await expect(
+      cancelRootScanThroughHost(
+        await startedHostWithClient(
+          config,
+          createFakeClient({
+            cancelRootScan: async () => ({
+              status: 'notCancelable'
+            })
+          })
+        ),
+        { scanRunId: 'scan-nc-1' },
+        noLog
+      )
+    ).resolves.toEqual({
+      state: 'notCancelable',
+      status: 'notCancelable'
+    } satisfies CancelRootScanResult)
+  })
+
+  it('handles protocol errors as cancelFailed', async () => {
+    const config = hostConfig()
+
+    const result = await cancelRootScanThroughHost(
+      await startedHostWithClient(
+        config,
+        createFakeClient({
+          cancelRootScan: async () => {
+            throw new LibraryBoundaryProtocolError({
+              type: 'durableStoreFailure',
+              payload: { detail: 'database is locked' }
+            })
+          }
+        })
+      ),
+      { scanRunId: 'scan-err' },
+      noLog
+    )
+
+    expect(result).toMatchObject({
+      state: 'cancelFailed',
+      error: { code: 'cancelFailed' }
+    })
+  })
+
+  it('returns hostUnavailable for unstarted host', async () => {
+    const config = hostConfig()
+    const idleHost = new LibraryBoundaryHost(config, silentLogger())
+
+    await expect(
+      cancelRootScanThroughHost(idleHost, { scanRunId: 'scan-1' }, noLog)
+    ).resolves.toMatchObject({
+      state: 'hostUnavailable',
+      error: { code: 'hostNotStarted' }
+    })
+  })
+
+  it('registers the cancel scan IPC channel', () => {
+    const registration: {
+      channel?: string
+      handler?: (request: unknown) => Promise<CancelRootScanResult>
+    } = {}
+
+    registerCancelRootScanIpc(
+      {
+        handle(channel, listener): void {
+          registration.channel = channel
+          registration.handler = (request) => listener({}, request)
+        }
+      },
+      new LibraryBoundaryHost(hostConfig(), silentLogger())
+    )
+
+    expect(registration.channel).toBe(rootChannels.cancelScan)
     expect(typeof registration.handler).toBe('function')
   })
 })

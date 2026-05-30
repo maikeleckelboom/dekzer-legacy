@@ -104,6 +104,7 @@ export function createFakeClient(
   return {
     registerLocalRoot: rejectUnexpectedClientCall,
     startRootScan: rejectUnexpectedClientCall,
+    cancelRootScan: rejectUnexpectedClientCall,
     readNavigationRows: rejectUnexpectedClientCall,
     loadNavigationRow: rejectUnexpectedClientCall,
     loadNavigationRowByStableKey: rejectUnexpectedClientCall,

@@ -1,4 +1,6 @@
 import type {
+  CancelRootScanReply,
+  CancelRootScanRequest,
   CommandReply,
   CommandRequest,
   CreatePlaylistReply,
@@ -99,6 +101,19 @@ export class LibraryBoundaryClient {
       },
       "libraryRoots",
       "unregisterLocalRoot"
+    );
+  }
+
+  cancelRootScan(
+    request: CancelRootScanRequest
+  ): Promise<CancelRootScanReply> {
+    return this.sendAndExpect(
+      {
+        type: "libraryRoots",
+        payload: { type: "cancelRootScan", payload: request }
+      },
+      "libraryRoots",
+      "cancelRootScan"
     );
   }
 

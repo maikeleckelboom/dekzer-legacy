@@ -27,6 +27,9 @@ Current code does not yet implement `GetBoundaryEventCursor`, `eventStreamEpoch`
 a Main-owned event pump, `bootstrapPrepared`, finer invalidation scopes, or a full bounded scan
 worker pool. The renderer polls `ReadAfter` directly.
 
+`CancelRootScan` is wired through the desktop Main IPC boundary and exposed as a typed renderer API
+method. No user-facing cancel UI exists in this pass.
+
 These are ratified target concepts, not accidental names. This document defines the target
 architecture. Implementation must close gaps deliberately.
 
