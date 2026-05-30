@@ -87,10 +87,7 @@ export function testStatus(): LibraryBoundaryHostStatus {
 }
 
 export function emitStatus(
-  listeners: ReadonlyMap<
-    string,
-    ReadonlySet<(event: unknown, changedStatus: LibraryBoundaryHostStatus) => void>
-  >,
+  listeners: ReadonlyMap<string, ReadonlySet<(event: unknown, payload: unknown) => void>>,
   status: LibraryBoundaryHostStatus
 ): void {
   for (const listener of listeners.get(hostStatusChannels.statusChanged) ?? []) {

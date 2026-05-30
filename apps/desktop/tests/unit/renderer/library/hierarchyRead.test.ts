@@ -242,6 +242,98 @@ describe('createLibraryHierarchyReadController', () => {
     expect(readRequests[1]).toMatchObject({ offset: 0 })
   })
 
+  it('refreshNavigationRows rereads navigation without forcing a source child read', async () => {
+    const readRequests: ReadRequest[] = []
+    let navigationReadCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => {
+          navigationReadCount += 1
+          return navigationSourceReadRowsResult()
+        },
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+          return directoryRootHierarchyReadResult()
+        }
+      })
+    )
+
+    await expect(controller.refreshNavigationRows()).resolves.toBe(true)
+
+    expect(navigationReadCount).toBe(1)
+    expect(readRequests).toEqual([])
+    expect(treeNodes(controller).map((node) => node.id)).toEqual(['navigation-row:7'])
+  })
+
+  it('refreshLoadedBrowserWindows rereads loaded source and directory windows', async () => {
+    const readRequests: ReadRequest[] = []
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+
+          if (request.parentDirectoryId === '12') {
+            return loadedDirectoryReadResult('12')
+          }
+
+          return directoryRootHierarchyReadResult()
+        }
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
+    readRequests.length = 0
+
+    await expect(controller.refreshLoadedBrowserWindows()).resolves.toBe(true)
+
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
+      'root',
+      '12'
+    ])
+    expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
+      'source-directory:12',
+      'source-directory:13',
+      'source-directory:14'
+    ])
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
+      'source-file:12-track',
+      'source-directory:99'
+    ])
+  })
+
+  it('refreshBrowserWindowsForNodeIds loads expanded source windows from authoritative reads', async () => {
+    const readRequests: ReadRequest[] = []
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => navigationSourceReadRowsResult(),
+        readChildren: async (request) => {
+          readRequests.push(structuredClone(request))
+          return directoryRootHierarchyReadResult()
+        }
+      })
+    )
+
+    await expect(controller.refreshNavigationRows()).resolves.toBe(true)
+    expect(controller.sourceReadStates.value.get('navigation-row:7')).toBeUndefined()
+
+    await expect(
+      controller.refreshBrowserWindowsForNodeIds(new Set(['navigation-row:7']))
+    ).resolves.toBe(true)
+
+    expect(readRequests).toHaveLength(1)
+    expect(readRequests[0]).toMatchObject({
+      target: {
+        kind: 'entryPoint',
+        entryPoint: { kind: 'source', sourceId: '7' }
+      },
+      offset: 0,
+      limit: 50
+    })
+    expect(controller.sourceReadStates.value.get('navigation-row:7')?.kind).toBe('loaded')
+  })
+
   it('load-more requests preserve parentDirectoryId, offset, and limit', async () => {
     const readRequests: ReadRequest[] = []
     const controller = createLibraryHierarchyReadController(
@@ -286,9 +378,7 @@ describe('createLibraryHierarchyReadController', () => {
       })
     )
 
-    expect(
-      (controller as Record<string, unknown>).setSourceFileVisibility
-    ).toBeUndefined()
+    expect((controller as Record<string, unknown>).setSourceFileVisibility).toBeUndefined()
   })
 
   it('keeps loaded directory children visible while a source refresh is pending', async () => {

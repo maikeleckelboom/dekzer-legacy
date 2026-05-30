@@ -49,6 +49,11 @@ export type LibraryHierarchyReadController = {
   readonly browserProjection: ComputedRef<BrowserProjection | undefined>
   readonly currentRoot: ComputedRef<ReadRoot | undefined>
   readonly refresh: () => Promise<boolean>
+  readonly refreshNavigationRows: () => Promise<boolean>
+  readonly refreshLoadedBrowserWindows: () => Promise<boolean>
+  readonly refreshBrowserWindowsForNodeIds: (
+    nodeIds: ReadonlySet<BrowserTreeNodeId>
+  ) => Promise<boolean>
   readonly loadFirstSource: () => Promise<boolean>
   readonly requestNodeChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
   readonly requestDirectoryChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
@@ -253,6 +258,74 @@ export function createLibraryHierarchyReadController(
     })
   }
 
+  async function refreshLoadedBrowserWindows(): Promise<boolean> {
+    const projection = browserProjection.value
+
+    if (projection?.kind !== 'tree') {
+      return false
+    }
+
+    let refreshedAny = false
+    let allSucceeded = true
+    const loadedDirectoryTargets = new Map<string, DirectoryTarget>()
+
+    for (const [nodeId, binding] of projection.bindingsById) {
+      if (binding.kind === 'source') {
+        const state = sourceReadStates.value.get(nodeId)
+        if (state?.kind === 'loaded') {
+          refreshedAny = true
+          allSucceeded = (await readSource(nodeId, binding.target)) && allSucceeded
+        }
+      } else if (binding.kind === 'directory') {
+        const state = directoryReadStates.value.get(binding.directoryId)
+        if (state?.kind === 'loaded') {
+          loadedDirectoryTargets.set(binding.directoryId, {
+            entryPoint: binding.entryPoint,
+            ...(binding.label === undefined ? {} : { label: binding.label }),
+            directoryId: binding.directoryId
+          })
+        }
+      }
+    }
+
+    for (const target of loadedDirectoryTargets.values()) {
+      refreshedAny = true
+      allSucceeded = (await readDirectory(target)) && allSucceeded
+    }
+
+    return refreshedAny ? allSucceeded : true
+  }
+
+  async function refreshBrowserWindowsForNodeIds(
+    nodeIds: ReadonlySet<BrowserTreeNodeId>
+  ): Promise<boolean> {
+    if (nodeIds.size === 0) {
+      return true
+    }
+
+    const projection = browserProjection.value
+
+    if (projection?.kind !== 'tree') {
+      return false
+    }
+
+    let refreshedAny = false
+    let allSucceeded = true
+
+    for (const nodeId of nodeIds) {
+      const binding = projection.bindingsById.get(nodeId)
+
+      if (binding?.kind !== 'source' && binding?.kind !== 'directory') {
+        continue
+      }
+
+      refreshedAny = true
+      allSucceeded = (await requestNodeChildren(nodeId)) && allSucceeded
+    }
+
+    return refreshedAny ? allSucceeded : true
+  }
+
   async function readSource(nodeId: BrowserTreeNodeId, target: SourceTarget): Promise<boolean> {
     const requestKey = createEntryPointRequestKey(target.entryPoint)
     const currentState = resolveSourceState(nodeId)
@@ -289,9 +362,7 @@ export function createLibraryHierarchyReadController(
     }
 
     try {
-      const result = await libraryApi.hierarchy.readChildren(
-        sourceReadRequest(target)
-      )
+      const result = await libraryApi.hierarchy.readChildren(sourceReadRequest(target))
 
       if (!isCurrentSourceLoading(nodeId, requestKey, sequence)) {
         return false
@@ -403,9 +474,7 @@ export function createLibraryHierarchyReadController(
     }
 
     try {
-      const result = await libraryApi.hierarchy.readChildren(
-        directoryReadRequest(target)
-      )
+      const result = await libraryApi.hierarchy.readChildren(directoryReadRequest(target))
 
       if (!isCurrentDirectoryLoading(target.directoryId, requestKey, sequence)) {
         return false
@@ -427,14 +496,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (
-        !isExpectedWindow(
-          result.window,
-          0,
-          target.directoryId,
-          target.entryPoint
-        )
-      ) {
+      if (!isExpectedWindow(result.window, 0, target.directoryId, target.entryPoint)) {
         if (hadPriorChildren) {
           setDirectoryReadState(target.directoryId, {
             kind: 'loaded',
@@ -454,10 +516,7 @@ export function createLibraryHierarchyReadController(
         target.directoryId,
         {
           kind: 'loaded',
-          children: loadedChildrenFromWindow(
-            result.window,
-            directoryLoadedTarget(target)
-          )
+          children: loadedChildrenFromWindow(result.window, directoryLoadedTarget(target))
         },
         result.window
       )
@@ -536,12 +595,7 @@ export function createLibraryHierarchyReadController(
       }
 
       if (
-        !isExpectedWindow(
-          result.window,
-          target.offset,
-          target.parentDirectoryId,
-          target.entryPoint
-        )
+        !isExpectedWindow(result.window, target.offset, target.parentDirectoryId, target.entryPoint)
       ) {
         setSourceMoreState(target, {
           kind: 'failed',
@@ -629,14 +683,7 @@ export function createLibraryHierarchyReadController(
         return true
       }
 
-      if (
-        !isExpectedWindow(
-          result.window,
-          target.offset,
-          directoryId,
-          target.entryPoint
-        )
-      ) {
+      if (!isExpectedWindow(result.window, target.offset, directoryId, target.entryPoint)) {
         setDirectoryMoreState(target, {
           kind: 'failed',
           detail: safeUnexpectedChildWindowFailure
@@ -810,6 +857,9 @@ export function createLibraryHierarchyReadController(
     browserProjection,
     currentRoot,
     refresh,
+    refreshNavigationRows,
+    refreshLoadedBrowserWindows,
+    refreshBrowserWindowsForNodeIds,
     loadFirstSource,
     requestNodeChildren,
     requestDirectoryChildren,
@@ -858,9 +908,7 @@ function moreReadRequest(target: MoreTarget): ReadRequest {
   }
 }
 
-function sourceLoadedTarget(
-  target: SourceTarget
-): {
+function sourceLoadedTarget(target: SourceTarget): {
   readonly entryPoint: EntryPoint
   readonly label?: string
   readonly parentDirectoryId?: string
@@ -871,9 +919,7 @@ function sourceLoadedTarget(
   }
 }
 
-function directoryLoadedTarget(
-  target: DirectoryTarget
-): {
+function directoryLoadedTarget(target: DirectoryTarget): {
   readonly entryPoint: EntryPoint
   readonly label?: string
   readonly parentDirectoryId?: string
@@ -896,7 +942,9 @@ function loadedChildrenFromWindow(
   return makeLoadedChildren({
     entryPoint: target.entryPoint,
     ...(target.label === undefined ? {} : { label: target.label }),
-    ...(target.parentDirectoryId === undefined ? {} : { parentDirectoryId: target.parentDirectoryId }),
+    ...(target.parentDirectoryId === undefined
+      ? {}
+      : { parentDirectoryId: target.parentDirectoryId }),
     rows: window.nodes,
     totalRows: window.totalRows,
     coverage: window.coverage,
@@ -911,7 +959,9 @@ function appendHierarchyChildrenWindow(
   return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
-    ...(children.parentDirectoryId === undefined ? {} : { parentDirectoryId: children.parentDirectoryId }),
+    ...(children.parentDirectoryId === undefined
+      ? {}
+      : { parentDirectoryId: children.parentDirectoryId }),
     rows: [...children.rows, ...window.nodes],
     totalRows: window.totalRows,
     coverage: window.coverage,
@@ -923,7 +973,9 @@ function withMoreState(children: LoadedChildren, more: MoreState): LoadedChildre
   return makeLoadedChildren({
     entryPoint: children.entryPoint,
     ...(children.label === undefined ? {} : { label: children.label }),
-    ...(children.parentDirectoryId === undefined ? {} : { parentDirectoryId: children.parentDirectoryId }),
+    ...(children.parentDirectoryId === undefined
+      ? {}
+      : { parentDirectoryId: children.parentDirectoryId }),
     rows: children.rows,
     totalRows: children.totalRows,
     coverage: children.coverage,
@@ -1014,9 +1066,7 @@ function addDiscoveredUnloadedDirectoryStates(
   }
 }
 
-function createEntryPointRequestKey(
-  entryPoint: EntryPoint
-): string {
+function createEntryPointRequestKey(entryPoint: EntryPoint): string {
   switch (entryPoint.kind) {
     case 'source':
       return `source:${entryPoint.sourceId}`
@@ -1025,10 +1075,7 @@ function createEntryPointRequestKey(
   }
 }
 
-function createDirectoryRequestKey(
-  entryPoint: EntryPoint,
-  directoryId: string
-): string {
+function createDirectoryRequestKey(entryPoint: EntryPoint, directoryId: string): string {
   return `${createEntryPointRequestKey(entryPoint)}/directory:${directoryId}`
 }
 

@@ -2,10 +2,7 @@ import type {
   LibraryBoundaryHostStatus,
   LibraryBoundaryHostStatusChangedCallback
 } from './libraryBoundary/status'
-import type {
-  BoundaryEventReadAfterReply,
-  BoundaryEventReadAfterRequest
-} from './libraryBoundary/events'
+import type { BoundaryEventDeliveryPayload } from './libraryBoundary/events'
 import type {
   LibraryViewStateReadResult,
   LibraryViewStateWriteResult,
@@ -20,10 +17,7 @@ import type { ContentsReadRequest, ContentsReadResult } from './libraryContents/
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
-import type {
-  CancelRootScanRequest,
-  CancelRootScanResult
-} from './libraryRoots/cancelScan'
+import type { CancelRootScanRequest, CancelRootScanResult } from './libraryRoots/cancelScan'
 import type {
   UnregisterLocalRootRequest,
   UnregisterLocalRootResult
@@ -44,8 +38,10 @@ export type LibraryApi = {
 }
 
 export type LibraryBoundaryEventApi = {
-  readAfter(request: BoundaryEventReadAfterRequest): Promise<BoundaryEventReadAfterReply>
+  subscribe(callback: BoundaryEventDeliveryCallback): () => void
 }
+
+export type BoundaryEventDeliveryCallback = (payload: BoundaryEventDeliveryPayload) => void
 
 export type LibraryHostApi = {
   getStatus(): Promise<LibraryBoundaryHostStatus>

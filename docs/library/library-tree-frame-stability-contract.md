@@ -49,7 +49,7 @@ visible-frontier reads, and targeted scan invalidation by parent IDs are future 
 It covers:
 
 | Area                   | Included                                                                   |
-|------------------------|----------------------------------------------------------------------------|
+| ---------------------- | -------------------------------------------------------------------------- |
 | Tree row identity      | Stable renderer keys grounded in substrate-assigned hierarchy node IDs.    |
 | Expansion behavior     | Immediate expansion without clearing valid visible children.               |
 | Child projection reads | Reads from persisted hierarchy/projection state, not filesystem traversal. |
@@ -71,7 +71,7 @@ inaccessible, or excluded, the tree renders that state. It does not scan the fil
 ## Required concepts
 
 | Concept          | Meaning                                                                                                                                   |
-|------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Hierarchy node   | Substrate-owned persisted node representing a source root, directory, candidate, companion, blocked entry, or projected tree row subject. |
 | Tree row         | Renderer projection of a hierarchy node for the current row profile and policy.                                                           |
 | Row key          | Stable renderer key derived from substrate-assigned node identity, never from path alone.                                                 |
@@ -96,7 +96,7 @@ source root relocates, a cloud provider changes a local path, a junction resolve
 Correct row identity:
 
 | Identity source                      |      Allowed as row key? | Reason                                                         |
-|--------------------------------------|-------------------------:|----------------------------------------------------------------|
+| ------------------------------------ | -----------------------: | -------------------------------------------------------------- |
 | Substrate-assigned hierarchy node ID |                      Yes | Stable for the persisted node and independent of current path. |
 | Opaque substrate UUID                |                      Yes | Stable and intentionally non-semantic.                         |
 | Database autoincrement node ID       | Yes, if scoped correctly | Stable within the local substrate database.                    |
@@ -115,7 +115,7 @@ preserved by the hierarchy substrate.
 ## Ownership boundaries
 
 | Owner                    | Owns                                                         | Must not own                           |
-|--------------------------|--------------------------------------------------------------|----------------------------------------|
+| ------------------------ | ------------------------------------------------------------ | -------------------------------------- |
 | Source scanner           | Discovery, scan coverage, skipped/inaccessible observations. | Renderer expansion state.              |
 | Library substrate        | Persisted hierarchy node identity and source coverage.       | DOM realization.                       |
 | Projection read model    | Tree rows, child summaries, policy-shaped row output.        | Filesystem traversal.                  |
@@ -129,7 +129,7 @@ Expansion state is immediate and renderer-owned. Child truth and coverage are su
 A tree row projection must carry enough state for stable rendering.
 
 | Field           | Meaning                                                                                        |
-|-----------------|------------------------------------------------------------------------------------------------|
+| --------------- | ---------------------------------------------------------------------------------------------- |
 | nodeId          | Substrate-assigned hierarchy node identity.                                                    |
 | rowKey          | Stable renderer key derived from nodeId and row-scope where needed.                            |
 | parentNodeId    | Parent node identity, if any.                                                                  |
@@ -149,7 +149,7 @@ Counts must be honest. A directory with 14 known children during partial coverag
 Renderer rule:
 
 | `isCountComplete` | Render                   |
-|-------------------|--------------------------|
+| ----------------- | ------------------------ |
 | `true`            | Exact count: `14`        |
 | `false`           | Provisional count: `14+` |
 
@@ -158,7 +158,7 @@ Never display a provisional count as final.
 ## Child states
 
 | State        | Meaning                                                                                | UI behavior                                                                        |
-|--------------|----------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
+| ------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | unknown      | Children are not loaded into the renderer and no more precise work state is available. | Show chevron if summary says possible children; on expand show stable loading row. |
 | queued       | Scan or projection work has admitted this branch but has not traversed/read it yet.    | Show discovered/pending state if the work queue is queryable.                      |
 | loading      | A child projection read is in flight.                                                  | Keep prior children or show branch-local loading row.                              |
@@ -190,7 +190,7 @@ On expand:
 Forbidden behavior:
 
 | Forbidden behavior                                | Why                                              |
-|---------------------------------------------------|--------------------------------------------------|
+| ------------------------------------------------- | ------------------------------------------------ |
 | Clearing children before a read returns           | Creates empty-frame flicker.                     |
 | Collapsing a branch while loading                 | Lies about user intent.                          |
 | Rebuilding the whole tree for one branch response | Destroys DOM stability.                          |
@@ -205,14 +205,14 @@ The substrate should expose child projection reads that are shaped for branch pa
 
 Current read surface:
 
-| Read                                                   | Purpose                                                      |
-|--------------------------------------------------------|--------------------------------------------------------------|
-| readChildren(parentNodeId, offset, limit)             | Read child rows for one parent.                              |
+| Read                                      | Purpose                         |
+| ----------------------------------------- | ------------------------------- |
+| readChildren(parentNodeId, offset, limit) | Read child rows for one parent. |
 
 Future recommended read surfaces:
 
 | Read                                                                               | Purpose                                                      |
-|------------------------------------------------------------------------------------|--------------------------------------------------------------|
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | readChildrenBatch(parentNodeIds, rowProfile, policy, limit)                        | Batch multiple branch reads into one boundary call.          |
 | readChildSummary(parentNodeIds, rowProfile, policy)                                | Read chevron/count/coverage summary without full child rows. |
 | readVisibleFrontier(rootNodeId, expandedNodeIds, viewportHint, rowProfile, policy) | Read the currently visible and near-visible branch frontier. |
@@ -220,7 +220,7 @@ Future recommended read surfaces:
 Child summary shape:
 
 | Field            | Meaning                                                                 |
-|------------------|-------------------------------------------------------------------------|
+| ---------------- | ----------------------------------------------------------------------- |
 | parentNodeId     | Parent being summarized.                                                |
 | knownChildCount  | Number of known child rows for the current row policy.                  |
 | isCountComplete  | True only when count is final for current coverage/policy.              |
@@ -240,7 +240,7 @@ Every child read request must carry the projection context under which it was is
 Request guard fields (current):
 
 | Field                  | Meaning                                         |
-|------------------------|-------------------------------------------------|
+| ---------------------- | ----------------------------------------------- |
 | requestId              | Renderer-generated unique request identity.     |
 | parentNodeId           | Branch being read.                              |
 | scanEpochAtIssue       | Scan epoch known when request was issued.       |
@@ -249,11 +249,11 @@ Request guard fields (current):
 
 Request guard fields (future — not active in current implementation):
 
-| Field                  | Meaning                                         |
-|------------------------|-------------------------------------------------|
-| rowProfile             | Row profile/filter policy for the request.      |
-| sortPolicy             | Sort order in effect when request was issued.   |
-| projectionPolicyKey    | Filter/media policy key for the request.        |
+| Field               | Meaning                                       |
+| ------------------- | --------------------------------------------- |
+| rowProfile          | Row profile/filter policy for the request.    |
+| sortPolicy          | Sort order in effect when request was issued. |
+| projectionPolicyKey | Filter/media policy key for the request.      |
 
 Response acceptance rule:
 
@@ -275,16 +275,16 @@ The renderer may maintain a non-authoritative branch cache.
 
 Cache key (current):
 
-| Component           | Reason                                                                                                                                                    |
-|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| sourceRootNodeId    | Separate source roots.                                                                                                                                    |
-| parentNodeId        | Branch identity.                                                                                                                                          |
-| projectionEpoch     | Guards against incompatible projection changes.                                                                                                           |
+| Component        | Reason                                          |
+| ---------------- | ----------------------------------------------- |
+| sourceRootNodeId | Separate source roots.                          |
+| parentNodeId     | Branch identity.                                |
+| projectionEpoch  | Guards against incompatible projection changes. |
 
 Cache key (future — not active in current implementation):
 
 | Component           | Reason                                                                                                                                                    |
-|---------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | rowProfile          | Different row shapes may produce different children.                                                                                                      |
 | sortPolicyKey       | Different sort orders produce different row order. A cache entry produced under one sort policy must not satisfy a request under a different sort policy. |
 | projectionPolicyKey | Filter/media policy affect child rows.                                                                                                                    |
@@ -295,7 +295,7 @@ profile governs which node kinds appear; sort governs their order.
 Cache value:
 
 | Field           | Meaning                              |
-|-----------------|--------------------------------------|
+| --------------- | ------------------------------------ |
 | children        | Last accepted child rows.            |
 | summary         | Last accepted child summary.         |
 | scanEpoch       | Scan epoch used when accepted.       |
@@ -311,7 +311,7 @@ The cache is not authority. It may be discarded. It must not invent children or 
 Do not treat all epoch changes as full cache clears.
 
 | Event                                                | Correct invalidation scope                                                                                                                                                      |
-|------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Source root identity changes                         | Full clear for that root. Node identities may no longer refer to the same substrate branch.                                                                                     |
 | Source root becomes unavailable or unmounted         | Keep last-known rows for that root; mark branch degraded/inaccessible. Do not clear.                                                                                            |
 | Source root relocation with preserved node identity  | Retain cache if node identities and projection epoch remain valid; refresh display paths.                                                                                       |
@@ -333,16 +333,18 @@ Current implementation reality:
 
 - Cursor-only boundary events exist (`ReadAfter` with `eventSequence` cursors).
 - `SourceScanEvent` and `MaintainedSnapshotInvalidated` are distinct event families.
-- The renderer polls events and updates scan progress state per root.
+- Desktop Main polls events and forwards batches; the renderer updates scan progress state per root
+  from Main-delivered events.
 - Scan events do not currently provide `affectedParentNodeIds` for targeted invalidation.
 - Event gaps (`gapDetected`) trigger authoritative snapshot refresh/recovery, not user re-add/rescan blame.
 - True live scan progress requires background scan jobs (not yet implemented; `runRootScan` is synchronous).
-- The renderer consumes scan events through the event scanner but does not author scan progress.
+- The renderer consumes scan events through the boundary events controller but does not author scan
+  progress.
 
 Future scan event fields (not yet implemented):
 
 | Field                  | Meaning                                                |
-|------------------------|--------------------------------------------------------|
+| ---------------------- | ------------------------------------------------------ |
 | scanEpoch              | New scan epoch.                                        |
 | affectedParentNodeIds  | Parents whose child lists changed or may have changed. |
 | affectedSummaryNodeIds | Nodes whose counts/coverage changed.                   |
@@ -364,7 +366,7 @@ Prefetch is an optimization after frame stability exists. It must not hide a cle
 Allowed prefetch targets:
 
 | Trigger                           | Prefetch target                                                      |
-|-----------------------------------|----------------------------------------------------------------------|
+| --------------------------------- | -------------------------------------------------------------------- |
 | Root opened                       | First-level child summary and visible child rows.                    |
 | Row expanded                      | Expanded row's children and summary for immediate child directories. |
 | Keyboard focus moves              | Nearby sibling summaries.                                            |
@@ -374,7 +376,7 @@ Allowed prefetch targets:
 Stopping rules:
 
 | Rule                 | Requirement                                                                                         |
-|----------------------|-----------------------------------------------------------------------------------------------------|
+| -------------------- | --------------------------------------------------------------------------------------------------- |
 | Depth bound          | Prefetch extends at most one level below the deepest visible row in the current viewport.           |
 | Viewport bound       | Prefetch never crosses into subtrees outside the current viewport's expansion depth.                |
 | Count bound          | Prefetch at most N child summaries or rows per unit, where N is policy-defined.                     |
@@ -387,7 +389,7 @@ This prevents one expanded row from quietly crawling the whole collection.
 Default bounds (adjustable by configuration):
 
 | Limit                                    | Default |
-|------------------------------------------|--------:|
+| ---------------------------------------- | ------: |
 | Prefetch depth below deepest visible row |       1 |
 | Max prefetch parent rows per tick        |       8 |
 | Max prefetched child rows per parent     |      64 |
@@ -405,7 +407,7 @@ Branch updates must be patched, not rebuilt wholesale.
 Required renderer behavior:
 
 | Rule                | Requirement                                                          |
-|---------------------|----------------------------------------------------------------------|
+| ------------------- | -------------------------------------------------------------------- |
 | Stable keys         | Use substrate node IDs for row keys.                                 |
 | Branch patching     | Replace children only under the target parent.                       |
 | State retention     | Preserve existing branch rows while refresh is pending.              |
@@ -420,7 +422,7 @@ Required renderer behavior:
 `loading` and `refreshing` are distinct states with distinct rendering rules.
 
 | Condition                                        | Correct state                                                                                     |
-|--------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | No prior child projection exists; read in flight | `childState = loading`; show branch-local loading row.                                            |
 | Prior children exist; newer read in flight       | `childState` remains `ready` or `partial`; cache `refreshing = true`; keep existing rows visible. |
 | Read completes with new data                     | Patch branch; clear `refreshing`.                                                                 |
@@ -436,7 +438,7 @@ A tree row participating in an active drag operation is frozen from the perspect
 Required behavior during active drag:
 
 | Rule                                          | Requirement                                                                                                  |
-|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Drag source row key stability                 | The dragged row's node ID and DOM key must not change while the drag is in progress.                         |
 | Branch refresh does not remove drag source    | A cache invalidation or branch patch must not remove or re-key the active drag source row.                   |
 | Sibling updates are allowed                   | Non-dragged siblings may update normally.                                                                    |
@@ -450,7 +452,7 @@ mid-gesture.
 A known source does not disappear merely because its current filesystem resolution is unavailable.
 
 | Source condition       | Tree behavior                                                                              |
-|------------------------|--------------------------------------------------------------------------------------------|
+| ---------------------- | ------------------------------------------------------------------------------------------ |
 | Mounted and accessible | Render normally.                                                                           |
 | Unmounted / ejected    | Keep root row and last-known child structure; render in `inaccessible` presentation.       |
 | Relocation in progress | Keep root row; update display path when new resolution is confirmed.                       |
@@ -484,7 +486,7 @@ Prefetch before frame stability is fixed is caching a bug.
 ### Expansion stability
 
 | Scenario                             | Required result                                                             |
-|--------------------------------------|-----------------------------------------------------------------------------|
+| ------------------------------------ | --------------------------------------------------------------------------- |
 | User expands cached row              | Children appear in the same frame from cache.                               |
 | User expands uncached row            | Parent remains expanded and stable; branch-local loading row appears.       |
 | Read takes multiple frames           | Existing children stay visible or loading row stays stable.                 |
@@ -495,7 +497,7 @@ Prefetch before frame stability is fixed is caching a bug.
 ### Identity stability
 
 | Scenario                                               | Required result                                              |
-|--------------------------------------------------------|--------------------------------------------------------------|
+| ------------------------------------------------------ | ------------------------------------------------------------ |
 | Source root remounts with preserved substrate identity | Row keys remain stable where node identities are preserved.  |
 | Directory display path changes                         | Row key does not change solely because display path changed. |
 | Sibling order changes                                  | Vue/DOM preserves rows by node ID, not index.                |
@@ -503,7 +505,7 @@ Prefetch before frame stability is fixed is caching a bug.
 ### Child summary honesty
 
 | Scenario                                             | Required result                                        |
-|------------------------------------------------------|--------------------------------------------------------|
+| ---------------------------------------------------- | ------------------------------------------------------ |
 | Directory has 14 known children and partial coverage | Renderer shows provisional count such as 14+.          |
 | Directory has 14 children and complete coverage      | Renderer shows final count 14.                         |
 | Directory is excluded                                | Renderer shows excluded/skipped state, not empty.      |
@@ -513,7 +515,7 @@ Prefetch before frame stability is fixed is caching a bug.
 ### Cache and invalidation
 
 | Scenario                                 | Required result                                                              |
-|------------------------------------------|------------------------------------------------------------------------------|
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
 | Scan epoch advances for unrelated parent | Current visible branch is not cleared.                                       |
 | Scan epoch advances for visible parent   | Branch is marked stale and refreshed without empty-frame flicker.            |
 | Projection policy changes                | Cache for that policy is cleared and rows reload under stable loading state. |
@@ -523,7 +525,7 @@ Prefetch before frame stability is fixed is caching a bug.
 ### Prefetch bounds
 
 | Scenario                                     | Required result                                                     |
-|----------------------------------------------|---------------------------------------------------------------------|
+| -------------------------------------------- | ------------------------------------------------------------------- |
 | User expands one deep branch                 | Prefetch does not cascade into unrelated roots or whole collection. |
 | Artist folder has hundreds of subdirectories | Prefetch uses a bounded first-N policy and work budget.             |
 | Prefetch misses                              | Manual expansion still uses frame-stable loading behavior.          |
@@ -533,7 +535,7 @@ Prefetch before frame stability is fixed is caching a bug.
 A change fails this contract if it does any of the following:
 
 | Failure                                                      | Why rejected                                                    |
-|--------------------------------------------------------------|-----------------------------------------------------------------|
+| ------------------------------------------------------------ | --------------------------------------------------------------- |
 | Clears branch children before replacement projection arrives | Causes empty-frame flicker.                                     |
 | Uses filesystem path as renderer row key                     | Breaks stability under relocation/remount.                      |
 | Uses array index as row key                                  | Breaks stability under insert/remove/reorder.                   |
@@ -550,7 +552,7 @@ A change fails this contract if it does any of the following:
 Before accepting a tree-related change, ask:
 
 | Question                                                                                                                 | Required answer                        |
-|--------------------------------------------------------------------------------------------------------------------------|----------------------------------------|
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
 | Are row keys substrate-assigned node IDs?                                                                                | Yes.                                   |
 | Are paths treated as display/resolution claims only?                                                                     | Yes.                                   |
 | Does expand keep valid children visible while pending?                                                                   | Yes.                                   |

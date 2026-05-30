@@ -29,6 +29,10 @@ import {
   contentsReadChannels,
   type ContentsReadResult
 } from '../../../src/shared/libraryContents/read'
+import {
+  boundaryEventChannels,
+  type BoundaryEventDeliveryPayload
+} from '../../../src/shared/libraryBoundary/events'
 import { emitStatus, testStatus } from '../../support/libraryBoundary'
 import { firstAvailableSourceReadRequest } from '../../support/libraryHierarchy'
 
@@ -133,10 +137,9 @@ describe('preload renderer API', () => {
     let receivedCancelScanRequest: unknown
     let receivedContentsRequest: unknown
     let receivedViewStatePayload: unknown
-    const listeners = new Map<
-      string,
-      Set<(event: unknown, changedStatus: LibraryBoundaryHostStatus) => void>
-    >()
+    let subscribeCount = 0
+    let unsubscribeCount = 0
+    const listeners = new Map<string, Set<(event: unknown, payload: unknown) => void>>()
     const ipcRenderer = {
       invoke: async (channel: string, ...args: readonly unknown[]): Promise<unknown> => {
         if (channel === hostStatusChannels.getStatus) {
@@ -193,20 +196,26 @@ describe('preload renderer API', () => {
           return viewStateWriteResult
         }
 
+        if (channel === boundaryEventChannels.subscribe) {
+          expect(args).toEqual([])
+          subscribeCount += 1
+          return { kind: 'subscribed' }
+        }
+
+        if (channel === boundaryEventChannels.unsubscribe) {
+          expect(args).toEqual([])
+          unsubscribeCount += 1
+          return { kind: 'unsubscribed' }
+        }
+
         throw new Error(`Unexpected preload invoke channel ${channel}.`)
       },
-      on: (
-        channel: string,
-        listener: (event: unknown, changedStatus: LibraryBoundaryHostStatus) => void
-      ): void => {
+      on: (channel: string, listener: (event: unknown, payload: unknown) => void): void => {
         const channelListeners = listeners.get(channel) ?? new Set()
         channelListeners.add(listener)
         listeners.set(channel, channelListeners)
       },
-      off: (
-        channel: string,
-        listener: (event: unknown, changedStatus: LibraryBoundaryHostStatus) => void
-      ): void => {
+      off: (channel: string, listener: (event: unknown, payload: unknown) => void): void => {
         listeners.get(channel)?.delete(listener)
       }
     }
@@ -269,5 +278,38 @@ describe('preload renderer API', () => {
     unsubscribe()
     emitStatus(listeners, status)
     expect(receivedStatus).toBeNull()
+
+    const eventPayload: BoundaryEventDeliveryPayload = {
+      kind: 'batch',
+      events: [],
+      latestEventSequence: null,
+      earliestRetainedSequence: null,
+      gapDetected: false
+    }
+    let receivedEventPayload: BoundaryEventDeliveryPayload | undefined
+    const unsubscribeEvents = api.library.events.subscribe((payload) => {
+      receivedEventPayload = payload
+    })
+
+    await waitForMicrotasks()
+    expect(subscribeCount).toBe(1)
+    for (const listener of listeners.get(boundaryEventChannels.batch) ?? []) {
+      listener({}, eventPayload)
+    }
+    expect(receivedEventPayload).toBe(eventPayload)
+
+    unsubscribeEvents()
+    await waitForMicrotasks()
+    expect(unsubscribeCount).toBe(1)
+    receivedEventPayload = undefined
+    for (const listener of listeners.get(boundaryEventChannels.batch) ?? []) {
+      listener({}, eventPayload)
+    }
+    expect(receivedEventPayload).toBeUndefined()
   })
 })
+
+async function waitForMicrotasks(): Promise<void> {
+  await Promise.resolve()
+  await Promise.resolve()
+}

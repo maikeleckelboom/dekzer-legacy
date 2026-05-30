@@ -54,7 +54,7 @@ Some diagrams include current-direction architecture. Those sections must label 
 Current first-slice projections are:
 
 | Projection                   | Role                                                                                                                                               |
-|------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Navigation rows              | Source entry rows and top-level navigation state. Source visible state is carried by navigation rows until a dedicated boundary projection exists. |
 | Library tree windows         | Authoritative immediate-children reads for a source or directory entry point.                                                                      |
 | Selected contents read pages | Authoritative selected-scope read results, including access state, coverage state, rows, and window cursor.                                        |
@@ -78,7 +78,7 @@ the semantic scope identity.
 This document uses the visible state vocabulary from the source lifecycle visible-state contract:
 
 | State                  | Meaning in this document                                                          |
-|------------------------|-----------------------------------------------------------------------------------|
+| ---------------------- | --------------------------------------------------------------------------------- |
 | `mounted`              | Source is known, resolved, and accessible enough for reads and scans.             |
 | `unavailable`          | Source is known but not currently reachable.                                      |
 | `relocating`           | Source identity is preserved while a new locator is being resolved.               |
@@ -111,7 +111,7 @@ library restoration.
 Staged startup budgets:
 
 | Stage                         | Contract                                                                                                      |
-|-------------------------------|---------------------------------------------------------------------------------------------------------------|
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Shell-to-glass                | The app/workspace frame paints without waiting for full library substrate reads.                              |
 | First library substrate frame | Navigation/source rows and active selection shell state paint from bounded authoritative reads.               |
 | Progressive restoration       | Active tree windows and selected contents restore progressively and may degrade without blocking first paint. |
@@ -315,7 +315,7 @@ flowchart TD
 Recovery action policy:
 
 | Source state              | Primary action                                            | Notes                                                                                    |
-|---------------------------|-----------------------------------------------------------|------------------------------------------------------------------------------------------|
+| ------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `unavailable`             | Retry connection                                          | For reseated drives, remounted volumes, or transient locator failures.                   |
 | `unavailable` after retry | Locate source                                             | Uses a host-owned native picker; renderer never provides arbitrary path authority.       |
 | `blocked`                 | Open permission guidance or retry after permission change | Deterministic permission denial is not micro-retried in a loop.                          |
@@ -505,13 +505,13 @@ These names are projection/product concepts. The current boundary schema defines
 exactly three wire values: `unknown`, `hasChildRows`, `noChildRows`. The richer
 states below are target scope expansion, not current wire values.
 
-| State                   | Meaning                                                                                                  | Schema status            |
-|-------------------------|----------------------------------------------------------------------------------------------------------|--------------------------|
-| `has_children_unloaded` | The row can expand, but the child window is not loaded in the renderer cache.                            | projection concept only  |
-| `has_children_loaded`   | The row can expand and a current child window is loaded.                                                 | projection concept only  |
-| `no_children`           | The authoritative read says the row has no children in this tree projection.                             | maps to `noChildRows`    |
-| `scan_pending`          | Expandability or child completeness is not yet authoritative because coverage is incomplete.             | target scope expansion   |
-| `unknown`               | The service cannot currently prove child state because of stale, unavailable, or failed read conditions. | maps to `unknown`         |
+| State                   | Meaning                                                                                                  | Schema status           |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `has_children_unloaded` | The row can expand, but the child window is not loaded in the renderer cache.                            | projection concept only |
+| `has_children_loaded`   | The row can expand and a current child window is loaded.                                                 | projection concept only |
+| `no_children`           | The authoritative read says the row has no children in this tree projection.                             | maps to `noChildRows`   |
+| `scan_pending`          | Expandability or child completeness is not yet authoritative because coverage is incomplete.             | target scope expansion  |
+| `unknown`               | The service cannot currently prove child state because of stale, unavailable, or failed read conditions. | maps to `unknown`       |
 
 Implementation notes:
 
@@ -534,14 +534,12 @@ Invalidation scopes route targeted rereads. Unknown or broad invalidation refres
 ```mermaid
 flowchart TD
   A["Main forwards MaintainedSnapshotInvalidated"] --> B{"Scope kind"}
-  B -->|" NavigationRows / source identity "| C["Renderer requests navigation rows through Main"]
-  B -->|" Source visible state / source identity "| D["Renderer refreshes the existing projection that carries source state"]
-  B -->|" LibraryTreeChildren / parent directory identity "| E["Renderer refreshes matching loaded visible tree windows"]
-  B -->|" Selected contents scope identity "| F["Renderer refreshes active contents windows if their selected scope is affected"]
+  B -->|" navigationRows "| C["Renderer requests navigation rows through Main"]
+  B -->|" libraryBrowser "| D["Renderer refreshes loaded and expanded browser tree windows"]
+  B -->|" libraryBrowser "| F["Renderer refreshes active contents for the current selection"]
   B -->|" Broad or unknown library refresh "| G["Renderer refreshes active first-slice projections by bounded policy"]
   C --> H["Authoritative reread through Main"]
   D --> H
-  E --> H
   F --> H
   G --> H
   H --> I{"Reread result"}
@@ -556,7 +554,12 @@ Governing law:
 Snapshot invalidation carries boundary-defined scope identity. It does not carry replacement rows. Renderer uses
 invalidation to request fresh authoritative snapshots through Main.
 
-Current-schema `MaintainedSnapshotScope` values are `NavigationRows` and `LibraryBrowser`.
+Current-schema `MaintainedSnapshotScope` values are `navigationRows` and `libraryBrowser`.
+
+Desktop Main now pumps the service event stream and the renderer treats `MaintainedSnapshotInvalidated`
+as normal refresh input. `navigationRows` refreshes navigation rows. `libraryBrowser` refreshes
+previously loaded browser windows and expanded source/directory windows through authoritative reads,
+keeping previous rows visible while those reads are pending.
 
 The finer scopes shown in the invalidation diagrams (source visible state, library tree children by parent directory, selected contents scope identity) are target scope expansion. They are not current wire values.
 

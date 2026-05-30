@@ -23,9 +23,14 @@ precise cumulative counters during cancellation are a future refinement.
 Active `CancelRootScan` returns one of `accepted`, `notFound`, or `alreadyTerminal`. `notCancelable`
 is reserved for a genuinely non-cancellable scan phase and is no longer the permanent default.
 
-Current code does not yet implement `GetBoundaryEventCursor`, `eventStreamEpoch`, `WaitForEventsAfter`,
-a Main-owned event pump, `bootstrapPrepared`, finer invalidation scopes, or a full bounded scan
-worker pool. The renderer polls `ReadAfter` directly.
+Current code implements a desktop Main-owned boundary event pump v1. Main polls the service's
+cursor-only `ReadAfter` stream, owns the desktop cursor, tracks renderer subscriptions, and forwards
+event batches to renderer consumers. The renderer no longer polls `ReadAfter` directly for live
+boundary event ingestion.
+
+Current code does not yet implement `GetBoundaryEventCursor`, `eventStreamEpoch`,
+`WaitForEventsAfter`, `bootstrapPrepared`, finer invalidation scopes, durable event audit log, or a
+full bounded scan worker pool.
 
 `CancelRootScan` is wired through the desktop Main IPC boundary and exposed as a typed renderer API
 method. The desktop boundary cancellation path has a real vertical proof against the Rust service
@@ -171,7 +176,7 @@ flowchart TD
   C["Blocked or failed subtree persisted"] --> D
   D --> E["Renderer receives forwarded invalidation from Main event pump"]
   E --> F{"Invalidation scope"}
-  F -->|" NavigationRows sourceId "| G["Refresh navigation rows for source"]
+  F -->|" navigationRows "| G["Refresh navigation rows for source"]
   F -->|" LibraryTreeChildren entryPoint parentSourceDirectoryId "| H["Refresh matching loaded tree windows only"]
   F -->|" ContentsScope scopeId "| I["Refresh selected contents if scope matches"]
   F -->|" SourceLifecycle sourceId "| J["Refresh source status in navigation"]
@@ -230,7 +235,7 @@ flowchart TD
   Q --> R{"Event family"}
   R -->|" SourceScanEvent "| S["Renderer updates scan operation feedback"]
   R -->|" MaintainedSnapshotInvalidated "| T{"Invalidation scope"}
-  T -->|" NavigationRows sourceId "| U["Renderer refreshes navigation rows"]
+  T -->|" navigationRows "| U["Renderer refreshes navigation rows"]
   T -->|" LibraryTreeChildren entryPoint parentSourceDirectoryId "| V["Renderer refreshes matching loaded tree windows"]
   T -->|" ContentsScope scopeId "| W["Renderer refreshes selected contents if scope matches"]
   T -->|" SourceLifecycle sourceId "| X["Renderer refreshes source status in navigation"]

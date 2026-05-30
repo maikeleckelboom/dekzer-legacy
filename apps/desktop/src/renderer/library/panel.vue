@@ -5,7 +5,7 @@ import { CircleXIcon, Icon, ScanIcon } from '../icons'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
-import { useBoundaryEventScanner, type ScanProgressState } from './boundary/eventScanner'
+import { useBoundaryEvents, type ScanProgressState } from './boundary/boundaryEvents'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import {
@@ -13,6 +13,7 @@ import {
   type LibraryOperationFeedbackKind,
   type LibraryOperationFeedbackTone
 } from './operationFeedback'
+import { refreshHierarchyForMaintainedSnapshotInvalidation } from './runtime/invalidationRefresh'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
 import type { BrowserState, RowBinding } from './state'
@@ -51,14 +52,14 @@ const viewStateStore = createViewStateStore()
 const hierarchyRead = useLibraryHierarchyRead()
 const contentsRead = useContentsRead()
 const rootActions = useLocalRootActions()
-const eventScanner = useBoundaryEventScanner()
+const boundaryEvents = useBoundaryEvents()
 
 const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
   const root = rootActions.registeredRoot.value
   if (root === undefined) {
     return undefined
   }
-  return eventScanner.scanProgress.value.get(root.rootId)
+  return boundaryEvents.scanProgress.value.get(root.rootId)
 })
 
 const rootLifecycle = useRootLifecycle({
@@ -152,7 +153,7 @@ const operationFeedback = computed(() =>
     scanStatus: rootActions.scanStatus.value,
     scanSummary: rootActions.scanSummary.value,
     scanProgressFromEvents: scanProgressForRegisteredRoot.value,
-    eventGapDetected: eventScanner.recoveryNeeded.value,
+    eventGapDetected: boundaryEvents.recoveryNeeded.value,
     ...(rootActions.scanFailureMessage.value === undefined
       ? {}
       : { scanFailureMessage: rootActions.scanFailureMessage.value }),
@@ -180,50 +181,44 @@ const operationFeedbackClass = computed(() =>
   operationFeedbackToneClass(operationFeedback.value.tone)
 )
 
-watch(
-  preferredNodeId,
-  (nodeId) => {
-    if (restoreState.userInteracted || restoreState.initialNodeApplied) {
-      return
-    }
+watch(preferredNodeId, (nodeId) => {
+  if (restoreState.userInteracted || restoreState.initialNodeApplied) {
+    return
+  }
 
-    if (nodeId === undefined) {
-      selectedNodeId.value = undefined
-      expandedNodeIds.value = new Set()
-      return
-    }
+  if (nodeId === undefined) {
+    selectedNodeId.value = undefined
+    expandedNodeIds.value = new Set()
+    return
+  }
 
-    selectedNodeId.value = nodeId
-    expandedNodeIds.value = new Set([nodeId])
-    restoreState.initialNodeApplied = true
-  },
-)
+  selectedNodeId.value = nodeId
+  expandedNodeIds.value = new Set([nodeId])
+  restoreState.initialNodeApplied = true
+})
 
-watch(
-  scanProgressForRegisteredRoot,
-  (progress) => {
-    if (progress === undefined) {
-      return
-    }
+watch(scanProgressForRegisteredRoot, (progress) => {
+  if (progress === undefined) {
+    return
+  }
 
-    switch (progress.kind) {
-      case 'completed':
-        rootActions.scanStatus.value = 'scanned'
-        rootActions.scanSummary.value = {
-          rootId: progress.rootId,
-          scanRunId: progress.scanRunId,
-          discoveredFileCount: progress.filesDiscovered,
-          queuedSourceWorkItems: progress.queuedWorkItems
-        }
-        break
-      case 'failed':
-      case 'blocked':
-        rootActions.scanStatus.value = 'failed'
-        rootActions.scanFailureMessage.value = progress.detail ?? 'Scan failed.'
-        break
-    }
-  },
-)
+  switch (progress.kind) {
+    case 'completed':
+      rootActions.scanStatus.value = 'scanned'
+      rootActions.scanSummary.value = {
+        rootId: progress.rootId,
+        scanRunId: progress.scanRunId,
+        discoveredFileCount: progress.filesDiscovered,
+        queuedSourceWorkItems: progress.queuedWorkItems
+      }
+      break
+    case 'failed':
+    case 'blocked':
+      rootActions.scanStatus.value = 'failed'
+      rootActions.scanFailureMessage.value = progress.detail ?? 'Scan failed.'
+      break
+  }
+})
 
 watch(
   [
@@ -266,14 +261,33 @@ watch(
 )
 
 watch(
-  () => eventScanner.recoveryNeeded.value,
+  () => boundaryEvents.recoveryNeeded.value,
   async (needed) => {
     if (!needed) {
       return
     }
 
     await hierarchyRead.refresh()
-    eventScanner.acknowledgedGap()
+    boundaryEvents.acknowledgedGap()
+  }
+)
+
+watch(
+  () => boundaryEvents.maintainedSnapshotInvalidations.value.length,
+  async (count, previousCount = 0) => {
+    const invalidations = boundaryEvents.maintainedSnapshotInvalidations.value.slice(
+      previousCount,
+      count
+    )
+
+    for (const event of invalidations) {
+      await refreshHierarchyForMaintainedSnapshotInvalidation(event, {
+        hierarchyRead,
+        expandedNodeIds: expandedNodeIds.value,
+        refreshContentsForCurrentSelection: () =>
+          requestContentsForCurrentSelection({ force: true })
+      })
+    }
   }
 )
 

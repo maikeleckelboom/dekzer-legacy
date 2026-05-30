@@ -13,12 +13,14 @@ import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
 import { registerUnregisterLocalRootIpc } from './libraryRoots/unregisterLocalRoot'
 import { registerLibraryViewStateIpc } from './libraryViewState/viewState'
 import { registerBoundaryEventIpc } from './libraryBoundary/events'
+import { BoundaryEventPump, registerBoundaryEventPumpIpc } from './libraryBoundary/eventPump'
 import { HostStatusController, registerHostStatusIpc } from './libraryBoundary/status'
 import { hostStatusChannels } from '../shared/libraryBoundary/status'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
 let hostStatusController: HostStatusController | undefined
+let boundaryEventPump: BoundaryEventPump | undefined
 let isQuittingAfterLibraryBoundaryHostStop = false
 
 function createWindow(): void {
@@ -62,6 +64,7 @@ app.whenReady().then(() => {
     isDev: is.dev
   })
   hostStatusController = new HostStatusController(host)
+  boundaryEventPump = new BoundaryEventPump(host)
   registerHostStatusIpc(ipcMain, hostStatusController)
   registerReadNavigationRowsIpc(ipcMain, host)
   registerReadChildrenIpc(ipcMain, host)
@@ -76,7 +79,9 @@ app.whenReady().then(() => {
   registerUnregisterLocalRootIpc(ipcMain, host)
   registerLibraryViewStateIpc(ipcMain, host)
   registerBoundaryEventIpc(ipcMain, host)
+  registerBoundaryEventPumpIpc(ipcMain, boundaryEventPump)
   hostStatusController.onStatusChanged((status) => {
+    boundaryEventPump?.setHostStarted(status.state === 'started')
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(hostStatusChannels.statusChanged, status)
     }
@@ -122,6 +127,7 @@ app.on('before-quit', (event) => {
   }
 
   event.preventDefault()
+  boundaryEventPump?.stop()
   void hostStatusController
     .stop()
     .catch((error: unknown) => {

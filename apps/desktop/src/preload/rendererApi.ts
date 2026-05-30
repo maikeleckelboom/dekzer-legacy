@@ -26,17 +26,14 @@ import {
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
-  BoundaryEventReadAfterReply,
-  BoundaryEventReadAfterRequest,
-  BoundaryEventReadResult
+  BoundaryEventDeliveryPayload,
+  BoundaryEventSubscribeResult,
+  BoundaryEventUnsubscribeResult
 } from '../shared/libraryBoundary/events'
 import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
-import type {
-  CancelRootScanRequest,
-  CancelRootScanResult
-} from '../shared/libraryRoots/cancelScan'
+import type { CancelRootScanRequest, CancelRootScanResult } from '../shared/libraryRoots/cancelScan'
 import type {
   UnregisterLocalRootRequest,
   UnregisterLocalRootResult
@@ -47,14 +44,8 @@ type IpcRendererEventLike = unknown
 
 export type RendererApiPreloadIpcRenderer = {
   invoke(channel: string, ...args: readonly unknown[]): Promise<unknown>
-  on(
-    channel: string,
-    listener: (event: IpcRendererEventLike, status: LibraryBoundaryHostStatus) => void
-  ): void
-  off(
-    channel: string,
-    listener: (event: IpcRendererEventLike, status: LibraryBoundaryHostStatus) => void
-  ): void
+  on(channel: string, listener: (event: IpcRendererEventLike, payload: unknown) => void): void
+  off(channel: string, listener: (event: IpcRendererEventLike, payload: unknown) => void): void
 }
 
 export type RendererApiPreloadContextBridge = {
@@ -78,11 +69,8 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           )) as LibraryBoundaryHostStatus
         },
         onStatusChanged(callback) {
-          const listener = (
-            _event: IpcRendererEventLike,
-            status: LibraryBoundaryHostStatus
-          ): void => {
-            callback(status)
+          const listener = (_event: IpcRendererEventLike, payload: unknown): void => {
+            callback(payload as LibraryBoundaryHostStatus)
           }
 
           ipcRenderer.on(hostStatusChannels.statusChanged, listener)
@@ -125,9 +113,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         async runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult> {
           return (await ipcRenderer.invoke(rootChannels.runScan, request)) as LocalRootScanResult
         },
-        async cancelScan(
-          request: CancelRootScanRequest
-        ): Promise<CancelRootScanResult> {
+        async cancelScan(request: CancelRootScanRequest): Promise<CancelRootScanResult> {
           return (await ipcRenderer.invoke(
             rootChannels.cancelScan,
             request
@@ -161,17 +147,49 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
         }
       },
       events: {
-        async readAfter(
-          request: BoundaryEventReadAfterRequest
-        ): Promise<BoundaryEventReadAfterReply> {
-          const result = (await ipcRenderer.invoke(
-            boundaryEventChannels.readAfter,
-            request
-          )) as BoundaryEventReadResult
-          if (result.kind === 'failed') {
-            throw new Error(result.detail)
+        subscribe(callback) {
+          let active = true
+          const listener = (_event: IpcRendererEventLike, payload: unknown): void => {
+            callback(payload as BoundaryEventDeliveryPayload)
           }
-          return result.reply
+
+          ipcRenderer.on(boundaryEventChannels.batch, listener)
+          void ipcRenderer
+            .invoke(boundaryEventChannels.subscribe)
+            .then((result) => {
+              const subscribeResult = result as BoundaryEventSubscribeResult
+              if (!active) {
+                void ipcRenderer.invoke(boundaryEventChannels.unsubscribe).catch(() => undefined)
+                return
+              }
+              if (subscribeResult.kind === 'failed') {
+                callback({ kind: 'failed', detail: subscribeResult.detail })
+              }
+            })
+            .catch((error: unknown) => {
+              if (!active) {
+                return
+              }
+              callback({
+                kind: 'failed',
+                detail:
+                  error instanceof Error ? error.message : 'boundary event subscription failed'
+              })
+            })
+
+          return () => {
+            active = false
+            ipcRenderer.off(boundaryEventChannels.batch, listener)
+            void ipcRenderer
+              .invoke(boundaryEventChannels.unsubscribe)
+              .then((result) => {
+                const unsubscribeResult = result as BoundaryEventUnsubscribeResult
+                if (unsubscribeResult.kind === 'failed') {
+                  callback({ kind: 'failed', detail: unsubscribeResult.detail })
+                }
+              })
+              .catch(() => undefined)
+          }
         }
       }
     }

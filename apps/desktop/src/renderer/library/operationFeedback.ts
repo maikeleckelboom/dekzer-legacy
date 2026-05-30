@@ -6,7 +6,7 @@ import type {
   LocalRootScanSummary,
   RemoveSourceStatus
 } from './boundary/localRootActions'
-import type { ScanProgressState } from './boundary/eventScanner'
+import type { ScanProgressState } from './boundary/boundaryEvents'
 import type { RootLifecycleRefreshStatus } from './runtime/rootLifecycle'
 
 export type LibraryOperationFeedbackKind =
@@ -333,9 +333,7 @@ function scanFailureDetail(
   return undefined
 }
 
-function scanProgressDetailFromEvents(
-  progress: ScanProgressState | undefined
-): string | undefined {
+function scanProgressDetailFromEvents(progress: ScanProgressState | undefined): string | undefined {
   if (progress === undefined || progress.kind !== 'scanning') {
     return undefined
   }
@@ -347,7 +345,9 @@ function scanProgressDetailFromEvents(
   }
 
   if (progress.directoriesVisited > 0) {
-    parts.push(`${progress.directoriesVisited} ${progress.directoriesVisited === 1 ? 'directory' : 'directories'} visited`)
+    parts.push(
+      `${progress.directoriesVisited} ${progress.directoriesVisited === 1 ? 'directory' : 'directories'} visited`
+    )
   }
 
   if (parts.length === 0) {

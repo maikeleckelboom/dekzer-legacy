@@ -5,6 +5,7 @@ import type { RendererApi } from '../../../shared/rendererApi'
 import {
   parseBoundaryEvent,
   type AppBoundaryEvent,
+  type AppMaintainedSnapshotInvalidatedEvent,
   type AppSourceScanEvent
 } from '../../../shared/libraryBoundary/eventParser'
 
@@ -44,8 +45,11 @@ export type ScanProgressState =
       readonly detail: string | null
     }
 
-export type BoundaryEventScannerController = {
+export type MaintainedSnapshotInvalidationSignal = AppMaintainedSnapshotInvalidatedEvent
+
+export type BoundaryEventsController = {
   readonly scanProgress: Ref<ReadonlyMap<string, ScanProgressState>>
+  readonly maintainedSnapshotInvalidations: Ref<readonly MaintainedSnapshotInvalidationSignal[]>
   readonly lastReadFailed: Ref<boolean>
   readonly gapDetected: Ref<boolean>
   readonly recoveryNeeded: Ref<boolean>
@@ -56,13 +60,10 @@ export type BoundaryEventScannerController = {
 
 export type BoundaryEventApi = RendererApi['library']['events']
 
-const POLL_INTERVAL_MS = 250
-const MAX_EVENTS_PER_POLL = 32
-
-export function useBoundaryEventScanner(
+export function useBoundaryEvents(
   eventApi: BoundaryEventApi = getRendererApi().library.events
-): BoundaryEventScannerController {
-  const controller = createBoundaryEventScannerController(eventApi)
+): BoundaryEventsController {
+  const controller = createBoundaryEventsController(eventApi)
 
   onMounted(() => {
     controller.start()
@@ -75,31 +76,58 @@ export function useBoundaryEventScanner(
   return controller
 }
 
-export function createBoundaryEventScannerController(
+export function createBoundaryEventsController(
   eventApi: BoundaryEventApi
-): BoundaryEventScannerController {
+): BoundaryEventsController {
   const scanProgress = shallowRef<ReadonlyMap<string, ScanProgressState>>(new Map())
+  const maintainedSnapshotInvalidations = shallowRef<
+    readonly MaintainedSnapshotInvalidationSignal[]
+  >([])
   const lastReadFailed = shallowRef(false)
   const gapDetected = shallowRef(false)
   const recoveryNeeded = shallowRef(false)
-  let lastSeenEventSequence: number | null = null
-  let pollTimer: ReturnType<typeof setInterval> | null = null
-  let running = false
+  let unsubscribe: (() => void) | undefined
 
-  async function poll(): Promise<void> {
-    if (!running) {
+  function applyEvents(events: ReadonlyArray<AppBoundaryEvent>): void {
+    const nextProgress = new Map(scanProgress.value)
+    const nextInvalidations = [...maintainedSnapshotInvalidations.value]
+
+    for (const event of events) {
+      if (event.type === 'sourceScanEvent') {
+        const progress = scanProgressFromEvent(event.payload)
+        nextProgress.set(event.payload.rootId, progress)
+      } else if (event.type === 'maintainedSnapshotInvalidated') {
+        nextInvalidations.push(event.payload)
+      }
+    }
+
+    scanProgress.value = nextProgress
+    maintainedSnapshotInvalidations.value = nextInvalidations
+  }
+
+  function acknowledgedGap(): void {
+    recoveryNeeded.value = false
+  }
+
+  function start(): void {
+    if (unsubscribe !== undefined) {
       return
     }
 
-    try {
-      const reply = await eventApi.readAfter({
-        lastSeenEventSequence,
-        maxEvents: MAX_EVENTS_PER_POLL
-      })
+    unsubscribe = eventApi.subscribe((payload) => {
+      if (payload.kind === 'failed') {
+        lastReadFailed.value = true
+        return
+      }
 
       lastReadFailed.value = false
 
-      const parsed = (reply.events as readonly unknown[])
+      if (payload.gapDetected) {
+        gapDetected.value = true
+        recoveryNeeded.value = true
+      }
+
+      const parsed = payload.events
         .map(parseBoundaryEvent)
         .filter(
           (event): event is Exclude<AppBoundaryEvent, { type: 'unsupported' }> =>
@@ -109,60 +137,17 @@ export function createBoundaryEventScannerController(
       if (parsed.length > 0) {
         applyEvents(parsed)
       }
-
-      if (reply.gapDetected) {
-        gapDetected.value = true
-        recoveryNeeded.value = true
-      }
-
-      if (reply.latestEventSequence !== null) {
-        lastSeenEventSequence = reply.latestEventSequence
-      }
-    } catch {
-      lastReadFailed.value = true
-    }
-  }
-
-  function applyEvents(events: ReadonlyArray<AppBoundaryEvent>): void {
-    const nextProgress = new Map(scanProgress.value)
-
-    for (const event of events) {
-      if (event.type !== 'sourceScanEvent') {
-        continue
-      }
-
-      const progress = scanProgressFromEvent(event.payload)
-      nextProgress.set(event.payload.rootId, progress)
-    }
-
-    scanProgress.value = nextProgress
-  }
-
-  function acknowledgedGap(): void {
-    recoveryNeeded.value = false
-  }
-
-  function start(): void {
-    if (running) {
-      return
-    }
-
-    running = true
-    pollTimer = setInterval(poll, POLL_INTERVAL_MS)
-    void poll()
+    })
   }
 
   function stop(): void {
-    running = false
-
-    if (pollTimer !== null) {
-      clearInterval(pollTimer)
-      pollTimer = null
-    }
+    unsubscribe?.()
+    unsubscribe = undefined
   }
 
   return {
     scanProgress,
+    maintainedSnapshotInvalidations,
     lastReadFailed,
     gapDetected,
     recoveryNeeded,
