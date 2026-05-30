@@ -139,6 +139,33 @@ describe('deriveOperationFeedback', () => {
       kind: 'scanFailed',
       tone: 'error'
     })
+    expect(
+      deriveOperationFeedback({
+        ...base,
+        scanStatus: 'blocked',
+        scanFailureMessage: 'Permission denied.'
+      })
+    ).toMatchObject({
+      kind: 'scanBlocked',
+      tone: 'warning',
+      detail: 'Permission denied.'
+    })
+    expect(deriveOperationFeedback({ ...base, scanStatus: 'canceled' })).toMatchObject({
+      kind: 'scanCanceled',
+      tone: 'warning'
+    })
+    expect(
+      deriveOperationFeedback({
+        ...base,
+        scanStatus: 'blocked',
+        scanProgressFromEvents: {
+          kind: 'blocked',
+          rootId: 'r1',
+          detail: 'Permission denied.'
+        },
+        navigationReadResult: readyNavigation([makeNavRow()])
+      })
+    ).toMatchObject({ kind: 'ready' })
     expect(deriveOperationFeedback({ ...base, refreshStatus: 'failed' })).toMatchObject({
       kind: 'refreshFailed',
       tone: 'warning'
@@ -200,6 +227,22 @@ describe('deriveOperationFeedback', () => {
     )
     expect(scanWithEventProgress.detail).toMatch(/42 files/)
     expect(scanWithEventProgress.detail).toMatch(/3 items/)
+
+    expect(
+      deriveOperationFeedback(
+        startedInputs({
+          scanStatus: 'scanned',
+          scanProgressFromEvents: {
+            kind: 'completed',
+            rootId: 'r1',
+            scanRunId: 's1',
+            filesDiscovered: 42,
+            queuedWorkItems: 3
+          },
+          navigationReadResult: readyNavigation([makeNavRow()])
+        })
+      )
+    ).toMatchObject({ kind: 'ready' })
 
     expect(
       deriveOperationFeedback({

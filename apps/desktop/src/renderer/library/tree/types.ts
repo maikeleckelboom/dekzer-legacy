@@ -87,6 +87,7 @@ export type BrowserTreeNode = {
   readonly label: string
   readonly role: BrowserTreeRowRole
   readonly badge?: BrowserTreeBadge
+  readonly badges?: readonly BrowserTreeBadge[]
   readonly detail?: string
   readonly icon?: BrowserTreeIcon
   readonly children: BrowserTreeChildren

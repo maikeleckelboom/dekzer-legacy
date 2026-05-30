@@ -16,8 +16,10 @@ import {
 import { refreshHierarchyForMaintainedSnapshotInvalidation } from './runtime/invalidationRefresh'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
+import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
 import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
+import { projectState } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
 
@@ -42,6 +44,8 @@ const visibleOperationFeedbackKinds = new Set<LibraryOperationFeedbackKind>([
   'refreshingView',
   'refreshFailed',
   'scanningRoot',
+  'scanBlocked',
+  'scanCanceled',
   'scanFailed',
   'scanComplete',
   'removingSource',
@@ -62,16 +66,6 @@ const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(()
   return boundaryEvents.scanProgress.value.get(root.rootId)
 })
 
-const rootLifecycle = useRootLifecycle({
-  rootActions,
-  hierarchyRead: {
-    refresh: hierarchyRead.refresh
-  },
-  confirmRemoveSource: () => window.confirm(removeSourceMessage),
-  isSourceRootVisible: (rootId) =>
-    hasVisibleSourceRootBinding(hierarchyRead.browserProjection.value, rootId)
-})
-
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
@@ -84,10 +78,46 @@ const restoreState = {
   initialNodeApplied: false
 }
 
-const liveTreeNodes = computed(() => hierarchyRead.browserProjection.value?.nodes ?? [])
+const sourceReadinessByNodeId = computed(() =>
+  projectSourceReadinessByNodeId({
+    projection: hierarchyRead.browserProjection.value,
+    localRootsReadState: rootActions.localRootsReadState.value,
+    sourceReadStates: hierarchyRead.sourceReadStates.value,
+    scanProgressByRootId: boundaryEvents.scanProgress.value,
+    ...(rootActions.registeredRoot.value === undefined
+      ? {}
+      : { currentScanRootId: rootActions.registeredRoot.value.rootId }),
+    currentScanStatus: rootActions.scanStatus.value
+  })
+)
+
+const browserState = computed<BrowserState>(() => ({
+  sourceReadinessByNodeId: sourceReadinessByNodeId.value,
+  sourceReadStates: hierarchyRead.sourceReadStates.value,
+  directoryReadStates: hierarchyRead.directoryReadStates.value,
+  ...(hierarchyRead.hostStatus.value === undefined
+    ? {}
+    : { hostStatus: hierarchyRead.hostStatus.value }),
+  ...(hierarchyRead.navigationReadResult.value === undefined
+    ? {}
+    : { navigationReadResult: hierarchyRead.navigationReadResult.value })
+}))
+
+const browserProjection = computed(() => projectState(browserState.value))
+
+const rootLifecycle = useRootLifecycle({
+  rootActions,
+  hierarchyRead: {
+    refresh: hierarchyRead.refresh
+  },
+  confirmRemoveSource: () => window.confirm(removeSourceMessage),
+  isSourceRootVisible: (rootId) => hasVisibleSourceRootBinding(browserProjection.value, rootId)
+})
+
+const liveTreeNodes = computed(() => browserProjection.value?.nodes ?? [])
 
 const preferredNodeId = computed(() => {
-  const projection = hierarchyRead.browserProjection.value
+  const projection = browserProjection.value
 
   if (projection === undefined) {
     return undefined
@@ -110,19 +140,8 @@ const treeRootProps = computed(() => ({
   ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
 }))
 
-const browserState = computed<BrowserState>(() => ({
-  sourceReadStates: hierarchyRead.sourceReadStates.value,
-  directoryReadStates: hierarchyRead.directoryReadStates.value,
-  ...(hierarchyRead.hostStatus.value === undefined
-    ? {}
-    : { hostStatus: hierarchyRead.hostStatus.value }),
-  ...(hierarchyRead.navigationReadResult.value === undefined
-    ? {}
-    : { navigationReadResult: hierarchyRead.navigationReadResult.value })
-}))
-
 const contentsProjection = computed(() => {
-  const projection = hierarchyRead.browserProjection.value
+  const projection = browserProjection.value
 
   return projectContents({
     state: browserState.value,
@@ -134,7 +153,7 @@ const contentsProjection = computed(() => {
 
 const sourceActionModel = computed(() =>
   deriveSourceActionModel({
-    projection: hierarchyRead.browserProjection.value,
+    projection: browserProjection.value,
     selectedNodeId: selectedNodeId.value,
     localRootsReadState: rootActions.localRootsReadState.value,
     scanStatus: rootActions.scanStatus.value,
@@ -213,19 +232,22 @@ watch(scanProgressForRegisteredRoot, (progress) => {
       }
       break
     case 'failed':
-    case 'blocked':
       rootActions.scanStatus.value = 'failed'
       rootActions.scanFailureMessage.value = progress.detail ?? 'Scan failed.'
+      break
+    case 'blocked':
+      rootActions.scanStatus.value = 'blocked'
+      rootActions.scanFailureMessage.value = progress.detail ?? 'Scan blocked.'
+      break
+    case 'cancelled':
+      rootActions.scanStatus.value = 'canceled'
+      rootActions.scanFailureMessage.value = progress.detail ?? 'Scan canceled.'
       break
   }
 })
 
 watch(
-  [
-    selectedNodeId,
-    () => hierarchyRead.browserProjection.value,
-    () => hierarchyRead.hostStatus.value?.state
-  ],
+  [selectedNodeId, () => browserProjection.value, () => hierarchyRead.hostStatus.value?.state],
   () => {
     requestContentsForCurrentSelection()
   },
@@ -312,7 +334,7 @@ function saveViewState(): void {
 }
 
 async function restoreViewState(): Promise<void> {
-  const projection = hierarchyRead.browserProjection.value
+  const projection = browserProjection.value
 
   if (projection?.kind !== 'tree') {
     restoreState.readStarted = false
@@ -377,7 +399,7 @@ function applyRestoredExpansion(
 }
 
 function applyPendingRestoreIds(): void {
-  const projection = hierarchyRead.browserProjection.value
+  const projection = browserProjection.value
 
   if (projection?.kind !== 'tree') {
     return
@@ -505,16 +527,15 @@ function activateContentRowAction(row: ContentRow): void {
     saveViewState()
     void hierarchyRead.requestNodeChildren(action.nodeId)
   } else if (action.kind === 'loadContentsPage') {
-    void contentsRead.readForBinding(
-      hierarchyRead.browserProjection.value?.bindingsById.get(action.nodeId),
-      { cursor: action.cursor }
-    )
+    void contentsRead.readForBinding(browserProjection.value?.bindingsById.get(action.nodeId), {
+      cursor: action.cursor
+    })
   }
 }
 
 function requestContentsForCurrentSelection(options: { readonly force?: boolean } = {}): void {
   const selectedId = selectedNodeId.value
-  const projection = hierarchyRead.browserProjection.value
+  const projection = browserProjection.value
 
   if (selectedId === undefined || projection === undefined) {
     contentsRead.clear()

@@ -17,6 +17,8 @@ export type LibraryOperationFeedbackKind =
   | 'rootChoiceFailed'
   | 'rootChoiceCanceled'
   | 'scanningRoot'
+  | 'scanBlocked'
+  | 'scanCanceled'
   | 'scanFailed'
   | 'scanComplete'
   | 'refreshingView'
@@ -101,6 +103,16 @@ const meta: Record<LibraryOperationFeedbackKind, FeedbackMeta> = {
     tone: 'loading',
     title: 'Scanning music folder',
     detail: 'Scanning your music folder for files.'
+  },
+  scanBlocked: {
+    tone: 'warning',
+    title: 'Scan blocked',
+    detail: 'The registered folder could not be scanned until access is restored.'
+  },
+  scanCanceled: {
+    tone: 'warning',
+    title: 'Scan canceled',
+    detail: 'The source remains registered.'
   },
   scanFailed: {
     tone: 'error',
@@ -217,9 +229,36 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
     return build('rootChoiceFailed')
   }
 
+  const terminalScanFeedbackIsOwnedBySourceRow = sourceRowOwnsTerminalScanFeedback(inputs)
+
   if (inputs.scanStatus === 'failed') {
+    if (terminalScanFeedbackIsOwnedBySourceRow) {
+      return navigationReadyFeedback(inputs.navigationReadResult)
+    }
+
     const failureDetail = scanFailureDetail(inputs.scanFailureMessage, inputs.scanFailureDetail)
     return build('scanFailed', failureDetail === undefined ? {} : { detail: failureDetail })
+  }
+
+  if (inputs.scanStatus === 'blocked') {
+    if (terminalScanFeedbackIsOwnedBySourceRow) {
+      return navigationReadyFeedback(inputs.navigationReadResult)
+    }
+
+    const detail =
+      inputs.scanFailureMessage ??
+      terminalScanProgressDetail(inputs.scanProgressFromEvents) ??
+      undefined
+    return build('scanBlocked', detail === undefined ? {} : { detail })
+  }
+
+  if (inputs.scanStatus === 'canceled') {
+    if (terminalScanFeedbackIsOwnedBySourceRow) {
+      return navigationReadyFeedback(inputs.navigationReadResult)
+    }
+
+    const detail = terminalScanProgressDetail(inputs.scanProgressFromEvents)
+    return build('scanCanceled', detail === undefined ? {} : { detail })
   }
 
   if (inputs.removeSourceStatus === 'failed') {
@@ -248,15 +287,55 @@ export function deriveOperationFeedback(inputs: OperationFeedbackInputs): Librar
   }
 
   if (inputs.scanStatus === 'scanned') {
+    if (terminalScanFeedbackIsOwnedBySourceRow) {
+      return navigationReadyFeedback(inputs.navigationReadResult)
+    }
+
     const completedDetail = scanCompletedDetailFromEvents(inputs.scanProgressFromEvents)
     return build('scanComplete', completedDetail === undefined ? {} : { detail: completedDetail })
   }
 
   if (inputs.navigationReadResult?.state === 'ready') {
-    return inputs.navigationReadResult.rows.length > 0 ? build('ready') : build('noSources')
+    return navigationReadyFeedback(inputs.navigationReadResult)
   }
 
   return build('chooseRoot')
+}
+
+function navigationReadyFeedback(
+  result: NavigationReadRowsResult | undefined
+): LibraryOperationFeedback {
+  return result?.state === 'ready' && result.rows.length > 0 ? build('ready') : build('noSources')
+}
+
+function sourceRowOwnsTerminalScanFeedback(inputs: OperationFeedbackInputs): boolean {
+  if (inputs.navigationReadResult?.state !== 'ready') {
+    return false
+  }
+
+  switch (inputs.scanProgressFromEvents?.kind) {
+    case 'completed':
+    case 'failed':
+    case 'blocked':
+    case 'cancelled':
+      return true
+    case 'idle':
+    case 'scanning':
+    case undefined:
+      return false
+  }
+}
+
+function terminalScanProgressDetail(progress: ScanProgressState | undefined): string | undefined {
+  if (
+    progress?.kind !== 'failed' &&
+    progress?.kind !== 'blocked' &&
+    progress?.kind !== 'cancelled'
+  ) {
+    return undefined
+  }
+
+  return progress.detail ?? undefined
 }
 
 function hostNotReadyFeedback(host: LibraryBoundaryHostStatus): LibraryOperationFeedback {

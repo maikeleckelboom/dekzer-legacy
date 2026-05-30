@@ -23,6 +23,11 @@ import type {
   BrowserTreeNodeId
 } from './types'
 import { copyEntryPoint } from '../runtime/entryPoint'
+import {
+  branchRefreshingBadge,
+  sourceReadinessBadge,
+  type SourceReadiness
+} from '../runtime/sourceReadiness'
 import { formatSourceDisplayName } from './sourcePresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
 
@@ -129,6 +134,9 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
     nodes: visibleRows.map((row) =>
       projectNavigationRow({
         row,
+        ...(state.sourceReadinessByNodeId === undefined
+          ? {}
+          : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),
         sourceReadStates: state.sourceReadStates,
         directoryReadStates: state.directoryReadStates,
         bindingsById
@@ -140,6 +148,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
 
 function projectNavigationRow(options: {
   readonly row: NavigationRow
+  readonly sourceReadinessByNodeId?: ReadonlyMap<string, SourceReadiness>
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -149,7 +158,8 @@ function projectNavigationRow(options: {
 
   if (sourceTarget !== undefined) {
     const sourceState = options.sourceReadStates.get(nodeId)
-    const sourceUnavailableBadge = sourceUnavailableBadgeForState(sourceState)
+    const sourceReadiness = options.sourceReadinessByNodeId?.get(nodeId)
+    const sourceBadges = badgesForSourceState(sourceReadiness, sourceState)
 
     options.bindingsById.set(nodeId, {
       kind: 'source',
@@ -161,9 +171,9 @@ function projectNavigationRow(options: {
       id: nodeId,
       role: browserRowRoleForNavigationRow(options.row),
       label: formatSourceDisplayName(options.row.displayName),
-      ...(sourceUnavailableBadge === undefined ? {} : { badge: sourceUnavailableBadge }),
+      ...badgeProps(sourceBadges),
       icon: 'source',
-      detail: formatNavigationSourceDetail(options.row),
+      detail: formatNavigationSourceDetail(options.row, sourceReadiness),
       ...projectSourceChildren({
         ownerId: nodeId,
         target: sourceTarget,
@@ -401,14 +411,14 @@ function projectLiteralNode(options: {
     })
 
     const directoryState = options.directoryReadStates.get(node.directoryId)
-    const dirBadge = presenceBadge(node.presence)
+    const dirBadges = badgesForDirectoryState(presenceBadge(node.presence), directoryState)
 
     if (isConfirmedDirectoryLeaf(node, directoryState)) {
       return {
         id: node.id,
         role: 'literalDirectory',
         label: node.label,
-        ...(dirBadge === undefined ? {} : { badge: dirBadge }),
+        ...badgeProps(dirBadges),
         icon: 'folder',
         detail: formatDirectoryDetail(node.presence),
         children: { kind: 'none' }
@@ -419,7 +429,7 @@ function projectLiteralNode(options: {
       id: node.id,
       role: 'literalDirectory',
       label: node.label,
-      ...(dirBadge === undefined ? {} : { badge: dirBadge }),
+      ...badgeProps(dirBadges),
       icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
       ...projectDirectoryChildren({
@@ -460,6 +470,57 @@ function isConfirmedDirectoryLeaf(
     return false
   }
   return node.childRowState === 'noChildRows'
+}
+
+function badgesForSourceState(
+  readiness: SourceReadiness | undefined,
+  state: SourceState | undefined
+): readonly BrowserTreeBadge[] {
+  const badges: BrowserTreeBadge[] = []
+
+  if (readiness !== undefined) {
+    badges.push(sourceReadinessBadge(readiness))
+  } else {
+    const unavailableBadge = sourceUnavailableBadgeForState(state)
+    if (unavailableBadge !== undefined) {
+      badges.push(unavailableBadge)
+    }
+  }
+
+  if (state?.kind === 'refreshing') {
+    badges.push(branchRefreshingBadge(state.detail ?? 'Refreshing visible source rows.'))
+  }
+
+  return badges
+}
+
+function badgesForDirectoryState(
+  presence: BrowserTreeBadge | undefined,
+  state: DirectoryState | undefined
+): readonly BrowserTreeBadge[] {
+  const badges: BrowserTreeBadge[] = []
+
+  if (presence !== undefined) {
+    badges.push(presence)
+  }
+
+  if (state?.kind === 'refreshing') {
+    badges.push(branchRefreshingBadge(state.detail ?? 'Refreshing visible folder rows.'))
+  }
+
+  return badges
+}
+
+function badgeProps(
+  badges: readonly BrowserTreeBadge[]
+): Pick<BrowserTreeNode, 'badge' | 'badges'> {
+  const first = badges[0]
+
+  if (first === undefined) {
+    return {}
+  }
+
+  return badges.length === 1 ? { badge: first } : { badge: first, badges }
 }
 
 const sourceUnavailableErrorCodes = new Set([
@@ -892,8 +953,12 @@ function isPositiveOpaqueId(value: unknown): value is string {
   return typeof value === 'string' && positiveOpaqueIdPattern.test(value)
 }
 
-function formatNavigationSourceDetail(row: NavigationRow): string {
-  return `Library source. Updated ${formatRowFreshness(row)}.`
+function formatNavigationSourceDetail(
+  row: NavigationRow,
+  readiness: SourceReadiness | undefined
+): string {
+  const lifecycleDetail = readiness?.detail ?? 'Library source.'
+  return `${lifecycleDetail} Updated ${formatRowFreshness(row)}.`
 }
 
 function formatNavigationDetail(row: NavigationRow): string {

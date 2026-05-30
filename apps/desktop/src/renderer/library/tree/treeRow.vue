@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 
 import type { BrowserTreeVisibleItem } from './types'
+import type { BrowserTreeBadgeTone } from './types'
 import type { IconComponent, IconTone } from '../../icons'
 import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
 import { resolveBrowserTreeRowIcon } from './presentation'
@@ -26,12 +27,33 @@ const rowStyle = computed(() => ({
 
 const hasAffordance = computed(() => props.item.canRevealChildren)
 
+const visibleBadges = computed(
+  () =>
+    props.item.node.badges ?? (props.item.node.badge === undefined ? [] : [props.item.node.badge])
+)
+
+const visibleBadgeTone = computed<BrowserTreeBadgeTone | undefined>(() => {
+  if (visibleBadges.value.some((badge) => badge.tone === 'danger')) {
+    return 'danger'
+  }
+
+  if (visibleBadges.value.some((badge) => badge.tone === 'warning')) {
+    return 'warning'
+  }
+
+  if (visibleBadges.value.some((badge) => badge.tone === 'accent')) {
+    return 'accent'
+  }
+
+  return visibleBadges.value[0]?.tone
+})
+
 const rowIcon = computed<IconComponent | undefined>(() =>
   resolveBrowserTreeRowIcon(props.item.node, props.item.isExpanded)
 )
 
 const iconTone = computed<IconTone>(() => {
-  const badgeTone = props.item.node.badge?.tone
+  const badgeTone = visibleBadgeTone.value
 
   if (badgeTone === 'warning') {
     return 'warning'
@@ -67,7 +89,7 @@ const iconTone = computed<IconTone>(() => {
 })
 
 const labelClass = computed(() => {
-  const badgeTone = props.item.node.badge?.tone
+  const badgeTone = visibleBadgeTone.value
 
   if (badgeTone === 'warning') {
     return 'text-(--color-warning)'
@@ -91,6 +113,22 @@ const labelClass = computed(() => {
       return ''
   }
 })
+
+function badgeClass(tone: BrowserTreeBadgeTone | undefined): string {
+  switch (tone) {
+    case 'accent':
+      return 'border-(--color-accent) text-(--color-accent)'
+    case 'warning':
+      return 'border-(--color-warning) text-(--color-warning)'
+    case 'danger':
+      return 'border-(--color-danger) text-(--color-danger)'
+    case 'muted':
+      return 'border-(--color-border) text-(--color-text-muted)'
+    case 'neutral':
+    default:
+      return 'border-(--color-border) text-(--color-text-muted)'
+  }
+}
 </script>
 
 <template>
@@ -98,6 +136,7 @@ const labelClass = computed(() => {
     class="flex min-w-0 items-center gap-2 rounded-sm border-l-2 py-1.5 text-left group-focus-visible:ring-2 group-focus-visible:ring-(--color-accent)"
     :class="rowClass"
     :style="rowStyle"
+    :title="item.node.detail"
   >
     <span class="grid size-6 shrink-0 place-items-center" aria-hidden="true">
       <Icon
@@ -116,12 +155,14 @@ const labelClass = computed(() => {
     </span>
 
     <span
-      v-if="item.node.badge"
+      v-for="badge in visibleBadges"
+      :key="badge.value"
       class="shrink-0 rounded-sm border px-1.5 text-xs leading-5"
-      :title="item.node.badge.title"
-      :aria-label="item.node.badge.ariaLabel"
+      :class="badgeClass(badge.tone)"
+      :title="badge.title"
+      :aria-label="badge.ariaLabel"
     >
-      {{ item.node.badge.value }}
+      {{ badge.value }}
     </span>
   </div>
 </template>

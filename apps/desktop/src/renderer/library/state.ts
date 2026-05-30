@@ -8,6 +8,7 @@ import type {
   NavigationReadRowsResult,
   NavigationRow
 } from '../../shared/libraryNavigation/readRows'
+import type { SourceReadiness } from './runtime/sourceReadiness'
 
 export type DirectoryTarget = {
   readonly entryPoint: EntryPoint
@@ -152,6 +153,7 @@ export type RowBinding =
 export type BrowserState = {
   readonly hostStatus?: LibraryBoundaryHostStatus
   readonly navigationReadResult?: NavigationReadRowsResult
+  readonly sourceReadinessByNodeId?: ReadonlyMap<string, SourceReadiness>
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
 }

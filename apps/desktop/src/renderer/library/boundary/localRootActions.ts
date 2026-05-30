@@ -15,7 +15,13 @@ export type LibraryRootActionsApi = RendererApi['library']['roots']
 
 export type LocalRootChoiceStatus = 'idle' | 'choosing' | 'canceled' | 'registered' | 'failed'
 
-export type LocalRootScanStatus = 'idle' | 'scanning' | 'scanned' | 'failed'
+export type LocalRootScanStatus =
+  | 'idle'
+  | 'scanning'
+  | 'scanned'
+  | 'blocked'
+  | 'canceled'
+  | 'failed'
 
 export type RemoveSourceStatus = 'idle' | 'removing' | 'removed' | 'failed'
 
@@ -110,8 +116,10 @@ export function createLocalRootActionsController(
         return 'Scanning folder'
       case 'scanned':
         return 'Rescan folder'
+      case 'blocked':
       case 'failed':
         return 'Retry scan'
+      case 'canceled':
       case 'idle':
         return 'Scan folder'
     }
