@@ -1,7 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -30,14 +31,16 @@ use crate::storage_environment::resolve_library_storage_environment;
 struct ActiveScanJob {
     #[allow(dead_code)]
     root_id: i64,
-    #[allow(dead_code)]
     scan_run_id: i64,
+    completed: Arc<AtomicBool>,
     _handle: JoinHandle<()>,
 }
 
 #[derive(Default)]
 struct ScanJobRegistry {
     jobs: HashMap<i64, ActiveScanJob>,
+    scan_run_id_to_root_id: HashMap<i64, i64>,
+    terminal_scan_run_ids: HashSet<i64>,
     next_scan_run_id: i64,
 }
 
@@ -195,6 +198,8 @@ impl LibraryBoundaryService {
 
         let store = self.durable_store.clone();
         let events = self.session_events.clone();
+        let completed = Arc::new(AtomicBool::new(false));
+        let thread_completed = Arc::clone(&completed);
 
         events.publish_scan_event(
             library_boundary_protocol::SourceScanEventKind::SourceScanStarted,
@@ -211,18 +216,64 @@ impl LibraryBoundaryService {
 
         let handle = std::thread::spawn(move || {
             execute_scan_job(store, events, root_id, scan_run_id, scan_started_at_ms);
+            thread_completed.store(true, Ordering::Release);
         });
 
+        registry.scan_run_id_to_root_id.insert(scan_run_id, root_id);
         registry.jobs.insert(
             root_id,
             ActiveScanJob {
                 root_id,
                 scan_run_id,
+                completed,
                 _handle: handle,
             },
         );
 
         Ok(protocol::StartRootScanReply { scan_run_id })
+    }
+
+    pub fn cancel_root_scan(
+        &self,
+        request: protocol::CancelRootScanRequest,
+    ) -> protocol::ProtocolResult<protocol::CancelRootScanReply> {
+        let scan_run_id = require_positive_i64(request.scan_run_id, "scanRunId")?;
+
+        let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
+
+        let root_id = match registry.scan_run_id_to_root_id.get(&scan_run_id).copied() {
+            Some(id) => id,
+            None => {
+                let status = if registry.terminal_scan_run_ids.contains(&scan_run_id) {
+                    protocol::CancelRootScanStatus::AlreadyTerminal
+                } else {
+                    protocol::CancelRootScanStatus::NotFound
+                };
+                return Ok(protocol::CancelRootScanReply { status });
+            }
+        };
+
+        let job = match registry.jobs.get(&root_id) {
+            Some(job) if job.scan_run_id == scan_run_id => job,
+            _ => {
+                return Ok(protocol::CancelRootScanReply {
+                    status: protocol::CancelRootScanStatus::NotFound,
+                });
+            }
+        };
+
+        if job.completed.load(Ordering::Acquire) {
+            registry.jobs.remove(&root_id);
+            registry.scan_run_id_to_root_id.remove(&scan_run_id);
+            registry.terminal_scan_run_ids.insert(scan_run_id);
+            return Ok(protocol::CancelRootScanReply {
+                status: protocol::CancelRootScanStatus::AlreadyTerminal,
+            });
+        }
+
+        Ok(protocol::CancelRootScanReply {
+            status: protocol::CancelRootScanStatus::NotCancelable,
+        })
     }
 
     pub fn create_playlist(
@@ -526,6 +577,9 @@ impl LibraryBoundaryService {
             protocol::LibraryRootCommand::StartRootScan(request) => self
                 .start_root_scan(request)
                 .map(protocol::LibraryRootReply::StartRootScan),
+            protocol::LibraryRootCommand::CancelRootScan(request) => self
+                .cancel_root_scan(request)
+                .map(protocol::LibraryRootReply::CancelRootScan),
             protocol::LibraryRootCommand::ReadLocalRoots(_) => self
                 .read_local_roots()
                 .map(protocol::LibraryRootReply::ReadLocalRoots),
@@ -802,6 +856,7 @@ fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol:
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
+        CancelRootScanRequest, CancelRootScanReply, CancelRootScanStatus,
         CommandOutcome, CommandReply, CommandRequest, ContentsReadPolicy, ContentsRowProfile,
         CreatePlaylistReply, CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
@@ -1019,6 +1074,16 @@ mod tests {
                 root_id,
             })),
         )))
+    }
+
+    fn cancel_root_scan(service: &LibraryBoundaryService, scan_run_id: i64) -> CancelRootScanReply {
+        let outcome = service.handle_command(CommandRequest::LibraryRoots(
+            LibraryRootCommand::CancelRootScan(CancelRootScanRequest { scan_run_id }),
+        ));
+        match expect_success(outcome) {
+            CommandReply::LibraryRoots(LibraryRootReply::CancelRootScan(reply)) => reply,
+            other => panic!("expected cancel root scan reply, got {other:?}"),
+        }
     }
 
     fn read_after_events(
@@ -1570,5 +1635,67 @@ mod tests {
         )));
         assert_eq!(roots.roots.len(), 1);
         assert_eq!(roots.roots[0].root_id, first_registered.root_id);
+    }
+
+    #[test]
+    fn cancel_unknown_scan_run_id_returns_not_found() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let reply = cancel_root_scan(&service, 99999);
+        assert_eq!(reply.status, CancelRootScanStatus::NotFound);
+    }
+
+    #[test]
+    fn cancel_active_scan_returns_not_cancelable() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("music-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.wav"), b"data").expect("write test file");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let scanned = start_root_scan(&service, registered.root_id);
+
+        let reply = cancel_root_scan(&service, scanned.scan_run_id);
+        assert_eq!(
+            reply.status,
+            CancelRootScanStatus::NotCancelable,
+            "cooperative cancellation is not yet implemented for active scans"
+        );
+    }
+
+    #[test]
+    fn cancel_after_scan_completes_returns_already_terminal() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("music-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.wav"), b"data").expect("write test file");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let scanned = start_root_scan(&service, registered.root_id);
+
+        for _ in 0..30 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let reply = cancel_root_scan(&service, scanned.scan_run_id);
+            if reply.status == CancelRootScanStatus::AlreadyTerminal {
+                return;
+            }
+        }
+
+        panic!("expected cancel after scan completion to return AlreadyTerminal, got NotCancelable");
+    }
+
+    #[test]
+    fn cancel_invalid_scan_run_id_rejects() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let error = service
+            .try_handle_command(CommandRequest::LibraryRoots(
+                LibraryRootCommand::CancelRootScan(CancelRootScanRequest { scan_run_id: 0 }),
+            ))
+            .expect_err("zero scanRunId is invalid");
+        assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
+        assert_eq!(error.code(), "INVALID_REQUEST");
     }
 }

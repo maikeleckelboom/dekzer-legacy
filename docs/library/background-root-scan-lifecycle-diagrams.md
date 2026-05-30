@@ -1,9 +1,29 @@
 # Background Root Scan Lifecycle Diagrams
 
-Status: implementation-grade visual contract
+Status: ratified target architecture, implementation frontier open
 Owner: library boundary / local library substrate
 Scope: background source scan lifecycle, cursor event stream, scoped snapshot invalidation, renderer recovery,
 cancellation, and authority flow
+
+---
+
+## Implementation frontier
+
+Current code implements `StartRootScan`, `ReadAfter`, `SourceScanStarted`, `SourceScanProgressed`,
+`SourceScanCompleted`, `SourceScanFailed`, and `SourceScanBlocked`.
+
+Current code has an honest `CancelRootScan` command and `SourceScanCancelled` event in the boundary
+protocol and service command path, but cooperative scan cancellation is not yet implemented. The
+`CancelRootScan` service currently returns `NotCancelable` for active scans because the scan work
+loop does not observe a cancellation token. This is truthful behavior, not a stubbed acceptance.
+
+Current code does not yet implement `GetBoundaryEventCursor`, `eventStreamEpoch`, `WaitForEventsAfter`,
+or a Main-owned event pump. The renderer polls `ReadAfter` directly.
+
+These are ratified target concepts, not accidental names. This document defines the target
+architecture. Implementation must close gaps deliberately.
+
+---
 
 These diagrams define the target flow for the background root scan implementation slice.
 

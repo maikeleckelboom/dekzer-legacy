@@ -30,6 +30,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LibraryRootCommand>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::StartRootScanRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::CancelRootScanRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::CancelRootScanStatus>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalRootsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::UnregisterLocalRootRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LocalRootAvailability>(&cfg, &mut output);
@@ -62,6 +64,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LibraryRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::StartRootScanReply>(&cfg, &mut output);
+    push_ts_decl::<crate::CancelRootScanReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalRootsReply>(&cfg, &mut output);
     push_ts_decl::<crate::UnregisterLocalRootReply>(&cfg, &mut output);
     push_ts_decl::<crate::PlaylistWriteReply>(&cfg, &mut output);

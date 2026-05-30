@@ -13,11 +13,15 @@ export type ReadLibraryBoundaryEventsAfterRequest = {
  */
 lastSeenEventSequence: number | null, maxEvents: number, };
 
-export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "startRootScan", "payload": StartRootScanRequest } | { "type": "readLocalRoots", "payload": ReadLocalRootsRequest } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootRequest };
+export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "startRootScan", "payload": StartRootScanRequest } | { "type": "readLocalRoots", "payload": ReadLocalRootsRequest } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootRequest } | { "type": "cancelRootScan", "payload": CancelRootScanRequest };
 
 export type RegisterLocalRootRequest = { absolutePath: string, };
 
 export type StartRootScanRequest = { rootId: string, };
+
+export type CancelRootScanRequest = { scanRunId: string, };
+
+export type CancelRootScanStatus = "accepted" | "notFound" | "alreadyTerminal" | "notCancelable";
 
 export type ReadLocalRootsRequest = null;
 
@@ -96,11 +100,13 @@ earliestRetainedSequence: number | null,
  */
 gapDetected: boolean, };
 
-export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "startRootScan", "payload": StartRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootReply };
+export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "startRootScan", "payload": StartRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootReply } | { "type": "cancelRootScan", "payload": CancelRootScanReply };
 
 export type RegisterLocalRootReply = { rootId: string, canonicalPath: string, };
 
 export type StartRootScanReply = { scanRunId: string, };
+
+export type CancelRootScanReply = { status: CancelRootScanStatus, };
 
 export type ReadLocalRootsReply = { roots: Array<LocalRoot>, };
 
@@ -247,7 +253,7 @@ export type LibraryBoundaryEvent = { "type": "sourceScanEvent", "payload": Sourc
 
 export type SourceScanEvent = { eventSequence: number, occurredAtMs: number, kind: SourceScanEventKind, rootId: string, scanRunId: string, phase: ScanRunPhase, directoriesVisited: number, filesVisited: number, filesDiscovered: number, mediaCandidates: number, queuedWorkItems: number, detail: string | null, };
 
-export type SourceScanEventKind = "sourceScanStarted" | "sourceScanProgressed" | "sourceScanCompleted" | "sourceScanFailed" | "sourceScanBlocked";
+export type SourceScanEventKind = "sourceScanStarted" | "sourceScanProgressed" | "sourceScanCompleted" | "sourceScanFailed" | "sourceScanBlocked" | "sourceScanCancelled";
 
 export type ScanRunPhase = "scanning" | "blocked" | "interrupted";
 

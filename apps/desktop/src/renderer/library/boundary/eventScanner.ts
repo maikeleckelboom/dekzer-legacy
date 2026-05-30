@@ -37,6 +37,12 @@ export type ScanProgressState =
       readonly rootId: string
       readonly detail: string | null
     }
+  | {
+      readonly kind: 'cancelled'
+      readonly rootId: string
+      readonly scanRunId: string
+      readonly detail: string | null
+    }
 
 export type BoundaryEventScannerController = {
   readonly scanProgress: Ref<ReadonlyMap<string, ScanProgressState>>
@@ -198,6 +204,13 @@ function scanProgressFromEvent(event: AppSourceScanEvent): ScanProgressState {
       return {
         kind: 'blocked',
         rootId: event.rootId,
+        detail: event.detail
+      }
+    case 'sourceScanCancelled':
+      return {
+        kind: 'cancelled',
+        rootId: event.rootId,
+        scanRunId: event.scanRunId,
         detail: event.detail
       }
   }

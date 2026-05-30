@@ -180,6 +180,7 @@ pub enum SourceScanEventKind {
     SourceScanCompleted,
     SourceScanFailed,
     SourceScanBlocked,
+    SourceScanCancelled,
 }
 
 #[derive(
@@ -515,6 +516,58 @@ mod tests {
             payload.detail.as_deref(),
             Some("source root is not accessible")
         );
+    }
+
+    #[test]
+    fn source_scan_cancelled_event_serializes_and_deserializes() {
+        use super::{ScanRunPhase, SourceScanEvent, SourceScanEventKind};
+
+        let event = LibraryBoundaryEvent::SourceScanEvent(SourceScanEvent {
+            event_sequence: 7,
+            occurred_at_ms: 1700000000000,
+            kind: SourceScanEventKind::SourceScanCancelled,
+            root_id: 7,
+            scan_run_id: 14,
+            phase: ScanRunPhase::Interrupted,
+            directories_visited: 50,
+            files_visited: 120,
+            files_discovered: 100,
+            media_candidates: 20,
+            queued_work_items: 3,
+            detail: Some("cancelled by user".to_string()),
+        });
+
+        let json = serde_json::to_value(&event).expect("serialize cancelled event");
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "type": "sourceScanEvent",
+                "payload": {
+                    "eventSequence": 7,
+                    "occurredAtMs": 1700000000000i64,
+                    "kind": "sourceScanCancelled",
+                    "rootId": "7",
+                    "scanRunId": "14",
+                    "phase": "interrupted",
+                    "directoriesVisited": 50,
+                    "filesVisited": 120,
+                    "filesDiscovered": 100,
+                    "mediaCandidates": 20,
+                    "queuedWorkItems": 3,
+                    "detail": "cancelled by user"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<LibraryBoundaryEvent>(json).expect("deserialize cancelled event"),
+            event
+        );
+
+        let LibraryBoundaryEvent::SourceScanEvent(payload) = event else {
+            panic!("expected source scan event");
+        };
+        assert_eq!(payload.kind, SourceScanEventKind::SourceScanCancelled);
+        assert_eq!(payload.phase, ScanRunPhase::Interrupted);
     }
 
     #[test]

@@ -1,6 +1,72 @@
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct CancelRootScanRequest {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub scan_run_id: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+/// Discrimination of the cancel request outcome.
+/// Every variant describes a distinct renderer state
+/// and must not be collapsed into a generic not-active result.
+pub enum CancelRootScanStatus {
+    /// The cancellation token was set on the active job.
+    Accepted,
+    /// The scanRunId is unknown or unregistered.
+    NotFound,
+    /// The job has already reached a terminal state
+    /// (completed, cancelled, failed, or blocked).
+    AlreadyTerminal,
+    /// The job exists but cooperative cancellation has
+    /// not been implemented yet for the current scan phase.
+    NotCancelable,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct CancelRootScanReply {
+    pub status: CancelRootScanStatus,
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -199,6 +265,7 @@ pub enum LibraryRootCommand {
     StartRootScan(StartRootScanRequest),
     ReadLocalRoots(ReadLocalRootsRequest),
     UnregisterLocalRoot(UnregisterLocalRootRequest),
+    CancelRootScan(CancelRootScanRequest),
 }
 
 #[derive(
@@ -218,11 +285,13 @@ pub enum LibraryRootReply {
     StartRootScan(StartRootScanReply),
     ReadLocalRoots(ReadLocalRootsReply),
     UnregisterLocalRoot(UnregisterLocalRootReply),
+    CancelRootScan(CancelRootScanReply),
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
+        CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus,
         LibraryRootCommand, LibraryRootReply, LocalRoot, LocalRootAvailability,
         ReadLocalRootsReply, ReadLocalRootsRequest, RegisterLocalRootReply,
         RegisterLocalRootRequest, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
@@ -349,6 +418,94 @@ mod tests {
                     "unregistered": true
                 }
             })
+        );
+    }
+
+    #[test]
+    fn cancel_root_scan_command_serializes_with_tagged_shape() {
+        let cancel = LibraryRootCommand::CancelRootScan(CancelRootScanRequest {
+            scan_run_id: 42,
+        });
+
+        assert_eq!(
+            serde_json::to_value(&cancel).expect("serialize cancel command"),
+            json!({
+                "type": "cancelRootScan",
+                "payload": {
+                    "scanRunId": "42"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<LibraryRootCommand>(
+                serde_json::to_value(cancel.clone()).expect("serialize")
+            )
+            .expect("deserialize cancel command"),
+            cancel
+        );
+    }
+
+    #[test]
+    fn cancel_root_scan_reply_serializes_each_status_variant() {
+        let accepted =
+            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::Accepted });
+        let not_found =
+            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::NotFound });
+        let already_terminal =
+            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::AlreadyTerminal });
+        let not_cancelable =
+            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::NotCancelable });
+
+        assert_eq!(
+            serde_json::to_value(&accepted).expect("serialize accepted"),
+            json!({
+                "type": "cancelRootScan",
+                "payload": {
+                    "status": "accepted"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&not_found).expect("serialize notFound"),
+            json!({
+                "type": "cancelRootScan",
+                "payload": {
+                    "status": "notFound"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&already_terminal).expect("serialize alreadyTerminal"),
+            json!({
+                "type": "cancelRootScan",
+                "payload": {
+                    "status": "alreadyTerminal"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&not_cancelable).expect("serialize notCancelable"),
+            json!({
+                "type": "cancelRootScan",
+                "payload": {
+                    "status": "notCancelable"
+                }
+            })
+        );
+
+        assert_eq!(
+            serde_json::from_value::<LibraryRootReply>(
+                serde_json::to_value(accepted.clone()).expect("serialize")
+            )
+            .expect("deserialize accepted"),
+            accepted
+        );
+        assert_eq!(
+            serde_json::from_value::<LibraryRootReply>(
+                serde_json::to_value(not_found.clone()).expect("serialize")
+            )
+            .expect("deserialize notFound"),
+            not_found
         );
     }
 }

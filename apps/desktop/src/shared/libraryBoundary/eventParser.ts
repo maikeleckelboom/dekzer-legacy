@@ -6,6 +6,7 @@ export type AppSourceScanEventKind =
   | 'sourceScanCompleted'
   | 'sourceScanFailed'
   | 'sourceScanBlocked'
+  | 'sourceScanCancelled'
 
 export type AppSourceScanEvent = {
   readonly eventSequence: number
@@ -46,7 +47,8 @@ function isAppSourceScanEventKind(value: unknown): value is AppSourceScanEventKi
       'sourceScanProgressed',
       'sourceScanCompleted',
       'sourceScanFailed',
-      'sourceScanBlocked'
+      'sourceScanBlocked',
+      'sourceScanCancelled'
     ].includes(value)
   )
 }

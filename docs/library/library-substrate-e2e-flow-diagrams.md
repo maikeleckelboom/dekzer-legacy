@@ -501,16 +501,17 @@ Invalidation marks branch cache stale and schedules bounded refresh; it does not
 
 Conceptual `childRowState` vocabulary:
 
-These names are conceptual unless the boundary schema defines them exactly. Implementation must use the schema-defined
-values or add a deliberate protocol change.
+These names are projection/product concepts. The current boundary schema defines
+exactly three wire values: `unknown`, `hasChildRows`, `noChildRows`. The richer
+states below are target scope expansion, not current wire values.
 
-| State                   | Meaning                                                                                                  |
-|-------------------------|----------------------------------------------------------------------------------------------------------|
-| `has_children_unloaded` | The row can expand, but the child window is not loaded in the renderer cache.                            |
-| `has_children_loaded`   | The row can expand and a current child window is loaded.                                                 |
-| `no_children`           | The authoritative read says the row has no children in this tree projection.                             |
-| `scan_pending`          | Expandability or child completeness is not yet authoritative because coverage is incomplete.             |
-| `unknown`               | The service cannot currently prove child state because of stale, unavailable, or failed read conditions. |
+| State                   | Meaning                                                                                                  | Schema status            |
+|-------------------------|----------------------------------------------------------------------------------------------------------|--------------------------|
+| `has_children_unloaded` | The row can expand, but the child window is not loaded in the renderer cache.                            | projection concept only  |
+| `has_children_loaded`   | The row can expand and a current child window is loaded.                                                 | projection concept only  |
+| `no_children`           | The authoritative read says the row has no children in this tree projection.                             | maps to `noChildRows`    |
+| `scan_pending`          | Expandability or child completeness is not yet authoritative because coverage is incomplete.             | target scope expansion   |
+| `unknown`               | The service cannot currently prove child state because of stale, unavailable, or failed read conditions. | maps to `unknown`         |
 
 Implementation notes:
 
@@ -555,7 +556,9 @@ Governing law:
 Snapshot invalidation carries boundary-defined scope identity. It does not carry replacement rows. Renderer uses
 invalidation to request fresh authoritative snapshots through Main.
 
-Current-schema caution:
+Current-schema `MaintainedSnapshotScope` values are `NavigationRows` and `LibraryBrowser`.
+
+The finer scopes shown in the invalidation diagrams (source visible state, library tree children by parent directory, selected contents scope identity) are target scope expansion. They are not current wire values.
 
 - If the schema does not define SourceLifecycle invalidation, do not name it as if it exists. Use the actual
   invalidation scope that causes source visible state to be reread.

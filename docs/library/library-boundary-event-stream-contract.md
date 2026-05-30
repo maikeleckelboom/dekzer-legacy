@@ -89,7 +89,7 @@ Describes scan job lifecycle events for a source root.
 |----------------------|-----------------------------------------------------------------|
 | `eventSequence`      | Monotonic event sequence.                                       |
 | `occurredAtMs`       | Wall-clock timestamp.                                           |
-| `kind`               | `sourceScanStarted`, `sourceScanProgressed`, `sourceScanCompleted`, `sourceScanFailed`, `sourceScanBlocked`. |
+| `kind`               | `sourceScanStarted`, `sourceScanProgressed`, `sourceScanCompleted`, `sourceScanFailed`, `sourceScanBlocked`, `sourceScanCancelled`. |
 | `rootId`             | Source root identity.                                           |
 | `scanRunId`          | Scan run identity.                                              |
 | `phase`              | `scanning`, `blocked`, `interrupted`.                           |

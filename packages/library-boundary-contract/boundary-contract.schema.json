@@ -49,6 +49,53 @@
         "libraryAssetId"
       ]
     },
+    "CancelRootScanReply": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/CancelRootScanStatus"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "CancelRootScanRequest": {
+      "type": "object",
+      "properties": {
+        "scanRunId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scanRunId"
+      ]
+    },
+    "CancelRootScanStatus": {
+      "description": "Discrimination of the cancel request outcome.\nEvery variant describes a distinct renderer state\nand must not be collapsed into a generic not-active result.",
+      "oneOf": [
+        {
+          "description": "The cancellation token was set on the active job.",
+          "type": "string",
+          "const": "accepted"
+        },
+        {
+          "description": "The scanRunId is unknown or unregistered.",
+          "type": "string",
+          "const": "notFound"
+        },
+        {
+          "description": "The job has already reached a terminal state\n(completed, cancelled, failed, or blocked).",
+          "type": "string",
+          "const": "alreadyTerminal"
+        },
+        {
+          "description": "The job exists but cooperative cancellation has\nnot been implemented yet for the current scan phase.",
+          "type": "string",
+          "const": "notCancelable"
+        }
+      ]
+    },
     "ChildRowState": {
       "type": "string",
       "enum": [
@@ -1433,6 +1480,22 @@
             "type",
             "payload"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CancelRootScanRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "cancelRootScan"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
         }
       ]
     },
@@ -1495,6 +1558,22 @@
             "type": {
               "type": "string",
               "const": "unregisterLocalRoot"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CancelRootScanReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "cancelRootScan"
             }
           },
           "required": [
@@ -3175,7 +3254,8 @@
         "sourceScanProgressed",
         "sourceScanCompleted",
         "sourceScanFailed",
-        "sourceScanBlocked"
+        "sourceScanBlocked",
+        "sourceScanCancelled"
       ]
     },
     "StartRootScanReply": {
