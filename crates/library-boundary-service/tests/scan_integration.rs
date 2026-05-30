@@ -7,10 +7,11 @@ use library_boundary_protocol::{
     LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
     LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
     LibraryTreePresenceState, MaintainedSnapshotScope, NavigationRow, NavigationRowFamily,
-    NavigationRowKind, ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenReply,
-    ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
-    RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand, SnapshotReadReply,
-    SourceScanEventKind, StartRootScanReply, StartRootScanRequest,
+    NavigationRowKind, ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
+    ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest,
+    RegisterLocalRootReply, RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand,
+    SnapshotReadReply, SourceScanEvent, SourceScanEventKind, StartRootScanReply,
+    StartRootScanRequest,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -65,37 +66,59 @@ fn cancel_scan(service: &LibraryBoundaryService, scan_run_id: i64) -> CancelRoot
     }
 }
 
-fn wait_for_scan_completion(service: &LibraryBoundaryService, root_id: i64) -> bool {
-    let mut cursor: Option<i64> = None;
-    for _ in 0..30 {
-        let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
-            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
-                last_seen_event_sequence: cursor,
-                max_events: 32,
-            }),
-        ));
-        let reply = match outcome {
-            CommandOutcome::Success(env) => match env.reply {
-                CommandReply::LibraryBoundaryEvents(
-                    library_boundary_protocol::LibraryBoundaryEventStreamReply::ReadAfter(r),
-                ) => r,
-                other => panic!("Expected event stream reply, got {other:?}"),
-            },
-            CommandOutcome::Error(_) => continue,
-        };
-        cursor = reply.latest_event_sequence;
-        let completed = reply.events.iter().any(|e| {
-            let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
-                return false;
-            };
-            se.kind == SourceScanEventKind::SourceScanCompleted && se.root_id == root_id
-        });
-        if completed {
-            return true;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
+fn read_boundary_events_after(
+    service: &LibraryBoundaryService,
+    cursor: Option<i64>,
+    max_events: usize,
+) -> ReadLibraryBoundaryEventsAfterReply {
+    let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
+        LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+            last_seen_event_sequence: cursor,
+            max_events,
+        }),
+    ));
+    match outcome {
+        CommandOutcome::Success(env) => match env.reply {
+            CommandReply::LibraryBoundaryEvents(LibraryBoundaryEventStreamReply::ReadAfter(r)) => r,
+            other => panic!("Expected event stream reply, got {other:?}"),
+        },
+        CommandOutcome::Error(env) => panic!("read boundary events failed: {:?}", env.error),
     }
-    false
+}
+
+fn wait_for_scan_event<F>(
+    service: &LibraryBoundaryService,
+    max_events: usize,
+    mut matches_event: F,
+) -> Option<SourceScanEvent>
+where
+    F: FnMut(&SourceScanEvent) -> bool,
+{
+    let mut cursor: Option<i64> = None;
+    for _ in 0..60 {
+        let reply = read_boundary_events_after(service, cursor, max_events);
+        cursor = reply.latest_event_sequence;
+
+        for event in reply.events {
+            let LibraryBoundaryEvent::SourceScanEvent(scan_event) = event else {
+                continue;
+            };
+            if matches_event(&scan_event) {
+                return Some(scan_event);
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    None
+}
+
+fn wait_for_scan_completion(service: &LibraryBoundaryService, root_id: i64) -> bool {
+    wait_for_scan_event(service, 32, |se| {
+        se.kind == SourceScanEventKind::SourceScanCompleted && se.root_id == root_id
+    })
+    .is_some()
 }
 
 fn expect_command_reply(outcome: CommandOutcome, context: &str) -> CommandReply {
@@ -259,6 +282,25 @@ fn scan_with_unknown_root_id_returns_current_store_error() {
         "Current store error should mention root does not exist, got: {}",
         error.error,
     );
+}
+
+#[test]
+fn blocked_scan_event_carries_started_scan_run_id() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let missing_root = tempdir.path().join("missing-after-register");
+    fs::create_dir_all(&missing_root).expect("create root before registration");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &missing_root);
+    fs::remove_dir_all(&missing_root).expect("remove root after registration");
+
+    let scanned = start_scan(&service, registered.root_id);
+    let blocked = wait_for_scan_event(&service, 32, |se| {
+        se.kind == SourceScanEventKind::SourceScanBlocked && se.root_id == registered.root_id
+    })
+    .expect("SourceScanBlocked must be published for an unavailable root");
+
+    assert_eq!(blocked.scan_run_id, scanned.scan_run_id);
 }
 
 #[test]
@@ -639,7 +681,7 @@ fn scan_publishes_maintained_snapshot_invalidations_on_completion() {
     let service = open_service(&tempdir);
     let registered = register_root(&service, &music_root);
 
-    start_scan(&service, registered.root_id);
+    let scanned = start_scan(&service, registered.root_id);
 
     let mut cursor: Option<i64> = None;
     let mut has_navigation_invalidation = false;
@@ -690,6 +732,13 @@ fn scan_publishes_maintained_snapshot_invalidations_on_completion() {
     assert!(
         has_navigation_invalidation,
         "MaintainedSnapshotInvalidated for NavigationRows must be published after scan"
+    );
+
+    let cancel_after_publication = cancel_scan(&service, scanned.scan_run_id);
+    assert_eq!(
+        cancel_after_publication.status,
+        CancelRootScanStatus::AlreadyTerminal,
+        "registry must not report terminal until scan event and invalidations are published"
     );
 }
 
@@ -861,40 +910,10 @@ fn cancel_active_scan_cleans_registry_and_second_cancel_returns_already_terminal
     let first_cancel = cancel_scan(&service, scanned.scan_run_id);
     assert_eq!(first_cancel.status, CancelRootScanStatus::Accepted);
 
-    let mut cancelled = false;
-    let mut cursor: Option<i64> = None;
-    for _ in 0..60 {
-        let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
-            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
-                last_seen_event_sequence: cursor,
-                max_events: 64,
-            }),
-        ));
-        let reply = match outcome {
-            CommandOutcome::Success(env) => match env.reply {
-                CommandReply::LibraryBoundaryEvents(
-                    LibraryBoundaryEventStreamReply::ReadAfter(r),
-                ) => r,
-                other => panic!("Expected event stream reply, got {other:?}"),
-            },
-            CommandOutcome::Error(_) => continue,
-        };
-        cursor = reply.latest_event_sequence;
-        if reply.events.iter().any(|e| {
-            let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
-                return false;
-            };
-            se.kind == SourceScanEventKind::SourceScanCancelled
-                && se.scan_run_id == scanned.scan_run_id
-        }) {
-            cancelled = true;
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    assert!(cancelled, "SourceScanCancelled must be published");
-
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    let cancelled = wait_for_scan_event(&service, 64, |se| {
+        se.kind == SourceScanEventKind::SourceScanCancelled && se.scan_run_id == scanned.scan_run_id
+    });
+    assert!(cancelled.is_some(), "SourceScanCancelled must be published");
 
     let second_cancel = cancel_scan(&service, scanned.scan_run_id);
     assert_eq!(

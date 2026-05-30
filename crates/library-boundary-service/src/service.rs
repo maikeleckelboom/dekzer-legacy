@@ -31,7 +31,7 @@ struct ActiveScanJob {
     #[allow(dead_code)]
     root_id: i64,
     scan_run_id: i64,
-    completed: Arc<AtomicBool>,
+    terminal_publication_complete: Arc<AtomicBool>,
     _handle: JoinHandle<()>,
 }
 
@@ -51,6 +51,13 @@ impl ScanJobRegistry {
         let id = self.next_scan_run_id;
         self.next_scan_run_id += 1;
         id
+    }
+
+    fn cleanup_terminal_scan(&mut self, root_id: i64) {
+        if let Some(job) = self.jobs.remove(&root_id) {
+            self.scan_run_id_to_root_id.remove(&job.scan_run_id);
+            self.terminal_scan_run_ids.insert(job.scan_run_id);
+        }
     }
 }
 
@@ -178,16 +185,16 @@ impl LibraryBoundaryService {
         let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
 
         if let Some(existing) = registry.jobs.get(&root_id) {
-            if !existing.completed.load(Ordering::Acquire) {
+            if !existing
+                .terminal_publication_complete
+                .load(Ordering::Acquire)
+            {
                 return Err(protocol::ProtocolError::InvalidRequest {
                     detail: "A scan is already running for this root".to_string(),
                 });
             }
 
-            let scan_run_id = existing.scan_run_id;
-            registry.jobs.remove(&root_id);
-            registry.scan_run_id_to_root_id.remove(&scan_run_id);
-            registry.terminal_scan_run_ids.insert(scan_run_id);
+            registry.cleanup_terminal_scan(root_id);
         }
 
         self.durable_store
@@ -200,8 +207,8 @@ impl LibraryBoundaryService {
 
         let store = self.durable_store.clone();
         let events = self.session_events.clone();
-        let completed = Arc::new(AtomicBool::new(false));
-        let thread_completed = Arc::clone(&completed);
+        let terminal_publication_complete = Arc::new(AtomicBool::new(false));
+        let thread_terminal_publication_complete = Arc::clone(&terminal_publication_complete);
 
         events.publish_scan_event(ScanEventInput {
             kind: library_boundary_protocol::SourceScanEventKind::SourceScanStarted,
@@ -223,7 +230,7 @@ impl LibraryBoundaryService {
                 root_id,
                 scan_run_id,
                 scan_started_at_ms,
-                thread_completed,
+                thread_terminal_publication_complete,
             );
         });
 
@@ -233,7 +240,7 @@ impl LibraryBoundaryService {
             ActiveScanJob {
                 root_id,
                 scan_run_id,
-                completed,
+                terminal_publication_complete,
                 _handle: handle,
             },
         );
@@ -270,10 +277,8 @@ impl LibraryBoundaryService {
             }
         };
 
-        if job.completed.load(Ordering::Acquire) {
-            registry.jobs.remove(&root_id);
-            registry.scan_run_id_to_root_id.remove(&scan_run_id);
-            registry.terminal_scan_run_ids.insert(scan_run_id);
+        if job.terminal_publication_complete.load(Ordering::Acquire) {
+            registry.cleanup_terminal_scan(root_id);
             return Ok(protocol::CancelRootScanReply {
                 status: protocol::CancelRootScanStatus::AlreadyTerminal,
             });
@@ -678,7 +683,7 @@ fn execute_scan_job(
     root_id: i64,
     scan_run_id: i64,
     scan_started_at_ms: i64,
-    completed: Arc<AtomicBool>,
+    terminal_publication_complete: Arc<AtomicBool>,
 ) {
     let committed_chunk_count = Arc::new(AtomicUsize::new(0));
     let chunk_count = Arc::clone(&committed_chunk_count);
@@ -710,20 +715,23 @@ fn execute_scan_job(
 
     match result {
         Ok(scan) => {
-            completed.store(true, Ordering::Release);
-            events.publish_scan_event(ScanEventInput {
-                kind: library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
-                root_id,
-                scan_run_id,
-                phase: library_boundary_protocol::ScanRunPhase::Scanning,
-                directories_visited: 0,
-                files_visited: scan.discovered_file_count,
-                files_discovered: scan.discovered_file_count,
-                media_candidates: scan.discovered_file_count,
-                queued_work_items: scan.queued_source_work_items,
-                detail: None,
-            });
-            publish_job_maintained_invalidations(&store, &events);
+            publish_job_terminal_scan_event(
+                &store,
+                &events,
+                &terminal_publication_complete,
+                ScanEventInput {
+                    kind: library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
+                    root_id,
+                    scan_run_id,
+                    phase: library_boundary_protocol::ScanRunPhase::Scanning,
+                    directories_visited: 0,
+                    files_visited: scan.discovered_file_count,
+                    files_discovered: scan.discovered_file_count,
+                    media_candidates: scan.discovered_file_count,
+                    queued_work_items: scan.queued_source_work_items,
+                    detail: None,
+                },
+            );
         }
         Err(error) => {
             if matches!(
@@ -731,36 +739,46 @@ fn execute_scan_job(
                 library_store_sqlite::LibrarySqliteError::RootWorkCancelled { .. }
                     | library_store_sqlite::LibrarySqliteError::RootWorkAdmissionDenied { .. }
             ) {
-                completed.store(true, Ordering::Release);
-                publish_job_scan_cancelled(
+                publish_job_terminal_scan_event(
+                    &store,
                     &events,
-                    root_id,
-                    scan_run_id,
-                    committed_chunk_count.load(Ordering::Relaxed),
+                    &terminal_publication_complete,
+                    job_scan_cancelled_event(
+                        root_id,
+                        scan_run_id,
+                        committed_chunk_count.load(Ordering::Relaxed),
+                    ),
                 );
-                publish_job_maintained_invalidations(&store, &events);
             } else {
-                completed.store(true, Ordering::Release);
-                publish_job_scan_failed_or_blocked(&events, root_id, &error);
+                publish_job_terminal_scan_event(
+                    &store,
+                    &events,
+                    &terminal_publication_complete,
+                    job_scan_failed_or_blocked_event(root_id, scan_run_id, &error),
+                );
             }
         }
     }
 }
 
-fn publish_job_maintained_invalidations(
+fn publish_job_terminal_scan_event(
     store: &SqliteDurableStore,
     events: &LibraryBoundaryEventStream,
+    terminal_publication_complete: &AtomicBool,
+    event: ScanEventInput,
 ) {
-    if let Ok(revisions) = store.read_maintained_read_model_revisions() {
-        events.publish_revisions(map_maintained_read_model_revisions(revisions));
-    }
+    let revisions = store
+        .read_maintained_read_model_revisions()
+        .map(map_maintained_read_model_revisions)
+        .unwrap_or_default();
+    events.publish_terminal_scan_event(event, revisions, terminal_publication_complete);
 }
 
-fn publish_job_scan_failed_or_blocked(
-    events: &LibraryBoundaryEventStream,
+fn job_scan_failed_or_blocked_event(
     root_id: i64,
+    scan_run_id: i64,
     error: &library_store_sqlite::LibrarySqliteError,
-) {
+) -> ScanEventInput {
     use library_store_sqlite::CanonicalErrorCode;
 
     let detail = error.to_string();
@@ -771,10 +789,10 @@ fn publish_job_scan_failed_or_blocked(
     );
 
     if is_blocked {
-        events.publish_scan_event(ScanEventInput {
+        ScanEventInput {
             kind: library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
             root_id,
-            scan_run_id: 0,
+            scan_run_id,
             phase: library_boundary_protocol::ScanRunPhase::Blocked,
             directories_visited: 0,
             files_visited: 0,
@@ -782,12 +800,12 @@ fn publish_job_scan_failed_or_blocked(
             media_candidates: 0,
             queued_work_items: 0,
             detail: Some(detail),
-        });
+        }
     } else {
-        events.publish_scan_event(ScanEventInput {
+        ScanEventInput {
             kind: library_boundary_protocol::SourceScanEventKind::SourceScanFailed,
             root_id,
-            scan_run_id: 0,
+            scan_run_id,
             phase: library_boundary_protocol::ScanRunPhase::Scanning,
             directories_visited: 0,
             files_visited: 0,
@@ -795,18 +813,17 @@ fn publish_job_scan_failed_or_blocked(
             media_candidates: 0,
             queued_work_items: 0,
             detail: Some(detail),
-        });
+        }
     }
 }
 
-fn publish_job_scan_cancelled(
-    events: &LibraryBoundaryEventStream,
+fn job_scan_cancelled_event(
     root_id: i64,
     scan_run_id: i64,
     committed_chunks: usize,
-) {
+) -> ScanEventInput {
     let approx_files = committed_chunks * 256;
-    events.publish_scan_event(ScanEventInput {
+    ScanEventInput {
         kind: library_boundary_protocol::SourceScanEventKind::SourceScanCancelled,
         root_id,
         scan_run_id,
@@ -817,7 +834,7 @@ fn publish_job_scan_cancelled(
         media_candidates: 0,
         queued_work_items: 0,
         detail: Some("cancelled by user".to_string()),
-    });
+    }
 }
 
 fn require_playlist_id(value: i64, field_name: &str) -> protocol::ProtocolResult<PlaylistId> {

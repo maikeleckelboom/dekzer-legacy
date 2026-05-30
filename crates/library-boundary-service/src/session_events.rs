@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, VecDeque};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use library_boundary_protocol::{
@@ -58,6 +59,22 @@ impl LibraryBoundaryEventStream {
     pub(crate) fn publish_scan_event(&self, event: ScanEventInput) {
         let mut state = self.state.lock().expect("boundary event stream poisoned");
         state.publish_scan_event(event);
+    }
+
+    pub(crate) fn publish_terminal_scan_event<I>(
+        &self,
+        event: ScanEventInput,
+        revisions: I,
+        terminal_publication_complete: &AtomicBool,
+    ) where
+        I: IntoIterator<Item = MaintainedSnapshotScopeRevision>,
+    {
+        let mut state = self.state.lock().expect("boundary event stream poisoned");
+        state.publish_scan_event(event);
+        for revision in revisions {
+            state.publish_revision(revision);
+        }
+        terminal_publication_complete.store(true, Ordering::Release);
     }
 
     pub(crate) fn read_after(
