@@ -28,7 +28,12 @@ a Main-owned event pump, `bootstrapPrepared`, finer invalidation scopes, or a fu
 worker pool. The renderer polls `ReadAfter` directly.
 
 `CancelRootScan` is wired through the desktop Main IPC boundary and exposed as a typed renderer API
-method. No user-facing cancel UI exists in this pass.
+method. The desktop boundary cancellation path has a real vertical proof against the Rust service
+(`apps/desktop/tests/integration/main/rootScanCancelReal.test.ts`): it starts a real stdio
+transport, registers a large root, starts a scan, cancels through `cancelRootScanThroughHost`,
+observes `accepted` from the command result, reads events through the existing `ReadAfter` path,
+and verifies `SourceScanCancelled` with `phase: interrupted` is published while
+`SourceScanCompleted` is not. No user-facing cancel UI exists in this pass.
 
 These are ratified target concepts, not accidental names. This document defines the target
 architecture. Implementation must close gaps deliberately.
