@@ -13,6 +13,7 @@
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
+      "@dekzer/library-boundary-contract": ["../../packages/library-boundary-contract/index.ts"],
       "@renderer/*": ["src/renderer/*"]
     }
   }

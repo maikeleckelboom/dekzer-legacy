@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { refreshHierarchyForMaintainedSnapshotInvalidation } from '../../../../src/renderer/library/runtime/invalidationRefresh'
+import {
+  refreshHierarchyForMaintainedSnapshotInvalidation,
+  type InvalidationRefreshDependencies
+} from '../../../../src/renderer/library/runtime/invalidationRefresh'
 import type { AppMaintainedSnapshotInvalidatedEvent } from '../../../../src/shared/libraryBoundary/eventParser'
 
 describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
@@ -52,7 +55,7 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
   })
 })
 
-function testDependencies() {
+function testDependencies(): InvalidationRefreshDependencies {
   return {
     hierarchyRead: {
       refreshNavigationRows: vi.fn(async () => true),

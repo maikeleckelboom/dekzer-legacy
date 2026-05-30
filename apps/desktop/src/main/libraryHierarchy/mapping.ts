@@ -1,7 +1,4 @@
-import type {
-  LibraryTreeEntryPoint,
-  LibraryTreeNode
-} from '@dekzer/library-boundary-contract'
+import type { LibraryTreeEntryPoint, LibraryTreeNode } from '@dekzer/library-boundary-contract'
 
 import type { EntryPoint, ChildRow } from '../../shared/libraryHierarchy/readChildren'
 

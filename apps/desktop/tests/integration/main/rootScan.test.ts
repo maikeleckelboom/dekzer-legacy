@@ -238,14 +238,13 @@ describe('local root scan cancellation boundary', () => {
     const config = hostConfig()
 
     await expect(
-      cancelRootScanThroughHost(
-        await startedHostWithClient(config, createFakeClient()),
-        {},
-        noLog
-      )
+      cancelRootScanThroughHost(await startedHostWithClient(config, createFakeClient()), {}, noLog)
     ).resolves.toMatchObject({
       state: 'invalidRequest',
-      error: { code: 'invalidRequest' }
+      error: {
+        code: 'invalidRequest',
+        message: 'Cancel root scan scanRunId is invalid.'
+      }
     } satisfies Partial<CancelRootScanResult>)
 
     await expect(
@@ -256,7 +255,10 @@ describe('local root scan cancellation boundary', () => {
       )
     ).resolves.toMatchObject({
       state: 'invalidRequest',
-      error: { code: 'invalidRequest' }
+      error: {
+        code: 'invalidRequest',
+        message: 'Cancel root scan scanRunId is invalid.'
+      }
     } satisfies Partial<CancelRootScanResult>)
 
     await expect(
@@ -267,7 +269,10 @@ describe('local root scan cancellation boundary', () => {
       )
     ).resolves.toMatchObject({
       state: 'invalidRequest',
-      error: { code: 'invalidRequest' }
+      error: {
+        code: 'invalidRequest',
+        message: 'Cancel root scan requires a request object.'
+      }
     } satisfies Partial<CancelRootScanResult>)
   })
 

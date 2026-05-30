@@ -3,8 +3,8 @@ use rusqlite::{OptionalExtension, params};
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
-    LibraryTreeRowAdmission, is_image_media_class, is_primary_media_class, media_class_str_from_path,
-    library_tree_row_admission_predicate_sql_for_column,
+    LibraryTreeRowAdmission, is_image_media_class, is_primary_media_class,
+    library_tree_row_admission_predicate_sql_for_column, media_class_str_from_path,
 };
 use library_domain::SourcePresenceState;
 

@@ -25,9 +25,7 @@ describe('local root scan lifecycle', () => {
   })
 
   it('scans the root id returned by registration', async () => {
-    const runScan = vi.fn(async () =>
-      startedRootResult('scan-42')
-    )
+    const runScan = vi.fn(async () => startedRootResult('scan-42'))
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
@@ -82,8 +80,7 @@ describe('local root scan lifecycle', () => {
     const { rootActions, lifecycle } = testRootLifecycle(
       testRootApi({
         chooseAndRegisterLocal: async () => registeredChoice(),
-        runScan: async () =>
-          startedRootResult('scan-1')
+        runScan: async () => startedRootResult('scan-1')
       }),
       async () => false
     )
@@ -153,8 +150,7 @@ describe('local root scan lifecycle', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () => nextChoice(choices),
-        runScan: async () =>
-          startedRootResult('scan-1')
+        runScan: async () => startedRootResult('scan-1')
       })
     )
 
@@ -215,9 +211,7 @@ describe('local root scan lifecycle', () => {
     expect(rootActions.scanSummary.value).toBeUndefined()
     expect(scanRequests[1]).toEqual({ rootId: 'root-2' })
 
-    secondScan.resolve(
-      startedRootResult('scan-2')
-    )
+    secondScan.resolve(startedRootResult('scan-2'))
     await expect(pendingSecondAdd).resolves.toBe(true)
   })
 
@@ -451,8 +445,7 @@ describe('local root remove lifecycle', () => {
       testRootApi({
         chooseAndRegisterLocal: async () =>
           registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
-        runScan: async () =>
-          startedRootResult('scan-1')
+        runScan: async () => startedRootResult('scan-1')
       })
     )
 
@@ -608,6 +601,13 @@ function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRoo
         message: 'Local root read should not be called by this test.'
       }
     }),
+    cancelScan: async () => ({
+      state: 'cancelFailed',
+      error: {
+        code: 'cancelFailed',
+        message: 'Local root cancel should not be called by this test.'
+      }
+    }),
     unregisterLocalRoot: async () => ({
       state: 'unregistered',
       unregistered: true
@@ -663,9 +663,7 @@ function failedChoice(
   }
 }
 
-function startedRootResult(
-  scanRunId: string = 'scan-1'
-): LocalRootScanResult {
+function startedRootResult(scanRunId: string = 'scan-1'): LocalRootScanResult {
   return {
     state: 'started',
     scanRunId

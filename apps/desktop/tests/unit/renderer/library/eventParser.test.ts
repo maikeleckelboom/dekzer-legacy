@@ -11,24 +11,22 @@ describe('parseBoundaryEvent', () => {
   })
 
   it('rejects unknown event families as unsupported', () => {
-    expect(
-      parseBoundaryEvent({ type: 'unknownFamily', payload: {} })
-    ).toMatchObject({ type: 'unsupported' })
-    expect(
-      parseBoundaryEvent({ type: 'sourceScanEvent' })
-    ).toMatchObject({ type: 'unsupported' })
+    expect(parseBoundaryEvent({ type: 'unknownFamily', payload: {} })).toMatchObject({
+      type: 'unsupported'
+    })
+    expect(parseBoundaryEvent({ type: 'sourceScanEvent' })).toMatchObject({ type: 'unsupported' })
   })
 
   it('rejects sourceScanEvent with missing or invalid payload', () => {
-    expect(
-      parseBoundaryEvent({ type: 'sourceScanEvent', payload: null })
-    ).toMatchObject({ type: 'unsupported' })
-    expect(
-      parseBoundaryEvent({ type: 'sourceScanEvent', payload: undefined })
-    ).toMatchObject({ type: 'unsupported' })
-    expect(
-      parseBoundaryEvent({ type: 'sourceScanEvent', payload: 'not-an-object' })
-    ).toMatchObject({ type: 'unsupported' })
+    expect(parseBoundaryEvent({ type: 'sourceScanEvent', payload: null })).toMatchObject({
+      type: 'unsupported'
+    })
+    expect(parseBoundaryEvent({ type: 'sourceScanEvent', payload: undefined })).toMatchObject({
+      type: 'unsupported'
+    })
+    expect(parseBoundaryEvent({ type: 'sourceScanEvent', payload: 'not-an-object' })).toMatchObject(
+      { type: 'unsupported' }
+    )
   })
 
   it('rejects sourceScanEvent with invalid kind', () => {
@@ -556,9 +554,9 @@ describe('parseBoundaryEvent', () => {
   })
 
   it('handles unknown event families as unsupported', () => {
-    expect(
-      parseBoundaryEvent({ type: 'futureEventKind', payload: {} })
-    ).toMatchObject({ type: 'unsupported' })
+    expect(parseBoundaryEvent({ type: 'futureEventKind', payload: {} })).toMatchObject({
+      type: 'unsupported'
+    })
   })
 
   it('rejects sourceScanEvent with NaN eventSequence', () => {

@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@dekzer/library-boundary-client": "workspace:*",
+    "@dekzer/library-boundary-contract": "workspace:*",
     "@dekzer/library-boundary-stdio-transport": "workspace:*",
     "@electron-toolkit/utils": "^4.0.0",
     "@lucide/vue": "^1.16.0",

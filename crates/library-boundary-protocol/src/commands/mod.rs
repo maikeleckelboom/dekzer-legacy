@@ -77,20 +77,19 @@ mod tests {
         LibraryBoundaryEventStreamReply, LibraryRootCommand, LibraryRootReply,
         PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
         ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsReply, StartRootScanReply, StartRootScanRequest, SnapshotReadCommand,
-        SnapshotReadReply,
+        ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, StartRootScanReply,
+        StartRootScanRequest,
     };
     use serde_json::json;
 
     #[test]
     fn command_center_routes_maintained_and_playlist_command_families() {
-        let session_events =
-            CommandRequest::LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand::ReadAfter(
-                ReadLibraryBoundaryEventsAfterRequest {
-                    last_seen_event_sequence: None,
-                    max_events: 32,
-                },
-            ));
+        let session_events = CommandRequest::LibraryBoundaryEvents(
+            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+                last_seen_event_sequence: None,
+                max_events: 32,
+            }),
+        );
         let playlist_write = CommandRequest::PlaylistWrite(PlaylistWriteCommand::CreatePlaylist(
             CreatePlaylistRequest {
                 display_name: "Set".to_string(),
@@ -168,9 +167,10 @@ mod tests {
 
     #[test]
     fn command_reply_uses_same_tagged_family_shape() {
-        let reply = CommandReply::LibraryRoots(LibraryRootReply::StartRootScan(StartRootScanReply {
-            scan_run_id: 9,
-        }));
+        let reply =
+            CommandReply::LibraryRoots(LibraryRootReply::StartRootScan(StartRootScanReply {
+                scan_run_id: 9,
+            }));
 
         let json = serde_json::to_value(&reply).expect("serialize reply");
         assert_eq!(

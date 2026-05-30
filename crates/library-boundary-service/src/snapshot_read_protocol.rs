@@ -377,9 +377,17 @@ fn map_library_tree_node(
     let media_class = map_library_tree_file_media_class(&node)?;
     let child_row_state = match node.node_kind.as_str() {
         "directory" => {
-            match (directory_primary_media_state.as_ref(), directory_scan_state.as_ref()) {
-                (Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants), _) => Some(protocol::ChildRowState::HasChildRows),
-                (Some(protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants), Some(protocol::DirectoryScanState::Complete)) => Some(protocol::ChildRowState::NoChildRows),
+            match (
+                directory_primary_media_state.as_ref(),
+                directory_scan_state.as_ref(),
+            ) {
+                (Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants), _) => {
+                    Some(protocol::ChildRowState::HasChildRows)
+                }
+                (
+                    Some(protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants),
+                    Some(protocol::DirectoryScanState::Complete),
+                ) => Some(protocol::ChildRowState::NoChildRows),
                 _ => Some(protocol::ChildRowState::Unknown),
             }
         }
@@ -424,9 +432,9 @@ fn map_library_tree_file_media_class(
     node: &store::StoreLiteralHierarchyNode,
 ) -> store::LibrarySqliteResult<Option<protocol::LibraryTreeFileMediaClass>> {
     match (node.node_kind.as_str(), node.media_class.as_deref()) {
-        ("file", Some(value)) => Ok(
-            protocol::LibraryTreeFileMediaClass::from_projection_value(value),
-        ),
+        ("file", Some(value)) => Ok(protocol::LibraryTreeFileMediaClass::from_projection_value(
+            value,
+        )),
         ("file", None) => Ok(None),
         ("directory", None) => Ok(None),
         ("directory", Some(_)) => Ok(None),
@@ -1084,9 +1092,7 @@ fn malformed_store_state(detail: impl Into<String>) -> store::LibrarySqliteError
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        map_library_tree_node, map_read_library_tree_children_reply,
-    };
+    use super::{map_library_tree_node, map_read_library_tree_children_reply};
     use library_boundary_protocol as protocol;
     use library_store_sqlite as store;
 

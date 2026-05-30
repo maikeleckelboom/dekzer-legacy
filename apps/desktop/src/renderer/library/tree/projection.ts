@@ -161,9 +161,7 @@ function projectNavigationRow(options: {
       id: nodeId,
       role: browserRowRoleForNavigationRow(options.row),
       label: formatSourceDisplayName(options.row.displayName),
-      ...(sourceUnavailableBadge === undefined
-        ? {}
-        : { badge: sourceUnavailableBadge }),
+      ...(sourceUnavailableBadge === undefined ? {} : { badge: sourceUnavailableBadge }),
       icon: 'source',
       detail: formatNavigationSourceDetail(options.row),
       ...projectSourceChildren({

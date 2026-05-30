@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  type ContentsBoundaryState
-} from '../../../../src/renderer/library/boundary/contentsRead'
+import { type ContentsBoundaryState } from '../../../../src/renderer/library/boundary/contentsRead'
 import type {
   BrowserState,
   DirectoryState,
@@ -528,10 +526,12 @@ function contentsResult(options: {
   readonly profile?: ContentsReadPolicy
 }): ContentsResult {
   const state = options.state ?? 'ready'
-  const policy = options.profile ?? {
-    mediaClasses: ['audio', 'video'],
-    rowProfile: { kind: 'primaryMedia' }
-  } satisfies ContentsReadPolicy
+  const policy =
+    options.profile ??
+    ({
+      mediaClasses: ['audio', 'video'],
+      rowProfile: { kind: 'primaryMedia' }
+    } satisfies ContentsReadPolicy)
   return {
     state,
     scope: { kind: 'source', sourceId: '7' },
@@ -577,24 +577,6 @@ function primaryMediaRow(
       ...(origin === 'libraryAsset' ? { album: 'Album' } : {}),
       prepReadinessSummary: origin === 'libraryAsset' ? 'notRequired' : 'underprepared'
     },
-    updatedAtMs: 100
-  }
-}
-
-function sourceFileRow(
-  sourceFileId: string,
-  label: string,
-  mediaClass: ContentsFileRow['mediaClass']
-): ContentsFileRow {
-  return {
-    id: `source-file:${sourceFileId}`,
-    sourceId: '7',
-    sourceFileId,
-    label,
-    relativePath: label,
-    fileName: label,
-    mediaClass,
-    presence: 'present',
     updatedAtMs: 100
   }
 }

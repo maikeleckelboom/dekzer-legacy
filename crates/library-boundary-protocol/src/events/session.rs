@@ -292,14 +292,12 @@ mod tests {
         }
 
         let library_asset_reads = [
-            SnapshotReadCommand::ReadLibraryTreeChildren(
-                ReadLibraryTreeChildrenRequest {
-                    entry_point: LibraryTreeEntryPoint::Source { source_id: 8 },
-                    parent_source_directory_id: None,
-                    offset: 0,
-                    limit: 100,
-                },
-            ),
+            SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
+                entry_point: LibraryTreeEntryPoint::Source { source_id: 8 },
+                parent_source_directory_id: None,
+                offset: 0,
+                limit: 100,
+            }),
             SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
                 ReadNavigationNodeLibraryBrowserWindowRequest {
                     navigation_row_id: 8,
@@ -559,7 +557,8 @@ mod tests {
             })
         );
         assert_eq!(
-            serde_json::from_value::<LibraryBoundaryEvent>(json).expect("deserialize cancelled event"),
+            serde_json::from_value::<LibraryBoundaryEvent>(json)
+                .expect("deserialize cancelled event"),
             event
         );
 

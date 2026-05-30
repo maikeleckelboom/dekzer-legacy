@@ -11,18 +11,12 @@ import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
 import { registerLocalRoot } from '../../../src/main/libraryRoots/registerLocalRoot'
 import { runLocalRootScanThroughHost } from '../../../src/main/libraryRoots/runScan'
 import { cancelRootScanThroughHost } from '../../../src/main/libraryRoots/cancelScan'
-import type {
-  LocalRootScanResult,
-  LocalRootScanErrorResult
-} from '../../../src/shared/libraryRoots/runScan'
+import type { LocalRootScanResult } from '../../../src/shared/libraryRoots/runScan'
 import type {
   CancelRootScanResult,
   CancelRootScanAcceptedResult
 } from '../../../src/shared/libraryRoots/cancelScan'
-import type {
-  LocalRootRegistrationResult,
-  LocalRootRegisteredResult
-} from '../../../src/shared/libraryRoots/registerLocalRoot'
+import type { LocalRootRegistrationResult } from '../../../src/shared/libraryRoots/registerLocalRoot'
 import { silentLogger } from '../../support/libraryBoundary'
 
 const boundaryStdioBinaryPathEnvVar = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
@@ -33,9 +27,7 @@ function resolveBinaryPath(): string {
     return resolve(envPath)
   }
   const executableName =
-    process.platform === 'win32'
-      ? 'library-boundary-stdio.exe'
-      : 'library-boundary-stdio'
+    process.platform === 'win32' ? 'library-boundary-stdio.exe' : 'library-boundary-stdio'
   return resolve(process.cwd(), '..', '..', 'target', 'debug', executableName)
 }
 
@@ -111,7 +103,10 @@ describeOrSkip('real root scan cancellation through desktop boundary', () => {
         absolutePath: sourceRoot
       })) as LocalRootRegistrationResult
       expect(registration.state).toBe('registered')
-      const rootId = (registration as LocalRootRegisteredResult).root.rootId
+      if (registration.state !== 'registered') {
+        throw new Error('Expected local root registration to succeed.')
+      }
+      const rootId = registration.root.rootId
 
       const scanResult = (await runLocalRootScanThroughHost(
         host,
@@ -119,8 +114,10 @@ describeOrSkip('real root scan cancellation through desktop boundary', () => {
         noLog
       )) as LocalRootScanResult
       expect(scanResult.state).toBe('started')
-      const scanRunId = (scanResult as Exclude<LocalRootScanResult, LocalRootScanErrorResult>)
-        .scanRunId
+      if (scanResult.state !== 'started') {
+        throw new Error('Expected local root scan to start.')
+      }
+      const scanRunId = scanResult.scanRunId
 
       const cancelResult = (await cancelRootScanThroughHost(
         host,

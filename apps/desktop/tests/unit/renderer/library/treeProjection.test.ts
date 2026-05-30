@@ -109,13 +109,11 @@ describe('projectState', () => {
   it('projects literal file presentation from backend media class', () => {
     const projection = projectTree(
       browserState({
-        sourceChildren: loadedChildren(
-          [
-            fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
-            fileNode('13', 'clip.wav', { mediaClass: 'video' }),
-            fileNode('14', 'track.raw', { mediaClass: 'audio' })
-          ]
-        )
+        sourceChildren: loadedChildren([
+          fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
+          fileNode('13', 'clip.wav', { mediaClass: 'video' }),
+          fileNode('14', 'track.raw', { mediaClass: 'audio' })
+        ])
       })
     )
 
@@ -301,6 +299,7 @@ describe('projectState', () => {
             '12',
             {
               kind: 'failed',
+              errorCode: 'readFailed',
               detail: 'Unable to read children.'
             }
           ]

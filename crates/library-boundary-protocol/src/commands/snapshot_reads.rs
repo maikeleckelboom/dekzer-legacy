@@ -1628,15 +1628,15 @@ mod tests {
         LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
         LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
         LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
-        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage,
-        LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeFileMediaClass,
-        LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
-        LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
-        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
-        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage, LibraryTreeCoverageState,
+        LibraryTreeEntryPoint, LibraryTreeFileMediaClass, LibraryTreeNode, LibraryTreeNodeKind,
+        LibraryTreePresenceState, LibraryTreeWindow, LoadNavigationRowByStableKeyRequest,
+        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
+        NavigationRowSelectorKind, ReadLibraryAssetPreparationDetailRequest,
+        ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenReply,
+        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
+        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
+        SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
     };
     use serde_json::json;
@@ -1646,14 +1646,13 @@ mod tests {
         let navigation = SnapshotReadCommand::ReadNavigationRows(ReadNavigationRowsRequest {
             parent_navigation_row_id: Some(7),
         });
-        let library_tree = SnapshotReadCommand::ReadLibraryTreeChildren(
-            ReadLibraryTreeChildrenRequest {
+        let library_tree =
+            SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
                 parent_source_directory_id: None,
                 offset: 0,
                 limit: 50,
-            },
-        );
+            });
         let navigation_node = SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
             ReadNavigationNodeLibraryBrowserWindowRequest {
                 navigation_row_id: 4,
@@ -1688,14 +1687,12 @@ mod tests {
         ));
         assert!(matches!(
             library_tree,
-            SnapshotReadCommand::ReadLibraryTreeChildren(
-                ReadLibraryTreeChildrenRequest {
-                    entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
-                    parent_source_directory_id: None,
-                    offset: 0,
-                    limit: 50,
-                },
-            )
+            SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
+                entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
+                parent_source_directory_id: None,
+                offset: 0,
+                limit: 50,
+            },)
         ));
         assert!(matches!(
             navigation_node,
@@ -1819,43 +1816,42 @@ mod tests {
 
     #[test]
     fn library_tree_children_are_not_asset_browser_rows() {
-        let reply =
-            SnapshotReadReply::LibraryTreeChildren(ReadLibraryTreeChildrenReply {
-                window: Some(LibraryTreeWindow {
-                    entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
+        let reply = SnapshotReadReply::LibraryTreeChildren(ReadLibraryTreeChildrenReply {
+            window: Some(LibraryTreeWindow {
+                entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
+                parent_source_directory_id: None,
+                offset: 0,
+                limit: 25,
+                total_rows: 1,
+                coverage: LibraryTreeCoverage {
+                    state: LibraryTreeCoverageState::Scanning,
+                    recursive_scope_complete: false,
+                    empty_result_authoritative: false,
+                    detail: Some("Still indexing.".to_string()),
+                },
+                rows: vec![LibraryTreeNode {
+                    node_kind: LibraryTreeNodeKind::Directory,
+                    source_id: 7,
+                    source_directory_id: Some(11),
+                    source_file_id: None,
                     parent_source_directory_id: None,
-                    offset: 0,
-                    limit: 25,
-                    total_rows: 1,
-                    coverage: LibraryTreeCoverage {
-                        state: LibraryTreeCoverageState::Scanning,
-                        recursive_scope_complete: false,
-                        empty_result_authoritative: false,
-                        detail: Some("Still indexing.".to_string()),
-                    },
-                    rows: vec![LibraryTreeNode {
-                        node_kind: LibraryTreeNodeKind::Directory,
-                        source_id: 7,
-                        source_directory_id: Some(11),
-                        source_file_id: None,
-                        parent_source_directory_id: None,
-                        relative_path: "Albums".to_string(),
-                        display_name: "Albums".to_string(),
-                        media_class: None,
-                        presence_state: LibraryTreePresenceState::Present,
-                        size_bytes: None,
-                        modified_at_ns: None,
-                        updated_at_ms: 100,
-                        has_child_directories: Some(true),
-                        directory_primary_media_state: Some(
-                            DirectoryPrimaryMediaState::HasPrimaryMediaDescendants,
-                        ),
-                        directory_image_media_state: Some(DirectoryImageMediaState::Unknown),
-                        directory_scan_state: Some(DirectoryScanState::Scanning),
-                        child_row_state: Some(ChildRowState::Unknown),
-                    }],
-                }),
-            });
+                    relative_path: "Albums".to_string(),
+                    display_name: "Albums".to_string(),
+                    media_class: None,
+                    presence_state: LibraryTreePresenceState::Present,
+                    size_bytes: None,
+                    modified_at_ns: None,
+                    updated_at_ms: 100,
+                    has_child_directories: Some(true),
+                    directory_primary_media_state: Some(
+                        DirectoryPrimaryMediaState::HasPrimaryMediaDescendants,
+                    ),
+                    directory_image_media_state: Some(DirectoryImageMediaState::Unknown),
+                    directory_scan_state: Some(DirectoryScanState::Scanning),
+                    child_row_state: Some(ChildRowState::Unknown),
+                }],
+            }),
+        });
 
         let json = serde_json::to_value(&reply).expect("serialize library tree reply");
         assert_eq!(
@@ -1914,41 +1910,40 @@ mod tests {
 
     #[test]
     fn library_tree_file_media_class_serializes_as_media_class() {
-        let reply =
-            SnapshotReadReply::LibraryTreeChildren(ReadLibraryTreeChildrenReply {
-                window: Some(LibraryTreeWindow {
-                    entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
+        let reply = SnapshotReadReply::LibraryTreeChildren(ReadLibraryTreeChildrenReply {
+            window: Some(LibraryTreeWindow {
+                entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
+                parent_source_directory_id: None,
+                offset: 0,
+                limit: 25,
+                total_rows: 1,
+                coverage: LibraryTreeCoverage {
+                    state: LibraryTreeCoverageState::Complete,
+                    recursive_scope_complete: true,
+                    empty_result_authoritative: false,
+                    detail: Some("Complete.".to_string()),
+                },
+                rows: vec![LibraryTreeNode {
+                    node_kind: LibraryTreeNodeKind::File,
+                    source_id: 7,
+                    source_directory_id: None,
+                    source_file_id: Some(31),
                     parent_source_directory_id: None,
-                    offset: 0,
-                    limit: 25,
-                    total_rows: 1,
-                    coverage: LibraryTreeCoverage {
-                        state: LibraryTreeCoverageState::Complete,
-                        recursive_scope_complete: true,
-                        empty_result_authoritative: false,
-                        detail: Some("Complete.".to_string()),
-                    },
-                    rows: vec![LibraryTreeNode {
-                        node_kind: LibraryTreeNodeKind::File,
-                        source_id: 7,
-                        source_directory_id: None,
-                        source_file_id: Some(31),
-                        parent_source_directory_id: None,
-                        relative_path: "cover.mp3".to_string(),
-                        display_name: "cover.mp3".to_string(),
-                        media_class: Some(LibraryTreeFileMediaClass::Image),
-                        presence_state: LibraryTreePresenceState::Present,
-                        size_bytes: Some(10),
-                        modified_at_ns: Some(20),
-                        updated_at_ms: 100,
-                        has_child_directories: None,
-                        directory_primary_media_state: None,
-                        directory_image_media_state: None,
-                        directory_scan_state: None,
-                        child_row_state: None,
-                    }],
-                }),
-            });
+                    relative_path: "cover.mp3".to_string(),
+                    display_name: "cover.mp3".to_string(),
+                    media_class: Some(LibraryTreeFileMediaClass::Image),
+                    presence_state: LibraryTreePresenceState::Present,
+                    size_bytes: Some(10),
+                    modified_at_ns: Some(20),
+                    updated_at_ms: 100,
+                    has_child_directories: None,
+                    directory_primary_media_state: None,
+                    directory_image_media_state: None,
+                    directory_scan_state: None,
+                    child_row_state: None,
+                }],
+            }),
+        });
 
         let json = serde_json::to_value(&reply).expect("serialize literal hierarchy reply");
         assert_eq!(
@@ -2013,14 +2008,12 @@ mod tests {
                     stable_key: "view:all_media".to_string(),
                 },
             ),
-            SnapshotReadCommand::ReadLibraryTreeChildren(
-                ReadLibraryTreeChildrenRequest {
-                    entry_point: LibraryTreeEntryPoint::Source { source_id: 1 },
-                    parent_source_directory_id: None,
-                    offset: 0,
-                    limit: 50,
-                },
-            ),
+            SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
+                entry_point: LibraryTreeEntryPoint::Source { source_id: 1 },
+                parent_source_directory_id: None,
+                offset: 0,
+                limit: 50,
+            }),
             SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
                 ReadNavigationNodeLibraryBrowserWindowRequest {
                     navigation_row_id: 2,

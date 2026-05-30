@@ -12,11 +12,10 @@ use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
     LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
     RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
-    RootScanObservation, SqliteDurableStore,
-    UnregisterLocalRootInput,
+    RootScanObservation, SqliteDurableStore, UnregisterLocalRootInput,
 };
 
-use crate::session_events::LibraryBoundaryEventStream;
+use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
 use crate::snapshot_read_protocol::{
     map_load_navigation_row_by_stable_key_reply, map_load_navigation_row_reply,
     map_maintained_read_model_revisions, map_read_contents_reply,
@@ -179,13 +178,16 @@ impl LibraryBoundaryService {
         let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
 
         if let Some(existing) = registry.jobs.get(&root_id) {
-            if existing._handle.is_finished() {
-                registry.jobs.remove(&root_id);
-            } else {
+            if !existing.completed.load(Ordering::Acquire) {
                 return Err(protocol::ProtocolError::InvalidRequest {
                     detail: "A scan is already running for this root".to_string(),
                 });
             }
+
+            let scan_run_id = existing.scan_run_id;
+            registry.jobs.remove(&root_id);
+            registry.scan_run_id_to_root_id.remove(&scan_run_id);
+            registry.terminal_scan_run_ids.insert(scan_run_id);
         }
 
         self.durable_store
@@ -201,22 +203,28 @@ impl LibraryBoundaryService {
         let completed = Arc::new(AtomicBool::new(false));
         let thread_completed = Arc::clone(&completed);
 
-        events.publish_scan_event(
-            library_boundary_protocol::SourceScanEventKind::SourceScanStarted,
+        events.publish_scan_event(ScanEventInput {
+            kind: library_boundary_protocol::SourceScanEventKind::SourceScanStarted,
             root_id,
             scan_run_id,
-            library_boundary_protocol::ScanRunPhase::Scanning,
-            0,
-            0,
-            0,
-            0,
-            0,
-            None,
-        );
+            phase: library_boundary_protocol::ScanRunPhase::Scanning,
+            directories_visited: 0,
+            files_visited: 0,
+            files_discovered: 0,
+            media_candidates: 0,
+            queued_work_items: 0,
+            detail: None,
+        });
 
         let handle = std::thread::spawn(move || {
-            execute_scan_job(store, events, root_id, scan_run_id, scan_started_at_ms);
-            thread_completed.store(true, Ordering::Release);
+            execute_scan_job(
+                store,
+                events,
+                root_id,
+                scan_run_id,
+                scan_started_at_ms,
+                thread_completed,
+            );
         });
 
         registry.scan_run_id_to_root_id.insert(scan_run_id, root_id);
@@ -670,51 +678,51 @@ fn execute_scan_job(
     root_id: i64,
     scan_run_id: i64,
     scan_started_at_ms: i64,
+    completed: Arc<AtomicBool>,
 ) {
     let committed_chunk_count = Arc::new(AtomicUsize::new(0));
     let chunk_count = Arc::clone(&committed_chunk_count);
 
-    let result = store.run_root_scan_with_observer(
-        root_id,
-        scan_started_at_ms,
-        |observation| match observation {
+    let result = store.run_root_scan_with_observer(root_id, scan_started_at_ms, |observation| {
+        match observation {
             RootScanObservation::HierarchyPublished {
                 root_id: obs_root_id,
                 scan_run_id: obs_scan_run_id,
                 reason: _reason,
             } => {
                 chunk_count.fetch_add(1, Ordering::Relaxed);
-                events.publish_scan_event(
-                    library_boundary_protocol::SourceScanEventKind::SourceScanProgressed,
-                    obs_root_id,
-                    obs_scan_run_id,
-                    library_boundary_protocol::ScanRunPhase::Scanning,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    None,
-                );
+                events.publish_scan_event(ScanEventInput {
+                    kind: library_boundary_protocol::SourceScanEventKind::SourceScanProgressed,
+                    root_id: obs_root_id,
+                    scan_run_id: obs_scan_run_id,
+                    phase: library_boundary_protocol::ScanRunPhase::Scanning,
+                    directories_visited: 0,
+                    files_visited: 0,
+                    files_discovered: 0,
+                    media_candidates: 0,
+                    queued_work_items: 0,
+                    detail: None,
+                });
             }
             RootScanObservation::SourceWorkQueued { .. } => {}
-        },
-    );
+        }
+    });
 
     match result {
         Ok(scan) => {
-            events.publish_scan_event(
-                library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
+            completed.store(true, Ordering::Release);
+            events.publish_scan_event(ScanEventInput {
+                kind: library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
                 root_id,
                 scan_run_id,
-                library_boundary_protocol::ScanRunPhase::Scanning,
-                0,
-                scan.discovered_file_count,
-                scan.discovered_file_count,
-                scan.discovered_file_count,
-                scan.queued_source_work_items,
-                None,
-            );
+                phase: library_boundary_protocol::ScanRunPhase::Scanning,
+                directories_visited: 0,
+                files_visited: scan.discovered_file_count,
+                files_discovered: scan.discovered_file_count,
+                media_candidates: scan.discovered_file_count,
+                queued_work_items: scan.queued_source_work_items,
+                detail: None,
+            });
             publish_job_maintained_invalidations(&store, &events);
         }
         Err(error) => {
@@ -723,6 +731,7 @@ fn execute_scan_job(
                 library_store_sqlite::LibrarySqliteError::RootWorkCancelled { .. }
                     | library_store_sqlite::LibrarySqliteError::RootWorkAdmissionDenied { .. }
             ) {
+                completed.store(true, Ordering::Release);
                 publish_job_scan_cancelled(
                     &events,
                     root_id,
@@ -731,6 +740,7 @@ fn execute_scan_job(
                 );
                 publish_job_maintained_invalidations(&store, &events);
             } else {
+                completed.store(true, Ordering::Release);
                 publish_job_scan_failed_or_blocked(&events, root_id, &error);
             }
         }
@@ -761,31 +771,31 @@ fn publish_job_scan_failed_or_blocked(
     );
 
     if is_blocked {
-        events.publish_scan_event(
-            library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
+        events.publish_scan_event(ScanEventInput {
+            kind: library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
             root_id,
-            0,
-            library_boundary_protocol::ScanRunPhase::Blocked,
-            0,
-            0,
-            0,
-            0,
-            0,
-            Some(detail),
-        );
+            scan_run_id: 0,
+            phase: library_boundary_protocol::ScanRunPhase::Blocked,
+            directories_visited: 0,
+            files_visited: 0,
+            files_discovered: 0,
+            media_candidates: 0,
+            queued_work_items: 0,
+            detail: Some(detail),
+        });
     } else {
-        events.publish_scan_event(
-            library_boundary_protocol::SourceScanEventKind::SourceScanFailed,
+        events.publish_scan_event(ScanEventInput {
+            kind: library_boundary_protocol::SourceScanEventKind::SourceScanFailed,
             root_id,
-            0,
-            library_boundary_protocol::ScanRunPhase::Scanning,
-            0,
-            0,
-            0,
-            0,
-            0,
-            Some(detail),
-        );
+            scan_run_id: 0,
+            phase: library_boundary_protocol::ScanRunPhase::Scanning,
+            directories_visited: 0,
+            files_visited: 0,
+            files_discovered: 0,
+            media_candidates: 0,
+            queued_work_items: 0,
+            detail: Some(detail),
+        });
     }
 }
 
@@ -796,18 +806,18 @@ fn publish_job_scan_cancelled(
     committed_chunks: usize,
 ) {
     let approx_files = committed_chunks * 256;
-    events.publish_scan_event(
-        library_boundary_protocol::SourceScanEventKind::SourceScanCancelled,
+    events.publish_scan_event(ScanEventInput {
+        kind: library_boundary_protocol::SourceScanEventKind::SourceScanCancelled,
         root_id,
         scan_run_id,
-        library_boundary_protocol::ScanRunPhase::Interrupted,
-        0,
-        approx_files,
-        approx_files,
-        0,
-        0,
-        Some("cancelled by user".to_string()),
-    );
+        phase: library_boundary_protocol::ScanRunPhase::Interrupted,
+        directories_visited: 0,
+        files_visited: approx_files,
+        files_discovered: approx_files,
+        media_candidates: 0,
+        queued_work_items: 0,
+        detail: Some("cancelled by user".to_string()),
+    });
 }
 
 fn require_playlist_id(value: i64, field_name: &str) -> protocol::ProtocolResult<PlaylistId> {
@@ -895,9 +905,9 @@ fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol:
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
-        CancelRootScanRequest, CancelRootScanReply, CancelRootScanStatus,
-        CommandOutcome, CommandReply, CommandRequest, ContentsReadPolicy, ContentsRowProfile,
-        CreatePlaylistReply, CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
+        CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandOutcome,
+        CommandReply, CommandRequest, ContentsReadPolicy, ContentsRowProfile, CreatePlaylistReply,
+        CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
         LibraryBoundaryEvent, LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
         LibraryRootCommand, LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind,
@@ -906,8 +916,8 @@ mod tests {
         PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsAfterReply,
         ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
         RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
-        RenamePlaylistRequest, StartRootScanReply, StartRootScanRequest, SnapshotReadCommand,
-        SnapshotReadReply, UnregisterLocalRootReply, UnregisterLocalRootRequest,
+        RenamePlaylistRequest, SnapshotReadCommand, SnapshotReadReply, StartRootScanReply,
+        StartRootScanRequest, UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use serde_json::json;
     use tempfile::TempDir;
@@ -1225,10 +1235,7 @@ mod tests {
             .find(|row| row.display_name == "Crate")
             .expect("top-level folder is browsable");
         assert_eq!(crate_row.node_kind, LibraryTreeNodeKind::Directory);
-        assert_eq!(
-            crate_row.presence_state,
-            LibraryTreePresenceState::Present
-        );
+        assert_eq!(crate_row.presence_state, LibraryTreePresenceState::Present);
         assert_eq!(crate_row.has_child_directories, Some(false));
         assert_eq!(
             crate_row.directory_primary_media_state,
@@ -1324,8 +1331,7 @@ mod tests {
         assert!(second_read.latest_event_sequence.is_some());
         assert!(!second_read.gap_detected);
 
-        let third_read =
-            read_after_events(&service, second_read.latest_event_sequence, 16);
+        let third_read = read_after_events(&service, second_read.latest_event_sequence, 16);
         assert!(
             third_read.events.is_empty(),
             "cursor advance must not replay consumed events"
@@ -1334,10 +1340,12 @@ mod tests {
 
         let error = service
             .try_handle_command(CommandRequest::LibraryBoundaryEvents(
-                LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
-                    last_seen_event_sequence: None,
-                    max_events: 0,
-                }),
+                LibraryBoundaryEventStreamCommand::ReadAfter(
+                    ReadLibraryBoundaryEventsAfterRequest {
+                        last_seen_event_sequence: None,
+                        max_events: 0,
+                    },
+                ),
             ))
             .expect_err("zero maxEvents is invalid");
         assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
@@ -1404,7 +1412,8 @@ mod tests {
         let consumer1_second = read_after_events(&service, c1_cursor, 16);
         assert!(!consumer1_second.events.is_empty());
 
-        let consumer2_second = read_after_events(&service, consumer2_first.latest_event_sequence, 16);
+        let consumer2_second =
+            read_after_events(&service, consumer2_first.latest_event_sequence, 16);
         assert!(!consumer2_second.events.is_empty());
     }
 
@@ -1725,7 +1734,9 @@ mod tests {
             }
         }
 
-        panic!("expected cancel after scan completion to return AlreadyTerminal, got NotCancelable");
+        panic!(
+            "expected cancel after scan completion to return AlreadyTerminal, got NotCancelable"
+        );
     }
 
     #[test]

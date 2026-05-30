@@ -8,6 +8,12 @@ import {
 } from '../../../../src/main/libraryBoundary/eventPump'
 import { boundaryEventChannels } from '../../../../src/shared/libraryBoundary/events'
 
+type TestHost = {
+  readonly client: {
+    readonly readAfterBoundaryEvents: ReturnType<typeof vi.fn>
+  }
+}
+
 describe('BoundaryEventPump', () => {
   afterEach(() => {
     vi.useRealTimers()
@@ -222,7 +228,7 @@ describe('BoundaryEventPump', () => {
   })
 })
 
-function testHost(replies: readonly ReturnType<typeof emptyReply>[]) {
+function testHost(replies: readonly ReturnType<typeof emptyReply>[]): TestHost {
   const queuedReplies = [...replies]
 
   return {

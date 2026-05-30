@@ -42,7 +42,9 @@ pub(crate) fn library_tree_row_admission_predicate_sql(
 ) -> &'static str {
     match library_tree_row_admission {
         LibraryTreeRowAdmission::Performance => "media_class IN ('audio', 'video')",
-        LibraryTreeRowAdmission::PerformanceAndImages => "media_class IN ('audio', 'video', 'image')",
+        LibraryTreeRowAdmission::PerformanceAndImages => {
+            "media_class IN ('audio', 'video', 'image')"
+        }
     }
 }
 

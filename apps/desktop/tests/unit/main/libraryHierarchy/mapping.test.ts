@@ -43,6 +43,12 @@ function makeFileNode(overrides: Partial<LibraryTreeNode> = {}): LibraryTreeNode
   }
 }
 
+function withoutProperty(node: LibraryTreeNode, property: keyof LibraryTreeNode): LibraryTreeNode {
+  const copy: Partial<LibraryTreeNode> = { ...node }
+  delete copy[property]
+  return copy as LibraryTreeNode
+}
+
 describe('mapLibraryTreeNode', () => {
   it('maps a well-formed directory node', () => {
     const result = mapLibraryTreeNode(makeDirectoryNode())
@@ -65,32 +71,26 @@ describe('mapLibraryTreeNode', () => {
   })
 
   it('rejects a directory node without sourceDirectoryId', () => {
-    const result = mapLibraryTreeNode(
-      makeDirectoryNode({ sourceDirectoryId: null })
-    )
+    const result = mapLibraryTreeNode(makeDirectoryNode({ sourceDirectoryId: null }))
 
     expect(result).toBeUndefined()
   })
 
   it('rejects a directory node without childRowState', () => {
-    const result = mapLibraryTreeNode(
-      makeDirectoryNode({ childRowState: undefined })
-    )
+    const result = mapLibraryTreeNode(withoutProperty(makeDirectoryNode(), 'childRowState'))
 
     expect(result).toBeUndefined()
   })
 
   it('rejects a directory node without directoryScanState', () => {
-    const result = mapLibraryTreeNode(
-      makeDirectoryNode({ directoryScanState: undefined })
-    )
+    const result = mapLibraryTreeNode(withoutProperty(makeDirectoryNode(), 'directoryScanState'))
 
     expect(result).toBeUndefined()
   })
 
   it('rejects a directory node without directoryPrimaryMediaState', () => {
     const result = mapLibraryTreeNode(
-      makeDirectoryNode({ directoryPrimaryMediaState: undefined })
+      withoutProperty(makeDirectoryNode(), 'directoryPrimaryMediaState')
     )
 
     expect(result).toBeUndefined()
@@ -98,16 +98,14 @@ describe('mapLibraryTreeNode', () => {
 
   it('rejects a directory node without directoryImageMediaState', () => {
     const result = mapLibraryTreeNode(
-      makeDirectoryNode({ directoryImageMediaState: undefined })
+      withoutProperty(makeDirectoryNode(), 'directoryImageMediaState')
     )
 
     expect(result).toBeUndefined()
   })
 
   it('defaults missing hasChildDirectories to false for directory nodes', () => {
-    const result = mapLibraryTreeNode(
-      makeDirectoryNode({ hasChildDirectories: undefined })
-    )
+    const result = mapLibraryTreeNode(withoutProperty(makeDirectoryNode(), 'hasChildDirectories'))
 
     expect(result).not.toBeUndefined()
     if (result?.kind === 'directory') {
@@ -132,17 +130,13 @@ describe('mapLibraryTreeNode', () => {
   })
 
   it('rejects a file node without sourceFileId', () => {
-    const result = mapLibraryTreeNode(
-      makeFileNode({ sourceFileId: null })
-    )
+    const result = mapLibraryTreeNode(makeFileNode({ sourceFileId: null }))
 
     expect(result).toBeUndefined()
   })
 
   it('defaults missing mediaClass to none for file nodes', () => {
-    const result = mapLibraryTreeNode(
-      makeFileNode({ mediaClass: undefined })
-    )
+    const result = mapLibraryTreeNode(withoutProperty(makeFileNode(), 'mediaClass'))
 
     expect(result).not.toBeUndefined()
     if (result?.kind === 'file') {

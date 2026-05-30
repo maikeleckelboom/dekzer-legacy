@@ -3,14 +3,14 @@ use std::path::Path;
 
 use library_boundary_protocol::{
     CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandErrorEnvelope,
-    CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEventStreamCommand,
-    LibraryBoundaryEventStreamReply, LibraryRootCommand, LibraryRootReply,
-    LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
+    CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEvent,
+    LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
+    LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
     LibraryTreePresenceState, MaintainedSnapshotScope, NavigationRow, NavigationRowFamily,
     NavigationRowKind, ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenReply,
     ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
-    RegisterLocalRootRequest, ScanRunPhase, SourceScanEventKind, StartRootScanReply,
-    StartRootScanRequest, SnapshotReadCommand, SnapshotReadReply, LibraryBoundaryEvent,
+    RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand, SnapshotReadReply,
+    SourceScanEventKind, StartRootScanReply, StartRootScanRequest,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -69,12 +69,10 @@ fn wait_for_scan_completion(service: &LibraryBoundaryService, root_id: i64) -> b
     let mut cursor: Option<i64> = None;
     for _ in 0..30 {
         let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
-            LibraryBoundaryEventStreamCommand::ReadAfter(
-                ReadLibraryBoundaryEventsAfterRequest {
-                    last_seen_event_sequence: cursor,
-                    max_events: 32,
-                },
-            ),
+            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+                last_seen_event_sequence: cursor,
+                max_events: 32,
+            }),
         ));
         let reply = match outcome {
             CommandOutcome::Success(env) => match env.reply {
@@ -136,14 +134,12 @@ fn read_library_tree(
     parent_source_directory_id: Option<i64>,
 ) -> ReadLibraryTreeChildrenReply {
     let outcome = service.handle_command(CommandRequest::SnapshotRead(
-        SnapshotReadCommand::ReadLibraryTreeChildren(
-            ReadLibraryTreeChildrenRequest {
-                entry_point: LibraryTreeEntryPoint::Source { source_id },
-                parent_source_directory_id,
-                offset: 0,
-                limit: 50,
-            },
-        ),
+        SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
+            entry_point: LibraryTreeEntryPoint::Source { source_id },
+            parent_source_directory_id,
+            offset: 0,
+            limit: 50,
+        }),
     ));
     let reply = expect_command_reply(outcome, "read library tree");
     match reply {
@@ -170,7 +166,10 @@ fn register_and_scan_mixed_nested_folder_succeeds() {
             .join("track_two.flac"),
         b"not-real-audio-data",
     );
-    write_file(&music_root.join("artwork").join("cover.png"), b"fake-png-data");
+    write_file(
+        &music_root.join("artwork").join("cover.png"),
+        b"fake-png-data",
+    );
     write_file(&music_root.join("loose.mp3"), b"fake-mp3-data");
 
     let service = open_service(&tempdir);
@@ -281,10 +280,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         b"not-real-wav",
     );
     write_file(&music_root.join("loose.mp3"), b"not-real-mp3");
-    write_file(
-        &music_root.join("artwork").join("cover.png"),
-        b"fake-png",
-    );
+    write_file(&music_root.join("artwork").join("cover.png"), b"fake-png");
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &music_root);
@@ -318,7 +314,9 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     let artists_dir = root_window
         .rows
         .iter()
-        .find(|row| row.display_name == "artists" && row.node_kind == LibraryTreeNodeKind::Directory)
+        .find(|row| {
+            row.display_name == "artists" && row.node_kind == LibraryTreeNodeKind::Directory
+        })
         .expect("artists directory in root hierarchy");
 
     root_window
@@ -399,8 +397,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     let artists_dir_id = artists_dir
         .source_directory_id
         .expect("artists directory has source_directory_id");
-    let artists_reply =
-        read_library_tree(&service, registered.root_id, Some(artists_dir_id));
+    let artists_reply = read_library_tree(&service, registered.root_id, Some(artists_dir_id));
     let artists_window = artists_reply
         .window
         .as_ref()
@@ -414,8 +411,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     let alpha_dir_id = alpha_dir
         .source_directory_id
         .expect("alpha directory has source_directory_id");
-    let alpha_reply =
-        read_library_tree(&service, registered.root_id, Some(alpha_dir_id));
+    let alpha_reply = read_library_tree(&service, registered.root_id, Some(alpha_dir_id));
     let alpha_window = alpha_reply
         .window
         .as_ref()
@@ -485,8 +481,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         "artists directory child count must survive reopen",
     );
 
-    let reopened_alpha_reply =
-        read_library_tree(&reopened, registered.root_id, Some(alpha_dir_id));
+    let reopened_alpha_reply = read_library_tree(&reopened, registered.root_id, Some(alpha_dir_id));
     let reopened_alpha_window = reopened_alpha_reply
         .window
         .as_ref()
@@ -522,10 +517,7 @@ fn library_tree_children_excludes_image_only_directories() {
             .join("track_one.wav"),
         b"not-real-wav",
     );
-    write_file(
-        &music_root.join("artwork").join("cover.png"),
-        b"fake-png",
-    );
+    write_file(&music_root.join("artwork").join("cover.png"), b"fake-png");
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &music_root);
@@ -538,16 +530,13 @@ fn library_tree_children_excludes_image_only_directories() {
         .as_ref()
         .expect("Library tree children resolves hierarchy");
 
-    let has_artists = window
-        .rows
-        .iter()
-        .any(|row| row.display_name == "artists");
-    assert!(has_artists, "artists directory must appear in library tree children");
+    let has_artists = window.rows.iter().any(|row| row.display_name == "artists");
+    assert!(
+        has_artists,
+        "artists directory must appear in library tree children"
+    );
 
-    let has_artwork = window
-        .rows
-        .iter()
-        .any(|row| row.display_name == "artwork");
+    let has_artwork = window.rows.iter().any(|row| row.display_name == "artwork");
     assert!(
         !has_artwork,
         "artwork directory must NOT appear in library tree children (contains only images)"
@@ -572,12 +561,10 @@ fn start_root_scan_publishes_started_and_completed_events_in_order() {
 
     for _ in 0..30 {
         let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
-            LibraryBoundaryEventStreamCommand::ReadAfter(
-                ReadLibraryBoundaryEventsAfterRequest {
-                    last_seen_event_sequence: cursor,
-                    max_events: 32,
-                },
-            ),
+            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+                last_seen_event_sequence: cursor,
+                max_events: 32,
+            }),
         ));
         let reply = match outcome {
             CommandOutcome::Success(env) => match env.reply {
@@ -660,12 +647,10 @@ fn scan_publishes_maintained_snapshot_invalidations_on_completion() {
 
     for _ in 0..30 {
         let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
-            LibraryBoundaryEventStreamCommand::ReadAfter(
-                ReadLibraryBoundaryEventsAfterRequest {
-                    last_seen_event_sequence: cursor,
-                    max_events: 32,
-                },
-            ),
+            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+                last_seen_event_sequence: cursor,
+                max_events: 32,
+            }),
         ));
         let reply = match outcome {
             CommandOutcome::Success(env) => match env.reply {
@@ -722,11 +707,9 @@ fn cancel_invalid_scan_run_id_rejects() {
     let tempdir = TempDir::new().expect("create tempdir");
     let service = open_service(&tempdir);
 
-    let zero_error = expect_command_error(service.handle_command(
-        CommandRequest::LibraryRoots(LibraryRootCommand::CancelRootScan(CancelRootScanRequest {
-            scan_run_id: 0,
-        })),
-    ));
+    let zero_error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::CancelRootScan(CancelRootScanRequest { scan_run_id: 0 }),
+    )));
     assert_eq!(zero_error.error.code(), "INVALID_REQUEST");
     assert!(
         zero_error.error.to_string().contains("scanRunId"),
@@ -793,12 +776,10 @@ fn cancel_active_scan_returns_accepted_and_publishes_source_scan_cancelled() {
 
     for _ in 0..60 {
         let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
-            LibraryBoundaryEventStreamCommand::ReadAfter(
-                ReadLibraryBoundaryEventsAfterRequest {
-                    last_seen_event_sequence: cursor,
-                    max_events: 64,
-                },
-            ),
+            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+                last_seen_event_sequence: cursor,
+                max_events: 64,
+            }),
         ));
         let reply = match outcome {
             CommandOutcome::Success(env) => match env.reply {
@@ -815,9 +796,7 @@ fn cancel_active_scan_returns_accepted_and_publishes_source_scan_cancelled() {
             let LibraryBoundaryEvent::SourceScanEvent(se) = event else {
                 continue;
             };
-            if se.root_id != registered.root_id
-                || se.scan_run_id != scanned.scan_run_id
-            {
+            if se.root_id != registered.root_id || se.scan_run_id != scanned.scan_run_id {
                 continue;
             }
             match se.kind {
@@ -886,12 +865,10 @@ fn cancel_active_scan_cleans_registry_and_second_cancel_returns_already_terminal
     let mut cursor: Option<i64> = None;
     for _ in 0..60 {
         let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
-            LibraryBoundaryEventStreamCommand::ReadAfter(
-                ReadLibraryBoundaryEventsAfterRequest {
-                    last_seen_event_sequence: cursor,
-                    max_events: 64,
-                },
-            ),
+            LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
+                last_seen_event_sequence: cursor,
+                max_events: 64,
+            }),
         ));
         let reply = match outcome {
             CommandOutcome::Success(env) => match env.reply {

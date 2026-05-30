@@ -7,7 +7,6 @@ import {
 import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
 import type {
   ChildRow,
-  ChildRowState,
   HierarchyCoverage,
   ReadErrorCode,
   ReadRequest,
@@ -423,6 +422,9 @@ describe('createLibraryHierarchyReadController', () => {
     await expect(controller.requestNodeChildren('more:source-directory:12:1')).resolves.toBe(true)
 
     const moreRequest = readRequests[2]
+    if (moreRequest === undefined) {
+      throw new Error('Expected a request for the next directory page.')
+    }
     expect(moreRequest).toMatchObject({
       parentDirectoryId: '12',
       offset: 1,
@@ -1061,22 +1063,6 @@ function deferred<T>(): { readonly promise: Promise<T>; readonly resolve: (value
     promise,
     resolve: resolveDeferred
   }
-}
-
-async function waitForReadRequestCount(
-  readRequests: readonly ReadRequest[],
-  expectedCount: number
-): Promise<void> {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    if (readRequests.length >= expectedCount) {
-      await waitForMicrotasks()
-      return
-    }
-
-    await waitForMicrotasks()
-  }
-
-  throw new Error(`Expected ${expectedCount} hierarchy read requests.`)
 }
 
 async function waitForMicrotasks(): Promise<void> {

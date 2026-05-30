@@ -291,10 +291,10 @@ pub enum LibraryRootReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus,
-        LibraryRootCommand, LibraryRootReply, LocalRoot, LocalRootAvailability,
-        ReadLocalRootsReply, ReadLocalRootsRequest, RegisterLocalRootReply,
-        RegisterLocalRootRequest, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
+        CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, LibraryRootCommand,
+        LibraryRootReply, LocalRoot, LocalRootAvailability, ReadLocalRootsReply,
+        ReadLocalRootsRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
+        StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
         UnregisterLocalRootRequest,
     };
     use serde_json::json;
@@ -365,9 +365,7 @@ mod tests {
             root_id: 7,
             canonical_path: "C:/Music".to_string(),
         });
-        let scanned = LibraryRootReply::StartRootScan(StartRootScanReply {
-            scan_run_id: 1000,
-        });
+        let scanned = LibraryRootReply::StartRootScan(StartRootScanReply { scan_run_id: 1000 });
         let read_local = LibraryRootReply::ReadLocalRoots(ReadLocalRootsReply {
             roots: vec![LocalRoot {
                 root_id: 3,
@@ -423,9 +421,7 @@ mod tests {
 
     #[test]
     fn cancel_root_scan_command_serializes_with_tagged_shape() {
-        let cancel = LibraryRootCommand::CancelRootScan(CancelRootScanRequest {
-            scan_run_id: 42,
-        });
+        let cancel = LibraryRootCommand::CancelRootScan(CancelRootScanRequest { scan_run_id: 42 });
 
         assert_eq!(
             serde_json::to_value(&cancel).expect("serialize cancel command"),
@@ -447,14 +443,18 @@ mod tests {
 
     #[test]
     fn cancel_root_scan_reply_serializes_each_status_variant() {
-        let accepted =
-            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::Accepted });
-        let not_found =
-            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::NotFound });
-        let already_terminal =
-            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::AlreadyTerminal });
-        let not_cancelable =
-            LibraryRootReply::CancelRootScan(CancelRootScanReply { status: CancelRootScanStatus::NotCancelable });
+        let accepted = LibraryRootReply::CancelRootScan(CancelRootScanReply {
+            status: CancelRootScanStatus::Accepted,
+        });
+        let not_found = LibraryRootReply::CancelRootScan(CancelRootScanReply {
+            status: CancelRootScanStatus::NotFound,
+        });
+        let already_terminal = LibraryRootReply::CancelRootScan(CancelRootScanReply {
+            status: CancelRootScanStatus::AlreadyTerminal,
+        });
+        let not_cancelable = LibraryRootReply::CancelRootScan(CancelRootScanReply {
+            status: CancelRootScanStatus::NotCancelable,
+        });
 
         assert_eq!(
             serde_json::to_value(&accepted).expect("serialize accepted"),

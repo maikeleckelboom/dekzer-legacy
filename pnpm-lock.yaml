@@ -13,6 +13,9 @@ importers:
       '@dekzer/library-boundary-client':
         specifier: workspace:*
         version: link:../../packages/library-boundary-client
+      '@dekzer/library-boundary-contract':
+        specifier: workspace:*
+        version: link:../../packages/library-boundary-contract
       '@dekzer/library-boundary-stdio-transport':
         specifier: workspace:*
         version: link:../../packages/library-boundary-stdio-transport

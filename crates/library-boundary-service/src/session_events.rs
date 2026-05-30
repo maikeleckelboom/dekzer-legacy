@@ -14,6 +14,19 @@ pub(crate) struct LibraryBoundaryEventStream {
     state: Arc<Mutex<LibraryBoundaryEventStreamState>>,
 }
 
+pub(crate) struct ScanEventInput {
+    pub(crate) kind: SourceScanEventKind,
+    pub(crate) root_id: i64,
+    pub(crate) scan_run_id: i64,
+    pub(crate) phase: ScanRunPhase,
+    pub(crate) directories_visited: usize,
+    pub(crate) files_visited: usize,
+    pub(crate) files_discovered: usize,
+    pub(crate) media_candidates: usize,
+    pub(crate) queued_work_items: usize,
+    pub(crate) detail: Option<String>,
+}
+
 impl LibraryBoundaryEventStream {
     pub(crate) fn new<I>(initial_revisions: I) -> Self
     where
@@ -42,32 +55,9 @@ impl LibraryBoundaryEventStream {
         }
     }
 
-    pub(crate) fn publish_scan_event(
-        &self,
-        kind: SourceScanEventKind,
-        root_id: i64,
-        scan_run_id: i64,
-        phase: ScanRunPhase,
-        directories_visited: usize,
-        files_visited: usize,
-        files_discovered: usize,
-        media_candidates: usize,
-        queued_work_items: usize,
-        detail: Option<String>,
-    ) {
+    pub(crate) fn publish_scan_event(&self, event: ScanEventInput) {
         let mut state = self.state.lock().expect("boundary event stream poisoned");
-        state.publish_scan_event(
-            kind,
-            root_id,
-            scan_run_id,
-            phase,
-            directories_visited,
-            files_visited,
-            files_discovered,
-            media_candidates,
-            queued_work_items,
-            detail,
-        );
+        state.publish_scan_event(event);
     }
 
     pub(crate) fn read_after(
@@ -109,33 +99,21 @@ impl LibraryBoundaryEventStreamState {
             .unwrap_or(0)
     }
 
-    fn publish_scan_event(
-        &mut self,
-        kind: SourceScanEventKind,
-        root_id: i64,
-        scan_run_id: i64,
-        phase: ScanRunPhase,
-        directories_visited: usize,
-        files_visited: usize,
-        files_discovered: usize,
-        media_candidates: usize,
-        queued_work_items: usize,
-        detail: Option<String>,
-    ) {
+    fn publish_scan_event(&mut self, input: ScanEventInput) {
         let sequence = self.next_sequence();
         let event = LibraryBoundaryEvent::SourceScanEvent(SourceScanEvent {
             event_sequence: sequence,
             occurred_at_ms: Self::current_time_ms(),
-            kind,
-            root_id,
-            scan_run_id,
-            phase,
-            directories_visited,
-            files_visited,
-            files_discovered,
-            media_candidates,
-            queued_work_items,
-            detail,
+            kind: input.kind,
+            root_id: input.root_id,
+            scan_run_id: input.scan_run_id,
+            phase: input.phase,
+            directories_visited: input.directories_visited,
+            files_visited: input.files_visited,
+            files_discovered: input.files_discovered,
+            media_candidates: input.media_candidates,
+            queued_work_items: input.queued_work_items,
+            detail: input.detail,
         });
         self.latest_published_sequence = Some(sequence);
         self.push_event(event);
@@ -159,13 +137,11 @@ impl LibraryBoundaryEventStreamState {
 
     fn publish_invalidation(&mut self, invalidation: MaintainedSnapshotInvalidation) {
         let sequence = self.next_sequence();
-        let event = LibraryBoundaryEvent::MaintainedSnapshotInvalidated(
-            MaintainedSnapshotEvent {
-                event_sequence: sequence,
-                occurred_at_ms: Self::current_time_ms(),
-                invalidation,
-            },
-        );
+        let event = LibraryBoundaryEvent::MaintainedSnapshotInvalidated(MaintainedSnapshotEvent {
+            event_sequence: sequence,
+            occurred_at_ms: Self::current_time_ms(),
+            invalidation,
+        });
         self.latest_published_sequence = Some(sequence);
         self.push_event(event);
     }
@@ -180,10 +156,7 @@ impl LibraryBoundaryEventStreamState {
             None => 0,
         };
 
-        let earliest_retained = self
-            .stored_events
-            .front()
-            .map(|e| Self::event_sequence(e));
+        let earliest_retained = self.stored_events.front().map(Self::event_sequence);
 
         let gap_detected = match (last_seen_event_sequence, earliest_retained) {
             (Some(last_seen), Some(earliest)) => last_seen + 1 < earliest,
@@ -200,7 +173,7 @@ impl LibraryBoundaryEventStreamState {
 
         let latest = events
             .last()
-            .map(|e| Self::event_sequence(e))
+            .map(Self::event_sequence)
             .or(last_seen_event_sequence)
             .or(self.latest_published_sequence);
 
