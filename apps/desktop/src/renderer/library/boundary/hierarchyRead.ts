@@ -50,9 +50,8 @@ export type LibraryHierarchyReadController = {
   readonly currentRoot: ComputedRef<ReadRoot | undefined>
   readonly refresh: () => Promise<boolean>
   readonly refreshNavigationRows: () => Promise<boolean>
-  readonly refreshLoadedBrowserWindows: () => Promise<boolean>
-  readonly refreshBrowserWindowsForNodeIds: (
-    nodeIds: ReadonlySet<BrowserTreeNodeId>
+  readonly refreshBrowserWindows: (
+    expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   ) => Promise<boolean>
   readonly loadFirstSource: () => Promise<boolean>
   readonly requestNodeChildren: (nodeId: BrowserTreeNodeId) => Promise<boolean>
@@ -258,7 +257,9 @@ export function createLibraryHierarchyReadController(
     })
   }
 
-  async function refreshLoadedBrowserWindows(): Promise<boolean> {
+  async function refreshBrowserWindows(
+    expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
+  ): Promise<boolean> {
     const projection = browserProjection.value
 
     if (projection?.kind !== 'tree') {
@@ -267,60 +268,57 @@ export function createLibraryHierarchyReadController(
 
     let refreshedAny = false
     let allSucceeded = true
+    const sourceTargets = new Map<string, SourceTarget>()
     const loadedDirectoryTargets = new Map<string, DirectoryTarget>()
 
     for (const [nodeId, binding] of projection.bindingsById) {
       if (binding.kind === 'source') {
         const state = sourceReadStates.value.get(nodeId)
         if (state?.kind === 'loaded') {
-          refreshedAny = true
-          allSucceeded = (await readSource(nodeId, binding.target)) && allSucceeded
+          sourceTargets.set(nodeId, binding.target)
         }
       } else if (binding.kind === 'directory') {
         const state = directoryReadStates.value.get(binding.directoryId)
         if (state?.kind === 'loaded') {
-          loadedDirectoryTargets.set(binding.directoryId, {
+          const target = {
             entryPoint: binding.entryPoint,
             ...(binding.label === undefined ? {} : { label: binding.label }),
             directoryId: binding.directoryId
-          })
+          }
+          loadedDirectoryTargets.set(
+            createDirectoryRequestKey(target.entryPoint, target.directoryId),
+            target
+          )
         }
       }
+    }
+
+    for (const nodeId of expandedNodeIds) {
+      const binding = projection.bindingsById.get(nodeId)
+
+      if (binding?.kind === 'source') {
+        sourceTargets.set(nodeId, binding.target)
+      } else if (binding?.kind === 'directory') {
+        const target = {
+          entryPoint: binding.entryPoint,
+          ...(binding.label === undefined ? {} : { label: binding.label }),
+          directoryId: binding.directoryId
+        }
+        loadedDirectoryTargets.set(
+          createDirectoryRequestKey(target.entryPoint, target.directoryId),
+          target
+        )
+      }
+    }
+
+    for (const [nodeId, target] of sourceTargets) {
+      refreshedAny = true
+      allSucceeded = (await readSource(nodeId, target)) && allSucceeded
     }
 
     for (const target of loadedDirectoryTargets.values()) {
       refreshedAny = true
       allSucceeded = (await readDirectory(target)) && allSucceeded
-    }
-
-    return refreshedAny ? allSucceeded : true
-  }
-
-  async function refreshBrowserWindowsForNodeIds(
-    nodeIds: ReadonlySet<BrowserTreeNodeId>
-  ): Promise<boolean> {
-    if (nodeIds.size === 0) {
-      return true
-    }
-
-    const projection = browserProjection.value
-
-    if (projection?.kind !== 'tree') {
-      return false
-    }
-
-    let refreshedAny = false
-    let allSucceeded = true
-
-    for (const nodeId of nodeIds) {
-      const binding = projection.bindingsById.get(nodeId)
-
-      if (binding?.kind !== 'source' && binding?.kind !== 'directory') {
-        continue
-      }
-
-      refreshedAny = true
-      allSucceeded = (await requestNodeChildren(nodeId)) && allSucceeded
     }
 
     return refreshedAny ? allSucceeded : true
@@ -858,8 +856,7 @@ export function createLibraryHierarchyReadController(
     currentRoot,
     refresh,
     refreshNavigationRows,
-    refreshLoadedBrowserWindows,
-    refreshBrowserWindowsForNodeIds,
+    refreshBrowserWindows,
     loadFirstSource,
     requestNodeChildren,
     requestDirectoryChildren,

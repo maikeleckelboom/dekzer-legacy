@@ -5,7 +5,7 @@ import type { BrowserTreeNodeId } from '../tree/types'
 export type InvalidationRefreshDependencies = {
   readonly hierarchyRead: Pick<
     LibraryHierarchyReadController,
-    'refreshNavigationRows' | 'refreshLoadedBrowserWindows' | 'refreshBrowserWindowsForNodeIds'
+    'refreshNavigationRows' | 'refreshBrowserWindows'
   >
   readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   readonly refreshContentsForCurrentSelection: () => void
@@ -19,12 +19,11 @@ export async function refreshHierarchyForMaintainedSnapshotInvalidation(
     case 'navigationRows':
       return dependencies.hierarchyRead.refreshNavigationRows()
     case 'libraryBrowser': {
-      const refreshedLoaded = await dependencies.hierarchyRead.refreshLoadedBrowserWindows()
-      const refreshedExpanded = await dependencies.hierarchyRead.refreshBrowserWindowsForNodeIds(
+      const refreshedBrowser = await dependencies.hierarchyRead.refreshBrowserWindows(
         dependencies.expandedNodeIds
       )
       dependencies.refreshContentsForCurrentSelection()
-      return refreshedLoaded && refreshedExpanded
+      return refreshedBrowser
     }
     default:
       return true

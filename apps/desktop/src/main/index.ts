@@ -12,7 +12,6 @@ import { registerCancelRootScanIpc } from './libraryRoots/cancelScan'
 import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
 import { registerUnregisterLocalRootIpc } from './libraryRoots/unregisterLocalRoot'
 import { registerLibraryViewStateIpc } from './libraryViewState/viewState'
-import { registerBoundaryEventIpc } from './libraryBoundary/events'
 import { BoundaryEventPump, registerBoundaryEventPumpIpc } from './libraryBoundary/eventPump'
 import { HostStatusController, registerHostStatusIpc } from './libraryBoundary/status'
 import { hostStatusChannels } from '../shared/libraryBoundary/status'
@@ -78,7 +77,6 @@ app.whenReady().then(() => {
   registerReadLocalRootsIpc(ipcMain, host)
   registerUnregisterLocalRootIpc(ipcMain, host)
   registerLibraryViewStateIpc(ipcMain, host)
-  registerBoundaryEventIpc(ipcMain, host)
   registerBoundaryEventPumpIpc(ipcMain, boundaryEventPump)
   hostStatusController.onStatusChanged((status) => {
     boundaryEventPump?.setHostStarted(status.state === 'started')

@@ -186,15 +186,29 @@ export class BoundaryEventPump {
       const webContents = subscriber.webContents
 
       if (webContents.isDestroyed?.()) {
-        this.#subscribers.delete(webContents.id)
-        subscriber.removeDestroyedListener?.()
+        this.#removeSubscriber(webContents.id)
         continue
       }
 
-      webContents.send(boundaryEventChannels.batch, payload)
+      try {
+        webContents.send(boundaryEventChannels.batch, payload)
+      } catch {
+        this.#removeSubscriber(webContents.id)
+      }
     }
 
     this.#syncPolling()
+  }
+
+  #removeSubscriber(webContentsId: number): void {
+    const subscriber = this.#subscribers.get(webContentsId)
+
+    if (subscriber === undefined) {
+      return
+    }
+
+    subscriber.removeDestroyedListener?.()
+    this.#subscribers.delete(webContentsId)
   }
 
   #trackWebContentsDestroyed(webContents: BoundaryEventPumpWebContents): (() => void) | undefined {
@@ -203,9 +217,7 @@ export class BoundaryEventPump {
     }
 
     const removeSubscriber = (): void => {
-      const subscriber = this.#subscribers.get(webContents.id)
-      subscriber?.removeDestroyedListener?.()
-      this.#subscribers.delete(webContents.id)
+      this.#removeSubscriber(webContents.id)
       this.#syncPolling()
     }
 

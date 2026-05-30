@@ -57,13 +57,15 @@ describe('createBoundaryEventsController', () => {
       filesDiscovered: 3,
       queuedWorkItems: 5
     })
-    expect(controller.maintainedSnapshotInvalidations.value).toEqual([
+    expect(controller.maintainedSnapshotInvalidationSignal.value).toBe(1)
+    expect(controller.consumeMaintainedSnapshotInvalidations()).toEqual([
       {
         eventSequence: 2,
         occurredAtMs: 1001,
         invalidation: { scope: 'libraryBrowser', revision: '8' }
       }
     ])
+    expect(controller.consumeMaintainedSnapshotInvalidations()).toEqual([])
 
     controller.stop()
     expect(api.unsubscribe).toHaveBeenCalledTimes(1)
@@ -95,12 +97,65 @@ describe('createBoundaryEventsController', () => {
     expect(controller.recoveryNeeded.value).toBe(true)
     expect(controller.gapDetected.value).toBe(true)
     expect(
-      controller.maintainedSnapshotInvalidations.value.map((event) => event.invalidation)
+      controller.consumeMaintainedSnapshotInvalidations().map((event) => event.invalidation)
     ).toEqual([{ scope: 'navigationRows', revision: '9' }])
 
     controller.acknowledgedGap()
     expect(controller.recoveryNeeded.value).toBe(false)
-    expect(controller.maintainedSnapshotInvalidations.value).toHaveLength(1)
+    expect(controller.consumeMaintainedSnapshotInvalidations()).toEqual([])
+  })
+
+  it('consumes multiple maintained invalidation batches once without retaining old events', () => {
+    const api = testEventApi()
+    const controller = createBoundaryEventsController(api)
+
+    controller.start()
+    api.deliver({
+      kind: 'batch',
+      events: [
+        {
+          type: 'maintainedSnapshotInvalidated',
+          payload: {
+            eventSequence: 4,
+            occurredAtMs: 1004,
+            invalidation: { scope: 'libraryBrowser', revision: '10' }
+          }
+        }
+      ],
+      latestEventSequence: 4,
+      earliestRetainedSequence: 4,
+      gapDetected: false
+    })
+    api.deliver({
+      kind: 'batch',
+      events: [
+        {
+          type: 'maintainedSnapshotInvalidated',
+          payload: {
+            eventSequence: 5,
+            occurredAtMs: 1005,
+            invalidation: { scope: 'navigationRows', revision: '11' }
+          }
+        },
+        {
+          type: 'maintainedSnapshotInvalidated',
+          payload: {
+            eventSequence: 6,
+            occurredAtMs: 1006,
+            invalidation: { scope: 'libraryBrowser', revision: '12' }
+          }
+        }
+      ],
+      latestEventSequence: 6,
+      earliestRetainedSequence: 4,
+      gapDetected: false
+    })
+
+    expect(controller.maintainedSnapshotInvalidationSignal.value).toBe(2)
+    expect(
+      controller.consumeMaintainedSnapshotInvalidations().map((event) => event.eventSequence)
+    ).toEqual([4, 5, 6])
+    expect(controller.consumeMaintainedSnapshotInvalidations()).toEqual([])
   })
 
   it('reports read failures from the Main delivery channel', () => {

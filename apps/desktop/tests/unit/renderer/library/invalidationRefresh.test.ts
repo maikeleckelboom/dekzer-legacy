@@ -15,12 +15,11 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
     ).resolves.toBe(true)
 
     expect(dependencies.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
-    expect(dependencies.hierarchyRead.refreshLoadedBrowserWindows).not.toHaveBeenCalled()
-    expect(dependencies.hierarchyRead.refreshBrowserWindowsForNodeIds).not.toHaveBeenCalled()
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
     expect(dependencies.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
   })
 
-  it('refreshes loaded and expanded browser windows for libraryBrowser invalidation', async () => {
+  it('refreshes browser windows once with expanded ids for libraryBrowser invalidation', async () => {
     const dependencies = testDependencies()
 
     await expect(
@@ -31,8 +30,7 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
     ).resolves.toBe(true)
 
     expect(dependencies.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
-    expect(dependencies.hierarchyRead.refreshLoadedBrowserWindows).toHaveBeenCalledTimes(1)
-    expect(dependencies.hierarchyRead.refreshBrowserWindowsForNodeIds).toHaveBeenCalledWith(
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(
       new Set(['navigation-row:7', 'source-directory:12'])
     )
     expect(dependencies.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
@@ -49,8 +47,7 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
     ).resolves.toBe(true)
 
     expect(dependencies.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
-    expect(dependencies.hierarchyRead.refreshLoadedBrowserWindows).not.toHaveBeenCalled()
-    expect(dependencies.hierarchyRead.refreshBrowserWindowsForNodeIds).not.toHaveBeenCalled()
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
     expect(dependencies.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
   })
 })
@@ -59,8 +56,7 @@ function testDependencies() {
   return {
     hierarchyRead: {
       refreshNavigationRows: vi.fn(async () => true),
-      refreshLoadedBrowserWindows: vi.fn(async () => true),
-      refreshBrowserWindowsForNodeIds: vi.fn(async () => true)
+      refreshBrowserWindows: vi.fn(async () => true)
     },
     expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12']),
     refreshContentsForCurrentSelection: vi.fn()

@@ -273,12 +273,9 @@ watch(
 )
 
 watch(
-  () => boundaryEvents.maintainedSnapshotInvalidations.value.length,
-  async (count, previousCount = 0) => {
-    const invalidations = boundaryEvents.maintainedSnapshotInvalidations.value.slice(
-      previousCount,
-      count
-    )
+  () => boundaryEvents.maintainedSnapshotInvalidationSignal.value,
+  async () => {
+    const invalidations = boundaryEvents.consumeMaintainedSnapshotInvalidations()
 
     for (const event of invalidations) {
       await refreshHierarchyForMaintainedSnapshotInvalidation(event, {

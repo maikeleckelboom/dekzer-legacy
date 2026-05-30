@@ -104,6 +104,90 @@ describe('BoundaryEventPump', () => {
     expect(host.client.readAfterBoundaryEvents).toHaveBeenCalledTimes(1)
   })
 
+  it('isolates a subscriber send failure while delivering to healthy subscribers', async () => {
+    vi.useFakeTimers()
+    const host = testHost([
+      {
+        events: [{ type: 'sourceScanEvent', payload: { eventSequence: 1 } }],
+        latestEventSequence: 1,
+        earliestRetainedSequence: 1,
+        gapDetected: false
+      }
+    ])
+    const pump = new BoundaryEventPump(host as never)
+    const failingSubscriber = testWebContents(1, { throwOnSend: true })
+    const healthySubscriber = testWebContents(2)
+
+    pump.subscribe(failingSubscriber)
+    pump.subscribe(healthySubscriber)
+    pump.setHostStarted(true)
+    await waitForMicrotasks()
+
+    expect(host.client.readAfterBoundaryEvents).toHaveBeenCalledTimes(1)
+    expect(healthySubscriber.sent).toHaveLength(1)
+    expect(healthySubscriber.sent[0]).toMatchObject({
+      channel: boundaryEventChannels.batch,
+      payload: { kind: 'batch', latestEventSequence: 1 }
+    })
+    expect(pump.subscriberCount).toBe(1)
+
+    pump.stop()
+  })
+
+  it('removes destroyed subscribers without affecting healthy subscribers', async () => {
+    vi.useFakeTimers()
+    const host = testHost([
+      {
+        events: [{ type: 'sourceScanEvent', payload: { eventSequence: 1 } }],
+        latestEventSequence: 1,
+        earliestRetainedSequence: 1,
+        gapDetected: false
+      }
+    ])
+    const pump = new BoundaryEventPump(host as never)
+    const destroyedSubscriber = testWebContents(1, { destroyed: true })
+    const healthySubscriber = testWebContents(2)
+
+    pump.subscribe(destroyedSubscriber)
+    pump.subscribe(healthySubscriber)
+    pump.setHostStarted(true)
+    await waitForMicrotasks()
+
+    expect(destroyedSubscriber.sent).toHaveLength(0)
+    expect(healthySubscriber.sent).toHaveLength(1)
+    expect(pump.subscriberCount).toBe(1)
+
+    pump.stop()
+  })
+
+  it('delivers service read failures to healthy subscribers', async () => {
+    vi.useFakeTimers()
+    const host = {
+      client: {
+        readAfterBoundaryEvents: vi.fn(async () => {
+          throw new Error('host read failed')
+        })
+      }
+    }
+    const pump = new BoundaryEventPump(host as never)
+    const subscriber = testWebContents(1)
+
+    pump.subscribe(subscriber)
+    pump.setHostStarted(true)
+    await waitForMicrotasks()
+
+    expect(host.client.readAfterBoundaryEvents).toHaveBeenCalledTimes(1)
+    expect(subscriber.sent).toEqual([
+      {
+        channel: boundaryEventChannels.batch,
+        payload: { kind: 'failed', detail: 'host read failed' }
+      }
+    ])
+    expect(pump.subscriberCount).toBe(1)
+
+    pump.stop()
+  })
+
   it('registers explicit subscribe and unsubscribe IPC handlers', async () => {
     const host = testHost([emptyReply(null)])
     const pump = new BoundaryEventPump(host as never)
@@ -162,7 +246,10 @@ function emptyReply(latestEventSequence: number | null): {
   }
 }
 
-function testWebContents(id: number): BoundaryEventPumpWebContents & {
+function testWebContents(
+  id: number,
+  options: { readonly throwOnSend?: boolean; readonly destroyed?: boolean } = {}
+): BoundaryEventPumpWebContents & {
   readonly sent: Array<{ readonly channel: string; readonly payload: unknown }>
 } {
   const sent: Array<{ readonly channel: string; readonly payload: unknown }> = []
@@ -170,7 +257,12 @@ function testWebContents(id: number): BoundaryEventPumpWebContents & {
   return {
     id,
     sent,
+    isDestroyed: () => options.destroyed === true,
     send(channel, payload): void {
+      if (options.throwOnSend === true) {
+        throw new Error('webContents unavailable')
+      }
+
       sent.push({ channel, payload })
     }
   }

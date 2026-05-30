@@ -49,7 +49,8 @@ export type MaintainedSnapshotInvalidationSignal = AppMaintainedSnapshotInvalida
 
 export type BoundaryEventsController = {
   readonly scanProgress: Ref<ReadonlyMap<string, ScanProgressState>>
-  readonly maintainedSnapshotInvalidations: Ref<readonly MaintainedSnapshotInvalidationSignal[]>
+  readonly maintainedSnapshotInvalidationSignal: Ref<number>
+  readonly consumeMaintainedSnapshotInvalidations: () => readonly MaintainedSnapshotInvalidationSignal[]
   readonly lastReadFailed: Ref<boolean>
   readonly gapDetected: Ref<boolean>
   readonly recoveryNeeded: Ref<boolean>
@@ -80,17 +81,16 @@ export function createBoundaryEventsController(
   eventApi: BoundaryEventApi
 ): BoundaryEventsController {
   const scanProgress = shallowRef<ReadonlyMap<string, ScanProgressState>>(new Map())
-  const maintainedSnapshotInvalidations = shallowRef<
-    readonly MaintainedSnapshotInvalidationSignal[]
-  >([])
+  const maintainedSnapshotInvalidationSignal = shallowRef(0)
   const lastReadFailed = shallowRef(false)
   const gapDetected = shallowRef(false)
   const recoveryNeeded = shallowRef(false)
+  let pendingMaintainedSnapshotInvalidations: MaintainedSnapshotInvalidationSignal[] = []
   let unsubscribe: (() => void) | undefined
 
   function applyEvents(events: ReadonlyArray<AppBoundaryEvent>): void {
     const nextProgress = new Map(scanProgress.value)
-    const nextInvalidations = [...maintainedSnapshotInvalidations.value]
+    const nextInvalidations: MaintainedSnapshotInvalidationSignal[] = []
 
     for (const event of events) {
       if (event.type === 'sourceScanEvent') {
@@ -102,11 +102,24 @@ export function createBoundaryEventsController(
     }
 
     scanProgress.value = nextProgress
-    maintainedSnapshotInvalidations.value = nextInvalidations
+
+    if (nextInvalidations.length > 0) {
+      pendingMaintainedSnapshotInvalidations = [
+        ...pendingMaintainedSnapshotInvalidations,
+        ...nextInvalidations
+      ]
+      maintainedSnapshotInvalidationSignal.value += 1
+    }
   }
 
   function acknowledgedGap(): void {
     recoveryNeeded.value = false
+  }
+
+  function consumeMaintainedSnapshotInvalidations(): readonly MaintainedSnapshotInvalidationSignal[] {
+    const invalidations = pendingMaintainedSnapshotInvalidations
+    pendingMaintainedSnapshotInvalidations = []
+    return invalidations
   }
 
   function start(): void {
@@ -147,7 +160,8 @@ export function createBoundaryEventsController(
 
   return {
     scanProgress,
-    maintainedSnapshotInvalidations,
+    maintainedSnapshotInvalidationSignal,
+    consumeMaintainedSnapshotInvalidations,
     lastReadFailed,
     gapDetected,
     recoveryNeeded,
