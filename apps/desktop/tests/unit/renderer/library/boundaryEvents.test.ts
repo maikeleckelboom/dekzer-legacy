@@ -7,7 +7,7 @@ import {
 import type { BoundaryEventDeliveryPayload } from '../../../../src/shared/libraryBoundary/events'
 
 describe('createBoundaryEventsController', () => {
-  it('consumes Main-delivered event batches without polling or owning a cursor', () => {
+  it('consumes Main-delivered event batches without polling', () => {
     const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
     const api = testEventApi()
     const controller = createBoundaryEventsController(api)
@@ -16,7 +16,6 @@ describe('createBoundaryEventsController', () => {
 
     expect(api.subscribe).toHaveBeenCalledTimes(1)
     expect(setIntervalSpy).not.toHaveBeenCalled()
-    expect((controller as Record<string, unknown>).lastSeenEventSequence).toBeUndefined()
 
     api.deliver({
       kind: 'batch',

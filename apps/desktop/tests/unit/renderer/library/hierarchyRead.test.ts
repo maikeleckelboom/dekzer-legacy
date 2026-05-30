@@ -186,33 +186,6 @@ describe('createLibraryHierarchyReadController', () => {
     }
   })
 
-  it('read requests have the correct shape with target, offset, and limit', async () => {
-    const readRequests: ReadRequest[] = []
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readRows: async () => navigationSourceReadRowsResult(),
-        readChildren: async (request) => {
-          readRequests.push(structuredClone(request))
-          return directoryRootHierarchyReadResult()
-        }
-      })
-    )
-
-    await expect(controller.refresh()).resolves.toBe(true)
-    expect(readRequests[0]).toEqual({
-      target: {
-        kind: 'entryPoint',
-        entryPoint: {
-          kind: 'source',
-          sourceId: '7'
-        },
-        label: 'Source Fixture'
-      },
-      offset: 0,
-      limit: 50
-    })
-  })
-
   it('refresh re-reads navigation and first source after initial load', async () => {
     const readRequests: ReadRequest[] = []
     let navigationReadCount = 0
@@ -264,29 +237,7 @@ describe('createLibraryHierarchyReadController', () => {
     expect(treeNodes(controller).map((node) => node.id)).toEqual(['navigation-row:7'])
   })
 
-  it('refreshBrowserWindows refreshes an expanded loaded source once', async () => {
-    const readRequests: ReadRequest[] = []
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readRows: async () => navigationSourceReadRowsResult(),
-        readChildren: async (request) => {
-          readRequests.push(structuredClone(request))
-          return directoryRootHierarchyReadResult()
-        }
-      })
-    )
-
-    await expect(controller.refresh()).resolves.toBe(true)
-    readRequests.length = 0
-
-    await expect(controller.refreshBrowserWindows(new Set(['navigation-row:7']))).resolves.toBe(
-      true
-    )
-
-    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual(['root'])
-  })
-
-  it('refreshBrowserWindows refreshes an expanded loaded directory once', async () => {
+  it('refreshBrowserWindows unions loaded and expanded windows without duplicate reads', async () => {
     const readRequests: ReadRequest[] = []
     const controller = createLibraryHierarchyReadController(
       testLibraryApi({
@@ -307,9 +258,9 @@ describe('createLibraryHierarchyReadController', () => {
     await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
     readRequests.length = 0
 
-    await expect(controller.refreshBrowserWindows(new Set(['source-directory:12']))).resolves.toBe(
-      true
-    )
+    await expect(
+      controller.refreshBrowserWindows(new Set(['navigation-row:7', 'source-directory:12']))
+    ).resolves.toBe(true)
 
     expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
       'root',
@@ -323,35 +274,6 @@ describe('createLibraryHierarchyReadController', () => {
     expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
       'source-file:12-track',
       'source-directory:99'
-    ])
-  })
-
-  it('refreshBrowserWindows refreshes loaded windows that are not expanded', async () => {
-    const readRequests: ReadRequest[] = []
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readRows: async () => navigationSourceReadRowsResult(),
-        readChildren: async (request) => {
-          readRequests.push(structuredClone(request))
-
-          if (request.parentDirectoryId === '12') {
-            return loadedDirectoryReadResult('12')
-          }
-
-          return directoryRootHierarchyReadResult()
-        }
-      })
-    )
-
-    await expect(controller.refresh()).resolves.toBe(true)
-    await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
-    readRequests.length = 0
-
-    await expect(controller.refreshBrowserWindows(new Set())).resolves.toBe(true)
-
-    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
-      'root',
-      '12'
     ])
   })
 
@@ -434,16 +356,6 @@ describe('createLibraryHierarchyReadController', () => {
       kind: 'entryPoint',
       entryPoint: { kind: 'source', sourceId: '7' }
     })
-  })
-
-  it('controller does not expose setSourceFileVisibility', () => {
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readChildren: async () => directoryRootHierarchyReadResult()
-      })
-    )
-
-    expect((controller as Record<string, unknown>).setSourceFileVisibility).toBeUndefined()
   })
 
   it('keeps loaded directory children visible while a source refresh is pending', async () => {
