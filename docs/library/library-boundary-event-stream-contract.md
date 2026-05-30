@@ -251,4 +251,5 @@ This contract does not:
 | `SourceScanEvent` and `MaintainedSnapshotInvalidated` are distinct families.                | Protocol enum in `session.rs` — two separate variants.                               |
 | The event ring is session-bounded, not a durable audit log.                                 | In-memory `VecDeque` with `MAX_STORED_EVENTS = 256`.                                 |
 | Renderer consumes events but does not author scan progress.                                 | Event scanner reflects substrate-published events.                                   |
+| `SourceScanCancelled` is terminal for a `scanRunId`; `SourceScanCompleted` must not follow. | Service publishes cancellation from the scan job error path and does not re-publish completed. |
 | True live scan progress requires background scan jobs (not yet implemented).                | `runRootScan` is synchronous; no background job lifecycle exists.                    |

@@ -12,13 +12,20 @@ cancellation, and authority flow
 Current code implements `StartRootScan`, `ReadAfter`, `SourceScanStarted`, `SourceScanProgressed`,
 `SourceScanCompleted`, `SourceScanFailed`, and `SourceScanBlocked`.
 
-Current code has an honest `CancelRootScan` command and `SourceScanCancelled` event in the boundary
-protocol and service command path, but cooperative scan cancellation is not yet implemented. The
-`CancelRootScan` service currently returns `NotCancelable` for active scans because the scan work
-loop does not observe a cancellation token. This is truthful behavior, not a stubbed acceptance.
+Cooperative root scan cancellation is implemented. `CancelRootScan` returns `accepted` for active
+scans and the scan worker observes the cancellation token at safe work-unit boundaries. The service
+emits `SourceScanCancelled` as a terminal event after observed cancellation. `SourceScanCompleted`
+is not published after `SourceScanCancelled` for the same `scanRunId`.
+
+Partial scan counters in `SourceScanCancelled` are approximate (driven by committed chunk count);
+precise cumulative counters during cancellation are a future refinement.
+
+Active `CancelRootScan` returns one of `accepted`, `notFound`, or `alreadyTerminal`. `notCancelable`
+is reserved for a genuinely non-cancellable scan phase and is no longer the permanent default.
 
 Current code does not yet implement `GetBoundaryEventCursor`, `eventStreamEpoch`, `WaitForEventsAfter`,
-or a Main-owned event pump. The renderer polls `ReadAfter` directly.
+a Main-owned event pump, `bootstrapPrepared`, finer invalidation scopes, or a full bounded scan
+worker pool. The renderer polls `ReadAfter` directly.
 
 These are ratified target concepts, not accidental names. This document defines the target
 architecture. Implementation must close gaps deliberately.

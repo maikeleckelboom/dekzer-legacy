@@ -2,17 +2,15 @@ use std::fs;
 use std::path::Path;
 
 use library_boundary_protocol::{
-    CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest,
-    LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
-    LibraryRootCommand,
-    LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint,
-    LibraryTreeNodeKind, LibraryTreePresenceState, MaintainedSnapshotScope,
-    NavigationRow,
-    NavigationRowFamily, NavigationRowKind, ReadLibraryBoundaryEventsAfterRequest,
-    ReadLibraryTreeChildrenReply,
+    CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandErrorEnvelope,
+    CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEventStreamCommand,
+    LibraryBoundaryEventStreamReply, LibraryRootCommand, LibraryRootReply,
+    LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
+    LibraryTreePresenceState, MaintainedSnapshotScope, NavigationRow, NavigationRowFamily,
+    NavigationRowKind, ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenReply,
     ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
-    RegisterLocalRootRequest, StartRootScanReply, StartRootScanRequest, SnapshotReadCommand,
-    SnapshotReadReply, LibraryBoundaryEvent, SourceScanEventKind,
+    RegisterLocalRootRequest, ScanRunPhase, SourceScanEventKind, StartRootScanReply,
+    StartRootScanRequest, SnapshotReadCommand, SnapshotReadReply, LibraryBoundaryEvent,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -53,6 +51,17 @@ fn start_scan(service: &LibraryBoundaryService, root_id: i64) -> StartRootScanRe
     match reply {
         CommandReply::LibraryRoots(LibraryRootReply::StartRootScan(reply)) => reply,
         other => panic!("Expected start scan reply, got {other:?}"),
+    }
+}
+
+fn cancel_scan(service: &LibraryBoundaryService, scan_run_id: i64) -> CancelRootScanReply {
+    let outcome = service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::CancelRootScan(CancelRootScanRequest { scan_run_id }),
+    ));
+    let reply = expect_command_reply(outcome, "cancel root scan");
+    match reply {
+        CommandReply::LibraryRoots(LibraryRootReply::CancelRootScan(reply)) => reply,
+        other => panic!("Expected cancel scan reply, got {other:?}"),
     }
 }
 
@@ -697,4 +706,254 @@ fn scan_publishes_maintained_snapshot_invalidations_on_completion() {
         has_navigation_invalidation,
         "MaintainedSnapshotInvalidated for NavigationRows must be published after scan"
     );
+}
+
+#[test]
+fn cancel_unknown_scan_run_id_returns_not_found() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let service = open_service(&tempdir);
+
+    let reply = cancel_scan(&service, 99999);
+    assert_eq!(reply.status, CancelRootScanStatus::NotFound);
+}
+
+#[test]
+fn cancel_invalid_scan_run_id_rejects() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let service = open_service(&tempdir);
+
+    let zero_error = expect_command_error(service.handle_command(
+        CommandRequest::LibraryRoots(LibraryRootCommand::CancelRootScan(CancelRootScanRequest {
+            scan_run_id: 0,
+        })),
+    ));
+    assert_eq!(zero_error.error.code(), "INVALID_REQUEST");
+    assert!(
+        zero_error.error.to_string().contains("scanRunId"),
+        "Error should mention scanRunId, got: {}",
+        zero_error.error,
+    );
+}
+
+#[test]
+fn cancel_already_terminal_scan_run_id_returns_already_terminal() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(&music_root.join("track.wav"), b"data");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    let scanned = start_scan(&service, registered.root_id);
+
+    assert!(scanned.scan_run_id > 0);
+    assert!(wait_for_scan_completion(&service, registered.root_id));
+
+    let reply = cancel_scan(&service, scanned.scan_run_id);
+    assert_eq!(reply.status, CancelRootScanStatus::AlreadyTerminal);
+
+    let second_reply = cancel_scan(&service, scanned.scan_run_id);
+    assert_eq!(second_reply.status, CancelRootScanStatus::AlreadyTerminal);
+}
+
+#[test]
+fn cancel_active_scan_returns_accepted_and_publishes_source_scan_cancelled() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("large-root");
+    fs::create_dir_all(&music_root).expect("create large root");
+
+    for d in 0..40 {
+        let dir = music_root.join(format!("dir-{:03}", d));
+        fs::create_dir_all(&dir).expect("create subdir");
+        for f in 0..60 {
+            fs::write(
+                dir.join(format!("track-{:03}.wav", f)),
+                b"not-real-audio-data",
+            )
+            .expect("write file");
+        }
+    }
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    let scanned = start_scan(&service, registered.root_id);
+
+    assert!(scanned.scan_run_id > 0);
+
+    let reply = cancel_scan(&service, scanned.scan_run_id);
+    assert_eq!(
+        reply.status,
+        CancelRootScanStatus::Accepted,
+        "cancel of active scan should return Accepted"
+    );
+
+    let mut cursor: Option<i64> = None;
+    let mut started = false;
+    let mut cancelled = false;
+    let mut completed = false;
+
+    for _ in 0..60 {
+        let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
+            LibraryBoundaryEventStreamCommand::ReadAfter(
+                ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence: cursor,
+                    max_events: 64,
+                },
+            ),
+        ));
+        let reply = match outcome {
+            CommandOutcome::Success(env) => match env.reply {
+                CommandReply::LibraryBoundaryEvents(
+                    LibraryBoundaryEventStreamReply::ReadAfter(r),
+                ) => r,
+                other => panic!("Expected event stream reply, got {other:?}"),
+            },
+            CommandOutcome::Error(_) => continue,
+        };
+        cursor = reply.latest_event_sequence;
+
+        for event in &reply.events {
+            let LibraryBoundaryEvent::SourceScanEvent(se) = event else {
+                continue;
+            };
+            if se.root_id != registered.root_id
+                || se.scan_run_id != scanned.scan_run_id
+            {
+                continue;
+            }
+            match se.kind {
+                SourceScanEventKind::SourceScanStarted => started = true,
+                SourceScanEventKind::SourceScanCancelled => {
+                    assert!(
+                        started,
+                        "SourceScanCancelled must appear after SourceScanStarted"
+                    );
+                    assert!(
+                        !completed,
+                        "SourceScanCancelled must not be preceded by SourceScanCompleted"
+                    );
+                    assert_eq!(se.phase, ScanRunPhase::Interrupted);
+                    cancelled = true;
+                }
+                SourceScanEventKind::SourceScanCompleted => {
+                    completed = true;
+                }
+                _ => {}
+            }
+        }
+
+        if cancelled {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    assert!(
+        cancelled,
+        "SourceScanCancelled must be published after cancel accepted"
+    );
+    assert!(
+        !completed,
+        "SourceScanCompleted must not be published for cancelled scan"
+    );
+}
+
+#[test]
+fn cancel_active_scan_cleans_registry_and_second_cancel_returns_already_terminal() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("large-root");
+    fs::create_dir_all(&music_root).expect("create large root");
+
+    for d in 0..40 {
+        let dir = music_root.join(format!("dir-{:03}", d));
+        fs::create_dir_all(&dir).expect("create subdir");
+        for f in 0..60 {
+            fs::write(
+                dir.join(format!("track-{:03}.wav", f)),
+                b"not-real-audio-data",
+            )
+            .expect("write file");
+        }
+    }
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    let scanned = start_scan(&service, registered.root_id);
+
+    let first_cancel = cancel_scan(&service, scanned.scan_run_id);
+    assert_eq!(first_cancel.status, CancelRootScanStatus::Accepted);
+
+    let mut cancelled = false;
+    let mut cursor: Option<i64> = None;
+    for _ in 0..60 {
+        let outcome = service.handle_command(CommandRequest::LibraryBoundaryEvents(
+            LibraryBoundaryEventStreamCommand::ReadAfter(
+                ReadLibraryBoundaryEventsAfterRequest {
+                    last_seen_event_sequence: cursor,
+                    max_events: 64,
+                },
+            ),
+        ));
+        let reply = match outcome {
+            CommandOutcome::Success(env) => match env.reply {
+                CommandReply::LibraryBoundaryEvents(
+                    LibraryBoundaryEventStreamReply::ReadAfter(r),
+                ) => r,
+                other => panic!("Expected event stream reply, got {other:?}"),
+            },
+            CommandOutcome::Error(_) => continue,
+        };
+        cursor = reply.latest_event_sequence;
+        if reply.events.iter().any(|e| {
+            let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
+                return false;
+            };
+            se.kind == SourceScanEventKind::SourceScanCancelled
+                && se.scan_run_id == scanned.scan_run_id
+        }) {
+            cancelled = true;
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    assert!(cancelled, "SourceScanCancelled must be published");
+
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    let second_cancel = cancel_scan(&service, scanned.scan_run_id);
+    assert_eq!(
+        second_cancel.status,
+        CancelRootScanStatus::AlreadyTerminal,
+        "second cancel after scan termination must return AlreadyTerminal"
+    );
+}
+
+#[test]
+fn duplicate_start_root_scan_behavior_remains_unchanged_after_cancellation() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    write_file(&music_root.join("track.wav"), b"data");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+
+    let first = start_scan(&service, registered.root_id);
+    assert!(first.scan_run_id > 0);
+
+    let error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::StartRootScan(StartRootScanRequest {
+            root_id: registered.root_id,
+        }),
+    )));
+    assert_eq!(error.error.code(), "INVALID_REQUEST");
+    assert!(
+        error.error.to_string().contains("already running"),
+        "Duplicate start should be rejected while scan is running"
+    );
+
+    assert!(wait_for_scan_completion(&service, registered.root_id));
+
+    let rescan = start_scan(&service, registered.root_id);
+    assert!(rescan.scan_run_id > 0);
+    assert_ne!(rescan.scan_run_id, first.scan_run_id);
+    assert!(wait_for_scan_completion(&service, registered.root_id));
 }

@@ -3,8 +3,8 @@ import type {
   LibraryBoundaryHostStatusChangedCallback
 } from './libraryBoundary/status'
 import type {
-  BoundaryEventReadAfterRequest,
-  BoundaryEventReadAfterReply
+  BoundaryEventReadAfterReply,
+  BoundaryEventReadAfterRequest
 } from './libraryBoundary/events'
 import type {
   LibraryViewStateReadResult,
@@ -16,7 +16,7 @@ import type {
   NavigationReadRowsRequest,
   NavigationReadRowsResult
 } from './libraryNavigation/readRows'
-import type { ContentsReadResult, ContentsReadRequest } from './libraryContents/read'
+import type { ContentsReadRequest, ContentsReadResult } from './libraryContents/read'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'

@@ -19,8 +19,7 @@ impl SqliteDurableStore {
         self.source_admission_gate.freeze_sources(root_ids.iter());
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn cancel_root_work(&self, root_ids: &[i64]) {
+    pub fn cancel_root_work(&self, root_ids: &[i64]) {
         self.source_admission_gate.cancel_sources(root_ids.iter());
     }
 

@@ -34,7 +34,10 @@ export type AppMaintainedSnapshotInvalidatedEvent = {
 
 export type AppBoundaryEvent =
   | { readonly type: 'sourceScanEvent'; readonly payload: AppSourceScanEvent }
-  | { readonly type: 'maintainedSnapshotInvalidated'; readonly payload: AppMaintainedSnapshotInvalidatedEvent }
+  | {
+      readonly type: 'maintainedSnapshotInvalidated'
+      readonly payload: AppMaintainedSnapshotInvalidatedEvent
+    }
   | { readonly type: 'unsupported'; readonly payload: unknown }
 
 const SCAN_RUN_PHASES: ReadonlySet<string> = new Set(['scanning', 'blocked', 'interrupted'])
@@ -101,16 +104,17 @@ export function parseBoundaryEvent(raw: unknown): AppBoundaryEvent {
       payload: {
         eventSequence,
         occurredAtMs,
-        kind: payload.kind as AppSourceScanEventKind,
+        kind: payload.kind,
         rootId,
         scanRunId,
-        phase: payload.phase as ScanRunPhase,
+        phase: payload.phase,
         directoriesVisited,
         filesVisited,
         filesDiscovered,
         mediaCandidates,
         queuedWorkItems,
-        detail: payload.detail === null || payload.detail === undefined ? null : String(payload.detail)
+        detail:
+          payload.detail === null || payload.detail === undefined ? null : String(payload.detail)
       }
     }
   }

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -271,8 +271,10 @@ impl LibraryBoundaryService {
             });
         }
 
+        self.durable_store.cancel_root_work(&[root_id]);
+
         Ok(protocol::CancelRootScanReply {
-            status: protocol::CancelRootScanStatus::NotCancelable,
+            status: protocol::CancelRootScanStatus::Accepted,
         })
     }
 
@@ -669,6 +671,9 @@ fn execute_scan_job(
     scan_run_id: i64,
     scan_started_at_ms: i64,
 ) {
+    let committed_chunk_count = Arc::new(AtomicUsize::new(0));
+    let chunk_count = Arc::clone(&committed_chunk_count);
+
     let result = store.run_root_scan_with_observer(
         root_id,
         scan_started_at_ms,
@@ -678,6 +683,7 @@ fn execute_scan_job(
                 scan_run_id: obs_scan_run_id,
                 reason: _reason,
             } => {
+                chunk_count.fetch_add(1, Ordering::Relaxed);
                 events.publish_scan_event(
                     library_boundary_protocol::SourceScanEventKind::SourceScanProgressed,
                     obs_root_id,
@@ -712,7 +718,21 @@ fn execute_scan_job(
             publish_job_maintained_invalidations(&store, &events);
         }
         Err(error) => {
-            publish_job_scan_failed_or_blocked(&events, root_id, &error);
+            if matches!(
+                &error,
+                library_store_sqlite::LibrarySqliteError::RootWorkCancelled { .. }
+                    | library_store_sqlite::LibrarySqliteError::RootWorkAdmissionDenied { .. }
+            ) {
+                publish_job_scan_cancelled(
+                    &events,
+                    root_id,
+                    scan_run_id,
+                    committed_chunk_count.load(Ordering::Relaxed),
+                );
+                publish_job_maintained_invalidations(&store, &events);
+            } else {
+                publish_job_scan_failed_or_blocked(&events, root_id, &error);
+            }
         }
     }
 }
@@ -731,16 +751,14 @@ fn publish_job_scan_failed_or_blocked(
     root_id: i64,
     error: &library_store_sqlite::LibrarySqliteError,
 ) {
-    use library_store_sqlite::{CanonicalErrorCode, LibrarySqliteError};
+    use library_store_sqlite::CanonicalErrorCode;
 
     let detail = error.to_string();
-    let is_blocked = match error {
-        LibrarySqliteError::Canonical(canonical) => {
-            matches!(canonical.code, CanonicalErrorCode::NotFound)
-        }
-        LibrarySqliteError::RootWorkCancelled { .. } => true,
-        _ => false,
-    };
+    let is_blocked = matches!(
+        error,
+        library_store_sqlite::LibrarySqliteError::Canonical(canonical)
+            if matches!(canonical.code, CanonicalErrorCode::NotFound)
+    );
 
     if is_blocked {
         events.publish_scan_event(
@@ -769,6 +787,27 @@ fn publish_job_scan_failed_or_blocked(
             Some(detail),
         );
     }
+}
+
+fn publish_job_scan_cancelled(
+    events: &LibraryBoundaryEventStream,
+    root_id: i64,
+    scan_run_id: i64,
+    committed_chunks: usize,
+) {
+    let approx_files = committed_chunks * 256;
+    events.publish_scan_event(
+        library_boundary_protocol::SourceScanEventKind::SourceScanCancelled,
+        root_id,
+        scan_run_id,
+        library_boundary_protocol::ScanRunPhase::Interrupted,
+        0,
+        approx_files,
+        approx_files,
+        0,
+        0,
+        Some("cancelled by user".to_string()),
+    );
 }
 
 fn require_playlist_id(value: i64, field_name: &str) -> protocol::ProtocolResult<PlaylistId> {
@@ -1646,7 +1685,7 @@ mod tests {
     }
 
     #[test]
-    fn cancel_active_scan_returns_not_cancelable() {
+    fn cancel_active_scan_returns_accepted_or_already_terminal() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("music-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -1657,10 +1696,13 @@ mod tests {
         let scanned = start_root_scan(&service, registered.root_id);
 
         let reply = cancel_root_scan(&service, scanned.scan_run_id);
-        assert_eq!(
+        assert!(
+            matches!(
+                reply.status,
+                CancelRootScanStatus::Accepted | CancelRootScanStatus::AlreadyTerminal
+            ),
+            "active scan cancellation must return Accepted or AlreadyTerminal, not {:?}",
             reply.status,
-            CancelRootScanStatus::NotCancelable,
-            "cooperative cancellation is not yet implemented for active scans"
         );
     }
 
