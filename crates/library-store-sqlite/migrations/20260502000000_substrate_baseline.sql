@@ -672,6 +672,38 @@ CREATE INDEX SourceFacts_source_basis
 CREATE INDEX SourceFacts_media_kind
     ON SourceFacts (media_kind);
 
+CREATE TABLE content_attachments
+(
+    attachment_id           INTEGER PRIMARY KEY,
+    content_hash_algorithm  TEXT    NOT NULL CHECK (content_hash_algorithm = 'blake3'),
+    content_hash_value      TEXT    NOT NULL CHECK (length(trim(content_hash_value)) > 0),
+    first_observed_at       INTEGER NOT NULL,
+    updated_at              INTEGER NOT NULL,
+    CHECK (updated_at >= first_observed_at),
+    UNIQUE (content_hash_algorithm, content_hash_value)
+) STRICT;
+
+CREATE TABLE source_file_attachment_links
+(
+    source_file_attachment_link_id  INTEGER PRIMARY KEY,
+    attachment_id                   INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
+    source_file_id                  INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
+    source_id                       INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
+    content_hash_value              TEXT    NOT NULL CHECK (length(trim(content_hash_value)) > 0),
+    file_kind                       TEXT    NOT NULL
+        CHECK (file_kind IN ('audio', 'video', 'image', 'cue_sheet', 'log_doc', 'text_doc', 'archive', 'other', 'unknown')),
+    created_at                      INTEGER NOT NULL,
+    updated_at                      INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    UNIQUE (source_file_id, attachment_id)
+) STRICT;
+
+CREATE INDEX source_file_attachment_links_source_file
+    ON source_file_attachment_links (source_file_id);
+
+CREATE INDEX source_file_attachment_links_attachment
+    ON source_file_attachment_links (attachment_id);
+
 CREATE TABLE SourceSegmentSets
 (
     source_segment_set_id  INTEGER PRIMARY KEY,

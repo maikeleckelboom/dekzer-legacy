@@ -1,6 +1,6 @@
 ---
 status: accepted
-last-reviewed: 2026-05-31
+last-reviewed: 2026-06-01
 owner: library-substrate-boundary
 canonical-context:
   - media-relevant-file-inventory-contract
@@ -195,7 +195,7 @@ Future work remains separate:
 - media/container probing
 - CUE parsing
 - CUE-to-audio association evidence
-- attachment identity
+- attachment identity scheduling, boundary exposure, and later promotion beyond the Rust/store foundation
 - track identity
 - artwork intelligence
 - waveform, stems, and preparation jobs

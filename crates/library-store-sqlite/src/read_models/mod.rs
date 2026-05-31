@@ -1,3 +1,4 @@
+pub mod attachment_identity;
 pub mod contents;
 pub mod library_asset_preparation_detail;
 pub mod library_asset_waveform_overview;

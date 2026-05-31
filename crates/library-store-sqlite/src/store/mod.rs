@@ -10,6 +10,7 @@ use crate::authority::write_lane::{AdmittedWrite, admit_write};
 use crate::work_control::SourceAdmissionGate;
 
 mod artifacts;
+mod attachment_identity;
 mod bootstrap;
 mod contents_reads;
 mod context;
@@ -29,6 +30,7 @@ mod source_lifecycle_reads;
 mod sources;
 mod work_items;
 
+pub use attachment_identity::MaterializeAttachmentsForSourceResult;
 pub use context::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
     DurableStoreSchemaCompatibilityState, LibraryStoreContext, SqliteDurableStoreAppOwnedState,

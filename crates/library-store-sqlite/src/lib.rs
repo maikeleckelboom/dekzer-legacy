@@ -55,6 +55,10 @@ pub use error::{
     CanonicalError, CanonicalErrorCode, CanonicalErrorCodeParseError, DurableStoreOpenFailure,
     DurableStoreOpenFailureKind, LibrarySqliteError, LibrarySqliteResult,
 };
+pub use read_models::attachment_identity::{
+    StoreSourceFileAttachmentLink, StoreSourceFileAttachmentLinkStatus,
+    get_attachment_for_source_file, get_source_files_for_attachment,
+};
 pub use read_models::contents::{
     StoreContentsCoverage, StoreContentsCoverageState, StoreContentsFileRow,
     StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion, StoreContentsResult,
@@ -85,8 +89,8 @@ pub use store::{
     DurableStoreSchemaCompatibilityState, HashSourceFileBlake3BatchInput,
     HashSourceFileBlake3BatchOutcome, HashSourceFileBlake3BatchOutcomeStatus,
     HashSourceFileBlake3BatchResult, LibraryStoreContext, LocalRoot, LocalRootAvailability,
-    MaintainedReadModelRevision, MaintainedReadModelScope, ReadLocalRootsResult,
-    ReadSourceFileBlake3HashCandidatesInput, RegisterLocalRootInput,
+    MaintainedReadModelRevision, MaintainedReadModelScope, MaterializeAttachmentsForSourceResult,
+    ReadLocalRootsResult, ReadSourceFileBlake3HashCandidatesInput, RegisterLocalRootInput,
     RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
     SOURCE_FILE_BLAKE3_ALGORITHM, SourceFileBlake3HashAdmissionScope,
     SourceFileBlake3HashCandidate, SourceFileBlake3HashCandidateReason,

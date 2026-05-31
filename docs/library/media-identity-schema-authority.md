@@ -1,6 +1,6 @@
 ---
 status: accepted
-last-reviewed: 2026-05-31
+last-reviewed: 2026-06-01
 owner: library-substrate-boundary
 canonical-context:
   - source-lifecycle-backend-contract-gap
@@ -37,6 +37,7 @@ Reading order:
 | `source_files` | SQLite + `SourceFilesAuthorityTx` | Canonical attachment inventory row for observed source files. Classification is path-derived and provisional. |
 | `readContents` default policy | Renderer boundary + service/store read model | Current product contents path: recursive `sourceFile` rows for audio, video, image, and admitted unsupported CUE sheets. |
 | `SourceFacts` content hash evidence | Observed source facts substrate | Optional accepted, algorithm-tagged source-fact evidence attached to a `source_file_id` and copied file basis. It is not attachment identity and is not required by default contents reads. |
+| `content_attachments` / `source_file_attachment_links` | SQLite + `SqliteDurableStore::materialize_attachments_for_source` | Current Rust/store-only attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing, and not boundary-exposed. |
 | `source_media` write/read guards | Store filesystem guard | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing. |
 | `Playlists` / `PlaylistEntries` | Boundary service + store | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`. |
 
@@ -47,8 +48,8 @@ requests `rowProfile: sourceFile` with audio, video, image, and unsupported medi
 
 | Surface | Status | Blocker / owner |
 | --- | --- | --- |
-| `LibraryAssets` | Live transitional substrate, not current file identity authority | `equivalence_fingerprint` is caller-provided. Attachment identity requires observed file facts and durable bytes-derived evidence. |
-| `LibraryAssetAttachments` / `SourceSegmentSets` / `SourceSegments` | Dormant future shape | Segment and attachment identity are not ratified. Future owner: observed facts / segmentation promotion. |
+| `LibraryAssets` | Live transitional substrate, not current attachment identity authority | `equivalence_fingerprint` is caller-provided and remains non-authoritative for content identity. Current attachment identity uses `content_attachments`. |
+| `LibraryAssetAttachments` / `SourceSegmentSets` / `SourceSegments` | Dormant future segment/promotion shape | Segment promotion remains separate from BLAKE3 attachment identity. These tables are not used by attachment materialization. |
 | `LibraryBrowserRows` | Live maintained projection over `LibraryAssets` | Used by library browser, playlist-scoped browser reads, and promoted `primaryMedia` summaries. Not current default contents authority. |
 | `primaryMedia` row profile | Intentionally dormant projection shape with live protocol/read-model support | Correct long-term playable/performance projection. Blocked on attachment identity, observed file facts, and playable media evidence. |
 | Waveform, stems, prep readiness summaries | Live generated/service/store projection fields, dormant in desktop UI | Future preparation owner. They summarize capability/projection state and are not canonical media identity. |
@@ -101,6 +102,9 @@ derivation is not owned by the table or authority method. `LibraryAssetsAuthorit
 accepts an opaque string and stores it as-is. `ResolveLibraryAssetPromotionTx` forwards the same caller-provided value
 and also uses it as a projection rebuild basis.
 
+Attachment identity does not read or write `equivalence_fingerprint`. It is not copied into `content_attachments`, does
+not satisfy BLAKE3 evidence, and is not a content identity authority after the attachment foundation pass.
+
 Answers:
 
 | Question | Decision |
@@ -133,7 +137,8 @@ Current placement:
 - A basis change between the pre-hash source-file read and pre-commit source-file read rejects the commit.
 - Admission is bounded, deterministic, and limited to present media-relevant source-file inventory: audio, video, image,
   and CUE sheet rows. Current BLAKE3 facts are skipped; missing, stale, absent, or non-BLAKE3 hash facts are candidates.
-- Attachment identity consumes durable hash/evidence later.
+- Attachment identity now consumes current BLAKE3 durable hash evidence through the Rust/store-only
+  `materialize_attachments_for_source(source_id, limit)` path.
 - Track identity must not rely on path identity.
 - Attachment identity should not re-read files merely to discover content identity if observed facts already owns
   hashing.
@@ -148,13 +153,13 @@ Current placement:
 | --- | --- | --- |
 | Source files | Durable source-relative file inventory, path-derived file kind/media class, presence, size, mtime | Playability, track identity, attachment identity, artwork role |
 | Observed file facts | Future/partial evidence from reading bytes or probing containers | Product row admission or user-facing track identity by itself |
-| Attachments | Future durable relation between media evidence and playable/asset identity | Path proximity guesses |
+| Attachments | Current durable bytes-identity relation from current BLAKE3 evidence to source-file occurrence links | Path proximity guesses, track identity, CUE pairing, prep readiness, browser rows |
 | Track identity | Future semantic musical/performance identity | Source-file row identity or playlist membership alone |
 | Preparation | Capability targets, artifacts, readiness summaries | File identity or content-addressed attachment identity |
 
 ## Next Implementation Gate
 
-The next gate is a broader scheduler policy for the bounded BLAKE3 admission path, source-location-scoped admission, or
-media probing work that adds new observed facts. Attachment identity remains a later promotion layer. It must not add
-track tables, CUE pairing, artwork intelligence, playlist UI, prep facets, or waveform generation as part of the same
-change.
+The next gate is a broader scheduler policy for attachment materialization, source-location-scoped hash admission, media
+probing work that adds new observed facts, or a later promotion layer from attachments to playable identity. Follow-on
+work must not conflate this attachment foundation with track tables, CUE pairing, artwork intelligence, playlist UI,
+prep facets, or waveform generation.
