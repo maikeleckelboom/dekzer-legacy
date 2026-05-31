@@ -1,5 +1,5 @@
-// Source-file observation owns provisional path-based media classification.
-// Maintained read models should consume the stored source_files.media_class.
+// Source-file observation owns provisional path-based file/media classification.
+// Maintained read models should consume the stored source_files.file_kind and media_class.
 #![allow(dead_code)]
 
 use std::path::Path;
@@ -99,6 +99,14 @@ pub(crate) fn media_class_str_from_path(relative_path: &str) -> &'static str {
     }
 }
 
+pub(crate) fn file_kind_str_from_path(relative_path: &str) -> &'static str {
+    classify_relative_path_file_kind(relative_path)
+}
+
+pub(crate) fn is_media_relevant_unsupported_file_kind(file_kind: &str) -> bool {
+    file_kind == "cue_sheet"
+}
+
 pub(crate) fn classify_relative_path_file_kind(relative_path: &str) -> &'static str {
     let Some(extension) = Path::new(relative_path)
         .extension()
@@ -127,7 +135,8 @@ pub(crate) fn classify_relative_path_file_kind(relative_path: &str) -> &'static 
 mod tests {
     use super::{
         BrowseMediaClass, canonical_media_class_from_file_kind,
-        canonical_media_class_from_media_kind, media_class_str_from_path,
+        canonical_media_class_from_media_kind, file_kind_str_from_path,
+        is_media_relevant_unsupported_file_kind, media_class_str_from_path,
         provisional_media_class_from_path,
     };
 
@@ -198,6 +207,20 @@ mod tests {
         assert_eq!(media_class_str_from_path("lib/clip.mkv"), "video");
         assert_eq!(media_class_str_from_path("lib/cover.png"), "image");
         assert_eq!(media_class_str_from_path("lib/readme"), "none");
+    }
+
+    #[test]
+    fn file_kind_str_from_path_preserves_cue_without_broadening_unsupported() {
+        assert_eq!(file_kind_str_from_path("lib/album.cue"), "cue_sheet");
+        assert_eq!(file_kind_str_from_path("lib/readme.txt"), "text_doc");
+        assert_eq!(file_kind_str_from_path("lib/archive.zip"), "archive");
+        assert_eq!(file_kind_str_from_path("lib/data.bin"), "other");
+        assert_eq!(file_kind_str_from_path("lib/mystery"), "unknown");
+        assert!(is_media_relevant_unsupported_file_kind("cue_sheet"));
+        assert!(!is_media_relevant_unsupported_file_kind("text_doc"));
+        assert!(!is_media_relevant_unsupported_file_kind("archive"));
+        assert!(!is_media_relevant_unsupported_file_kind("other"));
+        assert!(!is_media_relevant_unsupported_file_kind("unknown"));
     }
 
     #[test]

@@ -415,6 +415,7 @@ pub enum StoreContentsMediaClass {
     Audio,
     Video,
     Image,
+    Unsupported,
 }
 
 impl StoreContentsMediaClass {
@@ -423,6 +424,7 @@ impl StoreContentsMediaClass {
             Self::Audio => "audio",
             Self::Video => "video",
             Self::Image => "image",
+            Self::Unsupported => "unsupported",
         }
     }
 }
@@ -480,6 +482,7 @@ pub struct StoreContentsFileRow {
     pub relative_path: String,
     pub file_name: String,
     pub media_class: String,
+    pub file_kind: String,
     pub presence: String,
     pub availability_state: Option<String>,
     pub primary_media: Option<StorePrimaryMediaSummary>,
@@ -560,9 +563,12 @@ pub(crate) fn read_contents(
     let policy = canonicalize_policy(policy)?;
 
     if policy.row_profile == StoreContentsRowProfile::PrimaryMedia
-        && policy
-            .media_classes
-            .contains(&StoreContentsMediaClass::Image)
+        && policy.media_classes.iter().any(|media_class| {
+            matches!(
+                media_class,
+                StoreContentsMediaClass::Image | StoreContentsMediaClass::Unsupported
+            )
+        })
     {
         return Ok(non_ready_result(
             scope,
@@ -570,7 +576,7 @@ pub(crate) fn read_contents(
             recursion,
             StoreContentsState::PolicyConflict,
             StoreContentsCoverageState::Failed,
-            "Primary media contents cannot include image rows.",
+            "Primary media contents can include audio and video rows only.",
         ));
     }
 
@@ -746,12 +752,14 @@ pub(crate) fn canonicalize_policy(
     let mut has_audio = false;
     let mut has_video = false;
     let mut has_image = false;
+    let mut has_unsupported = false;
 
     for media_class in policy.media_classes {
         match media_class {
             StoreContentsMediaClass::Audio => has_audio = true,
             StoreContentsMediaClass::Video => has_video = true,
             StoreContentsMediaClass::Image => has_image = true,
+            StoreContentsMediaClass::Unsupported => has_unsupported = true,
         }
     }
 
@@ -764,6 +772,9 @@ pub(crate) fn canonicalize_policy(
     }
     if has_image {
         media_classes.push(StoreContentsMediaClass::Image);
+    }
+    if has_unsupported {
+        media_classes.push(StoreContentsMediaClass::Unsupported);
     }
 
     if media_classes.is_empty() {
@@ -779,15 +790,21 @@ pub(crate) fn canonicalize_policy(
 }
 
 fn media_classes_predicate_sql(
-    column_sql: &str,
+    media_class_column_sql: &str,
+    file_kind_column_sql: &str,
     media_classes: &[StoreContentsMediaClass],
 ) -> String {
-    let values = media_classes
+    let predicates = media_classes
         .iter()
-        .map(|media_class| format!("'{}'", media_class.as_str()))
+        .map(|media_class| match media_class {
+            StoreContentsMediaClass::Unsupported => format!(
+                "({media_class_column_sql} = 'unsupported' AND {file_kind_column_sql} = 'cue_sheet')"
+            ),
+            _ => format!("{media_class_column_sql} = '{}'", media_class.as_str()),
+        })
         .collect::<Vec<_>>()
-        .join(", ");
-    format!("{column_sql} IN ({values})")
+        .join(" OR ");
+    format!("({predicates})")
 }
 
 fn resolve_scope(
@@ -1502,7 +1519,8 @@ fn read_rows(
             "contents limit {limit} exceeds i64 range"
         ))
     })?;
-    let media_predicate = media_classes_predicate_sql("sf.media_class", &policy.media_classes);
+    let media_predicate =
+        media_classes_predicate_sql("sf.media_class", "sf.file_kind", &policy.media_classes);
 
     match scope {
         ResolvedContentsScope::WholeSource { source_id } => {
@@ -1794,6 +1812,7 @@ SELECT sf.source_file_id, \
        sf.relative_path, \
        sf.name AS file_name, \
        sf.media_class, \
+       sf.file_kind, \
        sf.presence_state, \
        NULL AS library_asset_id, \
        NULL AS row_version, \
@@ -1811,8 +1830,7 @@ SELECT sf.source_file_id, \
        NULL AS prep_readiness_summary, \
        sf.updated_at \
   FROM source_files sf \
- WHERE sf.presence_state = 'present' \
-   AND {media_predicate} \
+ WHERE {media_predicate} \
    AND {source_predicate}{cursor_clause} \
  ORDER BY {SOURCE_FILE_CONTENTS_ORDER_SQL} \
  LIMIT ?{limit_param}"
@@ -1906,6 +1924,7 @@ fn primary_media_rows_sql(
                      sf.relative_path, \
                      sf.name, \
                      sf.media_class, \
+                     sf.file_kind, \
                      sf.presence_state, \
                      sf.updated_at \
               FROM source_files sf \
@@ -1935,6 +1954,7 @@ fn primary_media_rows_sql(
                      sf.relative_path, \
                      sf.name, \
                      sf.media_class, \
+                     sf.file_kind, \
                      sf.presence_state, \
                      pia.accepted_at, \
                      ss.ordinal, \
@@ -1965,6 +1985,7 @@ fn primary_media_rows_sql(
                      relative_path, \
                      name AS file_name, \
                      media_class, \
+                     file_kind, \
                      presence_state, \
                      library_asset_id, \
                      row_version, \
@@ -1991,6 +2012,7 @@ fn primary_media_rows_sql(
                      sf.relative_path, \
                      sf.name AS file_name, \
                      sf.media_class, \
+                     sf.file_kind, \
                      sf.presence_state, \
                      NULL AS library_asset_id, \
                      NULL AS row_version, \
@@ -2020,6 +2042,7 @@ fn primary_media_rows_sql(
                  relative_path, \
                  file_name, \
                  media_class, \
+                 file_kind, \
                  presence_state, \
                  library_asset_id, \
                  row_version, \
@@ -2106,22 +2129,23 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let relative_path: String = row.get(3)?;
     let file_name: String = row.get(4)?;
     let media_class: String = row.get(5)?;
-    let presence: String = row.get(6)?;
-    let library_asset_id: Option<i64> = row.get(7)?;
-    let row_version: Option<i64> = row.get(8)?;
-    let primary_source_file_id: Option<i64> = row.get(9)?;
-    let availability_state: Option<String> = row.get(10)?;
-    let title: Option<String> = row.get(11)?;
-    let artist: Option<String> = row.get(12)?;
-    let album: Option<String> = row.get(13)?;
-    let duration_ms: Option<i64> = row.get(14)?;
-    let musical_key: Option<String> = row.get(15)?;
-    let tempo_bpm: Option<f64> = row.get(16)?;
-    let waveform_quality_current: Option<i64> = row.get(17)?;
-    let waveform_quality_target: Option<i64> = row.get(18)?;
-    let stems_state_summary: Option<String> = row.get(19)?;
-    let prep_readiness_summary: Option<String> = row.get(20)?;
-    let updated_at: i64 = row.get(21)?;
+    let file_kind: String = row.get(6)?;
+    let presence: String = row.get(7)?;
+    let library_asset_id: Option<i64> = row.get(8)?;
+    let row_version: Option<i64> = row.get(9)?;
+    let primary_source_file_id: Option<i64> = row.get(10)?;
+    let availability_state: Option<String> = row.get(11)?;
+    let title: Option<String> = row.get(12)?;
+    let artist: Option<String> = row.get(13)?;
+    let album: Option<String> = row.get(14)?;
+    let duration_ms: Option<i64> = row.get(15)?;
+    let musical_key: Option<String> = row.get(16)?;
+    let tempo_bpm: Option<f64> = row.get(17)?;
+    let waveform_quality_current: Option<i64> = row.get(18)?;
+    let waveform_quality_target: Option<i64> = row.get(19)?;
+    let stems_state_summary: Option<String> = row.get(20)?;
+    let prep_readiness_summary: Option<String> = row.get(21)?;
+    let updated_at: i64 = row.get(22)?;
 
     let primary_media = availability_state.as_ref().map(|availability_state| {
         let origin = if library_asset_id.is_some() {
@@ -2166,6 +2190,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
         relative_path,
         file_name,
         media_class,
+        file_kind,
         presence,
         availability_state,
         primary_media,
@@ -2446,6 +2471,7 @@ mod tests {
         title: &str,
     ) {
         let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
+        let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -2454,6 +2480,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      relative_path,
+                     file_kind,
                      media_class,
                      presence_state,
                      first_discovered_at,
@@ -2462,13 +2489,14 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'present', 1, 1, 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'present', 1, 1, 1, 1, 1)",
                 params![
                     source_file_id,
                     source_id,
                     parent_directory_id,
                     file_name,
                     relative_path,
+                    file_kind,
                     media_class
                 ],
             )
@@ -2909,6 +2937,7 @@ mod tests {
         media_class: &str,
     ) {
         let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
+        let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -2917,6 +2946,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      relative_path,
+                     file_kind,
                      media_class,
                      presence_state,
                      first_discovered_at,
@@ -2925,13 +2955,14 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'present', 1, 1, 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'present', 1, 1, 1, 1, 1)",
                 params![
                     source_file_id,
                     source_id,
                     parent_directory_id,
                     file_name,
                     relative_path,
+                    file_kind,
                     media_class
                 ],
             )
@@ -3206,15 +3237,18 @@ mod tests {
     }
 
     #[test]
-    fn source_file_profile_returns_audio_video_and_image_without_primary_media() {
+    fn source_file_profile_returns_media_relevant_inventory_without_primary_media() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
         insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
         insert_scanned_file(&connection, 1001, 1, 10, "Media/clip.mp4", "video");
         insert_scanned_file(&connection, 1002, 1, 10, "Media/cover.jpg", "image");
-        insert_scanned_file(&connection, 1003, 1, 10, "Media/readme.txt", "unsupported");
-        insert_scanned_file(&connection, 1004, 1, 10, "Media/mystery", "none");
+        insert_scanned_file(&connection, 1003, 1, 10, "Media/album.cue", "unsupported");
+        insert_scanned_file(&connection, 1004, 1, 10, "Media/readme.txt", "unsupported");
+        insert_scanned_file(&connection, 1005, 1, 10, "Media/archive.zip", "unsupported");
+        insert_scanned_file(&connection, 1006, 1, 10, "Media/blob.bin", "unsupported");
+        insert_scanned_file(&connection, 1007, 1, 10, "Media/mystery", "none");
 
         let result = read_contents(
             &connection,
@@ -3226,6 +3260,7 @@ mod tests {
                 StoreContentsMediaClass::Audio,
                 StoreContentsMediaClass::Video,
                 StoreContentsMediaClass::Image,
+                StoreContentsMediaClass::Unsupported,
             ]),
             StoreContentsRecursion::Recursive,
             10,
@@ -3241,15 +3276,28 @@ mod tests {
                 .iter()
                 .map(|media_class| media_class.as_str())
                 .collect::<Vec<_>>(),
-            vec!["audio", "video", "image"]
+            vec!["audio", "video", "image", "unsupported"]
         );
-        let mut media_classes = result
+        let rows = result
             .rows
             .iter()
-            .map(|row| row.media_class.as_str())
+            .map(|row| {
+                (
+                    row.relative_path.as_str(),
+                    row.media_class.as_str(),
+                    row.file_kind.as_str(),
+                )
+            })
             .collect::<Vec<_>>();
-        media_classes.sort_unstable();
-        assert_eq!(media_classes, vec!["audio", "image", "video"]);
+        assert_eq!(
+            rows,
+            vec![
+                ("Media/album.cue", "unsupported", "cue_sheet"),
+                ("Media/clip.mp4", "video", "video"),
+                ("Media/cover.jpg", "image", "image"),
+                ("Media/track.wav", "audio", "audio"),
+            ]
+        );
         assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
         assert!(
             result
@@ -3257,6 +3305,140 @@ mod tests {
                 .iter()
                 .all(|row| row.availability_state.is_none())
         );
+    }
+
+    #[test]
+    fn source_file_profile_unsupported_policy_admits_only_cue_sheets() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/album.cue", "unsupported");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/readme.txt", "unsupported");
+        insert_scanned_file(&connection, 1002, 1, 10, "Media/log.pdf", "unsupported");
+        insert_scanned_file(&connection, 1003, 1, 10, "Media/archive.zip", "unsupported");
+        insert_scanned_file(&connection, 1004, 1, 10, "Media/blob.bin", "unsupported");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Unsupported]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read unsupported source-file contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0].relative_path, "Media/album.cue");
+        assert_eq!(result.rows[0].media_class, "unsupported");
+        assert_eq!(result.rows[0].file_kind, "cue_sheet");
+        assert!(result.rows[0].primary_media.is_none());
+    }
+
+    #[test]
+    fn source_file_profile_represents_missing_and_removed_media_inventory_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/missing.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/removed.cue", "unsupported");
+        connection
+            .execute(
+                "UPDATE source_files
+                 SET presence_state = 'missing',
+                     updated_at = 2
+                 WHERE source_file_id = 1000",
+                [],
+            )
+            .expect("mark missing");
+        connection
+            .execute(
+                "UPDATE source_files
+                 SET presence_state = 'removed',
+                     updated_at = 3
+                 WHERE source_file_id = 1001",
+                [],
+            )
+            .expect("mark removed");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Unsupported,
+            ]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read source-file contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_eq!(
+            result
+                .rows
+                .iter()
+                .map(|row| (row.relative_path.as_str(), row.presence.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("Media/missing.wav", "missing"),
+                ("Media/removed.cue", "removed")
+            ]
+        );
+    }
+
+    #[test]
+    fn source_and_directory_scopes_apply_backend_recursion_without_renderer_fanout() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
+
+        let recursive_source = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read recursive source");
+        let immediate_source = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Immediate,
+            10,
+            None,
+        )
+        .expect("read immediate source");
+        let recursive_directory = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read recursive directory");
+
+        assert_eq!(recursive_source.rows.len(), 1);
+        assert_eq!(recursive_source.rows[0].relative_path, "Media/track.wav");
+        assert_eq!(immediate_source.state, StoreContentsState::Empty);
+        assert!(immediate_source.rows.is_empty());
+        assert_eq!(recursive_directory.rows.len(), 1);
+        assert_eq!(recursive_directory.rows[0].relative_path, "Media/track.wav");
     }
 
     #[test]
@@ -3301,6 +3483,8 @@ mod tests {
                 StoreContentsMediaClass::Audio,
                 StoreContentsMediaClass::Audio,
                 StoreContentsMediaClass::Video,
+                StoreContentsMediaClass::Unsupported,
+                StoreContentsMediaClass::Unsupported,
             ]),
             StoreContentsRecursion::Recursive,
             10,
@@ -3314,12 +3498,13 @@ mod tests {
                 StoreContentsMediaClass::Audio,
                 StoreContentsMediaClass::Video,
                 StoreContentsMediaClass::Image,
+                StoreContentsMediaClass::Unsupported,
             ]
         );
     }
 
     #[test]
-    fn primary_media_policy_with_image_returns_policy_conflict() {
+    fn primary_media_policy_with_non_primary_media_classes_returns_policy_conflict() {
         let connection = open_connection();
         insert_source(&connection, 1);
 
@@ -3352,6 +3537,28 @@ mod tests {
 
         assert_eq!(conflict.state, StoreContentsState::PolicyConflict);
         assert!(conflict.rows.is_empty());
+
+        let unsupported_conflict = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            StoreContentsReadPolicy {
+                media_classes: vec![
+                    StoreContentsMediaClass::Audio,
+                    StoreContentsMediaClass::Unsupported,
+                ],
+                row_profile: StoreContentsRowProfile::PrimaryMedia,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read unsupported conflicted contents");
+
+        assert_eq!(
+            unsupported_conflict.state,
+            StoreContentsState::PolicyConflict
+        );
+        assert!(unsupported_conflict.rows.is_empty());
     }
 
     #[test]
@@ -4072,6 +4279,7 @@ mod tests {
 
         let media_predicate = super::media_classes_predicate_sql(
             "sf.media_class",
+            "sf.file_kind",
             &primary_media_policy().media_classes,
         );
         let sql =
@@ -4119,6 +4327,7 @@ mod tests {
         );
         let media_predicate = super::media_classes_predicate_sql(
             "sf.media_class",
+            "sf.file_kind",
             &primary_media_policy().media_classes,
         );
         let sql = super::primary_media_rows_sql(None, &source_predicate, &media_predicate, None, 3);
@@ -4171,6 +4380,7 @@ mod tests {
         );
         let media_predicate = super::media_classes_predicate_sql(
             "sf.media_class",
+            "sf.file_kind",
             &primary_media_policy().media_classes,
         );
         let sql = super::primary_media_rows_sql(
@@ -4231,6 +4441,7 @@ mod tests {
 
         let media_predicate = super::media_classes_predicate_sql(
             "sf.media_class",
+            "sf.file_kind",
             &primary_media_policy().media_classes,
         );
         let sql =

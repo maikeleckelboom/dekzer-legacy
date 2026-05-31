@@ -35,7 +35,12 @@ export type LibraryContentsReadIpcMain = {
 const defaultContentsLimit = 100
 const maxContentsLimit = 200
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
-const canonicalMediaClassOrder: readonly ContentsMediaClass[] = ['audio', 'video', 'image']
+const canonicalMediaClassOrder: readonly ContentsMediaClass[] = [
+  'audio',
+  'video',
+  'image',
+  'unsupported'
+]
 
 export function registerContentsReadIpc(
   ipcMain: LibraryContentsReadIpcMain,
@@ -233,7 +238,12 @@ function normalizeMediaClasses(value: unknown): readonly ContentsMediaClass[] | 
   const mediaClasses = new Set<ContentsMediaClass>()
 
   for (const mediaClass of value) {
-    if (mediaClass !== 'audio' && mediaClass !== 'video' && mediaClass !== 'image') {
+    if (
+      mediaClass !== 'audio' &&
+      mediaClass !== 'video' &&
+      mediaClass !== 'image' &&
+      mediaClass !== 'unsupported'
+    ) {
       return createContentsErrorResult(
         'invalidRequest',
         'invalidRequest',
@@ -449,7 +459,10 @@ function mapCoverage(result: ContractContentsResult): ContentsCoverage {
 }
 
 function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefined {
-  if (row.primaryMedia !== undefined && row.mediaClass === 'image') {
+  if (
+    row.primaryMedia !== undefined &&
+    (row.mediaClass === 'image' || row.mediaClass === 'unsupported')
+  ) {
     return undefined
   }
 
@@ -462,6 +475,7 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
     ...(row.relativePath === undefined ? {} : { relativePath: row.relativePath }),
     fileName: row.fileName,
     mediaClass: row.mediaClass,
+    fileKind: row.fileKind,
     presence: row.presence,
     ...(row.availabilityState === undefined ? {} : { availabilityState: row.availabilityState }),
     ...(row.primaryMedia === undefined ? {} : { primaryMedia: mapPrimaryMedia(row.primaryMedia) }),

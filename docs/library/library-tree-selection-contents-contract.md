@@ -49,8 +49,8 @@ Scope kinds:
 
 | Tree node kind  | Derived contents scope                                                           |
 |-----------------|----------------------------------------------------------------------------------|
-| `source_root`   | All primary media under this source, subject to browse policy.                   |
-| `directory`     | Primary media under this directory, subject to browse policy (recursive or not). |
+| `source_root`   | Media-relevant source-file inventory under this source, subject to contents policy. |
+| `directory`     | Media-relevant source-file inventory under this directory, subject to contents policy (recursive or not). |
 | `primary_media` | Single track. Contents panel shows track detail or adjacent context.             |
 | `segment`       | Single segment. Contents panel shows segment detail or parent disc context.      |
 | `blocked`       | Blocked scope. Contents panel shows blocked state, not empty.                    |

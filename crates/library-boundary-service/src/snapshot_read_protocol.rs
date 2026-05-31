@@ -100,6 +100,7 @@ const fn store_contents_media_class(
         protocol::ContentsMediaClass::Audio => store::StoreContentsMediaClass::Audio,
         protocol::ContentsMediaClass::Video => store::StoreContentsMediaClass::Video,
         protocol::ContentsMediaClass::Image => store::StoreContentsMediaClass::Image,
+        protocol::ContentsMediaClass::Unsupported => store::StoreContentsMediaClass::Unsupported,
     }
 }
 
@@ -770,6 +771,7 @@ const fn map_contents_media_class(
         store::StoreContentsMediaClass::Audio => protocol::ContentsMediaClass::Audio,
         store::StoreContentsMediaClass::Video => protocol::ContentsMediaClass::Video,
         store::StoreContentsMediaClass::Image => protocol::ContentsMediaClass::Image,
+        store::StoreContentsMediaClass::Unsupported => protocol::ContentsMediaClass::Unsupported,
     }
 }
 
@@ -831,6 +833,8 @@ fn map_contents_row(
 ) -> store::LibrarySqliteResult<protocol::ContentsFileRow> {
     let media_class = protocol::ContentsMediaClass::from_projection_value(&row.media_class)
         .ok_or_else(|| invalid_contents_value("media_class", &row.media_class))?;
+    let file_kind = protocol::ContentsFileKind::from_projection_value(&row.file_kind)
+        .ok_or_else(|| invalid_contents_value("file_kind", &row.file_kind))?;
     let presence = protocol::ContentsPresenceState::from_projection_value(&row.presence)
         .ok_or_else(|| invalid_contents_value("presence", &row.presence))?;
     let availability_state = row
@@ -855,6 +859,7 @@ fn map_contents_row(
         relative_path: Some(row.relative_path),
         file_name: row.file_name,
         media_class,
+        file_kind,
         presence,
         availability_state,
         primary_media,

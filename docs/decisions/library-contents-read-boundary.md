@@ -122,7 +122,17 @@ type ContentsScope =
 
 type ContentsRecursion = 'immediate' | 'recursive'
 
-type ContentsMediaClass = 'audio' | 'video' | 'image'
+type ContentsMediaClass = 'audio' | 'video' | 'image' | 'unsupported'
+type ContentsFileKind =
+  | 'audio'
+  | 'video'
+  | 'image'
+  | 'cueSheet'
+  | 'logDoc'
+  | 'textDoc'
+  | 'archive'
+  | 'other'
+  | 'unknown'
 
 type ContentsReadPolicy = {
   readonly mediaClasses: readonly ContentsMediaClass[]
@@ -139,14 +149,16 @@ type ContentsReadPolicy = {
 - Renderer sends typed policy, never raw SQL.
 - Backend and query code own media filtering.
 - Renderer does not answer authoritative selected scope contents from loaded hierarchy cache.
-- sourceFile profile may include audio, video, and image.
+- sourceFile profile may include audio, video, image, and admitted unsupported companion rows.
 - sourceFile profile never carries primaryMedia summary.
 - primaryMedia profile may include audio and video only.
-- primaryMedia + image returns `policyConflict`.
+- primaryMedia + image or unsupported returns `policyConflict`.
 - Image rows never carry primaryMedia summary.
 - `mediaClasses` are deterministic arrays, not Set.
-- `mediaClasses` are canonicalized in deterministic order: audio, video, image.
-- Unsupported and `none` files are excluded from normal contents policy.
+- `mediaClasses` are canonicalized in deterministic order: audio, video, image, unsupported.
+- Normal media-relevant source-file inventory admits unsupported rows only when `fileKind = cueSheet`.
+- Unsupported docs, archives, binaries, unknown files, and `none` files are excluded from normal contents policy.
+- See `docs/library/media-relevant-file-inventory-contract.md` for the default inventory policy.
 - Cursor pagination is implemented; `nextCursor` is produced when more rows exist.
 - Provided cursor must not be silently ignored or treated as page one.
 - Invalid or mismatched cursor returns `cursorInvalid` with no `nextCursor`.

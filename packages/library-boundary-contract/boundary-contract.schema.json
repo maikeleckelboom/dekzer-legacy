@@ -336,6 +336,20 @@
         "incomplete"
       ]
     },
+    "ContentsFileKind": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video",
+        "image",
+        "cueSheet",
+        "logDoc",
+        "textDoc",
+        "archive",
+        "other",
+        "unknown"
+      ]
+    },
     "ContentsFileRow": {
       "type": "object",
       "properties": {
@@ -348,6 +362,9 @@
               "type": "null"
             }
           ]
+        },
+        "fileKind": {
+          "$ref": "#/$defs/ContentsFileKind"
         },
         "fileName": {
           "type": "string"
@@ -407,6 +424,7 @@
         "label",
         "fileName",
         "mediaClass",
+        "fileKind",
         "presence"
       ]
     },
@@ -415,7 +433,8 @@
       "enum": [
         "audio",
         "video",
-        "image"
+        "image",
+        "unsupported"
       ]
     },
     "ContentsPresenceState": {

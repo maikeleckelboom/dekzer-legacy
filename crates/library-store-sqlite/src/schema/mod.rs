@@ -376,6 +376,7 @@ mod tests {
                 "relative_path",
                 "size_bytes",
                 "mtime_ns",
+                "file_kind",
                 "media_class",
                 "presence_state",
                 "first_discovered_at",

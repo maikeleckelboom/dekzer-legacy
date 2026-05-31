@@ -55,7 +55,7 @@ export type ContentRow = {
   readonly detail?: string
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
-  readonly mediaClass?: 'audio' | 'video' | 'image'
+  readonly mediaClass?: 'audio' | 'video' | 'image' | 'unsupported'
   readonly availabilityState?: 'available' | 'unavailable' | 'degraded'
   readonly action?: ContentRowAction
 }
@@ -356,7 +356,7 @@ function projectFileContents(options: {
 }
 
 function contentsRow(row: ContentsFileRow): ContentRow {
-  const icon = row.mediaClass === 'image' ? 'image' : row.mediaClass === 'video' ? 'video' : 'music'
+  const icon = contentsRowIcon(row)
   const detail =
     row.primaryMedia === undefined
       ? sourceFileRowDetail(row)
@@ -373,6 +373,19 @@ function contentsRow(row: ContentsFileRow): ContentRow {
   }
 }
 
+function contentsRowIcon(row: ContentsFileRow): ContentRowIcon {
+  switch (row.mediaClass) {
+    case 'audio':
+      return 'music'
+    case 'video':
+      return 'video'
+    case 'image':
+      return 'image'
+    case 'unsupported':
+      return row.fileKind === 'cueSheet' ? 'cueSheet' : 'metadata'
+  }
+}
+
 function sourceFileRowDetail(row: ContentsFileRow): string {
   if (row.presence === 'missing') {
     return 'File missing'
@@ -382,7 +395,7 @@ function sourceFileRowDetail(row: ContentsFileRow): string {
     return 'File removed'
   }
 
-  return row.relativePath ?? sourceFileMediaLabel(row.mediaClass)
+  return row.relativePath ?? sourceFileMediaLabel(row.mediaClass, row.fileKind)
 }
 
 function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsFileRow): string {
@@ -392,7 +405,7 @@ function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsF
   const base =
     parts.length > 0
       ? parts.join(' - ')
-      : (row.relativePath ?? sourceFileMediaLabel(row.mediaClass))
+      : (row.relativePath ?? sourceFileMediaLabel(row.mediaClass, row.fileKind))
 
   switch (row.availabilityState) {
     case 'available':
@@ -408,7 +421,10 @@ function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsF
   return base
 }
 
-function sourceFileMediaLabel(mediaClass: ContentsFileRow['mediaClass']): string {
+function sourceFileMediaLabel(
+  mediaClass: ContentsFileRow['mediaClass'],
+  fileKind?: ContentsFileRow['fileKind']
+): string {
   switch (mediaClass) {
     case 'audio':
       return 'Audio file'
@@ -416,6 +432,8 @@ function sourceFileMediaLabel(mediaClass: ContentsFileRow['mediaClass']): string
       return 'Video file'
     case 'image':
       return 'Image file'
+    case 'unsupported':
+      return fileKind === 'cueSheet' ? 'Cue sheet' : 'Unsupported file'
   }
 
   return 'File'

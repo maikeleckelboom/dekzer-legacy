@@ -1429,6 +1429,16 @@ mod tests {
             .expect("read media_class")
     }
 
+    fn read_file_kind(connection: &rusqlite::Connection, relative_path: &str) -> String {
+        connection
+            .query_row(
+                "SELECT file_kind FROM source_files WHERE relative_path = ?1",
+                [relative_path],
+                |row| row.get::<_, String>(0),
+            )
+            .expect("read file_kind")
+    }
+
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct DirectoryFacts {
         has_child_directories: bool,
@@ -1692,6 +1702,26 @@ mod tests {
             "albums/data.xyz",
         );
         assert_eq!(read_media_class(&connection, "albums/data.xyz"), "none");
+    }
+
+    #[test]
+    fn cue_file_stores_fine_file_kind_and_unsupported_media_class() {
+        let mut connection =
+            rusqlite::Connection::open_in_memory().expect("open in-memory database");
+        install_baseline_schema_for_test(&mut connection).expect("install baseline");
+        let (source_id, parent_dir_id) = setup_source_with_directory(&mut connection);
+        insert_file(
+            &mut connection,
+            source_id,
+            Some(parent_dir_id),
+            "album.cue",
+            "albums/album.cue",
+        );
+        assert_eq!(
+            read_media_class(&connection, "albums/album.cue"),
+            "unsupported"
+        );
+        assert_eq!(read_file_kind(&connection, "albums/album.cue"), "cue_sheet");
     }
 
     #[test]

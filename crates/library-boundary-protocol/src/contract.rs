@@ -115,6 +115,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::PrimaryMediaSummary>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsRowOrigin>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsMediaClass>(&cfg, &mut output);
+    push_ts_decl::<crate::ContentsFileKind>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsPresenceState>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBrowserWindow>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryAssetBrowserRow>(&cfg, &mut output);

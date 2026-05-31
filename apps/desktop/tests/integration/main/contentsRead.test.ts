@@ -60,7 +60,7 @@ describe('contents reads through the host', () => {
               payload: { sourceLocationId: '33' }
             },
             policy: {
-              mediaClasses: ['audio', 'image'],
+              mediaClasses: ['audio', 'image', 'unsupported'],
               rowProfile: { kind: 'sourceFile' }
             },
             recursion: 'recursive',
@@ -79,7 +79,7 @@ describe('contents reads through the host', () => {
       result: {
         scope: { kind: 'sourceLocation', sourceLocationId: '33' },
         policy: {
-          mediaClasses: ['audio', 'image'],
+          mediaClasses: ['audio', 'image', 'unsupported'],
           rowProfile: { kind: 'sourceFile' }
         },
         recursion: 'recursive',
@@ -174,7 +174,7 @@ function sourceLocationRequest(): Parameters<typeof readContentsThroughHost>[1] 
       sourceLocationId: '33'
     },
     policy: {
-      mediaClasses: ['image', 'audio', 'image'],
+      mediaClasses: ['unsupported', 'image', 'audio', 'image'],
       rowProfile: { kind: 'sourceFile' }
     },
     recursion: 'recursive',
@@ -199,6 +199,7 @@ function readyContentsReply(request: ContentsReadRequest): ContentsReadReply {
           relativePath: 'Covers/Cover.jpg',
           fileName: 'Cover.jpg',
           mediaClass: 'image',
+          fileKind: 'image',
           presence: 'present',
           updatedAtMs: 100
         }

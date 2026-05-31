@@ -3,7 +3,7 @@ use rusqlite::{OptionalExtension, params};
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
-    LibraryTreeRowAdmission, is_image_media_class, is_primary_media_class,
+    LibraryTreeRowAdmission, file_kind_str_from_path, is_image_media_class, is_primary_media_class,
     library_tree_row_admission_predicate_sql_for_column, media_class_str_from_path,
 };
 use library_domain::SourcePresenceState;
@@ -43,6 +43,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
         &self,
         input: &RecordSourceFileObservationInput,
     ) -> LibrarySqliteResult<i64> {
+        let file_kind = file_kind_str_from_path(&input.relative_path);
         let media_class = media_class_str_from_path(&input.relative_path);
         let existing = self.load_existing_row(input)?;
         if let Some(existing) = existing {
@@ -63,6 +64,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                      mtime_ns = ?7,
                      presence_state = ?8,
                      media_class = ?12,
+                     file_kind = ?13,
                      last_observed_at = COALESCE(?9, last_observed_at),
                      last_presence_change_at = COALESCE(?10, last_presence_change_at),
                      updated_at = ?11
@@ -80,6 +82,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                     last_presence_change_at,
                     input.updated_at,
                     media_class,
+                    file_kind,
                 ],
             )?;
             self.propagate_source_file_descendant_facts(existing.source_file_id, input.updated_at)?;
@@ -99,6 +102,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          relative_path,
                          size_bytes,
                          mtime_ns,
+                         file_kind,
                          presence_state,
                          media_class,
                          first_discovered_at,
@@ -107,7 +111,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)",
                     params![
                         source_file_id,
                         input.source_id,
@@ -116,6 +120,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.relative_path,
                         input.size_bytes,
                         input.mtime_ns,
+                        file_kind,
                         input.presence_state.as_str(),
                         media_class,
                         first_discovered_at,
@@ -135,6 +140,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          relative_path,
                          size_bytes,
                          mtime_ns,
+                         file_kind,
                          presence_state,
                          media_class,
                          first_discovered_at,
@@ -143,7 +149,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
                     params![
                         input.source_id,
                         input.parent_source_directory_id,
@@ -151,6 +157,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.relative_path,
                         input.size_bytes,
                         input.mtime_ns,
+                        file_kind,
                         input.presence_state.as_str(),
                         media_class,
                         first_discovered_at,

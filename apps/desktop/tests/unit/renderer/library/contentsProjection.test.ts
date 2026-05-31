@@ -104,7 +104,7 @@ describe('projectContents', () => {
     expect(contents.rows.map((row) => row.label)).toEqual(['inside.wav'])
   })
 
-  it('keeps selected directory contents primary-media scoped for image-only folders', () => {
+  it('projects selected directory image inventory rows for image-only folders', () => {
     const state = browserState({
       sourceState: {
         kind: 'loaded',
@@ -122,16 +122,32 @@ describe('projectContents', () => {
     const contents = projectForSelection(
       state,
       'source-directory:50',
-      readyContents({ rows: [], state: 'empty' })
+      readyContents({ rows: [sourceFileRow('cover-1', 'front.jpg', 'image')] })
     )
 
     expect(contents.kind).toBe('ready')
     expect(contents.title).toBe('Covers')
     expect(contents.rows).toHaveLength(1)
     expect(contents.rows[0]).toMatchObject({
-      kind: 'state',
-      state: 'empty',
-      label: 'No primary media found'
+      kind: 'file',
+      mediaClass: 'image',
+      label: 'front.jpg'
+    })
+  })
+
+  it('projects cue sheet inventory rows as non-primary metadata files', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({ rows: [sourceFileRow('cue-1', 'album.cue', 'unsupported', 'cueSheet')] })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'file',
+      mediaClass: 'unsupported',
+      icon: 'cueSheet',
+      label: 'album.cue'
     })
   })
 
@@ -229,7 +245,7 @@ describe('projectContents', () => {
     )
 
     expect(contents.kind).toBe('ready')
-    expect(contents.detail).toBe('3 primary media items loaded.')
+    expect(contents.detail).toBe('3 visible files loaded.')
     expect(contents.rows).toHaveLength(3)
   })
 
@@ -249,7 +265,7 @@ describe('projectContents', () => {
     expect(empty.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No primary media found'
+      label: 'No visible files found'
     })
 
     const partial = projectForSelection(
@@ -529,8 +545,8 @@ function contentsResult(options: {
   const policy =
     options.profile ??
     ({
-      mediaClasses: ['audio', 'video'],
-      rowProfile: { kind: 'primaryMedia' }
+      mediaClasses: ['audio', 'video', 'image', 'unsupported'],
+      rowProfile: { kind: 'sourceFile' }
     } satisfies ContentsReadPolicy)
   return {
     state,
@@ -555,7 +571,7 @@ function contentsResult(options: {
 function primaryMediaRow(
   stableId: string,
   label: string,
-  mediaClass: Exclude<ContentsFileRow['mediaClass'], 'image'>,
+  mediaClass: Exclude<ContentsFileRow['mediaClass'], 'image' | 'unsupported'>,
   origin: NonNullable<ContentsFileRow['primaryMedia']>['origin'] = 'libraryAsset'
 ): ContentsFileRow {
   return {
@@ -566,6 +582,7 @@ function primaryMediaRow(
     relativePath: label,
     fileName: label,
     mediaClass,
+    fileKind: mediaClass,
     presence: 'present',
     availabilityState: 'available',
     primaryMedia: {
@@ -577,6 +594,26 @@ function primaryMediaRow(
       ...(origin === 'libraryAsset' ? { album: 'Album' } : {}),
       prepReadinessSummary: origin === 'libraryAsset' ? 'notRequired' : 'underprepared'
     },
+    updatedAtMs: 100
+  }
+}
+
+function sourceFileRow(
+  stableId: string,
+  label: string,
+  mediaClass: ContentsFileRow['mediaClass'],
+  fileKind: ContentsFileRow['fileKind'] = mediaClass === 'unsupported' ? 'cueSheet' : mediaClass
+): ContentsFileRow {
+  return {
+    id: `source-file:${stableId}`,
+    sourceId: '7',
+    sourceFileId: `file-${stableId}`,
+    label,
+    relativePath: label,
+    fileName: label,
+    mediaClass,
+    fileKind,
+    presence: 'present',
     updatedAtMs: 100
   }
 }
