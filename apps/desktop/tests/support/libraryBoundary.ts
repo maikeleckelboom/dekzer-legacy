@@ -102,6 +102,7 @@ export function createFakeClient(
     registerLocalRoot: rejectUnexpectedClientCall,
     startRootScan: rejectUnexpectedClientCall,
     cancelRootScan: rejectUnexpectedClientCall,
+    hashSourceFilesBlake3: rejectUnexpectedClientCall,
     readNavigationRows: rejectUnexpectedClientCall,
     loadNavigationRow: rejectUnexpectedClientCall,
     loadNavigationRowByStableKey: rejectUnexpectedClientCall,

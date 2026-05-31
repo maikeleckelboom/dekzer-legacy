@@ -43,6 +43,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::AppendLibraryAssetToPlaylistRequest>(&cfg, &mut output);
     push_ts_decl::<crate::RemoveLibraryAssetFromPlaylistRequest>(&cfg, &mut output);
     push_ts_decl::<crate::MovePlaylistEntryRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceFileHashCommand>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3Request>(&cfg, &mut output);
     push_ts_decl::<crate::SnapshotReadCommand>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationRowsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowRequest>(&cfg, &mut output);
@@ -80,6 +82,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::AppendLibraryAssetToPlaylistReply>(&cfg, &mut output);
     push_ts_decl::<crate::RemoveLibraryAssetFromPlaylistReply>(&cfg, &mut output);
     push_ts_decl::<crate::MovePlaylistEntryReply>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceFileHashReply>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3Reply>(&cfg, &mut output);
     push_ts_decl::<crate::SnapshotReadReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationRowsReply>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowReply>(&cfg, &mut output);
@@ -138,6 +142,20 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LibraryAssetWaveformOverviewBucket>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryAssetWaveformOverviewCapabilityState>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryAssetWaveformOverviewAmplitudeScale>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3Outcome>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3OutcomeStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3HashedOutcome>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3SkippedOutcome>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3FailedOutcome>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3SkipReason>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3SourceFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3SourceUnavailableFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3SourceRootMissingFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3SourceRootBlockedFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3FileFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3SourceFileUnavailableFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3InvalidRelativePathFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::HashSourceFilesBlake3IoFailure>(&cfg, &mut output);
     push_ts_decl::<CommandOutcome>(&cfg, &mut output);
     push_ts_decl::<crate::CommandSuccessEnvelope>(&cfg, &mut output);
     push_ts_decl::<crate::CommandErrorEnvelope>(&cfg, &mut output);

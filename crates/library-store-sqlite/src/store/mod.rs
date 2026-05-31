@@ -44,7 +44,7 @@ pub use source_file_hash::{
     ReadSourceFileBlake3HashCandidatesInput, SOURCE_FILE_BLAKE3_ALGORITHM,
     SourceFileBlake3HashAdmissionScope, SourceFileBlake3HashCandidate,
     SourceFileBlake3HashCandidateReason, SourceFileBlake3HashFailure,
-    SourceFileBlake3HashSkipReason,
+    SourceFileBlake3HashSkipReason, effective_hash_batch_limit,
 };
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,

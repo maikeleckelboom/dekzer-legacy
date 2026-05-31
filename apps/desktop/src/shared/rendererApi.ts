@@ -18,6 +18,10 @@ import type {
   ReadSourceLifecycleRequest,
   ReadSourceLifecycleResult
 } from './librarySourceLifecycle/readSourceLifecycle'
+import type {
+  HashSourceFilesBlake3Request,
+  HashSourceFilesBlake3Result
+} from './librarySourceFileHashing/hashSourceFilesBlake3'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
@@ -36,6 +40,7 @@ export type LibraryApi = {
   readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
   readonly sourceLifecycle: LibrarySourceLifecycleApi
+  readonly hashing: LibraryHashingApi
   readonly contents: LibraryContentsApi
   readonly roots: LibraryRootsApi
   readonly viewState: LibraryViewStateApi
@@ -67,6 +72,10 @@ export type LibraryContentsApi = {
 
 export type LibrarySourceLifecycleApi = {
   readSourceLifecycle(request: ReadSourceLifecycleRequest): Promise<ReadSourceLifecycleResult>
+}
+
+export type LibraryHashingApi = {
+  hashSourceFilesBlake3(request: HashSourceFilesBlake3Request): Promise<HashSourceFilesBlake3Result>
 }
 
 export type LibraryRootsApi = {

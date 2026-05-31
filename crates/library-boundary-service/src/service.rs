@@ -12,7 +12,8 @@ use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
     LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
     RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
-    RootScanObservation, SqliteDurableStore, UnregisterLocalRootInput,
+    RootScanObservation, SourceFileBlake3HashAdmissionScope, SqliteDurableStore,
+    UnregisterLocalRootInput,
 };
 
 use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
@@ -25,6 +26,10 @@ use crate::snapshot_read_protocol::{
     map_read_source_lifecycle_reply, map_search_navigation_node_library_browser_window_reply,
     store_contents_policy, store_contents_recursion, store_contents_scope,
     store_library_tree_entry_point,
+};
+use crate::source_file_hash_protocol::{
+    empty_hash_source_files_blake3_reply, map_hash_lifecycle_source_failure,
+    map_hash_source_files_blake3_reply,
 };
 use crate::storage_environment::resolve_library_storage_environment;
 
@@ -124,6 +129,9 @@ impl LibraryBoundaryService {
             protocol::CommandRequest::PlaylistWrite(command) => self
                 .handle_playlist_write_command(command)
                 .map(protocol::CommandReply::PlaylistWrite),
+            protocol::CommandRequest::SourceFileHash(command) => self
+                .handle_source_file_hash_command(command)
+                .map(protocol::CommandReply::SourceFileHash),
             protocol::CommandRequest::SnapshotRead(command) => self
                 .handle_snapshot_read_command(command)
                 .map(protocol::CommandReply::SnapshotRead),
@@ -544,6 +552,44 @@ impl LibraryBoundaryService {
         map_read_library_asset_preparation_detail_reply(detail).map_err(map_store_error)
     }
 
+    pub fn hash_source_files_blake3(
+        &self,
+        request: protocol::HashSourceFilesBlake3Request,
+    ) -> protocol::ProtocolResult<protocol::HashSourceFilesBlake3Reply> {
+        let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        if matches!(request.limit, Some(0)) {
+            return Err(protocol::ProtocolError::InvalidRequest {
+                detail: "hashSourceFilesBlake3 limit must be greater than zero".to_string(),
+            });
+        }
+
+        let lifecycle = self
+            .durable_store
+            .read_source_lifecycle(source_id)
+            .map_err(map_store_error)?;
+        let source_failure =
+            map_hash_lifecycle_source_failure(lifecycle.as_ref()).map_err(map_store_error)?;
+        let effective_limit = library_store_sqlite::effective_hash_batch_limit(request.limit);
+
+        if let Some(source_failure) = source_failure {
+            return Ok(empty_hash_source_files_blake3_reply(
+                effective_limit,
+                source_failure,
+            ));
+        }
+
+        let result = self
+            .durable_store
+            .hash_source_file_blake3_batch(library_store_sqlite::HashSourceFileBlake3BatchInput {
+                scope: SourceFileBlake3HashAdmissionScope::Source { source_id },
+                limit: request.limit,
+                observed_at_ms: unix_time_ms()?,
+            })
+            .map_err(map_store_error)?;
+        self.publish_maintained_snapshot_invalidations()?;
+        Ok(map_hash_source_files_blake3_reply(result, None))
+    }
+
     fn handle_library_boundary_event_command(
         &self,
         command: protocol::LibraryBoundaryEventStreamCommand,
@@ -640,6 +686,17 @@ impl LibraryBoundaryService {
             protocol::PlaylistWriteCommand::MovePlaylistEntry(request) => self
                 .move_playlist_entry(request)
                 .map(protocol::PlaylistWriteReply::MovePlaylistEntry),
+        }
+    }
+
+    fn handle_source_file_hash_command(
+        &self,
+        command: protocol::SourceFileHashCommand,
+    ) -> protocol::ProtocolResult<protocol::SourceFileHashReply> {
+        match command {
+            protocol::SourceFileHashCommand::HashSourceFilesBlake3(request) => self
+                .hash_source_files_blake3(request)
+                .map(protocol::SourceFileHashReply::HashSourceFilesBlake3),
         }
     }
 
@@ -942,15 +999,17 @@ mod tests {
         CommandReply, CommandRequest, ContentsReadPolicy, ContentsRowProfile, CreatePlaylistReply,
         CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
-        LibraryBoundaryEvent, LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply,
-        LibraryRootCommand, LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind,
-        LibraryTreePresenceState, LoadNavigationRowByStableKeyReply,
-        LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
-        PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsAfterReply,
-        ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
-        ReadSourceLifecycleReply, ReadSourceLifecycleRequest, RegisterLocalRootReply,
-        RegisterLocalRootRequest, RenamePlaylistReply, RenamePlaylistRequest, SnapshotReadCommand,
-        SnapshotReadReply, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
+        HashSourceFilesBlake3OutcomeStatus, HashSourceFilesBlake3Reply,
+        HashSourceFilesBlake3Request, HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
+        LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
+        LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
+        LoadNavigationRowByStableKeyReply, LoadNavigationRowByStableKeyRequest,
+        MaintainedSnapshotScope, PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
+        ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
+        ReadLibraryTreeChildrenRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
+        RenamePlaylistRequest, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
+        SourceFileHashReply, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
         UnregisterLocalRootRequest,
     };
     use serde_json::json;
@@ -1069,6 +1128,15 @@ mod tests {
         match reply {
             CommandReply::SnapshotRead(SnapshotReadReply::SourceLifecycle(reply)) => reply,
             other => panic!("expected source lifecycle reply, got {other:?}"),
+        }
+    }
+
+    fn expect_hash_source_files_blake3_reply(reply: CommandReply) -> HashSourceFilesBlake3Reply {
+        match reply {
+            CommandReply::SourceFileHash(SourceFileHashReply::HashSourceFilesBlake3(reply)) => {
+                reply
+            }
+            other => panic!("expected hash source files BLAKE3 reply, got {other:?}"),
         }
     }
 
@@ -1193,6 +1261,36 @@ mod tests {
                 },
             )),
         )))
+    }
+
+    fn hash_source_files_blake3(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+        limit: Option<usize>,
+    ) -> HashSourceFilesBlake3Reply {
+        expect_hash_source_files_blake3_reply(expect_success(service.handle_command(
+            CommandRequest::SourceFileHash(SourceFileHashCommand::HashSourceFilesBlake3(
+                HashSourceFilesBlake3Request { source_id, limit },
+            )),
+        )))
+    }
+
+    fn wait_for_scan_completed(service: &LibraryBoundaryService, root_id: i64) {
+        for _ in 0..30 {
+            let events_reply = read_after_events(service, None, 64);
+            if events_reply.events.iter().any(|e| {
+                let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
+                    return false;
+                };
+                se.kind == library_boundary_protocol::SourceScanEventKind::SourceScanCompleted
+                    && se.root_id == root_id
+            }) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        panic!("scan should complete on a tiny directory");
     }
 
     fn read_library_tree_children(
@@ -1465,6 +1563,134 @@ mod tests {
             .window
             .expect("persisted hierarchy survives service reopen");
         assert_eq!(reopened_crate_window.rows, crate_window.rows);
+    }
+
+    #[test]
+    fn hash_source_files_blake3_updates_observed_facts_and_publishes_invalidation() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("hash-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("B.flac"), b"b bytes").expect("write b");
+        std::fs::write(source_root.join("a.flac"), b"a bytes").expect("write a");
+        std::fs::write(source_root.join("notes.txt"), b"not media").expect("write notes");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let _scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_completed(&service, registered.root_id);
+        let cursor_after_scan = read_after_events(&service, None, 64).latest_event_sequence;
+
+        let first = hash_source_files_blake3(&service, registered.root_id, Some(1));
+        assert_eq!(first.effective_limit, 1);
+        assert_eq!(first.hashed_count, 1);
+        assert_eq!(first.skipped_count, 0);
+        assert_eq!(first.failed_count, 0);
+        assert_eq!(first.remaining_candidates, 1);
+        assert_eq!(first.outcomes.len(), 1);
+        assert_eq!(first.outcomes[0].relative_path, "a.flac");
+        let HashSourceFilesBlake3OutcomeStatus::Hashed(hashed) = &first.outcomes[0].status else {
+            panic!("expected hashed outcome");
+        };
+        assert_eq!(hashed.content_hash_algorithm, "blake3");
+        assert_eq!(hashed.content_hash_value.len(), 64);
+
+        let facts = service
+            .durable_store
+            .read_observed_file_facts_for_source_file(first.outcomes[0].source_file_id)
+            .expect("read observed facts")
+            .expect("hash command writes observed facts");
+        assert_eq!(
+            facts.content_hash.expect("content hash").algorithm,
+            "blake3"
+        );
+
+        let events_after_hash = read_after_events(&service, cursor_after_scan, 16);
+        assert!(
+            events_after_hash.events.iter().any(|e| {
+                let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(event) = e else {
+                    return false;
+                };
+                event.invalidation.scope == MaintainedSnapshotScope::LibraryBrowser
+            }),
+            "hash evidence changes must publish the narrow current maintained scope"
+        );
+
+        let second = hash_source_files_blake3(&service, registered.root_id, Some(10));
+        assert_eq!(second.hashed_count, 1);
+        assert_eq!(second.remaining_candidates, 0);
+        assert_eq!(second.outcomes[0].relative_path, "B.flac");
+
+        let third = hash_source_files_blake3(&service, registered.root_id, Some(10));
+        assert_eq!(third.hashed_count, 0);
+        assert_eq!(third.outcomes.len(), 0);
+        assert_eq!(third.remaining_candidates, 0);
+    }
+
+    #[test]
+    fn hash_source_files_blake3_reports_source_failures_without_empty_success() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("blocked-hash-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.flac"), b"track").expect("write track");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        service
+            .durable_store
+            .upsert_source_state(UpsertSourceStateInput {
+                source_id: registered.root_id,
+                mount_status: "unmounted".to_string(),
+                mount_epoch: 2,
+                access_state: SourceAccessState::Blocked,
+                access_issue_kind: Some(SourceAccessIssueKind::UnavailableMount),
+                access_error_detail: None,
+                access_checked_at: Some(30),
+                mount_root: None,
+                effective_path: Some(source_root.to_string_lossy().into_owned()),
+                observed_volume_label: None,
+                filesystem_type: None,
+                last_seen_at: Some(25),
+                updated_at: 31,
+            })
+            .expect("block source state");
+
+        let blocked = hash_source_files_blake3(&service, registered.root_id, Some(4));
+        assert_eq!(blocked.effective_limit, 4);
+        assert_eq!(blocked.hashed_count, 0);
+        assert_eq!(blocked.outcomes.len(), 0);
+        assert!(matches!(
+            blocked.source_failure,
+            Some(HashSourceFilesBlake3SourceFailure::SourceRootBlocked(_))
+        ));
+
+        let missing = hash_source_files_blake3(&service, 99_999, Some(4));
+        assert!(matches!(
+            missing.source_failure,
+            Some(HashSourceFilesBlake3SourceFailure::SourceNotFound)
+        ));
+
+        let invalid = service
+            .try_handle_command(CommandRequest::SourceFileHash(
+                SourceFileHashCommand::HashSourceFilesBlake3(HashSourceFilesBlake3Request {
+                    source_id: 0,
+                    limit: Some(4),
+                }),
+            ))
+            .expect_err("zero sourceId is invalid");
+        assert!(matches!(invalid, ProtocolError::InvalidRequest { .. }));
+
+        let invalid_limit = service
+            .try_handle_command(CommandRequest::SourceFileHash(
+                SourceFileHashCommand::HashSourceFilesBlake3(HashSourceFilesBlake3Request {
+                    source_id: registered.root_id,
+                    limit: Some(0),
+                }),
+            ))
+            .expect_err("zero limit is invalid");
+        assert!(matches!(
+            invalid_limit,
+            ProtocolError::InvalidRequest { .. }
+        ));
     }
 
     #[test]

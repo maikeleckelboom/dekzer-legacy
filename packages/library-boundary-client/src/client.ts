@@ -7,6 +7,8 @@ import type {
   CreatePlaylistRequest,
   DeletePlaylistReply,
   DeletePlaylistRequest,
+  HashSourceFilesBlake3Reply,
+  HashSourceFilesBlake3Request,
   LoadNavigationRowByStableKeyReply,
   LoadNavigationRowByStableKeyRequest,
   LoadNavigationRowReply,
@@ -116,6 +118,19 @@ export class LibraryBoundaryClient {
       },
       "libraryRoots",
       "cancelRootScan"
+    );
+  }
+
+  hashSourceFilesBlake3(
+    request: HashSourceFilesBlake3Request
+  ): Promise<HashSourceFilesBlake3Reply> {
+    return this.sendAndExpect(
+      {
+        type: "sourceFileHash",
+        payload: { type: "hashSourceFilesBlake3", payload: request }
+      },
+      "sourceFileHash",
+      "hashSourceFilesBlake3"
     );
   }
 

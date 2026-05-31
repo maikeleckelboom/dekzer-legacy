@@ -137,7 +137,8 @@ Current placement:
 - Track identity must not rely on path identity.
 - Attachment identity should not re-read files merely to discover content identity if observed facts already owns
   hashing.
-- Production scheduling and service exposure for the BLAKE3 batch remain separate integration work.
+- Production service exposure exists as the bounded `hashSourceFilesBlake3` boundary command. Scheduling remains
+  separate integration work.
 
 ## Boundary Between Identity Layers
 
@@ -151,6 +152,6 @@ Current placement:
 
 ## Next Implementation Gate
 
-The next gate is a scheduler/service integration pass for the bounded BLAKE3 admission path, or media probing work that
-adds new observed facts. Attachment identity remains a later promotion layer. It must not add track tables, CUE pairing,
-artwork intelligence, playlist UI, prep facets, or waveform generation as part of the same change.
+The next gate is a scheduler pass for the bounded BLAKE3 admission path, source-location-scoped admission, or media
+probing work that adds new observed facts. Attachment identity remains a later promotion layer. It must not add track
+tables, CUE pairing, artwork intelligence, playlist UI, prep facets, or waveform generation as part of the same change.

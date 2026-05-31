@@ -6,6 +6,7 @@ import type {
   MaintainedSnapshotEvent,
   MaintainedSnapshotInvalidation,
   ProtocolError,
+  HashSourceFilesBlake3Reply,
   RegisterLocalRootReply
 } from "@dekzer/library-boundary-contract";
 
@@ -41,10 +42,18 @@ type RegisterLocalRootIdStaysString = AssertType<
   EqualTypes<RegisterLocalRootReply["rootId"], string>
 >;
 
+type HashSourceFilesBlake3ReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient["hashSourceFilesBlake3"]>>,
+    HashSourceFilesBlake3Reply
+  >
+>;
+
 const compileTimeAssertions: [
   RegisterLocalRootReturnIsGenerated,
-  RegisterLocalRootIdStaysString
-] = [true, true];
+  RegisterLocalRootIdStaysString,
+  HashSourceFilesBlake3ReturnIsGenerated
+] = [true, true, true];
 void compileTimeAssertions;
 
 type Resolve<T> = (value: T | PromiseLike<T>) => void;
@@ -198,6 +207,65 @@ async function validatesRegisterLocalRootRequestAndReply(): Promise<void> {
   );
   equal(reply.rootId, "root-1", "registerLocalRoot unwraps the reply payload");
   equal(typeof reply.rootId, "string", "rootId remains a generated string id");
+}
+
+async function validatesHashSourceFilesBlake3RequestAndReply(): Promise<void> {
+  const transport = new RecordingTransport();
+  transport.enqueueOutcome(
+    success({
+      type: "sourceFileHash",
+      payload: {
+        type: "hashSourceFilesBlake3",
+        payload: {
+          effectiveLimit: 1,
+          outcomes: [
+            {
+              sourceFileId: "11",
+              sourceId: "7",
+              relativePath: "a.flac",
+              status: {
+                type: "hashed",
+                payload: {
+                  contentHashAlgorithm: "blake3",
+                  contentHashValue: "abc",
+                  acceptedArtifactId: "90",
+                  workItemId: "91"
+                }
+              }
+            }
+          ],
+          hashedCount: 1,
+          skippedCount: 0,
+          failedCount: 0,
+          remainingCandidates: 0
+        }
+      }
+    })
+  );
+  const client = new LibraryBoundaryClient(transport);
+
+  const reply = await client.hashSourceFilesBlake3({
+    sourceId: "7",
+    limit: 1
+  });
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: "sourceFileHash",
+      payload: {
+        type: "hashSourceFilesBlake3",
+        payload: { sourceId: "7", limit: 1 }
+      }
+    } satisfies CommandRequest,
+    "hashSourceFilesBlake3 sends the generated boundary command"
+  );
+  equal(reply.outcomes[0]?.sourceFileId, "11", "hash outcome keeps string source file id");
+  equal(
+    reply.outcomes[0]?.status.type,
+    "hashed",
+    "hashSourceFilesBlake3 unwraps the reply payload"
+  );
 }
 
 async function validatesProtocolErrorsArePreserved(): Promise<void> {
@@ -558,6 +626,7 @@ async function rejects<ErrorType extends Error>(
 }
 
 await validatesRegisterLocalRootRequestAndReply();
+await validatesHashSourceFilesBlake3RequestAndReply();
 await validatesProtocolErrorsArePreserved();
 await validatesReplyFamilyMismatch();
 await validatesReplyVariantMismatch();

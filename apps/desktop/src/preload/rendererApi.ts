@@ -28,6 +28,11 @@ import type {
   ReadSourceLifecycleResult,
   ReadSourceLifecycleRequest
 } from '../shared/librarySourceLifecycle/readSourceLifecycle'
+import {
+  sourceFileHashingChannels,
+  type HashSourceFilesBlake3Request,
+  type HashSourceFilesBlake3Result
+} from '../shared/librarySourceFileHashing/hashSourceFilesBlake3'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
@@ -109,6 +114,16 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             sourceLifecycleReadChannels.readSourceLifecycle,
             request
           )) as ReadSourceLifecycleResult
+        }
+      },
+      hashing: {
+        async hashSourceFilesBlake3(
+          request: HashSourceFilesBlake3Request
+        ): Promise<HashSourceFilesBlake3Result> {
+          return (await ipcRenderer.invoke(
+            sourceFileHashingChannels.hashSourceFilesBlake3,
+            request
+          )) as HashSourceFilesBlake3Result
         }
       },
       contents: {

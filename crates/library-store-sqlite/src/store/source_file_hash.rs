@@ -29,8 +29,8 @@ const HASH_READ_BUFFER_BYTES: usize = 64 * 1024;
 const HASH_JOB_ADAPTER_KEY: &str = "dekzer.source_file_hash.blake3";
 const HASH_JOB_ADAPTER_VERSION: &str = "1";
 const HASH_JOB_LEASE_DURATION_MS: i64 = 30_000;
-const DEFAULT_HASH_BATCH_LIMIT: usize = 32;
-const MAX_HASH_BATCH_LIMIT: usize = 256;
+pub const DEFAULT_HASH_BATCH_LIMIT: usize = 32;
+pub const MAX_HASH_BATCH_LIMIT: usize = 256;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HashSourceFileBlake3Input {
@@ -471,6 +471,11 @@ impl SqliteDurableStore {
                 input.observed_at_ms,
             )?;
             publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
+            publication::invalidate_projection_domain(
+                write,
+                ProjectionDomain::LibraryBrowser,
+                "source_file_blake3_hash",
+            )?;
             Ok(result)
         })
         .map_err(|error| match error {
@@ -675,7 +680,7 @@ impl SqliteDurableStore {
     }
 }
 
-fn effective_hash_batch_limit(limit: Option<usize>) -> usize {
+pub fn effective_hash_batch_limit(limit: Option<usize>) -> usize {
     limit
         .unwrap_or(DEFAULT_HASH_BATCH_LIMIT)
         .clamp(1, MAX_HASH_BATCH_LIMIT)

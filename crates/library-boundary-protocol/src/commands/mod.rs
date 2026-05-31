@@ -2,11 +2,13 @@ pub mod library_roots;
 pub mod playlist_writes;
 pub mod session_events;
 pub mod snapshot_reads;
+pub mod source_file_hash;
 
 pub use library_roots::*;
 pub use playlist_writes::*;
 pub use session_events::*;
 pub use snapshot_reads::*;
+pub use source_file_hash::*;
 
 use crate::ProtocolError;
 
@@ -19,6 +21,7 @@ pub enum CommandRequest {
     LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand),
     LibraryRoots(LibraryRootCommand),
     PlaylistWrite(PlaylistWriteCommand),
+    SourceFileHash(SourceFileHashCommand),
     SnapshotRead(SnapshotReadCommand),
 }
 
@@ -31,6 +34,7 @@ pub enum CommandReply {
     LibraryBoundaryEvents(LibraryBoundaryEventStreamReply),
     LibraryRoots(LibraryRootReply),
     PlaylistWrite(PlaylistWriteReply),
+    SourceFileHash(SourceFileHashReply),
     SnapshotRead(SnapshotReadReply),
 }
 
@@ -77,8 +81,8 @@ mod tests {
         LibraryBoundaryEventStreamReply, LibraryRootCommand, LibraryRootReply,
         PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
         ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, StartRootScanReply,
-        StartRootScanRequest,
+        ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
+        SourceFileHashReply, StartRootScanReply, StartRootScanRequest,
     };
     use serde_json::json;
 
@@ -108,11 +112,18 @@ mod tests {
                 },
             ),
         );
+        let hash = CommandRequest::SourceFileHash(SourceFileHashCommand::HashSourceFilesBlake3(
+            super::HashSourceFilesBlake3Request {
+                source_id: 7,
+                limit: Some(16),
+            },
+        ));
 
         match session_events {
             CommandRequest::LibraryBoundaryEvents(_) => {}
             CommandRequest::LibraryRoots(_) => {}
             CommandRequest::PlaylistWrite(_) => {}
+            CommandRequest::SourceFileHash(_) => {}
             CommandRequest::SnapshotRead(_) => {}
         }
 
@@ -120,6 +131,7 @@ mod tests {
             CommandRequest::LibraryBoundaryEvents(_) => {}
             CommandRequest::LibraryRoots(_) => {}
             CommandRequest::PlaylistWrite(_) => {}
+            CommandRequest::SourceFileHash(_) => {}
             CommandRequest::SnapshotRead(_) => {}
         }
 
@@ -127,6 +139,7 @@ mod tests {
             CommandRequest::LibraryBoundaryEvents(_) => {}
             CommandRequest::LibraryRoots(_) => {}
             CommandRequest::PlaylistWrite(_) => {}
+            CommandRequest::SourceFileHash(_) => {}
             CommandRequest::SnapshotRead(_) => {}
         }
 
@@ -134,6 +147,15 @@ mod tests {
             CommandRequest::LibraryBoundaryEvents(_) => {}
             CommandRequest::LibraryRoots(_) => {}
             CommandRequest::PlaylistWrite(_) => {}
+            CommandRequest::SourceFileHash(_) => {}
+            CommandRequest::SnapshotRead(_) => {}
+        }
+
+        match hash {
+            CommandRequest::LibraryBoundaryEvents(_) => {}
+            CommandRequest::LibraryRoots(_) => {}
+            CommandRequest::PlaylistWrite(_) => {}
+            CommandRequest::SourceFileHash(_) => {}
             CommandRequest::SnapshotRead(_) => {}
         }
     }
@@ -163,6 +185,25 @@ mod tests {
             serde_json::from_value::<CommandRequest>(json).expect("deserialize command"),
             command
         );
+
+        let hash_command = CommandRequest::SourceFileHash(
+            SourceFileHashCommand::HashSourceFilesBlake3(super::HashSourceFilesBlake3Request {
+                source_id: 7,
+                limit: None,
+            }),
+        );
+        assert_eq!(
+            serde_json::to_value(&hash_command).expect("serialize hash command"),
+            json!({
+                "type": "sourceFileHash",
+                "payload": {
+                    "type": "hashSourceFilesBlake3",
+                    "payload": {
+                        "sourceId": "7"
+                    }
+                }
+            })
+        );
     }
 
     #[test]
@@ -188,6 +229,35 @@ mod tests {
         assert_eq!(
             serde_json::from_value::<CommandReply>(json).expect("deserialize reply"),
             reply
+        );
+
+        let hash_reply = CommandReply::SourceFileHash(SourceFileHashReply::HashSourceFilesBlake3(
+            super::HashSourceFilesBlake3Reply {
+                effective_limit: 32,
+                outcomes: Vec::new(),
+                hashed_count: 0,
+                skipped_count: 0,
+                failed_count: 0,
+                remaining_candidates: 0,
+                source_failure: None,
+            },
+        ));
+        assert_eq!(
+            serde_json::to_value(&hash_reply).expect("serialize hash reply"),
+            json!({
+                "type": "sourceFileHash",
+                "payload": {
+                    "type": "hashSourceFilesBlake3",
+                    "payload": {
+                        "effectiveLimit": 32,
+                        "outcomes": [],
+                        "hashedCount": 0,
+                        "skippedCount": 0,
+                        "failedCount": 0,
+                        "remainingCandidates": 0
+                    }
+                }
+            })
         );
     }
 

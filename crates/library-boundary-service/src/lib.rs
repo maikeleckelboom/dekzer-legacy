@@ -3,6 +3,7 @@
 mod service;
 mod session_events;
 mod snapshot_read_protocol;
+mod source_file_hash_protocol;
 mod storage_environment;
 
 pub use library_boundary_protocol::{ProtocolError, ProtocolResult};

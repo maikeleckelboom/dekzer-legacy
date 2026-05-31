@@ -92,5 +92,5 @@ pub use store::{
     SourceFileBlake3HashCandidate, SourceFileBlake3HashCandidateReason,
     SourceFileBlake3HashFailure, SourceFileBlake3HashSkipReason, SqliteDurableStore,
     SqliteDurableStoreAppOwnedState, StoreEnvironment, UnregisterLocalRootInput,
-    UnregisterLocalRootResult, durable_store_path,
+    UnregisterLocalRootResult, durable_store_path, effective_hash_batch_limit,
 };

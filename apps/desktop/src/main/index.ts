@@ -7,6 +7,7 @@ import { registerReadChildrenIpc } from './libraryHierarchy/readChildren'
 import { registerReadNavigationRowsIpc } from './libraryNavigation/readRows'
 import { registerContentsReadIpc } from './libraryContents/read'
 import { registerReadSourceLifecycleIpc } from './librarySourceLifecycle/readSourceLifecycle'
+import { registerSourceFileHashingIpc } from './librarySourceFileHashing/hashSourceFilesBlake3'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerCancelRootScanIpc } from './libraryRoots/cancelScan'
@@ -69,6 +70,7 @@ app.whenReady().then(() => {
   registerReadNavigationRowsIpc(ipcMain, host)
   registerReadChildrenIpc(ipcMain, host)
   registerReadSourceLifecycleIpc(ipcMain, host)
+  registerSourceFileHashingIpc(ipcMain, host)
   registerContentsReadIpc(ipcMain, host)
   registerLocalRootChoiceIpc(ipcMain, host, {
     dialog,

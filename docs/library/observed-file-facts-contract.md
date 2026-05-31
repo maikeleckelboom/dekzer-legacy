@@ -112,6 +112,38 @@ hashed through the existing BLAKE3 evidence commit path. Per-file failures are r
 continues. If a source-scope batch discovers the source root itself is unavailable, missing, or blocked, it reports that
 typed failure and stops the source batch without treating the source as an empty success.
 
+## Boundary Command
+
+The current product boundary exposes bounded source-file hash evidence maintenance through:
+
+| Layer | Command |
+| --- | --- |
+| Rust protocol | `SourceFileHash.HashSourceFilesBlake3` |
+| Generated TS contract | `hashSourceFilesBlake3` |
+| Desktop IPC/preload API | `library.hashing.hashSourceFilesBlake3({ sourceId, limit })` |
+
+The public request is source-scoped: `sourceId` is required and `limit` is optional. The renderer never supplies
+filesystem paths, never resolves a `source_file_id` to a path, and never calls store internals. Explicit source-file-id
+admission remains store-only until a separate boundary use case needs it.
+
+The command is always bounded. A missing limit uses the backend default; oversized limits are capped by backend
+behavior. Non-positive source ids and zero limits are invalid requests.
+
+The reply includes `effectiveLimit`, per-file `outcomes`, `hashedCount`, `skippedCount`, `failedCount`,
+`remainingCandidates`, and optional `sourceFailure`.
+
+Per-file outcomes are typed as `hashed`, `skipped`, or `failed`. Successful `hashed` outcomes expose
+`contentHashAlgorithm = blake3`, the lowercase hex digest, and the accepted artifact/work ids. They do not expose local
+filesystem paths. Failures are typed as source-file unavailable, source-root unavailable/missing/blocked, invalid
+relative path, root escape, physical-file missing/blocked, file open/read failure, basis changed, or store failure.
+
+`sourceFailure` distinguishes source-level problems from an empty candidate set. A source that is unknown, unavailable,
+missing, or blocked must not be reported as an empty success.
+
+Hash evidence commits still go through the inspect-source artifact and observed-facts authority path. After a successful
+hash commit, the store reseeds and invalidates the current `LibraryBrowser` maintained scope. This is the narrowest
+current event scope available for source-file observed-facts changes; no separate observed-facts event scope exists yet.
+
 ## CUE Ownership
 
 A CUE file owns future CUE parse observations on its own `source_file_id`. An adjacent audio file owns future
@@ -122,8 +154,8 @@ does not parse CUE sheets, and does not create segment, attachment, or track row
 
 Future work remains separate:
 
-- production scheduling loop and service command exposure for BLAKE3 admission, if callers need it beyond the current
-  store-level batch
+- production scheduling loop for BLAKE3 admission
+- source-location-scoped hash admission
 - media/container probing
 - CUE parsing
 - CUE-to-audio association evidence

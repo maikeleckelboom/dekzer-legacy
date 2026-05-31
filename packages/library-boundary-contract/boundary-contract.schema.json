@@ -205,6 +205,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/SourceFileHashReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceFileHash"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/SnapshotReadReply"
             },
             "type": {
@@ -262,6 +278,22 @@
             "type": {
               "type": "string",
               "const": "playlistWrite"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SourceFileHashCommand"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceFileHash"
             }
           },
           "required": [
@@ -822,6 +854,561 @@
         "failed",
         "blocked"
       ]
+    },
+    "HashSourceFilesBlake3FailedOutcome": {
+      "type": "object",
+      "properties": {
+        "failure": {
+          "$ref": "#/$defs/HashSourceFilesBlake3FileFailure"
+        }
+      },
+      "required": [
+        "failure"
+      ]
+    },
+    "HashSourceFilesBlake3FileFailure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sourceFileNotFound"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceFileUnavailableFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceFileUnavailable"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceUnavailableFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceRootUnavailable"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceRootMissingFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceRootMissing"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceRootBlockedFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceRootBlocked"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3InvalidRelativePathFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "invalidRelativePath"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sourceFilePathEscapesRoot"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "physicalFileMissing"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3IoFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "physicalFileBlocked"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3IoFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "fileOpen"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3IoFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "fileRead"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "basisChanged"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "storeFailure"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "HashSourceFilesBlake3HashedOutcome": {
+      "type": "object",
+      "properties": {
+        "acceptedArtifactId": {
+          "type": "string"
+        },
+        "contentHashAlgorithm": {
+          "type": "string"
+        },
+        "contentHashValue": {
+          "type": "string"
+        },
+        "workItemId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contentHashAlgorithm",
+        "contentHashValue",
+        "acceptedArtifactId",
+        "workItemId"
+      ]
+    },
+    "HashSourceFilesBlake3InvalidRelativePathFailure": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "HashSourceFilesBlake3IoFailure": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "detail"
+      ]
+    },
+    "HashSourceFilesBlake3Outcome": {
+      "type": "object",
+      "properties": {
+        "relativePath": {
+          "type": "string"
+        },
+        "sourceFileId": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/HashSourceFilesBlake3OutcomeStatus"
+        }
+      },
+      "required": [
+        "sourceFileId",
+        "sourceId",
+        "relativePath",
+        "status"
+      ]
+    },
+    "HashSourceFilesBlake3OutcomeStatus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3HashedOutcome"
+            },
+            "type": {
+              "type": "string",
+              "const": "hashed"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SkippedOutcome"
+            },
+            "type": {
+              "type": "string",
+              "const": "skipped"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3FailedOutcome"
+            },
+            "type": {
+              "type": "string",
+              "const": "failed"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "HashSourceFilesBlake3Reply": {
+      "type": "object",
+      "properties": {
+        "effectiveLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "failedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "hashedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HashSourceFilesBlake3Outcome"
+          }
+        },
+        "remainingCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFailure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "effectiveLimit",
+        "outcomes",
+        "hashedCount",
+        "skippedCount",
+        "failedCount",
+        "remainingCandidates"
+      ]
+    },
+    "HashSourceFilesBlake3Request": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId"
+      ]
+    },
+    "HashSourceFilesBlake3SkipReason": {
+      "type": "string",
+      "enum": [
+        "workAlreadyActive"
+      ]
+    },
+    "HashSourceFilesBlake3SkippedOutcome": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/HashSourceFilesBlake3SkipReason"
+        }
+      },
+      "required": [
+        "reason"
+      ]
+    },
+    "HashSourceFilesBlake3SourceFailure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sourceNotFound"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceUnavailableFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceUnavailable"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceRootMissingFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceRootMissing"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3SourceRootBlockedFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceRootBlocked"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "HashSourceFilesBlake3SourceFileUnavailableFailure": {
+      "type": "object",
+      "properties": {
+        "presenceState": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "presenceState"
+      ]
+    },
+    "HashSourceFilesBlake3SourceRootBlockedFailure": {
+      "type": "object",
+      "properties": {
+        "accessIssueKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycleIssueKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "HashSourceFilesBlake3SourceRootMissingFailure": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "HashSourceFilesBlake3SourceUnavailableFailure": {
+      "type": "object",
+      "properties": {
+        "accessIssueKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycleIssueKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accessState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceAccessState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mountStatus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMountStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
     },
     "LibraryAssetAvailabilityState": {
       "type": "string",
@@ -3270,6 +3857,46 @@
         "internal",
         "externalMounted",
         "removableMounted"
+      ]
+    },
+    "SourceFileHashCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3Request"
+            },
+            "type": {
+              "type": "string",
+              "const": "hashSourceFilesBlake3"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "SourceFileHashReply": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HashSourceFilesBlake3Reply"
+            },
+            "type": {
+              "type": "string",
+              "const": "hashSourceFilesBlake3"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
       ]
     },
     "SourceLifecycle": {

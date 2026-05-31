@@ -32,6 +32,10 @@ import {
 import { sourceLifecycleReadChannels } from '../../../src/shared/librarySourceLifecycle/channels'
 import type { ReadSourceLifecycleResult } from '../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
 import {
+  sourceFileHashingChannels,
+  type HashSourceFilesBlake3Result
+} from '../../../src/shared/librarySourceFileHashing/hashSourceFilesBlake3'
+import {
   boundaryEventChannels,
   type BoundaryEventDeliveryPayload
 } from '../../../src/shared/libraryBoundary/events'
@@ -56,6 +60,7 @@ describe('preload renderer API', () => {
       limit: 100
     }
     const sourceLifecycleRequest = { sourceId: '7' }
+    const hashRequest = { sourceId: '7', limit: 4 }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
       version: 1,
@@ -111,6 +116,17 @@ describe('preload renderer API', () => {
         updatedAtMs: 21
       }
     }
+    const hashResult: HashSourceFilesBlake3Result = {
+      state: 'completed',
+      result: {
+        effectiveLimit: 4,
+        outcomes: [],
+        hashedCount: 0,
+        skippedCount: 0,
+        failedCount: 0,
+        remainingCandidates: 0
+      }
+    }
     const choiceResult: LocalRootChoiceResult = {
       state: 'registered',
       root: {
@@ -156,6 +172,7 @@ describe('preload renderer API', () => {
     let receivedCancelScanRequest: unknown
     let receivedContentsRequest: unknown
     let receivedSourceLifecycleRequest: unknown
+    let receivedHashRequest: unknown
     let receivedViewStatePayload: unknown
     let subscribeCount = 0
     let unsubscribeCount = 0
@@ -185,6 +202,11 @@ describe('preload renderer API', () => {
         if (channel === sourceLifecycleReadChannels.readSourceLifecycle) {
           receivedSourceLifecycleRequest = args[0]
           return sourceLifecycleResult
+        }
+
+        if (channel === sourceFileHashingChannels.hashSourceFilesBlake3) {
+          receivedHashRequest = args[0]
+          return hashResult
         }
 
         if (channel === rootChannels.chooseAndRegisterLocal) {
@@ -289,6 +311,8 @@ describe('preload renderer API', () => {
       api.library.sourceLifecycle.readSourceLifecycle(sourceLifecycleRequest)
     ).resolves.toBe(sourceLifecycleResult)
     expect(receivedSourceLifecycleRequest).toBe(sourceLifecycleRequest)
+    await expect(api.library.hashing.hashSourceFilesBlake3(hashRequest)).resolves.toBe(hashResult)
+    expect(receivedHashRequest).toBe(hashRequest)
     await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)
     await expect(api.library.viewState.writeViewState(persistedViewState)).resolves.toBe(
       viewStateWriteResult
