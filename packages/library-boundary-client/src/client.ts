@@ -15,6 +15,8 @@ import type {
   ReadLibraryBoundaryEventsAfterRequest,
   ReadLibraryTreeChildrenReply,
   ReadLibraryTreeChildrenRequest,
+  ReadSourceLifecycleReply,
+  ReadSourceLifecycleRequest,
   ReadLocalRootsReply,
   ReadLocalRootsRequest,
   ReadNavigationNodeLibraryBrowserWindowReply,
@@ -169,6 +171,22 @@ export class LibraryBoundaryClient {
       },
       "snapshotRead",
       "libraryTreeChildren"
+    );
+  }
+
+  readSourceLifecycle(
+    request: ReadSourceLifecycleRequest
+  ): Promise<ReadSourceLifecycleReply> {
+    return this.sendAndExpect(
+      {
+        type: "snapshotRead",
+        payload: {
+          type: "readSourceLifecycle",
+          payload: request
+        }
+      },
+      "snapshotRead",
+      "sourceLifecycle"
     );
   }
 

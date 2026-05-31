@@ -23,6 +23,7 @@ mod playlists;
 mod projections;
 mod promotion;
 mod revisions;
+mod source_lifecycle_reads;
 mod sources;
 mod work_items;
 

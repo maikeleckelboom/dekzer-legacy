@@ -1,4 +1,5 @@
 import type { LocalRoot } from '../../../shared/libraryRoots/readLocalRoots'
+import type { SourceLifecycleRecord } from '../../../shared/librarySourceLifecycle/readSourceLifecycle'
 import type { ScanProgressState } from '../boundary/boundaryEvents'
 import type { LocalRootScanStatus, LocalRootsReadState } from '../boundary/localRootActions'
 import type { RowBinding, SourceState } from '../state'
@@ -26,6 +27,7 @@ export type SourceReadinessInput = {
   readonly sourceLabel: string
   readonly rootId?: string
   readonly localRoot?: LocalRoot
+  readonly sourceLifecycle?: SourceLifecycleRecord
   readonly sourceReadState?: SourceState
   readonly scanProgress?: ScanProgressState
   readonly currentScanStatus?: LocalRootScanStatus
@@ -35,6 +37,7 @@ export type ProjectSourceReadinessByNodeIdInput = {
   readonly projection: BrowserProjection | undefined
   readonly localRootsReadState: LocalRootsReadState
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
+  readonly sourceLifecycleBySourceId?: ReadonlyMap<string, SourceLifecycleRecord>
   readonly scanProgressByRootId: ReadonlyMap<string, ScanProgressState>
   readonly currentScanRootId?: string
   readonly currentScanStatus?: LocalRootScanStatus
@@ -72,6 +75,8 @@ export function projectSourceReadinessByNodeId(
         ? input.currentScanStatus
         : undefined
     const localRoot = rootId === undefined ? undefined : localRootsById.get(rootId)
+    const sourceLifecycle =
+      rootId === undefined ? undefined : input.sourceLifecycleBySourceId?.get(rootId)
     const sourceReadState = input.sourceReadStates.get(nodeId)
     const scanProgress = rootId === undefined ? undefined : input.scanProgressByRootId.get(rootId)
 
@@ -82,6 +87,7 @@ export function projectSourceReadinessByNodeId(
         sourceLabel: binding.target.label,
         ...(rootId === undefined ? {} : { rootId }),
         ...(localRoot === undefined ? {} : { localRoot }),
+        ...(sourceLifecycle === undefined ? {} : { sourceLifecycle }),
         ...(sourceReadState === undefined ? {} : { sourceReadState }),
         ...(scanProgress === undefined ? {} : { scanProgress }),
         ...(currentScanStatus === undefined ? {} : { currentScanStatus })
@@ -101,6 +107,11 @@ export function deriveSourceReadiness(input: SourceReadinessInput): SourceReadin
       hasPriorAuthoritativeRead(input.sourceReadState) ? 'rescanRunning' : 'scanning',
       runningScan
     )
+  }
+
+  const lifecycleReadiness = sourceLifecycleReadiness(input)
+  if (lifecycleReadiness !== undefined) {
+    return lifecycleReadiness
   }
 
   const terminalProgress = terminalScanProgressReadiness(input)
@@ -126,6 +137,49 @@ export function deriveSourceReadiness(input: SourceReadinessInput): SourceReadin
     'registered',
     'The source is registered. Scan or expand it to read library rows.'
   )
+}
+
+function sourceLifecycleReadiness(input: SourceReadinessInput): SourceReadiness | undefined {
+  const lifecycle = input.sourceLifecycle
+
+  if (lifecycle === undefined) {
+    return undefined
+  }
+
+  if (lifecycle.sourceClass !== 'internal' && lifecycle.mountStatus !== 'mounted') {
+    return readiness(input, 'unavailable', 'The registered source is currently unavailable.')
+  }
+
+  switch (lifecycle.accessState) {
+    case 'missing':
+      return readiness(input, 'unavailable', 'The registered source root is missing.')
+    case 'blocked':
+      return readiness(
+        input,
+        lifecycle.accessIssueKind === 'unavailableMount' ? 'unavailable' : 'blocked',
+        'The registered source root is blocked.'
+      )
+    case 'accessible':
+    case 'unknown':
+      break
+  }
+
+  switch (lifecycle.scanPhase) {
+    case 'scanning':
+      return readiness(input, 'scanning', 'The source is still being indexed.')
+    case 'blocked':
+      return readiness(
+        input,
+        lifecycle.scanIssueKind === 'unavailableMount' ? 'unavailable' : 'blocked',
+        'The source scan is blocked.'
+      )
+    case 'failed':
+      return readiness(input, 'failed', 'The source scan failed.')
+    case 'idle':
+    case 'complete':
+    case 'partial':
+      return undefined
+  }
 }
 
 function runningScanProgress(

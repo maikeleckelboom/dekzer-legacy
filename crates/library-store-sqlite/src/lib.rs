@@ -75,6 +75,7 @@ pub use read_models::literal_hierarchy::{
     StoreLiteralHierarchyEntryPoint, StoreLiteralHierarchyNode, StoreLiteralHierarchyWindow,
 };
 pub use read_models::navigation::NavigationRow;
+pub use read_models::source_lifecycle::StoreSourceLifecycle;
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
     DurableStoreSchemaCompatibilityState, LibraryStoreContext, LocalRoot, LocalRootAvailability,

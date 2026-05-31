@@ -22,8 +22,9 @@ use crate::snapshot_read_protocol::{
     map_read_library_asset_preparation_detail_reply,
     map_read_library_asset_waveform_overview_reply, map_read_library_tree_children_reply,
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
-    map_search_navigation_node_library_browser_window_reply, store_contents_policy,
-    store_contents_recursion, store_contents_scope, store_library_tree_entry_point,
+    map_read_source_lifecycle_reply, map_search_navigation_node_library_browser_window_reply,
+    store_contents_policy, store_contents_recursion, store_contents_scope,
+    store_library_tree_entry_point,
 };
 use crate::storage_environment::resolve_library_storage_environment;
 
@@ -457,6 +458,18 @@ impl LibraryBoundaryService {
         map_read_library_tree_children_reply(window).map_err(map_store_error)
     }
 
+    pub fn read_source_lifecycle(
+        &self,
+        request: protocol::ReadSourceLifecycleRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadSourceLifecycleReply> {
+        let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        let lifecycle = self
+            .durable_store
+            .read_source_lifecycle(source_id)
+            .map_err(map_store_error)?;
+        map_read_source_lifecycle_reply(lifecycle).map_err(map_store_error)
+    }
+
     pub fn read_navigation_node_library_browser_window(
         &self,
         request: protocol::ReadNavigationNodeLibraryBrowserWindowRequest,
@@ -647,6 +660,9 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ReadLibraryTreeChildren(request) => self
                 .read_library_tree_children(request)
                 .map(protocol::SnapshotReadReply::LibraryTreeChildren),
+            protocol::SnapshotReadCommand::ReadSourceLifecycle(request) => self
+                .read_source_lifecycle(request)
+                .map(protocol::SnapshotReadReply::SourceLifecycle),
             protocol::SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(request) => self
                 .read_navigation_node_library_browser_window(request)
                 .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserWindow),
@@ -932,14 +948,19 @@ mod tests {
         LoadNavigationRowByStableKeyRequest, MaintainedSnapshotScope, PlaylistWriteCommand,
         PlaylistWriteReply, ProtocolError, ReadLibraryBoundaryEventsAfterReply,
         ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
-        RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
-        RenamePlaylistRequest, SnapshotReadCommand, SnapshotReadReply, StartRootScanReply,
-        StartRootScanRequest, UnregisterLocalRootReply, UnregisterLocalRootRequest,
+        ReadSourceLifecycleReply, ReadSourceLifecycleRequest, RegisterLocalRootReply,
+        RegisterLocalRootRequest, RenamePlaylistReply, RenamePlaylistRequest, SnapshotReadCommand,
+        SnapshotReadReply, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
+        UnregisterLocalRootRequest,
     };
     use serde_json::json;
     use tempfile::TempDir;
 
-    use library_store_sqlite::{LibraryStoreContext, StoreEnvironment, durable_store_path};
+    use library_domain::{SourceAccessIssueKind, SourceAccessState, SourceScanPhase};
+    use library_store_sqlite::{
+        LibraryStoreContext, StoreEnvironment, UpsertSourceScanStateInput, UpsertSourceStateInput,
+        durable_store_path,
+    };
 
     use super::{LibraryBoundaryService, validate_contents_policy};
 
@@ -1041,6 +1062,13 @@ mod tests {
         match reply {
             CommandReply::SnapshotRead(SnapshotReadReply::LibraryTreeChildren(reply)) => reply,
             other => panic!("expected library tree reply, got {other:?}"),
+        }
+    }
+
+    fn expect_source_lifecycle_reply(reply: CommandReply) -> ReadSourceLifecycleReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::SourceLifecycle(reply)) => reply,
+            other => panic!("expected source lifecycle reply, got {other:?}"),
         }
     }
 
@@ -1184,6 +1212,17 @@ mod tests {
         )))
     }
 
+    fn read_source_lifecycle(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+    ) -> ReadSourceLifecycleReply {
+        expect_source_lifecycle_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadSourceLifecycle(
+                ReadSourceLifecycleRequest { source_id },
+            )),
+        )))
+    }
+
     fn load_navigation_row_by_stable_key(
         service: &LibraryBoundaryService,
         stable_key: String,
@@ -1193,6 +1232,90 @@ mod tests {
                 LoadNavigationRowByStableKeyRequest { stable_key },
             )),
         )))
+    }
+
+    #[test]
+    fn source_lifecycle_read_returns_authoritative_source_level_facts() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("source-lifecycle-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+
+        service
+            .durable_store
+            .upsert_source_state(UpsertSourceStateInput {
+                source_id: registered.root_id,
+                mount_status: "unmounted".to_string(),
+                mount_epoch: 2,
+                access_state: SourceAccessState::Blocked,
+                access_issue_kind: Some(SourceAccessIssueKind::UnavailableMount),
+                access_error_detail: None,
+                access_checked_at: Some(30),
+                mount_root: None,
+                effective_path: Some(source_root.to_string_lossy().into_owned()),
+                observed_volume_label: None,
+                filesystem_type: None,
+                last_seen_at: Some(25),
+                updated_at: 31,
+            })
+            .expect("update source state");
+        service
+            .durable_store
+            .upsert_source_scan_state(UpsertSourceScanStateInput {
+                source_id: registered.root_id,
+                scan_phase: SourceScanPhase::Blocked,
+                last_scan_started_at: Some(10),
+                last_scan_finished_at: Some(20),
+                last_successful_scan_at: None,
+                scan_issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                error_detail: None,
+                updated_at: 32,
+            })
+            .expect("update scan state");
+
+        let reply = read_source_lifecycle(&service, registered.root_id);
+        let lifecycle = reply.lifecycle.expect("known source lifecycle");
+        assert_eq!(lifecycle.source_id, registered.root_id);
+        assert!(lifecycle.is_user_visible);
+        assert_eq!(
+            lifecycle.mount_status,
+            library_boundary_protocol::SourceMountStatus::Unmounted
+        );
+        assert_eq!(
+            lifecycle.access_state,
+            library_boundary_protocol::SourceAccessState::Blocked
+        );
+        assert_eq!(
+            lifecycle.access_issue_kind,
+            Some(library_boundary_protocol::SourceLifecycleIssueKind::UnavailableMount)
+        );
+        assert_eq!(
+            lifecycle.scan_phase,
+            library_boundary_protocol::SourceScanPhase::Blocked
+        );
+        assert_eq!(
+            lifecycle.scan_issue_kind,
+            Some(library_boundary_protocol::SourceLifecycleIssueKind::PermissionDenied)
+        );
+        assert_eq!(lifecycle.last_scan_started_at_ms, Some(10));
+        assert_eq!(lifecycle.last_scan_finished_at_ms, Some(20));
+        assert_eq!(lifecycle.last_successful_scan_at_ms, None);
+        assert_eq!(lifecycle.last_seen_at_ms, Some(25));
+        assert!(lifecycle.updated_at_ms >= 32);
+
+        let missing = read_source_lifecycle(&service, 99_999);
+        assert!(missing.lifecycle.is_none());
+
+        let invalid = service
+            .try_handle_command(CommandRequest::SnapshotRead(
+                SnapshotReadCommand::ReadSourceLifecycle(ReadSourceLifecycleRequest {
+                    source_id: 0,
+                }),
+            ))
+            .expect_err("zero sourceId is invalid");
+        assert!(matches!(invalid, ProtocolError::InvalidRequest { .. }));
     }
 
     #[test]

@@ -27,6 +27,7 @@ import type {
   NavigationReadRowsResult,
   NavigationRow
 } from '../../../../src/shared/libraryNavigation/readRows'
+import type { SourceLifecycleRecord } from '../../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
 
 describe('source readiness projection', () => {
   it('uses scan progress for source-level scanning without synthesizing children', () => {
@@ -147,6 +148,32 @@ describe('source readiness projection', () => {
 
     expect(readiness.kind).toBe('ready')
   })
+
+  it('prefers backend source lifecycle facts while preserving active scan immediacy', () => {
+    const blockedLifecycle = sourceLifecycle({
+      accessState: 'blocked',
+      accessIssueKind: 'permissionDenied',
+      scanPhase: 'complete'
+    })
+
+    expect(readinessFor(browserState(), { lifecycle: blockedLifecycle })?.kind).toBe('blocked')
+
+    expect(
+      readinessFor(browserState(), {
+        lifecycle: blockedLifecycle,
+        progress: {
+          kind: 'scanning',
+          rootId: '7',
+          scanRunId: 'scan-2',
+          directoriesVisited: 1,
+          filesVisited: 0,
+          filesDiscovered: 0,
+          mediaCandidates: 0,
+          queuedWorkItems: 0
+        }
+      })?.kind
+    ).toBe('scanning')
+  })
 })
 
 function readinessFor(
@@ -154,13 +181,18 @@ function readinessFor(
   options: {
     readonly roots?: LocalRootsReadState
     readonly progress?: ScanProgressState
+    readonly lifecycle?: SourceLifecycleRecord
   } = {}
 ): SourceReadiness | undefined {
   const projection = projectTree(state)
+  const lifecycleBySourceId = sourceLifecycleBySourceId(options.lifecycle)
   const readiness = projectSourceReadinessByNodeId({
     projection,
     localRootsReadState: options.roots ?? readyRoots('available'),
     sourceReadStates: state.sourceReadStates,
+    ...(lifecycleBySourceId === undefined
+      ? {}
+      : { sourceLifecycleBySourceId: lifecycleBySourceId }),
     scanProgressByRootId: scanProgressByRootId(options.progress)
   })
 
@@ -182,6 +214,29 @@ function withReadiness(
   return {
     ...state,
     sourceReadinessByNodeId: readiness
+  }
+}
+
+function sourceLifecycleBySourceId(
+  lifecycle: SourceLifecycleRecord | undefined
+): ReadonlyMap<string, SourceLifecycleRecord> | undefined {
+  if (lifecycle === undefined) {
+    return undefined
+  }
+
+  return new Map([[lifecycle.sourceId, lifecycle]])
+}
+
+function sourceLifecycle(overrides: Partial<SourceLifecycleRecord> = {}): SourceLifecycleRecord {
+  return {
+    sourceId: '7',
+    sourceClass: 'externalMounted',
+    isUserVisible: true,
+    mountStatus: 'mounted',
+    accessState: 'accessible',
+    scanPhase: 'idle',
+    updatedAtMs: 100,
+    ...overrides
   }
 }
 

@@ -49,6 +49,12 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LoadNavigationRowByStableKeyRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ChildRowState>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceLifecycleRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceClass>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceMountStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceAccessState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceLifecycleIssueKind>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceScanPhase>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadRequest>(&cfg, &mut output);
@@ -79,6 +85,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LoadNavigationRowReply>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowByStableKeyReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceLifecycleReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadReply>(&cfg, &mut output);
@@ -99,6 +106,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::DirectoryPrimaryMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryImageMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceLifecycle>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsResult>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsState>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsCoverage>(&cfg, &mut output);
@@ -187,6 +195,8 @@ mod tests {
         assert!(ts.contains("startRootScan"));
         assert!(ts.contains("readLocalRoots"));
         assert!(ts.contains("unregisterLocalRoot"));
+        assert!(ts.contains("readSourceLifecycle"));
+        assert!(ts.contains("SourceLifecycle"));
         assert!(ts.contains("readLibraryTreeChildren"));
         assert!(ts.contains("LibraryTreeNode"));
         assert!(ts.contains("LibraryTreeFileMediaClass"));
@@ -211,6 +221,7 @@ mod tests {
         assert!(schema.contains("\"CommandOutcome\""));
         assert!(schema.contains("\"ProtocolError\""));
         assert!(schema.contains("\"registerLocalRoot\""));
+        assert!(schema.contains("\"readSourceLifecycle\""));
         assert!(schema.contains("\"readLibraryTreeChildren\""));
         assert!(schema.contains("\"protocolError\""));
         assert!(schema.contains("\"navigationRowId\""));

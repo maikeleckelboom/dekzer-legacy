@@ -23,6 +23,11 @@ import {
   type ContentsReadResult,
   type ContentsReadRequest
 } from '../shared/libraryContents/read'
+import { sourceLifecycleReadChannels } from '../shared/librarySourceLifecycle/channels'
+import type {
+  ReadSourceLifecycleResult,
+  ReadSourceLifecycleRequest
+} from '../shared/librarySourceLifecycle/readSourceLifecycle'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
@@ -94,6 +99,16 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             hierarchyReadChannels.readChildren,
             request
           )) as ReadResult
+        }
+      },
+      sourceLifecycle: {
+        async readSourceLifecycle(
+          request: ReadSourceLifecycleRequest
+        ): Promise<ReadSourceLifecycleResult> {
+          return (await ipcRenderer.invoke(
+            sourceLifecycleReadChannels.readSourceLifecycle,
+            request
+          )) as ReadSourceLifecycleResult
         }
       },
       contents: {

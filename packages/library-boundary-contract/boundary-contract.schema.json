@@ -2743,6 +2743,32 @@
         }
       }
     },
+    "ReadSourceLifecycleReply": {
+      "type": "object",
+      "properties": {
+        "lifecycle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ReadSourceLifecycleRequest": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId"
+      ]
+    },
     "RegisterLocalRootReply": {
       "type": "object",
       "properties": {
@@ -2952,6 +2978,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadSourceLifecycleRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readSourceLifecycle"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadNavigationNodeLibraryBrowserWindowRequest"
             },
             "type": {
@@ -3100,6 +3142,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadSourceLifecycleReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceLifecycle"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadNavigationNodeLibraryBrowserWindowReply"
             },
             "type": {
@@ -3176,6 +3234,136 @@
             "payload"
           ]
         }
+      ]
+    },
+    "SourceAccessState": {
+      "type": "string",
+      "enum": [
+        "accessible",
+        "missing",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "SourceClass": {
+      "type": "string",
+      "enum": [
+        "internal",
+        "externalMounted",
+        "removableMounted"
+      ]
+    },
+    "SourceLifecycle": {
+      "type": "object",
+      "properties": {
+        "accessIssueKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycleIssueKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accessState": {
+          "$ref": "#/$defs/SourceAccessState"
+        },
+        "isUserVisible": {
+          "type": "boolean"
+        },
+        "lastScanFinishedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "lastScanStartedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "lastSeenAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "lastSuccessfulScanAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "mountStatus": {
+          "$ref": "#/$defs/SourceMountStatus"
+        },
+        "scanIssueKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycleIssueKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scanPhase": {
+          "$ref": "#/$defs/SourceScanPhase"
+        },
+        "sourceClass": {
+          "$ref": "#/$defs/SourceClass"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "updatedAtMs": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceClass",
+        "isUserVisible",
+        "mountStatus",
+        "accessState",
+        "scanPhase",
+        "updatedAtMs"
+      ]
+    },
+    "SourceLifecycleIssueKind": {
+      "type": "string",
+      "enum": [
+        "missing",
+        "notDirectory",
+        "permissionDenied",
+        "privacyPermissionRequired",
+        "unavailableMount",
+        "resourceBusy",
+        "staleNetworkHandle",
+        "symlinkLoop",
+        "symlinkEscapeBlocked",
+        "unsupportedPath",
+        "invalidPath",
+        "ioInterrupted",
+        "timedOut",
+        "unknownIo"
+      ]
+    },
+    "SourceMountStatus": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "mounted",
+        "unmounted",
+        "ejectRequested",
+        "ejectPending"
       ]
     },
     "SourceScanEvent": {
@@ -3256,6 +3444,17 @@
         "sourceScanFailed",
         "sourceScanBlocked",
         "sourceScanCancelled"
+      ]
+    },
+    "SourceScanPhase": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "scanning",
+        "complete",
+        "partial",
+        "blocked",
+        "failed"
       ]
     },
     "StartRootScanReply": {

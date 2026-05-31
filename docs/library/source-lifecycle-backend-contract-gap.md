@@ -14,13 +14,13 @@ scope:
 
 # Source lifecycle — backend contract inventory & gap
 
-Status: architecture inventory / contract gap
+Status: architecture inventory / partially implemented contract gap
 
 Purpose
 -------
 This note inventories the durable facts and runtime signals owned by the Rust/SQLite substrate and the
 boundary service, then defines the exact backend contract gap for a backend-owned source lifecycle/readiness
-surface. This is a documentation-only pass: it does not implement the contract.
+surface.
 
 Current owners (durable & runtime)
 ----------------------------------
@@ -37,6 +37,10 @@ Current exposed contracts (surface)
 
 - `libraryRoots.readLocalRoots` — coarse root identity + availability (`LibraryBoundaryService::read_local_roots`,
   `apps/desktop/src/shared/libraryRoots/readLocalRoots.ts`).
+- `snapshotRead.readSourceLifecycle` — dedicated backend-owned source lifecycle read keyed by `sourceId`.
+  It returns typed semantic source facts from `sources`, `source_state`, and `source_scan_state`, or `null`
+  for not found. Desktop Main maps `null` to a typed `notFound` result and validates invalid `sourceId`
+  requests before they cross the host boundary.
 - `snapshotRead.readLibraryTreeChildren` — windowed literal-hierarchy reads with per-window coverage
   (`read_literal_hierarchy_children` ⇒ `crates/library-store-sqlite::read_models::literal_hierarchy`).
 - `snapshotRead.readNavigationRows`, `snapshotRead.readContents`, and related snapshot reads — navigation rows and
@@ -82,11 +86,21 @@ The renderer projects a collapsed `SourceReadiness` (kinds like `registered`, `s
 This projection is intentionally an application-side lifecycle projection over multiple substrate surfaces.
 It normalizes currently exposed facts into renderer state until a backend-owned lifecycle read surface exists.
 
-What the backend does NOT yet expose (the gap)
-----------------------------------------------
+What the backend now exposes
+----------------------------
 
-- There is no dedicated backend-owned, authoritative, per-source collapsed lifecycle/readiness read surface (for
-  example `readSourceLifecycle` keyed by `sourceId` or `rootId`).
+- `readSourceLifecycle` is the dedicated backend-owned source lifecycle read surface keyed by `sourceId`.
+- The record currently exposes `sourceId`, `sourceClass`, `isUserVisible`, `mountStatus`, `accessState`,
+  optional `accessIssueKind`, `scanPhase`, optional `scanIssueKind`, scan timestamps, `lastSeenAtMs`, and
+  `updatedAtMs`.
+- The record does not expose presentation readiness labels such as `ready`, `empty`, `rescanRunning`, badges,
+  copy, tones, or child rows.
+- Known user-visible sources remain readable when unavailable because the read uses durable source lifecycle
+  rows, not renderer projection state.
+
+What remains a backend contract gap
+-----------------------------------
+
 - `readLocalRoots` exposes root identity and a coarse `availability` only; it does not expose backend-owned
   lifecycle fields such as `mount_status`, `access_state`, `scan_phase`, `scan_issue_kind`, last-scan timestamps,
   or an authoritative whole-source coverage summary.
@@ -94,6 +108,10 @@ What the backend does NOT yet expose (the gap)
   directory; it is not intended as a global per-source lifecycle contract.
 - Events communicate activity and progress but are append-only signals and do not, by themselves, constitute an
   authoritative collapsed lifecycle surface.
+- Whole-source coverage summary remains omitted. It should only be added if it can be computed without duplicating
+  branch/window hierarchy semantics or implying authoritative `empty` state without proof.
+- Locator/root identity remains outside `readSourceLifecycle` for now; `readLocalRoots` continues to own local-root
+  identity and path exposure.
 
 Why `readLibraryTreeChildren` is NOT the collapsed source lifecycle contract
 ----------------------------------------------------------------------
@@ -180,19 +198,15 @@ Renderer ownership afterward
 Option B — Add dedicated `readSourceLifecycle` (per-source read surface)
 ------------------------------------------------------------------
 
-What it would own
+What it owns
 
-Field names below describe substrate facts, not final protocol spelling. A boundary contract must expose typed
-semantic fields using the project's contract naming conventions.
-
-- A new snapshot read surface keyed by `sourceId` or `rootId` returning an authoritative, backend-owned contract
-  describing per-source lifecycle facts, for example:
-  - `sourceId`, `rootId`, `sourceClass`
-  - `mountStatus`, `accessState`, `accessIssueKind` (optional typed enum)
-  - `scanPhase`, `scanIssueKind` (optional typed enum), `lastScanStartedAtMs`, `lastScanFinishedAtMs`,
+- The implemented snapshot read surface is keyed by `sourceId` and returns an authoritative, backend-owned contract
+  describing per-source lifecycle facts:
+  - `sourceId`, `sourceClass`, `isUserVisible`
+  - `mountStatus`, `accessState`, optional `accessIssueKind`
+  - `scanPhase`, optional `scanIssueKind`, `lastScanStartedAtMs`, `lastScanFinishedAtMs`,
     `lastSuccessfulScanAtMs`
-  - an optional whole-source `coverageSummary` (computed from per-directory counts) consisting of
-    `coverageState`, `recursiveScopeComplete`, `emptyResultAuthoritative`, `detail`.
+  - `lastSeenAtMs`, `updatedAtMs`
 
 What it must NOT own
 
@@ -204,10 +218,10 @@ Advantages
 - A clear, single authoritative surface for per-source lifecycle facts. Cleaner separation of concerns and easier
   client contracts.
 
-Risks
+Remaining risks
 
-- Requires new protocol types and service methods; more work to implement and roll out.
 - Needs careful update and invalidation semantics so lifecycle reads stay coherent with events and projection seeds.
+- Future whole-source coverage summary must not duplicate or contradict hierarchy-window coverage.
 
 Why avoid presentation vocabulary
 
@@ -219,23 +233,26 @@ Renderer ownership afterward
   with local runtime inputs such as in-flight scan progress. It should not duplicate backend-owned lifecycle
   inference once the backend contract exists.
 
-Implementation acceptance bar (future contract must prove)
-------------------------------------------------------
-Future implementation must provide demonstrable evidence (tests + code) that:
+Implementation acceptance bar
+-----------------------------
+Current implementation provides demonstrable evidence (tests + code) that:
 
 1. Registered known source remains visible when filesystem resolution is unavailable (durable `is_user_visible` +
    read surface returns the source record).
 2. `unavailable` / `blocked` / `failed` are emitted only from authoritative substrate facts (derived from
    `source_state` and `source_scan_state` and not guessed from events alone).
 3. A `completed` scan does not synthesize children; completed-only state must not be used to fabricate rows.
-4. `empty` is emitted only when an authoritative whole-source coverage calculation or per-window
-   `emptyResultAuthoritative`
-   proves there are zero rows.
-5. Active scan state is represented distinctly from branch refresh; the service surface must return `scan_phase` and
-   `scan_run_id` or equivalent without conflating refresh events.
-6. Branch refresh semantics remain branch-owned and are not automatically promoted to source lifecycle changes.
-7. Renderer no longer duplicates backend-owned lifecycle inference once the backend contract is available; the renderer
-   consumes the new read surface as primary source of truth.
+4. Branch refresh semantics remain branch-owned and are not automatically promoted to source lifecycle changes.
+5. Renderer source readiness can consume backend lifecycle facts as primary durable source truth while preserving
+   active scan progress for runtime immediacy.
+
+Still future:
+
+- `empty` should be emitted only when an authoritative whole-source coverage calculation or per-window
+  `emptyResultAuthoritative` proves there are zero rows. `readSourceLifecycle` does not emit `empty`.
+- A future active-run identity can be added if callers need to correlate durable `scanPhase` with a specific
+  runtime scan run; the current minimal read exposes durable `scanPhase` without conflating it with branch refresh.
+- Full renderer hydration of `readSourceLifecycle` records can reduce remaining projection seeding heuristics.
 
 Docs / authority map
 --------------------
@@ -246,22 +263,15 @@ Current preference
 ------------------
 
 - Prefer Option B, a dedicated source lifecycle read surface.
-- Use Option A only if implementation proves a dedicated read surface creates disproportionate protocol churn.
+- Option B is implemented for the minimal source lifecycle substrate contract.
+- Use Option A only for future local-root-list enrichment if a concrete caller needs root-list hydration.
 - Reason: source lifecycle is not merely local-root hydration. Future source classes should not be forced through
   `readLocalRoots`.
 
-Implementation prompt (for later work)
-------------------------------------
-If the team decides to implement a backend contract, the follow-up work should include:
+Follow-up work
+--------------
 
-- Protocol: add a new snapshot/read protocol type (or enrich `ReadLocalRootsReply`) and version it.
-- Store read: add a substrate read in `crates/library-store-sqlite` to return the backend-owned lifecycle fields
-  and (optionally) whole-source coverage summary computed the same way `literal_hierarchy` does for whole-source
-  anchors.
-- Service: implement mapping in `snapshot_read_protocol.rs` and a handler in `service.rs` that returns the new type.
-- Tests: add integration tests asserting the acceptance bar above (visibility under unavailability, authoritative
-  empty, no synthesized children, separation of scan vs refresh).
-- Renderer: migrate `deriveSourceReadiness` to prefer backend-owned lifecycle fields for authoritative
-  classification and reduce duplicated heuristics.
-
-Do not implement changes in this pass. Use this note as the specification for the next implementation step.
+- Add a whole-source coverage summary only if the semantics can be proved without duplicating branch/window reads.
+- Add source locator/root identity only when the lifecycle caller needs it and the source/root mapping remains clean.
+- Hydrate renderer source lifecycle records through the new shared API where callers need durable lifecycle facts
+  independent of hierarchy reads.

@@ -45,7 +45,7 @@ export type RemoveLibraryAssetFromPlaylistRequest = { playlistId: string, librar
 
 export type MovePlaylistEntryRequest = { playlistId: string, playlistEntryId: string, newPosition: number, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -56,6 +56,18 @@ export type LoadNavigationRowByStableKeyRequest = { stableKey: string, };
 export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, };
 
 export type ChildRowState = "unknown" | "hasChildRows" | "noChildRows";
+
+export type ReadSourceLifecycleRequest = { sourceId: string, };
+
+export type SourceClass = "internal" | "externalMounted" | "removableMounted";
+
+export type SourceMountStatus = "unknown" | "mounted" | "unmounted" | "ejectRequested" | "ejectPending";
+
+export type SourceAccessState = "accessible" | "missing" | "blocked" | "unknown";
+
+export type SourceLifecycleIssueKind = "missing" | "notDirectory" | "permissionDenied" | "privacyPermissionRequired" | "unavailableMount" | "resourceBusy" | "staleNetworkHandle" | "symlinkLoop" | "symlinkEscapeBlocked" | "unsupportedPath" | "invalidPath" | "ioInterrupted" | "timedOut" | "unknownIo";
+
+export type SourceScanPhase = "idle" | "scanning" | "complete" | "partial" | "blocked" | "failed";
 
 export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
 
@@ -126,7 +138,7 @@ export type RemoveLibraryAssetFromPlaylistReply = { removed: boolean, };
 
 export type MovePlaylistEntryReply = { moved: boolean, };
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -135,6 +147,8 @@ export type LoadNavigationRowReply = { row: NavigationRow | null, };
 export type LoadNavigationRowByStableKeyReply = { row: NavigationRow | null, };
 
 export type ReadLibraryTreeChildrenReply = { window: LibraryTreeWindow | null, };
+
+export type ReadSourceLifecycleReply = { lifecycle: SourceLifecycle | null, };
 
 export type ReadNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
 
@@ -175,6 +189,8 @@ export type DirectoryPrimaryMediaState = { "kind": "unknown" } | { "kind": "hasP
 export type DirectoryImageMediaState = { "kind": "unknown" } | { "kind": "hasImageMediaDescendants" } | { "kind": "noImageMediaDescendants" };
 
 export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
+
+export type SourceLifecycle = { sourceId: string, sourceClass: SourceClass, isUserVisible: boolean, mountStatus: SourceMountStatus, accessState: SourceAccessState, accessIssueKind?: SourceLifecycleIssueKind, scanPhase: SourceScanPhase, scanIssueKind?: SourceLifecycleIssueKind, lastScanStartedAtMs?: number, lastScanFinishedAtMs?: number, lastSuccessfulScanAtMs?: number, lastSeenAtMs?: number, updatedAtMs: number, };
 
 export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, rows: Array<ContentsFileRow>, coverage: ContentsCoverage, nextCursor?: string, detail?: string, };
 

@@ -29,6 +29,8 @@ import {
   contentsReadChannels,
   type ContentsReadResult
 } from '../../../src/shared/libraryContents/read'
+import { sourceLifecycleReadChannels } from '../../../src/shared/librarySourceLifecycle/channels'
+import type { ReadSourceLifecycleResult } from '../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
 import {
   boundaryEventChannels,
   type BoundaryEventDeliveryPayload
@@ -53,6 +55,7 @@ describe('preload renderer API', () => {
       recursion: 'recursive' as const,
       limit: 100
     }
+    const sourceLifecycleRequest = { sourceId: '7' }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
       version: 1,
@@ -90,6 +93,22 @@ describe('preload renderer API', () => {
       error: {
         code: 'noTarget',
         message: 'No contents scope was provided.'
+      }
+    }
+    const sourceLifecycleResult: ReadSourceLifecycleResult = {
+      state: 'ready',
+      lifecycle: {
+        sourceId: '7',
+        sourceClass: 'externalMounted',
+        isUserVisible: true,
+        mountStatus: 'mounted',
+        accessState: 'accessible',
+        scanPhase: 'complete',
+        lastScanStartedAtMs: 10,
+        lastScanFinishedAtMs: 20,
+        lastSuccessfulScanAtMs: 20,
+        lastSeenAtMs: 9,
+        updatedAtMs: 21
       }
     }
     const choiceResult: LocalRootChoiceResult = {
@@ -136,6 +155,7 @@ describe('preload renderer API', () => {
     let receivedScanRequest: unknown
     let receivedCancelScanRequest: unknown
     let receivedContentsRequest: unknown
+    let receivedSourceLifecycleRequest: unknown
     let receivedViewStatePayload: unknown
     let subscribeCount = 0
     let unsubscribeCount = 0
@@ -160,6 +180,11 @@ describe('preload renderer API', () => {
         if (channel === contentsReadChannels.read) {
           receivedContentsRequest = args[0]
           return contentsResult
+        }
+
+        if (channel === sourceLifecycleReadChannels.readSourceLifecycle) {
+          receivedSourceLifecycleRequest = args[0]
+          return sourceLifecycleResult
         }
 
         if (channel === rootChannels.chooseAndRegisterLocal) {
@@ -260,6 +285,10 @@ describe('preload renderer API', () => {
     expect(receivedHierarchyRequest).toBe(hierarchyRequest)
     await expect(api.library.contents.read(contentsRequest)).resolves.toBe(contentsResult)
     expect(receivedContentsRequest).toBe(contentsRequest)
+    await expect(
+      api.library.sourceLifecycle.readSourceLifecycle(sourceLifecycleRequest)
+    ).resolves.toBe(sourceLifecycleResult)
+    expect(receivedSourceLifecycleRequest).toBe(sourceLifecycleRequest)
     await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)
     await expect(api.library.viewState.writeViewState(persistedViewState)).resolves.toBe(
       viewStateWriteResult

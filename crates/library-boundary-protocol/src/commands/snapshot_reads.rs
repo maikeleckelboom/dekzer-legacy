@@ -1577,6 +1577,188 @@ pub enum ChildRowState {
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceClass {
+    Internal,
+    ExternalMounted,
+    RemovableMounted,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceMountStatus {
+    Unknown,
+    Mounted,
+    Unmounted,
+    EjectRequested,
+    EjectPending,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceAccessState {
+    Accessible,
+    Missing,
+    Blocked,
+    Unknown,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceLifecycleIssueKind {
+    Missing,
+    NotDirectory,
+    PermissionDenied,
+    PrivacyPermissionRequired,
+    UnavailableMount,
+    ResourceBusy,
+    StaleNetworkHandle,
+    SymlinkLoop,
+    SymlinkEscapeBlocked,
+    UnsupportedPath,
+    InvalidPath,
+    IoInterrupted,
+    TimedOut,
+    UnknownIo,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceScanPhase {
+    Idle,
+    Scanning,
+    Complete,
+    Partial,
+    Blocked,
+    Failed,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceLifecycleRequest {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceLifecycleReply {
+    pub lifecycle: Option<SourceLifecycle>,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceLifecycle {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+    pub source_class: SourceClass,
+    pub is_user_visible: bool,
+    pub mount_status: SourceMountStatus,
+    pub access_state: SourceAccessState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub access_issue_kind: Option<SourceLifecycleIssueKind>,
+    pub scan_phase: SourceScanPhase,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub scan_issue_kind: Option<SourceLifecycleIssueKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_scan_started_at_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_scan_finished_at_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_successful_scan_at_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_seen_at_ms: Option<i64>,
+    pub updated_at_ms: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -1591,6 +1773,7 @@ pub enum SnapshotReadCommand {
     LoadNavigationRow(LoadNavigationRowRequest),
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
     ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
+    ReadSourceLifecycle(ReadSourceLifecycleRequest),
     ReadNavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowRequest),
     SearchNavigationNodeLibraryBrowserWindow(SearchNavigationNodeLibraryBrowserWindowRequest),
     ContentsRead(ContentsReadRequest),
@@ -1608,6 +1791,7 @@ pub enum SnapshotReadReply {
     NavigationRow(LoadNavigationRowReply),
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
+    SourceLifecycle(ReadSourceLifecycleReply),
     NavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowReply),
     NavigationNodeLibraryBrowserSearch(SearchNavigationNodeLibraryBrowserWindowReply),
     Contents(ContentsReadReply),
@@ -1636,8 +1820,11 @@ mod tests {
         ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenReply,
         ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
         ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
+        ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
         SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
+        SourceAccessState, SourceClass, SourceLifecycle, SourceLifecycleIssueKind,
+        SourceMountStatus, SourceScanPhase,
     };
     use serde_json::json;
 
@@ -1746,6 +1933,72 @@ mod tests {
         assert_eq!(
             ContentsMediaClass::from_projection_value("image"),
             Some(ContentsMediaClass::Image)
+        );
+    }
+
+    #[test]
+    fn source_lifecycle_serializes_semantic_source_facts() {
+        let reply = SnapshotReadReply::SourceLifecycle(ReadSourceLifecycleReply {
+            lifecycle: Some(SourceLifecycle {
+                source_id: 7,
+                source_class: SourceClass::ExternalMounted,
+                is_user_visible: true,
+                mount_status: SourceMountStatus::Unmounted,
+                access_state: SourceAccessState::Blocked,
+                access_issue_kind: Some(SourceLifecycleIssueKind::UnavailableMount),
+                scan_phase: SourceScanPhase::Blocked,
+                scan_issue_kind: Some(SourceLifecycleIssueKind::PermissionDenied),
+                last_scan_started_at_ms: Some(10),
+                last_scan_finished_at_ms: Some(20),
+                last_successful_scan_at_ms: None,
+                last_seen_at_ms: Some(9),
+                updated_at_ms: 30,
+            }),
+        });
+
+        let json = serde_json::to_value(&reply).expect("serialize lifecycle reply");
+        assert_eq!(
+            json,
+            json!({
+                "type": "sourceLifecycle",
+                "payload": {
+                    "lifecycle": {
+                        "sourceId": "7",
+                        "sourceClass": "externalMounted",
+                        "isUserVisible": true,
+                        "mountStatus": "unmounted",
+                        "accessState": "blocked",
+                        "accessIssueKind": "unavailableMount",
+                        "scanPhase": "blocked",
+                        "scanIssueKind": "permissionDenied",
+                        "lastScanStartedAtMs": 10,
+                        "lastScanFinishedAtMs": 20,
+                        "lastSeenAtMs": 9,
+                        "updatedAtMs": 30
+                    }
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(json).expect("deserialize lifecycle reply"),
+            reply
+        );
+
+        let command =
+            SnapshotReadCommand::ReadSourceLifecycle(ReadSourceLifecycleRequest { source_id: 7 });
+        let json = serde_json::to_value(&command).expect("serialize lifecycle command");
+        assert_eq!(
+            json,
+            json!({
+                "type": "readSourceLifecycle",
+                "payload": {
+                    "sourceId": "7"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadCommand>(json).expect("deserialize command"),
+            command
         );
     }
 

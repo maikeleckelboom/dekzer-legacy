@@ -106,6 +106,7 @@ export function createFakeClient(
     loadNavigationRow: rejectUnexpectedClientCall,
     loadNavigationRowByStableKey: rejectUnexpectedClientCall,
     readLibraryTreeChildren: rejectUnexpectedClientCall,
+    readSourceLifecycle: rejectUnexpectedClientCall,
     readNavigationNodeLibraryBrowserWindow: rejectUnexpectedClientCall,
     searchNavigationNodeLibraryBrowserWindow: rejectUnexpectedClientCall,
     createPlaylist: rejectUnexpectedClientCall,

@@ -120,6 +120,14 @@ pub(crate) fn map_read_library_tree_children_reply(
     })
 }
 
+pub(crate) fn map_read_source_lifecycle_reply(
+    lifecycle: Option<store::StoreSourceLifecycle>,
+) -> store::LibrarySqliteResult<protocol::ReadSourceLifecycleReply> {
+    Ok(protocol::ReadSourceLifecycleReply {
+        lifecycle: lifecycle.map(map_source_lifecycle).transpose()?,
+    })
+}
+
 pub(crate) fn map_read_navigation_node_library_browser_window_reply(
     window: Option<store::StoreLibraryBrowserWindow>,
 ) -> store::LibrarySqliteResult<protocol::ReadNavigationNodeLibraryBrowserWindowReply> {
@@ -320,6 +328,106 @@ fn map_library_tree_window(
             .map(map_library_tree_node)
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
     })
+}
+
+fn map_source_lifecycle(
+    lifecycle: store::StoreSourceLifecycle,
+) -> store::LibrarySqliteResult<protocol::SourceLifecycle> {
+    Ok(protocol::SourceLifecycle {
+        source_id: lifecycle.source_id,
+        source_class: map_source_class(&lifecycle.source_class)?,
+        is_user_visible: lifecycle.is_user_visible,
+        mount_status: map_source_mount_status(&lifecycle.mount_status)?,
+        access_state: map_source_access_state(&lifecycle.access_state)?,
+        access_issue_kind: lifecycle
+            .access_issue_kind
+            .as_deref()
+            .map(map_source_lifecycle_issue_kind)
+            .transpose()?,
+        scan_phase: map_source_scan_phase(&lifecycle.scan_phase)?,
+        scan_issue_kind: lifecycle
+            .scan_issue_kind
+            .as_deref()
+            .map(map_source_lifecycle_issue_kind)
+            .transpose()?,
+        last_scan_started_at_ms: lifecycle.last_scan_started_at,
+        last_scan_finished_at_ms: lifecycle.last_scan_finished_at,
+        last_successful_scan_at_ms: lifecycle.last_successful_scan_at,
+        last_seen_at_ms: lifecycle.last_seen_at,
+        updated_at_ms: lifecycle.updated_at,
+    })
+}
+
+fn map_source_class(value: &str) -> store::LibrarySqliteResult<protocol::SourceClass> {
+    match value {
+        "internal" => Ok(protocol::SourceClass::Internal),
+        "external_mounted" => Ok(protocol::SourceClass::ExternalMounted),
+        "removable_mounted" => Ok(protocol::SourceClass::RemovableMounted),
+        other => Err(invalid_source_lifecycle_value("source_class", other)),
+    }
+}
+
+fn map_source_mount_status(value: &str) -> store::LibrarySqliteResult<protocol::SourceMountStatus> {
+    match value {
+        "unknown" => Ok(protocol::SourceMountStatus::Unknown),
+        "mounted" => Ok(protocol::SourceMountStatus::Mounted),
+        "unmounted" => Ok(protocol::SourceMountStatus::Unmounted),
+        "eject_requested" => Ok(protocol::SourceMountStatus::EjectRequested),
+        "eject_pending" => Ok(protocol::SourceMountStatus::EjectPending),
+        other => Err(invalid_source_lifecycle_value("mount_status", other)),
+    }
+}
+
+fn map_source_access_state(value: &str) -> store::LibrarySqliteResult<protocol::SourceAccessState> {
+    match value {
+        "accessible" => Ok(protocol::SourceAccessState::Accessible),
+        "missing" => Ok(protocol::SourceAccessState::Missing),
+        "blocked" => Ok(protocol::SourceAccessState::Blocked),
+        "unknown" => Ok(protocol::SourceAccessState::Unknown),
+        other => Err(invalid_source_lifecycle_value("access_state", other)),
+    }
+}
+
+fn map_source_scan_phase(value: &str) -> store::LibrarySqliteResult<protocol::SourceScanPhase> {
+    match value {
+        "idle" => Ok(protocol::SourceScanPhase::Idle),
+        "scanning" => Ok(protocol::SourceScanPhase::Scanning),
+        "complete" => Ok(protocol::SourceScanPhase::Complete),
+        "partial" => Ok(protocol::SourceScanPhase::Partial),
+        "blocked" => Ok(protocol::SourceScanPhase::Blocked),
+        "failed" => Ok(protocol::SourceScanPhase::Failed),
+        other => Err(invalid_source_lifecycle_value("scan_phase", other)),
+    }
+}
+
+fn map_source_lifecycle_issue_kind(
+    value: &str,
+) -> store::LibrarySqliteResult<protocol::SourceLifecycleIssueKind> {
+    match value {
+        "missing" => Ok(protocol::SourceLifecycleIssueKind::Missing),
+        "not_directory" => Ok(protocol::SourceLifecycleIssueKind::NotDirectory),
+        "permission_denied" => Ok(protocol::SourceLifecycleIssueKind::PermissionDenied),
+        "privacy_permission_required" => {
+            Ok(protocol::SourceLifecycleIssueKind::PrivacyPermissionRequired)
+        }
+        "unavailable_mount" => Ok(protocol::SourceLifecycleIssueKind::UnavailableMount),
+        "resource_busy" => Ok(protocol::SourceLifecycleIssueKind::ResourceBusy),
+        "stale_network_handle" => Ok(protocol::SourceLifecycleIssueKind::StaleNetworkHandle),
+        "symlink_loop" => Ok(protocol::SourceLifecycleIssueKind::SymlinkLoop),
+        "symlink_escape_blocked" => Ok(protocol::SourceLifecycleIssueKind::SymlinkEscapeBlocked),
+        "unsupported_path" => Ok(protocol::SourceLifecycleIssueKind::UnsupportedPath),
+        "invalid_path" => Ok(protocol::SourceLifecycleIssueKind::InvalidPath),
+        "io_interrupted" => Ok(protocol::SourceLifecycleIssueKind::IoInterrupted),
+        "timed_out" => Ok(protocol::SourceLifecycleIssueKind::TimedOut),
+        "unknown_io" => Ok(protocol::SourceLifecycleIssueKind::UnknownIo),
+        other => Err(invalid_source_lifecycle_value("issue_kind", other)),
+    }
+}
+
+fn invalid_source_lifecycle_value(field_name: &str, value: &str) -> store::LibrarySqliteError {
+    malformed_store_state(format!(
+        "source lifecycle field {field_name} contains unsupported value {value:?}"
+    ))
 }
 
 const fn map_library_tree_coverage_state(

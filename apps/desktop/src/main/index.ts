@@ -6,6 +6,7 @@ import { createLibraryBoundaryHost } from './libraryBoundary/host'
 import { registerReadChildrenIpc } from './libraryHierarchy/readChildren'
 import { registerReadNavigationRowsIpc } from './libraryNavigation/readRows'
 import { registerContentsReadIpc } from './libraryContents/read'
+import { registerReadSourceLifecycleIpc } from './librarySourceLifecycle/readSourceLifecycle'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerCancelRootScanIpc } from './libraryRoots/cancelScan'
@@ -67,6 +68,7 @@ app.whenReady().then(() => {
   registerHostStatusIpc(ipcMain, hostStatusController)
   registerReadNavigationRowsIpc(ipcMain, host)
   registerReadChildrenIpc(ipcMain, host)
+  registerReadSourceLifecycleIpc(ipcMain, host)
   registerContentsReadIpc(ipcMain, host)
   registerLocalRootChoiceIpc(ipcMain, host, {
     dialog,
