@@ -27,17 +27,17 @@ This preserves diagnostic and future migration room while making the contents pa
 
 `source_files` owns durable file facts. The required inventory facts are:
 
-| Fact | Meaning |
-|------|---------|
-| `source_file_id` | Stable durable file row identity inside the store. |
-| `source_id` | Owning source root. |
-| `parent_source_directory_id` | Immediate directory when known. |
-| `relative_path`, `name` | Source-relative location and display filename. |
-| `size_bytes`, `mtime_ns` | Observed filesystem metadata when available. |
-| `file_kind` | Fine path-derived classifier: audio, video, image, cue_sheet, log_doc, text_doc, archive, other, unknown. |
-| `media_class` | Coarse class: audio, video, image, unsupported, none. |
-| `presence_state` | present, missing, or removed. |
-| timestamps | First discovery, last observation, presence change, creation, update. |
+| Fact                         | Meaning                                                                                                   |
+|------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `source_file_id`             | Stable durable file row identity inside the store.                                                        |
+| `source_id`                  | Owning source root.                                                                                       |
+| `parent_source_directory_id` | Immediate directory when known.                                                                           |
+| `relative_path`, `name`      | Source-relative location and display filename.                                                            |
+| `size_bytes`, `mtime_ns`     | Observed filesystem metadata when available.                                                              |
+| `file_kind`                  | Fine path-derived classifier: audio, video, image, cue_sheet, log_doc, text_doc, archive, other, unknown. |
+| `media_class`                | Coarse class: audio, video, image, unsupported, none.                                                     |
+| `presence_state`             | present, missing, or removed.                                                                             |
+| timestamps                   | First discovery, last observation, presence change, creation, update.                                     |
 
 `file_kind` and `media_class` are provisional path-derived facts. They are not proof of playability, readiness, track
 identity, or artwork role.
@@ -46,11 +46,11 @@ identity, or artwork role.
 
 The renderer default for selected library contents is:
 
-| Field | Value |
-|-------|-------|
-| `rowProfile` | `sourceFile` |
+| Field          | Value                            |
+|----------------|----------------------------------|
+| `rowProfile`   | `sourceFile`                     |
 | `mediaClasses` | audio, video, image, unsupported |
-| `recursion` | recursive |
+| `recursion`    | recursive                        |
 
 The renderer derives the scope from selection and sends this policy to `readContents`. The backend owns the query and
 admission. The renderer must not fan out tree children, synthesize directory contents, or answer the selected scope from
@@ -58,11 +58,11 @@ the hierarchy cache.
 
 ## Scope Behavior
 
-| Scope | Recursive behavior |
-|-------|--------------------|
-| source | Reads rows under the whole source, or under accepted source locations when user-visible source locations exist. |
-| sourceLocation | Reads rows under that registered location prefix. |
-| directory | Reads rows under that directory prefix. |
+| Scope          | Recursive behavior                                                                                              |
+|----------------|-----------------------------------------------------------------------------------------------------------------|
+| source         | Reads rows under the whole source, or under accepted source locations when user-visible source locations exist. |
+| sourceLocation | Reads rows under that registered location prefix.                                                               |
+| directory      | Reads rows under that directory prefix.                                                                         |
 
 Immediate recursion reads only immediate files for the selected scope. Recursive source and directory reads are backend
 queries over durable source-file rows.
@@ -75,14 +75,14 @@ or indexing is incomplete.
 
 Default media-relevant source-file inventory includes:
 
-| Stored facts | Default inventory admission |
-|--------------|-----------------------------|
-| `media_class = audio` | Include. |
-| `media_class = video` | Include. |
-| `media_class = image` | Include as an image file. |
-| `media_class = unsupported` and `file_kind = cue_sheet` | Include as a companion metadata file. |
-| `media_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from default inventory. |
-| `media_class = none` or `file_kind = unknown` | Exclude from default inventory. |
+| Stored facts                                                                     | Default inventory admission           |
+|----------------------------------------------------------------------------------|---------------------------------------|
+| `media_class = audio`                                                            | Include.                              |
+| `media_class = video`                                                            | Include.                              |
+| `media_class = image`                                                            | Include as an image file.             |
+| `media_class = unsupported` and `file_kind = cue_sheet`                          | Include as a companion metadata file. |
+| `media_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from default inventory.       |
+| `media_class = none` or `file_kind = unknown`                                    | Exclude from default inventory.       |
 
 This contract intentionally does not admit every `unsupported` row. `unsupported` is too broad for product inventory
 because it can include notes, PDFs, archives, binary data, and other unrelated files. CUE sheets are admitted because
@@ -108,7 +108,11 @@ video only. A policy that asks `primaryMedia` for image or unsupported rows must
 ## Ordering And Cursor
 
 `sourceFile` inventory rows are ordered by lowercased relative path, then `source_file_id`. Cursor identity includes
-scope, row profile, recursion, media classes, and the last row ordering position. Cursor mismatches return
+scope, row profile, recursion, the requested media classes including `unsupported`, and the last row ordering position.
+The media-class identity is derived from the requested policy, not from the rows returned on the current page. Changing
+media classes across pages returns `cursorInvalid`.
+
+Cursor resumption must follow the same ordering contract and produce no duplicates and no gaps. Cursor mismatches return
 `cursorInvalid`.
 
 The cursor must page the same backend query. It must not switch to renderer-local filtering or tree fanout.
@@ -120,12 +124,12 @@ Rust and SQLite own durable facts and read-model admission. Boundary protocol ex
 
 The renderer may project icons and labels:
 
-| Row facts | Renderer projection |
-|-----------|---------------------|
-| audio | music/file row |
-| video | video/file row |
-| image | image/file row |
-| unsupported + cueSheet | cue sheet/file row |
+| Row facts              | Renderer projection |
+|------------------------|---------------------|
+| audio                  | music/file row      |
+| video                  | video/file row      |
+| image                  | image/file row      |
+| unsupported + cueSheet | cue sheet/file row  |
 
 The renderer must not add scanning intelligence, CUE pairing, artwork role detection, file probing, polling, or sleep
 based refresh logic.

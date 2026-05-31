@@ -9,6 +9,12 @@ use crate::{LibrarySqliteError, LibrarySqliteResult};
 const CONTENTS_CURSOR_VERSION: u8 = 1;
 const CONTENTS_CURSOR_KIND_SOURCE_FILE: &str = "sf";
 const CONTENTS_CURSOR_KIND_PRIMARY_MEDIA: &str = "pm";
+const CONTENTS_CURSOR_MEDIA_CLASS_ORDER: [StoreContentsMediaClass; 4] = [
+    StoreContentsMediaClass::Audio,
+    StoreContentsMediaClass::Video,
+    StoreContentsMediaClass::Image,
+    StoreContentsMediaClass::Unsupported,
+];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ContentsCursor {
@@ -186,36 +192,7 @@ fn validate_cursor_identity(
     if !scope_matches {
         return false;
     }
-    let canonical_classes: Vec<String> = {
-        let mut classes: Vec<String> = policy
-            .media_classes
-            .iter()
-            .map(|mc| mc.as_str().to_string())
-            .collect();
-        let mut has_audio = false;
-        let mut has_video = false;
-        let mut has_image = false;
-        for c in &classes {
-            match c.as_str() {
-                "audio" => has_audio = true,
-                "video" => has_video = true,
-                "image" => has_image = true,
-                _ => {}
-            }
-        }
-        classes.clear();
-        if has_audio {
-            classes.push("audio".to_string());
-        }
-        if has_video {
-            classes.push("video".to_string());
-        }
-        if has_image {
-            classes.push("image".to_string());
-        }
-        classes
-    };
-    if cursor.media_classes != canonical_classes {
+    if cursor.media_classes != canonical_cursor_media_classes(policy) {
         return false;
     }
     let expected_recursion = match recursion {
@@ -278,6 +255,19 @@ fn compute_album_key(row: &StoreContentsFileRow) -> String {
         .unwrap_or_default()
 }
 
+fn canonical_cursor_media_classes(policy: &StoreContentsReadPolicy) -> Vec<String> {
+    CONTENTS_CURSOR_MEDIA_CLASS_ORDER
+        .iter()
+        .filter(|media_class| {
+            policy
+                .media_classes
+                .iter()
+                .any(|requested| requested == *media_class)
+        })
+        .map(|media_class| media_class.as_str().to_string())
+        .collect()
+}
+
 fn build_next_cursor(
     rows: &[StoreContentsFileRow],
     scope: &StoreContentsScope,
@@ -307,35 +297,6 @@ fn build_next_cursor(
             source_directory_id: *source_directory_id,
         },
     };
-    let canonical_classes: Vec<String> = {
-        let mut classes: Vec<String> = policy
-            .media_classes
-            .iter()
-            .map(|mc| mc.as_str().to_string())
-            .collect();
-        let mut has_audio = false;
-        let mut has_video = false;
-        let mut has_image = false;
-        for c in &classes {
-            match c.as_str() {
-                "audio" => has_audio = true,
-                "video" => has_video = true,
-                "image" => has_image = true,
-                _ => {}
-            }
-        }
-        classes.clear();
-        if has_audio {
-            classes.push("audio".to_string());
-        }
-        if has_video {
-            classes.push("video".to_string());
-        }
-        if has_image {
-            classes.push("image".to_string());
-        }
-        classes
-    };
     let recursion_str = match recursion {
         StoreContentsRecursion::Immediate => "immediate".to_string(),
         StoreContentsRecursion::Recursive => "recursive".to_string(),
@@ -344,7 +305,7 @@ fn build_next_cursor(
         version: CONTENTS_CURSOR_VERSION,
         kind,
         scope: cursor_scope,
-        media_classes: canonical_classes,
+        media_classes: canonical_cursor_media_classes(policy),
         recursion: recursion_str,
         position,
     };
@@ -2251,7 +2212,7 @@ mod tests {
     use super::{
         StoreContentsCoverageState, StoreContentsMediaClass, StoreContentsReadPolicy,
         StoreContentsRecursion, StoreContentsRowOrigin, StoreContentsRowProfile,
-        StoreContentsScope, StoreContentsState, read_contents,
+        StoreContentsScope, StoreContentsState, canonical_cursor_media_classes, read_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -2276,6 +2237,57 @@ mod tests {
             media_classes,
             row_profile: StoreContentsRowProfile::SourceFile,
         }
+    }
+
+    fn default_source_file_policy() -> StoreContentsReadPolicy {
+        source_file_policy(vec![
+            StoreContentsMediaClass::Audio,
+            StoreContentsMediaClass::Video,
+            StoreContentsMediaClass::Image,
+            StoreContentsMediaClass::Unsupported,
+        ])
+    }
+
+    #[test]
+    fn canonical_cursor_media_class_identity_uses_explicit_stable_order() {
+        let expected = vec![
+            "audio".to_string(),
+            "image".to_string(),
+            "unsupported".to_string(),
+        ];
+
+        for media_classes in [
+            vec![
+                StoreContentsMediaClass::Unsupported,
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Image,
+            ],
+            vec![
+                StoreContentsMediaClass::Image,
+                StoreContentsMediaClass::Unsupported,
+                StoreContentsMediaClass::Audio,
+            ],
+            vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Image,
+                StoreContentsMediaClass::Unsupported,
+            ],
+        ] {
+            assert_eq!(
+                canonical_cursor_media_classes(&source_file_policy(media_classes)),
+                expected
+            );
+        }
+
+        assert_eq!(
+            canonical_cursor_media_classes(&default_source_file_policy()),
+            vec![
+                "audio".to_string(),
+                "video".to_string(),
+                "image".to_string(),
+                "unsupported".to_string(),
+            ]
+        );
     }
 
     fn primary_media(row: &super::StoreContentsFileRow) -> &super::StorePrimaryMediaSummary {
@@ -3703,6 +3715,78 @@ mod tests {
     }
 
     #[test]
+    fn source_file_cursor_pages_interleaved_audio_and_cue_rows_without_gaps() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "disc1", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "disc1/track01.flac", "audio");
+        insert_scanned_file(
+            &connection,
+            1001,
+            1,
+            10,
+            "disc1/track01a.cue",
+            "unsupported",
+        );
+        insert_scanned_file(&connection, 1002, 1, 10, "disc1/track02.flac", "audio");
+        insert_scanned_file(&connection, 1003, 1, 10, "disc1/track03.flac", "audio");
+
+        let mut cursor = None;
+        let mut rows = Vec::new();
+        loop {
+            let result = read_contents(
+                &connection,
+                StoreContentsScope::Directory {
+                    source_id: 1,
+                    source_directory_id: 10,
+                },
+                source_file_policy(vec![
+                    StoreContentsMediaClass::Audio,
+                    StoreContentsMediaClass::Unsupported,
+                ]),
+                StoreContentsRecursion::Recursive,
+                2,
+                cursor.as_deref(),
+            )
+            .expect("read page");
+
+            assert_eq!(result.state, StoreContentsState::Ready);
+            rows.extend(result.rows);
+            match result.next_cursor {
+                Some(next_cursor) => cursor = Some(next_cursor),
+                None => break,
+            }
+        }
+
+        let unique_ids = rows
+            .iter()
+            .map(|row| row.source_file_id)
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(
+            unique_ids.len(),
+            rows.len(),
+            "paged rows must not duplicate"
+        );
+        assert_eq!(
+            rows.iter()
+                .map(|row| {
+                    (
+                        row.relative_path.as_str(),
+                        row.media_class.as_str(),
+                        row.file_kind.as_str(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+            vec![
+                ("disc1/track01.flac", "audio", "audio"),
+                ("disc1/track01a.cue", "unsupported", "cue_sheet"),
+                ("disc1/track02.flac", "audio", "audio"),
+                ("disc1/track03.flac", "audio", "audio"),
+            ]
+        );
+    }
+
+    #[test]
     fn primary_media_cursor_page_two_returns_next_deterministic_rows() {
         let connection = open_connection();
         insert_source(&connection, 1);
@@ -3802,6 +3886,161 @@ mod tests {
     }
 
     #[test]
+    fn cursor_with_unsupported_inclusion_removed_returns_cursor_invalid() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            default_source_file_policy(),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+                StoreContentsMediaClass::Image,
+            ]),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read with unsupported removed");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn cursor_with_unsupported_inclusion_added_returns_cursor_invalid() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+                StoreContentsMediaClass::Image,
+            ]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            default_source_file_policy(),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read with unsupported added");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn cursor_media_class_identity_uses_requested_policy_not_returned_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            default_source_file_policy(),
+            StoreContentsRecursion::Recursive,
+            2,
+            None,
+        )
+        .expect("read page 1");
+
+        assert_eq!(page1.rows.len(), 2);
+        assert!(
+            page1
+                .rows
+                .iter()
+                .all(|row| row.media_class.as_str() == "audio"),
+            "fixture page should return only audio rows"
+        );
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let same_policy = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            default_source_file_policy(),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&cursor),
+        )
+        .expect("read with same requested policy");
+        assert_ne!(same_policy.state, StoreContentsState::CursorInvalid);
+
+        let changed_policy = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+                StoreContentsMediaClass::Image,
+            ]),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&cursor),
+        )
+        .expect("read with unsupported excluded");
+
+        assert_eq!(changed_policy.state, StoreContentsState::CursorInvalid);
+        assert!(changed_policy.rows.is_empty());
+    }
+
+    #[test]
     fn cursor_with_changed_row_profile_returns_cursor_invalid() {
         let connection = open_connection();
         insert_source(&connection, 1);
@@ -3890,6 +4129,97 @@ mod tests {
             Some(&cursor),
         )
         .expect("read with changed scope");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn source_cursor_does_not_validate_for_directory_request() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read directory with source cursor");
+
+        assert_eq!(result.state, StoreContentsState::CursorInvalid);
+        assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn directory_cursor_does_not_validate_for_source_location_request() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_location(&connection, 100, 1, "Music", "user", "registered_subpath");
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..5 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            None,
+        )
+        .expect("read page 1");
+        let cursor = page1.next_cursor.expect("expected cursor");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("read source location with directory cursor");
 
         assert_eq!(result.state, StoreContentsState::CursorInvalid);
         assert!(result.rows.is_empty());
