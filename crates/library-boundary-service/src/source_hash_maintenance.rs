@@ -12,6 +12,7 @@ use crate::snapshot_read_protocol::map_maintained_read_model_revisions;
 use crate::source_file_hash_protocol::map_hash_lifecycle_source_failure;
 
 pub(crate) const SOURCE_HASH_MAINTENANCE_BATCH_LIMIT: usize = 8;
+pub(crate) const SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN: usize = 1;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SourceHashMaintenanceController {
@@ -37,6 +38,7 @@ pub(crate) struct SourceHashMaintenanceRun {
     pub(crate) remaining_candidates: usize,
     pub(crate) source_failure: Option<protocol::HashSourceFilesBlake3SourceFailure>,
     pub(crate) stopped: bool,
+    pub(crate) run_limit_reached: bool,
 }
 
 impl SourceHashMaintenanceController {
@@ -133,6 +135,7 @@ impl SourceHashMaintenanceController {
             remaining_candidates: 0,
             source_failure: None,
             stopped: false,
+            run_limit_reached: false,
         };
 
         loop {
@@ -172,6 +175,11 @@ impl SourceHashMaintenanceController {
             }
 
             if result.hashed_count == 0 {
+                return Ok(run);
+            }
+
+            if run.passes >= SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN {
+                run.run_limit_reached = true;
                 return Ok(run);
             }
         }

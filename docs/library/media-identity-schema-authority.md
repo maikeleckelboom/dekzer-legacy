@@ -138,9 +138,9 @@ Current placement:
 - Attachment identity should not re-read files merely to discover content identity if observed facts already owns
   hashing.
 - Production service exposure exists as the bounded `hashSourceFilesBlake3` boundary command. The boundary service also
-  owns a narrow scan-completion maintenance trigger that runs bounded BLAKE3 batches for the completed source after the
-  terminal scan event and maintained invalidations are published. Broader production scheduler policy remains separate
-  integration work.
+  owns a narrow scan-completion maintenance trigger that runs a small bounded BLAKE3 maintenance unit for the completed
+  source after the terminal scan event and maintained invalidations are published. It does not synchronously drain all
+  remaining candidates from a large source. Broader production scheduler policy remains separate integration work.
 
 ## Boundary Between Identity Layers
 

@@ -160,18 +160,20 @@ The current trigger model is intentionally narrow:
   completion path.
 
 Maintenance uses the existing store-owned `hash_source_file_blake3_batch` admission path with a service-owned limit per
-pass. It runs repeated bounded passes for one source while candidates remain and the previous pass made progress. A
-source-level unavailable, missing, blocked, or unknown-source state is reported as a typed maintenance outcome and stops
-the source run; it is not treated as an empty success. A per-file failure can leave candidates behind, but a pass with no
-successful hashes stops rather than spinning on the same failing candidate. A later maintenance request can retry after
-the source or file problem changes.
+pass and a service-owned maximum pass count per run. Scan-triggered maintenance performs only this small bounded unit; it
+does not synchronously drain a large source. Remaining candidates stay discoverable through candidate counts and can be
+handled by a later explicit hash command or future scheduler request. A source-level unavailable, missing, blocked, or
+unknown-source state is reported as a typed maintenance outcome and stops the source run; it is not treated as an empty
+success. A per-file failure can leave candidates behind, but a pass with no successful hashes stops rather than spinning
+on the same failing candidate. A later maintenance request can retry after the source or file problem changes.
 
 The controller is service-owned scheduling state only. It does not persist durable truth, create identity rows, or
 promote source files. In the current implementation it is synchronous on the service/scan execution path after terminal
-scan publication; it does not create a standalone scheduler thread. Service shutdown requests maintenance stop, cancels
-active scan work through the existing root-work cancellation path, and joins active scan threads. If shutdown happens
-while a file is being hashed, the current file read may finish before the next stop check; no additional hash pass starts
-after the stop request.
+scan publication; it does not create a standalone scheduler thread or hidden background drain loop. The current
+scan-triggered path clears the in-memory pending source request after one bounded run, so future scheduler or explicit
+commands must request additional work. Service shutdown requests maintenance stop, cancels active scan work through the
+existing root-work cancellation path, and joins active scan threads. If shutdown happens while a file is being hashed, the
+current file read may finish before the next stop check; no additional hash pass starts after the stop request.
 
 Hash maintenance emits existing maintained snapshot invalidations when hash writes advance the maintained revision.
 There is no public `sourceHashMaintenance*` boundary event yet. Tests use internal service observability for pass counts,

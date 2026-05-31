@@ -1067,7 +1067,9 @@ mod tests {
         UpsertSourceScanStateInput, UpsertSourceStateInput, durable_store_path,
     };
 
-    use crate::source_hash_maintenance::SOURCE_HASH_MAINTENANCE_BATCH_LIMIT;
+    use crate::source_hash_maintenance::{
+        SOURCE_HASH_MAINTENANCE_BATCH_LIMIT, SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN,
+    };
 
     use super::{LibraryBoundaryService, validate_contents_policy};
 
@@ -1672,7 +1674,10 @@ mod tests {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("hash-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
-        for index in 0..=SOURCE_HASH_MAINTENANCE_BATCH_LIMIT {
+        let run_bound =
+            SOURCE_HASH_MAINTENANCE_BATCH_LIMIT * SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN;
+        let candidate_count = run_bound + 1;
+        for index in 0..candidate_count {
             std::fs::write(
                 source_root.join(format!("track-{index:02}.flac")),
                 format!("track {index} bytes"),
@@ -1687,20 +1692,23 @@ mod tests {
         wait_for_scan_completed(&service, registered.root_id);
 
         let file_ids = read_source_contents_file_ids(&service, registered.root_id);
-        assert_eq!(file_ids.len(), SOURCE_HASH_MAINTENANCE_BATCH_LIMIT + 1);
-        assert_eq!(read_hash_candidate_count(&service, registered.root_id), 0);
+        assert_eq!(file_ids.len(), candidate_count);
+        assert_eq!(read_hash_candidate_count(&service, registered.root_id), 1);
 
-        for source_file_id in file_ids {
-            let facts = service
-                .durable_store
-                .read_observed_file_facts_for_source_file(source_file_id)
-                .expect("read observed facts")
-                .expect("scan-triggered maintenance writes observed facts");
-            assert_eq!(
-                facts.content_hash.expect("content hash").algorithm,
-                "blake3"
-            );
-        }
+        let hashed_after_scan = file_ids
+            .iter()
+            .filter(|source_file_id| {
+                service
+                    .durable_store
+                    .read_observed_file_facts_for_source_file(**source_file_id)
+                    .expect("read observed facts")
+                    .is_some()
+            })
+            .count();
+        assert_eq!(
+            hashed_after_scan, run_bound,
+            "scan-triggered maintenance must only run the bounded maintenance unit"
+        );
 
         let events_after_hash = read_after_events(&service, None, 128);
         assert!(
@@ -1718,18 +1726,27 @@ mod tests {
             .iter()
             .find(|run| run.source_id == registered.root_id)
             .expect("scan completion requests source hash maintenance");
-        assert!(
-            run.passes > 1,
-            "maintenance must continue across bounded passes, not one unbounded batch"
-        );
-        assert_eq!(run.hashed_count, SOURCE_HASH_MAINTENANCE_BATCH_LIMIT + 1);
-        assert_eq!(run.remaining_candidates, 0);
+        assert_eq!(run.passes, SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN);
+        assert_eq!(run.hashed_count, run_bound);
+        assert_eq!(run.remaining_candidates, 1);
+        assert!(run.run_limit_reached);
         assert!(!run.stopped);
 
-        let manual = hash_source_files_blake3(&service, registered.root_id, Some(10));
-        assert_eq!(manual.hashed_count, 0);
-        assert_eq!(manual.outcomes.len(), 0);
-        assert_eq!(manual.remaining_candidates, 0);
+        let manually_hashed = hash_source_files_blake3(&service, registered.root_id, Some(10));
+        assert_eq!(manually_hashed.hashed_count, 1);
+        assert_eq!(manually_hashed.remaining_candidates, 0);
+
+        for source_file_id in &file_ids {
+            let facts = service
+                .durable_store
+                .read_observed_file_facts_for_source_file(*source_file_id)
+                .expect("read observed facts")
+                .expect("scan-triggered and manual maintenance write observed facts");
+            assert_eq!(
+                facts.content_hash.expect("content hash").algorithm,
+                "blake3"
+            );
+        }
     }
 
     #[test]
@@ -1767,6 +1784,7 @@ mod tests {
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].source_id, registered.root_id);
         assert_eq!(runs[0].hashed_count, 0);
+        assert!(!runs[0].run_limit_reached);
         assert_eq!(
             service
                 .source_hash_maintenance
@@ -1843,6 +1861,7 @@ mod tests {
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].hashed_count, 0);
         assert_eq!(runs[0].passes, 0);
+        assert!(!runs[0].run_limit_reached);
         assert!(matches!(
             runs[0].source_failure,
             Some(HashSourceFilesBlake3SourceFailure::SourceRootBlocked(_))
