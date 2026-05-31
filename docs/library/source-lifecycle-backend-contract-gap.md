@@ -29,8 +29,8 @@ Current owners (durable & runtime)
   `source_state`, `source_scan_state`, `source_directories`, `source_files`, and the `literal_hierarchy` read model).
 - Boundary service: `crates/library-boundary-service` — owns host exposure and snapshot/read mapping (see
   `LibraryBoundaryService` in `service.rs` and protocol mappings in `snapshot_read_protocol.rs`).
-- Renderer projection: `apps/desktop/src/renderer/.../sourceReadiness.ts` — a temporary renderer-owned projection
-  derived from currently exposed reads and events; presentational only.
+- Renderer projection: `apps/desktop/src/renderer/.../sourceReadiness.ts` — temporary renderer-owned projection
+  state over currently exposed backend facts and live scan signals. It is not durable authority and not a UI taxonomy.
 
 Current exposed contracts (surface)
 -----------------------------------
@@ -41,9 +41,9 @@ Current exposed contracts (surface)
   (`read_literal_hierarchy_children` ⇒ `crates/library-store-sqlite::read_models::literal_hierarchy`).
 - `snapshotRead.readNavigationRows`, `snapshotRead.readContents`, and related snapshot reads — navigation rows and
   selected-contents reads provide scoped authoritative rows.
-- Event stream: `libraryBoundaryEvents.readAfter` — publishes scan lifecycle events (
-  start/progress/completed/failed/blocked)
-  but events are signals, not a durable per-source contract.
+- Event stream: the service boundary event stream is cursor/read-after based and owned by the boundary service.
+  Desktop Main owns polling this stream and delivers typed batches to renderer subscribers. Events publish scan
+  lifecycle and maintained snapshot invalidation signals, but they are not a durable per-source lifecycle contract.
 
 Durable / store facts currently available
 ----------------------------------------
@@ -69,8 +69,8 @@ Runtime / event facts currently available
   `phase`, basic counters, and optional `detail` (see `service.rs` and `session_events`).
 - Maintained snapshot revision invalidations used to drive projection refresh.
 
-Renderer-only inference currently performed
------------------------------------------
+Renderer lifecycle projection currently performed
+-------------------------------------------------
 The renderer projects a collapsed `SourceReadiness` (kinds like `registered`, `scanning`, `rescanRunning`,
 `ready`, `empty`, `unavailable`, `blocked`, `failed`) by combining:
 
@@ -79,17 +79,17 @@ The renderer projects a collapsed `SourceReadiness` (kinds like `registered`, `s
 - snapshot read `source` read-models (when available)
 - scan progress events mapped by `rootId` (scan progress states)
 
-This projection is intentionally an application-side, presentational inference over multiple substrate surfaces.
-It synthesizes a small set of presentation-ready kinds from substrate facts and events.
+This projection is intentionally an application-side lifecycle projection over multiple substrate surfaces.
+It normalizes currently exposed facts into renderer state until a backend-owned lifecycle read surface exists.
 
 What the backend does NOT yet expose (the gap)
 ----------------------------------------------
 
 - There is no dedicated backend-owned, authoritative, per-source collapsed lifecycle/readiness read surface (for
   example `readSourceLifecycle` keyed by `sourceId` or `rootId`).
-- `readLocalRoots` exposes root identity and a coarse `availability` only; it does not expose raw lifecycle fields
-  such as `mount_status`, `access_state`, `scan_phase`, `scan_issue_kind`, last-scan timestamps, or an
-  authoritative whole-source coverage summary.
+- `readLocalRoots` exposes root identity and a coarse `availability` only; it does not expose backend-owned
+  lifecycle fields such as `mount_status`, `access_state`, `scan_phase`, `scan_issue_kind`, last-scan timestamps,
+  or an authoritative whole-source coverage summary.
 - `readLibraryTreeChildren` is a windowed read and its `coverage` is scoped to the requested entry point/parent
   directory; it is not intended as a global per-source lifecycle contract.
 - Events communicate activity and progress but are append-only signals and do not, by themselves, constitute an
@@ -132,29 +132,34 @@ Product invariants (non-negotiable)
 Candidate backend contract shapes (do not choose prematurely)
 -----------------------------------------------------------
 
-Option A — Enrich `readLocalRoots` with backend-owned raw lifecycle fields
--------------------------------------------------------------------------
+Option A — Enrich `readLocalRoots` with backend-owned semantic lifecycle fields
+-----------------------------------------------------------------------------
 
 What it would own
 
-- Extend the `ReadLocalRootsReply` to include raw substrate fields per-root (authoritative, schema-facing):
-  - `mount_status` (enum: `unknown`|`mounted`|`unmounted`|...)
-  - `access_state` (enum: `accessible`|`missing`|`blocked`|`unknown`)
-  - `access_issue_kind` (nullable string enum)
-  - `scan_phase` (enum: `idle`|`scanning`|`complete`|`partial`|`blocked`|`failed`)
-  - `scan_issue_kind` (nullable string enum)
-  - `last_scan_started_at_ms`, `last_scan_finished_at_ms`, `last_successful_scan_at_ms`
-  - `last_seen_at_ms` / `updated_at_ms`
+Field names below describe substrate facts, not final protocol spelling. A boundary contract must expose typed
+semantic fields using the project's contract naming conventions.
+
+- Extend the reply to include per-root lifecycle fields:
+  - `mountStatus` (typed enum: `unknown` | `mounted` | `unmounted` | …)
+  - `accessState` (typed enum: `accessible` | `missing` | `blocked` | `unknown`)
+  - `accessIssueKind`, optional typed enum
+  - `scanPhase` (typed enum: `idle` | `scanning` | `complete` | `partial` | `blocked` | `failed`)
+  - `scanIssueKind`, optional typed enum
+  - `lastScanStartedAtMs`, `lastScanFinishedAtMs`, `lastSuccessfulScanAtMs`
+  - `lastSeenAtMs`, `updatedAtMs`
 
 What it must NOT own
 
-- Presentation mappings (for example `ready`/`rescanRunning`/`empty`), UI-only labels, or any synthesized
-  children/rows. It must not claim whole-window row coverage beyond coarse whole-source summary fields.
+- It must not own application-level readiness labels such as `ready` or `rescanRunning`, UI-only labels, or any
+  synthesized children/rows. `empty` may only appear as a backend lifecycle result if an authoritative
+  whole-source coverage calculation proves it. It must not claim whole-window row coverage beyond coarse
+  whole-source summary fields.
 
 Advantages
 
 - Minimal surface change (enriches an already-visible root list).
-- Gives renderer authoritative raw facts to compute a consistent projection.
+- Gives renderer authoritative lifecycle facts to compute a consistent projection.
 
 Risks
 
@@ -168,22 +173,26 @@ Why avoid presentation vocabulary
 
 Renderer ownership afterward
 
-- Renderer still owns the final presentational `SourceReadiness` projection (human-friendly messages, derived kinds),
-  but it should source its primary authoritative inputs from `readLocalRoots` (enriched) rather than heuristics or
-  event-only inference.
+- Renderer still owns the application-level `SourceReadiness` projection where it combines backend lifecycle facts
+  with local runtime inputs such as in-flight scan progress. It should not duplicate backend-owned lifecycle
+  inference once the backend contract exists.
 
 Option B — Add dedicated `readSourceLifecycle` (per-source read surface)
 ------------------------------------------------------------------
 
 What it would own
 
+Field names below describe substrate facts, not final protocol spelling. A boundary contract must expose typed
+semantic fields using the project's contract naming conventions.
+
 - A new snapshot read surface keyed by `sourceId` or `rootId` returning an authoritative, backend-owned contract
   describing per-source lifecycle facts, for example:
-  - `source_id`, `root_id`, `source_class`
-  - `mount_status`, `access_state`, `access_issue_kind`
-  - `scan_phase`, `scan_issue_kind`, `last_scan_*` timestamps
-  - an optional whole-source `coverage_summary` (computed from `source_directories` counts) consisting of
-    `coverage_state`, `recursive_scope_complete`, `empty_result_authoritative`, `detail`.
+  - `sourceId`, `rootId`, `sourceClass`
+  - `mountStatus`, `accessState`, `accessIssueKind` (optional typed enum)
+  - `scanPhase`, `scanIssueKind` (optional typed enum), `lastScanStartedAtMs`, `lastScanFinishedAtMs`,
+    `lastSuccessfulScanAtMs`
+  - an optional whole-source `coverageSummary` (computed from per-directory counts) consisting of
+    `coverageState`, `recursiveScopeComplete`, `emptyResultAuthoritative`, `detail`.
 
 What it must NOT own
 
@@ -202,12 +211,13 @@ Risks
 
 Why avoid presentation vocabulary
 
-- Expose raw enums and timestamps only; the renderer maps these to presentation kinds.
+- Expose typed semantic enums and timestamps only; the renderer maps these to presentation kinds.
 
 Renderer ownership afterward
 
-- Renderer continues to own presentation mapping and any UX phrasing, but can stop duplicating lifecycle inference.
-  Renderer should convert authoritative enums into the `SourceReadiness` kinds used by the UI.
+- Renderer still owns the application-level `SourceReadiness` projection where it combines backend lifecycle facts
+  with local runtime inputs such as in-flight scan progress. It should not duplicate backend-owned lifecycle
+  inference once the backend contract exists.
 
 Implementation acceptance bar (future contract must prove)
 ------------------------------------------------------
@@ -232,17 +242,26 @@ Docs / authority map
 This note is an inventory and contract gap. If the authority map is present, register this doc as an inventory /
 contract-gap entry under source/scan contracts so implementers can find the gap and next steps.
 
+Current preference
+------------------
+
+- Prefer Option B, a dedicated source lifecycle read surface.
+- Use Option A only if implementation proves a dedicated read surface creates disproportionate protocol churn.
+- Reason: source lifecycle is not merely local-root hydration. Future source classes should not be forced through
+  `readLocalRoots`.
+
 Implementation prompt (for later work)
 ------------------------------------
 If the team decides to implement a backend contract, the follow-up work should include:
 
 - Protocol: add a new snapshot/read protocol type (or enrich `ReadLocalRootsReply`) and version it.
-- Store read: add a substrate read in `crates/library-store-sqlite` to return the raw lifecycle fields and (optionally)
-  whole-source coverage summary computed the same way `literal_hierarchy` does for whole-source anchors.
+- Store read: add a substrate read in `crates/library-store-sqlite` to return the backend-owned lifecycle fields
+  and (optionally) whole-source coverage summary computed the same way `literal_hierarchy` does for whole-source
+  anchors.
 - Service: implement mapping in `snapshot_read_protocol.rs` and a handler in `service.rs` that returns the new type.
 - Tests: add integration tests asserting the acceptance bar above (visibility under unavailability, authoritative
   empty, no synthesized children, separation of scan vs refresh).
-- Renderer: migrate `deriveSourceReadiness` to prefer backend-owned raw fields for authoritative classification and
-  reduce duplicated heuristics.
+- Renderer: migrate `deriveSourceReadiness` to prefer backend-owned lifecycle fields for authoritative
+  classification and reduce duplicated heuristics.
 
 Do not implement changes in this pass. Use this note as the specification for the next implementation step.
