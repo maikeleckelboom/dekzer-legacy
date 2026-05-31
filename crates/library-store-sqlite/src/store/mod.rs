@@ -39,8 +39,12 @@ pub use discovery::{
 };
 pub use revisions::{MaintainedReadModelRevision, MaintainedReadModelScope};
 pub use source_file_hash::{
-    HashSourceFileBlake3Error, HashSourceFileBlake3Input, HashSourceFileBlake3Result,
-    SOURCE_FILE_BLAKE3_ALGORITHM,
+    HashSourceFileBlake3BatchInput, HashSourceFileBlake3BatchOutcome,
+    HashSourceFileBlake3BatchOutcomeStatus, HashSourceFileBlake3BatchResult,
+    ReadSourceFileBlake3HashCandidatesInput, SOURCE_FILE_BLAKE3_ALGORITHM,
+    SourceFileBlake3HashAdmissionScope, SourceFileBlake3HashCandidate,
+    SourceFileBlake3HashCandidateReason, SourceFileBlake3HashFailure,
+    SourceFileBlake3HashSkipReason,
 };
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,

@@ -123,15 +123,21 @@ use explicit `sha256` examples, and the store now also owns a narrow BLAKE3 sour
 Current placement:
 
 - Content hashing belongs to observed file facts / file evidence because hashing reads bytes.
-- The BLAKE3 job lives in `library-store-sqlite`, accepts a `source_file_id` and caller-resolved filesystem path,
-  streams bytes, and commits through the inspect-source artifact plus `SourceFacts` authority path.
+- The BLAKE3 job lives in `library-store-sqlite`. Production admission resolves filesystem paths in the backend from
+  durable source state plus `source_files.relative_path`, then streams bytes and commits through the inspect-source
+  artifact plus `SourceFacts` authority path.
+- The current root path authority is `source_state.effective_path`, falling back to `source_locators.absolute_path` for
+  absolute-path sources. Source-location subpath-scoped admission remains future; source-file path resolution itself is
+  root plus `source_files.relative_path`.
 - BLAKE3 evidence is stored as `content_hash_algorithm = 'blake3'` with a lowercase hex digest value.
 - A basis change between the pre-hash source-file read and pre-commit source-file read rejects the commit.
+- Admission is bounded, deterministic, and limited to present media-relevant source-file inventory: audio, video, image,
+  and CUE sheet rows. Current BLAKE3 facts are skipped; missing, stale, absent, or non-BLAKE3 hash facts are candidates.
 - Attachment identity consumes durable hash/evidence later.
 - Track identity must not rely on path identity.
 - Attachment identity should not re-read files merely to discover content identity if observed facts already owns
   hashing.
-- Production scheduling and path resolution for the BLAKE3 job remain separate integration work.
+- Production scheduling and service exposure for the BLAKE3 batch remain separate integration work.
 
 ## Boundary Between Identity Layers
 
@@ -145,6 +151,6 @@ Current placement:
 
 ## Next Implementation Gate
 
-The next gate is a byte-reading/hash job pass that defines BLAKE3 dependency ownership, bounded IO, idempotence, and
-how source facts feed attachment identity. It must not add track tables, CUE pairing, artwork intelligence, playlist UI,
-prep facets, or waveform generation as part of the same change.
+The next gate is a scheduler/service integration pass for the bounded BLAKE3 admission path, or media probing work that
+adds new observed facts. Attachment identity remains a later promotion layer. It must not add track tables, CUE pairing,
+artwork intelligence, playlist UI, prep facets, or waveform generation as part of the same change.

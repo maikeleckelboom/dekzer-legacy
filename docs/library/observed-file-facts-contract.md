@@ -51,9 +51,10 @@ algorithm tag.
 
 SHA-256 appears only in tests and fixtures as explicit evidence. It is not declared the product content-hash algorithm.
 
-BLAKE3 source-file hashing is implemented in `library-store-sqlite` as a narrow store-side evidence job. The job accepts
-a `source_file_id` plus a caller-resolved filesystem path, streams file bytes through BLAKE3, and commits accepted
-`SourceFacts` through the existing inspect-source artifact and observed-facts authority path. The algorithm string is
+BLAKE3 source-file hashing is implemented in `library-store-sqlite` as a store-side evidence job. The low-level commit
+path streams file bytes through BLAKE3 and commits accepted `SourceFacts` through the existing inspect-source artifact
+and observed-facts authority path. The production batch path does not accept renderer- or caller-resolved filesystem
+paths. It resolves each `source_file_id` from durable source state before reading bytes. The algorithm string is
 `blake3`, and the value is the canonical lowercase hex digest.
 
 BLAKE3 is content evidence, not identity by itself. The hash job does not create `LibraryAssets`,
@@ -68,6 +69,49 @@ errors and do not create `SourceFacts`.
 `LibraryAssets.equivalence_fingerprint` is not a content hash. It must not be copied into observed file facts as hash
 evidence.
 
+## Source-File Path Resolution
+
+Source-file filesystem path resolution is backend-owned by `library-store-sqlite`.
+
+The current root path authority is:
+
+- `source_state.effective_path` when present.
+- `source_locators.absolute_path` as the absolute-path fallback, matching the existing root scan and navigation path
+  reads.
+
+The resolver input is `source_file_id`. It loads the current `source_files` row, requires
+`source_files.presence_state = 'present'`, requires usable source lifecycle state, joins the effective source root with
+`source_files.relative_path`, canonicalizes the root and file, and rejects any path that escapes the source root. It
+also rejects malformed source-file relative paths containing absolute prefixes, URI schemes, backslashes, empty
+segments, or traversal segments.
+
+Missing physical files, blocked files, unavailable/unmounted roots, missing roots, invalid relative paths, and root
+escape attempts are typed failures. They do not erase source-file inventory and do not write `SourceFacts`.
+
+`source_locations` can represent user-visible registered subpaths and contents scopes. Production source-file hashing
+does not currently narrow path resolution through source-location subpath prefixes; the row's `source_id` root plus
+`source_files.relative_path` is the durable file path authority. Future source-location-scoped hash admission can reuse
+the same resolver after a scoped candidate read is added.
+
+## BLAKE3 Admission And Batch Behavior
+
+Hash admission is bounded and deterministic. The store-owned candidate read supports source scope and explicit
+`source_file_id` lists. It applies the media-relevant source-file inventory policy:
+
+- include present `audio`, `video`, and `image` rows;
+- include present `unsupported` rows only when `file_kind = 'cue_sheet'`;
+- exclude docs, logs, archives, other unsupported files, unknown files, missing rows, and removed rows.
+
+A candidate needs BLAKE3 evidence when no `SourceFacts` row exists, the content hash is absent, the stored hash
+algorithm is not `blake3`, or the observed facts read model would be stale against the current `source_files` basis.
+`LibraryAssets.equivalence_fingerprint` never satisfies hash evidence.
+
+The batch path uses a default bounded limit when none is supplied and caps oversized requests. It orders candidates by
+lowercased `relative_path`, then `source_file_id`. Each candidate is resolved through the backend resolver and then
+hashed through the existing BLAKE3 evidence commit path. Per-file failures are recorded as outcomes and the batch
+continues. If a source-scope batch discovers the source root itself is unavailable, missing, or blocked, it reports that
+typed failure and stops the source batch without treating the source as an empty success.
+
 ## CUE Ownership
 
 A CUE file owns future CUE parse observations on its own `source_file_id`. An adjacent audio file owns future
@@ -78,7 +122,8 @@ does not parse CUE sheets, and does not create segment, attachment, or track row
 
 Future work remains separate:
 
-- production scheduling/path-resolution integration for the BLAKE3 hash job
+- production scheduling loop and service command exposure for BLAKE3 admission, if callers need it beyond the current
+  store-level batch
 - media/container probing
 - CUE parsing
 - CUE-to-audio association evidence
