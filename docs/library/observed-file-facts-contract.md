@@ -144,6 +144,40 @@ Hash evidence commits still go through the inspect-source artifact and observed-
 hash commit, the store reseeds and invalidates the current `LibraryBrowser` maintained scope. This is the narrowest
 current event scope available for source-file observed-facts changes; no separate observed-facts event scope exists yet.
 
+## Service-Owned Hash Maintenance
+
+The boundary service owns the first source hash maintenance loop. After a root scan publishes its terminal
+`SourceScanCompleted` event and the maintained read-model invalidations for that scan, the service requests BLAKE3 hash
+maintenance for that same `source_id`. The renderer does not schedule this work, does not retry hash batches to keep
+the source current, and does not resolve filesystem paths.
+
+The current trigger model is intentionally narrow:
+
+- successful root scan completion requests maintenance for the completed source;
+- duplicate source maintenance requests are deduped while pending or active;
+- blocked, failed, or cancelled scans do not automatically request hash maintenance;
+- maintained `LibraryBrowser` invalidation alone does not yet schedule hashing unless it came from the successful scan
+  completion path.
+
+Maintenance uses the existing store-owned `hash_source_file_blake3_batch` admission path with a service-owned limit per
+pass. It runs repeated bounded passes for one source while candidates remain and the previous pass made progress. A
+source-level unavailable, missing, blocked, or unknown-source state is reported as a typed maintenance outcome and stops
+the source run; it is not treated as an empty success. A per-file failure can leave candidates behind, but a pass with no
+successful hashes stops rather than spinning on the same failing candidate. A later maintenance request can retry after
+the source or file problem changes.
+
+The controller is service-owned scheduling state only. It does not persist durable truth, create identity rows, or
+promote source files. In the current implementation it is synchronous on the service/scan execution path after terminal
+scan publication; it does not create a standalone scheduler thread. Service shutdown requests maintenance stop, cancels
+active scan work through the existing root-work cancellation path, and joins active scan threads. If shutdown happens
+while a file is being hashed, the current file read may finish before the next stop check; no additional hash pass starts
+after the stop request.
+
+Hash maintenance emits existing maintained snapshot invalidations when hash writes advance the maintained revision.
+There is no public `sourceHashMaintenance*` boundary event yet. Tests use internal service observability for pass counts,
+dedupe, typed source failure, and stopped state. Future event variants should distinguish maintenance activity from
+durable observed-facts truth and must not expose filesystem paths.
+
 ## CUE Ownership
 
 A CUE file owns future CUE parse observations on its own `source_file_id`. An adjacent audio file owns future
@@ -154,7 +188,7 @@ does not parse CUE sheets, and does not create segment, attachment, or track row
 
 Future work remains separate:
 
-- production scheduling loop for BLAKE3 admission
+- production scheduler policy beyond the current scan-completion trigger
 - source-location-scoped hash admission
 - media/container probing
 - CUE parsing

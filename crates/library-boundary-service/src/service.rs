@@ -31,6 +31,7 @@ use crate::source_file_hash_protocol::{
     empty_hash_source_files_blake3_reply, map_hash_lifecycle_source_failure,
     map_hash_source_files_blake3_reply,
 };
+use crate::source_hash_maintenance::SourceHashMaintenanceController;
 use crate::storage_environment::resolve_library_storage_environment;
 
 struct ActiveScanJob {
@@ -38,7 +39,7 @@ struct ActiveScanJob {
     root_id: i64,
     scan_run_id: i64,
     terminal_publication_complete: Arc<AtomicBool>,
-    _handle: JoinHandle<()>,
+    handle: JoinHandle<()>,
 }
 
 #[derive(Default)]
@@ -59,11 +60,18 @@ impl ScanJobRegistry {
         id
     }
 
-    fn cleanup_terminal_scan(&mut self, root_id: i64) {
+    fn cleanup_terminal_scan(&mut self, root_id: i64) -> Option<JoinHandle<()>> {
         if let Some(job) = self.jobs.remove(&root_id) {
             self.scan_run_id_to_root_id.remove(&job.scan_run_id);
             self.terminal_scan_run_ids.insert(job.scan_run_id);
+            return Some(job.handle);
         }
+        None
+    }
+
+    fn drain_jobs(&mut self) -> Vec<ActiveScanJob> {
+        self.scan_run_id_to_root_id.clear();
+        self.jobs.drain().map(|(_, job)| job).collect()
     }
 }
 
@@ -71,6 +79,7 @@ pub struct LibraryBoundaryService {
     durable_store: SqliteDurableStore,
     session_events: LibraryBoundaryEventStream,
     scan_registry: Mutex<ScanJobRegistry>,
+    source_hash_maintenance: SourceHashMaintenanceController,
 }
 
 impl LibraryBoundaryService {
@@ -103,6 +112,7 @@ impl LibraryBoundaryService {
             durable_store,
             session_events,
             scan_registry: Mutex::new(ScanJobRegistry::default()),
+            source_hash_maintenance: SourceHashMaintenanceController::new(),
         })
     }
 
@@ -193,7 +203,7 @@ impl LibraryBoundaryService {
 
         let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
 
-        if let Some(existing) = registry.jobs.get(&root_id) {
+        let terminal_handle = if let Some(existing) = registry.jobs.get(&root_id) {
             if !existing
                 .terminal_publication_complete
                 .load(Ordering::Acquire)
@@ -203,7 +213,12 @@ impl LibraryBoundaryService {
                 });
             }
 
-            registry.cleanup_terminal_scan(root_id);
+            registry.cleanup_terminal_scan(root_id)
+        } else {
+            None
+        };
+        if let Some(handle) = terminal_handle {
+            let _ = handle.join();
         }
 
         self.durable_store
@@ -216,6 +231,7 @@ impl LibraryBoundaryService {
 
         let store = self.durable_store.clone();
         let events = self.session_events.clone();
+        let hash_maintenance = self.source_hash_maintenance.clone();
         let terminal_publication_complete = Arc::new(AtomicBool::new(false));
         let thread_terminal_publication_complete = Arc::clone(&terminal_publication_complete);
 
@@ -240,6 +256,7 @@ impl LibraryBoundaryService {
                 scan_run_id,
                 scan_started_at_ms,
                 thread_terminal_publication_complete,
+                hash_maintenance,
             );
         });
 
@@ -250,7 +267,7 @@ impl LibraryBoundaryService {
                 root_id,
                 scan_run_id,
                 terminal_publication_complete,
-                _handle: handle,
+                handle,
             },
         );
 
@@ -287,7 +304,11 @@ impl LibraryBoundaryService {
         };
 
         if job.terminal_publication_complete.load(Ordering::Acquire) {
-            registry.cleanup_terminal_scan(root_id);
+            let handle = registry.cleanup_terminal_scan(root_id);
+            drop(registry);
+            if let Some(handle) = handle {
+                let _ = handle.join();
+            }
             return Ok(protocol::CancelRootScanReply {
                 status: protocol::CancelRootScanStatus::AlreadyTerminal,
             });
@@ -750,6 +771,24 @@ impl LibraryBoundaryService {
     }
 }
 
+impl Drop for LibraryBoundaryService {
+    fn drop(&mut self) {
+        self.source_hash_maintenance.stop();
+        let jobs = {
+            let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
+            let root_ids = registry.jobs.keys().copied().collect::<Vec<_>>();
+            if !root_ids.is_empty() {
+                self.durable_store.cancel_root_work(&root_ids);
+            }
+            registry.drain_jobs()
+        };
+
+        for job in jobs {
+            let _ = job.handle.join();
+        }
+    }
+}
+
 fn execute_scan_job(
     store: SqliteDurableStore,
     events: LibraryBoundaryEventStream,
@@ -757,6 +796,7 @@ fn execute_scan_job(
     scan_run_id: i64,
     scan_started_at_ms: i64,
     terminal_publication_complete: Arc<AtomicBool>,
+    hash_maintenance: SourceHashMaintenanceController,
 ) {
     let committed_chunk_count = Arc::new(AtomicUsize::new(0));
     let chunk_count = Arc::clone(&committed_chunk_count);
@@ -805,6 +845,8 @@ fn execute_scan_job(
                     detail: None,
                 },
             );
+            hash_maintenance.request_source(root_id);
+            let _ = hash_maintenance.run_queued(&store, &events);
         }
         Err(error) => {
             if matches!(
@@ -975,7 +1017,7 @@ fn validate_contents_limit(limit: usize) -> protocol::ProtocolResult<()> {
     }
 }
 
-fn unix_time_ms() -> protocol::ProtocolResult<i64> {
+pub(crate) fn unix_time_ms() -> protocol::ProtocolResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| protocol::ProtocolError::HostFailure {
@@ -986,7 +1028,9 @@ fn unix_time_ms() -> protocol::ProtocolResult<i64> {
     })
 }
 
-fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol::ProtocolError {
+pub(crate) fn map_store_error(
+    error: library_store_sqlite::LibrarySqliteError,
+) -> protocol::ProtocolError {
     protocol::ProtocolError::DurableStoreFailure {
         detail: error.to_string(),
     }
@@ -996,11 +1040,12 @@ fn map_store_error(error: library_store_sqlite::LibrarySqliteError) -> protocol:
 mod tests {
     use library_boundary_protocol::{
         CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandOutcome,
-        CommandReply, CommandRequest, ContentsReadPolicy, ContentsRowProfile, CreatePlaylistReply,
+        CommandReply, CommandRequest, ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest,
+        ContentsRecursion, ContentsRowProfile, ContentsScope, CreatePlaylistReply,
         CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
-        HashSourceFilesBlake3OutcomeStatus, HashSourceFilesBlake3Reply,
-        HashSourceFilesBlake3Request, HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
+        HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
+        HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
         LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
         LoadNavigationRowByStableKeyReply, LoadNavigationRowByStableKeyRequest,
@@ -1017,9 +1062,12 @@ mod tests {
 
     use library_domain::{SourceAccessIssueKind, SourceAccessState, SourceScanPhase};
     use library_store_sqlite::{
-        LibraryStoreContext, StoreEnvironment, UpsertSourceInput, UpsertSourceScanStateInput,
-        UpsertSourceStateInput, durable_store_path,
+        LibraryStoreContext, ReadSourceFileBlake3HashCandidatesInput,
+        SourceFileBlake3HashAdmissionScope, StoreEnvironment, UpsertSourceInput,
+        UpsertSourceScanStateInput, UpsertSourceStateInput, durable_store_path,
     };
+
+    use crate::source_hash_maintenance::SOURCE_HASH_MAINTENANCE_BATCH_LIMIT;
 
     use super::{LibraryBoundaryService, validate_contents_policy};
 
@@ -1276,21 +1324,39 @@ mod tests {
     }
 
     fn wait_for_scan_completed(service: &LibraryBoundaryService, root_id: i64) {
+        wait_for_scan_terminal_kind(
+            service,
+            root_id,
+            library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
+        );
+    }
+
+    fn wait_for_scan_terminal_kind(
+        service: &LibraryBoundaryService,
+        root_id: i64,
+        expected_kind: library_boundary_protocol::SourceScanEventKind,
+    ) {
         for _ in 0..30 {
             let events_reply = read_after_events(service, None, 64);
-            if events_reply.events.iter().any(|e| {
+            let scan_run_id = events_reply.events.iter().find_map(|e| {
                 let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
-                    return false;
+                    return None;
                 };
-                se.kind == library_boundary_protocol::SourceScanEventKind::SourceScanCompleted
-                    && se.root_id == root_id
-            }) {
+                (se.kind == expected_kind && se.root_id == root_id).then_some(se.scan_run_id)
+            });
+            if let Some(scan_run_id) = scan_run_id {
+                let cancelled = cancel_root_scan(service, scan_run_id);
+                assert_eq!(
+                    cancelled.status,
+                    CancelRootScanStatus::AlreadyTerminal,
+                    "completed scan should be joined through the deterministic cleanup path"
+                );
                 return;
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
 
-        panic!("scan should complete on a tiny directory");
+        panic!("scan should reach {expected_kind:?} on a tiny directory");
     }
 
     fn read_library_tree_children(
@@ -1319,6 +1385,42 @@ mod tests {
                 ReadSourceLifecycleRequest { source_id },
             )),
         )))
+    }
+
+    fn read_source_contents_file_ids(service: &LibraryBoundaryService, source_id: i64) -> Vec<i64> {
+        service
+            .read_contents(ContentsReadRequest {
+                scope: ContentsScope::Source { source_id },
+                policy: ContentsReadPolicy {
+                    media_classes: vec![
+                        ContentsMediaClass::Audio,
+                        ContentsMediaClass::Video,
+                        ContentsMediaClass::Image,
+                        ContentsMediaClass::Unsupported,
+                    ],
+                    row_profile: ContentsRowProfile::SourceFile,
+                },
+                recursion: ContentsRecursion::Recursive,
+                limit: Some(200),
+                cursor: None,
+            })
+            .expect("read source contents")
+            .result
+            .rows
+            .into_iter()
+            .map(|row| row.source_file_id)
+            .collect()
+    }
+
+    fn read_hash_candidate_count(service: &LibraryBoundaryService, source_id: i64) -> usize {
+        service
+            .durable_store
+            .read_source_file_blake3_hash_candidates(ReadSourceFileBlake3HashCandidatesInput {
+                scope: SourceFileBlake3HashAdmissionScope::Source { source_id },
+                limit: Some(512),
+            })
+            .expect("read hash candidates")
+            .len()
     }
 
     fn load_navigation_row_by_stable_key(
@@ -1566,45 +1668,41 @@ mod tests {
     }
 
     #[test]
-    fn hash_source_files_blake3_updates_observed_facts_and_publishes_invalidation() {
+    fn scan_completion_runs_service_owned_hash_maintenance() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("hash-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
-        std::fs::write(source_root.join("B.flac"), b"b bytes").expect("write b");
-        std::fs::write(source_root.join("a.flac"), b"a bytes").expect("write a");
+        for index in 0..=SOURCE_HASH_MAINTENANCE_BATCH_LIMIT {
+            std::fs::write(
+                source_root.join(format!("track-{index:02}.flac")),
+                format!("track {index} bytes"),
+            )
+            .expect("write media file");
+        }
         std::fs::write(source_root.join("notes.txt"), b"not media").expect("write notes");
 
         let (_json, registered) =
             register_local_root(&service, source_root.to_string_lossy().into_owned());
         let _scan = start_root_scan(&service, registered.root_id);
         wait_for_scan_completed(&service, registered.root_id);
-        let cursor_after_scan = read_after_events(&service, None, 64).latest_event_sequence;
 
-        let first = hash_source_files_blake3(&service, registered.root_id, Some(1));
-        assert_eq!(first.effective_limit, 1);
-        assert_eq!(first.hashed_count, 1);
-        assert_eq!(first.skipped_count, 0);
-        assert_eq!(first.failed_count, 0);
-        assert_eq!(first.remaining_candidates, 1);
-        assert_eq!(first.outcomes.len(), 1);
-        assert_eq!(first.outcomes[0].relative_path, "a.flac");
-        let HashSourceFilesBlake3OutcomeStatus::Hashed(hashed) = &first.outcomes[0].status else {
-            panic!("expected hashed outcome");
-        };
-        assert_eq!(hashed.content_hash_algorithm, "blake3");
-        assert_eq!(hashed.content_hash_value.len(), 64);
+        let file_ids = read_source_contents_file_ids(&service, registered.root_id);
+        assert_eq!(file_ids.len(), SOURCE_HASH_MAINTENANCE_BATCH_LIMIT + 1);
+        assert_eq!(read_hash_candidate_count(&service, registered.root_id), 0);
 
-        let facts = service
-            .durable_store
-            .read_observed_file_facts_for_source_file(first.outcomes[0].source_file_id)
-            .expect("read observed facts")
-            .expect("hash command writes observed facts");
-        assert_eq!(
-            facts.content_hash.expect("content hash").algorithm,
-            "blake3"
-        );
+        for source_file_id in file_ids {
+            let facts = service
+                .durable_store
+                .read_observed_file_facts_for_source_file(source_file_id)
+                .expect("read observed facts")
+                .expect("scan-triggered maintenance writes observed facts");
+            assert_eq!(
+                facts.content_hash.expect("content hash").algorithm,
+                "blake3"
+            );
+        }
 
-        let events_after_hash = read_after_events(&service, cursor_after_scan, 16);
+        let events_after_hash = read_after_events(&service, None, 128);
         assert!(
             events_after_hash.events.iter().any(|e| {
                 let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(event) = e else {
@@ -1615,15 +1713,140 @@ mod tests {
             "hash evidence changes must publish the narrow current maintained scope"
         );
 
-        let second = hash_source_files_blake3(&service, registered.root_id, Some(10));
-        assert_eq!(second.hashed_count, 1);
-        assert_eq!(second.remaining_candidates, 0);
-        assert_eq!(second.outcomes[0].relative_path, "B.flac");
+        let runs = service.source_hash_maintenance.completed_runs_for_test();
+        let run = runs
+            .iter()
+            .find(|run| run.source_id == registered.root_id)
+            .expect("scan completion requests source hash maintenance");
+        assert!(
+            run.passes > 1,
+            "maintenance must continue across bounded passes, not one unbounded batch"
+        );
+        assert_eq!(run.hashed_count, SOURCE_HASH_MAINTENANCE_BATCH_LIMIT + 1);
+        assert_eq!(run.remaining_candidates, 0);
+        assert!(!run.stopped);
 
-        let third = hash_source_files_blake3(&service, registered.root_id, Some(10));
-        assert_eq!(third.hashed_count, 0);
-        assert_eq!(third.outcomes.len(), 0);
-        assert_eq!(third.remaining_candidates, 0);
+        let manual = hash_source_files_blake3(&service, registered.root_id, Some(10));
+        assert_eq!(manual.hashed_count, 0);
+        assert_eq!(manual.outcomes.len(), 0);
+        assert_eq!(manual.remaining_candidates, 0);
+    }
+
+    #[test]
+    fn duplicate_source_hash_maintenance_requests_dedupe() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("dedupe-hash-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.flac"), b"track").expect("write track");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let _scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_completed(&service, registered.root_id);
+
+        let completed_before = service
+            .source_hash_maintenance
+            .completed_runs_for_test()
+            .len();
+        assert!(
+            service
+                .source_hash_maintenance
+                .request_source(registered.root_id)
+        );
+        assert!(
+            !service
+                .source_hash_maintenance
+                .request_source(registered.root_id),
+            "duplicate pending source maintenance requests must be deduped"
+        );
+
+        let runs = service
+            .source_hash_maintenance
+            .run_queued(&service.durable_store, &service.session_events)
+            .expect("run queued maintenance");
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].source_id, registered.root_id);
+        assert_eq!(runs[0].hashed_count, 0);
+        assert_eq!(
+            service
+                .source_hash_maintenance
+                .completed_runs_for_test()
+                .len(),
+            completed_before + 1
+        );
+    }
+
+    #[test]
+    fn blocked_scan_does_not_request_hash_maintenance() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("blocked-scan-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        std::fs::remove_dir_all(&source_root).expect("remove source root before scan");
+
+        let _scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_terminal_kind(
+            &service,
+            registered.root_id,
+            library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
+        );
+
+        assert!(
+            service
+                .source_hash_maintenance
+                .completed_runs_for_test()
+                .iter()
+                .all(|run| run.source_id != registered.root_id),
+            "blocked scans must not automatically request hash maintenance"
+        );
+    }
+
+    #[test]
+    fn source_hash_maintenance_reports_source_failures_without_empty_success() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("blocked-maintenance-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        service
+            .durable_store
+            .upsert_source_state(UpsertSourceStateInput {
+                source_id: registered.root_id,
+                mount_status: "unmounted".to_string(),
+                mount_epoch: 2,
+                access_state: SourceAccessState::Blocked,
+                access_issue_kind: Some(SourceAccessIssueKind::UnavailableMount),
+                access_error_detail: None,
+                access_checked_at: Some(30),
+                mount_root: None,
+                effective_path: Some(source_root.to_string_lossy().into_owned()),
+                observed_volume_label: None,
+                filesystem_type: None,
+                last_seen_at: Some(25),
+                updated_at: 31,
+            })
+            .expect("block source state");
+
+        assert!(
+            service
+                .source_hash_maintenance
+                .request_source(registered.root_id)
+        );
+        let runs = service
+            .source_hash_maintenance
+            .run_queued(&service.durable_store, &service.session_events)
+            .expect("run queued maintenance");
+
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].hashed_count, 0);
+        assert_eq!(runs[0].passes, 0);
+        assert!(matches!(
+            runs[0].source_failure,
+            Some(HashSourceFilesBlake3SourceFailure::SourceRootBlocked(_))
+        ));
     }
 
     #[test]
