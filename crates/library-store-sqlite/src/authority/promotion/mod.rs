@@ -65,7 +65,7 @@ mod tests {
     use crate::authority::library_asset::{
         AcceptedSourceSegmentInput, ReplaceAcceptedSourceSegmentSetInput,
     };
-    use crate::authority::sources::CommitAcceptedSourceFactsInput;
+    use crate::authority::sources::{CommitAcceptedSourceFactsInput, ContentHashEvidence};
 
     #[test]
     fn authority_modules_own_canonical_write_side_rows() {
@@ -181,7 +181,11 @@ mod tests {
                         source_file_id: source_file_domain_id(source_file_id),
                         accepted_artifact_id: artifact_domain_id(inspection_artifact_id),
                         basis_fingerprint: "basis:source:v1".to_string(),
-                        content_hash: Some("sha256:source-a".to_string()),
+                        observed_at_ms: 21,
+                        content_hash: Some(ContentHashEvidence {
+                            algorithm: "sha256".to_string(),
+                            value: "source-a".to_string(),
+                        }),
                         media_kind: "audio".to_string(),
                         mime_type: Some("audio/flac".to_string()),
                         duration_ms: Some(180_000),
@@ -395,16 +399,26 @@ mod tests {
 
         let source_facts = connection
             .query_row(
-                "SELECT content_hash, media_kind
+                "SELECT content_hash_algorithm, content_hash_value, media_kind
                  FROM SourceFacts
                  WHERE source_file_id = 300",
                 [],
-                |row| Ok((row.get::<_, Option<String>>(0)?, row.get::<_, String>(1)?)),
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
             )
             .expect("read source facts");
         assert_eq!(
             source_facts,
-            (Some("sha256:source-a".to_string()), "audio".to_string())
+            (
+                Some("sha256".to_string()),
+                Some("source-a".to_string()),
+                "audio".to_string()
+            )
         );
 
         let segment_set_row = connection

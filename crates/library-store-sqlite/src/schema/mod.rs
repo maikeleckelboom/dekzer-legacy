@@ -387,6 +387,35 @@ mod tests {
             ]
         );
         assert_eq!(
+            table_column_names(&connection, "SourceFacts"),
+            vec![
+                "source_file_id",
+                "fact_kind",
+                "basis_fingerprint",
+                "basis_source_id",
+                "basis_relative_path",
+                "basis_size_bytes",
+                "basis_mtime_ns",
+                "basis_presence_state",
+                "observed_at_ms",
+                "content_hash_algorithm",
+                "content_hash_value",
+                "media_kind",
+                "mime_type",
+                "duration_ms",
+                "sample_rate_hz",
+                "channels",
+                "bit_depth",
+                "codec",
+                "updated_at",
+                "accepted_artifact_id",
+            ]
+        );
+        assert!(
+            table_index_names(&connection, "SourceFacts")
+                .contains(&"SourceFacts_source_basis".to_string())
+        );
+        assert_eq!(
             table_column_names(&connection, "navigation_rows"),
             vec![
                 "navigation_row_id",

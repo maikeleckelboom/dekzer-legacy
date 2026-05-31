@@ -36,7 +36,7 @@ Reading order:
 | --- | --- | --- |
 | `source_files` | SQLite + `SourceFilesAuthorityTx` | Canonical attachment inventory row for observed source files. Classification is path-derived and provisional. |
 | `readContents` default policy | Renderer boundary + service/store read model | Current product contents path: recursive `sourceFile` rows for audio, video, image, and admitted unsupported CUE sheets. |
-| `SourceFacts.content_hash` | Observed source facts substrate | Optional accepted source-fact evidence attached to a `source_file_id`. It is not attachment identity and is not required by default contents reads. |
+| `SourceFacts` content hash evidence | Observed source facts substrate | Optional accepted, algorithm-tagged source-fact evidence attached to a `source_file_id` and copied file basis. It is not attachment identity and is not required by default contents reads. |
 | `source_media` write/read guards | Store filesystem guard | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing. |
 | `Playlists` / `PlaylistEntries` | Boundary service + store | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`. |
 
@@ -117,9 +117,9 @@ Answers:
 
 ## Content Hash / BLAKE3 Placement
 
-`SourceFacts.content_hash` exists and can store accepted observed-file evidence. Current tests and fixtures use
-`sha256:` examples, but there is no live default product path that computes BLAKE3 or uses a content hash as attachment
-identity. BLAKE3 is absent.
+`SourceFacts` stores optional `content_hash_algorithm` and `content_hash_value` evidence. Current tests and fixtures
+use explicit `sha256` examples, but there is no live default product path that computes BLAKE3 or uses a content hash
+as attachment identity. BLAKE3 is absent.
 
 Future placement:
 
@@ -128,7 +128,7 @@ Future placement:
 - Track identity must not rely on path identity.
 - Attachment identity should not re-read files merely to discover content identity if observed facts already owns
   hashing.
-- BLAKE3 selection, migration, and coexistence with any SHA-256 evidence require a separate observed-facts design.
+- BLAKE3 selection, dependency addition, and coexistence with any SHA-256 evidence require a separate hash-job design.
 
 ## Boundary Between Identity Layers
 
@@ -142,6 +142,6 @@ Future placement:
 
 ## Next Implementation Gate
 
-The next gate is an observed file facts pass that defines byte-reading ownership, hash algorithm policy, basis
-fingerprints, idempotence, and how source facts feed attachment identity. It must not add track tables, CUE pairing,
-artwork intelligence, playlist UI, prep facets, or waveform generation as part of the same change.
+The next gate is a byte-reading/hash job pass that defines BLAKE3 dependency ownership, bounded IO, idempotence, and
+how source facts feed attachment identity. It must not add track tables, CUE pairing, artwork intelligence, playlist UI,
+prep facets, or waveform generation as part of the same change.

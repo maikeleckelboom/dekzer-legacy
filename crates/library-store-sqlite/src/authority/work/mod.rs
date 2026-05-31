@@ -56,7 +56,7 @@ mod tests {
     };
     use crate::authority::roots::RootMountStatus;
     use crate::authority::sources::{
-        CommitAcceptedSourceFactsInput, RecordSourceFileObservationInput,
+        CommitAcceptedSourceFactsInput, ContentHashEvidence, RecordSourceFileObservationInput,
         SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx, SourceLocatorsAuthorityTx,
         SourceStateAuthorityTx, SourcesAuthorityTx, UpsertSourceDirectoryInput, UpsertSourceInput,
         UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
@@ -174,7 +174,11 @@ mod tests {
                     source_file_id: source_file_domain_id(300),
                     accepted_artifact_id: artifact.artifact_id,
                     basis_fingerprint: "basis:source:v1".to_string(),
-                    content_hash: Some("sha256:track-a".to_string()),
+                    observed_at_ms: 24,
+                    content_hash: Some(ContentHashEvidence {
+                        algorithm: "sha256".to_string(),
+                        value: "track-a".to_string(),
+                    }),
                     media_kind: "audio".to_string(),
                     mime_type: Some("audio/flac".to_string()),
                     duration_ms: Some(180_000),
@@ -1006,7 +1010,11 @@ mod tests {
                 source_file_id: source_file_domain_id(source_file_id),
                 accepted_artifact_id: artifact.artifact_id,
                 basis_fingerprint: basis_fingerprint.to_string(),
-                content_hash: Some(format!("sha256:{source_file_id}:{basis_fingerprint}")),
+                observed_at_ms: changed_at + 3,
+                content_hash: Some(ContentHashEvidence {
+                    algorithm: "sha256".to_string(),
+                    value: format!("{source_file_id}:{basis_fingerprint}"),
+                }),
                 media_kind: "audio".to_string(),
                 mime_type: Some("audio/flac".to_string()),
                 duration_ms: Some(180_000),

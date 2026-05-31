@@ -1708,8 +1708,16 @@ mod tests {
             .execute(
                 "INSERT INTO SourceFacts (
                      source_file_id,
+                     fact_kind,
                      basis_fingerprint,
-                     content_hash,
+                     basis_source_id,
+                     basis_relative_path,
+                     basis_size_bytes,
+                     basis_mtime_ns,
+                     basis_presence_state,
+                     observed_at_ms,
+                     content_hash_algorithm,
+                     content_hash_value,
                      media_kind,
                      mime_type,
                      duration_ms,
@@ -1720,7 +1728,28 @@ mod tests {
                      updated_at,
                      accepted_artifact_id
                  )
-                 VALUES (?1, ?2, NULL, ?3, NULL, NULL, NULL, NULL, NULL, NULL, 1, 1)",
+                 SELECT source_file_id,
+                        'source_inspection',
+                        ?2,
+                        source_id,
+                        relative_path,
+                        size_bytes,
+                        mtime_ns,
+                        presence_state,
+                        1,
+                        NULL,
+                        NULL,
+                        ?3,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        1,
+                        1
+                 FROM source_files
+                 WHERE source_file_id = ?1",
                 params![
                     source_file_id,
                     format!("basis:facts:{source_file_id}"),

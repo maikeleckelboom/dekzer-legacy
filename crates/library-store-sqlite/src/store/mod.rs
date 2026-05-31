@@ -19,6 +19,7 @@ mod library_asset_waveform_reads;
 mod library_browser_reads;
 mod literal_hierarchy_reads;
 mod navigation_reads;
+mod observed_file_facts_reads;
 mod playlists;
 mod projections;
 mod promotion;

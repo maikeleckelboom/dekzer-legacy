@@ -4,6 +4,7 @@ pub mod library_asset_waveform_overview;
 pub mod library_browser;
 pub mod literal_hierarchy;
 pub mod navigation;
+pub mod observed_file_facts;
 pub mod source_lifecycle;
 pub(crate) mod source_location_coverage;
 pub(crate) mod waveform_profile_selection;

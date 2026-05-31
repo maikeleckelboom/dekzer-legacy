@@ -10,7 +10,7 @@ use crate::authority::roots::{
 };
 use crate::{
     AcceptSegmentationPromotionInput, ClaimMachineWorkBatchInput, CommitAcceptedSourceFactsInput,
-    CompleteMachineWorkInput, DeleteSourceLocationInput, FinishWorkRunInput,
+    CompleteMachineWorkInput, ContentHashEvidence, DeleteSourceLocationInput, FinishWorkRunInput,
     InspectSourcePromotionInput, RecordArtifactInput, RecordInlineArtifactInput,
     ReplaceAcceptedSourceSegmentSetInput, ResolveLibraryAssetPromotionInput, StartWorkRunInput,
     UpsertPrepPolicyInput, UpsertSourceDirectoryInput, UpsertSourceInput,
@@ -1645,7 +1645,11 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
                 accepted_artifact_id: library_domain::ArtifactId::new(inspection_artifact_id)
                     .expect("positive artifact id"),
                 basis_fingerprint: source_basis_fingerprint.clone(),
-                content_hash: Some("sha256:store-flow".to_string()),
+                observed_at_ms: 24,
+                content_hash: Some(ContentHashEvidence {
+                    algorithm: "sha256".to_string(),
+                    value: "store-flow".to_string(),
+                }),
                 media_kind: "audio".to_string(),
                 mime_type: Some("audio/wav".to_string()),
                 duration_ms: Some(180_000),

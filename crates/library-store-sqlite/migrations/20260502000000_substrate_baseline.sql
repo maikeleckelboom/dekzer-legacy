@@ -640,8 +640,16 @@ CREATE UNIQUE INDEX ArtifactClaims_active_claim
 CREATE TABLE SourceFacts
 (
     source_file_id        INTEGER PRIMARY KEY REFERENCES source_files (source_file_id) ON DELETE CASCADE,
+    fact_kind             TEXT    NOT NULL CHECK (fact_kind IN ('source_inspection')),
     basis_fingerprint     TEXT    NOT NULL CHECK (length(trim(basis_fingerprint)) > 0),
-    content_hash          TEXT,
+    basis_source_id       INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
+    basis_relative_path   TEXT    NOT NULL CHECK (length(trim(basis_relative_path)) > 0),
+    basis_size_bytes      INTEGER CHECK (basis_size_bytes IS NULL OR basis_size_bytes >= 0),
+    basis_mtime_ns        INTEGER CHECK (basis_mtime_ns IS NULL OR basis_mtime_ns >= 0),
+    basis_presence_state  TEXT    NOT NULL CHECK (basis_presence_state IN ('present', 'missing', 'removed')),
+    observed_at_ms        INTEGER NOT NULL,
+    content_hash_algorithm TEXT CHECK (content_hash_algorithm IS NULL OR length(trim(content_hash_algorithm)) > 0),
+    content_hash_value    TEXT CHECK (content_hash_value IS NULL OR length(trim(content_hash_value)) > 0),
     media_kind            TEXT    NOT NULL CHECK (length(trim(media_kind)) > 0),
     mime_type             TEXT,
     duration_ms           INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),
@@ -650,8 +658,16 @@ CREATE TABLE SourceFacts
     bit_depth             INTEGER CHECK (bit_depth IS NULL OR bit_depth > 0),
     codec                 TEXT,
     updated_at            INTEGER NOT NULL,
-    accepted_artifact_id  INTEGER NOT NULL REFERENCES Artifacts (artifact_id)
+    accepted_artifact_id  INTEGER NOT NULL REFERENCES Artifacts (artifact_id),
+    CHECK (
+        (content_hash_algorithm IS NULL AND content_hash_value IS NULL)
+            OR (content_hash_algorithm IS NOT NULL AND content_hash_value IS NOT NULL)
+    ),
+    CHECK (updated_at >= observed_at_ms)
 ) STRICT;
+
+CREATE INDEX SourceFacts_source_basis
+    ON SourceFacts (basis_source_id, basis_relative_path);
 
 CREATE INDEX SourceFacts_media_kind
     ON SourceFacts (media_kind);

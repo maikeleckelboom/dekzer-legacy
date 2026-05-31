@@ -33,6 +33,7 @@ No two active docs may define the same authority._
 | `docs/library/library-boundary-event-stream-contract.md`     | **Canonical library contract**                               | Cursor-only boundary event model, `ReadAfter` semantics, event ring, gap recovery, scan event family, maintained snapshot invalidation, event parser contract.                                                   |
 | `docs/library/media-relevant-file-inventory-contract.md`     | **Canonical library contract**                               | Media-relevant source-file inventory policy, store/read-model ownership, default contents admission, CUE/image boundaries, presence, ordering, and renderer projection limits.                                   |
 | `docs/library/media-identity-schema-authority.md`            | **Canonical library contract**                               | Asset identity, `primaryMedia` authority, CUE association, content hashing placement, and intentionally dormant identity/prep surfaces. Depends on source lifecycle and media-relevant file inventory contracts.   |
+| `docs/library/observed-file-facts-contract.md`               | **Canonical library contract**                               | Observed source-file evidence, file-basis validity, algorithm-tagged content hash placement, CUE observation ownership, and current/future boundaries for probing and identity consumption.                       |
 
 ## Contents read boundary docs
 

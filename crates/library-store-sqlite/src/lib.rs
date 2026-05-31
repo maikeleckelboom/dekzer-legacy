@@ -33,10 +33,10 @@ pub use authority::promotion::{
     ResolveLibraryAssetPromotionInput, ResolveLibraryAssetPromotionResult,
 };
 pub use authority::sources::{
-    CommitAcceptedSourceFactsInput, DeleteSourceLocationInput, RecordSourceFileObservationInput,
-    SourceLocatorInput, UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
-    UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
-    canonicalize_source_location_relative_path,
+    CommitAcceptedSourceFactsInput, ContentHashEvidence, DeleteSourceLocationInput,
+    RecordSourceFileObservationInput, SourceLocatorInput, UpsertSourceDirectoryInput,
+    UpsertSourceInput, UpsertSourceLocationInput, UpsertSourceLocatorInput,
+    UpsertSourceScanStateInput, UpsertSourceStateInput, canonicalize_source_location_relative_path,
 };
 pub use authority::work::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
@@ -75,6 +75,10 @@ pub use read_models::literal_hierarchy::{
     StoreLiteralHierarchyEntryPoint, StoreLiteralHierarchyNode, StoreLiteralHierarchyWindow,
 };
 pub use read_models::navigation::NavigationRow;
+pub use read_models::observed_file_facts::{
+    StoreContentHashEvidence, StoreObservedFileFactStatus, StoreObservedFileFacts,
+    read_observed_file_facts_for_source_file,
+};
 pub use read_models::source_lifecycle::StoreSourceLifecycle;
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
