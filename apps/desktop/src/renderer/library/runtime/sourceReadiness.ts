@@ -99,14 +99,19 @@ export function projectSourceReadinessByNodeId(
 }
 
 export function deriveSourceReadiness(input: SourceReadinessInput): SourceReadiness {
+  const lifecycleBarrierReadiness = backendSourceLifecycleBarrierReadiness(input)
+  if (lifecycleBarrierReadiness !== undefined) {
+    return lifecycleBarrierReadiness
+  }
+
   const activeScanReadiness = activeScanProgressReadiness(input)
   if (activeScanReadiness !== undefined) {
     return activeScanReadiness
   }
 
-  const lifecycleReadiness = backendSourceLifecycleReadiness(input)
-  if (lifecycleReadiness !== undefined) {
-    return lifecycleReadiness
+  const lifecycleScanReadiness = backendSourceLifecycleScanReadiness(input)
+  if (lifecycleScanReadiness !== undefined) {
+    return lifecycleScanReadiness
   }
 
   const terminalProgress =
@@ -149,14 +154,20 @@ function activeScanProgressReadiness(input: SourceReadinessInput): SourceReadine
   )
 }
 
-function backendSourceLifecycleReadiness(input: SourceReadinessInput): SourceReadiness | undefined {
+function backendSourceLifecycleBarrierReadiness(
+  input: SourceReadinessInput
+): SourceReadiness | undefined {
   const lifecycle = input.sourceLifecycle
 
   if (lifecycle === undefined) {
     return undefined
   }
 
-  if (lifecycle.sourceClass !== 'internal' && lifecycle.mountStatus !== 'mounted') {
+  if (
+    lifecycle.sourceClass !== 'internal' &&
+    lifecycle.mountStatus !== 'mounted' &&
+    lifecycle.mountStatus !== 'unknown'
+  ) {
     return readiness(input, 'unavailable', 'The registered source is currently unavailable.')
   }
 
@@ -172,6 +183,18 @@ function backendSourceLifecycleReadiness(input: SourceReadinessInput): SourceRea
     case 'accessible':
     case 'unknown':
       break
+  }
+
+  return undefined
+}
+
+function backendSourceLifecycleScanReadiness(
+  input: SourceReadinessInput
+): SourceReadiness | undefined {
+  const lifecycle = input.sourceLifecycle
+
+  if (lifecycle === undefined) {
+    return undefined
   }
 
   switch (lifecycle.scanPhase) {

@@ -157,7 +157,8 @@ Product invariants (non-negotiable)
 - Source lifecycle refresh remains separate from hierarchy branch refresh. Maintained `navigationRows` and
   `libraryBrowser` invalidations trigger targeted lifecycle rereads for known/visible source ids. Delivered scan
   events also trigger targeted lifecycle rereads for named visible roots, but active scan progress is still only
-  runtime immediacy and not durable truth.
+  runtime scan-phase immediacy and not durable truth. Live scan progress must not override backend-owned
+  mount/access barriers.
 
 Candidate backend contract shapes (do not choose prematurely)
 -----------------------------------------------------------
@@ -256,7 +257,7 @@ Current implementation provides demonstrable evidence (tests + code) that:
 3. A `completed` scan does not synthesize children; completed-only state must not be used to fabricate rows.
 4. Branch refresh semantics remain branch-owned and are not automatically promoted to source lifecycle changes.
 5. Renderer source readiness can consume backend lifecycle facts as primary durable source truth while preserving
-   active scan progress for runtime immediacy.
+   active scan progress for scan-phase runtime immediacy only. Backend mount/access barriers remain authoritative.
 6. Missing lifecycle side rows do not produce `notFound`; they produce a known-source lifecycle record with typed
    unknown/default lifecycle facts.
 

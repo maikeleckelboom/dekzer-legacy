@@ -149,7 +149,7 @@ describe('source readiness projection', () => {
     expect(readiness.kind).toBe('ready')
   })
 
-  it('prefers backend source lifecycle facts while preserving active scan immediacy', () => {
+  it('does not let active scanning progress override backend blocked access', () => {
     const blockedLifecycle = sourceLifecycle({
       accessState: 'blocked',
       accessIssueKind: 'permissionDenied',
@@ -172,7 +172,75 @@ describe('source readiness projection', () => {
           queuedWorkItems: 0
         }
       })?.kind
-    ).toBe('scanning')
+    ).toBe('blocked')
+  })
+
+  it('does not let active scanning progress override backend unavailable mount', () => {
+    const readiness = readinessFor(browserState(), {
+      lifecycle: sourceLifecycle({
+        mountStatus: 'unmounted',
+        accessState: 'blocked',
+        accessIssueKind: 'unavailableMount',
+        scanPhase: 'complete'
+      }),
+      progress: {
+        kind: 'scanning',
+        rootId: '7',
+        scanRunId: 'scan-2',
+        directoriesVisited: 1,
+        filesVisited: 0,
+        filesDiscovered: 0,
+        mediaCandidates: 0,
+        queuedWorkItems: 0
+      }
+    })
+
+    expect(readiness?.kind).toBe('unavailable')
+  })
+
+  it('uses active scanning progress over backend durable scan phase when access and mount are usable', () => {
+    const readiness = readinessFor(browserState(), {
+      lifecycle: sourceLifecycle({
+        mountStatus: 'mounted',
+        accessState: 'accessible',
+        scanPhase: 'blocked',
+        scanIssueKind: 'permissionDenied'
+      }),
+      progress: {
+        kind: 'scanning',
+        rootId: '7',
+        scanRunId: 'scan-2',
+        directoriesVisited: 1,
+        filesVisited: 0,
+        filesDiscovered: 0,
+        mediaCandidates: 0,
+        queuedWorkItems: 0
+      }
+    })
+
+    expect(readiness?.kind).toBe('scanning')
+  })
+
+  it('allows active scanning progress when backend mount and access are unknown without a barrier', () => {
+    const readiness = readinessFor(browserState(), {
+      lifecycle: sourceLifecycle({
+        mountStatus: 'unknown',
+        accessState: 'unknown',
+        scanPhase: 'idle'
+      }),
+      progress: {
+        kind: 'scanning',
+        rootId: '7',
+        scanRunId: 'scan-2',
+        directoriesVisited: 0,
+        filesVisited: 0,
+        filesDiscovered: 0,
+        mediaCandidates: 0,
+        queuedWorkItems: 0
+      }
+    })
+
+    expect(readiness?.kind).toBe('scanning')
   })
 
   it('does not let branch refresh override backend-owned mount and access facts', () => {
@@ -209,6 +277,32 @@ describe('source readiness projection', () => {
     })
 
     expect(readiness?.kind).toBe('registered')
+  })
+
+  it('uses authoritative hierarchy coverage for ready and empty instead of scan completion', () => {
+    const readyState = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([fileNode('11', 'track.wav')])
+      }
+    })
+    const emptyState = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([])
+      }
+    })
+    const progress: ScanProgressState = {
+      kind: 'completed',
+      rootId: '7',
+      scanRunId: 'scan-1',
+      filesDiscovered: 0,
+      queuedWorkItems: 0
+    }
+
+    expect(readinessFor(readyState, { progress })?.kind).toBe('ready')
+    expect(readinessFor(emptyState, { progress })?.kind).toBe('empty')
+    expect(readinessFor(browserState(), { progress })?.kind).toBe('registered')
   })
 })
 
