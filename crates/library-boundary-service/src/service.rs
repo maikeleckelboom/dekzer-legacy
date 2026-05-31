@@ -958,8 +958,8 @@ mod tests {
 
     use library_domain::{SourceAccessIssueKind, SourceAccessState, SourceScanPhase};
     use library_store_sqlite::{
-        LibraryStoreContext, StoreEnvironment, UpsertSourceScanStateInput, UpsertSourceStateInput,
-        durable_store_path,
+        LibraryStoreContext, StoreEnvironment, UpsertSourceInput, UpsertSourceScanStateInput,
+        UpsertSourceStateInput, durable_store_path,
     };
 
     use super::{LibraryBoundaryService, validate_contents_policy};
@@ -1316,6 +1316,44 @@ mod tests {
             ))
             .expect_err("zero sourceId is invalid");
         assert!(matches!(invalid, ProtocolError::InvalidRequest { .. }));
+    }
+
+    #[test]
+    fn source_lifecycle_read_defaults_missing_side_rows_for_known_source() {
+        let (_tempdir, _context, service) = open_service_with_context();
+        let source_id = service
+            .durable_store
+            .upsert_source(UpsertSourceInput {
+                source_id: Some(77),
+                source_class: "external_mounted".to_string(),
+                authority: "device".to_string(),
+                identity_kind: "fixture".to_string(),
+                identity_value: "missing-side-rows".to_string(),
+                display_name: "Fixture".to_string(),
+                medium_label: None,
+                is_user_visible: true,
+                browser_order_ordinal: None,
+                changed_at: 100,
+            })
+            .expect("insert source without lifecycle side rows");
+
+        let reply = read_source_lifecycle(&service, source_id);
+        let lifecycle = reply.lifecycle.expect("known source lifecycle");
+
+        assert_eq!(lifecycle.source_id, source_id);
+        assert_eq!(
+            lifecycle.mount_status,
+            library_boundary_protocol::SourceMountStatus::Unknown
+        );
+        assert_eq!(
+            lifecycle.access_state,
+            library_boundary_protocol::SourceAccessState::Unknown
+        );
+        assert_eq!(
+            lifecycle.scan_phase,
+            library_boundary_protocol::SourceScanPhase::Idle
+        );
+        assert_eq!(lifecycle.updated_at_ms, 100);
     }
 
     #[test]

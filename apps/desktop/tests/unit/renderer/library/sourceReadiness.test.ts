@@ -174,6 +174,42 @@ describe('source readiness projection', () => {
       })?.kind
     ).toBe('scanning')
   })
+
+  it('does not let branch refresh override backend-owned mount and access facts', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([fileNode('11', 'track.wav')])
+      }
+    })
+
+    const readiness = readinessFor(state, {
+      lifecycle: sourceLifecycle({
+        mountStatus: 'unmounted',
+        accessState: 'blocked',
+        accessIssueKind: 'unavailableMount',
+        scanPhase: 'complete'
+      })
+    })
+
+    expect(readiness?.kind).toBe('unavailable')
+  })
+
+  it('uses backend durable scan facts over terminal scan event state', () => {
+    const readiness = readinessFor(browserState(), {
+      lifecycle: sourceLifecycle({
+        accessState: 'accessible',
+        scanPhase: 'complete'
+      }),
+      progress: {
+        kind: 'failed',
+        rootId: '7',
+        detail: 'Stale scan event.'
+      }
+    })
+
+    expect(readiness?.kind).toBe('registered')
+  })
 })
 
 function readinessFor(
@@ -202,12 +238,17 @@ function readinessFor(
 function withReadiness(
   state: BrowserState,
   roots: LocalRootsReadState = readyRoots('available'),
-  progress?: ScanProgressState
+  progress?: ScanProgressState,
+  lifecycle?: SourceLifecycleRecord
 ): BrowserState {
+  const lifecycleBySourceId = sourceLifecycleBySourceId(lifecycle)
   const readiness = projectSourceReadinessByNodeId({
     projection: projectTree(state),
     localRootsReadState: roots,
     sourceReadStates: state.sourceReadStates,
+    ...(lifecycleBySourceId === undefined
+      ? {}
+      : { sourceLifecycleBySourceId: lifecycleBySourceId }),
     scanProgressByRootId: scanProgressByRootId(progress)
   })
 

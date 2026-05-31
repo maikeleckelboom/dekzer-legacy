@@ -99,22 +99,18 @@ export function projectSourceReadinessByNodeId(
 }
 
 export function deriveSourceReadiness(input: SourceReadinessInput): SourceReadiness {
-  const runningScan = runningScanProgress(input.scanProgress, input.currentScanStatus)
-
-  if (runningScan !== undefined) {
-    return readiness(
-      input,
-      hasPriorAuthoritativeRead(input.sourceReadState) ? 'rescanRunning' : 'scanning',
-      runningScan
-    )
+  const activeScanReadiness = activeScanProgressReadiness(input)
+  if (activeScanReadiness !== undefined) {
+    return activeScanReadiness
   }
 
-  const lifecycleReadiness = sourceLifecycleReadiness(input)
+  const lifecycleReadiness = backendSourceLifecycleReadiness(input)
   if (lifecycleReadiness !== undefined) {
     return lifecycleReadiness
   }
 
-  const terminalProgress = terminalScanProgressReadiness(input)
+  const terminalProgress =
+    input.sourceLifecycle === undefined ? terminalScanProgressReadiness(input) : undefined
   if (terminalProgress !== undefined) {
     return terminalProgress
   }
@@ -139,7 +135,21 @@ export function deriveSourceReadiness(input: SourceReadinessInput): SourceReadin
   )
 }
 
-function sourceLifecycleReadiness(input: SourceReadinessInput): SourceReadiness | undefined {
+function activeScanProgressReadiness(input: SourceReadinessInput): SourceReadiness | undefined {
+  const runningScan = runningScanProgress(input.scanProgress, input.currentScanStatus)
+
+  if (runningScan === undefined) {
+    return undefined
+  }
+
+  return readiness(
+    input,
+    hasPriorAuthoritativeRead(input.sourceReadState) ? 'rescanRunning' : 'scanning',
+    runningScan
+  )
+}
+
+function backendSourceLifecycleReadiness(input: SourceReadinessInput): SourceReadiness | undefined {
   const lifecycle = input.sourceLifecycle
 
   if (lifecycle === undefined) {

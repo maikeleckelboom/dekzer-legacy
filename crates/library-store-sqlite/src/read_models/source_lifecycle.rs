@@ -28,20 +28,24 @@ pub fn read_source_lifecycle(
             "SELECT s.source_id,
                     s.source_class,
                     s.is_user_visible,
-                    ss.mount_status,
-                    ss.access_state,
+                    COALESCE(ss.mount_status, 'unknown'),
+                    COALESCE(ss.access_state, 'unknown'),
                     ss.access_issue_kind,
-                    sss.scan_phase,
+                    COALESCE(sss.scan_phase, 'idle'),
                     sss.scan_issue_kind,
                     sss.last_scan_started_at,
                     sss.last_scan_finished_at,
                     sss.last_successful_scan_at,
                     ss.last_seen_at,
-                    MAX(s.updated_at, ss.updated_at, sss.updated_at)
+                    MAX(
+                        s.updated_at,
+                        COALESCE(ss.updated_at, s.updated_at),
+                        COALESCE(sss.updated_at, s.updated_at)
+                    )
              FROM sources s
-             JOIN source_state ss
+             LEFT JOIN source_state ss
                ON ss.source_id = s.source_id
-             JOIN source_scan_state sss
+             LEFT JOIN source_scan_state sss
                ON sss.source_id = s.source_id
              WHERE s.source_id = ?1",
             [source_id],
@@ -77,6 +81,21 @@ mod tests {
         let mut connection = Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
         connection
+    }
+
+    fn delete_source_state(connection: &Connection, source_id: i64) {
+        connection
+            .execute("DELETE FROM source_state WHERE source_id = ?1", [source_id])
+            .expect("delete source state");
+    }
+
+    fn delete_source_scan_state(connection: &Connection, source_id: i64) {
+        connection
+            .execute(
+                "DELETE FROM source_scan_state WHERE source_id = ?1",
+                [source_id],
+            )
+            .expect("delete source scan state");
     }
 
     fn insert_source(connection: &Connection, source_id: i64) {
@@ -186,6 +205,46 @@ mod tests {
                 .expect("read unavailable source")
                 .is_some()
         );
+    }
+
+    #[test]
+    fn read_source_lifecycle_defaults_missing_side_rows_without_not_found() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        delete_source_state(&connection, 7);
+        delete_source_scan_state(&connection, 7);
+
+        let lifecycle = read_source_lifecycle(&connection, 7)
+            .expect("read source lifecycle")
+            .expect("source row remains known");
+
+        assert_eq!(lifecycle.source_id, 7);
+        assert_eq!(lifecycle.mount_status, "unknown");
+        assert_eq!(lifecycle.access_state, "unknown");
+        assert_eq!(lifecycle.access_issue_kind, None);
+        assert_eq!(lifecycle.scan_phase, "idle");
+        assert_eq!(lifecycle.scan_issue_kind, None);
+        assert_eq!(lifecycle.last_scan_started_at, None);
+        assert_eq!(lifecycle.last_scan_finished_at, None);
+        assert_eq!(lifecycle.last_successful_scan_at, None);
+        assert_eq!(lifecycle.last_seen_at, None);
+        assert_eq!(lifecycle.updated_at, 10);
+    }
+
+    #[test]
+    fn read_source_lifecycle_defaults_only_missing_scan_side_row() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        delete_source_scan_state(&connection, 7);
+
+        let lifecycle = read_source_lifecycle(&connection, 7)
+            .expect("read source lifecycle")
+            .expect("source row remains known");
+
+        assert_eq!(lifecycle.mount_status, "mounted");
+        assert_eq!(lifecycle.access_state, "accessible");
+        assert_eq!(lifecycle.scan_phase, "idle");
+        assert_eq!(lifecycle.updated_at, 11);
     }
 
     #[test]

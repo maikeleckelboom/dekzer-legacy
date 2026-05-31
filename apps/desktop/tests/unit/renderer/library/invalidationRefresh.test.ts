@@ -56,6 +56,29 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
     expect(dependencies.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
   })
 
+  it('refreshes known source lifecycles separately from hierarchy branch refresh', async () => {
+    const sourceLifecycleRead = {
+      refreshSourceLifecycles: vi.fn(async () => true)
+    }
+    const dependencies: InvalidationRefreshDependencies = {
+      ...testDependencies(),
+      sourceLifecycleRead,
+      sourceLifecycleSourceIds: new Set(['7'])
+    }
+
+    await expect(
+      refreshHierarchyForMaintainedSnapshotInvalidation(
+        invalidation('libraryBrowser', '4'),
+        dependencies
+      )
+    ).resolves.toBe(true)
+
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(
+      new Set(['navigation-row:7', 'source-directory:12'])
+    )
+    expect(sourceLifecycleRead.refreshSourceLifecycles).toHaveBeenCalledWith(new Set(['7']))
+  })
+
   it('does not alias unsupported future scopes', async () => {
     const dependencies = testDependencies()
 
@@ -130,6 +153,9 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
       filesDiscovered: 3,
       queuedWorkItems: 5
     })
+    expect(boundaryEvents.consumeSourceScanEvents().map((event) => event.rootId)).toEqual([
+      'root-1'
+    ])
     expect(boundaryEvents.consumeMaintainedSnapshotInvalidations()).toEqual([])
     expect(readRequests).toEqual([])
     expect(loadedChildIds(hierarchyRead, 'navigation-row:7')).toEqual(['source-directory:12'])

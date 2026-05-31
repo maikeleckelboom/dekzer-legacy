@@ -97,6 +97,10 @@ What the backend now exposes
   copy, tones, or child rows.
 - Known user-visible sources remain readable when unavailable because the read uses durable source lifecycle
   rows, not renderer projection state.
+- Known sources also remain readable if `source_state` or `source_scan_state` side rows are absent. The read is
+  anchored on `sources` and left-joins lifecycle side rows. Missing access/mount facts are returned as
+  `mountStatus: unknown` and `accessState: unknown`; missing scan facts are returned as `scanPhase: idle`.
+  `notFound` is reserved for an absent `sources` row.
 
 What remains a backend contract gap
 -----------------------------------
@@ -108,6 +112,10 @@ What remains a backend contract gap
   directory; it is not intended as a global per-source lifecycle contract.
 - Events communicate activity and progress but are append-only signals and do not, by themselves, constitute an
   authoritative collapsed lifecycle surface.
+- Renderer lifecycle hydration is implemented through a dedicated non-visual source lifecycle read owner. It reads
+  `readSourceLifecycle({ sourceId })` for current browser source rows plus selected/expanded source rows, stores
+  `sourceLifecycleBySourceId`, deduplicates in-flight reads per source, and preserves the last known lifecycle
+  record when refresh returns `notFound`, `hostUnavailable`, or `readFailed`.
 - Whole-source coverage summary remains omitted. It should only be added if it can be computed without duplicating
   branch/window hierarchy semantics or implying authoritative `empty` state without proof.
 - Locator/root identity remains outside `readSourceLifecycle` for now; `readLocalRoots` continues to own local-root
@@ -146,6 +154,10 @@ Product invariants (non-negotiable)
 - Source-level lifecycle (mount/access/scan) is separate from branch-level refresh and contents window reads. Branch
   refresh remains a branch-owned operation.
 - Events signal reads and active scan progress; events do not synthesize children nor act as durable source truth.
+- Source lifecycle refresh remains separate from hierarchy branch refresh. Maintained `navigationRows` and
+  `libraryBrowser` invalidations trigger targeted lifecycle rereads for known/visible source ids. Delivered scan
+  events also trigger targeted lifecycle rereads for named visible roots, but active scan progress is still only
+  runtime immediacy and not durable truth.
 
 Candidate backend contract shapes (do not choose prematurely)
 -----------------------------------------------------------
@@ -245,6 +257,20 @@ Current implementation provides demonstrable evidence (tests + code) that:
 4. Branch refresh semantics remain branch-owned and are not automatically promoted to source lifecycle changes.
 5. Renderer source readiness can consume backend lifecycle facts as primary durable source truth while preserving
    active scan progress for runtime immediacy.
+6. Missing lifecycle side rows do not produce `notFound`; they produce a known-source lifecycle record with typed
+   unknown/default lifecycle facts.
+
+Invalidation semantics discovered in this pass:
+
+- Root lifecycle mutations through `SourceLifecycleTx` call `sync_root_projection_state`, which reseeds navigation
+  and library-browser projections; subsequent event reads publish maintained snapshot invalidations for those
+  revisions.
+- Public `upsert_source_state` reseeds navigation and library-browser projections. Public
+  `upsert_source_scan_state` reseeds library-browser projections.
+- Discovery `start_scan_session` updates `source_scan_state` to `scanning` inside discovery materialization without
+  directly publishing a maintained invalidation at scan start. The already-delivered scan event is therefore used as
+  the supported renderer trigger for targeted scan-related lifecycle refresh; it does not synthesize durable
+  lifecycle state.
 
 Still future:
 
@@ -252,7 +278,7 @@ Still future:
   `emptyResultAuthoritative` proves there are zero rows. `readSourceLifecycle` does not emit `empty`.
 - A future active-run identity can be added if callers need to correlate durable `scanPhase` with a specific
   runtime scan run; the current minimal read exposes durable `scanPhase` without conflating it with branch refresh.
-- Full renderer hydration of `readSourceLifecycle` records can reduce remaining projection seeding heuristics.
+- Renderer hydration of `readSourceLifecycle` records is implemented for visible/selected/expanded source rows.
 
 Docs / authority map
 --------------------
@@ -273,5 +299,5 @@ Follow-up work
 
 - Add a whole-source coverage summary only if the semantics can be proved without duplicating branch/window reads.
 - Add source locator/root identity only when the lifecycle caller needs it and the source/root mapping remains clean.
-- Hydrate renderer source lifecycle records through the new shared API where callers need durable lifecycle facts
-  independent of hierarchy reads.
+- Add a narrower lifecycle invalidation scope only if future clients need lifecycle refresh independent of current
+  maintained projection invalidations and delivered scan events.

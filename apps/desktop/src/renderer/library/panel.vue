@@ -6,6 +6,10 @@ import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import { useBoundaryEvents, type ScanProgressState } from './boundary/boundaryEvents'
+import {
+  sourceLifecycleIdsForBrowserContext,
+  useSourceLifecycleRead
+} from './boundary/sourceLifecycleRead'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import { refreshHierarchyForMaintainedSnapshotInvalidation } from './runtime/invalidationRefresh'
@@ -38,6 +42,7 @@ const hierarchyRead = useLibraryHierarchyRead()
 const contentsRead = useContentsRead()
 const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
+const sourceLifecycleRead = useSourceLifecycleRead()
 
 const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
   const root = rootActions.registeredRoot.value
@@ -64,6 +69,7 @@ const sourceReadinessByNodeId = computed(() =>
     projection: hierarchyRead.browserProjection.value,
     localRootsReadState: rootActions.localRootsReadState.value,
     sourceReadStates: hierarchyRead.sourceReadStates.value,
+    sourceLifecycleBySourceId: sourceLifecycleRead.sourceLifecycleBySourceId.value,
     scanProgressByRootId: boundaryEvents.scanProgress.value,
     ...(rootActions.registeredRoot.value === undefined
       ? {}
@@ -85,6 +91,14 @@ const browserState = computed<BrowserState>(() => ({
 }))
 
 const browserProjection = computed(() => projectState(browserState.value))
+
+const sourceLifecycleSourceIds = computed(() =>
+  sourceLifecycleIdsForBrowserContext({
+    projection: hierarchyRead.browserProjection.value,
+    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
+    expandedNodeIds: expandedNodeIds.value
+  })
+)
 
 const rootLifecycle = useRootLifecycle({
   rootActions,
@@ -228,6 +242,18 @@ watch(
 )
 
 watch(
+  [sourceLifecycleSourceIds, () => hierarchyRead.hostStatus.value?.state],
+  ([sourceIds, hostState]) => {
+    if (hostState !== 'started') {
+      return
+    }
+
+    void sourceLifecycleRead.refreshSourceLifecycles(sourceIds)
+  },
+  { immediate: true }
+)
+
+watch(
   () => boundaryEvents.recoveryNeeded.value,
   async (needed) => {
     if (!needed) {
@@ -247,11 +273,29 @@ watch(
     for (const event of invalidations) {
       await refreshHierarchyForMaintainedSnapshotInvalidation(event, {
         hierarchyRead,
+        sourceLifecycleRead,
+        sourceLifecycleSourceIds: sourceLifecycleSourceIds.value,
         expandedNodeIds: expandedNodeIds.value,
         refreshContentsForCurrentSelection: () =>
           requestContentsForCurrentSelection({ force: true })
       })
     }
+  }
+)
+
+watch(
+  () => boundaryEvents.sourceScanSignal.value,
+  () => {
+    const sourceIds = sourceLifecycleSourceIds.value
+    const refreshedSourceIds = new Set<string>()
+
+    for (const event of boundaryEvents.consumeSourceScanEvents()) {
+      if (sourceIds.has(event.rootId)) {
+        refreshedSourceIds.add(event.rootId)
+      }
+    }
+
+    void sourceLifecycleRead.refreshSourceLifecycles(refreshedSourceIds)
   }
 )
 

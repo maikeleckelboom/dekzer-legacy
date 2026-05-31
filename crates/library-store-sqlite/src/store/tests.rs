@@ -1,6 +1,7 @@
 use super::discovery::{RootScanHierarchyObservationReason, RootScanObservation};
 use super::{
-    DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, SqliteDurableStore,
+    DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, RegisterLocalRootInput,
+    SqliteDurableStore,
 };
 use crate::authority::ingest::{DiscoveredFileInput, DiscoveryBatch};
 use crate::authority::roots::{
@@ -1308,6 +1309,64 @@ fn commit_discovery_syncs_source_rows_and_queues_inspection_work() {
         navigation_count,
         (FIXED_TOP_LEVEL_NAVIGATION_ROW_COUNT + 1) as i64
     );
+}
+
+#[test]
+fn register_local_root_initializes_lifecycle_side_rows() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("registered-root");
+    fs::create_dir_all(&root_path).expect("create root path");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register local root");
+
+    let connection = open_mutation_connection(&db_path);
+    let state_row = connection
+        .query_row(
+            "SELECT ss.mount_status,
+                    ss.access_state,
+                    ss.effective_path,
+                    sss.scan_phase
+             FROM source_state ss
+             JOIN source_scan_state sss ON sss.source_id = ss.source_id
+             WHERE ss.source_id = ?1",
+            [root.root_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .expect("read lifecycle side rows");
+
+    assert_eq!(state_row.0, RootMountStatus::Mounted.as_str());
+    assert_eq!(state_row.1, SourceAccessState::Accessible.as_str());
+    let canonical_root_path = fs::canonicalize(&root_path)
+        .expect("canonicalize root path")
+        .to_string_lossy()
+        .into_owned();
+    assert_eq!(state_row.2.as_deref(), Some(canonical_root_path.as_str()));
+    assert_eq!(state_row.3, SourceScanPhase::Idle.as_str());
+
+    let lifecycle = durable_store
+        .read_source_lifecycle(root.root_id)
+        .expect("read source lifecycle")
+        .expect("registered source lifecycle exists");
+    assert_eq!(lifecycle.source_id, root.root_id);
+    assert_eq!(lifecycle.mount_status, RootMountStatus::Mounted.as_str());
+    assert_eq!(
+        lifecycle.access_state,
+        SourceAccessState::Accessible.as_str()
+    );
+    assert_eq!(lifecycle.scan_phase, SourceScanPhase::Idle.as_str());
 }
 
 #[test]
