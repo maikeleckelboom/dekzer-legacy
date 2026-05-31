@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 
 import type { BrowserTreeVisibleItem } from './types'
-import type { BrowserTreeBadgeTone } from './types'
 import type { IconComponent, IconTone } from '../../icons'
 import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
 import { resolveBrowserTreeRowIcon } from './presentation'
@@ -27,41 +26,11 @@ const rowStyle = computed(() => ({
 
 const hasAffordance = computed(() => props.item.canRevealChildren)
 
-const visibleBadges = computed(
-  () =>
-    props.item.node.badges ?? (props.item.node.badge === undefined ? [] : [props.item.node.badge])
-)
-
-const visibleBadgeTone = computed<BrowserTreeBadgeTone | undefined>(() => {
-  if (visibleBadges.value.some((badge) => badge.tone === 'danger')) {
-    return 'danger'
-  }
-
-  if (visibleBadges.value.some((badge) => badge.tone === 'warning')) {
-    return 'warning'
-  }
-
-  if (visibleBadges.value.some((badge) => badge.tone === 'accent')) {
-    return 'accent'
-  }
-
-  return visibleBadges.value[0]?.tone
-})
-
 const rowIcon = computed<IconComponent | undefined>(() =>
   resolveBrowserTreeRowIcon(props.item.node, props.item.isExpanded)
 )
 
 const iconTone = computed<IconTone>(() => {
-  const badgeTone = visibleBadgeTone.value
-
-  if (badgeTone === 'warning') {
-    return 'warning'
-  }
-  if (badgeTone === 'danger') {
-    return 'danger'
-  }
-
   const icon = props.item.node.icon
   const role = props.item.node.role
 
@@ -89,15 +58,6 @@ const iconTone = computed<IconTone>(() => {
 })
 
 const labelClass = computed(() => {
-  const badgeTone = visibleBadgeTone.value
-
-  if (badgeTone === 'warning') {
-    return 'text-(--color-warning)'
-  }
-  if (badgeTone === 'danger') {
-    return 'text-(--color-danger)'
-  }
-
   const icon = props.item.node.icon
 
   switch (icon) {
@@ -113,22 +73,6 @@ const labelClass = computed(() => {
       return ''
   }
 })
-
-function badgeClass(tone: BrowserTreeBadgeTone | undefined): string {
-  switch (tone) {
-    case 'accent':
-      return 'border-(--color-accent) text-(--color-accent)'
-    case 'warning':
-      return 'border-(--color-warning) text-(--color-warning)'
-    case 'danger':
-      return 'border-(--color-danger) text-(--color-danger)'
-    case 'muted':
-      return 'border-(--color-border) text-(--color-text-muted)'
-    case 'neutral':
-    default:
-      return 'border-(--color-border) text-(--color-text-muted)'
-  }
-}
 </script>
 
 <template>
@@ -152,17 +96,6 @@ function badgeClass(tone: BrowserTreeBadgeTone | undefined): string {
 
     <span class="min-w-0 flex-1 truncate text-sm font-medium leading-5" :class="labelClass">
       {{ item.node.label }}
-    </span>
-
-    <span
-      v-for="badge in visibleBadges"
-      :key="badge.value"
-      class="shrink-0 rounded-sm border px-1.5 text-xs leading-5"
-      :class="badgeClass(badge.tone)"
-      :title="badge.title"
-      :aria-label="badge.ariaLabel"
-    >
-      {{ badge.value }}
     </span>
   </div>
 </template>

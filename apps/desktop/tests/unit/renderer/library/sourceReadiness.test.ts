@@ -48,7 +48,6 @@ describe('source readiness projection', () => {
 
     const projection = projectTree(withReadiness(state, readyRoots('available'), progress))
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badge).toMatchObject({ value: 'Scanning', tone: 'accent' })
     expect(sourceNode.children.kind).toBe('deferred')
   })
 
@@ -81,13 +80,11 @@ describe('source readiness projection', () => {
       }
     })
     const projection = projectTree(withReadiness(state, readyRoots('unavailable')))
-    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
     const visible = flattenVisibleTree({
       nodes: projection.nodes,
       expandedNodeIds: new Set(['navigation-row:7'])
     })
 
-    expect(sourceNode.badge).toMatchObject({ value: 'Unavailable', tone: 'warning' })
     expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({ kind: 'source' })
     expect(visible.map((item) => item.id)).toEqual([
       'navigation-row:7',
@@ -133,7 +130,6 @@ describe('source readiness projection', () => {
 
     const projection = projectTree(withReadiness(state))
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badges?.map((badge) => badge.value)).toEqual(['Ready', 'Refreshing'])
     expect(sourceNode.children.kind).toBe('loaded')
   })
 

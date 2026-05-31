@@ -449,7 +449,7 @@ describe('projectState', () => {
     }
   })
 
-  it('read failure does not project as source unavailable badge or label', () => {
+  it('read failure does not project as source unavailable label', () => {
     const projection = projectTree(
       browserState({
         sourceStates: new Map([
@@ -466,7 +466,6 @@ describe('projectState', () => {
     )
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badge).toBeUndefined()
 
     const children = sourceNode.children
     expect(children.kind).toBe('failed')
@@ -478,7 +477,7 @@ describe('projectState', () => {
     })
   })
 
-  it('notFound error projects as source unavailable with badge', () => {
+  it('notFound error projects as source unavailable label', () => {
     const projection = projectTree(
       browserState({
         sourceStates: new Map([
@@ -495,7 +494,6 @@ describe('projectState', () => {
     )
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badge).toMatchObject({ value: 'Unavailable', tone: 'warning' })
 
     const children = sourceNode.children
     expect(children.kind).toBe('failed')
@@ -504,7 +502,7 @@ describe('projectState', () => {
     }
   })
 
-  it('loaded source with sourceUnavailable coverage projects unavailable badge', () => {
+  it('loaded source with sourceUnavailable coverage projects unavailable state', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: makeCoverageChildren({
@@ -516,7 +514,6 @@ describe('projectState', () => {
     )
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badge).toMatchObject({ value: 'Unavailable', tone: 'warning' })
     expect(sourceNode.children.kind).toBe('loaded')
 
     const children = sourceNode.children
@@ -527,7 +524,7 @@ describe('projectState', () => {
     }
   })
 
-  it('loaded source with locationMissing coverage projects unavailable badge', () => {
+  it('loaded source with locationMissing coverage keeps source row bound', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: makeCoverageChildren({
@@ -539,10 +536,13 @@ describe('projectState', () => {
     )
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badge).toMatchObject({ value: 'Unavailable', tone: 'warning' })
+    expect(sourceNode.children.kind).toBe('loaded')
+    expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({
+      kind: 'source'
+    })
   })
 
-  it('complete empty library tree window does not project as source unavailable', () => {
+  it('complete empty library tree window keeps source row bound', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: makeCoverageChildren({
@@ -553,8 +553,9 @@ describe('projectState', () => {
       })
     )
 
-    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badge).toBeUndefined()
+    expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({
+      kind: 'source'
+    })
   })
 
   it('contents loaded state is independent from tree branch cache', () => {
@@ -576,7 +577,7 @@ describe('projectState', () => {
     expect(sourceBinding).toMatchObject({ kind: 'source' })
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(sourceNode.badge).toBeUndefined()
+    expect(sourceNode.children.kind).toBe('failed')
   })
 })
 

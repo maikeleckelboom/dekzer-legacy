@@ -73,21 +73,10 @@ export type BrowserTreeIcon =
   | 'warning'
   | 'state'
 
-export type BrowserTreeBadgeTone = 'neutral' | 'accent' | 'warning' | 'danger' | 'muted'
-
-export interface BrowserTreeBadge {
-  readonly value: string
-  readonly tone?: BrowserTreeBadgeTone
-  readonly title?: string
-  readonly ariaLabel?: string
-}
-
 export type BrowserTreeNode = {
   readonly id: BrowserTreeNodeId
   readonly label: string
   readonly role: BrowserTreeRowRole
-  readonly badge?: BrowserTreeBadge
-  readonly badges?: readonly BrowserTreeBadge[]
   readonly detail?: string
   readonly icon?: BrowserTreeIcon
   readonly children: BrowserTreeChildren

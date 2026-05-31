@@ -3,7 +3,6 @@ import type { ScanProgressState } from '../boundary/boundaryEvents'
 import type { LocalRootScanStatus, LocalRootsReadState } from '../boundary/localRootActions'
 import type { RowBinding, SourceState } from '../state'
 import type { BrowserProjection } from '../tree/projection'
-import type { BrowserTreeBadge } from '../tree/types'
 
 export type SourceReadinessKind =
   | 'registered'
@@ -127,36 +126,6 @@ export function deriveSourceReadiness(input: SourceReadinessInput): SourceReadin
     'registered',
     'The source is registered. Scan or expand it to read library rows.'
   )
-}
-
-export function sourceReadinessBadge(readiness: SourceReadiness): BrowserTreeBadge {
-  switch (readiness.kind) {
-    case 'registered':
-      return { value: 'Registered', tone: 'neutral', title: readiness.detail }
-    case 'scanning':
-      return { value: 'Scanning', tone: 'accent', title: readiness.detail }
-    case 'rescanRunning':
-      return { value: 'Rescanning', tone: 'accent', title: readiness.detail }
-    case 'ready':
-      return { value: 'Ready', tone: 'accent', title: readiness.detail }
-    case 'empty':
-      return { value: 'Empty', tone: 'muted', title: readiness.detail }
-    case 'unavailable':
-      return { value: 'Unavailable', tone: 'warning', title: readiness.detail }
-    case 'blocked':
-      return { value: 'Blocked', tone: 'warning', title: readiness.detail }
-    case 'failed':
-      return { value: 'Failed', tone: 'danger', title: readiness.detail }
-  }
-}
-
-export function branchRefreshingBadge(detail: string): BrowserTreeBadge {
-  return {
-    value: 'Refreshing',
-    tone: 'muted',
-    title: detail,
-    ariaLabel: `Refreshing branch. ${detail}`
-  }
 }
 
 function runningScanProgress(

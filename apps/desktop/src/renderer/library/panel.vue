@@ -8,11 +8,6 @@ import { useLocalRootActions } from './boundary/localRootActions'
 import { useBoundaryEvents, type ScanProgressState } from './boundary/boundaryEvents'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
-import {
-  deriveOperationFeedback,
-  type LibraryOperationFeedbackKind,
-  type LibraryOperationFeedbackTone
-} from './operationFeedback'
 import { refreshHierarchyForMaintainedSnapshotInvalidation } from './runtime/invalidationRefresh'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
@@ -37,20 +32,6 @@ const buttonBaseClass =
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
 const secondaryButtonClass = `${buttonBaseClass} min-w-31.5 border border-(--color-border) bg-(--color-background) text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 const dangerButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-(--color-background) text-(--color-accent) hover:brightness-110`
-const visibleOperationFeedbackKinds = new Set<LibraryOperationFeedbackKind>([
-  'choosingRoot',
-  'rootChoiceFailed',
-  'rootChoiceCanceled',
-  'refreshingView',
-  'refreshFailed',
-  'scanningRoot',
-  'scanBlocked',
-  'scanCanceled',
-  'scanFailed',
-  'scanComplete',
-  'removingSource',
-  'removeFailed'
-])
 
 const viewStateStore = createViewStateStore()
 const hierarchyRead = useLibraryHierarchyRead()
@@ -164,42 +145,6 @@ const sourceActionModel = computed(() =>
 
 const removeSourceRootId = computed(() => sourceActionModel.value.selectedRemovableSourceRootId)
 
-const operationFeedback = computed(() =>
-  deriveOperationFeedback({
-    hostStatus: hierarchyRead.hostStatus.value,
-    rootChoiceStatus: rootActions.rootChoiceStatus.value,
-    registeredRootPath: rootActions.registeredRootPath.value,
-    scanStatus: rootActions.scanStatus.value,
-    scanSummary: rootActions.scanSummary.value,
-    scanProgressFromEvents: scanProgressForRegisteredRoot.value,
-    eventGapDetected: boundaryEvents.recoveryNeeded.value,
-    ...(rootActions.scanFailureMessage.value === undefined
-      ? {}
-      : { scanFailureMessage: rootActions.scanFailureMessage.value }),
-    ...(rootActions.scanFailureDetail.value === undefined
-      ? {}
-      : { scanFailureDetail: rootActions.scanFailureDetail.value }),
-    refreshStatus: rootLifecycle.refreshStatus.value,
-    navigationReadIsLoading: hierarchyRead.navigationReadIsLoading.value,
-    hierarchyReadIsLoading: hierarchyRead.hierarchyReadIsLoading.value,
-    navigationReadRequestError: hierarchyRead.navigationReadRequestError.value,
-    hierarchyReadRequestError: hierarchyRead.hierarchyReadRequestError.value,
-    navigationReadResult: hierarchyRead.navigationReadResult.value,
-    removeSourceStatus: rootActions.removeSourceStatus.value,
-    ...(rootActions.removeSourceFailureMessage.value === undefined
-      ? {}
-      : { removeSourceFailureMessage: rootActions.removeSourceFailureMessage.value })
-  })
-)
-
-const showOperationFeedback = computed(() =>
-  visibleOperationFeedbackKinds.has(operationFeedback.value.kind)
-)
-
-const operationFeedbackClass = computed(() =>
-  operationFeedbackToneClass(operationFeedback.value.tone)
-)
-
 watch(preferredNodeId, (nodeId) => {
   if (restoreState.userInteracted || restoreState.initialNodeApplied) {
     return
@@ -309,21 +254,6 @@ watch(
     }
   }
 )
-
-function operationFeedbackToneClass(tone: LibraryOperationFeedbackTone): string {
-  switch (tone) {
-    case 'error':
-      return 'border-(--color-danger) bg-(--color-danger)/10 text-(--color-danger)'
-    case 'warning':
-      return 'border-(--color-warning) bg-(--color-warning)/10 text-(--color-warning)'
-    case 'loading':
-      return 'border-(--color-accent) bg-(--color-accent)/10 text-(--color-accent)'
-    case 'success':
-      return 'border-(--color-accent) bg-(--color-accent)/10 text-(--color-text)'
-    case 'idle':
-      return 'border-(--color-border) bg-(--color-background) text-(--color-text-muted)'
-  }
-}
 
 function saveViewState(): void {
   viewStateStore.save({
@@ -592,19 +522,6 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
         </button>
       </div>
     </header>
-
-    <div
-      v-if="showOperationFeedback"
-      class="mx-4 mb-3 rounded-sm border px-3 py-2 text-sm"
-      :class="operationFeedbackClass"
-      :role="operationFeedback.tone === 'error' ? 'alert' : 'status'"
-      aria-live="polite"
-    >
-      <p class="font-bold leading-5">{{ operationFeedback.title }}</p>
-      <p v-if="operationFeedback.detail !== undefined" class="mt-0.5 leading-5">
-        {{ operationFeedback.detail }}
-      </p>
-    </div>
 
     <div class="grid min-h-0 flex-1 grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
       <aside
