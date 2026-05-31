@@ -24,6 +24,7 @@ mod playlists;
 mod projections;
 mod promotion;
 mod revisions;
+mod source_file_hash;
 mod source_lifecycle_reads;
 mod sources;
 mod work_items;
@@ -37,6 +38,10 @@ pub use discovery::{
     RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
 };
 pub use revisions::{MaintainedReadModelRevision, MaintainedReadModelScope};
+pub use source_file_hash::{
+    HashSourceFileBlake3Error, HashSourceFileBlake3Input, HashSourceFileBlake3Result,
+    SOURCE_FILE_BLAKE3_ALGORITHM,
+};
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
     UnregisterLocalRootInput, UnregisterLocalRootResult,

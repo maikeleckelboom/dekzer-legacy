@@ -9,6 +9,7 @@ library-domain = { path = "../library-domain" }
 rusqlite = { version = "0.39.0", features = ["bundled", "hooks", "trace"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
+blake3 = "1.8.2"
 sha2 = "0.10.9"
 thiserror = "2.0.18"
 walkdir = "2.5.0"

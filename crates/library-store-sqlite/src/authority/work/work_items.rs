@@ -77,6 +77,13 @@ pub struct ClaimMachineWorkBatchInput {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ClaimSpecificMachineWorkInput {
+    pub work_item_id: WorkItemId,
+    pub lease_duration_ms: i64,
+    pub claimed_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClaimedMachineWorkItem {
     pub work_item_id: WorkItemId,
     pub subject: WorkSubject,
@@ -328,6 +335,39 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
         }
 
         Ok(claimed)
+    }
+
+    pub(crate) fn claim_specific_machine_work(
+        &self,
+        input: &ClaimSpecificMachineWorkInput,
+    ) -> LibrarySqliteResult<ClaimedMachineWorkItem> {
+        let lease_until = input.claimed_at + input.lease_duration_ms;
+        let changed = self.tx.execute(
+            "UPDATE WorkItems
+             SET state = 'leased',
+                 leased_until = ?2,
+                 attempt_count = attempt_count + 1,
+                 blocked_reason = NULL,
+                 failure_kind = NULL,
+                 error_detail = NULL,
+                 updated_at = ?3
+             WHERE work_item_id = ?1
+               AND (
+                   state = 'queued'
+                   OR (state = 'leased' AND leased_until IS NOT NULL AND leased_until <= ?3)
+               )",
+            params![input.work_item_id.get(), lease_until, input.claimed_at],
+        )?;
+        if changed != 1 {
+            let work_item = load_work_item_row(self.tx, input.work_item_id)?;
+            return Err(LibrarySqliteError::WriteInvariant(format!(
+                "work item {} must be queued or lease-expired before specific claim; found {}",
+                input.work_item_id.get(),
+                work_item.state.as_str()
+            )));
+        }
+
+        self.load_work_item(input.work_item_id)
     }
 
     pub fn complete_machine_work_item(

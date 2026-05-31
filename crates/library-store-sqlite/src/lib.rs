@@ -82,9 +82,11 @@ pub use read_models::observed_file_facts::{
 pub use read_models::source_lifecycle::StoreSourceLifecycle;
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
-    DurableStoreSchemaCompatibilityState, LibraryStoreContext, LocalRoot, LocalRootAvailability,
+    DurableStoreSchemaCompatibilityState, HashSourceFileBlake3Error, HashSourceFileBlake3Input,
+    HashSourceFileBlake3Result, LibraryStoreContext, LocalRoot, LocalRootAvailability,
     MaintainedReadModelRevision, MaintainedReadModelScope, ReadLocalRootsResult,
     RegisterLocalRootInput, RootScanHierarchyObservationReason, RootScanMaterializationResult,
-    RootScanObservation, SqliteDurableStore, SqliteDurableStoreAppOwnedState, StoreEnvironment,
-    UnregisterLocalRootInput, UnregisterLocalRootResult, durable_store_path,
+    RootScanObservation, SOURCE_FILE_BLAKE3_ALGORITHM, SqliteDurableStore,
+    SqliteDurableStoreAppOwnedState, StoreEnvironment, UnregisterLocalRootInput,
+    UnregisterLocalRootResult, durable_store_path,
 };

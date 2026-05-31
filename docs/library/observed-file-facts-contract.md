@@ -47,11 +47,23 @@ presence still match. Otherwise the fact is `stale`.
 ## Content Hash Policy
 
 Content hash evidence belongs here because hashing reads file bytes. Hash values must always be stored with an explicit
-algorithm tag. The current implementation stores algorithm-tagged evidence but does not compute hashes.
+algorithm tag.
 
 SHA-256 appears only in tests and fixtures as explicit evidence. It is not declared the product content-hash algorithm.
-BLAKE3 remains the preferred future candidate, but selecting it requires a narrow pass that adds the dependency,
-defines byte-reading ownership, and records deterministic hash-job behavior.
+
+BLAKE3 source-file hashing is implemented in `library-store-sqlite` as a narrow store-side evidence job. The job accepts
+a `source_file_id` plus a caller-resolved filesystem path, streams file bytes through BLAKE3, and commits accepted
+`SourceFacts` through the existing inspect-source artifact and observed-facts authority path. The algorithm string is
+`blake3`, and the value is the canonical lowercase hex digest.
+
+BLAKE3 is content evidence, not identity by itself. The hash job does not create `LibraryAssets`,
+`LibraryAssetAttachments`, `SourceSegmentSets`, `SourceSegments`, track rows, attachment identity, or CUE-to-audio
+pairing.
+
+The job captures the current `source_files` basis before reading bytes and re-reads it before committing. If the basis
+changed while hashing was in flight, the job rejects the commit with a typed basis-change result instead of recording
+evidence that could appear current for the wrong row state. Missing or unreadable filesystem paths fail as typed IO
+errors and do not create `SourceFacts`.
 
 `LibraryAssets.equivalence_fingerprint` is not a content hash. It must not be copied into observed file facts as hash
 evidence.
@@ -66,7 +78,7 @@ does not parse CUE sheets, and does not create segment, attachment, or track row
 
 Future work remains separate:
 
-- BLAKE3 byte-reading/hash job ownership
+- production scheduling/path-resolution integration for the BLAKE3 hash job
 - media/container probing
 - CUE parsing
 - CUE-to-audio association evidence

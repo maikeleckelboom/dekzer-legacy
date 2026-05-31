@@ -30,6 +30,7 @@ pub use resolved_targets::{
     ReplaceResolvedLibraryAssetPrepTargetsInput, ResolvedLibraryAssetPrepTargetInput,
     ResolvedTargetsAuthorityTx,
 };
+pub(crate) use work_items::ClaimSpecificMachineWorkInput;
 pub use work_items::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
     CompleteMachineWorkInput, FailMachineWorkInput, MachineWorkKey,

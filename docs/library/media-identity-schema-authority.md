@@ -118,17 +118,20 @@ Answers:
 ## Content Hash / BLAKE3 Placement
 
 `SourceFacts` stores optional `content_hash_algorithm` and `content_hash_value` evidence. Current tests and fixtures
-use explicit `sha256` examples, but there is no live default product path that computes BLAKE3 or uses a content hash
-as attachment identity. BLAKE3 is absent.
+use explicit `sha256` examples, and the store now also owns a narrow BLAKE3 source-file hash evidence job.
 
-Future placement:
+Current placement:
 
 - Content hashing belongs to observed file facts / file evidence because hashing reads bytes.
+- The BLAKE3 job lives in `library-store-sqlite`, accepts a `source_file_id` and caller-resolved filesystem path,
+  streams bytes, and commits through the inspect-source artifact plus `SourceFacts` authority path.
+- BLAKE3 evidence is stored as `content_hash_algorithm = 'blake3'` with a lowercase hex digest value.
+- A basis change between the pre-hash source-file read and pre-commit source-file read rejects the commit.
 - Attachment identity consumes durable hash/evidence later.
 - Track identity must not rely on path identity.
 - Attachment identity should not re-read files merely to discover content identity if observed facts already owns
   hashing.
-- BLAKE3 selection, dependency addition, and coexistence with any SHA-256 evidence require a separate hash-job design.
+- Production scheduling and path resolution for the BLAKE3 job remain separate integration work.
 
 ## Boundary Between Identity Layers
 
