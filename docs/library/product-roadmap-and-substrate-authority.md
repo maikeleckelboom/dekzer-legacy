@@ -14,17 +14,16 @@ details. This document defines sequence, dependency, vetoes, and long-term owner
 
 The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
 
-1. `fix(library): harden attachment link invariants` ← **in progress**
-2. `feat(library): wire bounded attachment materialization into service maintenance`
-3. `feat(library): expose attachment identity read boundary`
-4. `feat(library): add media probe observations v0`
-5. `feat(library): add collection health and source integrity read model`
+1. `feat(library): wire bounded attachment materialization into service maintenance`
+2. `feat(library): expose attachment identity read boundary`
+3. `feat(library): add media probe observations v0`
+4. `feat(library): add collection health and source integrity read model`
 
 ---
 
 ## Ratified Substrate
 
-The following layers are canonical once `fix(library): harden attachment link invariants` lands.
+The following layers are canonical.
 
 1. **Source lifecycle** — The app knows whether a source is known, mounted, accessible, scanning, failed, or blocked.
 2. **Media-relevant file inventory** — The app knows which source files exist and which are media-relevant by current
@@ -32,10 +31,10 @@ The following layers are canonical once `fix(library): harden attachment link in
 3. **Observed file facts** — The app can store basis-bound evidence about a source file. Staleness is tracked.
 4. **BLAKE3 evidence** — The app can compute content evidence through backend-owned path resolution, bounded and
    scan-triggered in one maintenance unit; scheduler/drain behavior remains future work.
-5. **Attachment identity v0** *(pending corrective pass — canonical once link uniqueness/outcome split lands)* — The app
-   can say: these source-file rows have the same bytes and map to the same durable content attachment.
+5. **Attachment identity v0** — The app can say: these source-file rows have the same bytes and map to the same durable
+   content attachment.
 
-### Canonical schema (ratified once corrective pass lands)
+### Canonical schema
 
 `content_attachments` — exact-byte identity keyed by `(content_hash_algorithm, content_hash_value)`. No `file_kind`, no
 `equivalence_fingerprint`, no track columns. `first_observed_at` is frozen at first insert.
@@ -268,20 +267,6 @@ Each slice carries one of:
 - **Blocked** — depends on a named earlier slice or gate
 
 Later items must not begin before the items they depend on are ratified.
-
----
-
-### Current [In progress]
-
-**[CODE] Corrective pass — harden attachment link invariants**
-
-- Replace `UNIQUE(source_file_id, attachment_id)` with `UNIQUE(source_file_id)` — replace, do not supplement
-- Split `attachments_upserted` into `attachments_created` and `attachments_refreshed`
-- Add dormant table exit criteria to docs
-- Document orphaned attachment rows as explicitly deferred
-- Zero TypeScript/boundary changes
-
-`fix(library): harden attachment link invariants`
 
 ---
 

@@ -325,6 +325,11 @@ CREATE INDEX source_files_parent_source_directory
 CREATE INDEX source_files_source_relative_path_binary
     ON source_files (source_id, relative_path COLLATE BINARY);
 
+-- TOMBSTONE: LibraryAssets is dormant for new content identity work. It is
+-- replaced by content_attachments plus future track/media layers, and the
+-- media-candidate/track-identity slice must delete or rename it once asset-prep
+-- and browser paths no longer depend on it. Current code must not use it for
+-- new content identity.
 CREATE TABLE LibraryAssets
 (
     library_asset_id          INTEGER PRIMARY KEY,
@@ -695,7 +700,7 @@ CREATE TABLE source_file_attachment_links
     created_at                      INTEGER NOT NULL,
     updated_at                      INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
-    UNIQUE (source_file_id, attachment_id)
+    UNIQUE (source_file_id)
 ) STRICT;
 
 CREATE INDEX source_file_attachment_links_source_file
@@ -737,6 +742,10 @@ CREATE TABLE SourceSegments
 CREATE INDEX SourceSegments_segment_set_range
     ON SourceSegments (source_segment_set_id, start_offset_ms);
 
+-- TOMBSTONE: LibraryAssetAttachments is dormant for new attachment identity
+-- work. It is replaced by source_file_attachment_links, and the future CUE
+-- association plus media-candidate/subtrack slice must delete it when segment
+-- promotion is replaced. Current code must not use it for attachment identity.
 CREATE TABLE LibraryAssetAttachments
 (
     library_asset_attachment_id  INTEGER PRIMARY KEY,
@@ -815,6 +824,11 @@ CREATE TABLE LibraryAssetCapabilities
 CREATE INDEX LibraryAssetCapabilities_state
     ON LibraryAssetCapabilities (state, capability_kind);
 
+-- TOMBSTONE: primaryMedia is dormant as a row-profile/projection shape. It is
+-- replaced by the future media-candidate/track-identity projection, and that
+-- slice must explicitly activate it as a projection or delete the shape once
+-- replacement read surfaces exist. Current code must not treat it as default
+-- content, track identity, or a new read/write target.
 CREATE TABLE LibraryBrowserRows
 (
     library_asset_id           INTEGER PRIMARY KEY REFERENCES LibraryAssets (library_asset_id) ON DELETE CASCADE,

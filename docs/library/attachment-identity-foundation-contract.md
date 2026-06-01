@@ -90,10 +90,11 @@ Columns:
 - `file_kind`
 - `created_at`
 - `updated_at`
-- `UNIQUE (source_file_id, attachment_id)`
+- `UNIQUE (source_file_id)`
 
-Indexes exist for `source_file_id` and `attachment_id`. The table deliberately has no stored `is_current`, `is_stale`,
-CUE/audio association, track FK, playlist FK, or prep FK.
+Indexes exist for `source_file_id` and `attachment_id`. The table represents the one current materialized attachment
+occurrence for a `source_file_id` in this v0. It deliberately has no link history, stored `is_current`, stored
+`is_stale`, CUE/audio association, track FK, playlist FK, or prep FK.
 
 ## Staleness Model
 
@@ -108,12 +109,30 @@ Materialization is source-scoped through:
 
 Policy:
 
-- new BLAKE3 hash evidence inserts or refreshes one `content_attachments` row;
+- new BLAKE3 hash evidence inserts one `content_attachments` row;
+- already-known BLAKE3 hash evidence refreshes that `content_attachments.updated_at`;
 - same hash across source files reuses the existing attachment and inserts more source-file links;
 - same source file and same hash refreshes the link `updated_at` and attachment `updated_at`;
 - same source file with a different current BLAKE3 hash deletes the old source-file link and inserts a new one;
-- old attachment rows remain durable even when a source-file link moves to a new hash;
+- old attachment rows remain durable, and may become orphaned when no source-file links still point at them;
 - `first_observed_at` is preserved on attachment refresh.
+
+No link history exists in this v0. Hash-change history is represented only by preserved `content_attachments` rows and
+the current source-file link.
+
+## Materialization Outcome Fields
+
+`MaterializeAttachmentsForSourceResult` is Rust/store-only and reports:
+
+- `attachments_created` increments once per newly inserted `content_attachments` row;
+- `attachments_refreshed` increments once per already-known BLAKE3 hash touched by the run;
+- `links_created` increments when a source file receives its first current attachment link;
+- `links_replaced` increments when a source file's old link is deleted and a new hash link is inserted;
+- `links_refreshed` increments when an existing same-hash source-file link is touched;
+- skipped counters report stale facts, non-BLAKE3 facts, and missing facts.
+
+Two source files with the same new BLAKE3 value in one run create one attachment and two links. A later run against the
+same BLAKE3 value refreshes the existing attachment instead of creating another one.
 
 ## Duplicate File Behavior
 
@@ -151,6 +170,7 @@ satisfy BLAKE3 evidence.
 ## Explicitly Deferred
 
 - cascade behavior when a `source_file` is removed from inventory beyond the current FK behavior;
+- orphaned `content_attachments` cleanup / garbage collection after link replacement;
 - auto-triggering materialization from scan completion or hash maintenance hooks;
 - boundary, service, desktop, preload, renderer, command, event, or TypeScript exposure;
 - track identity;

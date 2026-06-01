@@ -11,7 +11,8 @@ use super::SqliteDurableStore;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct MaterializeAttachmentsForSourceResult {
-    pub attachments_upserted: usize,
+    pub attachments_created: usize,
+    pub attachments_refreshed: usize,
     pub links_created: usize,
     pub links_replaced: usize,
     pub links_refreshed: usize,
@@ -57,6 +58,21 @@ enum SourceFileAttachmentLinkChange {
     Created,
     Replaced,
     Refreshed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContentAttachmentChange {
+    Created { attachment_id: i64 },
+    Refreshed { attachment_id: i64 },
+}
+
+impl ContentAttachmentChange {
+    fn attachment_id(self) -> i64 {
+        match self {
+            ContentAttachmentChange::Created { attachment_id }
+            | ContentAttachmentChange::Refreshed { attachment_id } => attachment_id,
+        }
+    }
 }
 
 impl SqliteDurableStore {
@@ -117,13 +133,19 @@ fn materialize_attachments_for_source(
         let attachment_id = match attachment_ids_by_hash.get(&candidate.content_hash_value) {
             Some(attachment_id) => *attachment_id,
             None => {
-                let attachment_id = upsert_content_attachment(
+                let attachment_change = upsert_content_attachment(
                     write,
                     &candidate.content_hash_value,
                     materialized_at,
                 )?;
+                let attachment_id = attachment_change.attachment_id();
                 attachment_ids_by_hash.insert(candidate.content_hash_value.clone(), attachment_id);
-                result.attachments_upserted += 1;
+                match attachment_change {
+                    ContentAttachmentChange::Created { .. } => result.attachments_created += 1,
+                    ContentAttachmentChange::Refreshed { .. } => {
+                        result.attachments_refreshed += 1;
+                    }
+                }
                 attachment_id
             }
         };
@@ -198,7 +220,32 @@ fn upsert_content_attachment(
     write: &AdmittedWrite<'_>,
     content_hash_value: &str,
     materialized_at: i64,
-) -> LibrarySqliteResult<i64> {
+) -> LibrarySqliteResult<ContentAttachmentChange> {
+    if let Some(attachment_id) = write
+        .query_row(
+            "SELECT attachment_id
+             FROM content_attachments
+             WHERE content_hash_algorithm = ?1
+               AND content_hash_value = ?2",
+            params![SOURCE_FILE_BLAKE3_ALGORITHM, content_hash_value],
+            |row| row.get(0),
+        )
+        .optional()?
+    {
+        write.execute(
+            "UPDATE content_attachments
+             SET updated_at = ?3
+             WHERE content_hash_algorithm = ?1
+               AND content_hash_value = ?2",
+            params![
+                SOURCE_FILE_BLAKE3_ALGORITHM,
+                content_hash_value,
+                materialized_at,
+            ],
+        )?;
+        return Ok(ContentAttachmentChange::Refreshed { attachment_id });
+    }
+
     write.execute(
         "INSERT INTO content_attachments (
              content_hash_algorithm,
@@ -207,15 +254,14 @@ fn upsert_content_attachment(
              updated_at
          )
          VALUES (?1, ?2, ?3, ?3)
-         ON CONFLICT(content_hash_algorithm, content_hash_value) DO UPDATE
-         SET updated_at = excluded.updated_at",
+        ",
         params![
             SOURCE_FILE_BLAKE3_ALGORITHM,
             content_hash_value,
             materialized_at,
         ],
     )?;
-    write
+    let attachment_id = write
         .query_row(
             "SELECT attachment_id
              FROM content_attachments
@@ -227,9 +273,10 @@ fn upsert_content_attachment(
         .optional()?
         .ok_or_else(|| {
             LibrarySqliteError::MalformedSchemaState(
-                "content attachment upsert did not leave an addressable row".to_string(),
+                "content attachment insert did not leave an addressable row".to_string(),
             )
-        })
+        })?;
+    Ok(ContentAttachmentChange::Created { attachment_id })
 }
 
 fn materialize_source_file_attachment_link(
@@ -556,6 +603,32 @@ mod tests {
                 .expect("attachment id for hash")
         }
 
+        fn link_count_for_source_file(&self, source_file_id: i64) -> i64 {
+            let connection = self.read_connection();
+            connection
+                .query_row(
+                    "SELECT COUNT(*)
+                     FROM source_file_attachment_links
+                     WHERE source_file_id = ?1",
+                    [source_file_id],
+                    |row| row.get(0),
+                )
+                .expect("count links for source file")
+        }
+
+        fn link_count_for_attachment(&self, attachment_id: i64) -> i64 {
+            let connection = self.read_connection();
+            connection
+                .query_row(
+                    "SELECT COUNT(*)
+                     FROM source_file_attachment_links
+                     WHERE attachment_id = ?1",
+                    [attachment_id],
+                    |row| row.get(0),
+                )
+                .expect("count links for attachment")
+        }
+
         fn tick(&mut self) -> i64 {
             let at = self.next_at;
             self.next_at += 10;
@@ -574,7 +647,7 @@ mod tests {
         assert_eq!(
             result,
             MaterializeAttachmentsForSourceResult {
-                attachments_upserted: 1,
+                attachments_created: 1,
                 links_created: 1,
                 ..Default::default()
             }
@@ -607,7 +680,8 @@ mod tests {
 
         let result = fixture.materialize(10);
 
-        assert_eq!(result.attachments_upserted, 1);
+        assert_eq!(result.attachments_created, 1);
+        assert_eq!(result.attachments_refreshed, 0);
         assert_eq!(result.links_created, 2);
         assert_eq!(fixture.count_rows("content_attachments"), 1);
         assert_eq!(fixture.count_rows("source_file_attachment_links"), 2);
@@ -641,7 +715,7 @@ mod tests {
 
         let result = fixture.materialize(10);
 
-        assert_eq!(result.attachments_upserted, 2);
+        assert_eq!(result.attachments_created, 2);
         assert_eq!(result.links_created, 2);
         assert_eq!(fixture.count_rows("content_attachments"), 2);
         assert_eq!(fixture.count_rows("source_file_attachment_links"), 2);
@@ -694,6 +768,86 @@ mod tests {
     }
 
     #[test]
+    fn same_hash_materialization_refreshes_existing_attachment_and_link() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/track.flac", 10, 100);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.materialize(10);
+
+        let result = fixture.materialize(10);
+
+        assert_eq!(
+            result,
+            MaterializeAttachmentsForSourceResult {
+                attachments_refreshed: 1,
+                links_refreshed: 1,
+                ..Default::default()
+            }
+        );
+        assert_eq!(fixture.count_rows("content_attachments"), 1);
+        assert_eq!(fixture.link_count_for_source_file(100), 1);
+    }
+
+    #[test]
+    fn existing_attachment_for_new_source_file_counts_as_refresh_not_creation() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/a.flac", 10, 100);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.materialize(10);
+
+        fixture.record_source_file(101, "Album/b.flac", 11, 101);
+        fixture.commit_blake3_fact(101, HASH_A, "audio");
+        let result = fixture.materialize(10);
+
+        assert_eq!(result.attachments_created, 0);
+        assert_eq!(result.attachments_refreshed, 1);
+        assert_eq!(result.links_created, 1);
+        assert_eq!(result.links_refreshed, 1);
+        assert_eq!(fixture.count_rows("content_attachments"), 1);
+        assert_eq!(fixture.count_rows("source_file_attachment_links"), 2);
+    }
+
+    #[test]
+    fn schema_rejects_multiple_current_attachment_links_for_one_source_file() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/track.flac", 10, 100);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.materialize(10);
+
+        let connection = fixture.read_connection();
+        connection
+            .execute(
+                "INSERT INTO content_attachments (
+                     attachment_id,
+                     content_hash_algorithm,
+                     content_hash_value,
+                     first_observed_at,
+                     updated_at
+                 )
+                 VALUES (999, 'blake3', ?1, 1, 1)",
+                [HASH_B],
+            )
+            .expect("insert second attachment");
+
+        connection
+            .execute(
+                "INSERT INTO source_file_attachment_links (
+                     attachment_id,
+                     source_file_id,
+                     source_id,
+                     content_hash_value,
+                     file_kind,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (999, 100, ?1, ?2, 'audio', 1, 1)",
+                rusqlite::params![fixture.source_id, HASH_B],
+            )
+            .expect_err("source_file_id must have only one attachment link");
+        assert_eq!(fixture.link_count_for_source_file(100), 1);
+    }
+
+    #[test]
     fn hash_change_replaces_source_file_link_and_preserves_old_attachment() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 10, 100);
@@ -713,7 +867,7 @@ mod tests {
 
         let result = fixture.materialize(10);
 
-        assert_eq!(result.attachments_upserted, 1);
+        assert_eq!(result.attachments_created, 1);
         assert_eq!(result.links_replaced, 1);
         assert_eq!(fixture.count_rows("content_attachments"), 2);
         assert_eq!(
@@ -733,6 +887,11 @@ mod tests {
                 )
                 .expect("old attachment still exists"),
             1
+        );
+        assert_eq!(
+            fixture.link_count_for_attachment(old_attachment_id),
+            0,
+            "old attachment row is preserved but orphaned after replacement"
         );
         let connection = fixture.read_connection();
         let link = get_attachment_for_source_file(&connection, 100)
@@ -755,7 +914,7 @@ mod tests {
 
         let result = fixture.materialize(10);
 
-        assert_eq!(result.attachments_upserted, 2);
+        assert_eq!(result.attachments_created, 2);
         assert_eq!(result.links_created, 2);
         let audio_attachment_id = fixture.attachment_id_for_hash(HASH_A);
         let cue_attachment_id = fixture.attachment_id_for_hash(HASH_B);
@@ -836,7 +995,7 @@ mod tests {
 
         let result = fixture.materialize(10);
 
-        assert_eq!(result.attachments_upserted, 1);
+        assert_eq!(result.attachments_created, 1);
         assert_eq!(fixture.count_rows("LibraryAssets"), 1);
         assert_eq!(fixture.count_rows("LibraryAssetAttachments"), 0);
         let connection = fixture.read_connection();
