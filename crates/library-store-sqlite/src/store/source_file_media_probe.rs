@@ -526,9 +526,9 @@ fn read_source_file_media_probe_candidates_for_scope(
            ON facts.source_file_id = sf.source_file_id
          WHERE {scope_predicate}
            AND sf.presence_state = 'present'
-           AND sf.media_class IN ('audio', 'video')
+           AND sf.media_class = 'audio'
            AND {}
-         ORDER BY lower(sf.relative_path) ASC,
+          ORDER BY lower(sf.relative_path) ASC,
                   sf.source_file_id ASC
          LIMIT ?{}",
         needs_media_probe_predicate_sql("sf", "facts"),
@@ -570,9 +570,9 @@ fn count_source_file_media_probe_candidates_for_scope(
          FROM source_files sf
          LEFT JOIN SourceFacts facts
            ON facts.source_file_id = sf.source_file_id
-         WHERE {scope_predicate}
+                   WHERE {scope_predicate}
            AND sf.presence_state = 'present'
-           AND sf.media_class IN ('audio', 'video')
+           AND sf.media_class = 'audio'
            AND {}",
         needs_media_probe_predicate_sql("sf", "facts")
     );
@@ -1541,7 +1541,7 @@ mod tests {
     }
 
     #[test]
-    fn source_scope_candidate_admission_is_bounded_and_media_relevant() {
+    fn source_scope_candidate_admission_is_bounded_and_audio_only() {
         let fixture = MediaProbeFixture::new();
         fixture.write_source_file(100, "Album/audio.wav", &tiny_wav_bytes(44_100, 1, 16, 441));
         fixture.write_source_file(101, "Album/video.mp4", b"video");
@@ -1551,19 +1551,108 @@ mod tests {
 
         let candidates = fixture.read_candidates_for_source(2);
 
-        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates.len(), 1);
         assert_eq!(
             candidates
                 .iter()
                 .map(|candidate| candidate.source_file_id.get())
                 .collect::<Vec<_>>(),
-            vec![100, 101]
+            vec![100]
         );
+        assert_eq!(
+            candidates[0].reason,
+            SourceFileMediaProbeCandidateReason::MissingFacts
+        );
+    }
+
+    #[test]
+    fn source_file_id_list_admission_excludes_video() {
+        let fixture = MediaProbeFixture::new();
+        fixture.write_source_file(100, "Album/track.wav", &tiny_wav_bytes(44_100, 1, 16, 441));
+        fixture.write_source_file(101, "Album/video.mp4", b"video");
+
+        let result = fixture.run_probe_batch_for_source_files(&[100, 101], 10);
+
+        assert_eq!(result.probed_count, 1);
+        assert_eq!(result.failed_count, 0);
+        assert_eq!(result.outcomes.len(), 1);
+        let ProbeSourceFileMediaBatchOutcomeStatus::Probed { facts, .. } =
+            &result.outcomes[0].status
+        else {
+            panic!("expected probed outcome for audio");
+        };
+        assert_eq!(facts.media_kind, "audio");
+    }
+
+    #[test]
+    fn direct_video_probe_returns_unsupported_and_writes_no_facts() {
+        let fixture = MediaProbeFixture::new();
+        let video_path = fixture.write_source_file(101, "Album/video.mp4", b"video");
+
+        let error = fixture
+            .store
+            .probe_source_file_media(ProbeSourceFileMediaInput {
+                source_file_id: SourceFileId::new(101).expect("positive source file"),
+                source_file_path: video_path,
+                observed_at_ms: 40,
+            })
+            .expect_err("direct video probe is unsupported");
+
+        assert!(matches!(
+            error,
+            ProbeSourceFileMediaError::UnsupportedMediaKind { file_kind, .. }
+            if file_kind == "video"
+        ));
+        assert_eq!(fixture.count_rows("SourceFacts"), 0);
+        assert_eq!(fixture.count_rows("Artifacts"), 0);
+    }
+
+    #[test]
+    fn bounded_admission_capacity_not_consumed_by_video_rows() {
+        let fixture = MediaProbeFixture::new();
+        fixture.write_source_file(100, "Album/video.mp4", b"video");
+        fixture.write_source_file(101, "Album/video2.mkv", b"video");
+        fixture.write_source_file(102, "Album/video3.avi", b"video");
+
+        let candidates = fixture.read_candidates_for_source(10);
+
         assert!(
-            candidates
-                .iter()
-                .all(|candidate| candidate.reason
-                    == SourceFileMediaProbeCandidateReason::MissingFacts)
+            candidates.is_empty(),
+            "video rows must not consume bounded probe admission capacity"
+        );
+        let remaining = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .query_row(
+                "SELECT COUNT(*) FROM source_files sf
+                 LEFT JOIN SourceFacts facts ON facts.source_file_id = sf.source_file_id
+                 WHERE sf.source_id = 1
+                   AND sf.presence_state = 'present'
+                   AND sf.media_class = 'audio'
+                   AND (facts.source_file_id IS NULL
+                        OR NOT (
+                            sf.source_id = facts.basis_source_id
+                            AND sf.relative_path = facts.basis_relative_path
+                            AND sf.size_bytes IS facts.basis_size_bytes
+                            AND sf.mtime_ns IS facts.basis_mtime_ns
+                            AND sf.presence_state = facts.basis_presence_state
+                        )
+                        OR (
+                            facts.mime_type IS NULL
+                            AND facts.duration_ms IS NULL
+                            AND facts.sample_rate_hz IS NULL
+                            AND facts.channels IS NULL
+                            AND facts.bit_depth IS NULL
+                            AND facts.codec IS NULL
+                        ))",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("count remaining candidates");
+        assert_eq!(
+            remaining, 0,
+            "video-less source must report zero candidates"
         );
     }
 

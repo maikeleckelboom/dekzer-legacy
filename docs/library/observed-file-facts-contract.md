@@ -169,10 +169,11 @@ fingerprint, and the observed probe fields.
 The probe captures source-file basis before reading metadata and re-reads basis before committing. If the basis changes
 while probing is in flight, the job rejects the commit with a typed basis-change result.
 
-Bounded probe admission is deterministic and source-owned. It currently admits present `audio` and `video` rows ordered
-by lowercased relative path then `source_file_id`. Audio files are probed by Symphonia. Video files return a typed
-unsupported outcome until a video-capable adapter is selected. Images are not admitted for v0 media probing. CUE sheets
-are excluded from probe admission and are not parsed or paired.
+Bounded probe admission is deterministic and source-owned. v0 source-scope media probe admission is audio-only: it
+admits present `audio` rows ordered by lowercased relative path then `source_file_id`. Video files remain media-relevant
+inventory rows but are not admitted to media probe v0 until a video-capable adapter is selected. Direct probing of a
+video file returns a typed `UnsupportedMediaKind` failure and does not write `SourceFacts`. Images are not admitted for
+v0 media probing. CUE sheets are excluded from probe admission and are not parsed or paired.
 
 Missing physical files, source lifecycle failures, invalid relative paths, root escapes, unreadable files, unsupported
 formats, and basis changes are typed outcomes. They do not write fake facts.

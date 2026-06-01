@@ -67,9 +67,10 @@ V0 writes the fields Symphonia can honestly expose for supported audio files:
 - `bit_depth`
 - `codec`
 
-The current v0 implementation supports audio probing. Video source files are admitted as media-probe candidates but
-return a typed unsupported outcome until a video-capable no-native-runtime adapter is selected. Images are not admitted
-for media probe v0. CUE sheets are not admitted and are not parsed.
+The current v0 implementation supports audio probing. v0 source-scope media probe admission is audio-only: video source
+files are not admitted as media-probe candidates until a video-capable no-native-runtime adapter is selected. Direct
+probing of a video file returns a typed `UnsupportedMediaKind` failure and does not write `SourceFacts`. Images are not
+admitted for media probe v0. CUE sheets are not admitted and are not parsed.
 
 MIME/container values are best-effort v0 labels derived from the source-relative extension after Symphonia has accepted
 the file as a supported audio stream. They are evidence summary fields, not identity.
@@ -92,6 +93,14 @@ Media probe v0 does not:
 - parse CUE sheets or associate CUE files with audio;
 - generate waveform data;
 - create stems, prep readiness, playlists UI, crates, sleeves, chips, badges, or renderer UI.
+
+## v0 Completion Heuristic
+
+v0 candidate admission treats any current non-null probe summary field (`mime_type`, `duration_ms`, `sample_rate_hz`,
+`channels`, `bit_depth`, or `codec`) in a current-basis `SourceFacts` row as sufficient evidence that a probe has
+produced accepted summary facts. When all probe summary fields are non-null and the basis is current, the row is excluded
+from candidate selection. This predicate is expressed in `needs_media_probe_predicate_sql` in
+`crates/library-store-sqlite/src/store/source_file_media_probe.rs`.
 
 ## Next Gate
 
