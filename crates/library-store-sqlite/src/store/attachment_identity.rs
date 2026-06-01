@@ -188,7 +188,7 @@ fn read_attachment_materialization_rows(
                         AND facts.content_hash_value IS NOT NULL
                     ) THEN 3
                     WHEN link.source_file_id IS NULL THEN 0
-                    WHEN link.content_hash_value != facts.content_hash_value THEN 1
+                    WHEN attachment.content_hash_value != facts.content_hash_value THEN 1
                     ELSE 2
                 END AS materialization_priority,
                 CASE
@@ -209,6 +209,8 @@ fn read_attachment_materialization_rows(
            ON facts.source_file_id = file.source_file_id
          LEFT JOIN source_file_attachment_links link
            ON link.source_file_id = file.source_file_id
+         LEFT JOIN content_attachments attachment
+           ON attachment.attachment_id = link.attachment_id
          WHERE file.source_id = ?1
          ORDER BY materialization_priority ASC,
                   lower(file.relative_path) ASC,
@@ -334,17 +336,15 @@ fn materialize_source_file_attachment_link(
              attachment_id,
              source_file_id,
              source_id,
-             content_hash_value,
              file_kind,
              created_at,
              updated_at
          )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?5)",
         params![
             attachment_id,
             candidate.source_file_id,
             candidate.source_id,
-            candidate.content_hash_value,
             candidate.file_kind,
             materialized_at,
         ],
@@ -363,11 +363,13 @@ fn read_existing_attachment_links(
 ) -> LibrarySqliteResult<Vec<ExistingAttachmentLink>> {
     write
         .prepare(
-            "SELECT attachment_id,
-                    content_hash_value
-             FROM source_file_attachment_links
-             WHERE source_file_id = ?1
-             ORDER BY source_file_attachment_link_id ASC",
+            "SELECT link.attachment_id,
+                    attachment.content_hash_value
+             FROM source_file_attachment_links link
+             JOIN content_attachments attachment
+               ON attachment.attachment_id = link.attachment_id
+             WHERE link.source_file_id = ?1
+             ORDER BY link.source_file_attachment_link_id ASC",
         )?
         .query_map([source_file_id], |row| {
             Ok(ExistingAttachmentLink {
@@ -693,6 +695,62 @@ mod tests {
     }
 
     #[test]
+    fn link_pointing_at_different_attachment_hash_reads_as_stale() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/track.flac", 123, 456);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+
+        let connection = fixture.read_connection();
+        connection
+            .execute(
+                "INSERT INTO content_attachments (
+                     attachment_id,
+                     content_hash_algorithm,
+                     content_hash_value,
+                     first_observed_at,
+                     updated_at
+                 )
+                 VALUES (999, 'blake3', ?1, 1, 1)",
+                [HASH_B],
+            )
+            .expect("insert mismatched attachment");
+        connection
+            .execute(
+                "INSERT INTO source_file_attachment_links (
+                     attachment_id,
+                     source_file_id,
+                     source_id,
+                     file_kind,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (999, 100, ?1, 'audio', 1, 1)",
+                [fixture.source_id],
+            )
+            .expect("insert mismatched link");
+
+        let link = get_attachment_for_source_file(&connection, 100)
+            .expect("read source-file attachment")
+            .expect("mismatched link exists");
+
+        assert_eq!(link.content_hash_value, HASH_B);
+        assert_eq!(link.link_status, StoreSourceFileAttachmentLinkStatus::Stale);
+
+        let result = fixture.materialize(10);
+        assert_eq!(result.attachments_created, 1);
+        assert_eq!(result.links_replaced, 1);
+
+        let replacement = get_attachment_for_source_file(&connection, 100)
+            .expect("read replacement source-file attachment")
+            .expect("replacement link exists");
+        assert_eq!(replacement.content_hash_value, HASH_A);
+        assert_eq!(
+            replacement.link_status,
+            StoreSourceFileAttachmentLinkStatus::Current
+        );
+    }
+
+    #[test]
     fn same_blake3_value_across_two_source_files_shares_one_attachment() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/a.flac", 10, 100);
@@ -922,13 +980,12 @@ mod tests {
                      attachment_id,
                      source_file_id,
                      source_id,
-                     content_hash_value,
                      file_kind,
                      created_at,
                      updated_at
                  )
-                 VALUES (999, 100, ?1, ?2, 'audio', 1, 1)",
-                rusqlite::params![fixture.source_id, HASH_B],
+                 VALUES (999, 100, ?1, 'audio', 1, 1)",
+                [fixture.source_id],
             )
             .expect_err("source_file_id must have only one attachment link");
         assert_eq!(fixture.link_count_for_source_file(100), 1);

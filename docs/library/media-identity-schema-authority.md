@@ -37,7 +37,7 @@ Reading order:
 | `source_files` | SQLite + `SourceFilesAuthorityTx` | Canonical attachment inventory row for observed source files. Classification is path-derived and provisional. |
 | `readContents` default policy | Renderer boundary + service/store read model | Current product contents path: recursive `sourceFile` rows for audio, video, image, and admitted unsupported CUE sheets. |
 | `SourceFacts` content hash evidence | Observed source facts substrate | Optional accepted, algorithm-tagged source-fact evidence attached to a `source_file_id` and copied file basis. It is not attachment identity and is not required by default contents reads. |
-| `content_attachments` / `source_file_attachment_links` | SQLite + `SqliteDurableStore::materialize_attachments_for_source` called by bounded service maintenance | Current Rust/store/service attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing, and not boundary-exposed. |
+| `content_attachments` / `source_file_attachment_links` | SQLite + `SqliteDurableStore::materialize_attachments_for_source` called by bounded service maintenance | Current Rust/store/service attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing. Exposed only through the narrow attachment identity read boundary. |
 | `source_media` write/read guards | Store filesystem guard | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing. |
 | `Playlists` / `PlaylistEntries` | Boundary service + store | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`. |
 
@@ -140,6 +140,8 @@ Current placement:
 - Attachment identity now consumes current BLAKE3 durable hash evidence through the store-owned
   `materialize_attachments_for_source(source_id, limit)` path, called by one bounded service-owned maintenance unit
   after scan-triggered or manual source hash maintenance.
+- `content_attachments` owns attachment hash authority. `source_file_attachment_links` stores the source-file occurrence
+  relation and derives exposed link hash values from the joined attachment row; it does not store a duplicate hash copy.
 - Track identity must not rely on path identity.
 - Attachment identity should not re-read files merely to discover content identity if observed facts already owns
   hashing.

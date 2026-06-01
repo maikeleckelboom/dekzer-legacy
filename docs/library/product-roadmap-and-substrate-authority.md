@@ -162,8 +162,9 @@ attachments. It produces its own evidence table consumed by track identity.
 ### Staleness is computed, not stored — for observed-fact and attachment-link validity
 
 No `is_current` or `is_stale` boolean column on observed-fact or attachment-link tables. Link status is computed by
-joining to the current `SourceFacts` row and comparing `content_hash_value`. If current `SourceFacts` for a source file
-has a different hash or no current BLAKE3 fact, the link is stale.
+joining to the current `SourceFacts` row and comparing `SourceFacts.content_hash_value` to the linked
+`content_attachments.content_hash_value`. `source_file_attachment_links` does not store a duplicate hash copy. If
+current `SourceFacts` for a source file has a different hash or no current BLAKE3 fact, the link is stale.
 
 This law applies to evidence and link validity. It does not prohibit stored lifecycle state fields for entities where
 state is an authority, not a cache — for example, user decision state, job status, or scan lifecycle.

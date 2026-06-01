@@ -172,7 +172,7 @@ pub fn get_source_attachment_summary(
                         CASE
                             WHEN facts.source_file_id IS NOT NULL
                              AND facts.content_hash_algorithm = attachment.content_hash_algorithm
-                             AND facts.content_hash_value = link.content_hash_value
+                             AND facts.content_hash_value = attachment.content_hash_value
                              AND file.source_id = facts.basis_source_id
                              AND file.relative_path = facts.basis_relative_path
                              AND file.size_bytes IS facts.basis_size_bytes
@@ -227,12 +227,12 @@ const ATTACHMENT_LINK_SELECT_SQL: &str = "SELECT link.attachment_id,
        link.source_file_id,
        link.source_id,
        attachment.content_hash_algorithm,
-       link.content_hash_value,
+       attachment.content_hash_value,
        link.file_kind,
        CASE
            WHEN facts.source_file_id IS NOT NULL
             AND facts.content_hash_algorithm = attachment.content_hash_algorithm
-            AND facts.content_hash_value = link.content_hash_value
+            AND facts.content_hash_value = attachment.content_hash_value
             AND file.source_id = facts.basis_source_id
             AND file.relative_path = facts.basis_relative_path
             AND file.size_bytes IS facts.basis_size_bytes

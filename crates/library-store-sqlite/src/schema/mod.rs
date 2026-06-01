@@ -418,6 +418,28 @@ mod tests {
                 .contains(&"SourceFacts_source_basis".to_string())
         );
         assert_eq!(
+            table_column_names(&connection, "content_attachments"),
+            vec![
+                "attachment_id",
+                "content_hash_algorithm",
+                "content_hash_value",
+                "first_observed_at",
+                "updated_at",
+            ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "source_file_attachment_links"),
+            vec![
+                "source_file_attachment_link_id",
+                "attachment_id",
+                "source_file_id",
+                "source_id",
+                "file_kind",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert_eq!(
             table_column_names(&connection, "navigation_rows"),
             vec![
                 "navigation_row_id",

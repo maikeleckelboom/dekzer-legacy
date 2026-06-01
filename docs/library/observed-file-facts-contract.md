@@ -150,8 +150,10 @@ non-source-failure manual hash batch. The public hash reply remains hash-only an
 
 The boundary service owns the first source hash maintenance loop. After a root scan publishes its terminal
 `SourceScanCompleted` event and the maintained read-model invalidations for that scan, the service requests BLAKE3 hash
-maintenance for that same `source_id`. The renderer does not schedule this work, does not retry hash batches to keep
-the source current, and does not resolve filesystem paths.
+maintenance for that same durable source. The scan command field is still named `rootId` because the public roots API
+uses root language, but registered local roots are source rows and the `rootId` value is the durable `source_id` used by
+hash maintenance and attachment materialization. The renderer does not schedule this work, does not retry hash batches
+to keep the source current, and does not resolve filesystem paths.
 
 The current trigger model is intentionally narrow:
 

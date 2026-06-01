@@ -38,12 +38,12 @@ layer:
 
 - `source_file_id`
 - `source_id`
-- `content_hash_value`
 - `file_kind`
 - `created_at`
 - `updated_at`
 
-`file_kind` belongs on the link, not on the attachment/content row, because it is source-file interpretation context.
+The link does not store a hash copy. Hash authority stays on the referenced `content_attachments` row. `file_kind`
+belongs on the link, not on the attachment/content row, because it is source-file interpretation context.
 
 ## Relation To Observed File Facts / SourceFacts
 
@@ -51,7 +51,7 @@ layer:
 current only when the current observed-facts read for that `source_file_id` has:
 
 - `content_hash_algorithm = 'blake3'`;
-- `content_hash_value` equal to the link's copied hash value;
+- `content_hash_value` equal to the linked `content_attachments.content_hash_value`;
 - current observed-fact status according to the observed-file-facts basis comparison.
 
 Facts with stale basis, missing facts, or non-BLAKE3 facts do not materialize current links.
@@ -151,7 +151,6 @@ Columns:
 - `attachment_id`
 - `source_file_id`
 - `source_id`
-- `content_hash_value`
 - `file_kind`
 - `created_at`
 - `updated_at`
@@ -159,12 +158,14 @@ Columns:
 
 Indexes exist for `source_file_id` and `attachment_id`. The table represents the one current materialized attachment
 occurrence for a `source_file_id` in this v0. It deliberately has no link history, stored `is_current`, stored
-`is_stale`, CUE/audio association, track FK, playlist FK, or prep FK.
+`is_stale`, stored hash copy, CUE/audio association, track FK, playlist FK, or prep FK.
 
 ## Staleness Model
 
-Staleness is computed by read-model join against current `SourceFacts` and `source_files` basis. It is not stored as a
-boolean or cached status column. The read model exposes `link_status = Current | Stale`.
+Staleness is computed by read-model join against current `SourceFacts`, `source_files` basis, and the linked
+`content_attachments` hash. It is not stored as a boolean or cached status column. The read model exposes
+`link_status = Current | Stale`, and any protocol-level link `content_hash_value` is derived from
+`content_attachments`.
 
 ## Merge Policy
 

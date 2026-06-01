@@ -694,7 +694,6 @@ CREATE TABLE source_file_attachment_links
     attachment_id                   INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
     source_file_id                  INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
     source_id                       INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
-    content_hash_value              TEXT    NOT NULL CHECK (length(trim(content_hash_value)) > 0),
     file_kind                       TEXT    NOT NULL
         CHECK (file_kind IN ('audio', 'video', 'image', 'cue_sheet', 'log_doc', 'text_doc', 'archive', 'other', 'unknown')),
     created_at                      INTEGER NOT NULL,

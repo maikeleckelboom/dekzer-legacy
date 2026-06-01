@@ -898,6 +898,8 @@ fn execute_scan_job(
                     detail: None,
                 },
             );
+            // Registered local root ids are durable source ids; hash maintenance
+            // and attachment materialization are source-scoped.
             hash_maintenance.request_source(root_id);
             let _ = hash_maintenance.run_queued(&store, &events);
         }
