@@ -14,10 +14,9 @@ details. This document defines sequence, dependency, vetoes, and long-term owner
 
 The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
 
-1. `feat(library): wire bounded attachment materialization into service maintenance`
-2. `feat(library): expose attachment identity read boundary`
-3. `feat(library): add media probe observations v0`
-4. `feat(library): add collection health and source integrity read model`
+1. `feat(library): expose attachment identity read boundary`
+2. `feat(library): add media probe observations v0`
+3. `feat(library): add collection health and source integrity read model`
 
 ---
 
@@ -42,7 +41,8 @@ The following layers are canonical.
 `source_file_attachment_links` — links source files to attachments. `UNIQUE(source_file_id)` enforces one current
 materialized attachment per source file. Staleness computed by join against current `SourceFacts`, not stored as a flag.
 
-Materialization: `materialize_attachments_for_source(source_id, limit)` — store/service only, not auto-triggered yet.
+Materialization: `materialize_attachments_for_source(source_id, limit)` — store authority, called by bounded
+service-owned scan/manual hash maintenance.
 
 Outcome fields: `attachments_created`, `attachments_refreshed`, `links_created`, `links_replaced`, `links_refreshed`,
 `skipped_stale_facts`, `skipped_no_blake3`, `skipped_no_facts`.
@@ -64,7 +64,7 @@ as a mandatory task.
 
 - Orphaned `content_attachments` rows after link replacement — attachment garbage collection is future work
 - Cascade behavior when a source file is removed from inventory
-- Auto-triggering attachment materialization from scan/hash maintenance hooks
+- durable scheduler/drain behavior for attachment materialization beyond one bounded service-owned maintenance unit
 
 ---
 
@@ -276,7 +276,7 @@ Goal: Dekzer can know what exists locally and preserve file/content continuity.
 
 ---
 
-**A-1 [CODE] Service-owned attachment materialization maintenance** [Planned]
+**A-1 [CODE] Service-owned attachment materialization maintenance** [Ratified]
 
 Wire bounded attachment materialization into service-owned maintenance after BLAKE3 hash evidence is produced.
 
@@ -285,6 +285,9 @@ Wire bounded attachment materialization into service-owned maintenance after BLA
 - Not a draining synchronous unit on scan completion
 - Manual `hashSourceFilesBlake3` can trigger materialization for the same source
 - No UI, no track identity, no CUE pairing, no primaryMedia activation
+- Scan-triggered maintenance performs at most one hash pass and one attachment materialization pass, then clears the
+  pending source request.
+- Remaining hash and attachment materialization candidates are explicit-command or future-scheduler work.
 
 Completes: `scan → source files → BLAKE3 facts → attachment links`
 

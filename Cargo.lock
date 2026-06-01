@@ -300,6 +300,7 @@ dependencies = [
  "library-boundary-protocol",
  "library-domain",
  "library-store-sqlite",
+ "rusqlite",
  "serde_json",
  "tempfile",
 ]

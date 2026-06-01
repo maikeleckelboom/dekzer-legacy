@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex};
 
 use library_boundary_protocol as protocol;
 use library_store_sqlite::{
-    HashSourceFileBlake3BatchInput, SourceFileBlake3HashAdmissionScope, SqliteDurableStore,
+    HashSourceFileBlake3BatchInput, MaterializeAttachmentsForSourceResult,
+    SourceFileBlake3HashAdmissionScope, SqliteDurableStore,
 };
 
 use crate::session_events::LibraryBoundaryEventStream;
@@ -13,11 +14,15 @@ use crate::source_file_hash_protocol::map_hash_lifecycle_source_failure;
 
 pub(crate) const SOURCE_HASH_MAINTENANCE_BATCH_LIMIT: usize = 8;
 pub(crate) const SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN: usize = 1;
+pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT: usize = 4;
+pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN: usize = 1;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SourceHashMaintenanceController {
     state: Arc<Mutex<SourceHashMaintenanceState>>,
     stop_requested: Arc<AtomicBool>,
+    #[cfg(test)]
+    stop_before_attachment_materialization_for_test: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Default)]
@@ -39,6 +44,23 @@ pub(crate) struct SourceHashMaintenanceRun {
     pub(crate) source_failure: Option<protocol::HashSourceFilesBlake3SourceFailure>,
     pub(crate) stopped: bool,
     pub(crate) run_limit_reached: bool,
+    pub(crate) attachment_materialization: Option<SourceAttachmentMaterializationMaintenanceRun>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct SourceAttachmentMaterializationMaintenanceRun {
+    pub(crate) source_id: i64,
+    pub(crate) passes: usize,
+    pub(crate) attachments_created: usize,
+    pub(crate) attachments_refreshed: usize,
+    pub(crate) links_created: usize,
+    pub(crate) links_replaced: usize,
+    pub(crate) links_refreshed: usize,
+    pub(crate) skipped_stale_facts: usize,
+    pub(crate) skipped_no_blake3: usize,
+    pub(crate) skipped_no_facts: usize,
+    pub(crate) remaining_candidates: usize,
+    pub(crate) run_limit_reached: bool,
 }
 
 impl SourceHashMaintenanceController {
@@ -46,6 +68,8 @@ impl SourceHashMaintenanceController {
         Self {
             state: Arc::new(Mutex::new(SourceHashMaintenanceState::default())),
             stop_requested: Arc::new(AtomicBool::new(false)),
+            #[cfg(test)]
+            stop_before_attachment_materialization_for_test: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -95,6 +119,12 @@ impl SourceHashMaintenanceController {
         state.pending_source_ids.clear();
     }
 
+    #[cfg(test)]
+    pub(crate) fn request_stop_before_attachment_materialization_for_test(&self) {
+        self.stop_before_attachment_materialization_for_test
+            .store(true, Ordering::Release);
+    }
+
     fn take_next_source(&self) -> Option<i64> {
         let mut state = self.state.lock().expect("hash maintenance state poisoned");
         let source_id = state.pending_source_ids.iter().next().copied()?;
@@ -136,6 +166,7 @@ impl SourceHashMaintenanceController {
             source_failure: None,
             stopped: false,
             run_limit_reached: false,
+            attachment_materialization: None,
         };
 
         loop {
@@ -171,18 +202,103 @@ impl SourceHashMaintenanceController {
             publish_maintained_snapshot_invalidations(store, events)?;
 
             if result.remaining_candidates == 0 {
-                return Ok(run);
+                break;
             }
 
             if result.hashed_count == 0 {
-                return Ok(run);
+                break;
             }
 
             if run.passes >= SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN {
                 run.run_limit_reached = true;
-                return Ok(run);
+                break;
             }
         }
+
+        self.run_attachment_materialization_after_hash(store, events, &mut run)?;
+        Ok(run)
+    }
+
+    fn run_attachment_materialization_after_hash(
+        &self,
+        store: &SqliteDurableStore,
+        events: &LibraryBoundaryEventStream,
+        hash_run: &mut SourceHashMaintenanceRun,
+    ) -> protocol::ProtocolResult<()> {
+        #[cfg(test)]
+        if self
+            .stop_before_attachment_materialization_for_test
+            .swap(false, Ordering::AcqRel)
+        {
+            self.stop();
+        }
+
+        if self.stop_requested.load(Ordering::Acquire) {
+            hash_run.stopped = true;
+            return Ok(());
+        }
+
+        let attachment_run = run_attachment_materialization_unit(store, hash_run.source_id)?;
+        publish_maintained_snapshot_invalidations(store, events)?;
+        hash_run.attachment_materialization = Some(attachment_run);
+        Ok(())
+    }
+}
+
+pub(crate) fn run_attachment_materialization_unit(
+    store: &SqliteDurableStore,
+    source_id: i64,
+) -> protocol::ProtocolResult<SourceAttachmentMaterializationMaintenanceRun> {
+    let mut run = SourceAttachmentMaterializationMaintenanceRun {
+        source_id,
+        passes: 0,
+        attachments_created: 0,
+        attachments_refreshed: 0,
+        links_created: 0,
+        links_replaced: 0,
+        links_refreshed: 0,
+        skipped_stale_facts: 0,
+        skipped_no_blake3: 0,
+        skipped_no_facts: 0,
+        remaining_candidates: 0,
+        run_limit_reached: false,
+    };
+
+    while run.passes < SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN {
+        let result = store
+            .materialize_attachments_for_source(
+                source_id,
+                SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT,
+            )
+            .map_err(crate::service::map_store_error)?;
+
+        run.record_pass(result);
+        if run.remaining_candidates == 0 {
+            break;
+        }
+    }
+
+    if run.remaining_candidates > 0
+        && run.passes >= SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN
+    {
+        run.run_limit_reached = true;
+    }
+
+    Ok(run)
+}
+
+impl SourceAttachmentMaterializationMaintenanceRun {
+    fn record_pass(&mut self, result: MaterializeAttachmentsForSourceResult) {
+        self.passes += 1;
+        self.attachments_created += result.attachments_created;
+        self.attachments_refreshed += result.attachments_refreshed;
+        self.links_created += result.links_created;
+        self.links_replaced += result.links_replaced;
+        self.links_refreshed += result.links_refreshed;
+        self.skipped_stale_facts += result.skipped_stale_facts;
+        self.skipped_no_blake3 += result.skipped_no_blake3;
+        self.skipped_no_facts += result.skipped_no_facts;
+        self.remaining_candidates = result.remaining_candidates;
     }
 }
 

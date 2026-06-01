@@ -31,7 +31,9 @@ use crate::source_file_hash_protocol::{
     empty_hash_source_files_blake3_reply, map_hash_lifecycle_source_failure,
     map_hash_source_files_blake3_reply,
 };
-use crate::source_hash_maintenance::SourceHashMaintenanceController;
+use crate::source_hash_maintenance::{
+    SourceHashMaintenanceController, run_attachment_materialization_unit,
+};
 use crate::storage_environment::resolve_library_storage_environment;
 
 struct ActiveScanJob {
@@ -608,6 +610,9 @@ impl LibraryBoundaryService {
             })
             .map_err(map_store_error)?;
         self.publish_maintained_snapshot_invalidations()?;
+        let _attachment_materialization =
+            run_attachment_materialization_unit(&self.durable_store, source_id)?;
+        self.publish_maintained_snapshot_invalidations()?;
         Ok(map_hash_source_files_blake3_reply(result, None))
     }
 
@@ -1057,18 +1062,23 @@ mod tests {
         SourceFileHashReply, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
         UnregisterLocalRootRequest,
     };
+    use rusqlite::Connection;
     use serde_json::json;
     use tempfile::TempDir;
 
-    use library_domain::{SourceAccessIssueKind, SourceAccessState, SourceScanPhase};
+    use library_domain::{
+        SourceAccessIssueKind, SourceAccessState, SourcePresenceState, SourceScanPhase,
+    };
     use library_store_sqlite::{
         LibraryStoreContext, ReadSourceFileBlake3HashCandidatesInput,
-        SourceFileBlake3HashAdmissionScope, StoreEnvironment, UpsertSourceInput,
-        UpsertSourceScanStateInput, UpsertSourceStateInput, durable_store_path,
+        RecordSourceFileObservationInput, SourceFileBlake3HashAdmissionScope, StoreEnvironment,
+        UpsertSourceInput, UpsertSourceScanStateInput, UpsertSourceStateInput, durable_store_path,
     };
 
     use crate::source_hash_maintenance::{
-        SOURCE_HASH_MAINTENANCE_BATCH_LIMIT, SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN,
+        SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT,
+        SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN, SOURCE_HASH_MAINTENANCE_BATCH_LIMIT,
+        SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN,
     };
 
     use super::{LibraryBoundaryService, validate_contents_policy};
@@ -1082,6 +1092,56 @@ mod tests {
         let service = LibraryBoundaryService::open(context.clone()).expect("open service");
 
         (tempdir, context, service)
+    }
+
+    fn open_test_read_connection(context: &LibraryStoreContext) -> Connection {
+        Connection::open(durable_store_path(
+            &context.user_data_path,
+            context.environment,
+        ))
+        .expect("open test read connection")
+    }
+
+    fn count_rows(context: &LibraryStoreContext, table: &str) -> i64 {
+        open_test_read_connection(context)
+            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap_or_else(|error| panic!("count rows in {table}: {error}"))
+    }
+
+    fn count_table_if_exists(context: &LibraryStoreContext, table: &str) -> Option<i64> {
+        let connection = open_test_read_connection(context);
+        let exists: i64 = connection
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM sqlite_schema
+                 WHERE type IN ('table', 'view')
+                   AND name = ?1",
+                [table],
+                |row| row.get(0),
+            )
+            .expect("check optional table existence");
+        if exists == 0 {
+            return None;
+        }
+        Some(
+            connection
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap_or_else(|error| panic!("count rows in optional {table}: {error}")),
+        )
+    }
+
+    fn clear_attachment_identity_rows(context: &LibraryStoreContext) {
+        let connection = open_test_read_connection(context);
+        connection
+            .execute("DELETE FROM source_file_attachment_links", [])
+            .expect("clear source-file attachment links");
+        connection
+            .execute("DELETE FROM content_attachments", [])
+            .expect("clear content attachments");
     }
 
     #[test]
@@ -1359,6 +1419,35 @@ mod tests {
         }
 
         panic!("scan should reach {expected_kind:?} on a tiny directory");
+    }
+
+    fn wait_for_scan_terminal_run(
+        service: &LibraryBoundaryService,
+        root_id: i64,
+        scan_run_id: i64,
+        expected_kind: library_boundary_protocol::SourceScanEventKind,
+    ) {
+        for _ in 0..30 {
+            let events_reply = read_after_events(service, None, 64);
+            let found = events_reply.events.iter().any(|e| {
+                let LibraryBoundaryEvent::SourceScanEvent(se) = e else {
+                    return false;
+                };
+                se.kind == expected_kind && se.root_id == root_id && se.scan_run_id == scan_run_id
+            });
+            if found {
+                let cancelled = cancel_root_scan(service, scan_run_id);
+                assert_eq!(
+                    cancelled.status,
+                    CancelRootScanStatus::AlreadyTerminal,
+                    "completed scan should be joined through the deterministic cleanup path"
+                );
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        panic!("scan {scan_run_id} should reach {expected_kind:?} on a tiny directory");
     }
 
     fn read_library_tree_children(
@@ -1671,7 +1760,7 @@ mod tests {
 
     #[test]
     fn scan_completion_runs_service_owned_hash_maintenance() {
-        let (tempdir, _context, service) = open_service_with_context();
+        let (tempdir, context, service) = open_service_with_context();
         let source_root = tempdir.path().join("hash-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
         let run_bound =
@@ -1709,6 +1798,18 @@ mod tests {
             hashed_after_scan, run_bound,
             "scan-triggered maintenance must only run the bounded maintenance unit"
         );
+        assert_eq!(
+            count_rows(&context, "source_file_attachment_links"),
+            i64::try_from(SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT)
+                .expect("attachment limit fits i64"),
+            "scan-triggered maintenance must only run one bounded attachment materialization unit"
+        );
+        assert_eq!(
+            count_rows(&context, "content_attachments"),
+            i64::try_from(SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT)
+                .expect("attachment limit fits i64"),
+            "test fixture uses unique bytes, so one bounded unit creates one attachment per link"
+        );
 
         let events_after_hash = read_after_events(&service, None, 128);
         assert!(
@@ -1731,10 +1832,33 @@ mod tests {
         assert_eq!(run.remaining_candidates, 1);
         assert!(run.run_limit_reached);
         assert!(!run.stopped);
+        let attachment_run = run
+            .attachment_materialization
+            .as_ref()
+            .expect("hash maintenance triggers attachment materialization");
+        assert_eq!(
+            attachment_run.passes,
+            SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN
+        );
+        assert_eq!(
+            attachment_run.links_created,
+            SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT
+        );
+        assert_eq!(
+            attachment_run.remaining_candidates,
+            run_bound - SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT
+        );
+        assert!(attachment_run.run_limit_reached);
 
         let manually_hashed = hash_source_files_blake3(&service, registered.root_id, Some(10));
         assert_eq!(manually_hashed.hashed_count, 1);
         assert_eq!(manually_hashed.remaining_candidates, 0);
+        assert_eq!(
+            count_rows(&context, "source_file_attachment_links"),
+            i64::try_from(SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT * 2)
+                .expect("attachment limit fits i64"),
+            "manual hash maintenance must also trigger one bounded attachment materialization unit"
+        );
 
         for source_file_id in &file_ids {
             let facts = service
@@ -1747,6 +1871,83 @@ mod tests {
                 "blake3"
             );
         }
+
+        for table in [
+            "LibraryAssets",
+            "LibraryAssetAttachments",
+            "LibraryBrowserRows",
+            "SourceSegmentSets",
+            "SourceSegments",
+            "PrepAssignments",
+            "ResolvedLibraryAssetPrepTargets",
+        ] {
+            assert_eq!(
+                count_rows(&context, table),
+                0,
+                "{table} must not be created by hash/attachment maintenance"
+            );
+        }
+        for absent_or_future_table in [
+            "Tracks",
+            "TrackRows",
+            "LibraryTracks",
+            "PrepRows",
+            "PreparationRows",
+            "primaryMedia",
+        ] {
+            assert!(
+                matches!(
+                    count_table_if_exists(&context, absent_or_future_table),
+                    None | Some(0)
+                ),
+                "{absent_or_future_table} must be absent or empty"
+            );
+        }
+    }
+
+    #[test]
+    fn scan_completion_materializes_existing_blake3_candidates_without_hash_work() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("existing-attachment-candidates-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("a.flac"), b"a").expect("write a");
+        std::fs::write(source_root.join("b.flac"), b"b").expect("write b");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let _first_scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_completed(&service, registered.root_id);
+        assert_eq!(read_hash_candidate_count(&service, registered.root_id), 0);
+        clear_attachment_identity_rows(&context);
+        assert_eq!(count_rows(&context, "source_file_attachment_links"), 0);
+
+        let second_scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_terminal_run(
+            &service,
+            registered.root_id,
+            second_scan.scan_run_id,
+            library_boundary_protocol::SourceScanEventKind::SourceScanCompleted,
+        );
+
+        assert_eq!(read_hash_candidate_count(&service, registered.root_id), 0);
+        assert_eq!(
+            count_rows(&context, "source_file_attachment_links"),
+            2,
+            "scan-triggered source maintenance should run one attachment unit even when hash work is already current"
+        );
+        let runs = service.source_hash_maintenance.completed_runs_for_test();
+        let run = runs
+            .iter()
+            .rev()
+            .find(|run| run.source_id == registered.root_id)
+            .expect("second scan completion records source maintenance");
+        assert_eq!(run.hashed_count, 0);
+        let attachment_run = run
+            .attachment_materialization
+            .as_ref()
+            .expect("existing BLAKE3 candidates still trigger one materialization unit");
+        assert_eq!(attachment_run.links_created, 2);
+        assert!(!attachment_run.run_limit_reached);
     }
 
     #[test]
@@ -1795,6 +1996,58 @@ mod tests {
     }
 
     #[test]
+    fn source_hash_maintenance_observes_stop_before_attachment_materialization() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("stop-before-attachment-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.flac"), b"track").expect("write track");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        service
+            .durable_store
+            .record_source_file_observation(RecordSourceFileObservationInput {
+                source_file_id: Some(100),
+                source_id: registered.root_id,
+                parent_source_directory_id: None,
+                name: "track.flac".to_string(),
+                relative_path: "track.flac".to_string(),
+                size_bytes: Some(5),
+                mtime_ns: Some(1),
+                presence_state: SourcePresenceState::Present,
+                first_discovered_at: Some(10),
+                observed_at: Some(10),
+                presence_changed_at: 10,
+                updated_at: 10,
+            })
+            .expect("record source file");
+
+        assert!(
+            service
+                .source_hash_maintenance
+                .request_source(registered.root_id)
+        );
+        service
+            .source_hash_maintenance
+            .request_stop_before_attachment_materialization_for_test();
+        let runs = service
+            .source_hash_maintenance
+            .run_queued(&service.durable_store, &service.session_events)
+            .expect("run queued maintenance");
+
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].hashed_count, 1);
+        assert!(runs[0].stopped);
+        assert!(
+            runs[0].attachment_materialization.is_none(),
+            "stop must be observed before starting the attachment materialization unit"
+        );
+        assert_eq!(count_rows(&context, "SourceFacts"), 1);
+        assert_eq!(count_rows(&context, "source_file_attachment_links"), 0);
+        assert_eq!(count_rows(&context, "content_attachments"), 0);
+    }
+
+    #[test]
     fn blocked_scan_does_not_request_hash_maintenance() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("blocked-scan-root");
@@ -1823,12 +2076,17 @@ mod tests {
 
     #[test]
     fn source_hash_maintenance_reports_source_failures_without_empty_success() {
-        let (tempdir, _context, service) = open_service_with_context();
+        let (tempdir, context, service) = open_service_with_context();
         let source_root = tempdir.path().join("blocked-maintenance-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.flac"), b"track").expect("write track");
 
         let (_json, registered) =
             register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let _scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_completed(&service, registered.root_id);
+        clear_attachment_identity_rows(&context);
+
         service
             .durable_store
             .upsert_source_state(UpsertSourceStateInput {
@@ -1866,6 +2124,16 @@ mod tests {
             runs[0].source_failure,
             Some(HashSourceFilesBlake3SourceFailure::SourceRootBlocked(_))
         ));
+        assert_eq!(
+            count_rows(&context, "source_file_attachment_links"),
+            0,
+            "blocked source maintenance must not create attachment links"
+        );
+        assert_eq!(
+            count_rows(&context, "content_attachments"),
+            0,
+            "blocked source maintenance must not materialize attachments"
+        );
     }
 
     #[test]

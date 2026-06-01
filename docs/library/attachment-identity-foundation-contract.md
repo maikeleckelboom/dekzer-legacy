@@ -15,8 +15,9 @@ scope:
 
 ## Status
 
-This is the first accepted attachment identity layer. It is Rust/store-only and has no boundary, desktop, preload,
-renderer, command, event, scheduler, or UI exposure.
+This is the first accepted attachment identity layer. Durable attachment identity remains Rust/store-owned, and bounded
+materialization is now service-owned maintenance. There is still no attachment read boundary, desktop, preload,
+renderer, command, scheduler, or UI exposure.
 
 ## Purpose
 
@@ -59,6 +60,37 @@ Facts with stale basis, missing facts, or non-BLAKE3 facts do not materialize cu
 
 BLAKE3 evidence is bytes evidence produced before this layer. Attachment materialization does not hash files, resolve
 filesystem paths, scan roots, or repair missing facts. It reads accepted `SourceFacts` rows and source-file basis only.
+
+## Service-Owned Maintenance
+
+The boundary service owns the current attachment materialization maintenance hook. The hook is intentionally narrow:
+
+- successful scan completion requests one source-scoped maintenance cycle for the completed source;
+- that cycle runs at most one bounded BLAKE3 hash maintenance pass and then at most one bounded attachment
+  materialization pass for the same `source_id`;
+- if BLAKE3 evidence is already current but attachment links are missing, scan-triggered maintenance may still run the
+  one bounded materialization pass;
+- the pending source request is cleared after that bounded cycle;
+- remaining hash candidates and remaining attachment materialization candidates are left to explicit commands or future
+  scheduler work.
+
+Manual `hashSourceFilesBlake3` is source-scoped. After a successful non-source-failure manual hash batch, the service
+runs one bounded internal `materialize_attachments_for_source(source_id, limit)` unit for the same source. The public
+hash command reply is unchanged and does not report attachment work; A-2 or later boundary work owns attachment read
+exposure.
+
+The current service limit constants are intentionally small:
+
+- `SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT`
+- `SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN = 1`
+
+The service checks stop/shutdown between the hash unit and the attachment materialization unit. If shutdown arrives
+while an individual file hash is in progress, the existing hash job may finish that file before the next stop check.
+
+Attachment materialization mutates `content_attachments` and `source_file_attachment_links`, but no public attachment
+read scope exists yet. The service republishes existing maintained snapshot revisions after maintenance units; today,
+hash writes can advance the existing maintained `LibraryBrowser` scope, while attachment-only writes do not claim a
+precise public invalidation. A-2 owns the read boundary and any meaningful attachment read invalidation.
 
 ## Attachment/Content Record Authority
 
@@ -122,7 +154,7 @@ the current source-file link.
 
 ## Materialization Outcome Fields
 
-`MaterializeAttachmentsForSourceResult` is Rust/store-only and reports:
+`MaterializeAttachmentsForSourceResult` is Rust/store/service-internal and reports:
 
 - `attachments_created` increments once per newly inserted `content_attachments` row;
 - `attachments_refreshed` increments once per already-known BLAKE3 hash touched by the run;
@@ -171,8 +203,8 @@ satisfy BLAKE3 evidence.
 
 - cascade behavior when a `source_file` is removed from inventory beyond the current FK behavior;
 - orphaned `content_attachments` cleanup / garbage collection after link replacement;
-- auto-triggering materialization from scan completion or hash maintenance hooks;
-- boundary, service, desktop, preload, renderer, command, event, or TypeScript exposure;
+- durable scheduler/drain behavior beyond one bounded scan/manual maintenance unit;
+- attachment read boundary, desktop, preload, renderer, command, event, or TypeScript exposure;
 - track identity;
 - CUE-to-audio association;
 - `primaryMedia` activation;

@@ -175,6 +175,23 @@ fn read_attachment_materialization_rows(
                 file.file_kind,
                 facts.content_hash_value,
                 CASE
+                    WHEN facts.source_file_id IS NULL THEN 3
+                    WHEN NOT (
+                        file.source_id = facts.basis_source_id
+                        AND file.relative_path = facts.basis_relative_path
+                        AND file.size_bytes IS facts.basis_size_bytes
+                        AND file.mtime_ns IS facts.basis_mtime_ns
+                        AND file.presence_state = facts.basis_presence_state
+                    ) THEN 3
+                    WHEN NOT (
+                        facts.content_hash_algorithm = ?2
+                        AND facts.content_hash_value IS NOT NULL
+                    ) THEN 3
+                    WHEN link.source_file_id IS NULL THEN 0
+                    WHEN link.content_hash_value != facts.content_hash_value THEN 1
+                    ELSE 2
+                END AS materialization_priority,
+                CASE
                     WHEN facts.source_file_id IS NULL THEN 'no_facts'
                     WHEN NOT (
                         file.source_id = facts.basis_source_id
@@ -190,14 +207,17 @@ fn read_attachment_materialization_rows(
          FROM source_files file
          LEFT JOIN SourceFacts facts
            ON facts.source_file_id = file.source_file_id
+         LEFT JOIN source_file_attachment_links link
+           ON link.source_file_id = file.source_file_id
          WHERE file.source_id = ?1
-         ORDER BY lower(file.relative_path) ASC,
+         ORDER BY materialization_priority ASC,
+                  lower(file.relative_path) ASC,
                   file.source_file_id ASC",
     )?;
 
     statement
         .query_map(params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM], |row| {
-            let raw_disposition = row.get::<_, String>(4)?;
+            let raw_disposition = row.get::<_, String>(5)?;
             let disposition = match raw_disposition.as_str() {
                 "materializable" => AttachmentMaterializationDisposition::Materializable,
                 "stale_facts" => AttachmentMaterializationDisposition::StaleFacts,
@@ -723,6 +743,33 @@ mod tests {
             fixture.attachment_id_for_hash(HASH_A),
             fixture.attachment_id_for_hash(HASH_B)
         );
+    }
+
+    #[test]
+    fn bounded_materialization_prioritizes_unlinked_rows_before_refreshes() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/a.flac", 10, 100);
+        fixture.record_source_file(101, "Album/b.flac", 11, 101);
+        fixture.record_source_file(102, "Album/c.flac", 12, 102);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_fact(101, HASH_B, "audio");
+        fixture.commit_blake3_fact(102, HASH_C, "audio");
+
+        let first = fixture.materialize(2);
+        assert_eq!(first.links_created, 2);
+        assert_eq!(first.remaining_candidates, 1);
+        assert_eq!(fixture.count_rows("source_file_attachment_links"), 2);
+        assert_eq!(fixture.link_count_for_source_file(102), 0);
+
+        let second = fixture.materialize(2);
+        assert_eq!(second.links_created, 1);
+        assert_eq!(second.links_refreshed, 1);
+        assert_eq!(
+            fixture.count_rows("source_file_attachment_links"),
+            3,
+            "a later bounded run must reach unlinked rows before refreshing current links"
+        );
+        assert_eq!(fixture.link_count_for_source_file(102), 1);
     }
 
     #[test]

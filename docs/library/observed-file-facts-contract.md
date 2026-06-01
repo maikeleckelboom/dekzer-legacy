@@ -143,6 +143,8 @@ missing, or blocked must not be reported as an empty success.
 Hash evidence commits still go through the inspect-source artifact and observed-facts authority path. After a successful
 hash commit, the store reseeds and invalidates the current `LibraryBrowser` maintained scope. This is the narrowest
 current event scope available for source-file observed-facts changes; no separate observed-facts event scope exists yet.
+The service also runs one bounded internal attachment materialization unit for the same source after a successful
+non-source-failure manual hash batch. The public hash reply remains hash-only and does not report attachment work.
 
 ## Service-Owned Hash Maintenance
 
@@ -175,6 +177,12 @@ commands must request additional work. Service shutdown requests maintenance sto
 existing root-work cancellation path, and joins active scan threads. If shutdown happens while a file is being hashed, the
 current file read may finish before the next stop check; no additional hash pass starts after the stop request.
 
+After the bounded hash unit finishes and before the pending source request is cleared, the same service-owned cycle runs
+at most one bounded attachment materialization unit for that source using
+`materialize_attachments_for_source(source_id, limit)`. It can run even when the hash unit finds no remaining hash work,
+so already-current BLAKE3 facts can still receive missing attachment links. It does not loop until attachment
+materialization candidates are exhausted.
+
 Hash maintenance emits existing maintained snapshot invalidations when hash writes advance the maintained revision.
 There is no public `sourceHashMaintenance*` boundary event yet. Tests use internal service observability for pass counts,
 dedupe, typed source failure, and stopped state. Future event variants should distinguish maintenance activity from
@@ -195,7 +203,7 @@ Future work remains separate:
 - media/container probing
 - CUE parsing
 - CUE-to-audio association evidence
-- attachment identity scheduling, boundary exposure, and later promotion beyond the Rust/store foundation
+- attachment identity read boundary and later promotion beyond the Rust/store/service maintenance foundation
 - track identity
 - artwork intelligence
 - waveform, stems, and preparation jobs
