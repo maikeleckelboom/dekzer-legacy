@@ -19,6 +19,14 @@ import type {
   ReadSourceLifecycleResult
 } from './librarySourceLifecycle/readSourceLifecycle'
 import type {
+  ReadAttachmentSourceFilesRequest,
+  ReadAttachmentSourceFilesResult,
+  ReadSourceAttachmentSummaryRequest,
+  ReadSourceAttachmentSummaryResult,
+  ReadSourceFileAttachmentRequest,
+  ReadSourceFileAttachmentResult
+} from './libraryAttachmentIdentity/read'
+import type {
   HashSourceFilesBlake3Request,
   HashSourceFilesBlake3Result
 } from './librarySourceFileHashing/hashSourceFilesBlake3'
@@ -40,6 +48,7 @@ export type LibraryApi = {
   readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
   readonly sourceLifecycle: LibrarySourceLifecycleApi
+  readonly attachmentIdentity: LibraryAttachmentIdentityApi
   readonly hashing: LibraryHashingApi
   readonly contents: LibraryContentsApi
   readonly roots: LibraryRootsApi
@@ -72,6 +81,18 @@ export type LibraryContentsApi = {
 
 export type LibrarySourceLifecycleApi = {
   readSourceLifecycle(request: ReadSourceLifecycleRequest): Promise<ReadSourceLifecycleResult>
+}
+
+export type LibraryAttachmentIdentityApi = {
+  readSourceFileAttachment(
+    request: ReadSourceFileAttachmentRequest
+  ): Promise<ReadSourceFileAttachmentResult>
+  readAttachmentSourceFiles(
+    request: ReadAttachmentSourceFilesRequest
+  ): Promise<ReadAttachmentSourceFilesResult>
+  readSourceAttachmentSummary(
+    request: ReadSourceAttachmentSummaryRequest
+  ): Promise<ReadSourceAttachmentSummaryResult>
 }
 
 export type LibraryHashingApi = {

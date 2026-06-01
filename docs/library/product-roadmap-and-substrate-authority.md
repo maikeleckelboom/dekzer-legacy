@@ -14,9 +14,8 @@ details. This document defines sequence, dependency, vetoes, and long-term owner
 
 The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
 
-1. `feat(library): expose attachment identity read boundary`
-2. `feat(library): add media probe observations v0`
-3. `feat(library): add collection health and source integrity read model`
+1. `feat(library): add media probe observations v0`
+2. `feat(library): add collection health and source integrity read model`
 
 ---
 
@@ -44,6 +43,10 @@ materialized attachment per source file. Staleness computed by join against curr
 Materialization: `materialize_attachments_for_source(source_id, limit)` — store authority, called by bounded
 service-owned scan/manual hash maintenance.
 
+Read boundary: `readSourceFileAttachment`, `readAttachmentSourceFiles`, and `readSourceAttachmentSummary` — explicit
+read-only identity reads. They do not hash, materialize, populate browser rows, or claim a maintained snapshot
+invalidation scope.
+
 Outcome fields: `attachments_created`, `attachments_refreshed`, `links_created`, `links_replaced`, `links_refreshed`,
 `skipped_stale_facts`, `skipped_no_blake3`, `skipped_no_facts`.
 
@@ -65,6 +68,7 @@ as a mandatory task.
 - Orphaned `content_attachments` rows after link replacement — attachment garbage collection is future work
 - Cascade behavior when a source file is removed from inventory
 - durable scheduler/drain behavior for attachment materialization beyond one bounded service-owned maintenance unit
+- precise attachment read invalidation scope
 
 ---
 
@@ -295,7 +299,7 @@ Completes: `scan → source files → BLAKE3 facts → attachment links`
 
 ---
 
-**A-2 [CODE] Attachment identity read boundary** [Planned]
+**A-2 [CODE] Attachment identity read boundary** [Ratified]
 
 Expose read-only attachment identity state through service/protocol boundary.
 
@@ -303,7 +307,8 @@ Expose read-only attachment identity state through service/protocol boundary.
 - Attachment → all source-file occurrences with status
 - Source → attachment materialization summary (current / stale / missing counts)
 
-No materialization command exposed. No UI.
+No materialization command exposed. No UI. No browser row population. No maintained snapshot invalidation scope is
+claimed for attachment-only link changes.
 
 **Note:** This is a prerequisite substrate surface, not a product-facing surface. Collection health (A-4) is the first
 product-trust read model. No attachment-detail UI may be built before A-4 lands.

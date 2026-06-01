@@ -31,6 +31,12 @@ import {
 } from '../../../src/shared/libraryContents/read'
 import { sourceLifecycleReadChannels } from '../../../src/shared/librarySourceLifecycle/channels'
 import type { ReadSourceLifecycleResult } from '../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
+import { attachmentIdentityReadChannels } from '../../../src/shared/libraryAttachmentIdentity/channels'
+import type {
+  ReadAttachmentSourceFilesResult,
+  ReadSourceAttachmentSummaryResult,
+  ReadSourceFileAttachmentResult
+} from '../../../src/shared/libraryAttachmentIdentity/read'
 import {
   sourceFileHashingChannels,
   type HashSourceFilesBlake3Result
@@ -60,6 +66,9 @@ describe('preload renderer API', () => {
       limit: 100
     }
     const sourceLifecycleRequest = { sourceId: '7' }
+    const sourceFileAttachmentRequest = { sourceFileId: '11' }
+    const attachmentSourceFilesRequest = { attachmentId: '7', limit: 25 }
+    const sourceAttachmentSummaryRequest = { sourceId: '7' }
     const hashRequest = { sourceId: '7', limit: 4 }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
@@ -114,6 +123,47 @@ describe('preload renderer API', () => {
         lastSuccessfulScanAtMs: 20,
         lastSeenAtMs: 9,
         updatedAtMs: 21
+      }
+    }
+    const sourceFileAttachmentResult: ReadSourceFileAttachmentResult = {
+      state: 'ok',
+      reply: {
+        status: 'ok',
+        attachmentLink: {
+          attachmentId: '7',
+          sourceFileId: '11',
+          sourceId: '3',
+          contentHashAlgorithm: 'blake3',
+          contentHashValue: 'abc',
+          fileKind: 'audio',
+          linkStatus: 'current',
+          createdAtMs: 100,
+          updatedAtMs: 200
+        }
+      }
+    }
+    const attachmentSourceFilesResult: ReadAttachmentSourceFilesResult = {
+      state: 'notFound',
+      reply: {
+        status: 'notFound',
+        sourceFileLinks: [],
+        effectiveLimit: 25,
+        remainingSourceFileLinks: 0
+      }
+    }
+    const sourceAttachmentSummaryResult: ReadSourceAttachmentSummaryResult = {
+      state: 'ok',
+      reply: {
+        status: 'ok',
+        summary: {
+          sourceId: '7',
+          currentLinksCount: 1,
+          staleLinksCount: 0,
+          sourceFilesWithCurrentBlake3FactsCount: 1,
+          sourceFilesWithAttachmentLinksCount: 1,
+          sourceFilesMissingAttachmentLinksCount: 0,
+          unmaterializedBlake3FactsCount: 0
+        }
       }
     }
     const hashResult: HashSourceFilesBlake3Result = {
@@ -172,6 +222,9 @@ describe('preload renderer API', () => {
     let receivedCancelScanRequest: unknown
     let receivedContentsRequest: unknown
     let receivedSourceLifecycleRequest: unknown
+    let receivedSourceFileAttachmentRequest: unknown
+    let receivedAttachmentSourceFilesRequest: unknown
+    let receivedSourceAttachmentSummaryRequest: unknown
     let receivedHashRequest: unknown
     let receivedViewStatePayload: unknown
     let subscribeCount = 0
@@ -202,6 +255,21 @@ describe('preload renderer API', () => {
         if (channel === sourceLifecycleReadChannels.readSourceLifecycle) {
           receivedSourceLifecycleRequest = args[0]
           return sourceLifecycleResult
+        }
+
+        if (channel === attachmentIdentityReadChannels.readSourceFileAttachment) {
+          receivedSourceFileAttachmentRequest = args[0]
+          return sourceFileAttachmentResult
+        }
+
+        if (channel === attachmentIdentityReadChannels.readAttachmentSourceFiles) {
+          receivedAttachmentSourceFilesRequest = args[0]
+          return attachmentSourceFilesResult
+        }
+
+        if (channel === attachmentIdentityReadChannels.readSourceAttachmentSummary) {
+          receivedSourceAttachmentSummaryRequest = args[0]
+          return sourceAttachmentSummaryResult
         }
 
         if (channel === sourceFileHashingChannels.hashSourceFilesBlake3) {
@@ -311,6 +379,18 @@ describe('preload renderer API', () => {
       api.library.sourceLifecycle.readSourceLifecycle(sourceLifecycleRequest)
     ).resolves.toBe(sourceLifecycleResult)
     expect(receivedSourceLifecycleRequest).toBe(sourceLifecycleRequest)
+    await expect(
+      api.library.attachmentIdentity.readSourceFileAttachment(sourceFileAttachmentRequest)
+    ).resolves.toBe(sourceFileAttachmentResult)
+    expect(receivedSourceFileAttachmentRequest).toBe(sourceFileAttachmentRequest)
+    await expect(
+      api.library.attachmentIdentity.readAttachmentSourceFiles(attachmentSourceFilesRequest)
+    ).resolves.toBe(attachmentSourceFilesResult)
+    expect(receivedAttachmentSourceFilesRequest).toBe(attachmentSourceFilesRequest)
+    await expect(
+      api.library.attachmentIdentity.readSourceAttachmentSummary(sourceAttachmentSummaryRequest)
+    ).resolves.toBe(sourceAttachmentSummaryResult)
+    expect(receivedSourceAttachmentSummaryRequest).toBe(sourceAttachmentSummaryRequest)
     await expect(api.library.hashing.hashSourceFilesBlake3(hashRequest)).resolves.toBe(hashResult)
     expect(receivedHashRequest).toBe(hashRequest)
     await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)

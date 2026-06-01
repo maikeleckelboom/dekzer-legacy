@@ -15,9 +15,9 @@ scope:
 
 ## Status
 
-This is the first accepted attachment identity layer. Durable attachment identity remains Rust/store-owned, and bounded
-materialization is now service-owned maintenance. There is still no attachment read boundary, desktop, preload,
-renderer, command, scheduler, or UI exposure.
+This is the first accepted attachment identity layer. Durable attachment identity remains Rust/store-owned, bounded
+materialization is service-owned maintenance, and attachment identity now has an explicit read-only boundary. There is
+still no public materialization command, scheduler, or UI exposure.
 
 ## Purpose
 
@@ -76,8 +76,8 @@ The boundary service owns the current attachment materialization maintenance hoo
 
 Manual `hashSourceFilesBlake3` is source-scoped. After a successful non-source-failure manual hash batch, the service
 runs one bounded internal `materialize_attachments_for_source(source_id, limit)` unit for the same source. The public
-hash command reply is unchanged and does not report attachment work; A-2 or later boundary work owns attachment read
-exposure.
+hash command reply is unchanged and does not report attachment work; attachment identity read state is exposed only
+through the explicit read boundary below.
 
 The current service limit constants are intentionally small:
 
@@ -87,10 +87,43 @@ The current service limit constants are intentionally small:
 The service checks stop/shutdown between the hash unit and the attachment materialization unit. If shutdown arrives
 while an individual file hash is in progress, the existing hash job may finish that file before the next stop check.
 
-Attachment materialization mutates `content_attachments` and `source_file_attachment_links`, but no public attachment
-read scope exists yet. The service republishes existing maintained snapshot revisions after maintenance units; today,
-hash writes can advance the existing maintained `LibraryBrowser` scope, while attachment-only writes do not claim a
-precise public invalidation. A-2 owns the read boundary and any meaningful attachment read invalidation.
+Attachment materialization mutates `content_attachments` and `source_file_attachment_links`. The service republishes
+existing maintained snapshot revisions after maintenance units; today, hash writes can advance the existing maintained
+`LibraryBrowser` scope, while attachment-only writes do not claim a precise public invalidation. Attachment identity
+reads are explicit snapshot reads. They are not currently attached to a maintained snapshot invalidation scope, because
+neither navigation rows nor library browser rows are an honest precise signal for attachment-only link changes.
+
+## Read Boundary
+
+Attachment identity read exposure is narrow and read-only.
+
+Service/client commands:
+
+- `readSourceFileAttachment`
+- `readAttachmentSourceFiles`
+- `readSourceAttachmentSummary`
+
+Desktop, preload, and renderer exposure is grouped under `library.attachmentIdentity.*` and forwards only those read
+commands. Reads do not hash source files, materialize attachments, resolve filesystem paths, publish invalidation
+events, update browser rows, or populate product views.
+
+Read statuses are:
+
+- `ok`
+- `notFound`
+- `invalidRequest`
+- `readFailed`
+
+`readAttachmentSourceFiles` is bounded by an optional `limit`. The reply reports `effectiveLimit` and
+`remainingSourceFileLinks`; pagination remains future work.
+
+`readSourceAttachmentSummary` reports current links, stale links, source files with current BLAKE3 facts, source files
+with attachment links, source files missing attachment links, and `unmaterializedBlake3FactsCount`. In this v0,
+`unmaterializedBlake3FactsCount` is equal to `sourceFilesMissingAttachmentLinksCount`; broader backlog estimation
+belongs to collection health / source integrity work.
+
+The boundary deliberately does not expose duplicate, relocation, product UI, track identity, CUE association,
+`primaryMedia`, preparation, playlist, waveform, or browser-row behavior.
 
 ## Attachment/Content Record Authority
 
@@ -204,7 +237,9 @@ satisfy BLAKE3 evidence.
 - cascade behavior when a `source_file` is removed from inventory beyond the current FK behavior;
 - orphaned `content_attachments` cleanup / garbage collection after link replacement;
 - durable scheduler/drain behavior beyond one bounded scan/manual maintenance unit;
-- attachment read boundary, desktop, preload, renderer, command, event, or TypeScript exposure;
+- precise attachment invalidation scope;
+- product duplicate / relocation view;
+- attachment-detail UI;
 - track identity;
 - CUE-to-audio association;
 - `primaryMedia` activation;

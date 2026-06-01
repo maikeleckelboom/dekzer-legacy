@@ -160,7 +160,7 @@ Current placement:
 
 ## Next Implementation Gate
 
-The next gate is the attachment identity read boundary, followed by source-location-scoped hash admission, media probing
-work that adds new observed facts, broader scheduler policy, or a later promotion layer from attachments to playable
-identity. Follow-on work must not conflate this attachment foundation with track tables, CUE pairing, artwork
+The next gate is media probe observations v0, followed by collection health / source integrity work,
+source-location-scoped hash admission, broader scheduler policy, or a later promotion layer from attachments to
+playable identity. Follow-on work must not conflate the attachment foundation with track tables, CUE pairing, artwork
 intelligence, playlist UI, prep facets, or waveform generation.

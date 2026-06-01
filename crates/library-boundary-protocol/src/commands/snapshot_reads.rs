@@ -1805,6 +1805,248 @@ pub struct SourceLifecycle {
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum AttachmentIdentityReadStatus {
+    Ok,
+    NotFound,
+    InvalidRequest,
+    ReadFailed,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceFileAttachmentLinkStatus {
+    Current,
+    Stale,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct AttachmentIdentity {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub attachment_id: i64,
+    pub content_hash_algorithm: String,
+    pub content_hash_value: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceFileAttachmentLink {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub attachment_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_file_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+    pub content_hash_algorithm: String,
+    pub content_hash_value: String,
+    pub file_kind: ContentsFileKind,
+    pub link_status: SourceFileAttachmentLinkStatus,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceAttachmentSummary {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+    pub current_links_count: usize,
+    pub stale_links_count: usize,
+    pub source_files_with_current_blake3_facts_count: usize,
+    pub source_files_with_attachment_links_count: usize,
+    pub source_files_missing_attachment_links_count: usize,
+    pub unmaterialized_blake3_facts_count: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceFileAttachmentRequest {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_file_id: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceFileAttachmentReply {
+    pub status: AttachmentIdentityReadStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub attachment_link: Option<SourceFileAttachmentLink>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadAttachmentSourceFilesRequest {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub attachment_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub limit: Option<usize>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadAttachmentSourceFilesReply {
+    pub status: AttachmentIdentityReadStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub attachment: Option<AttachmentIdentity>,
+    pub source_file_links: Vec<SourceFileAttachmentLink>,
+    pub effective_limit: usize,
+    pub remaining_source_file_links: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceAttachmentSummaryRequest {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceAttachmentSummaryReply {
+    pub status: AttachmentIdentityReadStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub summary: Option<SourceAttachmentSummary>,
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -1820,6 +2062,9 @@ pub enum SnapshotReadCommand {
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
     ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
     ReadSourceLifecycle(ReadSourceLifecycleRequest),
+    ReadSourceFileAttachment(ReadSourceFileAttachmentRequest),
+    ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest),
+    ReadSourceAttachmentSummary(ReadSourceAttachmentSummaryRequest),
     ReadNavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowRequest),
     SearchNavigationNodeLibraryBrowserWindow(SearchNavigationNodeLibraryBrowserWindowRequest),
     ContentsRead(ContentsReadRequest),
@@ -1838,6 +2083,9 @@ pub enum SnapshotReadReply {
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     SourceLifecycle(ReadSourceLifecycleReply),
+    SourceFileAttachment(ReadSourceFileAttachmentReply),
+    AttachmentSourceFiles(ReadAttachmentSourceFilesReply),
+    SourceAttachmentSummary(ReadSourceAttachmentSummaryReply),
     NavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowReply),
     NavigationNodeLibraryBrowserSearch(SearchNavigationNodeLibraryBrowserWindowReply),
     Contents(ContentsReadReply),
@@ -1848,28 +2096,32 @@ pub enum SnapshotReadReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        ChildRowState, ContentsFileKind, ContentsMediaClass, DirectoryImageMediaState,
-        DirectoryPrimaryMediaState, DirectoryScanState, LibraryAssetAvailabilityState,
-        LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
-        LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
-        LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
-        LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
-        LibraryAssetPreparationOutcomeKind, LibraryAssetPreparationOutcomeState,
-        LibraryAssetPreparationRequirementClass, LibraryAssetPreparationSatisfactionState,
-        LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
-        LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
-        LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint,
-        LibraryTreeFileMediaClass, LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
-        LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
-        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
-        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        SearchNavigationNodeLibraryBrowserWindowReply,
+        AttachmentIdentity, AttachmentIdentityReadStatus, ChildRowState, ContentsFileKind,
+        ContentsMediaClass, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
+        LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
+        LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
+        LibraryAssetPreparationDetailGroup, LibraryAssetPreparationDetailGroupKey,
+        LibraryAssetPreparationDetailRow, LibraryAssetPreparationOutcomeKind,
+        LibraryAssetPreparationOutcomeState, LibraryAssetPreparationRequirementClass,
+        LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
+        LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
+        LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
+        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage, LibraryTreeCoverageState,
+        LibraryTreeEntryPoint, LibraryTreeFileMediaClass, LibraryTreeNode, LibraryTreeNodeKind,
+        LibraryTreePresenceState, LibraryTreeWindow, LoadNavigationRowByStableKeyRequest,
+        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
+        NavigationRowSelectorKind, ReadAttachmentSourceFilesReply,
+        ReadAttachmentSourceFilesRequest, ReadLibraryAssetPreparationDetailRequest,
+        ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenReply,
+        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
+        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
+        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply,
+        ReadSourceLifecycleRequest, SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
-        SourceAccessState, SourceClass, SourceLifecycle, SourceLifecycleIssueKind,
+        SourceAccessState, SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
+        SourceFileAttachmentLinkStatus, SourceLifecycle, SourceLifecycleIssueKind,
         SourceMountStatus, SourceScanPhase,
     };
     use serde_json::json;
@@ -2314,6 +2566,155 @@ mod tests {
         assert_eq!(
             overview.capability_state.as_str(),
             LibraryAssetWaveformOverviewCapabilityState::Ready.as_str()
+        );
+    }
+
+    #[test]
+    fn attachment_identity_snapshot_reads_are_read_only_tagged_commands() {
+        let source_file_command =
+            SnapshotReadCommand::ReadSourceFileAttachment(ReadSourceFileAttachmentRequest {
+                source_file_id: 11,
+            });
+        assert_eq!(
+            serde_json::to_value(&source_file_command).expect("serialize source-file read"),
+            json!({
+                "type": "readSourceFileAttachment",
+                "payload": {
+                    "sourceFileId": "11"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadCommand>(
+                serde_json::to_value(source_file_command.clone()).expect("serialize")
+            )
+            .expect("deserialize source-file read"),
+            source_file_command
+        );
+
+        let attachment_command =
+            SnapshotReadCommand::ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest {
+                attachment_id: 7,
+                limit: Some(25),
+            });
+        assert_eq!(
+            serde_json::to_value(&attachment_command).expect("serialize attachment read"),
+            json!({
+                "type": "readAttachmentSourceFiles",
+                "payload": {
+                    "attachmentId": "7",
+                    "limit": 25
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadCommand>(
+                serde_json::to_value(attachment_command.clone()).expect("serialize")
+            )
+            .expect("deserialize attachment read"),
+            attachment_command
+        );
+
+        let summary_command =
+            SnapshotReadCommand::ReadSourceAttachmentSummary(ReadSourceAttachmentSummaryRequest {
+                source_id: 3,
+            });
+        assert_eq!(
+            serde_json::to_value(&summary_command).expect("serialize summary read"),
+            json!({
+                "type": "readSourceAttachmentSummary",
+                "payload": {
+                    "sourceId": "3"
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadCommand>(
+                serde_json::to_value(summary_command.clone()).expect("serialize")
+            )
+            .expect("deserialize summary read"),
+            summary_command
+        );
+    }
+
+    #[test]
+    fn attachment_identity_snapshot_replies_expose_identity_state_only() {
+        let link = SourceFileAttachmentLink {
+            attachment_id: 7,
+            source_file_id: 11,
+            source_id: 3,
+            content_hash_algorithm: "blake3".to_string(),
+            content_hash_value: "abc".to_string(),
+            file_kind: ContentsFileKind::Audio,
+            link_status: SourceFileAttachmentLinkStatus::Current,
+            created_at_ms: 100,
+            updated_at_ms: 200,
+        };
+        let source_file_reply =
+            SnapshotReadReply::SourceFileAttachment(ReadSourceFileAttachmentReply {
+                status: AttachmentIdentityReadStatus::Ok,
+                attachment_link: Some(link.clone()),
+            });
+        let json = serde_json::to_value(&source_file_reply).expect("serialize source-file reply");
+        assert_eq!(json["type"], json!("sourceFileAttachment"));
+        assert_eq!(json["payload"]["status"], json!("ok"));
+        assert_eq!(
+            json["payload"]["attachmentLink"]["attachmentId"],
+            json!("7")
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(json).expect("deserialize source reply"),
+            source_file_reply
+        );
+
+        let attachment_reply =
+            SnapshotReadReply::AttachmentSourceFiles(ReadAttachmentSourceFilesReply {
+                status: AttachmentIdentityReadStatus::Ok,
+                attachment: Some(AttachmentIdentity {
+                    attachment_id: 7,
+                    content_hash_algorithm: "blake3".to_string(),
+                    content_hash_value: "abc".to_string(),
+                }),
+                source_file_links: vec![link],
+                effective_limit: 25,
+                remaining_source_file_links: 1,
+            });
+        let json = serde_json::to_value(&attachment_reply).expect("serialize attachment reply");
+        assert_eq!(json["type"], json!("attachmentSourceFiles"));
+        assert_eq!(json["payload"]["attachment"]["attachmentId"], json!("7"));
+        assert_eq!(
+            json["payload"]["sourceFileLinks"][0]["linkStatus"],
+            json!("current")
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(json)
+                .expect("deserialize attachment reply"),
+            attachment_reply
+        );
+
+        let summary_reply =
+            SnapshotReadReply::SourceAttachmentSummary(ReadSourceAttachmentSummaryReply {
+                status: AttachmentIdentityReadStatus::Ok,
+                summary: Some(SourceAttachmentSummary {
+                    source_id: 3,
+                    current_links_count: 2,
+                    stale_links_count: 1,
+                    source_files_with_current_blake3_facts_count: 4,
+                    source_files_with_attachment_links_count: 3,
+                    source_files_missing_attachment_links_count: 2,
+                    unmaterialized_blake3_facts_count: 2,
+                }),
+            });
+        let json = serde_json::to_value(&summary_reply).expect("serialize summary reply");
+        assert_eq!(json["type"], json!("sourceAttachmentSummary"));
+        assert_eq!(json["payload"]["summary"]["sourceId"], json!("3"));
+        assert_eq!(
+            json["payload"]["summary"]["unmaterializedBlake3FactsCount"],
+            json!(2)
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(json).expect("deserialize summary reply"),
+            summary_reply
         );
     }
 

@@ -56,8 +56,10 @@ pub use error::{
     DurableStoreOpenFailureKind, LibrarySqliteError, LibrarySqliteResult,
 };
 pub use read_models::attachment_identity::{
+    StoreAttachmentIdentity, StoreAttachmentSourceFiles, StoreSourceAttachmentSummary,
     StoreSourceFileAttachmentLink, StoreSourceFileAttachmentLinkStatus,
-    get_attachment_for_source_file, get_source_files_for_attachment,
+    get_attachment_for_source_file, get_attachment_identity, get_source_attachment_summary,
+    get_source_files_for_attachment, get_source_files_for_attachment_limited,
 };
 pub use read_models::contents::{
     StoreContentsCoverage, StoreContentsCoverageState, StoreContentsFileRow,

@@ -7,6 +7,7 @@ import type {
   MaintainedSnapshotInvalidation,
   ProtocolError,
   HashSourceFilesBlake3Reply,
+  ReadSourceFileAttachmentReply,
   RegisterLocalRootReply
 } from "@dekzer/library-boundary-contract";
 
@@ -49,11 +50,19 @@ type HashSourceFilesBlake3ReturnIsGenerated = AssertType<
   >
 >;
 
+type ReadSourceFileAttachmentReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient["readSourceFileAttachment"]>>,
+    ReadSourceFileAttachmentReply
+  >
+>;
+
 const compileTimeAssertions: [
   RegisterLocalRootReturnIsGenerated,
   RegisterLocalRootIdStaysString,
-  HashSourceFilesBlake3ReturnIsGenerated
-] = [true, true, true];
+  HashSourceFilesBlake3ReturnIsGenerated,
+  ReadSourceFileAttachmentReturnIsGenerated
+] = [true, true, true, true];
 void compileTimeAssertions;
 
 type Resolve<T> = (value: T | PromiseLike<T>) => void;
@@ -265,6 +274,132 @@ async function validatesHashSourceFilesBlake3RequestAndReply(): Promise<void> {
     reply.outcomes[0]?.status.type,
     "hashed",
     "hashSourceFilesBlake3 unwraps the reply payload"
+  );
+}
+
+async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void> {
+  const transport = new RecordingTransport();
+  transport.enqueueOutcome(
+    success({
+      type: "snapshotRead",
+      payload: {
+        type: "sourceFileAttachment",
+        payload: {
+          status: "ok",
+          attachmentLink: {
+            attachmentId: "7",
+            sourceFileId: "11",
+            sourceId: "3",
+            contentHashAlgorithm: "blake3",
+            contentHashValue: "abc",
+            fileKind: "audio",
+            linkStatus: "current",
+            createdAtMs: 100,
+            updatedAtMs: 200
+          }
+        }
+      }
+    })
+  );
+  transport.enqueueOutcome(
+    success({
+      type: "snapshotRead",
+      payload: {
+        type: "attachmentSourceFiles",
+        payload: {
+          status: "ok",
+          attachment: {
+            attachmentId: "7",
+            contentHashAlgorithm: "blake3",
+            contentHashValue: "abc"
+          },
+          sourceFileLinks: [],
+          effectiveLimit: 25,
+          remainingSourceFileLinks: 0
+        }
+      }
+    })
+  );
+  transport.enqueueOutcome(
+    success({
+      type: "snapshotRead",
+      payload: {
+        type: "sourceAttachmentSummary",
+        payload: {
+          status: "ok",
+          summary: {
+            sourceId: "3",
+            currentLinksCount: 1,
+            staleLinksCount: 0,
+            sourceFilesWithCurrentBlake3FactsCount: 1,
+            sourceFilesWithAttachmentLinksCount: 1,
+            sourceFilesMissingAttachmentLinksCount: 0,
+            unmaterializedBlake3FactsCount: 0
+          }
+        }
+      }
+    })
+  );
+  const client = new LibraryBoundaryClient(transport);
+
+  const sourceFileReply = await client.readSourceFileAttachment({
+    sourceFileId: "11"
+  });
+  const attachmentReply = await client.readAttachmentSourceFiles({
+    attachmentId: "7",
+    limit: 25
+  });
+  const summaryReply = await client.readSourceAttachmentSummary({
+    sourceId: "3"
+  });
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: "snapshotRead",
+      payload: {
+        type: "readSourceFileAttachment",
+        payload: { sourceFileId: "11" }
+      }
+    } satisfies CommandRequest,
+    "readSourceFileAttachment sends the generated snapshot command"
+  );
+  deepEqual(
+    transport.sentRequests[1],
+    {
+      type: "snapshotRead",
+      payload: {
+        type: "readAttachmentSourceFiles",
+        payload: { attachmentId: "7", limit: 25 }
+      }
+    } satisfies CommandRequest,
+    "readAttachmentSourceFiles sends the generated snapshot command"
+  );
+  deepEqual(
+    transport.sentRequests[2],
+    {
+      type: "snapshotRead",
+      payload: {
+        type: "readSourceAttachmentSummary",
+        payload: { sourceId: "3" }
+      }
+    } satisfies CommandRequest,
+    "readSourceAttachmentSummary sends the generated snapshot command"
+  );
+  equal(
+    sourceFileReply.attachmentLink?.linkStatus,
+    "current",
+    "source-file attachment reply unwraps the link"
+  );
+  equal(
+    attachmentReply.attachment?.attachmentId,
+    "7",
+    "attachment source-files reply unwraps the attachment identity"
+  );
+  equal(
+    summaryReply.summary?.currentLinksCount,
+    1,
+    "source attachment summary reply unwraps counts"
   );
 }
 
@@ -627,6 +762,7 @@ async function rejects<ErrorType extends Error>(
 
 await validatesRegisterLocalRootRequestAndReply();
 await validatesHashSourceFilesBlake3RequestAndReply();
+await validatesAttachmentIdentityReadRequestsAndReplies();
 await validatesProtocolErrorsArePreserved();
 await validatesReplyFamilyMismatch();
 await validatesReplyVariantMismatch();

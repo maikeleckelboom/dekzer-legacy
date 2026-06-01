@@ -49,6 +49,34 @@
         "libraryAssetId"
       ]
     },
+    "AttachmentIdentity": {
+      "type": "object",
+      "properties": {
+        "attachmentId": {
+          "type": "string"
+        },
+        "contentHashAlgorithm": {
+          "type": "string"
+        },
+        "contentHashValue": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "attachmentId",
+        "contentHashAlgorithm",
+        "contentHashValue"
+      ]
+    },
+    "AttachmentIdentityReadStatus": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "notFound",
+        "invalidRequest",
+        "readFailed"
+      ]
+    },
     "CancelRootScanReply": {
       "type": "object",
       "properties": {
@@ -3117,6 +3145,65 @@
         }
       ]
     },
+    "ReadAttachmentSourceFilesReply": {
+      "type": "object",
+      "properties": {
+        "attachment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttachmentIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effectiveLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingSourceFileLinks": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFileLinks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceFileAttachmentLink"
+          }
+        },
+        "status": {
+          "$ref": "#/$defs/AttachmentIdentityReadStatus"
+        }
+      },
+      "required": [
+        "status",
+        "sourceFileLinks",
+        "effectiveLimit",
+        "remainingSourceFileLinks"
+      ]
+    },
+    "ReadAttachmentSourceFilesRequest": {
+      "type": "object",
+      "properties": {
+        "attachmentId": {
+          "type": "string"
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "attachmentId"
+      ]
+    },
     "ReadLibraryAssetPreparationDetailReply": {
       "type": "object",
       "properties": {
@@ -3348,6 +3435,70 @@
           ]
         }
       }
+    },
+    "ReadSourceAttachmentSummaryReply": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/AttachmentIdentityReadStatus"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceAttachmentSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "ReadSourceAttachmentSummaryRequest": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId"
+      ]
+    },
+    "ReadSourceFileAttachmentReply": {
+      "type": "object",
+      "properties": {
+        "attachmentLink": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceFileAttachmentLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/AttachmentIdentityReadStatus"
+        }
+      },
+      "required": [
+        "status"
+      ]
+    },
+    "ReadSourceFileAttachmentRequest": {
+      "type": "object",
+      "properties": {
+        "sourceFileId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceFileId"
+      ]
     },
     "ReadSourceLifecycleReply": {
       "type": "object",
@@ -3600,6 +3751,54 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadSourceFileAttachmentRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readSourceFileAttachment"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadAttachmentSourceFilesRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readAttachmentSourceFiles"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadSourceAttachmentSummaryRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readSourceAttachmentSummary"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadNavigationNodeLibraryBrowserWindowRequest"
             },
             "type": {
@@ -3764,6 +3963,54 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadSourceFileAttachmentReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceFileAttachment"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadAttachmentSourceFilesReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "attachmentSourceFiles"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadSourceAttachmentSummaryReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceAttachmentSummary"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadNavigationNodeLibraryBrowserWindowReply"
             },
             "type": {
@@ -3851,12 +4098,111 @@
         "unknown"
       ]
     },
+    "SourceAttachmentSummary": {
+      "type": "object",
+      "properties": {
+        "currentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesMissingAttachmentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesWithAttachmentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesWithCurrentBlake3FactsCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "staleLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "unmaterializedBlake3FactsCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "sourceId",
+        "currentLinksCount",
+        "staleLinksCount",
+        "sourceFilesWithCurrentBlake3FactsCount",
+        "sourceFilesWithAttachmentLinksCount",
+        "sourceFilesMissingAttachmentLinksCount",
+        "unmaterializedBlake3FactsCount"
+      ]
+    },
     "SourceClass": {
       "type": "string",
       "enum": [
         "internal",
         "externalMounted",
         "removableMounted"
+      ]
+    },
+    "SourceFileAttachmentLink": {
+      "type": "object",
+      "properties": {
+        "attachmentId": {
+          "type": "string"
+        },
+        "contentHashAlgorithm": {
+          "type": "string"
+        },
+        "contentHashValue": {
+          "type": "string"
+        },
+        "createdAtMs": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "fileKind": {
+          "$ref": "#/$defs/ContentsFileKind"
+        },
+        "linkStatus": {
+          "$ref": "#/$defs/SourceFileAttachmentLinkStatus"
+        },
+        "sourceFileId": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "updatedAtMs": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "attachmentId",
+        "sourceFileId",
+        "sourceId",
+        "contentHashAlgorithm",
+        "contentHashValue",
+        "fileKind",
+        "linkStatus",
+        "createdAtMs",
+        "updatedAtMs"
+      ]
+    },
+    "SourceFileAttachmentLinkStatus": {
+      "type": "string",
+      "enum": [
+        "current",
+        "stale"
       ]
     },
     "SourceFileHashCommand": {

@@ -13,10 +13,16 @@ import type {
   LoadNavigationRowByStableKeyRequest,
   LoadNavigationRowReply,
   LoadNavigationRowRequest,
+  ReadAttachmentSourceFilesReply,
+  ReadAttachmentSourceFilesRequest,
   ReadLibraryBoundaryEventsAfterReply,
   ReadLibraryBoundaryEventsAfterRequest,
   ReadLibraryTreeChildrenReply,
   ReadLibraryTreeChildrenRequest,
+  ReadSourceAttachmentSummaryReply,
+  ReadSourceAttachmentSummaryRequest,
+  ReadSourceFileAttachmentReply,
+  ReadSourceFileAttachmentRequest,
   ReadSourceLifecycleReply,
   ReadSourceLifecycleRequest,
   ReadLocalRootsReply,
@@ -202,6 +208,54 @@ export class LibraryBoundaryClient {
       },
       "snapshotRead",
       "sourceLifecycle"
+    );
+  }
+
+  readSourceFileAttachment(
+    request: ReadSourceFileAttachmentRequest
+  ): Promise<ReadSourceFileAttachmentReply> {
+    return this.sendAndExpect(
+      {
+        type: "snapshotRead",
+        payload: {
+          type: "readSourceFileAttachment",
+          payload: request
+        }
+      },
+      "snapshotRead",
+      "sourceFileAttachment"
+    );
+  }
+
+  readAttachmentSourceFiles(
+    request: ReadAttachmentSourceFilesRequest
+  ): Promise<ReadAttachmentSourceFilesReply> {
+    return this.sendAndExpect(
+      {
+        type: "snapshotRead",
+        payload: {
+          type: "readAttachmentSourceFiles",
+          payload: request
+        }
+      },
+      "snapshotRead",
+      "attachmentSourceFiles"
+    );
+  }
+
+  readSourceAttachmentSummary(
+    request: ReadSourceAttachmentSummaryRequest
+  ): Promise<ReadSourceAttachmentSummaryReply> {
+    return this.sendAndExpect(
+      {
+        type: "snapshotRead",
+        payload: {
+          type: "readSourceAttachmentSummary",
+          payload: request
+        }
+      },
+      "snapshotRead",
+      "sourceAttachmentSummary"
     );
   }
 

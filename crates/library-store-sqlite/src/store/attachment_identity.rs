@@ -386,7 +386,7 @@ mod tests {
 
     use crate::read_models::attachment_identity::{
         StoreSourceFileAttachmentLinkStatus, get_attachment_for_source_file,
-        get_source_files_for_attachment,
+        get_source_attachment_summary, get_source_files_for_attachment,
     };
     use crate::{
         CommitAcceptedSourceFactsInput, CompleteMachineWorkInput, ContentHashEvidence,
@@ -688,6 +688,8 @@ mod tests {
             link.link_status,
             StoreSourceFileAttachmentLinkStatus::Current
         );
+        assert!(link.created_at > 0);
+        assert!(link.updated_at >= link.created_at);
     }
 
     #[test]
@@ -742,6 +744,44 @@ mod tests {
         assert_ne!(
             fixture.attachment_id_for_hash(HASH_A),
             fixture.attachment_id_for_hash(HASH_B)
+        );
+    }
+
+    #[test]
+    fn source_attachment_summary_counts_current_stale_and_missing_links() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/a-current.flac", 10, 100);
+        fixture.record_source_file(101, "Album/b-stale.flac", 11, 101);
+        fixture.record_source_file(102, "Album/c-missing-link.flac", 12, 102);
+        fixture.record_source_file(103, "Album/d-no-facts.flac", 13, 103);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_fact(101, HASH_B, "audio");
+        fixture.commit_blake3_fact(102, HASH_C, "audio");
+        fixture.materialize(2);
+        fixture.commit_blake3_fact(101, HASH_C, "audio");
+
+        let connection = fixture.read_connection();
+        let summary = get_source_attachment_summary(&connection, fixture.source_id)
+            .expect("read source attachment summary")
+            .expect("source exists");
+
+        assert_eq!(summary.source_id, fixture.source_id);
+        assert_eq!(summary.current_links_count, 1);
+        assert_eq!(summary.stale_links_count, 1);
+        assert_eq!(summary.source_files_with_current_blake3_facts_count, 3);
+        assert_eq!(summary.source_files_with_attachment_links_count, 2);
+        assert_eq!(summary.source_files_missing_attachment_links_count, 1);
+    }
+
+    #[test]
+    fn source_attachment_summary_returns_none_for_unknown_source() {
+        let fixture = AttachmentIdentityFixture::new();
+        let connection = fixture.read_connection();
+
+        assert!(
+            get_source_attachment_summary(&connection, 99_999)
+                .expect("read missing source attachment summary")
+                .is_none()
         );
     }
 

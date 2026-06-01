@@ -49,7 +49,7 @@ export type SourceFileHashCommand = { "type": "hashSourceFilesBlake3", "payload"
 
 export type HashSourceFilesBlake3Request = { sourceId: string, limit?: number, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -72,6 +72,12 @@ export type SourceAccessState = "accessible" | "missing" | "blocked" | "unknown"
 export type SourceLifecycleIssueKind = "missing" | "notDirectory" | "permissionDenied" | "privacyPermissionRequired" | "unavailableMount" | "resourceBusy" | "staleNetworkHandle" | "symlinkLoop" | "symlinkEscapeBlocked" | "unsupportedPath" | "invalidPath" | "ioInterrupted" | "timedOut" | "unknownIo";
 
 export type SourceScanPhase = "idle" | "scanning" | "complete" | "partial" | "blocked" | "failed";
+
+export type ReadSourceFileAttachmentRequest = { sourceFileId: string, };
+
+export type ReadAttachmentSourceFilesRequest = { attachmentId: string, limit?: number, };
+
+export type ReadSourceAttachmentSummaryRequest = { sourceId: string, };
 
 export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
 
@@ -146,7 +152,7 @@ export type SourceFileHashReply = { "type": "hashSourceFilesBlake3", "payload": 
 
 export type HashSourceFilesBlake3Reply = { effectiveLimit: number, outcomes: Array<HashSourceFilesBlake3Outcome>, hashedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, sourceFailure?: HashSourceFilesBlake3SourceFailure, };
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -157,6 +163,12 @@ export type LoadNavigationRowByStableKeyReply = { row: NavigationRow | null, };
 export type ReadLibraryTreeChildrenReply = { window: LibraryTreeWindow | null, };
 
 export type ReadSourceLifecycleReply = { lifecycle: SourceLifecycle | null, };
+
+export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStatus, attachmentLink?: SourceFileAttachmentLink, };
+
+export type ReadAttachmentSourceFilesReply = { status: AttachmentIdentityReadStatus, attachment?: AttachmentIdentity, sourceFileLinks: Array<SourceFileAttachmentLink>, effectiveLimit: number, remainingSourceFileLinks: number, };
+
+export type ReadSourceAttachmentSummaryReply = { status: AttachmentIdentityReadStatus, summary?: SourceAttachmentSummary, };
 
 export type ReadNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
 
@@ -199,6 +211,16 @@ export type DirectoryImageMediaState = { "kind": "unknown" } | { "kind": "hasIma
 export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
 
 export type SourceLifecycle = { sourceId: string, sourceClass: SourceClass, isUserVisible: boolean, mountStatus: SourceMountStatus, accessState: SourceAccessState, accessIssueKind?: SourceLifecycleIssueKind, scanPhase: SourceScanPhase, scanIssueKind?: SourceLifecycleIssueKind, lastScanStartedAtMs?: number, lastScanFinishedAtMs?: number, lastSuccessfulScanAtMs?: number, lastSeenAtMs?: number, updatedAtMs: number, };
+
+export type AttachmentIdentityReadStatus = "ok" | "notFound" | "invalidRequest" | "readFailed";
+
+export type AttachmentIdentity = { attachmentId: string, contentHashAlgorithm: string, contentHashValue: string, };
+
+export type SourceFileAttachmentLink = { attachmentId: string, sourceFileId: string, sourceId: string, contentHashAlgorithm: string, contentHashValue: string, fileKind: ContentsFileKind, linkStatus: SourceFileAttachmentLinkStatus, createdAtMs: number, updatedAtMs: number, };
+
+export type SourceFileAttachmentLinkStatus = "current" | "stale";
+
+export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
 
 export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, rows: Array<ContentsFileRow>, coverage: ContentsCoverage, nextCursor?: string, detail?: string, };
 

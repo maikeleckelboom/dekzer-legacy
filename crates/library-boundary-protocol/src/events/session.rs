@@ -29,18 +29,23 @@ pub enum MaintainedSnapshotScope {
 }
 
 impl MaintainedSnapshotScope {
-    pub fn for_snapshot_read(command: &SnapshotReadCommand) -> Self {
+    pub fn for_snapshot_read(command: &SnapshotReadCommand) -> Option<Self> {
         match command {
             SnapshotReadCommand::ReadNavigationRows(_)
             | SnapshotReadCommand::LoadNavigationRow(_)
-            | SnapshotReadCommand::LoadNavigationRowByStableKey(_) => Self::NavigationRows,
+            | SnapshotReadCommand::LoadNavigationRowByStableKey(_) => Some(Self::NavigationRows),
             SnapshotReadCommand::ReadLibraryTreeChildren(_)
             | SnapshotReadCommand::ReadSourceLifecycle(_)
             | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::ContentsRead(_)
             | SnapshotReadCommand::ReadLibraryAssetWaveformOverview(_)
-            | SnapshotReadCommand::ReadLibraryAssetPreparationDetail(_) => Self::LibraryBrowser,
+            | SnapshotReadCommand::ReadLibraryAssetPreparationDetail(_) => {
+                Some(Self::LibraryBrowser)
+            }
+            SnapshotReadCommand::ReadSourceFileAttachment(_)
+            | SnapshotReadCommand::ReadAttachmentSourceFiles(_)
+            | SnapshotReadCommand::ReadSourceAttachmentSummary(_) => None,
         }
     }
 }
@@ -262,10 +267,12 @@ mod tests {
         ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
         ContentsRowProfile, ContentsScope, LibraryTreeEntryPoint,
         LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, ReadSourceLifecycleRequest,
-        SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand,
+        ReadAttachmentSourceFilesRequest, ReadLibraryAssetPreparationDetailRequest,
+        ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenRequest,
+        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentRequest,
+        ReadSourceLifecycleRequest, SearchNavigationNodeLibraryBrowserWindowRequest,
+        SnapshotReadCommand,
     };
     use serde_json::json;
 
@@ -288,7 +295,7 @@ mod tests {
         for command in &navigation_reads {
             assert_eq!(
                 MaintainedSnapshotScope::for_snapshot_read(command),
-                MaintainedSnapshotScope::NavigationRows
+                Some(MaintainedSnapshotScope::NavigationRows)
             );
         }
 
@@ -343,7 +350,28 @@ mod tests {
         for command in &library_asset_reads {
             assert_eq!(
                 MaintainedSnapshotScope::for_snapshot_read(command),
-                MaintainedSnapshotScope::LibraryBrowser
+                Some(MaintainedSnapshotScope::LibraryBrowser)
+            );
+        }
+
+        let explicit_attachment_reads = [
+            SnapshotReadCommand::ReadSourceFileAttachment(ReadSourceFileAttachmentRequest {
+                source_file_id: 8,
+            }),
+            SnapshotReadCommand::ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest {
+                attachment_id: 9,
+                limit: Some(100),
+            }),
+            SnapshotReadCommand::ReadSourceAttachmentSummary(ReadSourceAttachmentSummaryRequest {
+                source_id: 8,
+            }),
+        ];
+
+        for command in &explicit_attachment_reads {
+            assert_eq!(
+                MaintainedSnapshotScope::for_snapshot_read(command),
+                None,
+                "attachment identity reads are explicit until a precise maintained scope exists"
             );
         }
     }

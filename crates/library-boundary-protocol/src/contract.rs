@@ -57,6 +57,9 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SourceAccessState>(&cfg, &mut output);
     push_ts_decl::<crate::SourceLifecycleIssueKind>(&cfg, &mut output);
     push_ts_decl::<crate::SourceScanPhase>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceFileAttachmentRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadAttachmentSourceFilesRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceAttachmentSummaryRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadRequest>(&cfg, &mut output);
@@ -90,6 +93,9 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LoadNavigationRowByStableKeyReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceFileAttachmentReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadAttachmentSourceFilesReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceAttachmentSummaryReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadReply>(&cfg, &mut output);
@@ -111,6 +117,11 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::DirectoryImageMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
     push_ts_decl::<crate::SourceLifecycle>(&cfg, &mut output);
+    push_ts_decl::<crate::AttachmentIdentityReadStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::AttachmentIdentity>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceFileAttachmentLink>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceFileAttachmentLinkStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceAttachmentSummary>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsResult>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsState>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsCoverage>(&cfg, &mut output);

@@ -19,10 +19,11 @@ use library_store_sqlite::{
 use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
 use crate::snapshot_read_protocol::{
     map_load_navigation_row_by_stable_key_reply, map_load_navigation_row_reply,
-    map_maintained_read_model_revisions, map_read_contents_reply,
-    map_read_library_asset_preparation_detail_reply,
+    map_maintained_read_model_revisions, map_read_attachment_source_files_reply,
+    map_read_contents_reply, map_read_library_asset_preparation_detail_reply,
     map_read_library_asset_waveform_overview_reply, map_read_library_tree_children_reply,
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
+    map_read_source_attachment_summary_reply, map_read_source_file_attachment_reply,
     map_read_source_lifecycle_reply, map_search_navigation_node_library_browser_window_reply,
     store_contents_policy, store_contents_recursion, store_contents_scope,
     store_library_tree_entry_point,
@@ -501,6 +502,44 @@ impl LibraryBoundaryService {
         map_read_source_lifecycle_reply(lifecycle).map_err(map_store_error)
     }
 
+    pub fn read_source_file_attachment(
+        &self,
+        request: protocol::ReadSourceFileAttachmentRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadSourceFileAttachmentReply> {
+        let source_file_id = require_positive_i64(request.source_file_id, "sourceFileId")?;
+        let attachment_link = self
+            .durable_store
+            .read_attachment_for_source_file(source_file_id)
+            .map_err(map_store_error)?;
+        map_read_source_file_attachment_reply(attachment_link).map_err(map_store_error)
+    }
+
+    pub fn read_attachment_source_files(
+        &self,
+        request: protocol::ReadAttachmentSourceFilesRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadAttachmentSourceFilesReply> {
+        let attachment_id = require_positive_i64(request.attachment_id, "attachmentId")?;
+        let limit = request.limit.unwrap_or(100);
+        validate_attachment_source_files_limit(limit)?;
+        let source_files = self
+            .durable_store
+            .read_source_files_for_attachment(attachment_id, limit)
+            .map_err(map_store_error)?;
+        map_read_attachment_source_files_reply(source_files).map_err(map_store_error)
+    }
+
+    pub fn read_source_attachment_summary(
+        &self,
+        request: protocol::ReadSourceAttachmentSummaryRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadSourceAttachmentSummaryReply> {
+        let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        let summary = self
+            .durable_store
+            .read_source_attachment_summary(source_id)
+            .map_err(map_store_error)?;
+        Ok(map_read_source_attachment_summary_reply(summary))
+    }
+
     pub fn read_navigation_node_library_browser_window(
         &self,
         request: protocol::ReadNavigationNodeLibraryBrowserWindowRequest,
@@ -746,6 +785,15 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ReadSourceLifecycle(request) => self
                 .read_source_lifecycle(request)
                 .map(protocol::SnapshotReadReply::SourceLifecycle),
+            protocol::SnapshotReadCommand::ReadSourceFileAttachment(request) => self
+                .read_source_file_attachment(request)
+                .map(protocol::SnapshotReadReply::SourceFileAttachment),
+            protocol::SnapshotReadCommand::ReadAttachmentSourceFiles(request) => self
+                .read_attachment_source_files(request)
+                .map(protocol::SnapshotReadReply::AttachmentSourceFiles),
+            protocol::SnapshotReadCommand::ReadSourceAttachmentSummary(request) => self
+                .read_source_attachment_summary(request)
+                .map(protocol::SnapshotReadReply::SourceAttachmentSummary),
             protocol::SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(request) => self
                 .read_navigation_node_library_browser_window(request)
                 .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserWindow),
@@ -1022,6 +1070,16 @@ fn validate_contents_limit(limit: usize) -> protocol::ProtocolResult<()> {
     }
 }
 
+fn validate_attachment_source_files_limit(limit: usize) -> protocol::ProtocolResult<()> {
+    if (1..=200).contains(&limit) {
+        Ok(())
+    } else {
+        Err(protocol::ProtocolError::InvalidRequest {
+            detail: "readAttachmentSourceFiles limit must be between 1 and 200".to_string(),
+        })
+    }
+}
+
 pub(crate) fn unix_time_ms() -> protocol::ProtocolResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1044,22 +1102,26 @@ pub(crate) fn map_store_error(
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
-        CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandOutcome,
-        CommandReply, CommandRequest, ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest,
-        ContentsRecursion, ContentsRowProfile, ContentsScope, CreatePlaylistReply,
-        CreatePlaylistRequest, DeletePlaylistReply, DeletePlaylistRequest,
-        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
-        HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
+        AttachmentIdentityReadStatus, CancelRootScanReply, CancelRootScanRequest,
+        CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest, ContentsMediaClass,
+        ContentsReadPolicy, ContentsReadRequest, ContentsRecursion, ContentsRowProfile,
+        ContentsScope, CreatePlaylistReply, CreatePlaylistRequest, DeletePlaylistReply,
+        DeletePlaylistRequest, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        DirectoryScanState, HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
         HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
         LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
         LoadNavigationRowByStableKeyReply, LoadNavigationRowByStableKeyRequest,
         MaintainedSnapshotScope, PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
+        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
         ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
-        ReadLibraryTreeChildrenRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadLibraryTreeChildrenRequest, ReadSourceAttachmentSummaryReply,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
+        ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
         RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
-        RenamePlaylistRequest, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
-        SourceFileHashReply, StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
+        RenamePlaylistRequest, SnapshotReadCommand, SnapshotReadReply,
+        SourceFileAttachmentLinkStatus, SourceFileHashCommand, SourceFileHashReply,
+        StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
         UnregisterLocalRootRequest,
     };
     use rusqlite::Connection;
@@ -1238,6 +1300,29 @@ mod tests {
         match reply {
             CommandReply::SnapshotRead(SnapshotReadReply::SourceLifecycle(reply)) => reply,
             other => panic!("expected source lifecycle reply, got {other:?}"),
+        }
+    }
+
+    fn expect_source_file_attachment_reply(reply: CommandReply) -> ReadSourceFileAttachmentReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::SourceFileAttachment(reply)) => reply,
+            other => panic!("expected source-file attachment reply, got {other:?}"),
+        }
+    }
+
+    fn expect_attachment_source_files_reply(reply: CommandReply) -> ReadAttachmentSourceFilesReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::AttachmentSourceFiles(reply)) => reply,
+            other => panic!("expected attachment source-files reply, got {other:?}"),
+        }
+    }
+
+    fn expect_source_attachment_summary_reply(
+        reply: CommandReply,
+    ) -> ReadSourceAttachmentSummaryReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::SourceAttachmentSummary(reply)) => reply,
+            other => panic!("expected source attachment summary reply, got {other:?}"),
         }
     }
 
@@ -1474,6 +1559,43 @@ mod tests {
         expect_source_lifecycle_reply(expect_success(service.handle_command(
             CommandRequest::SnapshotRead(SnapshotReadCommand::ReadSourceLifecycle(
                 ReadSourceLifecycleRequest { source_id },
+            )),
+        )))
+    }
+
+    fn read_source_file_attachment(
+        service: &LibraryBoundaryService,
+        source_file_id: i64,
+    ) -> ReadSourceFileAttachmentReply {
+        expect_source_file_attachment_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadSourceFileAttachment(
+                ReadSourceFileAttachmentRequest { source_file_id },
+            )),
+        )))
+    }
+
+    fn read_attachment_source_files(
+        service: &LibraryBoundaryService,
+        attachment_id: i64,
+        limit: Option<usize>,
+    ) -> ReadAttachmentSourceFilesReply {
+        expect_attachment_source_files_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadAttachmentSourceFiles(
+                ReadAttachmentSourceFilesRequest {
+                    attachment_id,
+                    limit,
+                },
+            )),
+        )))
+    }
+
+    fn read_source_attachment_summary(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+    ) -> ReadSourceAttachmentSummaryReply {
+        expect_source_attachment_summary_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadSourceAttachmentSummary(
+                ReadSourceAttachmentSummaryRequest { source_id },
             )),
         )))
     }
@@ -1948,6 +2070,278 @@ mod tests {
             .expect("existing BLAKE3 candidates still trigger one materialization unit");
         assert_eq!(attachment_run.links_created, 2);
         assert!(!attachment_run.run_limit_reached);
+    }
+
+    #[test]
+    fn attachment_identity_snapshot_reads_expose_current_stale_occurrences_and_summary() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("attachment-read-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("a.flac"), b"same bytes").expect("write a");
+        std::fs::write(source_root.join("b.flac"), b"same bytes").expect("write b");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let _scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_completed(&service, registered.root_id);
+        let file_ids = read_source_contents_file_ids(&service, registered.root_id);
+        assert_eq!(file_ids.len(), 2);
+
+        let first = read_source_file_attachment(&service, file_ids[0]);
+        assert_eq!(first.status, AttachmentIdentityReadStatus::Ok);
+        let first_link = first
+            .attachment_link
+            .expect("first file has attachment link");
+        assert_eq!(first_link.source_id, registered.root_id);
+        assert_eq!(
+            first_link.link_status,
+            SourceFileAttachmentLinkStatus::Current
+        );
+        assert_eq!(first_link.content_hash_algorithm, "blake3");
+        assert_eq!(
+            first_link.file_kind,
+            library_boundary_protocol::ContentsFileKind::Audio
+        );
+
+        let second = read_source_file_attachment(&service, file_ids[1]);
+        assert_eq!(second.status, AttachmentIdentityReadStatus::Ok);
+        assert_eq!(
+            second
+                .attachment_link
+                .as_ref()
+                .expect("second file has attachment link")
+                .attachment_id,
+            first_link.attachment_id,
+            "same bytes should point at one attachment identity"
+        );
+
+        let limited = read_attachment_source_files(&service, first_link.attachment_id, Some(1));
+        assert_eq!(limited.status, AttachmentIdentityReadStatus::Ok);
+        assert_eq!(
+            limited
+                .attachment
+                .as_ref()
+                .expect("attachment identity is included")
+                .content_hash_value,
+            first_link.content_hash_value
+        );
+        assert_eq!(limited.source_file_links.len(), 1);
+        assert_eq!(limited.effective_limit, 1);
+        assert_eq!(limited.remaining_source_file_links, 1);
+
+        let all_links = read_attachment_source_files(&service, first_link.attachment_id, Some(10));
+        assert_eq!(all_links.source_file_links.len(), 2);
+        assert!(
+            all_links
+                .source_file_links
+                .iter()
+                .all(|link| link.link_status == SourceFileAttachmentLinkStatus::Current)
+        );
+
+        let summary = read_source_attachment_summary(&service, registered.root_id);
+        assert_eq!(summary.status, AttachmentIdentityReadStatus::Ok);
+        let summary = summary.summary.expect("source summary exists");
+        assert_eq!(summary.source_id, registered.root_id);
+        assert_eq!(summary.current_links_count, 2);
+        assert_eq!(summary.stale_links_count, 0);
+        assert_eq!(summary.source_files_with_current_blake3_facts_count, 2);
+        assert_eq!(summary.source_files_with_attachment_links_count, 2);
+        assert_eq!(summary.source_files_missing_attachment_links_count, 0);
+        assert_eq!(summary.unmaterialized_blake3_facts_count, 0);
+
+        service
+            .durable_store
+            .record_source_file_observation(RecordSourceFileObservationInput {
+                source_file_id: Some(file_ids[1]),
+                source_id: registered.root_id,
+                parent_source_directory_id: None,
+                name: "b.flac".to_string(),
+                relative_path: "b.flac".to_string(),
+                size_bytes: Some(13),
+                mtime_ns: Some(999),
+                presence_state: SourcePresenceState::Present,
+                first_discovered_at: Some(9_000_000_000_000),
+                observed_at: Some(9_000_000_000_000),
+                presence_changed_at: 9_000_000_000_000,
+                updated_at: 9_000_000_000_000,
+            })
+            .expect("change source-file basis");
+        std::fs::write(source_root.join("b.flac"), b"different now").expect("rewrite b");
+        service
+            .durable_store
+            .hash_source_file_blake3_batch(library_store_sqlite::HashSourceFileBlake3BatchInput {
+                scope: SourceFileBlake3HashAdmissionScope::Source {
+                    source_id: registered.root_id,
+                },
+                limit: Some(1),
+                observed_at_ms: 50,
+            })
+            .expect("rehash changed source file without attachment materialization");
+
+        let stale = read_source_file_attachment(&service, file_ids[1]);
+        assert_eq!(stale.status, AttachmentIdentityReadStatus::Ok);
+        assert_eq!(
+            stale
+                .attachment_link
+                .expect("stale link still exists")
+                .link_status,
+            SourceFileAttachmentLinkStatus::Stale
+        );
+
+        let summary = read_source_attachment_summary(&service, registered.root_id);
+        let summary = summary
+            .summary
+            .expect("source summary exists after stale basis");
+        assert_eq!(summary.current_links_count, 1);
+        assert_eq!(summary.stale_links_count, 1);
+        assert_eq!(summary.source_files_with_current_blake3_facts_count, 1);
+        assert_eq!(summary.source_files_with_attachment_links_count, 2);
+        assert_eq!(summary.source_files_missing_attachment_links_count, 0);
+
+        service
+            .durable_store
+            .record_source_file_observation(RecordSourceFileObservationInput {
+                source_file_id: Some(999),
+                source_id: registered.root_id,
+                parent_source_directory_id: None,
+                name: "unlinked.flac".to_string(),
+                relative_path: "unlinked.flac".to_string(),
+                size_bytes: Some(7),
+                mtime_ns: Some(7),
+                presence_state: SourcePresenceState::Present,
+                first_discovered_at: Some(9_000_000_000_100),
+                observed_at: Some(9_000_000_000_100),
+                presence_changed_at: 9_000_000_000_100,
+                updated_at: 9_000_000_000_100,
+            })
+            .expect("record unlinked source file");
+        let unlinked = read_source_file_attachment(&service, 999);
+        assert_eq!(unlinked.status, AttachmentIdentityReadStatus::NotFound);
+        assert!(unlinked.attachment_link.is_none());
+
+        let missing_attachment = read_attachment_source_files(&service, 99_999, Some(10));
+        assert_eq!(
+            missing_attachment.status,
+            AttachmentIdentityReadStatus::NotFound
+        );
+        assert!(missing_attachment.attachment.is_none());
+        assert!(missing_attachment.source_file_links.is_empty());
+
+        let missing_source = read_source_attachment_summary(&service, 99_999);
+        assert_eq!(
+            missing_source.status,
+            AttachmentIdentityReadStatus::NotFound
+        );
+        assert!(missing_source.summary.is_none());
+
+        let before_counts = (
+            count_rows(&context, "SourceFacts"),
+            count_rows(&context, "content_attachments"),
+            count_rows(&context, "source_file_attachment_links"),
+            count_rows(&context, "LibraryAssets"),
+            count_rows(&context, "LibraryAssetAttachments"),
+            count_rows(&context, "LibraryBrowserRows"),
+            count_rows(&context, "SourceSegmentSets"),
+            count_rows(&context, "SourceSegments"),
+            service
+                .source_hash_maintenance
+                .completed_runs_for_test()
+                .len(),
+        );
+        let _ = read_source_file_attachment(&service, file_ids[0]);
+        let _ = read_attachment_source_files(&service, first_link.attachment_id, Some(10));
+        let _ = read_source_attachment_summary(&service, registered.root_id);
+        let after_counts = (
+            count_rows(&context, "SourceFacts"),
+            count_rows(&context, "content_attachments"),
+            count_rows(&context, "source_file_attachment_links"),
+            count_rows(&context, "LibraryAssets"),
+            count_rows(&context, "LibraryAssetAttachments"),
+            count_rows(&context, "LibraryBrowserRows"),
+            count_rows(&context, "SourceSegmentSets"),
+            count_rows(&context, "SourceSegments"),
+            service
+                .source_hash_maintenance
+                .completed_runs_for_test()
+                .len(),
+        );
+        assert_eq!(
+            after_counts, before_counts,
+            "attachment identity reads must not trigger hash maintenance, materialization, or old identity rows"
+        );
+        for absent_or_future_table in [
+            "Tracks",
+            "TrackRows",
+            "LibraryTracks",
+            "PrepRows",
+            "PreparationRows",
+            "primaryMedia",
+            "Playlists",
+            "PlaylistEntries",
+        ] {
+            assert!(
+                matches!(
+                    count_table_if_exists(&context, absent_or_future_table),
+                    None | Some(0)
+                ),
+                "{absent_or_future_table} must be absent or empty after attachment reads"
+            );
+        }
+    }
+
+    #[test]
+    fn attachment_identity_snapshot_reads_reject_invalid_ids_and_limits() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let invalid_source_file = service
+            .try_handle_command(CommandRequest::SnapshotRead(
+                SnapshotReadCommand::ReadSourceFileAttachment(ReadSourceFileAttachmentRequest {
+                    source_file_id: 0,
+                }),
+            ))
+            .expect_err("zero sourceFileId is invalid");
+        assert!(matches!(
+            invalid_source_file,
+            ProtocolError::InvalidRequest { .. }
+        ));
+
+        let invalid_attachment = service
+            .try_handle_command(CommandRequest::SnapshotRead(
+                SnapshotReadCommand::ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest {
+                    attachment_id: -1,
+                    limit: Some(10),
+                }),
+            ))
+            .expect_err("negative attachmentId is invalid");
+        assert!(matches!(
+            invalid_attachment,
+            ProtocolError::InvalidRequest { .. }
+        ));
+
+        let invalid_limit = service
+            .try_handle_command(CommandRequest::SnapshotRead(
+                SnapshotReadCommand::ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest {
+                    attachment_id: 1,
+                    limit: Some(0),
+                }),
+            ))
+            .expect_err("zero attachment read limit is invalid");
+        assert!(matches!(
+            invalid_limit,
+            ProtocolError::InvalidRequest { .. }
+        ));
+
+        let invalid_source = service
+            .try_handle_command(CommandRequest::SnapshotRead(
+                SnapshotReadCommand::ReadSourceAttachmentSummary(
+                    ReadSourceAttachmentSummaryRequest { source_id: 0 },
+                ),
+            ))
+            .expect_err("zero sourceId is invalid");
+        assert!(matches!(
+            invalid_source,
+            ProtocolError::InvalidRequest { .. }
+        ));
     }
 
     #[test]

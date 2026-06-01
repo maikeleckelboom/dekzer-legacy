@@ -129,6 +129,59 @@ pub(crate) fn map_read_source_lifecycle_reply(
     })
 }
 
+pub(crate) fn map_read_source_file_attachment_reply(
+    attachment_link: Option<store::StoreSourceFileAttachmentLink>,
+) -> store::LibrarySqliteResult<protocol::ReadSourceFileAttachmentReply> {
+    Ok(protocol::ReadSourceFileAttachmentReply {
+        status: if attachment_link.is_some() {
+            protocol::AttachmentIdentityReadStatus::Ok
+        } else {
+            protocol::AttachmentIdentityReadStatus::NotFound
+        },
+        attachment_link: attachment_link
+            .map(map_source_file_attachment_link)
+            .transpose()?,
+    })
+}
+
+pub(crate) fn map_read_attachment_source_files_reply(
+    source_files: Option<store::StoreAttachmentSourceFiles>,
+) -> store::LibrarySqliteResult<protocol::ReadAttachmentSourceFilesReply> {
+    match source_files {
+        Some(source_files) => Ok(protocol::ReadAttachmentSourceFilesReply {
+            status: protocol::AttachmentIdentityReadStatus::Ok,
+            attachment: Some(map_attachment_identity(source_files.attachment)),
+            source_file_links: source_files
+                .source_file_links
+                .into_iter()
+                .map(map_source_file_attachment_link)
+                .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
+            effective_limit: source_files.effective_limit,
+            remaining_source_file_links: source_files.remaining_source_file_links,
+        }),
+        None => Ok(protocol::ReadAttachmentSourceFilesReply {
+            status: protocol::AttachmentIdentityReadStatus::NotFound,
+            attachment: None,
+            source_file_links: Vec::new(),
+            effective_limit: 0,
+            remaining_source_file_links: 0,
+        }),
+    }
+}
+
+pub(crate) fn map_read_source_attachment_summary_reply(
+    summary: Option<store::StoreSourceAttachmentSummary>,
+) -> protocol::ReadSourceAttachmentSummaryReply {
+    protocol::ReadSourceAttachmentSummaryReply {
+        status: if summary.is_some() {
+            protocol::AttachmentIdentityReadStatus::Ok
+        } else {
+            protocol::AttachmentIdentityReadStatus::NotFound
+        },
+        summary: summary.map(map_source_attachment_summary),
+    }
+}
+
 pub(crate) fn map_read_navigation_node_library_browser_window_reply(
     window: Option<store::StoreLibraryBrowserWindow>,
 ) -> store::LibrarySqliteResult<protocol::ReadNavigationNodeLibraryBrowserWindowReply> {
@@ -357,6 +410,70 @@ fn map_source_lifecycle(
         last_seen_at_ms: lifecycle.last_seen_at,
         updated_at_ms: lifecycle.updated_at,
     })
+}
+
+fn map_attachment_identity(
+    attachment: store::StoreAttachmentIdentity,
+) -> protocol::AttachmentIdentity {
+    protocol::AttachmentIdentity {
+        attachment_id: attachment.attachment_id,
+        content_hash_algorithm: attachment.content_hash_algorithm,
+        content_hash_value: attachment.content_hash_value,
+    }
+}
+
+fn map_source_file_attachment_link(
+    link: store::StoreSourceFileAttachmentLink,
+) -> store::LibrarySqliteResult<protocol::SourceFileAttachmentLink> {
+    let file_kind = protocol::ContentsFileKind::from_projection_value(&link.file_kind)
+        .ok_or_else(|| invalid_attachment_identity_value("file_kind", &link.file_kind))?;
+
+    Ok(protocol::SourceFileAttachmentLink {
+        attachment_id: link.attachment_id,
+        source_file_id: link.source_file_id,
+        source_id: link.source_id,
+        content_hash_algorithm: link.content_hash_algorithm,
+        content_hash_value: link.content_hash_value,
+        file_kind,
+        link_status: map_source_file_attachment_link_status(link.link_status),
+        created_at_ms: link.created_at,
+        updated_at_ms: link.updated_at,
+    })
+}
+
+const fn map_source_file_attachment_link_status(
+    status: store::StoreSourceFileAttachmentLinkStatus,
+) -> protocol::SourceFileAttachmentLinkStatus {
+    match status {
+        store::StoreSourceFileAttachmentLinkStatus::Current => {
+            protocol::SourceFileAttachmentLinkStatus::Current
+        }
+        store::StoreSourceFileAttachmentLinkStatus::Stale => {
+            protocol::SourceFileAttachmentLinkStatus::Stale
+        }
+    }
+}
+
+fn map_source_attachment_summary(
+    summary: store::StoreSourceAttachmentSummary,
+) -> protocol::SourceAttachmentSummary {
+    protocol::SourceAttachmentSummary {
+        source_id: summary.source_id,
+        current_links_count: summary.current_links_count,
+        stale_links_count: summary.stale_links_count,
+        source_files_with_current_blake3_facts_count: summary
+            .source_files_with_current_blake3_facts_count,
+        source_files_with_attachment_links_count: summary.source_files_with_attachment_links_count,
+        source_files_missing_attachment_links_count: summary
+            .source_files_missing_attachment_links_count,
+        unmaterialized_blake3_facts_count: summary.source_files_missing_attachment_links_count,
+    }
+}
+
+fn invalid_attachment_identity_value(field_name: &str, value: &str) -> store::LibrarySqliteError {
+    malformed_store_state(format!(
+        "attachment identity field {field_name} contains unsupported value {value:?}"
+    ))
 }
 
 fn map_source_class(value: &str) -> store::LibrarySqliteResult<protocol::SourceClass> {

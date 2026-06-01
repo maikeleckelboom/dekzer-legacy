@@ -28,6 +28,15 @@ import type {
   ReadSourceLifecycleResult,
   ReadSourceLifecycleRequest
 } from '../shared/librarySourceLifecycle/readSourceLifecycle'
+import { attachmentIdentityReadChannels } from '../shared/libraryAttachmentIdentity/channels'
+import type {
+  ReadAttachmentSourceFilesRequest,
+  ReadAttachmentSourceFilesResult,
+  ReadSourceAttachmentSummaryRequest,
+  ReadSourceAttachmentSummaryResult,
+  ReadSourceFileAttachmentRequest,
+  ReadSourceFileAttachmentResult
+} from '../shared/libraryAttachmentIdentity/read'
 import {
   sourceFileHashingChannels,
   type HashSourceFilesBlake3Request,
@@ -114,6 +123,32 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             sourceLifecycleReadChannels.readSourceLifecycle,
             request
           )) as ReadSourceLifecycleResult
+        }
+      },
+      attachmentIdentity: {
+        async readSourceFileAttachment(
+          request: ReadSourceFileAttachmentRequest
+        ): Promise<ReadSourceFileAttachmentResult> {
+          return (await ipcRenderer.invoke(
+            attachmentIdentityReadChannels.readSourceFileAttachment,
+            request
+          )) as ReadSourceFileAttachmentResult
+        },
+        async readAttachmentSourceFiles(
+          request: ReadAttachmentSourceFilesRequest
+        ): Promise<ReadAttachmentSourceFilesResult> {
+          return (await ipcRenderer.invoke(
+            attachmentIdentityReadChannels.readAttachmentSourceFiles,
+            request
+          )) as ReadAttachmentSourceFilesResult
+        },
+        async readSourceAttachmentSummary(
+          request: ReadSourceAttachmentSummaryRequest
+        ): Promise<ReadSourceAttachmentSummaryResult> {
+          return (await ipcRenderer.invoke(
+            attachmentIdentityReadChannels.readSourceAttachmentSummary,
+            request
+          )) as ReadSourceAttachmentSummaryResult
         }
       },
       hashing: {

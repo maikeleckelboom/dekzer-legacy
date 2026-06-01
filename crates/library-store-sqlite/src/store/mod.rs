@@ -11,6 +11,7 @@ use crate::work_control::SourceAdmissionGate;
 
 mod artifacts;
 mod attachment_identity;
+mod attachment_identity_reads;
 mod bootstrap;
 mod contents_reads;
 mod context;
