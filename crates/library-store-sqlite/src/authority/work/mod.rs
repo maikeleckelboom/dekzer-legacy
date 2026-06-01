@@ -57,10 +57,11 @@ mod tests {
     };
     use crate::authority::roots::RootMountStatus;
     use crate::authority::sources::{
-        CommitAcceptedSourceFactsInput, ContentHashEvidence, RecordSourceFileObservationInput,
-        SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx, SourceLocatorsAuthorityTx,
-        SourceStateAuthorityTx, SourcesAuthorityTx, UpsertSourceDirectoryInput, UpsertSourceInput,
-        UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
+        CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+        RecordSourceFileObservationInput, SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx,
+        SourceLocatorsAuthorityTx, SourceStateAuthorityTx, SourcesAuthorityTx,
+        UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocatorInput,
+        UpsertSourceScanStateInput, UpsertSourceStateInput,
     };
     use crate::authority::write_lane::{AdmittedWrite, admit_write};
     use crate::schema::install_baseline_schema_for_test;
@@ -189,6 +190,7 @@ mod tests {
                     codec: Some("flac".to_string()),
                     updated_at: 24,
                 },
+                source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
                 rebuild_projection_domains: vec![],
                 rebuild_priority: WorkPriorityClass::Interactive,
             })?;
@@ -1025,6 +1027,7 @@ mod tests {
                 codec: Some("flac".to_string()),
                 updated_at: changed_at + 3,
             },
+            source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
             rebuild_projection_domains: vec![],
             rebuild_priority: WorkPriorityClass::Interactive,
         })?;

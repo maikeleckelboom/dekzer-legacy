@@ -6,7 +6,9 @@ use rusqlite::{OptionalExtension, params_from_iter, types::Value};
 use thiserror::Error;
 
 use crate::authority::promotion::{InspectSourcePromotionInput, InspectSourcePromotionTx};
-use crate::authority::sources::{CommitAcceptedSourceFactsInput, ContentHashEvidence};
+use crate::authority::sources::{
+    CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+};
 use crate::authority::work::{
     ArtifactsAuthorityTx, ClaimSpecificMachineWorkInput, CompleteMachineWorkInput,
     FinishWorkRunInput, QueueInspectSourceWorkInput, RecordArtifactInput,
@@ -201,19 +203,19 @@ enum HashSourceFileBlake3Error {
 type HashSourceFileBlake3JobResult<T> = Result<T, HashSourceFileBlake3Error>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct SourceFileHashBasis {
-    source_file_id: SourceFileId,
-    source_id: i64,
-    relative_path: String,
-    size_bytes: Option<i64>,
-    mtime_ns: Option<i64>,
-    presence_state: String,
-    file_kind: String,
-    updated_at: i64,
+pub(super) struct SourceFileHashBasis {
+    pub(super) source_file_id: SourceFileId,
+    pub(super) source_id: i64,
+    pub(super) relative_path: String,
+    pub(super) size_bytes: Option<i64>,
+    pub(super) mtime_ns: Option<i64>,
+    pub(super) presence_state: String,
+    pub(super) file_kind: String,
+    pub(super) updated_at: i64,
 }
 
 impl SourceFileHashBasis {
-    fn basis_fingerprint(&self) -> String {
+    pub(super) fn basis_fingerprint(&self) -> String {
         source_observation_basis_fingerprint(
             self.source_file_id.get(),
             &self.relative_path,
@@ -223,15 +225,15 @@ impl SourceFileHashBasis {
         )
     }
 
-    fn media_kind(&self) -> String {
+    pub(super) fn media_kind(&self) -> String {
         self.file_kind.clone()
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ResolvedSourceFilePath {
-    basis: SourceFileHashBasis,
-    path: PathBuf,
+pub(super) struct ResolvedSourceFilePath {
+    pub(super) basis: SourceFileHashBasis,
+    pub(super) path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,7 +247,7 @@ struct SourceFilePathResolutionRow {
 }
 
 #[derive(Debug, Error)]
-enum ResolveSourceFilePathError {
+pub(super) enum ResolveSourceFilePathError {
     #[error(transparent)]
     Store(#[from] LibrarySqliteError),
     #[error("source file {source_file_id} does not exist")]
@@ -328,7 +330,7 @@ impl SqliteDurableStore {
 
         for candidate in candidates {
             let source_file_id = candidate.source_file_id;
-            let outcome = match self.resolve_source_file_path_for_hash(source_file_id) {
+            let outcome = match self.resolve_source_file_path_for_observation(source_file_id) {
                 Ok(resolved) => {
                     let source_id = resolved.basis.source_id;
                     let relative_path = resolved.basis.relative_path.clone();
@@ -543,7 +545,7 @@ impl SqliteDurableStore {
         Ok(basis)
     }
 
-    fn resolve_source_file_path_for_hash(
+    pub(super) fn resolve_source_file_path_for_observation(
         &self,
         source_file_id: SourceFileId,
     ) -> Result<ResolvedSourceFilePath, ResolveSourceFilePathError> {
@@ -929,7 +931,9 @@ fn map_file_canonicalize_error(
     }
 }
 
-fn is_source_scope_unavailable_resolution_error(error: &ResolveSourceFilePathError) -> bool {
+pub(super) fn is_source_scope_unavailable_resolution_error(
+    error: &ResolveSourceFilePathError,
+) -> bool {
     matches!(
         error,
         ResolveSourceFilePathError::SourceRootUnavailable { .. }
@@ -1092,6 +1096,8 @@ fn commit_blake3_hash_evidence(
                 codec: None,
                 updated_at: observed_at_ms,
             },
+            source_facts_merge_policy:
+                CommitAcceptedSourceFactsMergePolicy::preserve_current_probe_fields(),
             rebuild_projection_domains: vec![],
             rebuild_priority: WorkPriorityClass::Interactive,
         },
@@ -1118,7 +1124,7 @@ fn commit_blake3_hash_evidence(
     })
 }
 
-fn load_source_file_hash_basis(
+pub(super) fn load_source_file_hash_basis(
     write: &AdmittedWrite<'_>,
     source_file_id: SourceFileId,
 ) -> LibrarySqliteResult<SourceFileHashBasis> {

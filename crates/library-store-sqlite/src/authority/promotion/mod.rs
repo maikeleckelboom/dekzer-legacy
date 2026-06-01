@@ -65,7 +65,9 @@ mod tests {
     use crate::authority::library_asset::{
         AcceptedSourceSegmentInput, ReplaceAcceptedSourceSegmentSetInput,
     };
-    use crate::authority::sources::{CommitAcceptedSourceFactsInput, ContentHashEvidence};
+    use crate::authority::sources::{
+        CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+    };
 
     #[test]
     fn authority_modules_own_canonical_write_side_rows() {
@@ -195,6 +197,7 @@ mod tests {
                         codec: Some("flac".to_string()),
                         updated_at: 21,
                     },
+                    source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
                     rebuild_projection_domains: vec![ProjectionDomain::LibraryBrowser],
                     rebuild_priority: WorkPriorityClass::Interactive,
                 })

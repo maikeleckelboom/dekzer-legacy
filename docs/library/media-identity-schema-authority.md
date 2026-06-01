@@ -36,7 +36,7 @@ Reading order:
 | --- | --- | --- |
 | `source_files` | SQLite + `SourceFilesAuthorityTx` | Canonical attachment inventory row for observed source files. Classification is path-derived and provisional. |
 | `readContents` default policy | Renderer boundary + service/store read model | Current product contents path: recursive `sourceFile` rows for audio, video, image, and admitted unsupported CUE sheets. |
-| `SourceFacts` content hash evidence | Observed source facts substrate | Optional accepted, algorithm-tagged source-fact evidence attached to a `source_file_id` and copied file basis. It is not attachment identity and is not required by default contents reads. |
+| `SourceFacts` observed-file evidence | Observed source facts substrate | Optional accepted source-file evidence attached to a `source_file_id` and copied file basis. Current evidence includes BLAKE3 content hash and audio media probe facts. It is not attachment identity and is not required by default contents reads. |
 | `content_attachments` / `source_file_attachment_links` | SQLite + `SqliteDurableStore::materialize_attachments_for_source` called by bounded service maintenance | Current Rust/store/service attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing. Exposed only through the narrow attachment identity read boundary. |
 | `source_media` write/read guards | Store filesystem guard | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing. |
 | `Playlists` / `PlaylistEntries` | Boundary service + store | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`. |
@@ -150,6 +150,17 @@ Current placement:
   source after the terminal scan event and maintained invalidations are published. It does not synchronously drain all
   remaining candidates from a large source. Broader production scheduler policy remains separate integration work.
 
+## Media Probe Placement
+
+Media probe observations v0 also belong to `SourceFacts`. The store-owned adapter
+`dekzer.source_file_media_probe.symphonia` version `1` probes supported audio files for basic media/container facts and
+commits through the same inspect-source work/run/artifact authority path. Probe commits preserve current BLAKE3 evidence
+only when the existing row basis is current. BLAKE3 commits preserve current probe fields under the same basis rule.
+
+The probe job does not create attachment identity, track identity, CUE pairing, waveform data, prep rows, playlist rows,
+or renderer UI. Video source files return typed unsupported outcomes in v0 until a video-capable adapter is selected.
+CUE sheets remain source-file companion metadata rows and are not parsed by media probing.
+
 ## Boundary Between Identity Layers
 
 | Layer | Owns | Does not own |
@@ -162,7 +173,7 @@ Current placement:
 
 ## Next Implementation Gate
 
-The next gate is media probe observations v0, followed by collection health / source integrity work,
-source-location-scoped hash admission, broader scheduler policy, or a later promotion layer from attachments to
-playable identity. Follow-on work must not conflate the attachment foundation with track tables, CUE pairing, artwork
-intelligence, playlist UI, prep facets, or waveform generation.
+The next gate is collection health / source integrity work, video-capable probe adapter selection,
+source-location-scoped admission, broader scheduler policy, CUE parse observations, or a later promotion layer from
+attachments to playable identity. Follow-on work must not conflate the attachment foundation or media probe evidence
+with track tables, CUE pairing, artwork intelligence, playlist UI, prep facets, or waveform generation.

@@ -33,10 +33,11 @@ pub use authority::promotion::{
     ResolveLibraryAssetPromotionInput, ResolveLibraryAssetPromotionResult,
 };
 pub use authority::sources::{
-    CommitAcceptedSourceFactsInput, ContentHashEvidence, DeleteSourceLocationInput,
-    RecordSourceFileObservationInput, SourceLocatorInput, UpsertSourceDirectoryInput,
-    UpsertSourceInput, UpsertSourceLocationInput, UpsertSourceLocatorInput,
-    UpsertSourceScanStateInput, UpsertSourceStateInput, canonicalize_source_location_relative_path,
+    CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+    DeleteSourceLocationInput, RecordSourceFileObservationInput, SourceLocatorInput,
+    UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
+    UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
+    canonicalize_source_location_relative_path,
 };
 pub use authority::work::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
@@ -92,11 +93,16 @@ pub use store::{
     HashSourceFileBlake3BatchOutcome, HashSourceFileBlake3BatchOutcomeStatus,
     HashSourceFileBlake3BatchResult, LibraryStoreContext, LocalRoot, LocalRootAvailability,
     MaintainedReadModelRevision, MaintainedReadModelScope, MaterializeAttachmentsForSourceResult,
-    ReadLocalRootsResult, ReadSourceFileBlake3HashCandidatesInput, RegisterLocalRootInput,
-    RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
-    SOURCE_FILE_BLAKE3_ALGORITHM, SourceFileBlake3HashAdmissionScope,
+    ProbeSourceFileMediaBatchInput, ProbeSourceFileMediaBatchOutcome,
+    ProbeSourceFileMediaBatchOutcomeStatus, ProbeSourceFileMediaBatchResult, ReadLocalRootsResult,
+    ReadSourceFileBlake3HashCandidatesInput, ReadSourceFileMediaProbeCandidatesInput,
+    RegisterLocalRootInput, RootScanHierarchyObservationReason, RootScanMaterializationResult,
+    RootScanObservation, SOURCE_FILE_BLAKE3_ALGORITHM, SourceFileBlake3HashAdmissionScope,
     SourceFileBlake3HashCandidate, SourceFileBlake3HashCandidateReason,
-    SourceFileBlake3HashFailure, SourceFileBlake3HashSkipReason, SqliteDurableStore,
-    SqliteDurableStoreAppOwnedState, StoreEnvironment, UnregisterLocalRootInput,
-    UnregisterLocalRootResult, durable_store_path, effective_hash_batch_limit,
+    SourceFileBlake3HashFailure, SourceFileBlake3HashSkipReason,
+    SourceFileMediaProbeAdmissionScope, SourceFileMediaProbeCandidate,
+    SourceFileMediaProbeCandidateReason, SourceFileMediaProbeFacts, SourceFileMediaProbeFailure,
+    SourceFileMediaProbeSkipReason, SqliteDurableStore, SqliteDurableStoreAppOwnedState,
+    StoreEnvironment, UnregisterLocalRootInput, UnregisterLocalRootResult, durable_store_path,
+    effective_hash_batch_limit, effective_media_probe_batch_limit,
 };

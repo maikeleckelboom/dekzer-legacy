@@ -24,6 +24,35 @@ pub struct CommitAcceptedSourceFactsInput {
     pub updated_at: i64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CommitAcceptedSourceFactsMergePolicy {
+    pub preserve_current_content_hash_when_unspecified: bool,
+    pub preserve_current_probe_fields_when_unspecified: bool,
+}
+
+impl CommitAcceptedSourceFactsMergePolicy {
+    pub const fn replacement() -> Self {
+        Self {
+            preserve_current_content_hash_when_unspecified: false,
+            preserve_current_probe_fields_when_unspecified: false,
+        }
+    }
+
+    pub const fn preserve_current_content_hash() -> Self {
+        Self {
+            preserve_current_content_hash_when_unspecified: true,
+            preserve_current_probe_fields_when_unspecified: false,
+        }
+    }
+
+    pub const fn preserve_current_probe_fields() -> Self {
+        Self {
+            preserve_current_content_hash_when_unspecified: false,
+            preserve_current_probe_fields_when_unspecified: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContentHashEvidence {
     pub algorithm: String,
@@ -39,6 +68,17 @@ struct SourceFileBasis {
     presence_state: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CurrentSourceFactsForMerge {
+    content_hash: Option<ContentHashEvidence>,
+    mime_type: Option<String>,
+    duration_ms: Option<i64>,
+    sample_rate_hz: Option<i64>,
+    channels: Option<i64>,
+    bit_depth: Option<i64>,
+    codec: Option<String>,
+}
+
 pub struct SourceFactsAuthorityTx<'write, 'conn> {
     tx: &'write AdmittedWrite<'conn>,
 }
@@ -48,9 +88,10 @@ impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
         Self { tx }
     }
 
-    pub fn commit_accepted_source_facts(
+    pub fn commit_accepted_source_facts_with_merge(
         &self,
         input: &CommitAcceptedSourceFactsInput,
+        merge_policy: CommitAcceptedSourceFactsMergePolicy,
     ) -> LibrarySqliteResult<()> {
         validate_input(input)?;
         require_source_artifact(
@@ -61,7 +102,10 @@ impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
             &input.basis_fingerprint,
         )?;
         let source_file_basis = load_source_file_basis(self.tx, input.source_file_id)?;
-        let (content_hash_algorithm, content_hash_value) = input
+        let merged_input =
+            merge_with_current_facts(self.tx, input, merge_policy, &source_file_basis)?;
+        validate_input(&merged_input)?;
+        let (content_hash_algorithm, content_hash_value) = merged_input
             .content_hash
             .as_ref()
             .map(|hash| (Some(hash.algorithm.as_str()), Some(hash.value.as_str())))
@@ -120,22 +164,69 @@ impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
                 source_file_basis.size_bytes,
                 source_file_basis.mtime_ns,
                 source_file_basis.presence_state,
-                input.observed_at_ms,
+                merged_input.observed_at_ms,
                 content_hash_algorithm,
                 content_hash_value,
-                input.media_kind,
-                input.mime_type,
-                input.duration_ms,
-                input.sample_rate_hz,
-                input.channels,
-                input.bit_depth,
-                input.codec,
-                input.updated_at,
-                input.accepted_artifact_id.get(),
+                merged_input.media_kind,
+                merged_input.mime_type,
+                merged_input.duration_ms,
+                merged_input.sample_rate_hz,
+                merged_input.channels,
+                merged_input.bit_depth,
+                merged_input.codec,
+                merged_input.updated_at,
+                merged_input.accepted_artifact_id.get(),
             ],
         )?;
         Ok(())
     }
+}
+
+fn merge_with_current_facts(
+    tx: &AdmittedWrite<'_>,
+    input: &CommitAcceptedSourceFactsInput,
+    merge_policy: CommitAcceptedSourceFactsMergePolicy,
+    source_file_basis: &SourceFileBasis,
+) -> LibrarySqliteResult<CommitAcceptedSourceFactsInput> {
+    if !merge_policy.preserve_current_content_hash_when_unspecified
+        && !merge_policy.preserve_current_probe_fields_when_unspecified
+    {
+        return Ok(input.clone());
+    }
+
+    let Some(current) =
+        load_current_source_facts_for_merge(tx, input.source_file_id, source_file_basis)?
+    else {
+        return Ok(input.clone());
+    };
+
+    let mut merged = input.clone();
+    if merge_policy.preserve_current_content_hash_when_unspecified && merged.content_hash.is_none()
+    {
+        merged.content_hash = current.content_hash;
+    }
+    if merge_policy.preserve_current_probe_fields_when_unspecified {
+        if merged.mime_type.is_none() {
+            merged.mime_type = current.mime_type;
+        }
+        if merged.duration_ms.is_none() {
+            merged.duration_ms = current.duration_ms;
+        }
+        if merged.sample_rate_hz.is_none() {
+            merged.sample_rate_hz = current.sample_rate_hz;
+        }
+        if merged.channels.is_none() {
+            merged.channels = current.channels;
+        }
+        if merged.bit_depth.is_none() {
+            merged.bit_depth = current.bit_depth;
+        }
+        if merged.codec.is_none() {
+            merged.codec = current.codec;
+        }
+    }
+
+    Ok(merged)
 }
 
 fn validate_input(input: &CommitAcceptedSourceFactsInput) -> LibrarySqliteResult<()> {
@@ -195,13 +286,62 @@ fn load_source_file_basis(
     })
 }
 
+fn load_current_source_facts_for_merge(
+    tx: &AdmittedWrite<'_>,
+    source_file_id: SourceFileId,
+    source_file_basis: &SourceFileBasis,
+) -> LibrarySqliteResult<Option<CurrentSourceFactsForMerge>> {
+    tx.query_row(
+        "SELECT content_hash_algorithm,
+                content_hash_value,
+                mime_type,
+                duration_ms,
+                sample_rate_hz,
+                channels,
+                bit_depth,
+                codec
+         FROM SourceFacts
+         WHERE source_file_id = ?1
+           AND basis_source_id = ?2
+           AND basis_relative_path = ?3
+           AND basis_size_bytes IS ?4
+           AND basis_mtime_ns IS ?5
+           AND basis_presence_state = ?6",
+        params![
+            source_file_id.get(),
+            source_file_basis.source_id,
+            source_file_basis.relative_path,
+            source_file_basis.size_bytes,
+            source_file_basis.mtime_ns,
+            source_file_basis.presence_state,
+        ],
+        |row| {
+            let content_hash_algorithm = row.get::<_, Option<String>>(0)?;
+            let content_hash_value = row.get::<_, Option<String>>(1)?;
+            Ok(CurrentSourceFactsForMerge {
+                content_hash: content_hash_algorithm
+                    .zip(content_hash_value)
+                    .map(|(algorithm, value)| ContentHashEvidence { algorithm, value }),
+                mime_type: row.get(2)?,
+                duration_ms: row.get(3)?,
+                sample_rate_hz: row.get(4)?,
+                channels: row.get(5)?,
+                bit_depth: row.get(6)?,
+                codec: row.get(7)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        CommitAcceptedSourceFactsInput, ContentHashEvidence, SOURCE_FACT_KIND_SOURCE_INSPECTION,
-        SourceFactsAuthorityTx,
+        CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+        SOURCE_FACT_KIND_SOURCE_INSPECTION, SourceFactsAuthorityTx,
     };
     use crate::authority::write_lane::{AdmittedWrite, admit_write};
     use crate::read_models::observed_file_facts::{
@@ -348,7 +488,7 @@ mod tests {
     ) {
         admit_write(connection, |write| {
             insert_artifact(write, artifact_id, source_file_id, basis_fingerprint);
-            SourceFactsAuthorityTx::new(write).commit_accepted_source_facts(
+            SourceFactsAuthorityTx::new(write).commit_accepted_source_facts_with_merge(
                 &CommitAcceptedSourceFactsInput {
                     source_file_id: SourceFileId::new(source_file_id)
                         .expect("positive source_file_id"),
@@ -365,6 +505,7 @@ mod tests {
                     codec: None,
                     updated_at: 24,
                 },
+                CommitAcceptedSourceFactsMergePolicy::replacement(),
             )
         })
         .expect("commit source facts");

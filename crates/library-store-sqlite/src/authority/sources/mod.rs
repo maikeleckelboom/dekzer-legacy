@@ -12,7 +12,9 @@ pub(crate) use source_access::{
 };
 pub use source_directories::{SourceDirectoriesAuthorityTx, UpsertSourceDirectoryInput};
 pub(crate) use source_facts::SourceFactsAuthorityTx;
-pub use source_facts::{CommitAcceptedSourceFactsInput, ContentHashEvidence};
+pub use source_facts::{
+    CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+};
 pub use source_files::{RecordSourceFileObservationInput, SourceFilesAuthorityTx};
 pub use source_locations::{
     DeleteSourceLocationInput, SourceLocationsAuthorityTx, UpsertSourceLocationInput,

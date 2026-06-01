@@ -391,10 +391,11 @@ mod tests {
         get_source_attachment_summary, get_source_files_for_attachment,
     };
     use crate::{
-        CommitAcceptedSourceFactsInput, CompleteMachineWorkInput, ContentHashEvidence,
-        FinishWorkRunInput, InspectSourcePromotionInput, QueueInspectSourceWorkInput,
-        RecordArtifactInput, RecordInlineArtifactInput, RecordSourceFileObservationInput,
-        StartWorkRunInput, UpsertSourceInput,
+        CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy,
+        CompleteMachineWorkInput, ContentHashEvidence, FinishWorkRunInput,
+        InspectSourcePromotionInput, QueueInspectSourceWorkInput, RecordArtifactInput,
+        RecordInlineArtifactInput, RecordSourceFileObservationInput, StartWorkRunInput,
+        UpsertSourceInput,
     };
     use library_domain::{
         ArtifactKind, ArtifactRole, SourceFileId, SourcePresenceState, WorkPriorityClass,
@@ -547,6 +548,7 @@ mod tests {
                         codec: None,
                         updated_at: queued_at + 4,
                     },
+                    source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
                     rebuild_projection_domains: vec![],
                     rebuild_priority: WorkPriorityClass::Interactive,
                 })

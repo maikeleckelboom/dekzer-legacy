@@ -27,6 +27,7 @@ mod projections;
 mod promotion;
 mod revisions;
 mod source_file_hash;
+mod source_file_media_probe;
 mod source_lifecycle_reads;
 mod sources;
 mod work_items;
@@ -48,6 +49,13 @@ pub use source_file_hash::{
     SourceFileBlake3HashAdmissionScope, SourceFileBlake3HashCandidate,
     SourceFileBlake3HashCandidateReason, SourceFileBlake3HashFailure,
     SourceFileBlake3HashSkipReason, effective_hash_batch_limit,
+};
+pub use source_file_media_probe::{
+    ProbeSourceFileMediaBatchInput, ProbeSourceFileMediaBatchOutcome,
+    ProbeSourceFileMediaBatchOutcomeStatus, ProbeSourceFileMediaBatchResult,
+    ReadSourceFileMediaProbeCandidatesInput, SourceFileMediaProbeAdmissionScope,
+    SourceFileMediaProbeCandidate, SourceFileMediaProbeCandidateReason, SourceFileMediaProbeFacts,
+    SourceFileMediaProbeFailure, SourceFileMediaProbeSkipReason, effective_media_probe_batch_limit,
 };
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,

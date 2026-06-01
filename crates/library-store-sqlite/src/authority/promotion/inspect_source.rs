@@ -1,7 +1,9 @@
 use crate::authority::promotion::{
     RebuildProjectionPromotionInput, RebuildProjectionPromotionResult, RebuildProjectionPromotionTx,
 };
-use crate::authority::sources::{CommitAcceptedSourceFactsInput, SourceFactsAuthorityTx};
+use crate::authority::sources::{
+    CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, SourceFactsAuthorityTx,
+};
 use crate::authority::work::{
     ArtifactFileStoreRoot, CapabilityInvalidationAuthorityTx, MarkCapabilitiesStaleFromBasisInput,
     QueueMachineWorkResult, load_attached_library_asset_ids_for_source_file,
@@ -14,6 +16,7 @@ use library_domain::{ArtifactId, ProjectionDomain, SourceFileId, WorkPriorityCla
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InspectSourcePromotionInput {
     pub source_facts: CommitAcceptedSourceFactsInput,
+    pub source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy,
     pub rebuild_projection_domains: Vec<ProjectionDomain>,
     pub rebuild_priority: WorkPriorityClass,
 }
@@ -45,7 +48,10 @@ impl<'write, 'conn> InspectSourcePromotionTx<'write, 'conn> {
     ) -> LibrarySqliteResult<InspectSourcePromotionResult> {
         let previous_source_facts =
             load_source_facts_state(&*self.tx, input.source_facts.source_file_id)?;
-        SourceFactsAuthorityTx::new(&*self.tx).commit_accepted_source_facts(&input.source_facts)?;
+        SourceFactsAuthorityTx::new(&*self.tx).commit_accepted_source_facts_with_merge(
+            &input.source_facts,
+            input.source_facts_merge_policy,
+        )?;
 
         if let Some((_, previous_accepted_artifact_id)) = previous_source_facts.as_ref()
             && *previous_accepted_artifact_id != input.source_facts.accepted_artifact_id

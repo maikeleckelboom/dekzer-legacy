@@ -10,12 +10,12 @@ use crate::authority::roots::{
 };
 use crate::{
     AcceptSegmentationPromotionInput, ClaimMachineWorkBatchInput, CommitAcceptedSourceFactsInput,
-    CompleteMachineWorkInput, ContentHashEvidence, DeleteSourceLocationInput, FinishWorkRunInput,
-    InspectSourcePromotionInput, RecordArtifactInput, RecordInlineArtifactInput,
-    ReplaceAcceptedSourceSegmentSetInput, ResolveLibraryAssetPromotionInput, StartWorkRunInput,
-    UpsertPrepPolicyInput, UpsertSourceDirectoryInput, UpsertSourceInput,
-    UpsertSourceLocationInput, UpsertSourceLocatorInput, UpsertSourceScanStateInput,
-    UpsertSourceStateInput,
+    CommitAcceptedSourceFactsMergePolicy, CompleteMachineWorkInput, ContentHashEvidence,
+    DeleteSourceLocationInput, FinishWorkRunInput, InspectSourcePromotionInput,
+    RecordArtifactInput, RecordInlineArtifactInput, ReplaceAcceptedSourceSegmentSetInput,
+    ResolveLibraryAssetPromotionInput, StartWorkRunInput, UpsertPrepPolicyInput,
+    UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
+    UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
 };
 use library_domain::{
     ArtifactKind, ArtifactRole, NavigationSelector, PrepPolicyId, SourceAccessState, SourceFileId,
@@ -1659,6 +1659,7 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
                 codec: Some("pcm".to_string()),
                 updated_at: 24,
             },
+            source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
             rebuild_projection_domains: vec![library_domain::ProjectionDomain::LibraryBrowser],
             rebuild_priority: WorkPriorityClass::Interactive,
         })

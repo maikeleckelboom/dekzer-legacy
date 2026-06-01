@@ -5,6 +5,7 @@ owner: library-substrate-boundary
 canonical-context:
   - media-relevant-file-inventory-contract
   - media-identity-schema-authority
+  - media-probe-observations-contract
 scope:
   - observed-file-facts
   - content-hash-placement
@@ -146,6 +147,36 @@ current event scope available for source-file observed-facts changes; no separat
 The service also runs one bounded internal attachment materialization unit for the same source after a successful
 non-source-failure manual hash batch. The public hash reply remains hash-only and does not report attachment work.
 
+## Media Probe Policy
+
+Media probe observations v0 are store-owned source-file evidence jobs. The v0 adapter is
+`dekzer.source_file_media_probe.symphonia` version `1`, using the pure Rust Symphonia metadata/container reader for audio
+headers and container facts. The job does not decode packets into waveform buffers and does not generate analysis output.
+
+Probe commits use the same inspect-source work/run/artifact plus observed-facts authority path as BLAKE3 hashing. The
+accepted artifact is an inline JSON `inspection_result` that records adapter key/version, source file id, basis
+fingerprint, and the observed probe fields.
+
+`SourceFacts` remains one accepted row per `source_file_id`, so current compatible evidence must be merged:
+
+- a probe commit preserves current BLAKE3 hash evidence only when the previous `SourceFacts` basis still matches the
+  current `source_files` row;
+- a BLAKE3 hash commit preserves current probe fields only when the previous `SourceFacts` basis still matches the
+  current `source_files` row;
+- stale hash evidence is not resurrected by probing;
+- stale probe fields are not resurrected by hashing.
+
+The probe captures source-file basis before reading metadata and re-reads basis before committing. If the basis changes
+while probing is in flight, the job rejects the commit with a typed basis-change result.
+
+Bounded probe admission is deterministic and source-owned. It currently admits present `audio` and `video` rows ordered
+by lowercased relative path then `source_file_id`. Audio files are probed by Symphonia. Video files return a typed
+unsupported outcome until a video-capable adapter is selected. Images are not admitted for v0 media probing. CUE sheets
+are excluded from probe admission and are not parsed or paired.
+
+Missing physical files, source lifecycle failures, invalid relative paths, root escapes, unreadable files, unsupported
+formats, and basis changes are typed outcomes. They do not write fake facts.
+
 ## Service-Owned Hash Maintenance
 
 The boundary service owns the first source hash maintenance loop. After a root scan publishes its terminal
@@ -202,7 +233,7 @@ Future work remains separate:
 
 - production scheduler policy beyond the current scan-completion trigger
 - source-location-scoped hash admission
-- media/container probing
+- video-capable media probing beyond the audio-only v0 adapter
 - CUE parsing
 - CUE-to-audio association evidence
 - attachment identity read boundary and later promotion beyond the Rust/store/service maintenance foundation
