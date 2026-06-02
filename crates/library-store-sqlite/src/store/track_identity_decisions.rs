@@ -267,52 +267,66 @@ fn insert_decision_evidence_snapshot(
     track_identity_candidate_id: i64,
     decided_at: i64,
 ) -> LibrarySqliteResult<usize> {
+    let predicate = CURRENT_TRACK_IDENTITY_CANDIDATE_EVIDENCE_PREDICATE.replace("?2", "?4");
     write
         .execute(
-            "INSERT INTO track_identity_decision_evidence (
-                 track_identity_decision_id,
-                 track_identity_candidate_id,
-                 track_identity_candidate_member_id,
-                 track_identity_candidate_evidence_id,
-                 primary_media_candidate_id,
-                 attachment_id,
-                 source_file_attachment_link_id,
-                 source_file_id,
-                 source_id,
-                 evidence_basis_fingerprint,
-                 content_hash_algorithm,
-                 content_hash_value,
-                 probe_accepted_artifact_id,
-                 created_at,
-                 updated_at
-             )
-             SELECT ?1,
-                    evidence.track_identity_candidate_id,
-                    member.track_identity_candidate_member_id,
-                    evidence.track_identity_candidate_evidence_id,
-                    evidence.primary_media_candidate_id,
-                    evidence.attachment_id,
-                    evidence.source_file_attachment_link_id,
-                    evidence.source_file_id,
-                    evidence.source_id,
-                    evidence.evidence_basis_fingerprint,
-                    evidence.content_hash_algorithm,
-                    evidence.content_hash_value,
-                    evidence.probe_accepted_artifact_id,
-                    ?3,
-                    ?3
-             FROM track_identity_candidate_evidence evidence
-             JOIN track_identity_candidate_members member
-               ON member.track_identity_candidate_id =
-                  evidence.track_identity_candidate_id
-              AND member.primary_media_candidate_id = evidence.primary_media_candidate_id
-             WHERE evidence.track_identity_candidate_id = ?2
-             ORDER BY evidence.source_id ASC,
-                      evidence.source_file_id ASC",
+            &format!(
+                "INSERT INTO track_identity_decision_evidence (
+                     track_identity_decision_id,
+                     track_identity_candidate_id,
+                     track_identity_candidate_member_id,
+                     track_identity_candidate_evidence_id,
+                     primary_media_candidate_id,
+                     attachment_id,
+                     source_file_attachment_link_id,
+                     source_file_id,
+                     source_id,
+                     evidence_basis_fingerprint,
+                     content_hash_algorithm,
+                     content_hash_value,
+                     probe_accepted_artifact_id,
+                     created_at,
+                     updated_at
+                 )
+                 SELECT ?1,
+                        evidence.track_identity_candidate_id,
+                        member.track_identity_candidate_member_id,
+                        evidence.track_identity_candidate_evidence_id,
+                        evidence.primary_media_candidate_id,
+                        evidence.attachment_id,
+                        evidence.source_file_attachment_link_id,
+                        evidence.source_file_id,
+                        evidence.source_id,
+                        evidence.evidence_basis_fingerprint,
+                        evidence.content_hash_algorithm,
+                        evidence.content_hash_value,
+                        evidence.probe_accepted_artifact_id,
+                        ?3,
+                        ?3
+                 FROM track_identity_candidate_evidence evidence
+                 JOIN track_identity_candidate_members member
+                   ON member.track_identity_candidate_id =
+                      evidence.track_identity_candidate_id
+                  AND member.primary_media_candidate_id = evidence.primary_media_candidate_id
+                 JOIN source_files file
+                   ON file.source_file_id = evidence.source_file_id
+                 LEFT JOIN SourceFacts facts
+                   ON facts.source_file_id = evidence.source_file_id
+                 LEFT JOIN source_file_attachment_links link
+                   ON link.source_file_attachment_link_id =
+                      evidence.source_file_attachment_link_id
+                 LEFT JOIN content_attachments attachment
+                   ON attachment.attachment_id = evidence.attachment_id
+                 WHERE evidence.track_identity_candidate_id = ?2
+                   AND {predicate}
+                 ORDER BY evidence.source_id ASC,
+                          evidence.source_file_id ASC",
+            ),
             params![
                 track_identity_decision_id,
                 track_identity_candidate_id,
                 decided_at,
+                SOURCE_FILE_BLAKE3_ALGORITHM,
             ],
         )
         .map_err(Into::into)
@@ -934,5 +948,58 @@ mod tests {
                 "decision schema must not contain metadata column {forbidden}"
             );
         }
+    }
+
+    #[test]
+    fn decision_evidence_snapshot_includes_only_current_evidence_rows() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/track.wav");
+        fixture.insert_source_file(101, "Album/track copy.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.link_attachment(101, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_facts(101, HASH_A);
+        fixture.promote_and_candidate();
+
+        assert_eq!(
+            fixture.count_rows("track_identity_candidate_evidence"),
+            2,
+            "both source files share the same hash and group into one candidate"
+        );
+
+        fixture.change_file_basis(100);
+        fixture
+            .store
+            .produce_track_identity_candidates_for_source(fixture.source_id, 10)
+            .expect("re-produce candidates to mark file 100 evidence stale");
+
+        assert_eq!(
+            fixture.count_rows("track_identity_candidate_evidence"),
+            2,
+            "stale evidence row is preserved but no longer current"
+        );
+
+        let result = fixture.produce_decisions(10);
+        assert_eq!(result.decisions_created, 1);
+        assert_eq!(
+            result.decision_evidence_created, 1,
+            "only the current evidence row must be snapshotted"
+        );
+
+        let decisions = fixture
+            .store
+            .read_track_identity_decisions_for_source(fixture.source_id, 10)
+            .expect("read decisions");
+        assert_eq!(decisions.len(), 1);
+        let evidence = &decisions[0].evidence;
+        assert_eq!(
+            evidence.len(),
+            1,
+            "decision evidence must contain only the current supporting evidence row"
+        );
+        assert_eq!(
+            evidence[0].source_file_id, 101,
+            "snapshot evidence must reference the still-current source file"
+        );
     }
 }

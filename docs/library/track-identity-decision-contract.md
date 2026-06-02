@@ -111,6 +111,11 @@ Decision evidence snapshots must preserve:
 - evidence basis fingerprint;
 - probe artifact id.
 
+Only candidate evidence rows that validate as current under the decision's evidence predicate are snapshotted.
+Stale evidence rows belonging to the same candidate are excluded from the snapshot even if they remain durable
+in `track_identity_candidate_evidence`. This ensures provenance reflects only the evidence that actually
+supported the decision at the time it was made.
+
 The snapshot is provenance, not a new content identity authority. BLAKE3 evidence remains exact bytes evidence and
 `LibraryAssets.equivalence_fingerprint` must not be used as content identity.
 
