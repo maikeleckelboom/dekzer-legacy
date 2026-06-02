@@ -8,6 +8,7 @@ canonical-context:
   - media-probe-observations-contract
   - primary-media-promotion-contract
   - track-identity-candidate-contract
+  - track-identity-decision-contract
   - source-lifecycle-backend-contract-gap
 scope:
   - source-maintenance-orchestration
@@ -21,7 +22,7 @@ scope:
 
 Source maintenance is the backend-owned orchestration path for one bounded substrate maintenance unit for a source.
 It coordinates existing evidence and attachment authority paths; it does not create a new evidence type, durable
-identity layer, readiness taxonomy, scheduler loop, or renderer-owned maintenance state.
+canonical identity layer, readiness taxonomy, scheduler loop, or renderer-owned maintenance state.
 The Rust service owner is the `source_maintenance` module in `library-boundary-service`.
 
 The current unit exists so a scan completion or explicit command can make bounded progress on:
@@ -31,12 +32,14 @@ The current unit exists so a scan completion or explicit command can make bounde
 3. Audio-only media probe observations for pending audio source files.
 4. Evidence-backed primary-media promotion from current attachments and audio probe facts.
 5. Track identity candidate production from current evidence-backed primary-media candidates.
-6. Maintained read-model invalidation through the existing honest scopes.
+6. Track identity decision production from active exact-content candidates.
+7. Maintained read-model invalidation through the existing honest scopes.
 
 This is substrate maintenance only. Primary-media promotion v0 is attachment/probe evidence promotion, not preparation
 readiness, canonical track identity, CUE association, waveform generation, stems, artwork intelligence, playlist UI, or
 renderer presentation state. Track identity candidate production is exact current evidence grouping only; it is not a
-canonical track decision.
+canonical track decision. Track identity decision production creates reversible/supersedable decision records only; it
+does not create canonical tracks.
 
 ## Maintenance Unit Order
 
@@ -47,7 +50,8 @@ The deterministic order is:
 3. Run one bounded source-scoped media probe batch.
 4. Run one bounded source-scoped primary-media promotion batch.
 5. Run one bounded source-scoped track identity candidate production batch.
-6. Publish maintained snapshot invalidations after each phase using current maintained revision scopes.
+6. Run one bounded source-scoped track identity decision production batch.
+7. Publish maintained snapshot invalidations after each phase using current maintained revision scopes.
 
 Attachment materialization follows hashing because `content_attachments` and `source_file_attachment_links` consume
 current BLAKE3 `SourceFacts`. Media probing follows materialization because probe commits merge current compatible
@@ -55,7 +59,9 @@ BLAKE3 evidence into `SourceFacts`; existing attachment links remain current whe
 Primary-media promotion follows probing because it requires current attachment links and at least one current audio
 probe fact. Track identity candidate production follows primary-media promotion because it consumes only current
 evidence-backed `primary_media_candidates` rows and revalidates the source-file, attachment, BLAKE3, and probe evidence
-before producing or refreshing candidate rows.
+before producing or refreshing candidate rows. Track identity decision production follows candidate production because it
+consumes only active exact-content candidates with current candidate evidence and produces current
+`system_exact_content_v0` accepted decision records only when a current system decision does not already exist.
 
 The order must not be interpreted as product preparation. Remaining candidates are expected after a bounded unit.
 
@@ -69,6 +75,7 @@ The command is source-scoped and accepts:
 - optional `probeLimit`
 - optional `promotionLimit`
 - optional `identityCandidateLimit`
+- optional `identityDecisionLimit`
 
 The renderer never supplies filesystem paths and never supplies a source-file-id list for v0. Limits are validated as
 positive integers and are capped by backend policy. No phase loops until the source is drained.
@@ -84,7 +91,8 @@ second same-source unit from starting while one is already running.
 
 A manual `runSourceMaintenance` command for a source that is already active returns a bounded `skipped` run reply with
 the requested effective limits and does not run hashing, attachment materialization, probing, primary-media promotion,
-or track identity candidate production. That scheduler skip is not recorded as `lastRun`.
+track identity candidate production, or track identity decision production. That scheduler skip is not recorded as
+`lastRun`.
 
 A manual `runSourceMaintenance` command for a source that is pending but not active takes immediate ownership of that
 source and removes it from pending state before running one bounded unit. The same source must not then run again from
@@ -101,17 +109,18 @@ The boundary command is:
 | --- | --- |
 | Rust protocol | `SourceMaintenance.RunSourceMaintenance` |
 | Generated TS contract | `runSourceMaintenance` |
-| Desktop IPC/preload API | `library.sourceMaintenance.runSourceMaintenance({ sourceId, hashLimit?, attachmentLimit?, probeLimit?, promotionLimit?, identityCandidateLimit? })` |
+| Desktop IPC/preload API | `library.sourceMaintenance.runSourceMaintenance({ sourceId, hashLimit?, attachmentLimit?, probeLimit?, promotionLimit?, identityCandidateLimit?, identityDecisionLimit? })` |
 
 The reply includes:
 
 - `sourceId`
-- effective limits for hash, attachment, probe, promotion, and track identity candidate phases
+- effective limits for hash, attachment, probe, promotion, track identity candidate, and track identity decision phases
 - hash summary counts and remaining hash candidates
 - attachment materialization summary counts
 - probe summary counts and remaining probe candidates
 - primary-media promotion summary counts and remaining promotion candidates
 - track identity candidate production summary counts and remaining candidate production candidates
+- track identity decision production summary counts and remaining decision production candidates
 - current/stale/missing attachment-link summary when the source attachment read model can answer
 - typed `sourceFailure` for unavailable, missing, blocked, or not-found source state
 - coarse run status: `completed`, `partial`, `skipped`, or `failed`
@@ -135,6 +144,7 @@ The snapshot computes:
 - remaining media probe candidates
 - remaining primary-media promotion candidates
 - remaining track identity candidate production candidates
+- remaining track identity decision production candidates
 - attachment current/stale/missing counts from the attachment identity read model
 - in-memory service runtime status: `idle` or `running`
 - in-memory last bounded run summary, when this service instance has run one
@@ -142,7 +152,8 @@ The snapshot computes:
 Runtime maintenance state is service-owned memory only. It is not durable identity and is not stored in SQLite. Durable
 truth remains in `SourceFacts`, `content_attachments`, `source_file_attachment_links`, and
 `primary_media_candidates`. Durable track identity candidate evidence remains in `track_identity_candidates`,
-`track_identity_candidate_members`, and `track_identity_candidate_evidence`.
+`track_identity_candidate_members`, and `track_identity_candidate_evidence`. Durable track identity decisions remain in
+`track_identity_decisions` and `track_identity_decision_evidence`.
 
 If source lifecycle prevents maintenance, the snapshot returns a typed source failure and does not report an empty
 success. Snapshot status maps source-not-found to `failed`, missing/unavailable source roots to `unavailable`, blocked
@@ -170,6 +181,8 @@ Each phase commits through the existing authority path:
 - Track identity candidate production updates `track_identity_candidates`,
   `track_identity_candidate_members`, and `track_identity_candidate_evidence` from current evidence-backed
   primary-media candidates.
+- Track identity decision production updates `track_identity_decisions` and `track_identity_decision_evidence` from
+  active exact-content candidates and preserves candidate/member/evidence provenance.
 
 After each phase, the service publishes maintained snapshot invalidations from current maintained revisions. The narrow
 honest maintained scope today is `LibraryBrowser`; attachment identity reads remain explicit until a precise maintained
@@ -181,6 +194,7 @@ Source maintenance v0 does not:
 
 - implement canonical track identity or user-facing track identity;
 - make exact track identity candidates canonical;
+- make exact track identity decisions canonical tracks;
 - parse CUE sheets or pair CUE with audio;
 - probe video files;
 - generate waveform data, stems, prep rows, artwork intelligence, playlist UI, crates, sleeves, badges, chips, or
@@ -197,5 +211,5 @@ Future work remains separate:
 - video probe adapter selection;
 - CUE parse observations owned by CUE source-file rows;
 - video-capable or richer `primaryMedia` promotion beyond audio v0;
-- canonical track identity and user identity decisions;
+- canonical track identity and user-authored identity decisions;
 - preparation, waveform, stems, and artwork work.

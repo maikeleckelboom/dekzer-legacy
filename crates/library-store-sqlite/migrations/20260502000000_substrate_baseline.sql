@@ -793,6 +793,70 @@ CREATE INDEX track_identity_candidate_evidence_candidate
 CREATE INDEX track_identity_candidate_evidence_source_file
     ON track_identity_candidate_evidence (source_file_id);
 
+CREATE TABLE track_identity_decisions
+(
+    track_identity_decision_id   INTEGER PRIMARY KEY,
+    track_identity_candidate_id  INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
+    decision_state               TEXT    NOT NULL CHECK (decision_state IN ('accepted', 'rejected', 'deferred', 'superseded')),
+    decision_source              TEXT    NOT NULL CHECK (length(trim(decision_source)) > 0),
+    decision_basis               TEXT    NOT NULL CHECK (length(trim(decision_basis)) > 0),
+    decision_reason              TEXT    NOT NULL CHECK (length(trim(decision_reason)) > 0),
+    candidate_kind               TEXT    NOT NULL CHECK (candidate_kind = 'exact_primary_media_content'),
+    candidate_evidence_basis     TEXT    NOT NULL CHECK (candidate_evidence_basis = 'current_primary_media_exact_blake3'),
+    candidate_status_at_decision TEXT    NOT NULL CHECK (candidate_status_at_decision IN ('active', 'stale', 'superseded')),
+    evidence_key_algorithm       TEXT    NOT NULL CHECK (evidence_key_algorithm = 'blake3'),
+    evidence_key_value           TEXT    NOT NULL CHECK (length(trim(evidence_key_value)) > 0),
+    superseded_by_decision_id    INTEGER REFERENCES track_identity_decisions (track_identity_decision_id) ON DELETE SET NULL,
+    created_at                   INTEGER NOT NULL,
+    updated_at                   INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    CHECK (
+        superseded_by_decision_id IS NULL
+        OR superseded_by_decision_id != track_identity_decision_id
+    )
+) STRICT;
+
+CREATE UNIQUE INDEX track_identity_decisions_current_source
+    ON track_identity_decisions (track_identity_candidate_id, decision_source)
+    WHERE superseded_by_decision_id IS NULL;
+
+CREATE INDEX track_identity_decisions_candidate
+    ON track_identity_decisions (track_identity_candidate_id);
+
+CREATE INDEX track_identity_decisions_state
+    ON track_identity_decisions (decision_state);
+
+CREATE TABLE track_identity_decision_evidence
+(
+    track_identity_decision_evidence_id  INTEGER PRIMARY KEY,
+    track_identity_decision_id           INTEGER NOT NULL REFERENCES track_identity_decisions (track_identity_decision_id) ON DELETE CASCADE,
+    track_identity_candidate_id          INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
+    track_identity_candidate_member_id   INTEGER NOT NULL REFERENCES track_identity_candidate_members (track_identity_candidate_member_id) ON DELETE CASCADE,
+    track_identity_candidate_evidence_id INTEGER NOT NULL REFERENCES track_identity_candidate_evidence (track_identity_candidate_evidence_id) ON DELETE CASCADE,
+    primary_media_candidate_id           INTEGER NOT NULL REFERENCES primary_media_candidates (primary_media_candidate_id) ON DELETE CASCADE,
+    attachment_id                        INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
+    source_file_attachment_link_id       INTEGER NOT NULL REFERENCES source_file_attachment_links (source_file_attachment_link_id) ON DELETE CASCADE,
+    source_file_id                       INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
+    source_id                            INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
+    evidence_basis_fingerprint           TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
+    content_hash_algorithm               TEXT    NOT NULL CHECK (content_hash_algorithm = 'blake3'),
+    content_hash_value                   TEXT    NOT NULL CHECK (length(trim(content_hash_value)) > 0),
+    probe_accepted_artifact_id           INTEGER NOT NULL REFERENCES Artifacts (artifact_id),
+    created_at                           INTEGER NOT NULL,
+    updated_at                           INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    UNIQUE (track_identity_decision_id, track_identity_candidate_evidence_id)
+) STRICT;
+
+CREATE INDEX track_identity_decision_evidence_decision
+    ON track_identity_decision_evidence (track_identity_decision_id);
+
+CREATE INDEX track_identity_decision_evidence_candidate
+    ON track_identity_decision_evidence (track_identity_candidate_id);
+
+CREATE INDEX track_identity_decision_evidence_source_file
+    ON track_identity_decision_evidence (source_file_id);
+
 CREATE TABLE SourceSegmentSets
 (
     source_segment_set_id  INTEGER PRIMARY KEY,

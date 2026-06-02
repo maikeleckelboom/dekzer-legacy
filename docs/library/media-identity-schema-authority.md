@@ -8,11 +8,13 @@ canonical-context:
   - library-contents-read-boundary
   - primary-media-promotion-contract
   - track-identity-candidate-contract
+  - track-identity-decision-contract
 scope:
   - asset-identity
   - primary-media-authority
   - cue-association
   - content-hash-placement
+  - track-identity-decisions
   - deferred-preparation-surfaces
 ---
 
@@ -42,6 +44,7 @@ Reading order:
 | `content_attachments` / `source_file_attachment_links` | SQLite + `SqliteDurableStore::materialize_attachments_for_source` called by bounded service maintenance | Current Rust/store/service attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing. Exposed only through the narrow attachment identity read boundary. |
 | `primary_media_candidates` | SQLite + `SqliteDurableStore::promote_primary_media_for_source` called by bounded service maintenance | Current evidence-backed primary-media v0 projection target. One row per attachment with current BLAKE3 attachment identity and current audio probe evidence. Not canonical track identity, not browser-row authority, not CUE pairing. |
 | `track_identity_candidates` / `track_identity_candidate_members` / `track_identity_candidate_evidence` | SQLite + `SqliteDurableStore::produce_track_identity_candidates_for_source` called by bounded service maintenance | Current exact evidence candidate foundation from current `primary_media_candidates`. Groups exact current BLAKE3 primary-media content evidence with provenance. Not canonical track identity, not user identity, not semantic recording matching. |
+| `track_identity_decisions` / `track_identity_decision_evidence` | SQLite + `SqliteDurableStore::produce_track_identity_decisions_for_source` called by bounded service maintenance | Current backend-owned decision foundation over active exact-content candidates. V0 automatic decisions accept only active exact-content candidates and preserve candidate/member/evidence provenance. Not canonical track identity and not user-facing identity. |
 | `readContents` `primaryMedia` policy | Store read model + boundary protocol | Current evidence-backed primary-media row profile. Reads only promoted `primary_media_candidates` revalidated against current scoped source files, attachment links, content attachments, and `SourceFacts`. No source-file fallback. |
 | `source_media` write/read guards | Store filesystem guard | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing. |
 | `Playlists` / `PlaylistEntries` | Boundary service + store | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`. |
@@ -104,6 +107,27 @@ by exact content evidence. They must not create canonical tracks, user decisions
 reconciliation, prep surfaces, playlist/crate/sleeve rows, waveform/stem authority, or renderer-owned grouping. The
 detailed status, grouping, and stale/current rules are owned by
 `docs/library/track-identity-candidate-contract.md`.
+
+## Track Identity Decision Foundation
+
+Decision: **current backend-owned decision foundation over candidates, non-canonical.**
+
+Evidence:
+
+- Store schema contains `track_identity_decisions` and `track_identity_decision_evidence`.
+- V0 decision production is backend-owned, source-scoped, and bounded.
+- Production creates only current `accepted` decisions with `decision_source = system_exact_content_v0`.
+- Production consumes only `active` exact-content candidates with current candidate evidence and skips candidates that
+  already have a current system exact-content decision.
+- Decision evidence snapshots preserve candidate, member, candidate evidence, primary-media candidate, attachment,
+  source-file link, source-file, BLAKE3, basis fingerprint, and probe artifact provenance.
+
+Therefore track identity decisions may say only that a backend-owned decision source accepted, rejected, deferred, or
+superseded a candidate under a recorded basis. The v0 automatic accepted decision means accepted exact-content candidate;
+it must not be read as canonical track identity, same-song semantic identity, metadata reconciliation, CUE association,
+prep readiness, playlist membership, waveform/stem authority, artwork intelligence, or renderer-owned grouping. The
+detailed status, provenance, and supersession rules are owned by
+`docs/library/track-identity-decision-contract.md`.
 
 ## CUE Association Decision
 
@@ -173,6 +197,10 @@ Current placement:
   `produce_track_identity_candidates_for_source(source_id, limit)`, called by the same bounded service-owned maintenance
   unit after primary-media promotion. The v0 evidence key is exact BLAKE3 content evidence and remains a reversible
   candidate grouping, not canonical track identity.
+- Track identity decision production consumes active exact-content candidates through
+  `produce_track_identity_decisions_for_source(source_id, limit)`, called by the same bounded service-owned maintenance
+  unit after candidate production. The v0 decision source is `system_exact_content_v0` and remains a reversible or
+  supersedable decision record, not canonical track identity.
 - `content_attachments` owns attachment hash authority. `source_file_attachment_links` stores the source-file occurrence
   relation and derives exposed link hash values from the joined attachment row; it does not store a duplicate hash copy.
 - Track identity must not rely on path identity.
@@ -203,13 +231,15 @@ CUE sheets remain source-file companion metadata rows and are not parsed by medi
 | Attachments | Current durable bytes-identity relation from current BLAKE3 evidence to source-file occurrence links | Path proximity guesses, track identity, CUE pairing, prep readiness, browser rows |
 | Primary media | Evidence-backed playable-media candidate projection from current attachments and audio probe facts | Canonical track identity, CUE pairing, browser-row authority |
 | Track identity candidates | Reversible exact evidence candidate grouping from current primary-media candidates | Canonical track identity, user decisions, semantic recording matching, CUE pairing |
+| Track identity decisions | Reversible/supersedable decisions over candidates with preserved provenance | Canonical track rows, semantic identity by hash alone, CUE pairing, metadata reconciliation |
 | Track identity | Future semantic musical/performance identity | Source-file row identity, exact hash candidate alone, or playlist membership alone |
 | Preparation | Capability targets, artifacts, readiness summaries | File identity or content-addressed attachment identity |
 
 ## Next Implementation Gate
 
 The next gate is collection health / source integrity work, video-capable probe adapter selection,
-source-location-scoped admission, broader scheduler policy, CUE parse observations, or a later canonical track identity
-layer that consumes exact candidate evidence plus additional evidence and user decisions. Follow-on work must not
-conflate the attachment foundation, media probe evidence, primary-media candidates, or track identity candidates with
-canonical track tables, CUE pairing, artwork intelligence, playlist UI, prep facets, or waveform generation.
+source-location-scoped admission, broader scheduler policy, CUE parse observations, user correction commands, or a later
+canonical track identity layer that consumes exact candidate evidence plus additional evidence and user decisions.
+Follow-on work must not conflate the attachment foundation, media probe evidence, primary-media candidates, track
+identity candidates, or track identity decisions with canonical track tables, CUE pairing, artwork intelligence,
+playlist UI, prep facets, or waveform generation.

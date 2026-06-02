@@ -684,6 +684,10 @@ impl LibraryBoundaryService {
             request.identity_candidate_limit,
             "runSourceMaintenance identityCandidateLimit",
         )?;
+        require_optional_positive_limit(
+            request.identity_decision_limit,
+            "runSourceMaintenance identityDecisionLimit",
+        )?;
 
         let run = self.source_maintenance.run_manual(
             &self.durable_store,
@@ -695,6 +699,7 @@ impl LibraryBoundaryService {
                 probe_limit: request.probe_limit,
                 promotion_limit: request.promotion_limit,
                 identity_candidate_limit: request.identity_candidate_limit,
+                identity_decision_limit: request.identity_decision_limit,
             },
         )?;
         Ok(map_run_source_maintenance_reply(run))
@@ -717,6 +722,8 @@ impl LibraryBoundaryService {
                 .remaining_primary_media_promotion_candidates,
             remaining_track_identity_candidate_production_candidates: snapshot
                 .remaining_track_identity_candidate_production_candidates,
+            remaining_track_identity_decision_production_candidates: snapshot
+                .remaining_track_identity_decision_production_candidates,
             attachment_links: snapshot.attachment_links,
             source_failure: snapshot.source_failure,
             last_run: snapshot.last_run,
@@ -1140,12 +1147,15 @@ fn map_run_source_maintenance_reply(
         probe: run.probe,
         primary_media_promotion: run.primary_media_promotion,
         track_identity_candidates: run.track_identity_candidates,
+        track_identity_decisions: run.track_identity_decisions,
         remaining_hash_candidates: run.remaining_hash_candidates,
         remaining_probe_candidates: run.remaining_probe_candidates,
         remaining_primary_media_promotion_candidates: run
             .remaining_primary_media_promotion_candidates,
         remaining_track_identity_candidate_production_candidates: run
             .remaining_track_identity_candidate_production_candidates,
+        remaining_track_identity_decision_production_candidates: run
+            .remaining_track_identity_decision_production_candidates,
         attachment_links: run.attachment_links,
         source_failure: run.source_failure,
     }
@@ -1649,36 +1659,27 @@ mod tests {
         probe_limit: Option<usize>,
         promotion_limit: Option<usize>,
     ) -> RunSourceMaintenanceReply {
-        run_source_maintenance_with_identity_limit(
+        run_source_maintenance_with_request(
             service,
-            source_id,
-            hash_limit,
-            attachment_limit,
-            probe_limit,
-            promotion_limit,
-            None,
+            RunSourceMaintenanceRequest {
+                source_id,
+                hash_limit,
+                attachment_limit,
+                probe_limit,
+                promotion_limit,
+                identity_candidate_limit: None,
+                identity_decision_limit: None,
+            },
         )
     }
 
-    fn run_source_maintenance_with_identity_limit(
+    fn run_source_maintenance_with_request(
         service: &LibraryBoundaryService,
-        source_id: i64,
-        hash_limit: Option<usize>,
-        attachment_limit: Option<usize>,
-        probe_limit: Option<usize>,
-        promotion_limit: Option<usize>,
-        identity_candidate_limit: Option<usize>,
+        request: RunSourceMaintenanceRequest,
     ) -> RunSourceMaintenanceReply {
         expect_run_source_maintenance_reply(expect_success(service.handle_command(
             CommandRequest::SourceMaintenance(SourceMaintenanceCommand::RunSourceMaintenance(
-                RunSourceMaintenanceRequest {
-                    source_id,
-                    hash_limit,
-                    attachment_limit,
-                    probe_limit,
-                    promotion_limit,
-                    identity_candidate_limit,
-                },
+                request,
             )),
         )))
     }
@@ -2446,14 +2447,17 @@ mod tests {
             second_wav.len(),
         );
 
-        let run = run_source_maintenance_with_identity_limit(
+        let run = run_source_maintenance_with_request(
             &service,
-            registered.root_id,
-            Some(10),
-            Some(10),
-            Some(10),
-            Some(10),
-            Some(1),
+            RunSourceMaintenanceRequest {
+                source_id: registered.root_id,
+                hash_limit: Some(10),
+                attachment_limit: Some(10),
+                probe_limit: Some(10),
+                promotion_limit: Some(10),
+                identity_candidate_limit: Some(1),
+                identity_decision_limit: None,
+            },
         );
 
         assert_eq!(
@@ -2468,6 +2472,61 @@ mod tests {
         );
         assert_eq!(count_rows(&context, "track_identity_candidates"), 1);
         assert_eq!(count_rows(&context, "track_identity_candidate_members"), 1);
+    }
+
+    #[test]
+    fn source_maintenance_track_identity_decision_phase_respects_limit() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("track-identity-decision-limit-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let first_wav = tiny_wav_bytes(44_100, 2, 16, 4_410);
+        let second_wav = tiny_wav_bytes(44_100, 2, 16, 2_205);
+        std::fs::write(source_root.join("track-a.wav"), &first_wav).expect("write first wav");
+        std::fs::write(source_root.join("track-b.wav"), &second_wav).expect("write second wav");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(
+            &service,
+            registered.root_id,
+            100,
+            "track-a.wav",
+            first_wav.len(),
+        );
+        record_present_source_file(
+            &service,
+            registered.root_id,
+            101,
+            "track-b.wav",
+            second_wav.len(),
+        );
+
+        let run = run_source_maintenance_with_request(
+            &service,
+            RunSourceMaintenanceRequest {
+                source_id: registered.root_id,
+                hash_limit: Some(10),
+                attachment_limit: Some(10),
+                probe_limit: Some(10),
+                promotion_limit: Some(10),
+                identity_candidate_limit: Some(10),
+                identity_decision_limit: Some(1),
+            },
+        );
+
+        assert_eq!(
+            run.status,
+            library_boundary_protocol::SourceMaintenanceRunStatus::Partial
+        );
+        assert_eq!(run.track_identity_candidates.candidates_created, 2);
+        assert_eq!(run.track_identity_decisions.effective_limit, 1);
+        assert_eq!(run.track_identity_decisions.decisions_created, 1);
+        assert_eq!(
+            run.remaining_track_identity_decision_production_candidates,
+            1
+        );
+        assert_eq!(count_rows(&context, "track_identity_decisions"), 1);
+        assert_eq!(count_rows(&context, "track_identity_decision_evidence"), 1);
     }
 
     #[test]

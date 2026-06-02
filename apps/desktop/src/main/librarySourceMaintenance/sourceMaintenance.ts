@@ -77,7 +77,10 @@ export async function runSourceMaintenanceThroughHost(
         : { promotionLimit: normalizedRequest.promotionLimit }),
       ...(normalizedRequest.identityCandidateLimit === undefined
         ? {}
-        : { identityCandidateLimit: normalizedRequest.identityCandidateLimit })
+        : { identityCandidateLimit: normalizedRequest.identityCandidateLimit }),
+      ...(normalizedRequest.identityDecisionLimit === undefined
+        ? {}
+        : { identityDecisionLimit: normalizedRequest.identityDecisionLimit })
     } satisfies ContractRunSourceMaintenanceRequest)
 
     return {
@@ -160,13 +163,22 @@ function normalizeRunRequest(
     return identityCandidateLimit
   }
 
+  const identityDecisionLimit = normalizeOptionalLimit(
+    request.identityDecisionLimit,
+    'identityDecisionLimit'
+  )
+  if (isRunSourceMaintenanceResult(identityDecisionLimit)) {
+    return identityDecisionLimit
+  }
+
   return {
     sourceId: request.sourceId,
     ...(hashLimit === undefined ? {} : { hashLimit }),
     ...(attachmentLimit === undefined ? {} : { attachmentLimit }),
     ...(probeLimit === undefined ? {} : { probeLimit }),
     ...(promotionLimit === undefined ? {} : { promotionLimit }),
-    ...(identityCandidateLimit === undefined ? {} : { identityCandidateLimit })
+    ...(identityCandidateLimit === undefined ? {} : { identityCandidateLimit }),
+    ...(identityDecisionLimit === undefined ? {} : { identityDecisionLimit })
   }
 }
 

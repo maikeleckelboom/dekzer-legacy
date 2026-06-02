@@ -133,6 +133,8 @@ mod tests {
         "track_identity_candidate_evidence",
         "track_identity_candidate_members",
         "track_identity_candidates",
+        "track_identity_decision_evidence",
+        "track_identity_decisions",
         "WorkItems",
         "WorkRuns",
     ];
@@ -518,6 +520,54 @@ mod tests {
         assert!(
             table_index_names(&connection, "track_identity_candidate_evidence")
                 .contains(&"track_identity_candidate_evidence_source_file".to_string())
+        );
+        assert_eq!(
+            table_column_names(&connection, "track_identity_decisions"),
+            vec![
+                "track_identity_decision_id",
+                "track_identity_candidate_id",
+                "decision_state",
+                "decision_source",
+                "decision_basis",
+                "decision_reason",
+                "candidate_kind",
+                "candidate_evidence_basis",
+                "candidate_status_at_decision",
+                "evidence_key_algorithm",
+                "evidence_key_value",
+                "superseded_by_decision_id",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "track_identity_decision_evidence"),
+            vec![
+                "track_identity_decision_evidence_id",
+                "track_identity_decision_id",
+                "track_identity_candidate_id",
+                "track_identity_candidate_member_id",
+                "track_identity_candidate_evidence_id",
+                "primary_media_candidate_id",
+                "attachment_id",
+                "source_file_attachment_link_id",
+                "source_file_id",
+                "source_id",
+                "evidence_basis_fingerprint",
+                "content_hash_algorithm",
+                "content_hash_value",
+                "probe_accepted_artifact_id",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert!(
+            table_index_names(&connection, "track_identity_decisions")
+                .contains(&"track_identity_decisions_current_source".to_string())
+        );
+        assert!(
+            table_index_names(&connection, "track_identity_decision_evidence")
+                .contains(&"track_identity_decision_evidence_source_file".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "navigation_rows"),

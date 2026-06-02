@@ -8,6 +8,7 @@ canonical-context:
   - media-probe-observations-contract
   - primary-media-promotion-contract
   - source-maintenance-orchestration-contract
+  - track-identity-decision-contract
 scope:
   - track-identity-candidates
   - exact-primary-media-content-evidence
@@ -22,8 +23,9 @@ Track identity candidates are the first durable backend-owned foundation for say
 `primaryMedia` candidates appear to represent the same exact playable item candidate.
 
 They are not canonical tracks. They are not user-facing track identity. They do not make a semantic recording decision.
-They preserve reversible evidence and provenance so a later identity layer can decide whether exact duplicate playable
-content, metadata, CUE associations, user choices, or other observations should become canonical track identity.
+They preserve reversible evidence and provenance so the track identity decision layer and later identity layers can
+decide whether exact duplicate playable content, metadata, CUE associations, user choices, or other observations should
+become canonical track identity.
 
 ## Durable Target
 
@@ -123,6 +125,7 @@ Track identity candidates v0 do not:
 
 - create canonical track rows;
 - create user decisions or user-facing identity;
+- create track identity decision rows directly;
 - create playlists, crates, sleeves, prep facets, waveform or stem authority, artwork intelligence, or UI;
 - parse CUE sheets or infer CUE-to-audio pairing;
 - reconcile metadata or match different encodes;
@@ -130,7 +133,7 @@ Track identity candidates v0 do not:
 
 ## Future Work
 
-Future layers may add canonical track identity, reversible user decisions, CUE parse observations, CUE-to-audio
+Future layers may add user-authored decisions, canonical track identity, CUE parse observations, CUE-to-audio
 association, multi-encode matching, metadata reconciliation, prep facets, playlists, crates, sleeves, waveform authority,
-stem authority, and artwork intelligence. Those layers must consume this candidate foundation as evidence, not reinterpret
-it as canonical track identity.
+stem authority, and artwork intelligence. Those layers must consume this candidate foundation as evidence, not
+reinterpret it as canonical track identity.

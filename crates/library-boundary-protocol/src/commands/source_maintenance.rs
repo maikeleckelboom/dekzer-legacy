@@ -33,6 +33,9 @@ pub struct RunSourceMaintenanceRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub identity_candidate_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub identity_decision_limit: Option<usize>,
 }
 
 #[derive(
@@ -52,10 +55,12 @@ pub struct RunSourceMaintenanceReply {
     pub probe: SourceMaintenanceProbeSummary,
     pub primary_media_promotion: SourceMaintenancePrimaryMediaPromotionSummary,
     pub track_identity_candidates: SourceMaintenanceTrackIdentityCandidateSummary,
+    pub track_identity_decisions: SourceMaintenanceTrackIdentityDecisionSummary,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
     pub remaining_primary_media_promotion_candidates: usize,
     pub remaining_track_identity_candidate_production_candidates: usize,
+    pub remaining_track_identity_decision_production_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub attachment_links: Option<SourceMaintenanceAttachmentLinkSummary>,
@@ -98,6 +103,7 @@ pub struct ReadSourceMaintenanceReply {
     pub remaining_probe_candidates: usize,
     pub remaining_primary_media_promotion_candidates: usize,
     pub remaining_track_identity_candidate_production_candidates: usize,
+    pub remaining_track_identity_decision_production_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub attachment_links: Option<SourceMaintenanceAttachmentLinkSummary>,
@@ -128,6 +134,7 @@ pub struct SourceMaintenanceEffectiveLimits {
     pub probe_limit: usize,
     pub promotion_limit: usize,
     pub identity_candidate_limit: usize,
+    pub identity_decision_limit: usize,
 }
 
 #[derive(
@@ -265,6 +272,28 @@ pub struct SourceMaintenanceTrackIdentityCandidateSummary {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct SourceMaintenanceTrackIdentityDecisionSummary {
+    pub effective_limit: usize,
+    pub decisions_created: usize,
+    pub decision_evidence_created: usize,
+    pub skipped_stale_candidates: usize,
+    pub skipped_existing_current_decisions: usize,
+    pub remaining_candidates: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct SourceMaintenanceAttachmentLinkSummary {
     pub current_links_count: usize,
     pub stale_links_count: usize,
@@ -286,10 +315,12 @@ pub struct SourceMaintenanceLastRunSummary {
     pub probe: SourceMaintenanceProbeSummary,
     pub primary_media_promotion: SourceMaintenancePrimaryMediaPromotionSummary,
     pub track_identity_candidates: SourceMaintenanceTrackIdentityCandidateSummary,
+    pub track_identity_decisions: SourceMaintenanceTrackIdentityDecisionSummary,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
     pub remaining_primary_media_promotion_candidates: usize,
     pub remaining_track_identity_candidate_production_candidates: usize,
+    pub remaining_track_identity_decision_production_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub source_failure: Option<SourceMaintenanceSourceFailure>,

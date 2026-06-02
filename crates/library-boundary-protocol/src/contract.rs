@@ -179,6 +179,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SourceMaintenanceProbeSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenancePrimaryMediaPromotionSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceTrackIdentityCandidateSummary>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceMaintenanceTrackIdentityDecisionSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceAttachmentLinkSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceLastRunSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceRunStatus>(&cfg, &mut output);

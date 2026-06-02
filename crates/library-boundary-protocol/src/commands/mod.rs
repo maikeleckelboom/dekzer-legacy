@@ -132,6 +132,7 @@ mod tests {
                 probe_limit: Some(4),
                 promotion_limit: Some(4),
                 identity_candidate_limit: Some(4),
+                identity_decision_limit: Some(4),
             }),
         );
 
@@ -207,6 +208,7 @@ mod tests {
                 probe_limit: None,
                 promotion_limit: None,
                 identity_candidate_limit: None,
+                identity_decision_limit: None,
             }),
         );
         assert_eq!(
@@ -289,6 +291,7 @@ mod tests {
                     probe_limit: 4,
                     promotion_limit: 4,
                     identity_candidate_limit: 4,
+                    identity_decision_limit: 4,
                 },
                 hash: super::SourceMaintenanceHashSummary {
                     effective_limit: 8,
@@ -343,10 +346,19 @@ mod tests {
                     skipped_stale_primary_media_candidates: 0,
                     remaining_candidates: 0,
                 },
+                track_identity_decisions: super::SourceMaintenanceTrackIdentityDecisionSummary {
+                    effective_limit: 4,
+                    decisions_created: 1,
+                    decision_evidence_created: 1,
+                    skipped_stale_candidates: 0,
+                    skipped_existing_current_decisions: 0,
+                    remaining_candidates: 0,
+                },
                 remaining_hash_candidates: 0,
                 remaining_probe_candidates: 0,
                 remaining_primary_media_promotion_candidates: 0,
                 remaining_track_identity_candidate_production_candidates: 0,
+                remaining_track_identity_decision_production_candidates: 0,
                 attachment_links: None,
                 source_failure: None,
             }),

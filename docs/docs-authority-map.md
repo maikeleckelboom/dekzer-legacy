@@ -38,6 +38,7 @@ No two active docs may define the same authority._
 | `docs/library/source-maintenance-orchestration-contract.md`   | **Canonical library contract**                               | Backend-owned bounded source maintenance unit order, command/read boundary, runtime-vs-durable ownership, scan-triggered behavior, and invalidation behavior.                                                     |
 | `docs/library/primary-media-promotion-contract.md`            | **Canonical library contract**                               | Evidence-backed primary-media v0 promotion target, eligibility, `readContents` behavior, source-maintenance integration, and non-goals.                                                                          |
 | `docs/library/track-identity-candidate-contract.md`           | **Canonical library contract**                               | Backend/store-owned exact evidence track identity candidate foundation, grouping provenance, staleness, read model, and explicit non-canonical boundaries.                                                        |
+| `docs/library/track-identity-decision-contract.md`            | **Canonical library contract**                               | Backend/store-owned track identity decision foundation over candidates, exact-content v0 decision production, provenance snapshots, supersession, and non-canonical boundaries.                                    |
 
 ## Contents read boundary docs
 

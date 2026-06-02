@@ -6,8 +6,8 @@ use library_boundary_protocol as protocol;
 use library_store_sqlite::{
     HashSourceFileBlake3BatchInput, MaterializeAttachmentsForSourceResult,
     ProbeSourceFileMediaBatchInput, ProduceTrackIdentityCandidatesForSourceResult,
-    PromotePrimaryMediaForSourceResult, SourceFileBlake3HashAdmissionScope,
-    SourceFileMediaProbeAdmissionScope, SqliteDurableStore,
+    ProduceTrackIdentityDecisionsForSourceResult, PromotePrimaryMediaForSourceResult,
+    SourceFileBlake3HashAdmissionScope, SourceFileMediaProbeAdmissionScope, SqliteDurableStore,
 };
 
 use crate::session_events::LibraryBoundaryEventStream;
@@ -20,6 +20,7 @@ pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_MAX_LIMIT: usize = 128;
 pub(crate) const SOURCE_PRIMARY_MEDIA_PROMOTION_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_TRACK_IDENTITY_CANDIDATE_BATCH_LIMIT: usize = 4;
+pub(crate) const SOURCE_TRACK_IDENTITY_DECISION_BATCH_LIMIT: usize = 4;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SourceMaintenanceController {
@@ -49,10 +50,12 @@ pub(crate) struct SourceMaintenanceRun {
     pub(crate) probe: protocol::SourceMaintenanceProbeSummary,
     pub(crate) primary_media_promotion: protocol::SourceMaintenancePrimaryMediaPromotionSummary,
     pub(crate) track_identity_candidates: protocol::SourceMaintenanceTrackIdentityCandidateSummary,
+    pub(crate) track_identity_decisions: protocol::SourceMaintenanceTrackIdentityDecisionSummary,
     pub(crate) remaining_hash_candidates: usize,
     pub(crate) remaining_probe_candidates: usize,
     pub(crate) remaining_primary_media_promotion_candidates: usize,
     pub(crate) remaining_track_identity_candidate_production_candidates: usize,
+    pub(crate) remaining_track_identity_decision_production_candidates: usize,
     pub(crate) attachment_links: Option<protocol::SourceMaintenanceAttachmentLinkSummary>,
     pub(crate) source_failure: Option<protocol::SourceMaintenanceSourceFailure>,
     pub(crate) stopped: bool,
@@ -66,6 +69,7 @@ pub(crate) struct SourceMaintenanceSnapshot {
     pub(crate) remaining_probe_candidates: usize,
     pub(crate) remaining_primary_media_promotion_candidates: usize,
     pub(crate) remaining_track_identity_candidate_production_candidates: usize,
+    pub(crate) remaining_track_identity_decision_production_candidates: usize,
     pub(crate) attachment_links: Option<protocol::SourceMaintenanceAttachmentLinkSummary>,
     pub(crate) source_failure: Option<protocol::SourceMaintenanceSourceFailure>,
     pub(crate) last_run: Option<protocol::SourceMaintenanceLastRunSummary>,
@@ -116,6 +120,7 @@ impl SourceMaintenanceController {
                     probe_limit: Some(SOURCE_PROBE_MAINTENANCE_BATCH_LIMIT),
                     promotion_limit: Some(SOURCE_PRIMARY_MEDIA_PROMOTION_BATCH_LIMIT),
                     identity_candidate_limit: Some(SOURCE_TRACK_IDENTITY_CANDIDATE_BATCH_LIMIT),
+                    identity_decision_limit: Some(SOURCE_TRACK_IDENTITY_DECISION_BATCH_LIMIT),
                 },
             );
             self.finish_source(source_id);
@@ -185,6 +190,12 @@ impl SourceMaintenanceController {
                 source_id,
                 source_failure.as_ref(),
             )?;
+        let remaining_track_identity_decision_production_candidates =
+            count_track_identity_decision_production_candidates(
+                store,
+                source_id,
+                source_failure.as_ref(),
+            )?;
         let attachment_links = read_attachment_link_summary(store, source_id)
             .map_err(crate::service::map_store_error)?;
         let last_run = self
@@ -202,6 +213,7 @@ impl SourceMaintenanceController {
             remaining_probe_candidates,
             remaining_primary_media_promotion_candidates,
             remaining_track_identity_candidate_production_candidates,
+            remaining_track_identity_decision_production_candidates,
             attachment_links,
             source_failure,
             last_run,
@@ -429,6 +441,26 @@ impl SourceMaintenanceController {
             run.track_identity_candidates.remaining_candidates;
         publish_maintained_snapshot_invalidations(store, events)?;
 
+        if self.stop_requested.load(Ordering::Acquire) {
+            run.stopped = true;
+            run.status = protocol::SourceMaintenanceRunStatus::Partial;
+            return Ok(run);
+        }
+
+        let track_identity_decision_result = store
+            .produce_track_identity_decisions_for_source(
+                input.source_id,
+                effective_limits.identity_decision_limit,
+            )
+            .map_err(crate::service::map_store_error)?;
+        run.track_identity_decisions = map_track_identity_decision_summary(
+            effective_limits.identity_decision_limit,
+            track_identity_decision_result,
+        );
+        run.remaining_track_identity_decision_production_candidates =
+            run.track_identity_decisions.remaining_candidates;
+        publish_maintained_snapshot_invalidations(store, events)?;
+
         run.status = run_status(&run);
         Ok(run)
     }
@@ -442,6 +474,7 @@ pub(crate) struct SourceMaintenanceRunInput {
     pub(crate) probe_limit: Option<usize>,
     pub(crate) promotion_limit: Option<usize>,
     pub(crate) identity_candidate_limit: Option<usize>,
+    pub(crate) identity_decision_limit: Option<usize>,
 }
 
 fn effective_limits_for_input(
@@ -456,6 +489,9 @@ fn effective_limits_for_input(
         ),
         identity_candidate_limit: library_store_sqlite::effective_track_identity_candidate_limit(
             input.identity_candidate_limit,
+        ),
+        identity_decision_limit: library_store_sqlite::effective_track_identity_decision_limit(
+            input.identity_decision_limit,
         ),
     }
 }
@@ -526,10 +562,19 @@ fn empty_run(
             skipped_stale_primary_media_candidates: 0,
             remaining_candidates: 0,
         },
+        track_identity_decisions: protocol::SourceMaintenanceTrackIdentityDecisionSummary {
+            effective_limit: effective_limits.identity_decision_limit,
+            decisions_created: 0,
+            decision_evidence_created: 0,
+            skipped_stale_candidates: 0,
+            skipped_existing_current_decisions: 0,
+            remaining_candidates: 0,
+        },
         remaining_hash_candidates: 0,
         remaining_probe_candidates: 0,
         remaining_primary_media_promotion_candidates: 0,
         remaining_track_identity_candidate_production_candidates: 0,
+        remaining_track_identity_decision_production_candidates: 0,
         attachment_links: None,
         source_failure: None,
         stopped: false,
@@ -545,6 +590,7 @@ fn run_status(run: &SourceMaintenanceRun) -> protocol::SourceMaintenanceRunStatu
         || run.attachment_materialization.remaining_candidates > 0
         || run.remaining_primary_media_promotion_candidates > 0
         || run.remaining_track_identity_candidate_production_candidates > 0
+        || run.remaining_track_identity_decision_production_candidates > 0
     {
         return protocol::SourceMaintenanceRunStatus::Partial;
     }
@@ -559,12 +605,15 @@ fn last_run_summary(run: &SourceMaintenanceRun) -> protocol::SourceMaintenanceLa
         probe: run.probe,
         primary_media_promotion: run.primary_media_promotion,
         track_identity_candidates: run.track_identity_candidates,
+        track_identity_decisions: run.track_identity_decisions,
         remaining_hash_candidates: run.remaining_hash_candidates,
         remaining_probe_candidates: run.remaining_probe_candidates,
         remaining_primary_media_promotion_candidates: run
             .remaining_primary_media_promotion_candidates,
         remaining_track_identity_candidate_production_candidates: run
             .remaining_track_identity_candidate_production_candidates,
+        remaining_track_identity_decision_production_candidates: run
+            .remaining_track_identity_decision_production_candidates,
         source_failure: run.source_failure.clone(),
     }
 }
@@ -621,6 +670,20 @@ fn map_track_identity_candidate_summary(
         evidence_refreshed: result.evidence_refreshed,
         candidates_marked_stale: result.candidates_marked_stale,
         skipped_stale_primary_media_candidates: result.skipped_stale_primary_media_candidates,
+        remaining_candidates: result.remaining_candidates,
+    }
+}
+
+fn map_track_identity_decision_summary(
+    effective_limit: usize,
+    result: ProduceTrackIdentityDecisionsForSourceResult,
+) -> protocol::SourceMaintenanceTrackIdentityDecisionSummary {
+    protocol::SourceMaintenanceTrackIdentityDecisionSummary {
+        effective_limit,
+        decisions_created: result.decisions_created,
+        decision_evidence_created: result.decision_evidence_created,
+        skipped_stale_candidates: result.skipped_stale_candidates,
+        skipped_existing_current_decisions: result.skipped_existing_current_decisions,
         remaining_candidates: result.remaining_candidates,
     }
 }
@@ -738,6 +801,19 @@ fn count_track_identity_candidate_production_candidates(
     }
     store
         .count_track_identity_candidate_production_candidates(source_id)
+        .map_err(crate::service::map_store_error)
+}
+
+fn count_track_identity_decision_production_candidates(
+    store: &SqliteDurableStore,
+    source_id: i64,
+    source_failure: Option<&protocol::SourceMaintenanceSourceFailure>,
+) -> protocol::ProtocolResult<usize> {
+    if source_failure.is_some() {
+        return Ok(0);
+    }
+    store
+        .count_track_identity_decision_production_candidates(source_id)
         .map_err(crate::service::map_store_error)
 }
 

@@ -33,6 +33,8 @@ mod source_lifecycle_reads;
 mod sources;
 mod track_identity_candidate_reads;
 mod track_identity_candidates;
+mod track_identity_decision_reads;
+mod track_identity_decisions;
 mod work_items;
 
 pub use attachment_identity::MaterializeAttachmentsForSourceResult;
@@ -69,6 +71,9 @@ pub use sources::{
 };
 pub use track_identity_candidates::{
     ProduceTrackIdentityCandidatesForSourceResult, effective_track_identity_candidate_limit,
+};
+pub use track_identity_decisions::{
+    ProduceTrackIdentityDecisionsForSourceResult, effective_track_identity_decision_limit,
 };
 
 #[cfg(test)]

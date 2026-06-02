@@ -3671,6 +3671,11 @@
           "format": "uint",
           "minimum": 0
         },
+        "remainingTrackIdentityDecisionProductionCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
         "sourceFailure": {
           "anyOf": [
             {
@@ -3694,7 +3699,8 @@
         "remainingHashCandidates",
         "remainingProbeCandidates",
         "remainingPrimaryMediaPromotionCandidates",
-        "remainingTrackIdentityCandidateProductionCandidates"
+        "remainingTrackIdentityCandidateProductionCandidates",
+        "remainingTrackIdentityDecisionProductionCandidates"
       ]
     },
     "ReadSourceMaintenanceRequest": {
@@ -3834,6 +3840,11 @@
           "format": "uint",
           "minimum": 0
         },
+        "remainingTrackIdentityDecisionProductionCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
         "sourceFailure": {
           "anyOf": [
             {
@@ -3852,6 +3863,9 @@
         },
         "trackIdentityCandidates": {
           "$ref": "#/$defs/SourceMaintenanceTrackIdentityCandidateSummary"
+        },
+        "trackIdentityDecisions": {
+          "$ref": "#/$defs/SourceMaintenanceTrackIdentityDecisionSummary"
         }
       },
       "required": [
@@ -3863,10 +3877,12 @@
         "probe",
         "primaryMediaPromotion",
         "trackIdentityCandidates",
+        "trackIdentityDecisions",
         "remainingHashCandidates",
         "remainingProbeCandidates",
         "remainingPrimaryMediaPromotionCandidates",
-        "remainingTrackIdentityCandidateProductionCandidates"
+        "remainingTrackIdentityCandidateProductionCandidates",
+        "remainingTrackIdentityDecisionProductionCandidates"
       ]
     },
     "RunSourceMaintenanceRequest": {
@@ -3889,6 +3905,14 @@
           "minimum": 0
         },
         "identityCandidateLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "identityDecisionLimit": {
           "type": [
             "integer",
             "null"
@@ -4844,6 +4868,11 @@
           "format": "uint",
           "minimum": 0
         },
+        "identityDecisionLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
         "probeLimit": {
           "type": "integer",
           "format": "uint",
@@ -4860,7 +4889,8 @@
         "attachmentLimit",
         "probeLimit",
         "promotionLimit",
-        "identityCandidateLimit"
+        "identityCandidateLimit",
+        "identityDecisionLimit"
       ]
     },
     "SourceMaintenanceHashSummary": {
@@ -4935,6 +4965,11 @@
           "format": "uint",
           "minimum": 0
         },
+        "remainingTrackIdentityDecisionProductionCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
         "sourceFailure": {
           "anyOf": [
             {
@@ -4950,6 +4985,9 @@
         },
         "trackIdentityCandidates": {
           "$ref": "#/$defs/SourceMaintenanceTrackIdentityCandidateSummary"
+        },
+        "trackIdentityDecisions": {
+          "$ref": "#/$defs/SourceMaintenanceTrackIdentityDecisionSummary"
         }
       },
       "required": [
@@ -4959,10 +4997,12 @@
         "probe",
         "primaryMediaPromotion",
         "trackIdentityCandidates",
+        "trackIdentityDecisions",
         "remainingHashCandidates",
         "remainingProbeCandidates",
         "remainingPrimaryMediaPromotionCandidates",
-        "remainingTrackIdentityCandidateProductionCandidates"
+        "remainingTrackIdentityCandidateProductionCandidates",
+        "remainingTrackIdentityDecisionProductionCandidates"
       ]
     },
     "SourceMaintenancePrimaryMediaPromotionSummary": {
@@ -5315,6 +5355,49 @@
         "evidenceRefreshed",
         "candidatesMarkedStale",
         "skippedStalePrimaryMediaCandidates",
+        "remainingCandidates"
+      ]
+    },
+    "SourceMaintenanceTrackIdentityDecisionSummary": {
+      "type": "object",
+      "properties": {
+        "decisionEvidenceCreated": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "decisionsCreated": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "effectiveLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedExistingCurrentDecisions": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedStaleCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "effectiveLimit",
+        "decisionsCreated",
+        "decisionEvidenceCreated",
+        "skippedStaleCandidates",
+        "skippedExistingCurrentDecisions",
         "remainingCandidates"
       ]
     },

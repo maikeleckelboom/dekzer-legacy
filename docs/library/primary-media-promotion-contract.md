@@ -8,6 +8,7 @@ canonical-context:
   - media-probe-observations-contract
   - source-maintenance-orchestration-contract
   - track-identity-candidate-contract
+  - track-identity-decision-contract
 scope:
   - primary-media-promotion
   - primary-media-candidates
@@ -75,14 +76,15 @@ Source maintenance runs promotion after hashing, attachment materialization, and
 3. Audio media probe observations.
 4. Primary media promotion from current attachments and probe evidence.
 5. Track identity candidate production from current evidence-backed primary-media candidates.
-6. Maintained snapshot invalidation.
+6. Track identity decision production from active exact-content candidates.
+7. Maintained snapshot invalidation.
 
 The command accepts an optional `promotionLimit`, applies backend bounds, reports promotion summary counts, and reports
 remaining promotion candidates. A bounded maintenance unit is allowed to finish partial when more promotion candidates
 remain.
 
-Track identity candidate production has its own optional `identityCandidateLimit`. Primary-media promotion does not
-create or refresh those candidates directly.
+Track identity candidate production has its own optional `identityCandidateLimit`, and decision production has its own
+optional `identityDecisionLimit`. Primary-media promotion does not create or refresh candidates or decisions directly.
 
 ## Non-Goals
 

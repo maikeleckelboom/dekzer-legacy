@@ -66,7 +66,8 @@ describe('source maintenance through the host', () => {
               attachmentLimit: 3,
               probeLimit: 2,
               promotionLimit: 5,
-              identityCandidateLimit: 6
+              identityCandidateLimit: 6,
+              identityDecisionLimit: 7
             },
             hash: {
               effectiveLimit: 4,
@@ -120,10 +121,19 @@ describe('source maintenance through the host', () => {
               skippedStalePrimaryMediaCandidates: 0,
               remainingCandidates: 0
             },
+            trackIdentityDecisions: {
+              effectiveLimit: 7,
+              decisionsCreated: 1,
+              decisionEvidenceCreated: 1,
+              skippedStaleCandidates: 0,
+              skippedExistingCurrentDecisions: 0,
+              remainingCandidates: 0
+            },
             remainingHashCandidates: 0,
             remainingProbeCandidates: 0,
             remainingPrimaryMediaPromotionCandidates: 0,
-            remainingTrackIdentityCandidateProductionCandidates: 0
+            remainingTrackIdentityCandidateProductionCandidates: 0,
+            remainingTrackIdentityDecisionProductionCandidates: 0
           }
         },
         readSourceMaintenance: async (request) => {
@@ -135,6 +145,7 @@ describe('source maintenance through the host', () => {
             remainingProbeCandidates: 0,
             remainingPrimaryMediaPromotionCandidates: 0,
             remainingTrackIdentityCandidateProductionCandidates: 0,
+            remainingTrackIdentityDecisionProductionCandidates: 0,
             attachmentLinks: {
               currentLinksCount: 1,
               staleLinksCount: 0,
@@ -156,6 +167,7 @@ describe('source maintenance through the host', () => {
         probeLimit: 2,
         promotionLimit: 5,
         identityCandidateLimit: 6,
+        identityDecisionLimit: 7,
         absolutePath: 'C:/RendererMustNotControlThis'
       })
     ).resolves.toMatchObject({
@@ -173,7 +185,8 @@ describe('source maintenance through the host', () => {
       attachmentLimit: 3,
       probeLimit: 2,
       promotionLimit: 5,
-      identityCandidateLimit: 6
+      identityCandidateLimit: 6,
+      identityDecisionLimit: 7
     })
 
     await expect(readSourceMaintenanceThroughHost(successHost, { sourceId: '7' })).resolves.toEqual(
@@ -186,6 +199,7 @@ describe('source maintenance through the host', () => {
           remainingProbeCandidates: 0,
           remainingPrimaryMediaPromotionCandidates: 0,
           remainingTrackIdentityCandidateProductionCandidates: 0,
+          remainingTrackIdentityDecisionProductionCandidates: 0,
           attachmentLinks: {
             currentLinksCount: 1,
             staleLinksCount: 0,
@@ -219,6 +233,12 @@ describe('source maintenance through the host', () => {
     })
     await expect(
       runSourceMaintenanceThroughHost(successHost, { sourceId: '7', identityCandidateLimit: 0 })
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    })
+    await expect(
+      runSourceMaintenanceThroughHost(successHost, { sourceId: '7', identityDecisionLimit: 0 })
     ).resolves.toMatchObject({
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
