@@ -32,7 +32,7 @@ use crate::source_file_hash_protocol::{
     empty_hash_source_files_blake3_reply, map_hash_lifecycle_source_failure,
     map_hash_source_files_blake3_reply,
 };
-use crate::source_hash_maintenance::{
+use crate::source_maintenance::{
     SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT, SourceMaintenanceController,
     SourceMaintenanceRun, SourceMaintenanceRunInput,
 };
@@ -1237,7 +1237,7 @@ mod tests {
         UpsertSourceInput, UpsertSourceScanStateInput, UpsertSourceStateInput, durable_store_path,
     };
 
-    use crate::source_hash_maintenance::{
+    use crate::source_maintenance::{
         SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT, SOURCE_HASH_MAINTENANCE_BATCH_LIMIT,
     };
 
@@ -2087,7 +2087,7 @@ mod tests {
     }
 
     #[test]
-    fn scan_completion_runs_service_owned_hash_maintenance() {
+    fn scan_completion_runs_service_owned_source_maintenance() {
         let (tempdir, context, service) = open_service_with_context();
         let source_root = tempdir.path().join("hash-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -2174,7 +2174,7 @@ mod tests {
             count_rows(&context, "source_file_attachment_links"),
             i64::try_from(SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT * 2)
                 .expect("attachment limit fits i64"),
-            "manual hash maintenance must also trigger one bounded attachment materialization unit"
+            "manual source maintenance must also trigger one bounded attachment materialization unit"
         );
 
         for source_file_id in &file_ids {
@@ -2557,7 +2557,7 @@ mod tests {
         );
         assert_eq!(
             after_counts, before_counts,
-            "attachment identity reads must not trigger hash maintenance, materialization, or old identity rows"
+            "attachment identity reads must not trigger source maintenance, materialization, or old identity rows"
         );
         for absent_or_future_table in [
             "Tracks",
@@ -2674,6 +2674,162 @@ mod tests {
     }
 
     #[test]
+    fn active_manual_source_maintenance_returns_skipped_without_work() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("active-manual-maintenance-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.flac"), b"track").expect("write track");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(&service, registered.root_id, 100, "track.flac", 5);
+
+        service
+            .source_maintenance
+            .set_source_active_for_test(registered.root_id, true);
+        let completed_before = service.source_maintenance.completed_runs_for_test().len();
+
+        let run =
+            run_source_maintenance(&service, registered.root_id, Some(10), Some(10), Some(10));
+
+        assert_eq!(
+            run.status,
+            library_boundary_protocol::SourceMaintenanceRunStatus::Skipped
+        );
+        assert_eq!(run.hash.hashed_count, 0);
+        assert_eq!(run.attachment_materialization.links_created, 0);
+        assert_eq!(run.probe.probed_count, 0);
+        assert_eq!(count_rows(&context, "SourceFacts"), 0);
+        assert_eq!(count_rows(&context, "content_attachments"), 0);
+        assert_eq!(
+            service.source_maintenance.completed_runs_for_test().len(),
+            completed_before,
+            "duplicate active manual runs are scheduler skips, not completed maintenance units"
+        );
+
+        let snapshot = read_source_maintenance(&service, registered.root_id);
+        assert!(
+            snapshot.last_run.is_none(),
+            "skipped duplicate active runs must not overwrite last_run"
+        );
+        service
+            .source_maintenance
+            .set_source_active_for_test(registered.root_id, false);
+        assert!(
+            service
+                .source_maintenance
+                .active_source_ids_for_test()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn manual_source_maintenance_takes_pending_source_without_back_to_back_queue_run() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("manual-pending-maintenance-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.flac"), b"track").expect("write track");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(&service, registered.root_id, 100, "track.flac", 5);
+
+        assert!(
+            service
+                .source_maintenance
+                .request_source(registered.root_id)
+        );
+        assert_eq!(
+            service.source_maintenance.pending_source_ids_for_test(),
+            vec![registered.root_id]
+        );
+
+        let manual =
+            run_source_maintenance(&service, registered.root_id, Some(10), Some(10), Some(10));
+        assert_eq!(manual.hash.hashed_count, 1);
+
+        let queued = service
+            .source_maintenance
+            .run_queued(&service.durable_store, &service.session_events)
+            .expect("run queued maintenance");
+        assert!(
+            queued.is_empty(),
+            "manual ownership must remove the pending entry for the same source"
+        );
+        assert!(
+            service
+                .source_maintenance
+                .pending_source_ids_for_test()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn pending_source_maintenance_runs_in_source_id_order() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        assert!(service.source_maintenance.request_source(30));
+        assert!(service.source_maintenance.request_source(10));
+        assert!(service.source_maintenance.request_source(20));
+        assert!(!service.source_maintenance.request_source(10));
+        assert_eq!(
+            service.source_maintenance.pending_source_ids_for_test(),
+            vec![10, 20, 30]
+        );
+
+        let runs = service
+            .source_maintenance
+            .run_queued(&service.durable_store, &service.session_events)
+            .expect("run queued maintenance");
+        let run_source_ids = runs.iter().map(|run| run.source_id).collect::<Vec<_>>();
+        assert_eq!(run_source_ids, vec![10, 20, 30]);
+        assert!(runs.iter().all(|run| matches!(
+            run.source_failure,
+            Some(library_boundary_protocol::SourceMaintenanceSourceFailure::SourceNotFound)
+        )));
+    }
+
+    #[test]
+    fn stop_clears_pending_source_maintenance_without_stuck_active_sources() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("stop-cleanup-maintenance-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        std::fs::write(source_root.join("track.flac"), b"track").expect("write track");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(&service, registered.root_id, 100, "track.flac", 5);
+        assert!(
+            service
+                .source_maintenance
+                .request_source(registered.root_id)
+        );
+        service
+            .source_maintenance
+            .request_stop_before_attachment_materialization_for_test();
+
+        let runs = service
+            .source_maintenance
+            .run_queued(&service.durable_store, &service.session_events)
+            .expect("run queued maintenance");
+
+        assert_eq!(runs.len(), 1);
+        assert!(runs[0].stopped);
+        assert!(
+            service
+                .source_maintenance
+                .pending_source_ids_for_test()
+                .is_empty()
+        );
+        assert!(
+            service
+                .source_maintenance
+                .active_source_ids_for_test()
+                .is_empty()
+        );
+    }
+
+    #[test]
     fn source_maintenance_observes_stop_before_attachment_materialization() {
         let (tempdir, context, service) = open_service_with_context();
         let source_root = tempdir.path().join("stop-before-attachment-root");
@@ -2749,6 +2905,46 @@ mod tests {
                 .iter()
                 .all(|run| run.source_id != registered.root_id),
             "blocked scans must not automatically request source maintenance"
+        );
+    }
+
+    #[test]
+    fn failed_scan_does_not_request_source_maintenance() {
+        let (_tempdir, _context, service) = open_service_with_context();
+        let missing_source_id = 99_999;
+        let scan_run_id = 7;
+        let terminal_publication_complete =
+            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        super::execute_scan_job(
+            service.durable_store.clone(),
+            service.session_events.clone(),
+            missing_source_id,
+            scan_run_id,
+            10,
+            terminal_publication_complete,
+            service.source_maintenance.clone(),
+        );
+
+        let events = read_after_events(&service, None, 64);
+        assert!(
+            events.events.iter().any(|e| {
+                let LibraryBoundaryEvent::SourceScanEvent(event) = e else {
+                    return false;
+                };
+                event.kind == library_boundary_protocol::SourceScanEventKind::SourceScanFailed
+                    && event.root_id == missing_source_id
+                    && event.scan_run_id == scan_run_id
+            }),
+            "failed scan must publish a failed terminal event"
+        );
+        assert!(
+            service
+                .source_maintenance
+                .completed_runs_for_test()
+                .iter()
+                .all(|run| run.source_id != missing_source_id),
+            "failed scans must not automatically request source maintenance"
         );
     }
 

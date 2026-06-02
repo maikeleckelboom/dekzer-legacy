@@ -20,6 +20,7 @@ scope:
 Source maintenance is the backend-owned orchestration path for one bounded substrate maintenance unit for a source.
 It coordinates existing evidence and attachment authority paths; it does not create a new evidence type, durable
 identity layer, readiness taxonomy, scheduler loop, or renderer-owned maintenance state.
+The Rust service owner is the `source_maintenance` module in `library-boundary-service`.
 
 The current unit exists so a scan completion or explicit command can make bounded progress on:
 
@@ -60,6 +61,23 @@ positive integers and are capped by backend policy. No phase loops until the sou
 
 Per-file failures do not spin. A failed hash or probe outcome is reflected in the phase summary; unrelated successful
 candidates in the bounded batch can still commit through their existing authority paths.
+
+## Runtime Scheduling
+
+Runtime scheduling is owned by the backend service instance. Pending source ids are held in memory, deduped by source
+id, and drained deterministically in ascending source-id order. Active source ids are also held in memory and prevent a
+second same-source unit from starting while one is already running.
+
+A manual `runSourceMaintenance` command for a source that is already active returns a bounded `skipped` run reply with
+the requested effective limits and does not run hashing, attachment materialization, or probing. That scheduler skip is
+not recorded as `lastRun`.
+
+A manual `runSourceMaintenance` command for a source that is pending but not active takes immediate ownership of that
+source and removes it from pending state before running one bounded unit. The same source must not then run again from
+the pending queue immediately after the manual command.
+
+Calling stop clears pending state. Active state is cleared when the in-flight unit exits through its normal or error
+cleanup path.
 
 ## Command Boundary
 

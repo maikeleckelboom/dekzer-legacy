@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -28,7 +28,7 @@ pub(crate) struct SourceMaintenanceController {
 
 #[derive(Debug, Default)]
 struct SourceMaintenanceState {
-    pending_source_ids: HashSet<i64>,
+    pending_source_ids: BTreeSet<i64>,
     active_source_ids: HashSet<i64>,
     last_runs: HashMap<i64, SourceMaintenanceRun>,
     #[cfg(test)]
@@ -121,11 +121,16 @@ impl SourceMaintenanceController {
         events: &LibraryBoundaryEventStream,
         input: SourceMaintenanceRunInput,
     ) -> protocol::ProtocolResult<SourceMaintenanceRun> {
+        let effective_limits = effective_limits_for_input(&input);
         {
             let mut state = self
                 .state
                 .lock()
                 .expect("source maintenance state poisoned");
+            if state.active_source_ids.contains(&input.source_id) {
+                return Ok(empty_run(input.source_id, effective_limits));
+            }
+            state.pending_source_ids.remove(&input.source_id);
             state.active_source_ids.insert(input.source_id);
         }
         let run = self.run_source(store, events, input.clone());
@@ -191,6 +196,44 @@ impl SourceMaintenanceController {
             .clone()
     }
 
+    #[cfg(test)]
+    pub(crate) fn pending_source_ids_for_test(&self) -> Vec<i64> {
+        self.state
+            .lock()
+            .expect("source maintenance state poisoned")
+            .pending_source_ids
+            .iter()
+            .copied()
+            .collect()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn active_source_ids_for_test(&self) -> Vec<i64> {
+        let mut source_ids = self
+            .state
+            .lock()
+            .expect("source maintenance state poisoned")
+            .active_source_ids
+            .iter()
+            .copied()
+            .collect::<Vec<_>>();
+        source_ids.sort_unstable();
+        source_ids
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_source_active_for_test(&self, source_id: i64, active: bool) {
+        let mut state = self
+            .state
+            .lock()
+            .expect("source maintenance state poisoned");
+        if active {
+            state.active_source_ids.insert(source_id);
+        } else {
+            state.active_source_ids.remove(&source_id);
+        }
+    }
+
     pub(crate) fn stop(&self) {
         self.stop_requested.store(true, Ordering::Release);
         let mut state = self
@@ -241,15 +284,7 @@ impl SourceMaintenanceController {
         events: &LibraryBoundaryEventStream,
         input: SourceMaintenanceRunInput,
     ) -> protocol::ProtocolResult<SourceMaintenanceRun> {
-        let hash_limit = library_store_sqlite::effective_hash_batch_limit(input.hash_limit);
-        let attachment_limit = effective_attachment_materialization_limit(input.attachment_limit);
-        let probe_limit =
-            library_store_sqlite::effective_media_probe_batch_limit(input.probe_limit);
-        let effective_limits = protocol::SourceMaintenanceEffectiveLimits {
-            hash_limit,
-            attachment_limit,
-            probe_limit,
-        };
+        let effective_limits = effective_limits_for_input(&input);
         let mut run = empty_run(input.source_id, effective_limits);
 
         if self.stop_requested.load(Ordering::Acquire) {
@@ -274,7 +309,7 @@ impl SourceMaintenanceController {
                 scope: SourceFileBlake3HashAdmissionScope::Source {
                     source_id: input.source_id,
                 },
-                limit: Some(hash_limit),
+                limit: Some(effective_limits.hash_limit),
                 observed_at_ms: crate::service::unix_time_ms()?,
             })
             .map_err(crate::service::map_store_error)?;
@@ -303,10 +338,12 @@ impl SourceMaintenanceController {
         }
 
         let attachment_result = store
-            .materialize_attachments_for_source(input.source_id, attachment_limit)
+            .materialize_attachments_for_source(input.source_id, effective_limits.attachment_limit)
             .map_err(crate::service::map_store_error)?;
-        run.attachment_materialization =
-            map_attachment_materialization_summary(attachment_limit, attachment_result);
+        run.attachment_materialization = map_attachment_materialization_summary(
+            effective_limits.attachment_limit,
+            attachment_result,
+        );
         run.attachment_links = read_attachment_link_summary(store, input.source_id)
             .map_err(crate::service::map_store_error)?;
         publish_maintained_snapshot_invalidations(store, events)?;
@@ -322,7 +359,7 @@ impl SourceMaintenanceController {
                 scope: SourceFileMediaProbeAdmissionScope::Source {
                     source_id: input.source_id,
                 },
-                limit: Some(probe_limit),
+                limit: Some(effective_limits.probe_limit),
                 observed_at_ms: crate::service::unix_time_ms()?,
             })
             .map_err(crate::service::map_store_error)?;
@@ -347,6 +384,16 @@ pub(crate) struct SourceMaintenanceRunInput {
     pub(crate) hash_limit: Option<usize>,
     pub(crate) attachment_limit: Option<usize>,
     pub(crate) probe_limit: Option<usize>,
+}
+
+fn effective_limits_for_input(
+    input: &SourceMaintenanceRunInput,
+) -> protocol::SourceMaintenanceEffectiveLimits {
+    protocol::SourceMaintenanceEffectiveLimits {
+        hash_limit: library_store_sqlite::effective_hash_batch_limit(input.hash_limit),
+        attachment_limit: effective_attachment_materialization_limit(input.attachment_limit),
+        probe_limit: library_store_sqlite::effective_media_probe_batch_limit(input.probe_limit),
+    }
 }
 
 pub(crate) fn effective_attachment_materialization_limit(limit: Option<usize>) -> usize {
