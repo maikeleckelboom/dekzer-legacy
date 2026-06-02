@@ -7,6 +7,7 @@ canonical-context:
   - attachment-identity-foundation-contract
   - media-probe-observations-contract
   - source-maintenance-orchestration-contract
+  - track-identity-candidate-contract
 scope:
   - primary-media-promotion
   - primary-media-candidates
@@ -21,8 +22,9 @@ Primary media promotion v0 is the narrow bridge from current source-file evidenc
 row profile. It promotes audio attachments only when there is current BLAKE3 attachment identity and current audio probe
 evidence for a present source-file occurrence.
 
-This is not track identity, CUE association, playlist identity, preparation readiness, waveform generation, stems,
-artwork intelligence, or user-facing metadata intelligence.
+This is not canonical track identity, CUE association, playlist identity, preparation readiness, waveform generation,
+stems, artwork intelligence, or user-facing metadata intelligence. It is eligible input evidence for the later
+track-identity-candidate layer, which remains non-canonical and reversible.
 
 ## Durable Target
 
@@ -72,11 +74,15 @@ Source maintenance runs promotion after hashing, attachment materialization, and
 2. Attachment materialization from current BLAKE3 facts.
 3. Audio media probe observations.
 4. Primary media promotion from current attachments and probe evidence.
-5. Maintained snapshot invalidation.
+5. Track identity candidate production from current evidence-backed primary-media candidates.
+6. Maintained snapshot invalidation.
 
 The command accepts an optional `promotionLimit`, applies backend bounds, reports promotion summary counts, and reports
 remaining promotion candidates. A bounded maintenance unit is allowed to finish partial when more promotion candidates
 remain.
+
+Track identity candidate production has its own optional `identityCandidateLimit`. Primary-media promotion does not
+create or refresh those candidates directly.
 
 ## Non-Goals
 
@@ -84,13 +90,13 @@ Primary media promotion v0 does not:
 
 - promote video files;
 - parse CUE sheets or pair CUE with audio;
-- infer tracks, releases, performances, artwork roles, or metadata identity;
+- infer canonical tracks, releases, performances, artwork roles, or metadata identity;
 - create preparation, waveform, stems, playlist, or browser-row records;
 - drain all candidates synchronously;
 - expose local filesystem paths to the renderer.
 
 ## Next Gate
 
-Future work may add video-capable probing and promotion, CUE parse observations, richer playable identity, track identity,
-or preparation integration. Those layers must remain separate from attachment identity and from v0 evidence-backed
-primary-media candidates.
+Future work may add video-capable probing and promotion, CUE parse observations, richer playable identity, canonical
+track identity, or preparation integration. Those layers must remain separate from attachment identity and from v0
+evidence-backed primary-media candidates.

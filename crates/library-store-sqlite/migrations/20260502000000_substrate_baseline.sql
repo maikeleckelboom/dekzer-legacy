@@ -729,6 +729,70 @@ CREATE TABLE primary_media_candidates
 CREATE INDEX primary_media_candidates_evidence_source_file
     ON primary_media_candidates (evidence_source_file_id);
 
+CREATE TABLE track_identity_candidates
+(
+    track_identity_candidate_id  INTEGER PRIMARY KEY,
+    candidate_kind               TEXT    NOT NULL CHECK (candidate_kind = 'exact_primary_media_content'),
+    evidence_basis               TEXT    NOT NULL CHECK (evidence_basis = 'current_primary_media_exact_blake3'),
+    evidence_key_algorithm       TEXT    NOT NULL CHECK (evidence_key_algorithm = 'blake3'),
+    evidence_key_value           TEXT    NOT NULL CHECK (length(trim(evidence_key_value)) > 0),
+    status                       TEXT    NOT NULL CHECK (status IN ('active', 'stale', 'superseded')),
+    created_at                   INTEGER NOT NULL,
+    updated_at                   INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    UNIQUE (candidate_kind, evidence_basis, evidence_key_algorithm, evidence_key_value)
+) STRICT;
+
+CREATE INDEX track_identity_candidates_status
+    ON track_identity_candidates (status);
+
+CREATE TABLE track_identity_candidate_members
+(
+    track_identity_candidate_member_id  INTEGER PRIMARY KEY,
+    track_identity_candidate_id         INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
+    primary_media_candidate_id          INTEGER NOT NULL REFERENCES primary_media_candidates (primary_media_candidate_id) ON DELETE CASCADE,
+    attachment_id                       INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
+    evidence_source_file_id             INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
+    evidence_basis_fingerprint          TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
+    content_hash_algorithm              TEXT    NOT NULL CHECK (content_hash_algorithm = 'blake3'),
+    content_hash_value                  TEXT    NOT NULL CHECK (length(trim(content_hash_value)) > 0),
+    created_at                          INTEGER NOT NULL,
+    updated_at                          INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    UNIQUE (primary_media_candidate_id)
+) STRICT;
+
+CREATE INDEX track_identity_candidate_members_candidate
+    ON track_identity_candidate_members (track_identity_candidate_id);
+
+CREATE INDEX track_identity_candidate_members_attachment
+    ON track_identity_candidate_members (attachment_id);
+
+CREATE TABLE track_identity_candidate_evidence
+(
+    track_identity_candidate_evidence_id  INTEGER PRIMARY KEY,
+    track_identity_candidate_id           INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
+    primary_media_candidate_id            INTEGER NOT NULL REFERENCES primary_media_candidates (primary_media_candidate_id) ON DELETE CASCADE,
+    attachment_id                         INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
+    source_file_attachment_link_id        INTEGER NOT NULL REFERENCES source_file_attachment_links (source_file_attachment_link_id) ON DELETE CASCADE,
+    source_file_id                        INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
+    source_id                             INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
+    evidence_basis_fingerprint            TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
+    content_hash_algorithm                TEXT    NOT NULL CHECK (content_hash_algorithm = 'blake3'),
+    content_hash_value                    TEXT    NOT NULL CHECK (length(trim(content_hash_value)) > 0),
+    probe_accepted_artifact_id            INTEGER NOT NULL REFERENCES Artifacts (artifact_id),
+    created_at                            INTEGER NOT NULL,
+    updated_at                            INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    UNIQUE (track_identity_candidate_id, primary_media_candidate_id, source_file_id)
+) STRICT;
+
+CREATE INDEX track_identity_candidate_evidence_candidate
+    ON track_identity_candidate_evidence (track_identity_candidate_id);
+
+CREATE INDEX track_identity_candidate_evidence_source_file
+    ON track_identity_candidate_evidence (source_file_id);
+
 CREATE TABLE SourceSegmentSets
 (
     source_segment_set_id  INTEGER PRIMARY KEY,

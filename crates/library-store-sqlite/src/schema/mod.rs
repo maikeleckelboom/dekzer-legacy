@@ -130,6 +130,9 @@ mod tests {
         "source_locators",
         "SourceSegmentSets",
         "SourceSegments",
+        "track_identity_candidate_evidence",
+        "track_identity_candidate_members",
+        "track_identity_candidates",
         "WorkItems",
         "WorkRuns",
     ];
@@ -461,6 +464,60 @@ mod tests {
         assert!(
             table_index_names(&connection, "primary_media_candidates")
                 .contains(&"primary_media_candidates_evidence_source_file".to_string())
+        );
+        assert_eq!(
+            table_column_names(&connection, "track_identity_candidates"),
+            vec![
+                "track_identity_candidate_id",
+                "candidate_kind",
+                "evidence_basis",
+                "evidence_key_algorithm",
+                "evidence_key_value",
+                "status",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "track_identity_candidate_members"),
+            vec![
+                "track_identity_candidate_member_id",
+                "track_identity_candidate_id",
+                "primary_media_candidate_id",
+                "attachment_id",
+                "evidence_source_file_id",
+                "evidence_basis_fingerprint",
+                "content_hash_algorithm",
+                "content_hash_value",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "track_identity_candidate_evidence"),
+            vec![
+                "track_identity_candidate_evidence_id",
+                "track_identity_candidate_id",
+                "primary_media_candidate_id",
+                "attachment_id",
+                "source_file_attachment_link_id",
+                "source_file_id",
+                "source_id",
+                "evidence_basis_fingerprint",
+                "content_hash_algorithm",
+                "content_hash_value",
+                "probe_accepted_artifact_id",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert!(
+            table_index_names(&connection, "track_identity_candidate_members")
+                .contains(&"track_identity_candidate_members_candidate".to_string())
+        );
+        assert!(
+            table_index_names(&connection, "track_identity_candidate_evidence")
+                .contains(&"track_identity_candidate_evidence_source_file".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "navigation_rows"),

@@ -309,7 +309,8 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             hashLimit: 8,
             attachmentLimit: 4,
             probeLimit: 4,
-            promotionLimit: 4
+            promotionLimit: 4,
+            identityCandidateLimit: 4
           },
           hash: {
             effectiveLimit: 8,
@@ -351,9 +352,22 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             skippedStaleAttachmentLink: 0,
             remainingCandidates: 0
           },
+          trackIdentityCandidates: {
+            effectiveLimit: 4,
+            candidatesCreated: 1,
+            candidatesRefreshed: 0,
+            membersCreated: 1,
+            membersRefreshed: 0,
+            evidenceCreated: 1,
+            evidenceRefreshed: 0,
+            candidatesMarkedStale: 0,
+            skippedStalePrimaryMediaCandidates: 0,
+            remainingCandidates: 0
+          },
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
-          remainingPrimaryMediaPromotionCandidates: 0
+          remainingPrimaryMediaPromotionCandidates: 0,
+          remainingTrackIdentityCandidateProductionCandidates: 0
         }
       }
     })
@@ -369,6 +383,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
           remainingPrimaryMediaPromotionCandidates: 0,
+          remainingTrackIdentityCandidateProductionCandidates: 0,
           attachmentLinks: {
             currentLinksCount: 1,
             staleLinksCount: 0,
@@ -419,9 +434,22 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
               skippedStaleAttachmentLink: 0,
               remainingCandidates: 0
             },
+            trackIdentityCandidates: {
+              effectiveLimit: 4,
+              candidatesCreated: 1,
+              candidatesRefreshed: 0,
+              membersCreated: 1,
+              membersRefreshed: 0,
+              evidenceCreated: 1,
+              evidenceRefreshed: 0,
+              candidatesMarkedStale: 0,
+              skippedStalePrimaryMediaCandidates: 0,
+              remainingCandidates: 0
+            },
             remainingHashCandidates: 0,
             remainingProbeCandidates: 0,
-            remainingPrimaryMediaPromotionCandidates: 0
+            remainingPrimaryMediaPromotionCandidates: 0,
+            remainingTrackIdentityCandidateProductionCandidates: 0
           }
         }
       }
@@ -434,7 +462,8 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
     hashLimit: 8,
     attachmentLimit: 4,
     probeLimit: 4,
-    promotionLimit: 4
+    promotionLimit: 4,
+    identityCandidateLimit: 4
   });
   const readReply = await client.readSourceMaintenance({ sourceId: "7" });
 
@@ -449,7 +478,8 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
           hashLimit: 8,
           attachmentLimit: 4,
           probeLimit: 4,
-          promotionLimit: 4
+          promotionLimit: 4,
+          identityCandidateLimit: 4
         }
       }
     } satisfies CommandRequest,

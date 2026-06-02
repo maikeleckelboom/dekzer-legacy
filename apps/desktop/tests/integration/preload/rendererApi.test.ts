@@ -80,7 +80,8 @@ describe('preload renderer API', () => {
       hashLimit: 4,
       attachmentLimit: 2,
       probeLimit: 3,
-      promotionLimit: 5
+      promotionLimit: 5,
+      identityCandidateLimit: 6
     }
     const readSourceMaintenanceRequest = { sourceId: '7' }
     const scanRequest = { rootId: 'root-1' }
@@ -199,7 +200,8 @@ describe('preload renderer API', () => {
           hashLimit: 4,
           attachmentLimit: 2,
           probeLimit: 3,
-          promotionLimit: 5
+          promotionLimit: 5,
+          identityCandidateLimit: 6
         },
         hash: {
           effectiveLimit: 4,
@@ -241,9 +243,22 @@ describe('preload renderer API', () => {
           skippedStaleAttachmentLink: 0,
           remainingCandidates: 0
         },
+        trackIdentityCandidates: {
+          effectiveLimit: 6,
+          candidatesCreated: 1,
+          candidatesRefreshed: 0,
+          membersCreated: 1,
+          membersRefreshed: 0,
+          evidenceCreated: 1,
+          evidenceRefreshed: 0,
+          candidatesMarkedStale: 0,
+          skippedStalePrimaryMediaCandidates: 0,
+          remainingCandidates: 0
+        },
         remainingHashCandidates: 0,
         remainingProbeCandidates: 0,
-        remainingPrimaryMediaPromotionCandidates: 0
+        remainingPrimaryMediaPromotionCandidates: 0,
+        remainingTrackIdentityCandidateProductionCandidates: 0
       }
     }
     const readSourceMaintenanceResult: ReadSourceMaintenanceResult = {
@@ -253,7 +268,8 @@ describe('preload renderer API', () => {
         status: 'idle',
         remainingHashCandidates: 0,
         remainingProbeCandidates: 0,
-        remainingPrimaryMediaPromotionCandidates: 0
+        remainingPrimaryMediaPromotionCandidates: 0,
+        remainingTrackIdentityCandidateProductionCandidates: 0
       }
     }
     const choiceResult: LocalRootChoiceResult = {

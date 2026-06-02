@@ -131,6 +131,7 @@ mod tests {
                 attachment_limit: Some(4),
                 probe_limit: Some(4),
                 promotion_limit: Some(4),
+                identity_candidate_limit: Some(4),
             }),
         );
 
@@ -205,6 +206,7 @@ mod tests {
                 attachment_limit: Some(4),
                 probe_limit: None,
                 promotion_limit: None,
+                identity_candidate_limit: None,
             }),
         );
         assert_eq!(
@@ -286,6 +288,7 @@ mod tests {
                     attachment_limit: 4,
                     probe_limit: 4,
                     promotion_limit: 4,
+                    identity_candidate_limit: 4,
                 },
                 hash: super::SourceMaintenanceHashSummary {
                     effective_limit: 8,
@@ -328,9 +331,22 @@ mod tests {
                     skipped_stale_attachment_link: 0,
                     remaining_candidates: 0,
                 },
+                track_identity_candidates: super::SourceMaintenanceTrackIdentityCandidateSummary {
+                    effective_limit: 4,
+                    candidates_created: 1,
+                    candidates_refreshed: 0,
+                    members_created: 1,
+                    members_refreshed: 0,
+                    evidence_created: 1,
+                    evidence_refreshed: 0,
+                    candidates_marked_stale: 0,
+                    skipped_stale_primary_media_candidates: 0,
+                    remaining_candidates: 0,
+                },
                 remaining_hash_candidates: 0,
                 remaining_probe_candidates: 0,
                 remaining_primary_media_promotion_candidates: 0,
+                remaining_track_identity_candidate_production_candidates: 0,
                 attachment_links: None,
                 source_failure: None,
             }),

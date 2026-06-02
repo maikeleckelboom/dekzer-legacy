@@ -31,6 +31,8 @@ mod source_file_hash;
 mod source_file_media_probe;
 mod source_lifecycle_reads;
 mod sources;
+mod track_identity_candidate_reads;
+mod track_identity_candidates;
 mod work_items;
 
 pub use attachment_identity::MaterializeAttachmentsForSourceResult;
@@ -64,6 +66,9 @@ pub use source_file_media_probe::{
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
     UnregisterLocalRootInput, UnregisterLocalRootResult,
+};
+pub use track_identity_candidates::{
+    ProduceTrackIdentityCandidatesForSourceResult, effective_track_identity_candidate_limit,
 };
 
 #[cfg(test)]

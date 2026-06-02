@@ -87,6 +87,11 @@ pub use read_models::observed_file_facts::{
     read_observed_file_facts_for_source_file,
 };
 pub use read_models::source_lifecycle::StoreSourceLifecycle;
+pub use read_models::track_identity_candidates::{
+    StoreTrackIdentityCandidate, StoreTrackIdentityCandidateEvidence,
+    StoreTrackIdentityCandidateEvidenceStatus, StoreTrackIdentityCandidateMember,
+    StoreTrackIdentityCandidateStatus, read_track_identity_candidates_for_source,
+};
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
     DurableStoreSchemaCompatibilityState, HashSourceFileBlake3BatchInput,
@@ -95,10 +100,11 @@ pub use store::{
     MaintainedReadModelRevision, MaintainedReadModelScope, MaterializeAttachmentsForSourceResult,
     ProbeSourceFileMediaBatchInput, ProbeSourceFileMediaBatchOutcome,
     ProbeSourceFileMediaBatchOutcomeStatus, ProbeSourceFileMediaBatchResult,
-    PromotePrimaryMediaForSourceResult, ReadLocalRootsResult,
-    ReadSourceFileBlake3HashCandidatesInput, ReadSourceFileMediaProbeCandidatesInput,
-    RegisterLocalRootInput, RootScanHierarchyObservationReason, RootScanMaterializationResult,
-    RootScanObservation, SOURCE_FILE_BLAKE3_ALGORITHM, SourceFileBlake3HashAdmissionScope,
+    ProduceTrackIdentityCandidatesForSourceResult, PromotePrimaryMediaForSourceResult,
+    ReadLocalRootsResult, ReadSourceFileBlake3HashCandidatesInput,
+    ReadSourceFileMediaProbeCandidatesInput, RegisterLocalRootInput,
+    RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
+    SOURCE_FILE_BLAKE3_ALGORITHM, SourceFileBlake3HashAdmissionScope,
     SourceFileBlake3HashCandidate, SourceFileBlake3HashCandidateReason,
     SourceFileBlake3HashFailure, SourceFileBlake3HashSkipReason,
     SourceFileMediaProbeAdmissionScope, SourceFileMediaProbeCandidate,
@@ -106,5 +112,5 @@ pub use store::{
     SourceFileMediaProbeSkipReason, SqliteDurableStore, SqliteDurableStoreAppOwnedState,
     StoreEnvironment, UnregisterLocalRootInput, UnregisterLocalRootResult, durable_store_path,
     effective_hash_batch_limit, effective_media_probe_batch_limit,
-    effective_primary_media_promotion_limit,
+    effective_primary_media_promotion_limit, effective_track_identity_candidate_limit,
 };

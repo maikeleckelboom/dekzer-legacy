@@ -7,6 +7,7 @@ canonical-context:
   - media-relevant-file-inventory-contract
   - library-contents-read-boundary
   - primary-media-promotion-contract
+  - track-identity-candidate-contract
 scope:
   - asset-identity
   - primary-media-authority
@@ -39,7 +40,8 @@ Reading order:
 | `readContents` default policy | Renderer boundary + service/store read model | Current product contents path: recursive `sourceFile` rows for audio, video, image, and admitted unsupported CUE sheets. |
 | `SourceFacts` observed-file evidence | Observed source facts substrate | Optional accepted source-file evidence attached to a `source_file_id` and copied file basis. Current evidence includes BLAKE3 content hash and audio media probe facts. It is not attachment identity and is not required by default contents reads. |
 | `content_attachments` / `source_file_attachment_links` | SQLite + `SqliteDurableStore::materialize_attachments_for_source` called by bounded service maintenance | Current Rust/store/service attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing. Exposed only through the narrow attachment identity read boundary. |
-| `primary_media_candidates` | SQLite + `SqliteDurableStore::promote_primary_media_for_source` called by bounded service maintenance | Current evidence-backed primary-media v0 projection target. One row per attachment with current BLAKE3 attachment identity and current audio probe evidence. Not track identity, not browser-row authority, not CUE pairing. |
+| `primary_media_candidates` | SQLite + `SqliteDurableStore::promote_primary_media_for_source` called by bounded service maintenance | Current evidence-backed primary-media v0 projection target. One row per attachment with current BLAKE3 attachment identity and current audio probe evidence. Not canonical track identity, not browser-row authority, not CUE pairing. |
+| `track_identity_candidates` / `track_identity_candidate_members` / `track_identity_candidate_evidence` | SQLite + `SqliteDurableStore::produce_track_identity_candidates_for_source` called by bounded service maintenance | Current exact evidence candidate foundation from current `primary_media_candidates`. Groups exact current BLAKE3 primary-media content evidence with provenance. Not canonical track identity, not user identity, not semantic recording matching. |
 | `readContents` `primaryMedia` policy | Store read model + boundary protocol | Current evidence-backed primary-media row profile. Reads only promoted `primary_media_candidates` revalidated against current scoped source files, attachment links, content attachments, and `SourceFacts`. No source-file fallback. |
 | `source_media` write/read guards | Store filesystem guard | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing. |
 | `Playlists` / `PlaylistEntries` | Boundary service + store | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`. |
@@ -82,6 +84,26 @@ Evidence:
 Therefore `primaryMedia` must not be treated as current track identity. It is now a narrow playable-media candidate
 projection backed by current attachment identity and audio probe evidence. The detailed eligibility and non-goals are
 owned by `docs/library/primary-media-promotion-contract.md`.
+
+## Track Identity Candidate Decision
+
+Decision: **current evidence-backed candidate foundation, non-canonical.**
+
+Evidence:
+
+- Store schema contains `track_identity_candidates`, `track_identity_candidate_members`, and
+  `track_identity_candidate_evidence`.
+- Store production is backend-owned, source-scoped, and bounded.
+- Production consumes only current `primary_media_candidates` rows revalidated against current source files, attachment
+  links, `content_attachments`, BLAKE3 `SourceFacts`, and audio probe facts.
+- Duplicate current exact BLAKE3 primary-media evidence groups into one active candidate with preserved source-file and
+  attachment provenance.
+
+Therefore track identity candidates may say only that current evidence-backed primary-media candidates appear equivalent
+by exact content evidence. They must not create canonical tracks, user decisions, CUE associations, metadata
+reconciliation, prep surfaces, playlist/crate/sleeve rows, waveform/stem authority, or renderer-owned grouping. The
+detailed status, grouping, and stale/current rules are owned by
+`docs/library/track-identity-candidate-contract.md`.
 
 ## CUE Association Decision
 
@@ -147,6 +169,10 @@ Current placement:
 - Primary-media promotion consumes current attachment identity plus current audio probe evidence through
   `promote_primary_media_for_source(source_id, limit)`, called by the same bounded service-owned maintenance unit after
   hashing, attachment materialization, and probing.
+- Track identity candidate production consumes current primary-media candidates through
+  `produce_track_identity_candidates_for_source(source_id, limit)`, called by the same bounded service-owned maintenance
+  unit after primary-media promotion. The v0 evidence key is exact BLAKE3 content evidence and remains a reversible
+  candidate grouping, not canonical track identity.
 - `content_attachments` owns attachment hash authority. `source_file_attachment_links` stores the source-file occurrence
   relation and derives exposed link hash values from the joined attachment row; it does not store a duplicate hash copy.
 - Track identity must not rely on path identity.
@@ -175,13 +201,15 @@ CUE sheets remain source-file companion metadata rows and are not parsed by medi
 | Source files | Durable source-relative file inventory, path-derived file kind/media class, presence, size, mtime | Playability, track identity, attachment identity, artwork role |
 | Observed file facts | Future/partial evidence from reading bytes or probing containers | Product row admission or user-facing track identity by itself |
 | Attachments | Current durable bytes-identity relation from current BLAKE3 evidence to source-file occurrence links | Path proximity guesses, track identity, CUE pairing, prep readiness, browser rows |
-| Track identity | Future semantic musical/performance identity | Source-file row identity or playlist membership alone |
+| Primary media | Evidence-backed playable-media candidate projection from current attachments and audio probe facts | Canonical track identity, CUE pairing, browser-row authority |
+| Track identity candidates | Reversible exact evidence candidate grouping from current primary-media candidates | Canonical track identity, user decisions, semantic recording matching, CUE pairing |
+| Track identity | Future semantic musical/performance identity | Source-file row identity, exact hash candidate alone, or playlist membership alone |
 | Preparation | Capability targets, artifacts, readiness summaries | File identity or content-addressed attachment identity |
 
 ## Next Implementation Gate
 
 The next gate is collection health / source integrity work, video-capable probe adapter selection,
-source-location-scoped admission, broader scheduler policy, CUE parse observations, or a later layer from playable
-primary-media candidates to semantic track identity. Follow-on work must not conflate the attachment foundation, media
-probe evidence, or primary-media candidates with track tables, CUE pairing, artwork intelligence, playlist UI, prep
-facets, or waveform generation.
+source-location-scoped admission, broader scheduler policy, CUE parse observations, or a later canonical track identity
+layer that consumes exact candidate evidence plus additional evidence and user decisions. Follow-on work must not
+conflate the attachment foundation, media probe evidence, primary-media candidates, or track identity candidates with
+canonical track tables, CUE pairing, artwork intelligence, playlist UI, prep facets, or waveform generation.

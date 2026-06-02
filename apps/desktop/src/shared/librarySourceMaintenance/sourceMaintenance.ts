@@ -37,6 +37,7 @@ export type RunSourceMaintenanceRequest = {
   readonly attachmentLimit?: number
   readonly probeLimit?: number
   readonly promotionLimit?: number
+  readonly identityCandidateLimit?: number
 }
 
 export type ReadSourceMaintenanceRequest = {
