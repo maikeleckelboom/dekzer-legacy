@@ -690,9 +690,25 @@ mod tests {
             media_kind: &str,
             with_probe: bool,
         ) {
+            self.commit_current_facts_with_artifact_id(
+                source_file_id,
+                hash_value,
+                media_kind,
+                with_probe,
+                10_000 + source_file_id,
+            );
+        }
+
+        fn commit_current_facts_with_artifact_id(
+            &self,
+            source_file_id: i64,
+            hash_value: &str,
+            media_kind: &str,
+            with_probe: bool,
+            artifact_id: i64,
+        ) {
             self.store
                 .with_write(|write| {
-                    let artifact_id = 10_000 + source_file_id;
                     write.execute(
                         "INSERT OR IGNORE INTO WorkItems (
                              work_item_id,
@@ -926,6 +942,16 @@ mod tests {
                 })
                 .expect("change file basis");
         }
+
+        fn single_evidence_status(&self) -> StoreTrackIdentityCandidateEvidenceStatus {
+            let candidates = self
+                .store
+                .read_track_identity_candidates_for_source(self.source_id, 10)
+                .expect("read candidates");
+            assert_eq!(candidates.len(), 1);
+            assert_eq!(candidates[0].evidence.len(), 1);
+            candidates[0].evidence[0].evidence_status
+        }
     }
 
     #[test]
@@ -998,6 +1024,57 @@ mod tests {
     }
 
     #[test]
+    fn evidence_read_status_is_stale_when_probe_fields_are_removed() {
+        let fixture = TrackIdentityCandidateFixture::new();
+        fixture.insert_source_file(100, "Album/no-probe.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.promote(10);
+        fixture.produce(10);
+
+        fixture.commit_current_facts(100, HASH_A, "audio", false);
+
+        assert_eq!(
+            fixture.single_evidence_status(),
+            StoreTrackIdentityCandidateEvidenceStatus::Stale
+        );
+    }
+
+    #[test]
+    fn evidence_read_status_is_stale_when_media_kind_is_not_audio() {
+        let fixture = TrackIdentityCandidateFixture::new();
+        fixture.insert_source_file(100, "Album/not-audio.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.promote(10);
+        fixture.produce(10);
+
+        fixture.commit_current_facts(100, HASH_A, "video", true);
+
+        assert_eq!(
+            fixture.single_evidence_status(),
+            StoreTrackIdentityCandidateEvidenceStatus::Stale
+        );
+    }
+
+    #[test]
+    fn evidence_read_status_is_stale_when_probe_artifact_changes() {
+        let fixture = TrackIdentityCandidateFixture::new();
+        fixture.insert_source_file(100, "Album/probe-artifact.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.promote(10);
+        fixture.produce(10);
+
+        fixture.commit_current_facts_with_artifact_id(100, HASH_A, "audio", true, 20_000);
+
+        assert_eq!(
+            fixture.single_evidence_status(),
+            StoreTrackIdentityCandidateEvidenceStatus::Stale
+        );
+    }
+
+    #[test]
     fn stale_attachment_link_evidence_prevents_candidate_refresh() {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/hash-changed.wav");
@@ -1020,6 +1097,10 @@ mod tests {
         assert_eq!(
             candidates[0].status,
             StoreTrackIdentityCandidateStatus::Stale
+        );
+        assert_eq!(
+            candidates[0].evidence[0].evidence_status,
+            StoreTrackIdentityCandidateEvidenceStatus::Stale
         );
     }
 
