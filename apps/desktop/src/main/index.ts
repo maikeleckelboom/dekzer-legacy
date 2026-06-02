@@ -9,6 +9,7 @@ import { registerContentsReadIpc } from './libraryContents/read'
 import { registerReadSourceLifecycleIpc } from './librarySourceLifecycle/readSourceLifecycle'
 import { registerAttachmentIdentityReadIpc } from './libraryAttachmentIdentity/read'
 import { registerSourceFileHashingIpc } from './librarySourceFileHashing/hashSourceFilesBlake3'
+import { registerSourceMaintenanceIpc } from './librarySourceMaintenance/sourceMaintenance'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerCancelRootScanIpc } from './libraryRoots/cancelScan'
@@ -73,6 +74,7 @@ app.whenReady().then(() => {
   registerReadSourceLifecycleIpc(ipcMain, host)
   registerAttachmentIdentityReadIpc(ipcMain, host)
   registerSourceFileHashingIpc(ipcMain, host)
+  registerSourceMaintenanceIpc(ipcMain, host)
   registerContentsReadIpc(ipcMain, host)
   registerLocalRootChoiceIpc(ipcMain, host, {
     dialog,

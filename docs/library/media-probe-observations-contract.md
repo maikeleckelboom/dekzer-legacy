@@ -98,8 +98,8 @@ Media probe v0 does not:
 
 v0 candidate admission treats any current non-null probe summary field (`mime_type`, `duration_ms`, `sample_rate_hz`,
 `channels`, `bit_depth`, or `codec`) in a current-basis `SourceFacts` row as sufficient evidence that a probe has
-produced accepted summary facts. When all probe summary fields are non-null and the basis is current, the row is excluded
-from candidate selection. This predicate is expressed in `needs_media_probe_predicate_sql` in
+produced accepted summary facts. Rows are selected when facts are missing or stale, or when all probe summary fields are
+null. This predicate is expressed in `needs_media_probe_predicate_sql` in
 `crates/library-store-sqlite/src/store/source_file_media_probe.rs`.
 
 ## Next Gate

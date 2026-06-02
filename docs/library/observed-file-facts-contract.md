@@ -178,30 +178,30 @@ v0 media probing. CUE sheets are excluded from probe admission and are not parse
 Missing physical files, source lifecycle failures, invalid relative paths, root escapes, unreadable files, unsupported
 formats, and basis changes are typed outcomes. They do not write fake facts.
 
-## Service-Owned Hash Maintenance
+## Service-Owned Source Maintenance
 
-The boundary service owns the first source hash maintenance loop. After a root scan publishes its terminal
-`SourceScanCompleted` event and the maintained read-model invalidations for that scan, the service requests BLAKE3 hash
-maintenance for that same durable source. The scan command field is still named `rootId` because the public roots API
-uses root language, but registered local roots are source rows and the `rootId` value is the durable `source_id` used by
-hash maintenance and attachment materialization. The renderer does not schedule this work, does not retry hash batches
-to keep the source current, and does not resolve filesystem paths.
+The boundary service owns the current source maintenance orchestration path. After a root scan publishes its terminal
+`SourceScanCompleted` event and the maintained read-model invalidations for that scan, the service requests one bounded
+source maintenance unit for that same durable source. The scan command field is still named `rootId` because the public
+roots API uses root language, but registered local roots are source rows and the `rootId` value is the durable
+`source_id` used by source maintenance. The renderer does not schedule this work, does not retry batches to keep the
+source current, and does not resolve filesystem paths.
 
 The current trigger model is intentionally narrow:
 
-- successful root scan completion requests maintenance for the completed source;
+- successful root scan completion requests one bounded maintenance unit for the completed source;
 - duplicate source maintenance requests are deduped while pending or active;
-- blocked, failed, or cancelled scans do not automatically request hash maintenance;
-- maintained `LibraryBrowser` invalidation alone does not yet schedule hashing unless it came from the successful scan
-  completion path.
+- blocked, failed, or cancelled scans do not automatically request source maintenance;
+- maintained `LibraryBrowser` invalidation alone does not schedule maintenance unless it came from the successful scan
+  completion path or an explicit maintenance command.
 
-Maintenance uses the existing store-owned `hash_source_file_blake3_batch` admission path with a service-owned limit per
-pass and a service-owned maximum pass count per run. Scan-triggered maintenance performs only this small bounded unit; it
-does not synchronously drain a large source. Remaining candidates stay discoverable through candidate counts and can be
-handled by a later explicit hash command or future scheduler request. A source-level unavailable, missing, blocked, or
-unknown-source state is reported as a typed maintenance outcome and stops the source run; it is not treated as an empty
-success. A per-file failure can leave candidates behind, but a pass with no successful hashes stops rather than spinning
-on the same failing candidate. A later maintenance request can retry after the source or file problem changes.
+Maintenance uses the existing store-owned `hash_source_file_blake3_batch`,
+`materialize_attachments_for_source`, and `probe_source_file_media_batch` authority paths in that order. Scan-triggered
+maintenance performs only one small bounded unit; it does not synchronously drain a large source. Remaining candidates
+stay discoverable through source maintenance candidate counts and can be handled by a later explicit command or future
+scheduler request. A source-level unavailable, missing, blocked, or unknown-source state is reported as a typed
+maintenance outcome and stops the source run; it is not treated as an empty success. A per-file hash or probe failure
+can leave candidates behind, but the bounded unit does not spin on the same failing candidate.
 
 The controller is service-owned scheduling state only. It does not persist durable truth, create identity rows, or
 promote source files. In the current implementation it is synchronous on the service/scan execution path after terminal
@@ -211,16 +211,14 @@ commands must request additional work. Service shutdown requests maintenance sto
 existing root-work cancellation path, and joins active scan threads. If shutdown happens while a file is being hashed, the
 current file read may finish before the next stop check; no additional hash pass starts after the stop request.
 
-After the bounded hash unit finishes and before the pending source request is cleared, the same service-owned cycle runs
-at most one bounded attachment materialization unit for that source using
-`materialize_attachments_for_source(source_id, limit)`. It can run even when the hash unit finds no remaining hash work,
-so already-current BLAKE3 facts can still receive missing attachment links. It does not loop until attachment
-materialization candidates are exhausted.
+After the bounded hash phase, the same service-owned cycle runs one bounded attachment materialization phase for that
+source. It can run even when the hash phase finds no remaining hash work, so already-current BLAKE3 facts can still
+receive missing attachment links. The cycle then runs one bounded audio-only media probe phase.
 
-Hash maintenance emits existing maintained snapshot invalidations when hash writes advance the maintained revision.
-There is no public `sourceHashMaintenance*` boundary event yet. Tests use internal service observability for pass counts,
-dedupe, typed source failure, and stopped state. Future event variants should distinguish maintenance activity from
-durable observed-facts truth and must not expose filesystem paths.
+Source maintenance emits existing maintained snapshot invalidations when phase commits advance maintained revisions.
+There is no public source-maintenance event family yet. The public command/read contract is defined in
+`docs/library/source-maintenance-orchestration-contract.md`. Future event variants should distinguish maintenance
+activity from durable observed-facts truth and must not expose filesystem paths.
 
 ## CUE Ownership
 

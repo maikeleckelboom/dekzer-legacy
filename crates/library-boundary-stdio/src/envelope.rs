@@ -1,6 +1,7 @@
 use library_boundary_protocol::{CommandOutcome, CommandRequest};
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[allow(clippy::large_enum_variant)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum StdioResponseEnvelope {
     Ready {

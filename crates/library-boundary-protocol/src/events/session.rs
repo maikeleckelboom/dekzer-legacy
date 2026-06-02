@@ -36,6 +36,7 @@ impl MaintainedSnapshotScope {
             | SnapshotReadCommand::LoadNavigationRowByStableKey(_) => Some(Self::NavigationRows),
             SnapshotReadCommand::ReadLibraryTreeChildren(_)
             | SnapshotReadCommand::ReadSourceLifecycle(_)
+            | SnapshotReadCommand::ReadSourceMaintenance(_)
             | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::ContentsRead(_)

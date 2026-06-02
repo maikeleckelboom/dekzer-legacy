@@ -33,7 +33,8 @@ use crate::source_file_hash_protocol::{
     map_hash_source_files_blake3_reply,
 };
 use crate::source_hash_maintenance::{
-    SourceHashMaintenanceController, run_attachment_materialization_unit,
+    SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT, SourceMaintenanceController,
+    SourceMaintenanceRun, SourceMaintenanceRunInput,
 };
 use crate::storage_environment::resolve_library_storage_environment;
 
@@ -82,7 +83,7 @@ pub struct LibraryBoundaryService {
     durable_store: SqliteDurableStore,
     session_events: LibraryBoundaryEventStream,
     scan_registry: Mutex<ScanJobRegistry>,
-    source_hash_maintenance: SourceHashMaintenanceController,
+    source_maintenance: SourceMaintenanceController,
 }
 
 impl LibraryBoundaryService {
@@ -115,7 +116,7 @@ impl LibraryBoundaryService {
             durable_store,
             session_events,
             scan_registry: Mutex::new(ScanJobRegistry::default()),
-            source_hash_maintenance: SourceHashMaintenanceController::new(),
+            source_maintenance: SourceMaintenanceController::new(),
         })
     }
 
@@ -145,6 +146,9 @@ impl LibraryBoundaryService {
             protocol::CommandRequest::SourceFileHash(command) => self
                 .handle_source_file_hash_command(command)
                 .map(protocol::CommandReply::SourceFileHash),
+            protocol::CommandRequest::SourceMaintenance(command) => self
+                .handle_source_maintenance_command(command)
+                .map(protocol::CommandReply::SourceMaintenance),
             protocol::CommandRequest::SnapshotRead(command) => self
                 .handle_snapshot_read_command(command)
                 .map(protocol::CommandReply::SnapshotRead),
@@ -234,7 +238,7 @@ impl LibraryBoundaryService {
 
         let store = self.durable_store.clone();
         let events = self.session_events.clone();
-        let hash_maintenance = self.source_hash_maintenance.clone();
+        let source_maintenance = self.source_maintenance.clone();
         let terminal_publication_complete = Arc::new(AtomicBool::new(false));
         let thread_terminal_publication_complete = Arc::clone(&terminal_publication_complete);
 
@@ -259,7 +263,7 @@ impl LibraryBoundaryService {
                 scan_run_id,
                 scan_started_at_ms,
                 thread_terminal_publication_complete,
-                hash_maintenance,
+                source_maintenance,
             );
         });
 
@@ -649,10 +653,59 @@ impl LibraryBoundaryService {
             })
             .map_err(map_store_error)?;
         self.publish_maintained_snapshot_invalidations()?;
-        let _attachment_materialization =
-            run_attachment_materialization_unit(&self.durable_store, source_id)?;
+        let _attachment_materialization = self
+            .durable_store
+            .materialize_attachments_for_source(
+                source_id,
+                SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT,
+            )
+            .map_err(map_store_error)?;
         self.publish_maintained_snapshot_invalidations()?;
         Ok(map_hash_source_files_blake3_reply(result, None))
+    }
+
+    pub fn run_source_maintenance(
+        &self,
+        request: protocol::RunSourceMaintenanceRequest,
+    ) -> protocol::ProtocolResult<protocol::RunSourceMaintenanceReply> {
+        let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        require_optional_positive_limit(request.hash_limit, "runSourceMaintenance hashLimit")?;
+        require_optional_positive_limit(
+            request.attachment_limit,
+            "runSourceMaintenance attachmentLimit",
+        )?;
+        require_optional_positive_limit(request.probe_limit, "runSourceMaintenance probeLimit")?;
+
+        let run = self.source_maintenance.run_manual(
+            &self.durable_store,
+            &self.session_events,
+            SourceMaintenanceRunInput {
+                source_id,
+                hash_limit: request.hash_limit,
+                attachment_limit: request.attachment_limit,
+                probe_limit: request.probe_limit,
+            },
+        )?;
+        Ok(map_run_source_maintenance_reply(run))
+    }
+
+    pub fn read_source_maintenance(
+        &self,
+        request: protocol::ReadSourceMaintenanceRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadSourceMaintenanceReply> {
+        let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        let snapshot = self
+            .source_maintenance
+            .read_snapshot(&self.durable_store, source_id)?;
+        Ok(protocol::ReadSourceMaintenanceReply {
+            source_id: snapshot.source_id,
+            status: snapshot.status,
+            remaining_hash_candidates: snapshot.remaining_hash_candidates,
+            remaining_probe_candidates: snapshot.remaining_probe_candidates,
+            attachment_links: snapshot.attachment_links,
+            source_failure: snapshot.source_failure,
+            last_run: snapshot.last_run,
+        })
     }
 
     fn handle_library_boundary_event_command(
@@ -765,6 +818,17 @@ impl LibraryBoundaryService {
         }
     }
 
+    fn handle_source_maintenance_command(
+        &self,
+        command: protocol::SourceMaintenanceCommand,
+    ) -> protocol::ProtocolResult<protocol::SourceMaintenanceReply> {
+        match command {
+            protocol::SourceMaintenanceCommand::RunSourceMaintenance(request) => self
+                .run_source_maintenance(request)
+                .map(protocol::SourceMaintenanceReply::RunSourceMaintenance),
+        }
+    }
+
     fn handle_snapshot_read_command(
         &self,
         command: protocol::SnapshotReadCommand,
@@ -785,6 +849,9 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ReadSourceLifecycle(request) => self
                 .read_source_lifecycle(request)
                 .map(protocol::SnapshotReadReply::SourceLifecycle),
+            protocol::SnapshotReadCommand::ReadSourceMaintenance(request) => self
+                .read_source_maintenance(request)
+                .map(protocol::SnapshotReadReply::SourceMaintenance),
             protocol::SnapshotReadCommand::ReadSourceFileAttachment(request) => self
                 .read_source_file_attachment(request)
                 .map(protocol::SnapshotReadReply::SourceFileAttachment),
@@ -826,7 +893,7 @@ impl LibraryBoundaryService {
 
 impl Drop for LibraryBoundaryService {
     fn drop(&mut self) {
-        self.source_hash_maintenance.stop();
+        self.source_maintenance.stop();
         let jobs = {
             let mut registry = self.scan_registry.lock().expect("scan registry poisoned");
             let root_ids = registry.jobs.keys().copied().collect::<Vec<_>>();
@@ -849,7 +916,7 @@ fn execute_scan_job(
     scan_run_id: i64,
     scan_started_at_ms: i64,
     terminal_publication_complete: Arc<AtomicBool>,
-    hash_maintenance: SourceHashMaintenanceController,
+    source_maintenance: SourceMaintenanceController,
 ) {
     let committed_chunk_count = Arc::new(AtomicUsize::new(0));
     let chunk_count = Arc::clone(&committed_chunk_count);
@@ -898,10 +965,10 @@ fn execute_scan_job(
                     detail: None,
                 },
             );
-            // Registered local root ids are durable source ids; hash maintenance
-            // and attachment materialization are source-scoped.
-            hash_maintenance.request_source(root_id);
-            let _ = hash_maintenance.run_queued(&store, &events);
+            // Registered local root ids are durable source ids; source
+            // maintenance is source-scoped and bounded.
+            source_maintenance.request_source(root_id);
+            let _ = source_maintenance.run_queued(&store, &events);
         }
         Err(error) => {
             if matches!(
@@ -1032,6 +1099,36 @@ fn require_positive_i64(value: i64, field_name: &str) -> protocol::ProtocolResul
     }
 }
 
+fn require_optional_positive_limit(
+    value: Option<usize>,
+    field_name: &str,
+) -> protocol::ProtocolResult<()> {
+    if matches!(value, Some(0)) {
+        Err(protocol::ProtocolError::InvalidRequest {
+            detail: format!("{field_name} must be greater than zero"),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+fn map_run_source_maintenance_reply(
+    run: SourceMaintenanceRun,
+) -> protocol::RunSourceMaintenanceReply {
+    protocol::RunSourceMaintenanceReply {
+        source_id: run.source_id,
+        status: run.status,
+        effective_limits: run.effective_limits,
+        hash: run.hash,
+        attachment_materialization: run.attachment_materialization,
+        probe: run.probe,
+        remaining_hash_candidates: run.remaining_hash_candidates,
+        remaining_probe_candidates: run.remaining_probe_candidates,
+        attachment_links: run.attachment_links,
+        source_failure: run.source_failure,
+    }
+}
+
 fn validate_contents_scope(scope: &protocol::ContentsScope) -> protocol::ProtocolResult<()> {
     match scope {
         protocol::ContentsScope::Source { source_id } => {
@@ -1120,11 +1217,12 @@ mod tests {
         ReadLibraryTreeChildrenRequest, ReadSourceAttachmentSummaryReply,
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
         ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        RegisterLocalRootReply, RegisterLocalRootRequest, RenamePlaylistReply,
-        RenamePlaylistRequest, SnapshotReadCommand, SnapshotReadReply,
-        SourceFileAttachmentLinkStatus, SourceFileHashCommand, SourceFileHashReply,
-        StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
-        UnregisterLocalRootRequest,
+        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest, RegisterLocalRootReply,
+        RegisterLocalRootRequest, RenamePlaylistReply, RenamePlaylistRequest,
+        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SnapshotReadCommand,
+        SnapshotReadReply, SourceFileAttachmentLinkStatus, SourceFileHashCommand,
+        SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
+        StartRootScanRequest, UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use rusqlite::Connection;
     use serde_json::json;
@@ -1140,9 +1238,7 @@ mod tests {
     };
 
     use crate::source_hash_maintenance::{
-        SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT,
-        SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN, SOURCE_HASH_MAINTENANCE_BATCH_LIMIT,
-        SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN,
+        SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT, SOURCE_HASH_MAINTENANCE_BATCH_LIMIT,
     };
 
     use super::{LibraryBoundaryService, validate_contents_policy};
@@ -1206,6 +1302,68 @@ mod tests {
         connection
             .execute("DELETE FROM content_attachments", [])
             .expect("clear content attachments");
+    }
+
+    fn record_present_source_file(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+        source_file_id: i64,
+        relative_path: &str,
+        size_bytes: usize,
+    ) {
+        service
+            .durable_store
+            .record_source_file_observation(RecordSourceFileObservationInput {
+                source_file_id: Some(source_file_id),
+                source_id,
+                parent_source_directory_id: None,
+                name: relative_path
+                    .rsplit('/')
+                    .next()
+                    .expect("relative path has file name")
+                    .to_string(),
+                relative_path: relative_path.to_string(),
+                size_bytes: Some(i64::try_from(size_bytes).expect("fixture file length fits i64")),
+                mtime_ns: Some(source_file_id),
+                presence_state: SourcePresenceState::Present,
+                first_discovered_at: Some(10 + source_file_id),
+                observed_at: Some(10 + source_file_id),
+                presence_changed_at: 10 + source_file_id,
+                updated_at: 10 + source_file_id,
+            })
+            .expect("record source file");
+    }
+
+    fn tiny_wav_bytes(
+        sample_rate: u32,
+        channels: u16,
+        bits_per_sample: u16,
+        frames: u32,
+    ) -> Vec<u8> {
+        let bytes_per_sample = bits_per_sample / 8;
+        let block_align = channels * bytes_per_sample;
+        let byte_rate = sample_rate * u32::from(block_align);
+        let data_len = frames * u32::from(block_align);
+        let riff_len = 36 + data_len;
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"RIFF");
+        bytes.extend_from_slice(&riff_len.to_le_bytes());
+        bytes.extend_from_slice(b"WAVE");
+        bytes.extend_from_slice(b"fmt ");
+        bytes.extend_from_slice(&16_u32.to_le_bytes());
+        bytes.extend_from_slice(&1_u16.to_le_bytes());
+        bytes.extend_from_slice(&channels.to_le_bytes());
+        bytes.extend_from_slice(&sample_rate.to_le_bytes());
+        bytes.extend_from_slice(&byte_rate.to_le_bytes());
+        bytes.extend_from_slice(&block_align.to_le_bytes());
+        bytes.extend_from_slice(&bits_per_sample.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&data_len.to_le_bytes());
+        bytes.resize(
+            bytes.len() + usize::try_from(data_len).expect("data length fits usize"),
+            0,
+        );
+        bytes
     }
 
     #[test]
@@ -1337,6 +1495,22 @@ mod tests {
         }
     }
 
+    fn expect_run_source_maintenance_reply(reply: CommandReply) -> RunSourceMaintenanceReply {
+        match reply {
+            CommandReply::SourceMaintenance(SourceMaintenanceReply::RunSourceMaintenance(
+                reply,
+            )) => reply,
+            other => panic!("expected run source maintenance reply, got {other:?}"),
+        }
+    }
+
+    fn expect_read_source_maintenance_reply(reply: CommandReply) -> ReadSourceMaintenanceReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::SourceMaintenance(reply)) => reply,
+            other => panic!("expected source maintenance snapshot reply, got {other:?}"),
+        }
+    }
+
     fn expect_event_stream_read_after_reply(
         reply: CommandReply,
     ) -> ReadLibraryBoundaryEventsAfterReply {
@@ -1443,6 +1617,36 @@ mod tests {
             CommandReply::LibraryRoots(LibraryRootReply::CancelRootScan(reply)) => reply,
             other => panic!("expected cancel root scan reply, got {other:?}"),
         }
+    }
+
+    fn run_source_maintenance(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+        hash_limit: Option<usize>,
+        attachment_limit: Option<usize>,
+        probe_limit: Option<usize>,
+    ) -> RunSourceMaintenanceReply {
+        expect_run_source_maintenance_reply(expect_success(service.handle_command(
+            CommandRequest::SourceMaintenance(SourceMaintenanceCommand::RunSourceMaintenance(
+                RunSourceMaintenanceRequest {
+                    source_id,
+                    hash_limit,
+                    attachment_limit,
+                    probe_limit,
+                },
+            )),
+        )))
+    }
+
+    fn read_source_maintenance(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+    ) -> ReadSourceMaintenanceReply {
+        expect_read_source_maintenance_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadSourceMaintenance(
+                ReadSourceMaintenanceRequest { source_id },
+            )),
+        )))
     }
 
     fn read_after_events(
@@ -1887,8 +2091,7 @@ mod tests {
         let (tempdir, context, service) = open_service_with_context();
         let source_root = tempdir.path().join("hash-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
-        let run_bound =
-            SOURCE_HASH_MAINTENANCE_BATCH_LIMIT * SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN;
+        let run_bound = SOURCE_HASH_MAINTENANCE_BATCH_LIMIT;
         let candidate_count = run_bound + 1;
         for index in 0..candidate_count {
             std::fs::write(
@@ -1946,33 +2149,23 @@ mod tests {
             "hash evidence changes must publish the narrow current maintained scope"
         );
 
-        let runs = service.source_hash_maintenance.completed_runs_for_test();
+        let runs = service.source_maintenance.completed_runs_for_test();
         let run = runs
             .iter()
             .find(|run| run.source_id == registered.root_id)
-            .expect("scan completion requests source hash maintenance");
-        assert_eq!(run.passes, SOURCE_HASH_MAINTENANCE_MAX_PASSES_PER_RUN);
-        assert_eq!(run.hashed_count, run_bound);
-        assert_eq!(run.remaining_candidates, 1);
-        assert!(run.run_limit_reached);
+            .expect("scan completion requests source maintenance");
+        assert_eq!(run.hash.hashed_count, run_bound);
+        assert_eq!(run.remaining_hash_candidates, 1);
         assert!(!run.stopped);
-        let attachment_run = run
-            .attachment_materialization
-            .as_ref()
-            .expect("hash maintenance triggers attachment materialization");
         assert_eq!(
-            attachment_run.passes,
-            SOURCE_ATTACHMENT_MATERIALIZATION_MAX_PASSES_PER_RUN
-        );
-        assert_eq!(
-            attachment_run.links_created,
+            run.attachment_materialization.links_created,
             SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT
         );
         assert_eq!(
-            attachment_run.remaining_candidates,
+            run.attachment_materialization.remaining_candidates,
             run_bound - SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT
         );
-        assert!(attachment_run.run_limit_reached);
+        assert_eq!(run.probe.failed_count, run.probe.effective_limit);
 
         let manually_hashed = hash_source_files_blake3(&service, registered.root_id, Some(10));
         assert_eq!(manually_hashed.hashed_count, 1);
@@ -2059,19 +2252,120 @@ mod tests {
             2,
             "scan-triggered source maintenance should run one attachment unit even when hash work is already current"
         );
-        let runs = service.source_hash_maintenance.completed_runs_for_test();
+        let runs = service.source_maintenance.completed_runs_for_test();
         let run = runs
             .iter()
             .rev()
             .find(|run| run.source_id == registered.root_id)
             .expect("second scan completion records source maintenance");
-        assert_eq!(run.hashed_count, 0);
-        let attachment_run = run
-            .attachment_materialization
-            .as_ref()
-            .expect("existing BLAKE3 candidates still trigger one materialization unit");
-        assert_eq!(attachment_run.links_created, 2);
-        assert!(!attachment_run.run_limit_reached);
+        assert_eq!(run.hash.hashed_count, 0);
+        assert_eq!(run.attachment_materialization.links_created, 2);
+        assert_eq!(run.attachment_materialization.remaining_candidates, 0);
+    }
+
+    #[test]
+    fn run_source_maintenance_hashes_materializes_and_probes_one_bounded_unit() {
+        let (tempdir, context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("source-maintenance-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let wav_bytes = tiny_wav_bytes(44_100, 2, 16, 4_410);
+        std::fs::write(source_root.join("track.wav"), &wav_bytes).expect("write wav");
+        std::fs::write(source_root.join("video.mp4"), b"video bytes").expect("write video");
+        std::fs::write(source_root.join("album.cue"), b"FILE track.wav WAVE").expect("write cue");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(
+            &service,
+            registered.root_id,
+            100,
+            "track.wav",
+            wav_bytes.len(),
+        );
+        record_present_source_file(&service, registered.root_id, 101, "video.mp4", 11);
+        record_present_source_file(&service, registered.root_id, 102, "album.cue", 19);
+
+        let run =
+            run_source_maintenance(&service, registered.root_id, Some(10), Some(10), Some(10));
+
+        assert_eq!(
+            run.status,
+            library_boundary_protocol::SourceMaintenanceRunStatus::Completed
+        );
+        assert_eq!(run.effective_limits.hash_limit, 10);
+        assert_eq!(run.hash.hashed_count, 3);
+        assert_eq!(run.remaining_hash_candidates, 0);
+        assert_eq!(run.attachment_materialization.links_created, 3);
+        assert_eq!(run.probe.probed_count, 1);
+        assert_eq!(run.probe.failed_count, 0);
+        assert_eq!(run.remaining_probe_candidates, 0);
+        let links = run.attachment_links.expect("attachment summary exists");
+        assert_eq!(links.current_links_count, 3);
+        assert_eq!(links.stale_links_count, 0);
+        assert_eq!(links.source_files_missing_attachment_links_count, 0);
+
+        let audio_facts = service
+            .durable_store
+            .read_observed_file_facts_for_source_file(100)
+            .expect("read audio facts")
+            .expect("audio facts exist");
+        assert_eq!(
+            audio_facts.content_hash.expect("audio hash").algorithm,
+            "blake3"
+        );
+        assert_eq!(audio_facts.duration_ms, Some(100));
+        assert_eq!(audio_facts.sample_rate_hz, Some(44_100));
+
+        let video_facts = service
+            .durable_store
+            .read_observed_file_facts_for_source_file(101)
+            .expect("read video facts")
+            .expect("video facts exist");
+        assert_eq!(
+            video_facts.content_hash.expect("video hash").algorithm,
+            "blake3"
+        );
+        assert_eq!(video_facts.duration_ms, None);
+
+        let cue_facts = service
+            .durable_store
+            .read_observed_file_facts_for_source_file(102)
+            .expect("read cue facts")
+            .expect("cue facts exist");
+        assert_eq!(cue_facts.media_kind, "cue_sheet");
+        assert_eq!(
+            cue_facts.content_hash.expect("cue hash").algorithm,
+            "blake3"
+        );
+        assert_eq!(cue_facts.duration_ms, None);
+
+        let snapshot = read_source_maintenance(&service, registered.root_id);
+        assert_eq!(
+            snapshot.status,
+            library_boundary_protocol::SourceMaintenanceSnapshotStatus::Idle
+        );
+        assert_eq!(snapshot.remaining_hash_candidates, 0);
+        assert_eq!(snapshot.remaining_probe_candidates, 0);
+        assert_eq!(
+            snapshot.last_run.expect("last run summary exists").status,
+            library_boundary_protocol::SourceMaintenanceRunStatus::Completed
+        );
+
+        for table in [
+            "LibraryAssets",
+            "LibraryAssetAttachments",
+            "LibraryBrowserRows",
+            "SourceSegmentSets",
+            "SourceSegments",
+            "PrepAssignments",
+            "ResolvedLibraryAssetPrepTargets",
+        ] {
+            assert_eq!(
+                count_rows(&context, table),
+                0,
+                "{table} must not be created by source maintenance"
+            );
+        }
     }
 
     #[test]
@@ -2245,10 +2539,7 @@ mod tests {
             count_rows(&context, "LibraryBrowserRows"),
             count_rows(&context, "SourceSegmentSets"),
             count_rows(&context, "SourceSegments"),
-            service
-                .source_hash_maintenance
-                .completed_runs_for_test()
-                .len(),
+            service.source_maintenance.completed_runs_for_test().len(),
         );
         let _ = read_source_file_attachment(&service, file_ids[0]);
         let _ = read_attachment_source_files(&service, first_link.attachment_id, Some(10));
@@ -2262,10 +2553,7 @@ mod tests {
             count_rows(&context, "LibraryBrowserRows"),
             count_rows(&context, "SourceSegmentSets"),
             count_rows(&context, "SourceSegments"),
-            service
-                .source_hash_maintenance
-                .completed_runs_for_test()
-                .len(),
+            service.source_maintenance.completed_runs_for_test().len(),
         );
         assert_eq!(
             after_counts, before_counts,
@@ -2347,7 +2635,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_source_hash_maintenance_requests_dedupe() {
+    fn duplicate_source_maintenance_requests_dedupe() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("dedupe-hash-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -2358,41 +2646,35 @@ mod tests {
         let _scan = start_root_scan(&service, registered.root_id);
         wait_for_scan_completed(&service, registered.root_id);
 
-        let completed_before = service
-            .source_hash_maintenance
-            .completed_runs_for_test()
-            .len();
+        let completed_before = service.source_maintenance.completed_runs_for_test().len();
         assert!(
             service
-                .source_hash_maintenance
+                .source_maintenance
                 .request_source(registered.root_id)
         );
         assert!(
             !service
-                .source_hash_maintenance
+                .source_maintenance
                 .request_source(registered.root_id),
             "duplicate pending source maintenance requests must be deduped"
         );
 
         let runs = service
-            .source_hash_maintenance
+            .source_maintenance
             .run_queued(&service.durable_store, &service.session_events)
             .expect("run queued maintenance");
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].source_id, registered.root_id);
-        assert_eq!(runs[0].hashed_count, 0);
-        assert!(!runs[0].run_limit_reached);
+        assert_eq!(runs[0].hash.hashed_count, 0);
+        assert_eq!(runs[0].remaining_hash_candidates, 0);
         assert_eq!(
-            service
-                .source_hash_maintenance
-                .completed_runs_for_test()
-                .len(),
+            service.source_maintenance.completed_runs_for_test().len(),
             completed_before + 1
         );
     }
 
     #[test]
-    fn source_hash_maintenance_observes_stop_before_attachment_materialization() {
+    fn source_maintenance_observes_stop_before_attachment_materialization() {
         let (tempdir, context, service) = open_service_with_context();
         let source_root = tempdir.path().join("stop-before-attachment-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -2420,22 +2702,22 @@ mod tests {
 
         assert!(
             service
-                .source_hash_maintenance
+                .source_maintenance
                 .request_source(registered.root_id)
         );
         service
-            .source_hash_maintenance
+            .source_maintenance
             .request_stop_before_attachment_materialization_for_test();
         let runs = service
-            .source_hash_maintenance
+            .source_maintenance
             .run_queued(&service.durable_store, &service.session_events)
             .expect("run queued maintenance");
 
         assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0].hashed_count, 1);
+        assert_eq!(runs[0].hash.hashed_count, 1);
         assert!(runs[0].stopped);
         assert!(
-            runs[0].attachment_materialization.is_none(),
+            runs[0].attachment_materialization.links_created == 0,
             "stop must be observed before starting the attachment materialization unit"
         );
         assert_eq!(count_rows(&context, "SourceFacts"), 1);
@@ -2444,7 +2726,7 @@ mod tests {
     }
 
     #[test]
-    fn blocked_scan_does_not_request_hash_maintenance() {
+    fn blocked_scan_does_not_request_source_maintenance() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("blocked-scan-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -2462,16 +2744,16 @@ mod tests {
 
         assert!(
             service
-                .source_hash_maintenance
+                .source_maintenance
                 .completed_runs_for_test()
                 .iter()
                 .all(|run| run.source_id != registered.root_id),
-            "blocked scans must not automatically request hash maintenance"
+            "blocked scans must not automatically request source maintenance"
         );
     }
 
     #[test]
-    fn source_hash_maintenance_reports_source_failures_without_empty_success() {
+    fn source_maintenance_reports_source_failures_without_empty_success() {
         let (tempdir, context, service) = open_service_with_context();
         let source_root = tempdir.path().join("blocked-maintenance-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -2504,21 +2786,20 @@ mod tests {
 
         assert!(
             service
-                .source_hash_maintenance
+                .source_maintenance
                 .request_source(registered.root_id)
         );
         let runs = service
-            .source_hash_maintenance
+            .source_maintenance
             .run_queued(&service.durable_store, &service.session_events)
             .expect("run queued maintenance");
 
         assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0].hashed_count, 0);
-        assert_eq!(runs[0].passes, 0);
-        assert!(!runs[0].run_limit_reached);
+        assert_eq!(runs[0].hash.hashed_count, 0);
+        assert_eq!(runs[0].hash.remaining_candidates, 0);
         assert!(matches!(
             runs[0].source_failure,
-            Some(HashSourceFilesBlake3SourceFailure::SourceRootBlocked(_))
+            Some(library_boundary_protocol::SourceMaintenanceSourceFailure::SourceRootBlocked(_))
         ));
         assert_eq!(
             count_rows(&context, "source_file_attachment_links"),

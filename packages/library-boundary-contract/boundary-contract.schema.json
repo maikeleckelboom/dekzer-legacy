@@ -249,6 +249,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/SourceMaintenanceReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceMaintenance"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/SnapshotReadReply"
             },
             "type": {
@@ -322,6 +338,22 @@
             "type": {
               "type": "string",
               "const": "sourceFileHash"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SourceMaintenanceCommand"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceMaintenance"
             }
           },
           "required": [
@@ -3526,6 +3558,74 @@
         "sourceId"
       ]
     },
+    "ReadSourceMaintenanceReply": {
+      "type": "object",
+      "properties": {
+        "attachmentLinks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceAttachmentLinkSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastRun": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceLastRunSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remainingHashCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingProbeCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFailure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceSourceFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SourceMaintenanceSnapshotStatus"
+        }
+      },
+      "required": [
+        "sourceId",
+        "status",
+        "remainingHashCandidates",
+        "remainingProbeCandidates"
+      ]
+    },
+    "ReadSourceMaintenanceRequest": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId"
+      ]
+    },
     "RegisterLocalRootReply": {
       "type": "object",
       "properties": {
@@ -3602,6 +3702,104 @@
       "required": [
         "playlistId",
         "displayName"
+      ]
+    },
+    "RunSourceMaintenanceReply": {
+      "type": "object",
+      "properties": {
+        "attachmentLinks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceAttachmentLinkSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachmentMaterialization": {
+          "$ref": "#/$defs/SourceMaintenanceAttachmentMaterializationSummary"
+        },
+        "effectiveLimits": {
+          "$ref": "#/$defs/SourceMaintenanceEffectiveLimits"
+        },
+        "hash": {
+          "$ref": "#/$defs/SourceMaintenanceHashSummary"
+        },
+        "probe": {
+          "$ref": "#/$defs/SourceMaintenanceProbeSummary"
+        },
+        "remainingHashCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingProbeCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFailure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceSourceFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SourceMaintenanceRunStatus"
+        }
+      },
+      "required": [
+        "sourceId",
+        "status",
+        "effectiveLimits",
+        "hash",
+        "attachmentMaterialization",
+        "probe",
+        "remainingHashCandidates",
+        "remainingProbeCandidates"
+      ]
+    },
+    "RunSourceMaintenanceRequest": {
+      "type": "object",
+      "properties": {
+        "attachmentLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "hashLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "probeLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId"
       ]
     },
     "ScanRunPhase": {
@@ -3740,6 +3938,22 @@
             "type": {
               "type": "string",
               "const": "readSourceLifecycle"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadSourceMaintenanceRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readSourceMaintenance"
             }
           },
           "required": [
@@ -3952,6 +4166,22 @@
             "type": {
               "type": "string",
               "const": "sourceLifecycle"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadSourceMaintenanceReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceMaintenance"
             }
           },
           "required": [
@@ -4347,6 +4577,450 @@
         "timedOut",
         "unknownIo"
       ]
+    },
+    "SourceMaintenanceAttachmentLinkSummary": {
+      "type": "object",
+      "properties": {
+        "currentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesMissingAttachmentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesWithAttachmentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesWithCurrentBlake3FactsCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "staleLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "unmaterializedBlake3FactsCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "currentLinksCount",
+        "staleLinksCount",
+        "sourceFilesWithCurrentBlake3FactsCount",
+        "sourceFilesWithAttachmentLinksCount",
+        "sourceFilesMissingAttachmentLinksCount",
+        "unmaterializedBlake3FactsCount"
+      ]
+    },
+    "SourceMaintenanceAttachmentMaterializationSummary": {
+      "type": "object",
+      "properties": {
+        "attachmentsCreated": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "attachmentsRefreshed": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "effectiveLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "linksCreated": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "linksRefreshed": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "linksReplaced": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedNoBlake3": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedNoFacts": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedStaleFacts": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "effectiveLimit",
+        "attachmentsCreated",
+        "attachmentsRefreshed",
+        "linksCreated",
+        "linksReplaced",
+        "linksRefreshed",
+        "skippedStaleFacts",
+        "skippedNoBlake3",
+        "skippedNoFacts",
+        "remainingCandidates"
+      ]
+    },
+    "SourceMaintenanceCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RunSourceMaintenanceRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "runSourceMaintenance"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "SourceMaintenanceEffectiveLimits": {
+      "type": "object",
+      "properties": {
+        "attachmentLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "hashLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "probeLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "hashLimit",
+        "attachmentLimit",
+        "probeLimit"
+      ]
+    },
+    "SourceMaintenanceHashSummary": {
+      "type": "object",
+      "properties": {
+        "effectiveLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "failedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "hashedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "effectiveLimit",
+        "hashedCount",
+        "skippedCount",
+        "failedCount",
+        "remainingCandidates"
+      ]
+    },
+    "SourceMaintenanceLastRunSummary": {
+      "type": "object",
+      "properties": {
+        "attachmentMaterialization": {
+          "$ref": "#/$defs/SourceMaintenanceAttachmentMaterializationSummary"
+        },
+        "hash": {
+          "$ref": "#/$defs/SourceMaintenanceHashSummary"
+        },
+        "probe": {
+          "$ref": "#/$defs/SourceMaintenanceProbeSummary"
+        },
+        "remainingHashCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingProbeCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFailure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceSourceFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/SourceMaintenanceRunStatus"
+        }
+      },
+      "required": [
+        "status",
+        "hash",
+        "attachmentMaterialization",
+        "probe",
+        "remainingHashCandidates",
+        "remainingProbeCandidates"
+      ]
+    },
+    "SourceMaintenanceProbeSummary": {
+      "type": "object",
+      "properties": {
+        "effectiveLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "failedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "probedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "effectiveLimit",
+        "probedCount",
+        "skippedCount",
+        "failedCount",
+        "remainingCandidates"
+      ]
+    },
+    "SourceMaintenanceReply": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RunSourceMaintenanceReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "runSourceMaintenance"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "SourceMaintenanceRunStatus": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "partial",
+        "skipped",
+        "failed"
+      ]
+    },
+    "SourceMaintenanceSnapshotStatus": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "running",
+        "unavailable",
+        "blocked",
+        "failed"
+      ]
+    },
+    "SourceMaintenanceSourceFailure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "sourceNotFound"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SourceMaintenanceSourceUnavailableFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceUnavailable"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SourceMaintenanceSourceRootMissingFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceRootMissing"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SourceMaintenanceSourceRootBlockedFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceRootBlocked"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "SourceMaintenanceSourceRootBlockedFailure": {
+      "type": "object",
+      "properties": {
+        "accessIssueKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycleIssueKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "SourceMaintenanceSourceRootMissingFailure": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "SourceMaintenanceSourceUnavailableFailure": {
+      "type": "object",
+      "properties": {
+        "accessIssueKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycleIssueKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accessState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceAccessState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mountStatus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMountStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
     },
     "SourceMountStatus": {
       "type": "string",

@@ -35,6 +35,7 @@ No two active docs may define the same authority._
 | `docs/library/media-identity-schema-authority.md`            | **Canonical library contract**                               | Asset identity, `primaryMedia` authority, CUE association, content hashing placement, and intentionally dormant identity/prep surfaces. Depends on source lifecycle and media-relevant file inventory contracts.   |
 | `docs/library/attachment-identity-foundation-contract.md`    | **Canonical library contract**                               | Rust/store-only attachment identity foundation from current BLAKE3 observed-file facts, source-file attachment links, computed staleness, and deferred boundary/track/prep work.                                  |
 | `docs/library/observed-file-facts-contract.md`               | **Canonical library contract**                               | Observed source-file evidence, file-basis validity, algorithm-tagged content hash placement, CUE observation ownership, and current/future boundaries for probing and identity consumption.                       |
+| `docs/library/source-maintenance-orchestration-contract.md`   | **Canonical library contract**                               | Backend-owned bounded source maintenance unit order, command/read boundary, runtime-vs-durable ownership, scan-triggered behavior, and invalidation behavior.                                                     |
 
 ## Contents read boundary docs
 

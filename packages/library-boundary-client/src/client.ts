@@ -25,6 +25,8 @@ import type {
   ReadSourceFileAttachmentRequest,
   ReadSourceLifecycleReply,
   ReadSourceLifecycleRequest,
+  ReadSourceMaintenanceReply,
+  ReadSourceMaintenanceRequest,
   ReadLocalRootsReply,
   ReadLocalRootsRequest,
   ReadNavigationNodeLibraryBrowserWindowReply,
@@ -37,6 +39,8 @@ import type {
   RegisterLocalRootRequest,
   RenamePlaylistReply,
   RenamePlaylistRequest,
+  RunSourceMaintenanceReply,
+  RunSourceMaintenanceRequest,
   StartRootScanReply,
   StartRootScanRequest,
   SearchNavigationNodeLibraryBrowserWindowReply,
@@ -140,6 +144,19 @@ export class LibraryBoundaryClient {
     );
   }
 
+  runSourceMaintenance(
+    request: RunSourceMaintenanceRequest
+  ): Promise<RunSourceMaintenanceReply> {
+    return this.sendAndExpect(
+      {
+        type: "sourceMaintenance",
+        payload: { type: "runSourceMaintenance", payload: request }
+      },
+      "sourceMaintenance",
+      "runSourceMaintenance"
+    );
+  }
+
   readNavigationRows(
     request: ReadNavigationRowsRequest
   ): Promise<ReadNavigationRowsReply> {
@@ -208,6 +225,22 @@ export class LibraryBoundaryClient {
       },
       "snapshotRead",
       "sourceLifecycle"
+    );
+  }
+
+  readSourceMaintenance(
+    request: ReadSourceMaintenanceRequest
+  ): Promise<ReadSourceMaintenanceReply> {
+    return this.sendAndExpect(
+      {
+        type: "snapshotRead",
+        payload: {
+          type: "readSourceMaintenance",
+          payload: request
+        }
+      },
+      "snapshotRead",
+      "sourceMaintenance"
     );
   }
 

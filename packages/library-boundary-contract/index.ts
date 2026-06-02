@@ -2,7 +2,7 @@
 // Source of truth: crates/library-boundary-protocol
 // Do not edit by hand.
 
-export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "playlistWrite", "payload": PlaylistWriteCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
+export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "playlistWrite", "payload": PlaylistWriteCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "sourceMaintenance", "payload": SourceMaintenanceCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
 
 export type LibraryBoundaryEventStreamCommand = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterRequest };
 
@@ -49,7 +49,11 @@ export type SourceFileHashCommand = { "type": "hashSourceFilesBlake3", "payload"
 
 export type HashSourceFilesBlake3Request = { sourceId: string, limit?: number, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SourceMaintenanceCommand = { "type": "runSourceMaintenance", "payload": RunSourceMaintenanceRequest };
+
+export type RunSourceMaintenanceRequest = { sourceId: string, hashLimit?: number, attachmentLimit?: number, probeLimit?: number, };
+
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -62,6 +66,8 @@ export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint
 export type ChildRowState = "unknown" | "hasChildRows" | "noChildRows";
 
 export type ReadSourceLifecycleRequest = { sourceId: string, };
+
+export type ReadSourceMaintenanceRequest = { sourceId: string, };
 
 export type SourceClass = "internal" | "externalMounted" | "removableMounted";
 
@@ -97,7 +103,7 @@ export type ReadLibraryAssetWaveformOverviewRequest = { libraryAssetId: string, 
 
 export type ReadLibraryAssetPreparationDetailRequest = { libraryAssetId: string, };
 
-export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "playlistWrite", "payload": PlaylistWriteReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
+export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "playlistWrite", "payload": PlaylistWriteReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "sourceMaintenance", "payload": SourceMaintenanceReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
 
 export type LibraryBoundaryEventStreamReply = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterReply };
 
@@ -152,7 +158,11 @@ export type SourceFileHashReply = { "type": "hashSourceFilesBlake3", "payload": 
 
 export type HashSourceFilesBlake3Reply = { effectiveLimit: number, outcomes: Array<HashSourceFilesBlake3Outcome>, hashedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, sourceFailure?: HashSourceFilesBlake3SourceFailure, };
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SourceMaintenanceReply = { "type": "runSourceMaintenance", "payload": RunSourceMaintenanceReply };
+
+export type RunSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceRunStatus, effectiveLimits: SourceMaintenanceEffectiveLimits, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, remainingHashCandidates: number, remainingProbeCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, };
+
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -163,6 +173,8 @@ export type LoadNavigationRowByStableKeyReply = { row: NavigationRow | null, };
 export type ReadLibraryTreeChildrenReply = { window: LibraryTreeWindow | null, };
 
 export type ReadSourceLifecycleReply = { lifecycle: SourceLifecycle | null, };
+
+export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
 
 export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStatus, attachmentLink?: SourceFileAttachmentLink, };
 
@@ -316,6 +328,30 @@ export type HashSourceFilesBlake3SourceFileUnavailableFailure = { presenceState:
 export type HashSourceFilesBlake3InvalidRelativePathFailure = { reason: string, };
 
 export type HashSourceFilesBlake3IoFailure = { detail: string, };
+
+export type SourceMaintenanceEffectiveLimits = { hashLimit: number, attachmentLimit: number, probeLimit: number, };
+
+export type SourceMaintenanceHashSummary = { effectiveLimit: number, hashedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, };
+
+export type SourceMaintenanceAttachmentMaterializationSummary = { effectiveLimit: number, attachmentsCreated: number, attachmentsRefreshed: number, linksCreated: number, linksReplaced: number, linksRefreshed: number, skippedStaleFacts: number, skippedNoBlake3: number, skippedNoFacts: number, remainingCandidates: number, };
+
+export type SourceMaintenanceProbeSummary = { effectiveLimit: number, probedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, };
+
+export type SourceMaintenanceAttachmentLinkSummary = { currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
+
+export type SourceMaintenanceLastRunSummary = { status: SourceMaintenanceRunStatus, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, remainingHashCandidates: number, remainingProbeCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
+
+export type SourceMaintenanceRunStatus = "completed" | "partial" | "skipped" | "failed";
+
+export type SourceMaintenanceSnapshotStatus = "idle" | "running" | "unavailable" | "blocked" | "failed";
+
+export type SourceMaintenanceSourceFailure = { "type": "sourceNotFound" } | { "type": "sourceUnavailable", "payload": SourceMaintenanceSourceUnavailableFailure } | { "type": "sourceRootMissing", "payload": SourceMaintenanceSourceRootMissingFailure } | { "type": "sourceRootBlocked", "payload": SourceMaintenanceSourceRootBlockedFailure };
+
+export type SourceMaintenanceSourceUnavailableFailure = { mountStatus?: SourceMountStatus, accessState?: SourceAccessState, accessIssueKind?: SourceLifecycleIssueKind, };
+
+export type SourceMaintenanceSourceRootMissingFailure = { detail?: string, };
+
+export type SourceMaintenanceSourceRootBlockedFailure = { accessIssueKind?: SourceLifecycleIssueKind, detail?: string, };
 
 export type CommandOutcome = { "type": "success", "payload": CommandSuccessEnvelope } | { "type": "error", "payload": CommandErrorEnvelope };
 

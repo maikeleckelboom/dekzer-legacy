@@ -3,12 +3,14 @@ pub mod playlist_writes;
 pub mod session_events;
 pub mod snapshot_reads;
 pub mod source_file_hash;
+pub mod source_maintenance;
 
 pub use library_roots::*;
 pub use playlist_writes::*;
 pub use session_events::*;
 pub use snapshot_reads::*;
 pub use source_file_hash::*;
+pub use source_maintenance::*;
 
 use crate::ProtocolError;
 
@@ -22,6 +24,7 @@ pub enum CommandRequest {
     LibraryRoots(LibraryRootCommand),
     PlaylistWrite(PlaylistWriteCommand),
     SourceFileHash(SourceFileHashCommand),
+    SourceMaintenance(SourceMaintenanceCommand),
     SnapshotRead(SnapshotReadCommand),
 }
 
@@ -35,12 +38,14 @@ pub enum CommandReply {
     LibraryRoots(LibraryRootReply),
     PlaylistWrite(PlaylistWriteReply),
     SourceFileHash(SourceFileHashReply),
+    SourceMaintenance(SourceMaintenanceReply),
     SnapshotRead(SnapshotReadReply),
 }
 
 #[derive(
     Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
 )]
+#[allow(clippy::large_enum_variant)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum CommandOutcome {
@@ -82,7 +87,8 @@ mod tests {
         PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
         ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
-        SourceFileHashReply, StartRootScanReply, StartRootScanRequest,
+        SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
+        StartRootScanRequest,
     };
     use serde_json::json;
 
@@ -118,45 +124,31 @@ mod tests {
                 limit: Some(16),
             },
         ));
+        let maintenance = CommandRequest::SourceMaintenance(
+            SourceMaintenanceCommand::RunSourceMaintenance(super::RunSourceMaintenanceRequest {
+                source_id: 7,
+                hash_limit: Some(8),
+                attachment_limit: Some(4),
+                probe_limit: Some(4),
+            }),
+        );
 
-        match session_events {
-            CommandRequest::LibraryBoundaryEvents(_) => {}
-            CommandRequest::LibraryRoots(_) => {}
-            CommandRequest::PlaylistWrite(_) => {}
-            CommandRequest::SourceFileHash(_) => {}
-            CommandRequest::SnapshotRead(_) => {}
-        }
-
-        match playlist_write {
-            CommandRequest::LibraryBoundaryEvents(_) => {}
-            CommandRequest::LibraryRoots(_) => {}
-            CommandRequest::PlaylistWrite(_) => {}
-            CommandRequest::SourceFileHash(_) => {}
-            CommandRequest::SnapshotRead(_) => {}
-        }
-
-        match library_roots {
-            CommandRequest::LibraryBoundaryEvents(_) => {}
-            CommandRequest::LibraryRoots(_) => {}
-            CommandRequest::PlaylistWrite(_) => {}
-            CommandRequest::SourceFileHash(_) => {}
-            CommandRequest::SnapshotRead(_) => {}
-        }
-
-        match snapshot {
-            CommandRequest::LibraryBoundaryEvents(_) => {}
-            CommandRequest::LibraryRoots(_) => {}
-            CommandRequest::PlaylistWrite(_) => {}
-            CommandRequest::SourceFileHash(_) => {}
-            CommandRequest::SnapshotRead(_) => {}
-        }
-
-        match hash {
-            CommandRequest::LibraryBoundaryEvents(_) => {}
-            CommandRequest::LibraryRoots(_) => {}
-            CommandRequest::PlaylistWrite(_) => {}
-            CommandRequest::SourceFileHash(_) => {}
-            CommandRequest::SnapshotRead(_) => {}
+        for command in [
+            session_events,
+            playlist_write,
+            library_roots,
+            snapshot,
+            hash,
+            maintenance,
+        ] {
+            match command {
+                CommandRequest::LibraryBoundaryEvents(_) => {}
+                CommandRequest::LibraryRoots(_) => {}
+                CommandRequest::PlaylistWrite(_) => {}
+                CommandRequest::SourceFileHash(_) => {}
+                CommandRequest::SourceMaintenance(_) => {}
+                CommandRequest::SnapshotRead(_) => {}
+            }
         }
     }
 
@@ -200,6 +192,29 @@ mod tests {
                     "type": "hashSourceFilesBlake3",
                     "payload": {
                         "sourceId": "7"
+                    }
+                }
+            })
+        );
+
+        let maintenance_command = CommandRequest::SourceMaintenance(
+            SourceMaintenanceCommand::RunSourceMaintenance(super::RunSourceMaintenanceRequest {
+                source_id: 7,
+                hash_limit: Some(8),
+                attachment_limit: Some(4),
+                probe_limit: None,
+            }),
+        );
+        assert_eq!(
+            serde_json::to_value(&maintenance_command).expect("serialize maintenance command"),
+            json!({
+                "type": "sourceMaintenance",
+                "payload": {
+                    "type": "runSourceMaintenance",
+                    "payload": {
+                        "sourceId": "7",
+                        "hashLimit": 8,
+                        "attachmentLimit": 4
                     }
                 }
             })
@@ -258,6 +273,57 @@ mod tests {
                     }
                 }
             })
+        );
+
+        let maintenance_reply = CommandReply::SourceMaintenance(
+            SourceMaintenanceReply::RunSourceMaintenance(super::RunSourceMaintenanceReply {
+                source_id: 7,
+                status: super::SourceMaintenanceRunStatus::Completed,
+                effective_limits: super::SourceMaintenanceEffectiveLimits {
+                    hash_limit: 8,
+                    attachment_limit: 4,
+                    probe_limit: 4,
+                },
+                hash: super::SourceMaintenanceHashSummary {
+                    effective_limit: 8,
+                    hashed_count: 1,
+                    skipped_count: 0,
+                    failed_count: 0,
+                    remaining_candidates: 0,
+                },
+                attachment_materialization:
+                    super::SourceMaintenanceAttachmentMaterializationSummary {
+                        effective_limit: 4,
+                        attachments_created: 1,
+                        attachments_refreshed: 0,
+                        links_created: 1,
+                        links_replaced: 0,
+                        links_refreshed: 0,
+                        skipped_stale_facts: 0,
+                        skipped_no_blake3: 0,
+                        skipped_no_facts: 0,
+                        remaining_candidates: 0,
+                    },
+                probe: super::SourceMaintenanceProbeSummary {
+                    effective_limit: 4,
+                    probed_count: 1,
+                    skipped_count: 0,
+                    failed_count: 0,
+                    remaining_candidates: 0,
+                },
+                remaining_hash_candidates: 0,
+                remaining_probe_candidates: 0,
+                attachment_links: None,
+                source_failure: None,
+            }),
+        );
+        let json = serde_json::to_value(&maintenance_reply).expect("serialize maintenance reply");
+        assert_eq!(json["type"], json!("sourceMaintenance"));
+        assert_eq!(json["payload"]["type"], json!("runSourceMaintenance"));
+        assert_eq!(json["payload"]["payload"]["sourceId"], json!("7"));
+        assert_eq!(
+            serde_json::from_value::<CommandReply>(json).expect("deserialize maintenance reply"),
+            maintenance_reply
         );
     }
 

@@ -7,8 +7,10 @@ import type {
   MaintainedSnapshotInvalidation,
   ProtocolError,
   HashSourceFilesBlake3Reply,
+  ReadSourceMaintenanceReply,
   ReadSourceFileAttachmentReply,
-  RegisterLocalRootReply
+  RegisterLocalRootReply,
+  RunSourceMaintenanceReply
 } from "@dekzer/library-boundary-contract";
 
 import {
@@ -50,6 +52,20 @@ type HashSourceFilesBlake3ReturnIsGenerated = AssertType<
   >
 >;
 
+type RunSourceMaintenanceReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient["runSourceMaintenance"]>>,
+    RunSourceMaintenanceReply
+  >
+>;
+
+type ReadSourceMaintenanceReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient["readSourceMaintenance"]>>,
+    ReadSourceMaintenanceReply
+  >
+>;
+
 type ReadSourceFileAttachmentReturnIsGenerated = AssertType<
   EqualTypes<
     Awaited<ReturnType<LibraryBoundaryClient["readSourceFileAttachment"]>>,
@@ -61,8 +77,10 @@ const compileTimeAssertions: [
   RegisterLocalRootReturnIsGenerated,
   RegisterLocalRootIdStaysString,
   HashSourceFilesBlake3ReturnIsGenerated,
+  RunSourceMaintenanceReturnIsGenerated,
+  ReadSourceMaintenanceReturnIsGenerated,
   ReadSourceFileAttachmentReturnIsGenerated
-] = [true, true, true, true];
+] = [true, true, true, true, true, true];
 void compileTimeAssertions;
 
 type Resolve<T> = (value: T | PromiseLike<T>) => void;
@@ -274,6 +292,151 @@ async function validatesHashSourceFilesBlake3RequestAndReply(): Promise<void> {
     reply.outcomes[0]?.status.type,
     "hashed",
     "hashSourceFilesBlake3 unwraps the reply payload"
+  );
+}
+
+async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
+  const transport = new RecordingTransport();
+  transport.enqueueOutcome(
+    success({
+      type: "sourceMaintenance",
+      payload: {
+        type: "runSourceMaintenance",
+        payload: {
+          sourceId: "7",
+          status: "completed",
+          effectiveLimits: {
+            hashLimit: 8,
+            attachmentLimit: 4,
+            probeLimit: 4
+          },
+          hash: {
+            effectiveLimit: 8,
+            hashedCount: 1,
+            skippedCount: 0,
+            failedCount: 0,
+            remainingCandidates: 0
+          },
+          attachmentMaterialization: {
+            effectiveLimit: 4,
+            attachmentsCreated: 1,
+            attachmentsRefreshed: 0,
+            linksCreated: 1,
+            linksReplaced: 0,
+            linksRefreshed: 0,
+            skippedStaleFacts: 0,
+            skippedNoBlake3: 0,
+            skippedNoFacts: 0,
+            remainingCandidates: 0
+          },
+          probe: {
+            effectiveLimit: 4,
+            probedCount: 1,
+            skippedCount: 0,
+            failedCount: 0,
+            remainingCandidates: 0
+          },
+          remainingHashCandidates: 0,
+          remainingProbeCandidates: 0
+        }
+      }
+    })
+  );
+  transport.enqueueOutcome(
+    success({
+      type: "snapshotRead",
+      payload: {
+        type: "sourceMaintenance",
+        payload: {
+          sourceId: "7",
+          status: "idle",
+          remainingHashCandidates: 0,
+          remainingProbeCandidates: 0,
+          attachmentLinks: {
+            currentLinksCount: 1,
+            staleLinksCount: 0,
+            sourceFilesWithCurrentBlake3FactsCount: 1,
+            sourceFilesWithAttachmentLinksCount: 1,
+            sourceFilesMissingAttachmentLinksCount: 0,
+            unmaterializedBlake3FactsCount: 0
+          },
+          lastRun: {
+            status: "completed",
+            hash: {
+              effectiveLimit: 8,
+              hashedCount: 1,
+              skippedCount: 0,
+              failedCount: 0,
+              remainingCandidates: 0
+            },
+            attachmentMaterialization: {
+              effectiveLimit: 4,
+              attachmentsCreated: 1,
+              attachmentsRefreshed: 0,
+              linksCreated: 1,
+              linksReplaced: 0,
+              linksRefreshed: 0,
+              skippedStaleFacts: 0,
+              skippedNoBlake3: 0,
+              skippedNoFacts: 0,
+              remainingCandidates: 0
+            },
+            probe: {
+              effectiveLimit: 4,
+              probedCount: 1,
+              skippedCount: 0,
+              failedCount: 0,
+              remainingCandidates: 0
+            },
+            remainingHashCandidates: 0,
+            remainingProbeCandidates: 0
+          }
+        }
+      }
+    })
+  );
+  const client = new LibraryBoundaryClient(transport);
+
+  const runReply = await client.runSourceMaintenance({
+    sourceId: "7",
+    hashLimit: 8,
+    attachmentLimit: 4,
+    probeLimit: 4
+  });
+  const readReply = await client.readSourceMaintenance({ sourceId: "7" });
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: "sourceMaintenance",
+      payload: {
+        type: "runSourceMaintenance",
+        payload: {
+          sourceId: "7",
+          hashLimit: 8,
+          attachmentLimit: 4,
+          probeLimit: 4
+        }
+      }
+    } satisfies CommandRequest,
+    "runSourceMaintenance sends the generated boundary command"
+  );
+  deepEqual(
+    transport.sentRequests[1],
+    {
+      type: "snapshotRead",
+      payload: {
+        type: "readSourceMaintenance",
+        payload: { sourceId: "7" }
+      }
+    } satisfies CommandRequest,
+    "readSourceMaintenance sends the generated snapshot command"
+  );
+  equal(runReply.probe.probedCount, 1, "runSourceMaintenance unwraps probe summary");
+  equal(
+    readReply.attachmentLinks?.currentLinksCount,
+    1,
+    "readSourceMaintenance unwraps attachment link summary"
   );
 }
 
@@ -762,6 +925,7 @@ async function rejects<ErrorType extends Error>(
 
 await validatesRegisterLocalRootRequestAndReply();
 await validatesHashSourceFilesBlake3RequestAndReply();
+await validatesSourceMaintenanceRequestsAndReplies();
 await validatesAttachmentIdentityReadRequestsAndReplies();
 await validatesProtocolErrorsArePreserved();
 await validatesReplyFamilyMismatch();

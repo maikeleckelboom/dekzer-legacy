@@ -313,6 +313,14 @@ impl SqliteDurableStore {
         )
     }
 
+    pub fn count_source_file_blake3_hash_candidates(
+        &self,
+        scope: SourceFileBlake3HashAdmissionScope,
+    ) -> LibrarySqliteResult<usize> {
+        let connection = self.open_read_connection()?;
+        count_source_file_blake3_hash_candidates_for_scope(&connection, &scope)
+    }
+
     pub fn hash_source_file_blake3_batch(
         &self,
         input: HashSourceFileBlake3BatchInput,

@@ -1,3 +1,5 @@
+use super::{ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest};
+
 #[derive(
     Debug,
     Clone,
@@ -2062,6 +2064,7 @@ pub enum SnapshotReadCommand {
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
     ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
     ReadSourceLifecycle(ReadSourceLifecycleRequest),
+    ReadSourceMaintenance(ReadSourceMaintenanceRequest),
     ReadSourceFileAttachment(ReadSourceFileAttachmentRequest),
     ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest),
     ReadSourceAttachmentSummary(ReadSourceAttachmentSummaryRequest),
@@ -2083,6 +2086,7 @@ pub enum SnapshotReadReply {
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     SourceLifecycle(ReadSourceLifecycleReply),
+    SourceMaintenance(ReadSourceMaintenanceReply),
     SourceFileAttachment(ReadSourceFileAttachmentReply),
     AttachmentSourceFiles(ReadAttachmentSourceFilesReply),
     SourceAttachmentSummary(ReadSourceAttachmentSummaryReply),

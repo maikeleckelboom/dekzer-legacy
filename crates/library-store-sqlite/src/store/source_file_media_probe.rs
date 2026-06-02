@@ -249,6 +249,14 @@ impl SqliteDurableStore {
         )
     }
 
+    pub fn count_source_file_media_probe_candidates(
+        &self,
+        scope: SourceFileMediaProbeAdmissionScope,
+    ) -> LibrarySqliteResult<usize> {
+        let connection = self.open_read_connection()?;
+        count_source_file_media_probe_candidates_for_scope(&connection, &scope)
+    }
+
     pub fn probe_source_file_media_batch(
         &self,
         input: ProbeSourceFileMediaBatchInput,

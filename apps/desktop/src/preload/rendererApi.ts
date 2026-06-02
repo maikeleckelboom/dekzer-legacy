@@ -42,6 +42,13 @@ import {
   type HashSourceFilesBlake3Request,
   type HashSourceFilesBlake3Result
 } from '../shared/librarySourceFileHashing/hashSourceFilesBlake3'
+import {
+  sourceMaintenanceChannels,
+  type ReadSourceMaintenanceRequest,
+  type ReadSourceMaintenanceResult,
+  type RunSourceMaintenanceRequest,
+  type RunSourceMaintenanceResult
+} from '../shared/librarySourceMaintenance/sourceMaintenance'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
@@ -159,6 +166,24 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             sourceFileHashingChannels.hashSourceFilesBlake3,
             request
           )) as HashSourceFilesBlake3Result
+        }
+      },
+      sourceMaintenance: {
+        async runSourceMaintenance(
+          request: RunSourceMaintenanceRequest
+        ): Promise<RunSourceMaintenanceResult> {
+          return (await ipcRenderer.invoke(
+            sourceMaintenanceChannels.runSourceMaintenance,
+            request
+          )) as RunSourceMaintenanceResult
+        },
+        async readSourceMaintenance(
+          request: ReadSourceMaintenanceRequest
+        ): Promise<ReadSourceMaintenanceResult> {
+          return (await ipcRenderer.invoke(
+            sourceMaintenanceChannels.readSourceMaintenance,
+            request
+          )) as ReadSourceMaintenanceResult
         }
       },
       contents: {

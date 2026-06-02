@@ -42,6 +42,11 @@ import {
   type HashSourceFilesBlake3Result
 } from '../../../src/shared/librarySourceFileHashing/hashSourceFilesBlake3'
 import {
+  sourceMaintenanceChannels,
+  type ReadSourceMaintenanceResult,
+  type RunSourceMaintenanceResult
+} from '../../../src/shared/librarySourceMaintenance/sourceMaintenance'
+import {
   boundaryEventChannels,
   type BoundaryEventDeliveryPayload
 } from '../../../src/shared/libraryBoundary/events'
@@ -70,6 +75,13 @@ describe('preload renderer API', () => {
     const attachmentSourceFilesRequest = { attachmentId: '7', limit: 25 }
     const sourceAttachmentSummaryRequest = { sourceId: '7' }
     const hashRequest = { sourceId: '7', limit: 4 }
+    const runSourceMaintenanceRequest = {
+      sourceId: '7',
+      hashLimit: 4,
+      attachmentLimit: 2,
+      probeLimit: 3
+    }
+    const readSourceMaintenanceRequest = { sourceId: '7' }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
       version: 1,
@@ -177,6 +189,55 @@ describe('preload renderer API', () => {
         remainingCandidates: 0
       }
     }
+    const runSourceMaintenanceResult: RunSourceMaintenanceResult = {
+      state: 'completed',
+      result: {
+        sourceId: '7',
+        status: 'completed',
+        effectiveLimits: {
+          hashLimit: 4,
+          attachmentLimit: 2,
+          probeLimit: 3
+        },
+        hash: {
+          effectiveLimit: 4,
+          hashedCount: 1,
+          skippedCount: 0,
+          failedCount: 0,
+          remainingCandidates: 0
+        },
+        attachmentMaterialization: {
+          effectiveLimit: 2,
+          attachmentsCreated: 1,
+          attachmentsRefreshed: 0,
+          linksCreated: 1,
+          linksReplaced: 0,
+          linksRefreshed: 0,
+          skippedStaleFacts: 0,
+          skippedNoBlake3: 0,
+          skippedNoFacts: 0,
+          remainingCandidates: 0
+        },
+        probe: {
+          effectiveLimit: 3,
+          probedCount: 1,
+          skippedCount: 0,
+          failedCount: 0,
+          remainingCandidates: 0
+        },
+        remainingHashCandidates: 0,
+        remainingProbeCandidates: 0
+      }
+    }
+    const readSourceMaintenanceResult: ReadSourceMaintenanceResult = {
+      state: 'ready',
+      snapshot: {
+        sourceId: '7',
+        status: 'idle',
+        remainingHashCandidates: 0,
+        remainingProbeCandidates: 0
+      }
+    }
     const choiceResult: LocalRootChoiceResult = {
       state: 'registered',
       root: {
@@ -226,6 +287,8 @@ describe('preload renderer API', () => {
     let receivedAttachmentSourceFilesRequest: unknown
     let receivedSourceAttachmentSummaryRequest: unknown
     let receivedHashRequest: unknown
+    let receivedRunSourceMaintenanceRequest: unknown
+    let receivedReadSourceMaintenanceRequest: unknown
     let receivedViewStatePayload: unknown
     let subscribeCount = 0
     let unsubscribeCount = 0
@@ -275,6 +338,16 @@ describe('preload renderer API', () => {
         if (channel === sourceFileHashingChannels.hashSourceFilesBlake3) {
           receivedHashRequest = args[0]
           return hashResult
+        }
+
+        if (channel === sourceMaintenanceChannels.runSourceMaintenance) {
+          receivedRunSourceMaintenanceRequest = args[0]
+          return runSourceMaintenanceResult
+        }
+
+        if (channel === sourceMaintenanceChannels.readSourceMaintenance) {
+          receivedReadSourceMaintenanceRequest = args[0]
+          return readSourceMaintenanceResult
         }
 
         if (channel === rootChannels.chooseAndRegisterLocal) {
@@ -393,6 +466,14 @@ describe('preload renderer API', () => {
     expect(receivedSourceAttachmentSummaryRequest).toBe(sourceAttachmentSummaryRequest)
     await expect(api.library.hashing.hashSourceFilesBlake3(hashRequest)).resolves.toBe(hashResult)
     expect(receivedHashRequest).toBe(hashRequest)
+    await expect(
+      api.library.sourceMaintenance.runSourceMaintenance(runSourceMaintenanceRequest)
+    ).resolves.toBe(runSourceMaintenanceResult)
+    expect(receivedRunSourceMaintenanceRequest).toBe(runSourceMaintenanceRequest)
+    await expect(
+      api.library.sourceMaintenance.readSourceMaintenance(readSourceMaintenanceRequest)
+    ).resolves.toBe(readSourceMaintenanceResult)
+    expect(receivedReadSourceMaintenanceRequest).toBe(readSourceMaintenanceRequest)
     await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)
     await expect(api.library.viewState.writeViewState(persistedViewState)).resolves.toBe(
       viewStateWriteResult
