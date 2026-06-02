@@ -51,7 +51,7 @@ export type HashSourceFilesBlake3Request = { sourceId: string, limit?: number, }
 
 export type SourceMaintenanceCommand = { "type": "runSourceMaintenance", "payload": RunSourceMaintenanceRequest };
 
-export type RunSourceMaintenanceRequest = { sourceId: string, hashLimit?: number, attachmentLimit?: number, probeLimit?: number, };
+export type RunSourceMaintenanceRequest = { sourceId: string, hashLimit?: number, attachmentLimit?: number, probeLimit?: number, promotionLimit?: number, };
 
 export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
@@ -160,7 +160,7 @@ export type HashSourceFilesBlake3Reply = { effectiveLimit: number, outcomes: Arr
 
 export type SourceMaintenanceReply = { "type": "runSourceMaintenance", "payload": RunSourceMaintenanceReply };
 
-export type RunSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceRunStatus, effectiveLimits: SourceMaintenanceEffectiveLimits, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, remainingHashCandidates: number, remainingProbeCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, };
+export type RunSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceRunStatus, effectiveLimits: SourceMaintenanceEffectiveLimits, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, primaryMediaPromotion: SourceMaintenancePrimaryMediaPromotionSummary, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, };
 
 export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
@@ -174,7 +174,7 @@ export type ReadLibraryTreeChildrenReply = { window: LibraryTreeWindow | null, }
 
 export type ReadSourceLifecycleReply = { lifecycle: SourceLifecycle | null, };
 
-export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
+export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
 
 export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStatus, attachmentLink?: SourceFileAttachmentLink, };
 
@@ -244,9 +244,9 @@ export type ContentsCoverageState = "complete" | "pending" | "scanning" | "block
 
 export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, mediaClass: ContentsMediaClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, availabilityState?: LibraryAssetAvailabilityState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
 
-export type PrimaryMediaSummary = { origin: ContentsRowOrigin, libraryAssetId: string | null, rowVersion: string | null, primarySourceFileId: string | null, title: string | null, artist: string | null, album: string | null, durationMs: number | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary | null, };
+export type PrimaryMediaSummary = { origin: ContentsRowOrigin, primaryMediaCandidateId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, libraryAssetId: string | null, rowVersion: string | null, primarySourceFileId: string | null, title: string | null, artist: string | null, album: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary | null, };
 
-export type ContentsRowOrigin = "libraryAsset" | "sourceFile";
+export type ContentsRowOrigin = "libraryAsset" | "sourceFile" | "primaryMediaCandidate";
 
 export type ContentsMediaClass = "audio" | "video" | "image" | "unsupported";
 
@@ -329,7 +329,7 @@ export type HashSourceFilesBlake3InvalidRelativePathFailure = { reason: string, 
 
 export type HashSourceFilesBlake3IoFailure = { detail: string, };
 
-export type SourceMaintenanceEffectiveLimits = { hashLimit: number, attachmentLimit: number, probeLimit: number, };
+export type SourceMaintenanceEffectiveLimits = { hashLimit: number, attachmentLimit: number, probeLimit: number, promotionLimit: number, };
 
 export type SourceMaintenanceHashSummary = { effectiveLimit: number, hashedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, };
 
@@ -337,9 +337,11 @@ export type SourceMaintenanceAttachmentMaterializationSummary = { effectiveLimit
 
 export type SourceMaintenanceProbeSummary = { effectiveLimit: number, probedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, };
 
+export type SourceMaintenancePrimaryMediaPromotionSummary = { effectiveLimit: number, promotedCount: number, refreshedCount: number, skippedUnusableSource: number, skippedUnsupportedMediaKind: number, skippedNoFacts: number, skippedStaleFacts: number, skippedNoBlake3: number, skippedNoProbeFacts: number, skippedMissingAttachmentLink: number, skippedStaleAttachmentLink: number, remainingCandidates: number, };
+
 export type SourceMaintenanceAttachmentLinkSummary = { currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
 
-export type SourceMaintenanceLastRunSummary = { status: SourceMaintenanceRunStatus, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, remainingHashCandidates: number, remainingProbeCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
+export type SourceMaintenanceLastRunSummary = { status: SourceMaintenanceRunStatus, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, primaryMediaPromotion: SourceMaintenancePrimaryMediaPromotionSummary, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
 
 export type SourceMaintenanceRunStatus = "completed" | "partial" | "skipped" | "failed";
 

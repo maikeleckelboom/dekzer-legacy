@@ -71,7 +71,10 @@ export async function runSourceMaintenanceThroughHost(
         : { attachmentLimit: normalizedRequest.attachmentLimit }),
       ...(normalizedRequest.probeLimit === undefined
         ? {}
-        : { probeLimit: normalizedRequest.probeLimit })
+        : { probeLimit: normalizedRequest.probeLimit }),
+      ...(normalizedRequest.promotionLimit === undefined
+        ? {}
+        : { promotionLimit: normalizedRequest.promotionLimit })
     } satisfies ContractRunSourceMaintenanceRequest)
 
     return {
@@ -141,11 +144,17 @@ function normalizeRunRequest(
     return probeLimit
   }
 
+  const promotionLimit = normalizeOptionalLimit(request.promotionLimit, 'promotionLimit')
+  if (isRunSourceMaintenanceResult(promotionLimit)) {
+    return promotionLimit
+  }
+
   return {
     sourceId: request.sourceId,
     ...(hashLimit === undefined ? {} : { hashLimit }),
     ...(attachmentLimit === undefined ? {} : { attachmentLimit }),
-    ...(probeLimit === undefined ? {} : { probeLimit })
+    ...(probeLimit === undefined ? {} : { probeLimit }),
+    ...(promotionLimit === undefined ? {} : { promotionLimit })
   }
 }
 

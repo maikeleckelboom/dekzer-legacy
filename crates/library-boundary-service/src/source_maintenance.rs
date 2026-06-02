@@ -5,8 +5,8 @@ use std::sync::{Arc, Mutex};
 use library_boundary_protocol as protocol;
 use library_store_sqlite::{
     HashSourceFileBlake3BatchInput, MaterializeAttachmentsForSourceResult,
-    ProbeSourceFileMediaBatchInput, SourceFileBlake3HashAdmissionScope,
-    SourceFileMediaProbeAdmissionScope, SqliteDurableStore,
+    ProbeSourceFileMediaBatchInput, PromotePrimaryMediaForSourceResult,
+    SourceFileBlake3HashAdmissionScope, SourceFileMediaProbeAdmissionScope, SqliteDurableStore,
 };
 
 use crate::session_events::LibraryBoundaryEventStream;
@@ -17,6 +17,7 @@ pub(crate) const SOURCE_HASH_MAINTENANCE_BATCH_LIMIT: usize = 8;
 pub(crate) const SOURCE_PROBE_MAINTENANCE_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_MAX_LIMIT: usize = 128;
+pub(crate) const SOURCE_PRIMARY_MEDIA_PROMOTION_BATCH_LIMIT: usize = 4;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SourceMaintenanceController {
@@ -44,8 +45,10 @@ pub(crate) struct SourceMaintenanceRun {
     pub(crate) attachment_materialization:
         protocol::SourceMaintenanceAttachmentMaterializationSummary,
     pub(crate) probe: protocol::SourceMaintenanceProbeSummary,
+    pub(crate) primary_media_promotion: protocol::SourceMaintenancePrimaryMediaPromotionSummary,
     pub(crate) remaining_hash_candidates: usize,
     pub(crate) remaining_probe_candidates: usize,
+    pub(crate) remaining_primary_media_promotion_candidates: usize,
     pub(crate) attachment_links: Option<protocol::SourceMaintenanceAttachmentLinkSummary>,
     pub(crate) source_failure: Option<protocol::SourceMaintenanceSourceFailure>,
     pub(crate) stopped: bool,
@@ -57,6 +60,7 @@ pub(crate) struct SourceMaintenanceSnapshot {
     pub(crate) status: protocol::SourceMaintenanceSnapshotStatus,
     pub(crate) remaining_hash_candidates: usize,
     pub(crate) remaining_probe_candidates: usize,
+    pub(crate) remaining_primary_media_promotion_candidates: usize,
     pub(crate) attachment_links: Option<protocol::SourceMaintenanceAttachmentLinkSummary>,
     pub(crate) source_failure: Option<protocol::SourceMaintenanceSourceFailure>,
     pub(crate) last_run: Option<protocol::SourceMaintenanceLastRunSummary>,
@@ -105,6 +109,7 @@ impl SourceMaintenanceController {
                     hash_limit: Some(SOURCE_HASH_MAINTENANCE_BATCH_LIMIT),
                     attachment_limit: Some(SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT),
                     probe_limit: Some(SOURCE_PROBE_MAINTENANCE_BATCH_LIMIT),
+                    promotion_limit: Some(SOURCE_PRIMARY_MEDIA_PROMOTION_BATCH_LIMIT),
                 },
             );
             self.finish_source(source_id);
@@ -166,6 +171,8 @@ impl SourceMaintenanceController {
             count_hash_candidates(store, source_id, source_failure.as_ref())?;
         let remaining_probe_candidates =
             count_probe_candidates(store, source_id, source_failure.as_ref())?;
+        let remaining_primary_media_promotion_candidates =
+            count_primary_media_promotion_candidates(store, source_id, source_failure.as_ref())?;
         let attachment_links = read_attachment_link_summary(store, source_id)
             .map_err(crate::service::map_store_error)?;
         let last_run = self
@@ -181,6 +188,7 @@ impl SourceMaintenanceController {
             status,
             remaining_hash_candidates,
             remaining_probe_candidates,
+            remaining_primary_media_promotion_candidates,
             attachment_links,
             source_failure,
             last_run,
@@ -373,6 +381,21 @@ impl SourceMaintenanceController {
         run.remaining_probe_candidates = probe_result.remaining_candidates;
         publish_maintained_snapshot_invalidations(store, events)?;
 
+        if self.stop_requested.load(Ordering::Acquire) {
+            run.stopped = true;
+            run.status = protocol::SourceMaintenanceRunStatus::Partial;
+            return Ok(run);
+        }
+
+        let promotion_result = store
+            .promote_primary_media_for_source(input.source_id, effective_limits.promotion_limit)
+            .map_err(crate::service::map_store_error)?;
+        run.primary_media_promotion =
+            map_primary_media_promotion_summary(effective_limits.promotion_limit, promotion_result);
+        run.remaining_primary_media_promotion_candidates =
+            run.primary_media_promotion.remaining_candidates;
+        publish_maintained_snapshot_invalidations(store, events)?;
+
         run.status = run_status(&run);
         Ok(run)
     }
@@ -384,6 +407,7 @@ pub(crate) struct SourceMaintenanceRunInput {
     pub(crate) hash_limit: Option<usize>,
     pub(crate) attachment_limit: Option<usize>,
     pub(crate) probe_limit: Option<usize>,
+    pub(crate) promotion_limit: Option<usize>,
 }
 
 fn effective_limits_for_input(
@@ -393,6 +417,9 @@ fn effective_limits_for_input(
         hash_limit: library_store_sqlite::effective_hash_batch_limit(input.hash_limit),
         attachment_limit: effective_attachment_materialization_limit(input.attachment_limit),
         probe_limit: library_store_sqlite::effective_media_probe_batch_limit(input.probe_limit),
+        promotion_limit: library_store_sqlite::effective_primary_media_promotion_limit(
+            input.promotion_limit,
+        ),
     }
 }
 
@@ -436,8 +463,23 @@ fn empty_run(
             failed_count: 0,
             remaining_candidates: 0,
         },
+        primary_media_promotion: protocol::SourceMaintenancePrimaryMediaPromotionSummary {
+            effective_limit: effective_limits.promotion_limit,
+            promoted_count: 0,
+            refreshed_count: 0,
+            skipped_unusable_source: 0,
+            skipped_unsupported_media_kind: 0,
+            skipped_no_facts: 0,
+            skipped_stale_facts: 0,
+            skipped_no_blake3: 0,
+            skipped_no_probe_facts: 0,
+            skipped_missing_attachment_link: 0,
+            skipped_stale_attachment_link: 0,
+            remaining_candidates: 0,
+        },
         remaining_hash_candidates: 0,
         remaining_probe_candidates: 0,
+        remaining_primary_media_promotion_candidates: 0,
         attachment_links: None,
         source_failure: None,
         stopped: false,
@@ -451,6 +493,7 @@ fn run_status(run: &SourceMaintenanceRun) -> protocol::SourceMaintenanceRunStatu
     if run.remaining_hash_candidates > 0
         || run.remaining_probe_candidates > 0
         || run.attachment_materialization.remaining_candidates > 0
+        || run.remaining_primary_media_promotion_candidates > 0
     {
         return protocol::SourceMaintenanceRunStatus::Partial;
     }
@@ -463,9 +506,32 @@ fn last_run_summary(run: &SourceMaintenanceRun) -> protocol::SourceMaintenanceLa
         hash: run.hash,
         attachment_materialization: run.attachment_materialization,
         probe: run.probe,
+        primary_media_promotion: run.primary_media_promotion,
         remaining_hash_candidates: run.remaining_hash_candidates,
         remaining_probe_candidates: run.remaining_probe_candidates,
+        remaining_primary_media_promotion_candidates: run
+            .remaining_primary_media_promotion_candidates,
         source_failure: run.source_failure.clone(),
+    }
+}
+
+fn map_primary_media_promotion_summary(
+    effective_limit: usize,
+    result: PromotePrimaryMediaForSourceResult,
+) -> protocol::SourceMaintenancePrimaryMediaPromotionSummary {
+    protocol::SourceMaintenancePrimaryMediaPromotionSummary {
+        effective_limit,
+        promoted_count: result.promoted_count,
+        refreshed_count: result.refreshed_count,
+        skipped_unusable_source: result.skipped_unusable_source,
+        skipped_unsupported_media_kind: result.skipped_unsupported_media_kind,
+        skipped_no_facts: result.skipped_no_facts,
+        skipped_stale_facts: result.skipped_stale_facts,
+        skipped_no_blake3: result.skipped_no_blake3,
+        skipped_no_probe_facts: result.skipped_no_probe_facts,
+        skipped_missing_attachment_link: result.skipped_missing_attachment_link,
+        skipped_stale_attachment_link: result.skipped_stale_attachment_link,
+        remaining_candidates: result.remaining_candidates,
     }
 }
 
@@ -574,6 +640,19 @@ fn count_probe_candidates(
         .count_source_file_media_probe_candidates(SourceFileMediaProbeAdmissionScope::Source {
             source_id,
         })
+        .map_err(crate::service::map_store_error)
+}
+
+fn count_primary_media_promotion_candidates(
+    store: &SqliteDurableStore,
+    source_id: i64,
+    source_failure: Option<&protocol::SourceMaintenanceSourceFailure>,
+) -> protocol::ProtocolResult<usize> {
+    if source_failure.is_some() {
+        return Ok(0);
+    }
+    store
+        .count_primary_media_promotion_candidates(source_id)
         .map_err(crate::service::map_store_error)
 }
 

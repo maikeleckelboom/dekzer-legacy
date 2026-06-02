@@ -308,7 +308,8 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
           effectiveLimits: {
             hashLimit: 8,
             attachmentLimit: 4,
-            probeLimit: 4
+            probeLimit: 4,
+            promotionLimit: 4
           },
           hash: {
             effectiveLimit: 8,
@@ -336,8 +337,23 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             failedCount: 0,
             remainingCandidates: 0
           },
+          primaryMediaPromotion: {
+            effectiveLimit: 4,
+            promotedCount: 1,
+            refreshedCount: 0,
+            skippedUnusableSource: 0,
+            skippedUnsupportedMediaKind: 0,
+            skippedNoFacts: 0,
+            skippedStaleFacts: 0,
+            skippedNoBlake3: 0,
+            skippedNoProbeFacts: 0,
+            skippedMissingAttachmentLink: 0,
+            skippedStaleAttachmentLink: 0,
+            remainingCandidates: 0
+          },
           remainingHashCandidates: 0,
-          remainingProbeCandidates: 0
+          remainingProbeCandidates: 0,
+          remainingPrimaryMediaPromotionCandidates: 0
         }
       }
     })
@@ -352,6 +368,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
           status: "idle",
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
+          remainingPrimaryMediaPromotionCandidates: 0,
           attachmentLinks: {
             currentLinksCount: 1,
             staleLinksCount: 0,
@@ -388,8 +405,23 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
               failedCount: 0,
               remainingCandidates: 0
             },
+            primaryMediaPromotion: {
+              effectiveLimit: 4,
+              promotedCount: 1,
+              refreshedCount: 0,
+              skippedUnusableSource: 0,
+              skippedUnsupportedMediaKind: 0,
+              skippedNoFacts: 0,
+              skippedStaleFacts: 0,
+              skippedNoBlake3: 0,
+              skippedNoProbeFacts: 0,
+              skippedMissingAttachmentLink: 0,
+              skippedStaleAttachmentLink: 0,
+              remainingCandidates: 0
+            },
             remainingHashCandidates: 0,
-            remainingProbeCandidates: 0
+            remainingProbeCandidates: 0,
+            remainingPrimaryMediaPromotionCandidates: 0
           }
         }
       }
@@ -401,7 +433,8 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
     sourceId: "7",
     hashLimit: 8,
     attachmentLimit: 4,
-    probeLimit: 4
+    probeLimit: 4,
+    promotionLimit: 4
   });
   const readReply = await client.readSourceMaintenance({ sourceId: "7" });
 
@@ -415,7 +448,8 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
           sourceId: "7",
           hashLimit: 8,
           attachmentLimit: 4,
-          probeLimit: 4
+          probeLimit: 4,
+          promotionLimit: 4
         }
       }
     } satisfies CommandRequest,

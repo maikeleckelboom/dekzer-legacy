@@ -23,6 +23,7 @@ mod literal_hierarchy_reads;
 mod navigation_reads;
 mod observed_file_facts_reads;
 mod playlists;
+mod primary_media_promotion;
 mod projections;
 mod promotion;
 mod revisions;
@@ -40,6 +41,9 @@ pub use context::{
 };
 pub use discovery::{
     RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
+};
+pub use primary_media_promotion::{
+    PromotePrimaryMediaForSourceResult, effective_primary_media_promotion_limit,
 };
 pub use revisions::{MaintainedReadModelRevision, MaintainedReadModelScope};
 pub use source_file_hash::{

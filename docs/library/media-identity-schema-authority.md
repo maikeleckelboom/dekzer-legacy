@@ -1,11 +1,12 @@
 ---
 status: accepted
-last-reviewed: 2026-06-01
+last-reviewed: 2026-06-02
 owner: library-substrate-boundary
 canonical-context:
   - source-lifecycle-backend-contract-gap
   - media-relevant-file-inventory-contract
   - library-contents-read-boundary
+  - primary-media-promotion-contract
 scope:
   - asset-identity
   - primary-media-authority
@@ -38,6 +39,8 @@ Reading order:
 | `readContents` default policy | Renderer boundary + service/store read model | Current product contents path: recursive `sourceFile` rows for audio, video, image, and admitted unsupported CUE sheets. |
 | `SourceFacts` observed-file evidence | Observed source facts substrate | Optional accepted source-file evidence attached to a `source_file_id` and copied file basis. Current evidence includes BLAKE3 content hash and audio media probe facts. It is not attachment identity and is not required by default contents reads. |
 | `content_attachments` / `source_file_attachment_links` | SQLite + `SqliteDurableStore::materialize_attachments_for_source` called by bounded service maintenance | Current Rust/store/service attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing. Exposed only through the narrow attachment identity read boundary. |
+| `primary_media_candidates` | SQLite + `SqliteDurableStore::promote_primary_media_for_source` called by bounded service maintenance | Current evidence-backed primary-media v0 projection target. One row per attachment with current BLAKE3 attachment identity and current audio probe evidence. Not track identity, not browser-row authority, not CUE pairing. |
+| `readContents` `primaryMedia` policy | Store read model + boundary protocol | Current evidence-backed primary-media row profile. Reads only promoted `primary_media_candidates` revalidated against current scoped source files, attachment links, content attachments, and `SourceFacts`. No source-file fallback. |
 | `source_media` write/read guards | Store filesystem guard | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing. |
 | `Playlists` / `PlaylistEntries` | Boundary service + store | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`. |
 
@@ -50,8 +53,7 @@ requests `rowProfile: sourceFile` with audio, video, image, and unsupported medi
 | --- | --- | --- |
 | `LibraryAssets` | Live transitional substrate, not current attachment identity authority | `equivalence_fingerprint` is caller-provided and remains non-authoritative for content identity. Current attachment identity uses `content_attachments`. |
 | `LibraryAssetAttachments` / `SourceSegmentSets` / `SourceSegments` | Dormant future segment/promotion shape | Segment promotion remains separate from BLAKE3 attachment identity. These tables are not used by attachment materialization. |
-| `LibraryBrowserRows` | Live maintained projection over `LibraryAssets` | Used by library browser, playlist-scoped browser reads, and promoted `primaryMedia` summaries. Not current default contents authority. |
-| `primaryMedia` row profile | Intentionally dormant projection shape with live protocol/read-model support | Correct long-term playable/performance projection. Blocked on attachment identity, observed file facts, and playable media evidence. |
+| `LibraryBrowserRows` | Live maintained projection over `LibraryAssets` | Used by library browser and playlist-scoped browser reads. Not current default contents authority and not `primaryMedia` v0 authority. |
 | Waveform, stems, prep readiness summaries | Live generated/service/store projection fields, dormant in desktop UI | Future preparation owner. They summarize capability/projection state and are not canonical media identity. |
 | `CapabilitySpecs`, `CapabilityDependencies`, `PrepPolicies`, `PrepAssignments`, `ResolvedLibraryAssetPrepTargets` | Live preparation substrate | Scheduler/prep substrate exists, but observed facts and attachment identity are not complete enough to make it product authority. |
 
@@ -64,20 +66,22 @@ code was therefore not current product hashing authority.
 
 ## `primaryMedia` Decision
 
-Decision: **B. Intentionally dormant projection shape.**
+Decision: **current evidence-backed v0 projection.**
 
 Evidence:
 
-- Store read model support exists in `read_models/contents.rs`.
+- Store read model support exists in `read_models/contents.rs` and reads `primary_media_candidates`.
 - Boundary protocol and generated TypeScript expose `ContentsRowProfile.primaryMedia` and `PrimaryMediaSummary`.
 - Desktop Main validates and maps the profile, but the renderer default requests `sourceFile`.
 - `primaryMedia` rows are present-file scoped and reject image/unsupported media classes.
-- Promoted rows depend on `LibraryBrowserRows`, `LibraryAssetAttachments`, `SourceSegments`, and `SourceSegmentSets`.
-- Unpromoted fallback rows are derived directly from present audio/video `source_files` and are marked with
-  `origin: sourceFile`.
+- Promoted rows depend on current `primary_media_candidates`, `source_file_attachment_links`, `content_attachments`, and
+  current `SourceFacts`.
+- Unpromoted source-file fallback rows are intentionally removed. Plain scanned source files do not surface as
+  `primaryMedia`.
 
-Therefore `primaryMedia` must not be treated as current track identity. It remains the long-term playable/performance
-projection shape, blocked by attachment identity, observed facts, and playable media evidence.
+Therefore `primaryMedia` must not be treated as current track identity. It is now a narrow playable-media candidate
+projection backed by current attachment identity and audio probe evidence. The detailed eligibility and non-goals are
+owned by `docs/library/primary-media-promotion-contract.md`.
 
 ## CUE Association Decision
 
@@ -140,6 +144,9 @@ Current placement:
 - Attachment identity now consumes current BLAKE3 durable hash evidence through the store-owned
   `materialize_attachments_for_source(source_id, limit)` path, called by one bounded service-owned maintenance unit
   after scan-triggered or manual source hash maintenance.
+- Primary-media promotion consumes current attachment identity plus current audio probe evidence through
+  `promote_primary_media_for_source(source_id, limit)`, called by the same bounded service-owned maintenance unit after
+  hashing, attachment materialization, and probing.
 - `content_attachments` owns attachment hash authority. `source_file_attachment_links` stores the source-file occurrence
   relation and derives exposed link hash values from the joined attachment row; it does not store a duplicate hash copy.
 - Track identity must not rely on path identity.
@@ -174,6 +181,7 @@ CUE sheets remain source-file companion metadata rows and are not parsed by medi
 ## Next Implementation Gate
 
 The next gate is collection health / source integrity work, video-capable probe adapter selection,
-source-location-scoped admission, broader scheduler policy, CUE parse observations, or a later promotion layer from
-attachments to playable identity. Follow-on work must not conflate the attachment foundation or media probe evidence
-with track tables, CUE pairing, artwork intelligence, playlist UI, prep facets, or waveform generation.
+source-location-scoped admission, broader scheduler policy, CUE parse observations, or a later layer from playable
+primary-media candidates to semantic track identity. Follow-on work must not conflate the attachment foundation, media
+probe evidence, or primary-media candidates with track tables, CUE pairing, artwork intelligence, playlist UI, prep
+facets, or waveform generation.

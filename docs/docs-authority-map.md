@@ -36,6 +36,7 @@ No two active docs may define the same authority._
 | `docs/library/attachment-identity-foundation-contract.md`    | **Canonical library contract**                               | Rust/store-only attachment identity foundation from current BLAKE3 observed-file facts, source-file attachment links, computed staleness, and deferred boundary/track/prep work.                                  |
 | `docs/library/observed-file-facts-contract.md`               | **Canonical library contract**                               | Observed source-file evidence, file-basis validity, algorithm-tagged content hash placement, CUE observation ownership, and current/future boundaries for probing and identity consumption.                       |
 | `docs/library/source-maintenance-orchestration-contract.md`   | **Canonical library contract**                               | Backend-owned bounded source maintenance unit order, command/read boundary, runtime-vs-durable ownership, scan-triggered behavior, and invalidation behavior.                                                     |
+| `docs/library/primary-media-promotion-contract.md`            | **Canonical library contract**                               | Evidence-backed primary-media v0 promotion target, eligibility, `readContents` behavior, source-maintenance integration, and non-goals.                                                                          |
 
 ## Contents read boundary docs
 

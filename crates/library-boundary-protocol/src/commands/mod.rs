@@ -38,7 +38,7 @@ pub enum CommandReply {
     LibraryRoots(LibraryRootReply),
     PlaylistWrite(PlaylistWriteReply),
     SourceFileHash(SourceFileHashReply),
-    SourceMaintenance(SourceMaintenanceReply),
+    SourceMaintenance(Box<SourceMaintenanceReply>),
     SnapshotRead(SnapshotReadReply),
 }
 
@@ -130,6 +130,7 @@ mod tests {
                 hash_limit: Some(8),
                 attachment_limit: Some(4),
                 probe_limit: Some(4),
+                promotion_limit: Some(4),
             }),
         );
 
@@ -203,6 +204,7 @@ mod tests {
                 hash_limit: Some(8),
                 attachment_limit: Some(4),
                 probe_limit: None,
+                promotion_limit: None,
             }),
         );
         assert_eq!(
@@ -275,7 +277,7 @@ mod tests {
             })
         );
 
-        let maintenance_reply = CommandReply::SourceMaintenance(
+        let maintenance_reply = CommandReply::SourceMaintenance(Box::new(
             SourceMaintenanceReply::RunSourceMaintenance(super::RunSourceMaintenanceReply {
                 source_id: 7,
                 status: super::SourceMaintenanceRunStatus::Completed,
@@ -283,6 +285,7 @@ mod tests {
                     hash_limit: 8,
                     attachment_limit: 4,
                     probe_limit: 4,
+                    promotion_limit: 4,
                 },
                 hash: super::SourceMaintenanceHashSummary {
                     effective_limit: 8,
@@ -311,12 +314,27 @@ mod tests {
                     failed_count: 0,
                     remaining_candidates: 0,
                 },
+                primary_media_promotion: super::SourceMaintenancePrimaryMediaPromotionSummary {
+                    effective_limit: 4,
+                    promoted_count: 1,
+                    refreshed_count: 0,
+                    skipped_unusable_source: 0,
+                    skipped_unsupported_media_kind: 0,
+                    skipped_no_facts: 0,
+                    skipped_stale_facts: 0,
+                    skipped_no_blake3: 0,
+                    skipped_no_probe_facts: 0,
+                    skipped_missing_attachment_link: 0,
+                    skipped_stale_attachment_link: 0,
+                    remaining_candidates: 0,
+                },
                 remaining_hash_candidates: 0,
                 remaining_probe_candidates: 0,
+                remaining_primary_media_promotion_candidates: 0,
                 attachment_links: None,
                 source_failure: None,
             }),
-        );
+        ));
         let json = serde_json::to_value(&maintenance_reply).expect("serialize maintenance reply");
         assert_eq!(json["type"], json!("sourceMaintenance"));
         assert_eq!(json["payload"]["type"], json!("runSourceMaintenance"));

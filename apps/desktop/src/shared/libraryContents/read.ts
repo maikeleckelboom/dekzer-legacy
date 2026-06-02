@@ -107,7 +107,7 @@ export type ContentsCoverage = {
   readonly detail?: string
 }
 
-export type ContentsRowOrigin = 'libraryAsset' | 'sourceFile'
+export type ContentsRowOrigin = 'libraryAsset' | 'sourceFile' | 'primaryMediaCandidate'
 export type ContentsPresence = 'present' | 'missing' | 'removed'
 export type ContentsAvailabilityState = 'available' | 'unavailable' | 'degraded'
 export type ContentsStemsStateSummary =
@@ -128,6 +128,13 @@ export type ContentsPrepReadinessSummary =
 
 export type PrimaryMediaSummary = {
   readonly origin: ContentsRowOrigin
+  readonly primaryMediaCandidateId?: string
+  readonly attachmentId?: string
+  readonly contentHashAlgorithm?: string
+  readonly contentHashValue?: string
+  readonly evidenceSourceFileId?: string
+  readonly mediaKind?: string
+  readonly mimeType?: string
   readonly libraryAssetId?: string
   readonly rowVersion?: string
   readonly primarySourceFileId?: string
@@ -135,6 +142,10 @@ export type PrimaryMediaSummary = {
   readonly artist?: string
   readonly album?: string
   readonly durationMs?: number
+  readonly sampleRateHz?: number
+  readonly channels?: number
+  readonly bitDepth?: number
+  readonly codec?: string
   readonly musicalKey?: string
   readonly tempoBpm?: number
   readonly waveformQualityCurrent?: number

@@ -708,6 +708,27 @@ CREATE INDEX source_file_attachment_links_source_file
 CREATE INDEX source_file_attachment_links_attachment
     ON source_file_attachment_links (attachment_id);
 
+CREATE TABLE primary_media_candidates
+(
+    primary_media_candidate_id  INTEGER PRIMARY KEY,
+    attachment_id               INTEGER NOT NULL UNIQUE REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
+    evidence_source_file_id     INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
+    evidence_basis_fingerprint  TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
+    media_kind                  TEXT    NOT NULL CHECK (media_kind = 'audio'),
+    mime_type                   TEXT,
+    duration_ms                 INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0),
+    sample_rate_hz              INTEGER CHECK (sample_rate_hz IS NULL OR sample_rate_hz > 0),
+    channels                    INTEGER CHECK (channels IS NULL OR channels > 0),
+    bit_depth                   INTEGER CHECK (bit_depth IS NULL OR bit_depth > 0),
+    codec                       TEXT,
+    created_at                  INTEGER NOT NULL,
+    updated_at                  INTEGER NOT NULL,
+    CHECK (updated_at >= created_at)
+) STRICT;
+
+CREATE INDEX primary_media_candidates_evidence_source_file
+    ON primary_media_candidates (evidence_source_file_id);
+
 CREATE TABLE SourceSegmentSets
 (
     source_segment_set_id  INTEGER PRIMARY KEY,

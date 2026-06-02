@@ -1004,6 +1004,13 @@ fn map_primary_media_summary(
 
     Ok(protocol::PrimaryMediaSummary {
         origin: map_contents_row_origin(&summary.origin),
+        primary_media_candidate_id: summary.primary_media_candidate_id,
+        attachment_id: summary.attachment_id,
+        content_hash_algorithm: summary.content_hash_algorithm,
+        content_hash_value: summary.content_hash_value,
+        evidence_source_file_id: summary.evidence_source_file_id,
+        media_kind: summary.media_kind,
+        mime_type: summary.mime_type,
         library_asset_id: summary.library_asset_id,
         row_version: summary.row_version,
         primary_source_file_id: summary.primary_source_file_id,
@@ -1011,6 +1018,10 @@ fn map_primary_media_summary(
         artist: summary.artist,
         album: summary.album,
         duration_ms: summary.duration_ms,
+        sample_rate_hz: summary.sample_rate_hz,
+        channels: summary.channels,
+        bit_depth: summary.bit_depth,
+        codec: summary.codec,
         musical_key: summary.musical_key,
         tempo_bpm: summary.tempo_bpm,
         waveform_quality_current: summary.waveform_quality_current,
@@ -1026,6 +1037,9 @@ const fn map_contents_row_origin(
     match origin {
         store::StoreContentsRowOrigin::LibraryAsset => protocol::ContentsRowOrigin::LibraryAsset,
         store::StoreContentsRowOrigin::SourceFile => protocol::ContentsRowOrigin::SourceFile,
+        store::StoreContentsRowOrigin::PrimaryMediaCandidate => {
+            protocol::ContentsRowOrigin::PrimaryMediaCandidate
+        }
     }
 }
 

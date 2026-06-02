@@ -656,7 +656,8 @@
       "type": "string",
       "enum": [
         "libraryAsset",
-        "sourceFile"
+        "sourceFile",
+        "primaryMediaCandidate"
       ]
     },
     "ContentsRowProfile": {
@@ -3015,6 +3016,44 @@
             "null"
           ]
         },
+        "attachmentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bitDepth": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "channels": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "codec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contentHashAlgorithm": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contentHashValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "durationMs": {
           "type": [
             "integer",
@@ -3022,7 +3061,25 @@
           ],
           "format": "int64"
         },
+        "evidenceSourceFileId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "libraryAssetId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mediaKind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mimeType": {
           "type": [
             "string",
             "null"
@@ -3047,6 +3104,12 @@
             }
           ]
         },
+        "primaryMediaCandidateId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "primarySourceFileId": {
           "type": [
             "string",
@@ -3058,6 +3121,13 @@
             "string",
             "null"
           ]
+        },
+        "sampleRateHz": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
         },
         "stemsStateSummary": {
           "anyOf": [
@@ -3586,6 +3656,11 @@
           "format": "uint",
           "minimum": 0
         },
+        "remainingPrimaryMediaPromotionCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
         "remainingProbeCandidates": {
           "type": "integer",
           "format": "uint",
@@ -3612,7 +3687,8 @@
         "sourceId",
         "status",
         "remainingHashCandidates",
-        "remainingProbeCandidates"
+        "remainingProbeCandidates",
+        "remainingPrimaryMediaPromotionCandidates"
       ]
     },
     "ReadSourceMaintenanceRequest": {
@@ -3726,10 +3802,18 @@
         "hash": {
           "$ref": "#/$defs/SourceMaintenanceHashSummary"
         },
+        "primaryMediaPromotion": {
+          "$ref": "#/$defs/SourceMaintenancePrimaryMediaPromotionSummary"
+        },
         "probe": {
           "$ref": "#/$defs/SourceMaintenanceProbeSummary"
         },
         "remainingHashCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingPrimaryMediaPromotionCandidates": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -3763,8 +3847,10 @@
         "hash",
         "attachmentMaterialization",
         "probe",
+        "primaryMediaPromotion",
         "remainingHashCandidates",
-        "remainingProbeCandidates"
+        "remainingProbeCandidates",
+        "remainingPrimaryMediaPromotionCandidates"
       ]
     },
     "RunSourceMaintenanceRequest": {
@@ -3787,6 +3873,14 @@
           "minimum": 0
         },
         "probeLimit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "promotionLimit": {
           "type": [
             "integer",
             "null"
@@ -4725,12 +4819,18 @@
           "type": "integer",
           "format": "uint",
           "minimum": 0
+        },
+        "promotionLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
         }
       },
       "required": [
         "hashLimit",
         "attachmentLimit",
-        "probeLimit"
+        "probeLimit",
+        "promotionLimit"
       ]
     },
     "SourceMaintenanceHashSummary": {
@@ -4779,10 +4879,18 @@
         "hash": {
           "$ref": "#/$defs/SourceMaintenanceHashSummary"
         },
+        "primaryMediaPromotion": {
+          "$ref": "#/$defs/SourceMaintenancePrimaryMediaPromotionSummary"
+        },
         "probe": {
           "$ref": "#/$defs/SourceMaintenanceProbeSummary"
         },
         "remainingHashCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingPrimaryMediaPromotionCandidates": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -4811,8 +4919,89 @@
         "hash",
         "attachmentMaterialization",
         "probe",
+        "primaryMediaPromotion",
         "remainingHashCandidates",
-        "remainingProbeCandidates"
+        "remainingProbeCandidates",
+        "remainingPrimaryMediaPromotionCandidates"
+      ]
+    },
+    "SourceMaintenancePrimaryMediaPromotionSummary": {
+      "type": "object",
+      "properties": {
+        "effectiveLimit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "promotedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "refreshedCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedMissingAttachmentLink": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedNoBlake3": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedNoFacts": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedNoProbeFacts": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedStaleAttachmentLink": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedStaleFacts": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedUnsupportedMediaKind": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "skippedUnusableSource": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "effectiveLimit",
+        "promotedCount",
+        "refreshedCount",
+        "skippedUnusableSource",
+        "skippedUnsupportedMediaKind",
+        "skippedNoFacts",
+        "skippedStaleFacts",
+        "skippedNoBlake3",
+        "skippedNoProbeFacts",
+        "skippedMissingAttachmentLink",
+        "skippedStaleAttachmentLink",
+        "remainingCandidates"
       ]
     },
     "SourceMaintenanceProbeSummary": {

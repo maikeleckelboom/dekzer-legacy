@@ -486,6 +486,19 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
 function mapPrimaryMedia(summary: ContractPrimaryMediaSummary): PrimaryMediaSummary {
   return {
     origin: summary.origin,
+    ...(summary.primaryMediaCandidateId === null
+      ? {}
+      : { primaryMediaCandidateId: summary.primaryMediaCandidateId }),
+    ...(summary.attachmentId === null ? {} : { attachmentId: summary.attachmentId }),
+    ...(summary.contentHashAlgorithm === null
+      ? {}
+      : { contentHashAlgorithm: summary.contentHashAlgorithm }),
+    ...(summary.contentHashValue === null ? {} : { contentHashValue: summary.contentHashValue }),
+    ...(summary.evidenceSourceFileId === null
+      ? {}
+      : { evidenceSourceFileId: summary.evidenceSourceFileId }),
+    ...(summary.mediaKind === null ? {} : { mediaKind: summary.mediaKind }),
+    ...(summary.mimeType === null ? {} : { mimeType: summary.mimeType }),
     ...(summary.libraryAssetId === null ? {} : { libraryAssetId: summary.libraryAssetId }),
     ...(summary.rowVersion === null ? {} : { rowVersion: summary.rowVersion }),
     ...(summary.primarySourceFileId === null
@@ -495,6 +508,10 @@ function mapPrimaryMedia(summary: ContractPrimaryMediaSummary): PrimaryMediaSumm
     ...(summary.artist === null ? {} : { artist: summary.artist }),
     ...(summary.album === null ? {} : { album: summary.album }),
     ...(summary.durationMs === null ? {} : { durationMs: summary.durationMs }),
+    ...(summary.sampleRateHz === null ? {} : { sampleRateHz: summary.sampleRateHz }),
+    ...(summary.channels === null ? {} : { channels: summary.channels }),
+    ...(summary.bitDepth === null ? {} : { bitDepth: summary.bitDepth }),
+    ...(summary.codec === null ? {} : { codec: summary.codec }),
     ...(summary.musicalKey === null ? {} : { musicalKey: summary.musicalKey }),
     ...(summary.tempoBpm === null ? {} : { tempoBpm: summary.tempoBpm }),
     ...(summary.waveformQualityCurrent === null

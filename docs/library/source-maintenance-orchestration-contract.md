@@ -6,6 +6,7 @@ canonical-context:
   - observed-file-facts-contract
   - attachment-identity-foundation-contract
   - media-probe-observations-contract
+  - primary-media-promotion-contract
   - source-lifecycle-backend-contract-gap
 scope:
   - source-maintenance-orchestration
@@ -27,10 +28,12 @@ The current unit exists so a scan completion or explicit command can make bounde
 1. BLAKE3 observed-file hash evidence for pending media-relevant source files.
 2. Attachment materialization from current BLAKE3 facts.
 3. Audio-only media probe observations for pending audio source files.
-4. Maintained read-model invalidation through the existing honest scopes.
+4. Evidence-backed primary-media promotion from current attachments and audio probe facts.
+5. Maintained read-model invalidation through the existing honest scopes.
 
-This is substrate maintenance only. It is not preparation readiness, track identity, `primaryMedia` promotion, CUE
-association, waveform generation, stems, artwork intelligence, playlist UI, or renderer presentation state.
+This is substrate maintenance only. Primary-media promotion v0 is attachment/probe evidence promotion, not preparation
+readiness, track identity, CUE association, waveform generation, stems, artwork intelligence, playlist UI, or renderer
+presentation state.
 
 ## Maintenance Unit Order
 
@@ -39,11 +42,14 @@ The deterministic order is:
 1. Run one bounded source-scoped BLAKE3 hash batch.
 2. Run one bounded source-scoped attachment materialization batch.
 3. Run one bounded source-scoped media probe batch.
-4. Publish maintained snapshot invalidations after each phase using current maintained revision scopes.
+4. Run one bounded source-scoped primary-media promotion batch.
+5. Publish maintained snapshot invalidations after each phase using current maintained revision scopes.
 
 Attachment materialization follows hashing because `content_attachments` and `source_file_attachment_links` consume
 current BLAKE3 `SourceFacts`. Media probing follows materialization because probe commits merge current compatible
 BLAKE3 evidence into `SourceFacts`; existing attachment links remain current when the hash evidence is preserved.
+Primary-media promotion follows probing because it requires current attachment links and at least one current audio
+probe fact.
 
 The order must not be interpreted as product preparation. Remaining candidates are expected after a bounded unit.
 
@@ -55,6 +61,7 @@ The command is source-scoped and accepts:
 - optional `hashLimit`
 - optional `attachmentLimit`
 - optional `probeLimit`
+- optional `promotionLimit`
 
 The renderer never supplies filesystem paths and never supplies a source-file-id list for v0. Limits are validated as
 positive integers and are capped by backend policy. No phase loops until the source is drained.
@@ -87,15 +94,16 @@ The boundary command is:
 | --- | --- |
 | Rust protocol | `SourceMaintenance.RunSourceMaintenance` |
 | Generated TS contract | `runSourceMaintenance` |
-| Desktop IPC/preload API | `library.sourceMaintenance.runSourceMaintenance({ sourceId, hashLimit?, attachmentLimit?, probeLimit? })` |
+| Desktop IPC/preload API | `library.sourceMaintenance.runSourceMaintenance({ sourceId, hashLimit?, attachmentLimit?, probeLimit?, promotionLimit? })` |
 
 The reply includes:
 
 - `sourceId`
-- effective limits for hash, attachment, and probe phases
+- effective limits for hash, attachment, probe, and promotion phases
 - hash summary counts and remaining hash candidates
 - attachment materialization summary counts
 - probe summary counts and remaining probe candidates
+- primary-media promotion summary counts and remaining promotion candidates
 - current/stale/missing attachment-link summary when the source attachment read model can answer
 - typed `sourceFailure` for unavailable, missing, blocked, or not-found source state
 - coarse run status: `completed`, `partial`, `skipped`, or `failed`
@@ -117,12 +125,14 @@ The snapshot computes:
 - source lifecycle failure state from `readSourceLifecycle`
 - remaining BLAKE3 hash candidates
 - remaining media probe candidates
+- remaining primary-media promotion candidates
 - attachment current/stale/missing counts from the attachment identity read model
 - in-memory service runtime status: `idle` or `running`
 - in-memory last bounded run summary, when this service instance has run one
 
 Runtime maintenance state is service-owned memory only. It is not durable identity and is not stored in SQLite. Durable
-truth remains in `SourceFacts`, `content_attachments`, and `source_file_attachment_links`.
+truth remains in `SourceFacts`, `content_attachments`, `source_file_attachment_links`, and
+`primary_media_candidates`.
 
 If source lifecycle prevents maintenance, the snapshot returns a typed source failure and does not report an empty
 success. Snapshot status maps source-not-found to `failed`, missing/unavailable source roots to `unavailable`, blocked
@@ -146,6 +156,7 @@ Each phase commits through the existing authority path:
 - BLAKE3 hashing commits accepted `SourceFacts` through inspect-source work/artifact authority.
 - Attachment materialization updates `content_attachments` and `source_file_attachment_links`.
 - Media probing commits accepted `SourceFacts` through inspect-source work/artifact authority.
+- Primary-media promotion updates `primary_media_candidates` from current attachments and current audio probe facts.
 
 After each phase, the service publishes maintained snapshot invalidations from current maintained revisions. The narrow
 honest maintained scope today is `LibraryBrowser`; attachment identity reads remain explicit until a precise maintained
@@ -156,7 +167,6 @@ attachment scope exists. No new source-maintenance event family is introduced in
 Source maintenance v0 does not:
 
 - implement track identity;
-- promote attachments into `primaryMedia`;
 - parse CUE sheets or pair CUE with audio;
 - probe video files;
 - generate waveform data, stems, prep rows, artwork intelligence, playlist UI, crates, sleeves, badges, chips, or
@@ -172,6 +182,6 @@ Future work remains separate:
 - source-location-scoped maintenance;
 - video probe adapter selection;
 - CUE parse observations owned by CUE source-file rows;
-- attachment-to-`primaryMedia` promotion;
+- video-capable or richer `primaryMedia` promotion beyond audio v0;
 - track identity;
 - preparation, waveform, stems, and artwork work.

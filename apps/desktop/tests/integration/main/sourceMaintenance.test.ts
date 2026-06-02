@@ -64,7 +64,8 @@ describe('source maintenance through the host', () => {
             effectiveLimits: {
               hashLimit: 4,
               attachmentLimit: 3,
-              probeLimit: 2
+              probeLimit: 2,
+              promotionLimit: 5
             },
             hash: {
               effectiveLimit: 4,
@@ -92,8 +93,23 @@ describe('source maintenance through the host', () => {
               failedCount: 0,
               remainingCandidates: 0
             },
+            primaryMediaPromotion: {
+              effectiveLimit: 5,
+              promotedCount: 1,
+              refreshedCount: 0,
+              skippedUnusableSource: 0,
+              skippedUnsupportedMediaKind: 0,
+              skippedNoFacts: 0,
+              skippedStaleFacts: 0,
+              skippedNoBlake3: 0,
+              skippedNoProbeFacts: 0,
+              skippedMissingAttachmentLink: 0,
+              skippedStaleAttachmentLink: 0,
+              remainingCandidates: 0
+            },
             remainingHashCandidates: 0,
-            remainingProbeCandidates: 0
+            remainingProbeCandidates: 0,
+            remainingPrimaryMediaPromotionCandidates: 0
           }
         },
         readSourceMaintenance: async (request) => {
@@ -103,6 +119,7 @@ describe('source maintenance through the host', () => {
             status: 'idle',
             remainingHashCandidates: 0,
             remainingProbeCandidates: 0,
+            remainingPrimaryMediaPromotionCandidates: 0,
             attachmentLinks: {
               currentLinksCount: 1,
               staleLinksCount: 0,
@@ -122,6 +139,7 @@ describe('source maintenance through the host', () => {
         hashLimit: 4,
         attachmentLimit: 3,
         probeLimit: 2,
+        promotionLimit: 5,
         absolutePath: 'C:/RendererMustNotControlThis'
       })
     ).resolves.toMatchObject({
@@ -137,7 +155,8 @@ describe('source maintenance through the host', () => {
       sourceId: '7',
       hashLimit: 4,
       attachmentLimit: 3,
-      probeLimit: 2
+      probeLimit: 2,
+      promotionLimit: 5
     })
 
     await expect(readSourceMaintenanceThroughHost(successHost, { sourceId: '7' })).resolves.toEqual(
@@ -148,6 +167,7 @@ describe('source maintenance through the host', () => {
           status: 'idle',
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
+          remainingPrimaryMediaPromotionCandidates: 0,
           attachmentLinks: {
             currentLinksCount: 1,
             staleLinksCount: 0,
@@ -169,6 +189,12 @@ describe('source maintenance through the host', () => {
     })
     await expect(
       runSourceMaintenanceThroughHost(successHost, { sourceId: '7', probeLimit: 0 })
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    })
+    await expect(
+      runSourceMaintenanceThroughHost(successHost, { sourceId: '7', promotionLimit: 0 })
     ).resolves.toMatchObject({
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }

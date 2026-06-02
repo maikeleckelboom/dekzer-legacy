@@ -94,7 +94,8 @@ pub use store::{
     HashSourceFileBlake3BatchResult, LibraryStoreContext, LocalRoot, LocalRootAvailability,
     MaintainedReadModelRevision, MaintainedReadModelScope, MaterializeAttachmentsForSourceResult,
     ProbeSourceFileMediaBatchInput, ProbeSourceFileMediaBatchOutcome,
-    ProbeSourceFileMediaBatchOutcomeStatus, ProbeSourceFileMediaBatchResult, ReadLocalRootsResult,
+    ProbeSourceFileMediaBatchOutcomeStatus, ProbeSourceFileMediaBatchResult,
+    PromotePrimaryMediaForSourceResult, ReadLocalRootsResult,
     ReadSourceFileBlake3HashCandidatesInput, ReadSourceFileMediaProbeCandidatesInput,
     RegisterLocalRootInput, RootScanHierarchyObservationReason, RootScanMaterializationResult,
     RootScanObservation, SOURCE_FILE_BLAKE3_ALGORITHM, SourceFileBlake3HashAdmissionScope,
@@ -105,4 +106,5 @@ pub use store::{
     SourceFileMediaProbeSkipReason, SqliteDurableStore, SqliteDurableStoreAppOwnedState,
     StoreEnvironment, UnregisterLocalRootInput, UnregisterLocalRootResult, durable_store_path,
     effective_hash_batch_limit, effective_media_probe_batch_limit,
+    effective_primary_media_promotion_limit,
 };

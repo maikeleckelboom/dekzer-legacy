@@ -122,6 +122,7 @@ mod tests {
         "ProjectionSubscribers",
         "ResolvedLibraryAssetPrepTargets",
         "content_attachments",
+        "primary_media_candidates",
         "source_directories",
         "source_file_attachment_links",
         "SourceFacts",
@@ -438,6 +439,28 @@ mod tests {
                 "created_at",
                 "updated_at",
             ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "primary_media_candidates"),
+            vec![
+                "primary_media_candidate_id",
+                "attachment_id",
+                "evidence_source_file_id",
+                "evidence_basis_fingerprint",
+                "media_kind",
+                "mime_type",
+                "duration_ms",
+                "sample_rate_hz",
+                "channels",
+                "bit_depth",
+                "codec",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert!(
+            table_index_names(&connection, "primary_media_candidates")
+                .contains(&"primary_media_candidates_evidence_source_file".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "navigation_rows"),

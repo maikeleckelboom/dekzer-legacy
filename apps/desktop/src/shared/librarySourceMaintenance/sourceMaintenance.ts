@@ -36,6 +36,7 @@ export type RunSourceMaintenanceRequest = {
   readonly hashLimit?: number
   readonly attachmentLimit?: number
   readonly probeLimit?: number
+  readonly promotionLimit?: number
 }
 
 export type ReadSourceMaintenanceRequest = {

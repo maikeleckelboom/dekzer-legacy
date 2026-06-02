@@ -412,11 +412,19 @@ pub struct StoreContentsReadPolicy {
 pub enum StoreContentsRowOrigin {
     LibraryAsset,
     SourceFile,
+    PrimaryMediaCandidate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StorePrimaryMediaSummary {
     pub origin: StoreContentsRowOrigin,
+    pub primary_media_candidate_id: Option<i64>,
+    pub attachment_id: Option<i64>,
+    pub content_hash_algorithm: Option<String>,
+    pub content_hash_value: Option<String>,
+    pub evidence_source_file_id: Option<i64>,
+    pub media_kind: Option<String>,
+    pub mime_type: Option<String>,
     pub library_asset_id: Option<i64>,
     pub row_version: Option<i64>,
     pub primary_source_file_id: Option<i64>,
@@ -425,6 +433,10 @@ pub struct StorePrimaryMediaSummary {
     pub artist: Option<String>,
     pub album: Option<String>,
     pub duration_ms: Option<i64>,
+    pub sample_rate_hz: Option<i64>,
+    pub channels: Option<i64>,
+    pub bit_depth: Option<i64>,
+    pub codec: Option<String>,
     pub musical_key: Option<String>,
     pub tempo_bpm: Option<f64>,
     pub waveform_quality_current: Option<i64>,
@@ -1789,8 +1801,19 @@ SELECT sf.source_file_id, \
        NULL AS waveform_quality_target, \
        NULL AS stems_state_summary, \
        NULL AS prep_readiness_summary, \
-       sf.updated_at \
-  FROM source_files sf \
+       sf.updated_at, \
+       NULL AS primary_media_candidate_id, \
+       NULL AS attachment_id, \
+       NULL AS content_hash_algorithm, \
+       NULL AS content_hash_value, \
+       NULL AS evidence_source_file_id, \
+       NULL AS candidate_media_kind, \
+       NULL AS mime_type, \
+       NULL AS sample_rate_hz, \
+       NULL AS channels, \
+       NULL AS bit_depth, \
+       NULL AS codec \
+   FROM source_files sf \
  WHERE {media_predicate} \
    AND {source_predicate}{cursor_clause} \
  ORDER BY {SOURCE_FILE_CONTENTS_ORDER_SQL} \
@@ -1881,78 +1904,100 @@ fn primary_media_rows_sql(
          scope_files AS ( \
               SELECT sf.source_file_id, \
                      sf.source_id, \
-                     sf.parent_source_directory_id, \
-                     sf.relative_path, \
-                     sf.name, \
-                     sf.media_class, \
-                     sf.file_kind, \
+                      sf.parent_source_directory_id, \
+                      sf.relative_path, \
+                      sf.name, \
+                      sf.size_bytes, \
+                      sf.mtime_ns, \
+                      sf.media_class, \
+                      sf.file_kind, \
                      sf.presence_state, \
-                     sf.updated_at \
-              FROM source_files sf \
-              WHERE sf.presence_state = 'present' \
-                AND {media_predicate} \
-                AND {source_predicate} \
-          ), \
-          promoted_scope AS ( \
-              SELECT pbr.library_asset_id, \
-                     pbr.row_version, \
-                     pbr.primary_source_file_id, \
-                     pbr.availability_state, \
-                     pbr.title, \
-                     pbr.artist, \
-                     pbr.album, \
-                     pbr.duration_ms, \
-                     pbr.musical_key, \
-                     pbr.tempo_bpm, \
-                     pbr.waveform_quality_current, \
-                     pbr.waveform_quality_target, \
-                     pbr.stems_state_summary, \
-                     pbr.prep_readiness_summary, \
-                     pbr.updated_at, \
-                     sf.source_file_id, \
-                     sf.source_id, \
-                     sf.parent_source_directory_id, \
-                     sf.relative_path, \
-                     sf.name, \
-                     sf.media_class, \
-                     sf.file_kind, \
-                     sf.presence_state, \
-                     pia.accepted_at, \
-                     ss.ordinal, \
-                     ROW_NUMBER() OVER ( \
-                         PARTITION BY pbr.library_asset_id \
-                         ORDER BY CASE \
-                                      WHEN sf.source_file_id = pbr.primary_source_file_id THEN 0 \
-                                      ELSE 1 \
-                                  END ASC, \
-                                  pia.accepted_at ASC, \
-                                  ss.ordinal ASC, \
-                                  sf.source_file_id ASC \
-                     ) AS attachment_rank \
-              FROM scope_files sf \
-              JOIN SourceSegmentSets sss \
-                ON sss.source_file_id = sf.source_file_id \
-              JOIN SourceSegments ss \
-                ON ss.source_segment_set_id = sss.source_segment_set_id \
-              JOIN LibraryAssetAttachments pia \
-                ON pia.source_segment_id = ss.source_segment_id \
-              JOIN LibraryBrowserRows pbr \
-                ON pbr.library_asset_id = pia.library_asset_id \
-          ), \
-          promoted AS ( \
-              SELECT source_file_id, \
-                     source_id, \
-                     parent_source_directory_id, \
+                      sf.updated_at \
+               FROM source_files sf \
+               WHERE sf.presence_state = 'present' \
+                 AND {media_predicate} \
+                 AND {source_predicate} \
+           ), \
+           candidate_scope AS ( \
+               SELECT pmc.primary_media_candidate_id, \
+                      pmc.attachment_id, \
+                      attachment.content_hash_algorithm, \
+                      attachment.content_hash_value, \
+                      pmc.evidence_source_file_id, \
+                      pmc.media_kind AS candidate_media_kind, \
+                      pmc.mime_type, \
+                      pmc.duration_ms, \
+                      pmc.sample_rate_hz, \
+                      pmc.channels, \
+                      pmc.bit_depth, \
+                      pmc.codec, \
+                      MAX( \
+                          pmc.updated_at, \
+                          attachment.updated_at, \
+                          link.updated_at, \
+                          facts.updated_at, \
+                          sf.updated_at \
+                      ) AS updated_at, \
+                      sf.source_file_id, \
+                      sf.source_id, \
+                      sf.parent_source_directory_id, \
+                      sf.relative_path, \
+                      sf.name, \
+                      sf.size_bytes, \
+                      sf.mtime_ns, \
+                      sf.media_class, \
+                      sf.file_kind, \
+                      sf.presence_state, \
+                      ROW_NUMBER() OVER ( \
+                          PARTITION BY pmc.primary_media_candidate_id \
+                          ORDER BY CASE \
+                                       WHEN sf.source_file_id = pmc.evidence_source_file_id THEN 0 \
+                                       ELSE 1 \
+                                   END ASC, \
+                                   lower(sf.relative_path) ASC, \
+                                   sf.source_file_id ASC \
+                      ) AS scoped_occurrence_rank \
+               FROM scope_files sf \
+               JOIN source_file_attachment_links link \
+                 ON link.source_file_id = sf.source_file_id \
+                AND link.source_id = sf.source_id \
+               JOIN content_attachments attachment \
+                 ON attachment.attachment_id = link.attachment_id \
+               JOIN primary_media_candidates pmc \
+                 ON pmc.attachment_id = attachment.attachment_id \
+               JOIN SourceFacts facts \
+                 ON facts.source_file_id = sf.source_file_id \
+              WHERE sf.source_id = facts.basis_source_id \
+                AND sf.relative_path = facts.basis_relative_path \
+                AND sf.size_bytes IS facts.basis_size_bytes \
+                AND sf.mtime_ns IS facts.basis_mtime_ns \
+                AND sf.presence_state = facts.basis_presence_state \
+                AND facts.content_hash_algorithm = attachment.content_hash_algorithm \
+                AND facts.content_hash_value = attachment.content_hash_value \
+                AND facts.media_kind = 'audio' \
+                AND ( \
+                    facts.mime_type IS NOT NULL \
+                    OR facts.duration_ms IS NOT NULL \
+                    OR facts.sample_rate_hz IS NOT NULL \
+                    OR facts.channels IS NOT NULL \
+                    OR facts.bit_depth IS NOT NULL \
+                    OR facts.codec IS NOT NULL \
+                ) \
+           ), \
+           promoted AS ( \
+               SELECT source_file_id, \
+                      source_id, \
+                      parent_source_directory_id, \
                      relative_path, \
-                     name AS file_name, \
-                     media_class, \
-                     file_kind, \
-                     presence_state, \
-                     library_asset_id, \
-                     row_version, \
-                     primary_source_file_id, \
-                     availability_state, \
-                     title, \
+                      name AS file_name, \
+                      media_class, \
+                      file_kind, \
+                      presence_state, \
+                      NULL AS library_asset_id, \
+                      row_version, \
+                      primary_source_file_id, \
+                      availability_state, \
+                      title, \
                      artist, \
                      album, \
                      duration_ms, \
@@ -1960,45 +2005,60 @@ fn primary_media_rows_sql(
                      tempo_bpm, \
                      waveform_quality_current, \
                      waveform_quality_target, \
-                     stems_state_summary, \
-                     prep_readiness_summary, \
-                     updated_at \
-              FROM promoted_scope \
-              WHERE attachment_rank = 1 \
-          ), \
-          source_file_rows AS ( \
-              SELECT sf.source_file_id, \
-                     sf.source_id, \
-                     sf.parent_source_directory_id, \
-                     sf.relative_path, \
-                     sf.name AS file_name, \
-                     sf.media_class, \
-                     sf.file_kind, \
-                     sf.presence_state, \
-                     NULL AS library_asset_id, \
-                     NULL AS row_version, \
-                     NULL AS primary_source_file_id, \
-                     'available' AS availability_state, \
-                     NULL AS title, \
-                     NULL AS artist, \
-                     NULL AS album, \
-                     NULL AS duration_ms, \
-                     NULL AS musical_key, \
-                     NULL AS tempo_bpm, \
-                     NULL AS waveform_quality_current, \
-                     NULL AS waveform_quality_target, \
-                     NULL AS stems_state_summary, \
-                     'underprepared' AS prep_readiness_summary, \
-                     sf.updated_at \
-              FROM scope_files sf \
-              WHERE NOT EXISTS ( \
-                  SELECT 1 \
-                  FROM promoted_scope ps \
-                  WHERE ps.source_file_id = sf.source_file_id \
-              ) \
-          ) \
-          SELECT source_file_id, \
-                 source_id, \
+                      stems_state_summary, \
+                      prep_readiness_summary, \
+                      updated_at, \
+                      primary_media_candidate_id, \
+                      attachment_id, \
+                      content_hash_algorithm, \
+                      content_hash_value, \
+                      evidence_source_file_id, \
+                      candidate_media_kind, \
+                      mime_type, \
+                      sample_rate_hz, \
+                      channels, \
+                      bit_depth, \
+                      codec \
+               FROM ( \
+                   SELECT source_file_id, \
+                          source_id, \
+                          parent_source_directory_id, \
+                          relative_path, \
+                          name, \
+                          media_class, \
+                          file_kind, \
+                          presence_state, \
+                          NULL AS row_version, \
+                          evidence_source_file_id AS primary_source_file_id, \
+                          'available' AS availability_state, \
+                          NULL AS title, \
+                          NULL AS artist, \
+                          NULL AS album, \
+                          duration_ms, \
+                          NULL AS musical_key, \
+                          NULL AS tempo_bpm, \
+                          NULL AS waveform_quality_current, \
+                          NULL AS waveform_quality_target, \
+                          NULL AS stems_state_summary, \
+                          'not_required' AS prep_readiness_summary, \
+                          updated_at, \
+                          primary_media_candidate_id, \
+                          attachment_id, \
+                          content_hash_algorithm, \
+                          content_hash_value, \
+                          evidence_source_file_id, \
+                          candidate_media_kind, \
+                          mime_type, \
+                          sample_rate_hz, \
+                          channels, \
+                          bit_depth, \
+                          codec \
+                   FROM candidate_scope \
+                   WHERE scoped_occurrence_rank = 1 \
+               ) \
+           ) \
+           SELECT source_file_id, \
+                  source_id, \
                  parent_source_directory_id, \
                  relative_path, \
                  file_name, \
@@ -2016,17 +2076,24 @@ fn primary_media_rows_sql(
                  musical_key, \
                  tempo_bpm, \
                  waveform_quality_current, \
-                 waveform_quality_target, \
-                 stems_state_summary, \
-                 prep_readiness_summary, \
-                 updated_at \
-          FROM ( \
-              SELECT * FROM promoted \
-              UNION ALL \
-              SELECT * FROM source_file_rows \
-          ){cursor_clause} \
-          ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL} \
-          LIMIT ?{limit_param}"
+                  waveform_quality_target, \
+                  stems_state_summary, \
+                  prep_readiness_summary, \
+                  updated_at, \
+                  primary_media_candidate_id, \
+                  attachment_id, \
+                  content_hash_algorithm, \
+                  content_hash_value, \
+                  evidence_source_file_id, \
+                  candidate_media_kind, \
+                  mime_type, \
+                  sample_rate_hz, \
+                  channels, \
+                  bit_depth, \
+                  codec \
+           FROM promoted{cursor_clause} \
+           ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL} \
+           LIMIT ?{limit_param}"
     )
 }
 
@@ -2107,9 +2174,22 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let stems_state_summary: Option<String> = row.get(20)?;
     let prep_readiness_summary: Option<String> = row.get(21)?;
     let updated_at: i64 = row.get(22)?;
+    let primary_media_candidate_id: Option<i64> = row.get(23)?;
+    let attachment_id: Option<i64> = row.get(24)?;
+    let content_hash_algorithm: Option<String> = row.get(25)?;
+    let content_hash_value: Option<String> = row.get(26)?;
+    let evidence_source_file_id: Option<i64> = row.get(27)?;
+    let candidate_media_kind: Option<String> = row.get(28)?;
+    let mime_type: Option<String> = row.get(29)?;
+    let sample_rate_hz: Option<i64> = row.get(30)?;
+    let channels: Option<i64> = row.get(31)?;
+    let bit_depth: Option<i64> = row.get(32)?;
+    let codec: Option<String> = row.get(33)?;
 
     let primary_media = availability_state.as_ref().map(|availability_state| {
-        let origin = if library_asset_id.is_some() {
+        let origin = if primary_media_candidate_id.is_some() {
+            StoreContentsRowOrigin::PrimaryMediaCandidate
+        } else if library_asset_id.is_some() {
             StoreContentsRowOrigin::LibraryAsset
         } else {
             StoreContentsRowOrigin::SourceFile
@@ -2117,6 +2197,13 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
 
         StorePrimaryMediaSummary {
             origin,
+            primary_media_candidate_id,
+            attachment_id,
+            content_hash_algorithm: content_hash_algorithm.clone(),
+            content_hash_value: content_hash_value.clone(),
+            evidence_source_file_id,
+            media_kind: candidate_media_kind.clone(),
+            mime_type: mime_type.clone(),
             library_asset_id,
             row_version,
             primary_source_file_id,
@@ -2125,6 +2212,10 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
             artist: artist.clone(),
             album: album.clone(),
             duration_ms,
+            sample_rate_hz,
+            channels,
+            bit_depth,
+            codec: codec.clone(),
             musical_key: musical_key.clone(),
             tempo_bpm,
             waveform_quality_current,
@@ -2141,8 +2232,16 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     Ok(StoreContentsFileRow {
         id: primary_media
             .as_ref()
-            .and_then(|summary| summary.library_asset_id)
-            .map(|id| format!("library-asset:{id}"))
+            .and_then(|summary| {
+                summary
+                    .primary_media_candidate_id
+                    .map(|id| format!("primary-media:{id}"))
+                    .or_else(|| {
+                        summary
+                            .library_asset_id
+                            .map(|id| format!("library-asset:{id}"))
+                    })
+            })
             .unwrap_or_else(|| format!("source-file:{source_file_id}")),
         source_id,
         source_file_id,
@@ -2472,60 +2571,63 @@ mod tests {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn insert_asset_file(
+    fn insert_promoted_media_file(
         connection: &Connection,
-        library_asset_id: i64,
+        _legacy_asset_id: i64,
         source_file_id: i64,
         source_id: i64,
         parent_directory_id: i64,
         relative_path: &str,
         media_class: &str,
-        title: &str,
+        _title: &str,
     ) {
-        let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
         let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
+        insert_scanned_file(
+            connection,
+            source_file_id,
+            source_id,
+            parent_directory_id,
+            relative_path,
+            media_class,
+        );
+
+        if media_class != "audio" || file_kind != "audio" {
+            return;
+        }
+
         connection
             .execute(
-                "INSERT INTO source_files (
-                     source_file_id,
-                     source_id,
-                     parent_source_directory_id,
-                     name,
-                     relative_path,
-                     file_kind,
-                     media_class,
-                     presence_state,
-                     first_discovered_at,
-                     last_observed_at,
-                     last_presence_change_at,
+                "INSERT OR IGNORE INTO WorkItems (
+                     work_item_id,
+                     subject_kind,
+                     subject_id,
+                     work_kind,
+                     basis_fingerprint,
+                     state,
+                     priority_class,
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'present', 1, 1, 1, 1, 1)",
-                params![
-                    source_file_id,
-                    source_id,
-                    parent_directory_id,
-                    file_name,
-                    relative_path,
-                    file_kind,
-                    media_class
-                ],
+                 VALUES (1, 'source_file', 'fixture', 'inspect_source', 'fixture', 'completed', 'interactive', 1, 1)",
+                [],
             )
-            .expect("insert source file");
+            .expect("insert work item");
         connection
             .execute(
-                "INSERT INTO LibraryAssets (
-                     library_asset_id,
-                     equivalence_fingerprint,
-                     retention_policy,
-                     created_at,
-                     updated_at
+                "INSERT OR IGNORE INTO WorkRuns (
+                     work_run_id,
+                     work_item_id,
+                     adapter_key,
+                     adapter_version,
+                     started_at,
+                     outcome
                  )
-                 VALUES (?1, ?2, 'keep_metadata', 1, 1)",
-                params![library_asset_id, format!("asset:{library_asset_id}")],
+                 VALUES (1, 1, 'test.contents', '1', 1, 'ok')",
+                [],
             )
-            .expect("insert library asset");
+            .expect("insert work run");
+        let artifact_id = 10_000 + source_file_id;
+        let basis_fingerprint = format!("basis:{source_file_id}");
         connection
             .execute(
                 "INSERT INTO Artifacts (
@@ -2543,83 +2645,124 @@ mod tests {
                      payload_hash,
                      created_at
                  )
-                 VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
+                 VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test.contents', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
                 params![
-                    10_000 + source_file_id,
-                    source_file_id.to_string(),
-                    format!("basis:{source_file_id}"),
-                    format!("hash:{source_file_id}")
+                    artifact_id,
+                    source_file_id,
+                    basis_fingerprint,
+                    format!("payload:{source_file_id}")
                 ],
             )
             .expect("insert artifact");
+        let (basis_relative_path, basis_size_bytes, basis_mtime_ns, basis_presence_state): (
+            String,
+            Option<i64>,
+            Option<i64>,
+            String,
+        ) = connection
+            .query_row(
+                "SELECT relative_path, size_bytes, mtime_ns, presence_state
+                 FROM source_files
+                 WHERE source_file_id = ?1",
+                [source_file_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .expect("read source file basis");
+        let hash_value = format!("hash:{source_file_id}");
         connection
             .execute(
-                "INSERT INTO SourceSegmentSets (
-                     source_segment_set_id,
+                "INSERT INTO SourceFacts (
                      source_file_id,
-                     segment_set_kind,
+                     fact_kind,
                      basis_fingerprint,
-                     accepted_at,
-                     accepted_artifact_id,
-                     updated_at
+                     basis_source_id,
+                     basis_relative_path,
+                     basis_size_bytes,
+                     basis_mtime_ns,
+                     basis_presence_state,
+                     observed_at_ms,
+                     content_hash_algorithm,
+                     content_hash_value,
+                     media_kind,
+                     mime_type,
+                     duration_ms,
+                     sample_rate_hz,
+                     channels,
+                     bit_depth,
+                     codec,
+                     updated_at,
+                     accepted_artifact_id
                  )
-                 VALUES (?1, ?2, 'whole_file', ?3, 1, ?4, 1)",
+                 VALUES (?1, 'source_inspection', ?2, ?3, ?4, ?5, ?6, ?7, 1, 'blake3', ?8, 'audio', 'audio/wav', 120000, 44100, 2, 16, 'pcm', 1, ?9)",
                 params![
-                    20_000 + source_file_id,
                     source_file_id,
-                    format!("basis:segments:{source_file_id}"),
-                    10_000 + source_file_id
+                    basis_fingerprint,
+                    source_id,
+                    basis_relative_path,
+                    basis_size_bytes,
+                    basis_mtime_ns,
+                    basis_presence_state,
+                    hash_value,
+                    artifact_id
                 ],
             )
-            .expect("insert segment set");
+            .expect("insert source facts");
         connection
             .execute(
-                "INSERT INTO SourceSegments (
-                     source_segment_id,
-                     source_segment_set_id,
-                     segment_kind,
-                     ordinal,
-                     start_offset_ms,
-                     display_title,
+                "INSERT OR IGNORE INTO content_attachments (
+                     content_hash_algorithm,
+                     content_hash_value,
+                     first_observed_at,
+                     updated_at
+                 )
+                 VALUES ('blake3', ?1, 1, 1)",
+                [format!("hash:{source_file_id}")],
+            )
+            .expect("insert content attachment");
+        let attachment_id: i64 = connection
+            .query_row(
+                "SELECT attachment_id
+                 FROM content_attachments
+                 WHERE content_hash_algorithm = 'blake3'
+                   AND content_hash_value = ?1",
+                [format!("hash:{source_file_id}")],
+                |row| row.get(0),
+            )
+            .expect("read attachment id");
+        connection
+            .execute(
+                "INSERT INTO source_file_attachment_links (
+                     attachment_id,
+                     source_file_id,
+                     source_id,
+                     file_kind,
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, 'whole_file', 0, 0, ?3, 1, 1)",
-                params![30_000 + source_file_id, 20_000 + source_file_id, title],
+                 VALUES (?1, ?2, ?3, ?4, 1, 1)",
+                params![attachment_id, source_file_id, source_id, file_kind],
             )
-            .expect("insert segment");
+            .expect("insert attachment link");
         connection
             .execute(
-                "INSERT INTO LibraryAssetAttachments (
-                     library_asset_attachment_id,
-                     library_asset_id,
-                     source_segment_id,
-                     accepted_at,
+                "INSERT INTO primary_media_candidates (
+                     attachment_id,
+                     evidence_source_file_id,
+                     evidence_basis_fingerprint,
+                     media_kind,
+                     mime_type,
+                     duration_ms,
+                     sample_rate_hz,
+                     channels,
+                     bit_depth,
+                     codec,
+                     created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, 1, 1)",
-                params![
-                    40_000 + source_file_id,
-                    library_asset_id,
-                    30_000 + source_file_id
-                ],
+                 VALUES (?1, ?2, ?3, 'audio', 'audio/wav', 120000, 44100, 2, 16, 'pcm', 1, 1)",
+                params![attachment_id, source_file_id, basis_fingerprint],
             )
-            .expect("insert attachment");
-        connection
-            .execute(
-                "INSERT INTO LibraryBrowserRows (
-                     library_asset_id,
-                     row_version,
-                     primary_source_file_id,
-                     availability_state,
-                     title,
-                     prep_readiness_summary,
-                     updated_at
-                 )
-                 VALUES (?1, 1, ?2, 'available', ?3, 'not_required', 1)",
-                params![library_asset_id, source_file_id, title],
-            )
-            .expect("insert browser row");
+            .expect("insert primary media candidate");
     }
 
     fn seed_assets(connection: &Connection) {
@@ -2665,7 +2808,7 @@ mod tests {
         insert_directory(&connection, 11, 1, "Other", "complete");
         insert_location(&connection, 100, 1, "Music", "user", "registered_subpath");
         insert_location(&connection, 101, 1, "Other", "device", "observed_path");
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,
@@ -2675,7 +2818,7 @@ mod tests {
             "audio",
             "Track",
         );
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             2,
             1001,
@@ -2703,10 +2846,10 @@ mod tests {
                 .iter()
                 .map(|row| {
                     let summary = primary_media(row);
-                    (summary.origin, summary.library_asset_id)
+                    (summary.origin, summary.attachment_id.is_some())
                 })
                 .collect::<Vec<_>>(),
-            vec![(StoreContentsRowOrigin::LibraryAsset, Some(1))]
+            vec![(StoreContentsRowOrigin::PrimaryMediaCandidate, true)]
         );
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
     }
@@ -2718,7 +2861,7 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Observed", "complete");
         insert_location(&connection, 100, 1, "Observed", "device", "observed_path");
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,
@@ -2753,7 +2896,7 @@ mod tests {
         insert_directory(&connection, 10, 1, "Music", "complete");
         insert_directory(&connection, 11, 1, "Music/Nested", "complete");
         insert_directory(&connection, 12, 1, "Music2", "complete");
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,
@@ -2763,7 +2906,7 @@ mod tests {
             "audio",
             "Alpha",
         );
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             2,
             1001,
@@ -2773,7 +2916,7 @@ mod tests {
             "audio",
             "Beta",
         );
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             3,
             1002,
@@ -2806,12 +2949,12 @@ mod tests {
                     let summary = primary_media(row);
                     (
                         summary.origin,
-                        summary.library_asset_id,
+                        summary.attachment_id.is_some(),
                         row.media_class.as_str(),
                     )
                 })
                 .collect::<Vec<_>>(),
-            vec![(StoreContentsRowOrigin::LibraryAsset, Some(1), "audio")]
+            vec![(StoreContentsRowOrigin::PrimaryMediaCandidate, true, "audio")]
         );
     }
 
@@ -2982,7 +3125,7 @@ mod tests {
     }
 
     #[test]
-    fn source_scope_returns_source_file_rows_without_promotion() {
+    fn source_scope_returns_empty_primary_media_without_promotion() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -2999,44 +3142,19 @@ mod tests {
         )
         .expect("read contents");
 
-        assert_eq!(result.state, StoreContentsState::Ready);
-        assert_eq!(result.rows.len(), 2);
-
-        for row in &result.rows {
-            let summary = primary_media(row);
-            assert_eq!(summary.origin, StoreContentsRowOrigin::SourceFile);
-            assert!(summary.library_asset_id.is_none());
-            assert!(summary.row_version.is_none());
-            assert!(summary.primary_source_file_id.is_none());
-            assert!(summary.title.is_none());
-            assert!(summary.artist.is_none());
-            assert!(summary.album.is_none());
-            assert!(summary.duration_ms.is_none());
-            assert_eq!(row.availability_state.as_deref(), Some("available"));
-            assert_eq!(summary.prep_readiness_summary, "underprepared");
-            assert!(
-                row.id.starts_with("source-file:"),
-                "source-file row id must start with 'source-file:', got: {}",
-                row.id
-            );
-        }
-
-        let media_classes: Vec<&str> = result
-            .rows
-            .iter()
-            .map(|row| row.media_class.as_str())
-            .collect();
-        assert!(media_classes.contains(&"audio"));
-        assert!(media_classes.contains(&"video"));
+        assert_eq!(result.state, StoreContentsState::Empty);
+        assert!(result.rows.is_empty());
+        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
+        assert!(result.coverage.empty_result_authoritative);
     }
 
     #[test]
-    fn promoted_asset_rows_still_work_when_promotion_rows_exist() {
+    fn promoted_candidate_rows_are_returned_when_evidence_is_current() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,
@@ -3060,17 +3178,24 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         let summary = primary_media(&result.rows[0]);
-        assert_eq!(summary.origin, StoreContentsRowOrigin::LibraryAsset);
-        assert_eq!(summary.library_asset_id, Some(1));
+        assert_eq!(
+            summary.origin,
+            StoreContentsRowOrigin::PrimaryMediaCandidate
+        );
+        assert!(summary.primary_media_candidate_id.is_some());
+        assert!(summary.attachment_id.is_some());
+        assert!(summary.library_asset_id.is_none());
+        assert_eq!(summary.content_hash_value.as_deref(), Some("hash:1000"));
+        assert_eq!(summary.media_kind.as_deref(), Some("audio"));
         assert!(
-            result.rows[0].id.starts_with("library-asset:"),
-            "promoted row id must start with 'library-asset:', got: {}",
+            result.rows[0].id.starts_with("primary-media:"),
+            "promoted row id must start with 'primary-media:', got: {}",
             result.rows[0].id
         );
     }
 
     #[test]
-    fn complete_scope_with_media_files_without_promotion_returns_ready_not_empty() {
+    fn complete_scope_with_media_files_without_promotion_returns_authoritative_empty() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -3089,13 +3214,10 @@ mod tests {
         )
         .expect("read contents");
 
-        assert_eq!(result.state, StoreContentsState::Ready);
-        assert_eq!(result.rows.len(), 1);
-        assert_eq!(
-            primary_media(&result.rows[0]).origin,
-            StoreContentsRowOrigin::SourceFile
-        );
+        assert_eq!(result.state, StoreContentsState::Empty);
+        assert!(result.rows.is_empty());
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
+        assert!(result.coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3209,12 +3331,12 @@ mod tests {
     }
 
     #[test]
-    fn mixed_promoted_and_source_file_rows_coexist() {
+    fn primary_media_profile_omits_unpromoted_source_file_rows() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,
@@ -3237,15 +3359,12 @@ mod tests {
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Ready);
-        assert_eq!(result.rows.len(), 2);
-
-        let origins: Vec<_> = result
-            .rows
-            .iter()
-            .map(|row| primary_media(row).origin)
-            .collect();
-        assert!(origins.contains(&StoreContentsRowOrigin::LibraryAsset));
-        assert!(origins.contains(&StoreContentsRowOrigin::SourceFile));
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0].source_file_id, 1000);
+        assert_eq!(
+            primary_media(&result.rows[0]).origin,
+            StoreContentsRowOrigin::PrimaryMediaCandidate
+        );
     }
 
     #[test]
@@ -3598,13 +3717,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..5 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -3632,13 +3753,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..5 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -3666,13 +3789,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..5 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -3792,13 +3917,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..5 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -4292,13 +4419,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..3 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -4325,13 +4454,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..3 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -4358,13 +4489,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..5 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -4418,13 +4551,15 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         for i in 0..5 {
-            insert_scanned_file(
+            insert_promoted_media_file(
                 &connection,
+                i + 1,
                 1000 + i,
                 1,
                 10,
                 &format!("Music/track_{:02}.wav", i),
                 "audio",
+                &format!("Track {:02}", i),
             );
         }
 
@@ -4633,7 +4768,7 @@ mod tests {
     }
 
     #[test]
-    fn contents_directory_prefix_uses_binary_collation_index() {
+    fn contents_directory_prefix_uses_indexed_relative_path_scope() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4675,8 +4810,9 @@ mod tests {
         eprintln!("=== Directory prefix query plan ===\n{plan}");
 
         assert!(
-            plan_lower.contains("source_files_source_relative_path_binary"),
-            "directory-prefix scope should use the source_files_source_relative_path_binary index, observed:\n{plan}"
+            plan_lower.contains("source_files_source_relative_path_binary")
+                || plan_lower.contains("sourcefacts_source_basis"),
+            "directory-prefix scope should use an indexed relative-path range, observed:\n{plan}"
         );
     }
 
@@ -4747,7 +4883,7 @@ mod tests {
         for i in 0..10 {
             let source_file_id = 1000 + i as i64;
             let library_asset_id = i as i64 + 1;
-            insert_asset_file(
+            insert_promoted_media_file(
                 &connection,
                 library_asset_id,
                 source_file_id,
@@ -4789,20 +4925,27 @@ mod tests {
         eprintln!("=== Mixed promotion query plan ===\n{plan}");
 
         assert!(
-            plan_lower.contains("sqlite_autoindex_sourcesegmentsets_1"),
-            "mixed-promotion plan should use indexed lookup on SourceSegmentSets, observed:\n{plan}"
+            plan_lower.contains("source_files_source_presence"),
+            "mixed-promotion plan should use indexed source-file scope lookup, observed:\n{plan}"
         );
         assert!(
-            plan_lower.contains("sqlite_autoindex_sourcesegments_1"),
-            "mixed-promotion plan should use indexed lookup on SourceSegments, observed:\n{plan}"
+            plan_lower.contains("source_file_attachment_links"),
+            "mixed-promotion plan should use indexed attachment-link lookup, observed:\n{plan}"
         );
         assert!(
-            plan_lower.contains("sqlite_autoindex_libraryassetattachments_1"),
-            "mixed-promotion plan should use indexed lookup on LibraryAssetAttachments, observed:\n{plan}"
+            plan_lower.contains("search attachment"),
+            "mixed-promotion plan should use content-attachment lookup, observed:\n{plan}"
         );
         assert!(
-            plan_lower.contains("integer primary key"),
-            "mixed-promotion plan should use primary-key lookup on LibraryBrowserRows, observed:\n{plan}"
+            plan_lower.contains("primary_media_candidates"),
+            "mixed-promotion plan should use promoted-candidate lookup, observed:\n{plan}"
+        );
+        assert!(
+            !plan_lower.contains("sourcesegmentsets")
+                && !plan_lower.contains("sourcesegments")
+                && !plan_lower.contains("libraryassetattachments")
+                && !plan_lower.contains("librarybrowserrows"),
+            "mixed-promotion plan must not depend on legacy browser-row joins, observed:\n{plan}"
         );
     }
 
@@ -4869,7 +5012,16 @@ mod tests {
             )
             .expect("set partial scan phase");
         insert_directory(&connection, 10, 1, "Music", "complete");
-        insert_scanned_file(&connection, 1000, 1, 10, "Music/track.wav", "audio");
+        insert_promoted_media_file(
+            &connection,
+            1,
+            1000,
+            1,
+            10,
+            "Music/track.wav",
+            "audio",
+            "Track",
+        );
         insert_directory(&connection, 11, 1, "Music/Locked", "complete");
         set_directory_scan_issue(&connection, 11, "blocked", "permission_denied");
 
@@ -4906,7 +5058,16 @@ mod tests {
         insert_directory(&connection, 11, 1, "Music/Good", "complete");
         insert_directory(&connection, 12, 1, "Music/Locked", "complete");
         set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
-        insert_scanned_file(&connection, 1000, 1, 11, "Music/Good/track.wav", "audio");
+        insert_promoted_media_file(
+            &connection,
+            1,
+            1000,
+            1,
+            11,
+            "Music/Good/track.wav",
+            "audio",
+            "Track",
+        );
 
         let dir_result = read_contents(
             &connection,
@@ -5214,7 +5375,16 @@ mod tests {
             "user",
             "registered_subpath",
         );
-        insert_scanned_file(&connection, 1000, 1, 11, "Music/Good/track.wav", "audio");
+        insert_promoted_media_file(
+            &connection,
+            1,
+            1000,
+            1,
+            11,
+            "Music/Good/track.wav",
+            "audio",
+            "Track",
+        );
 
         let result = read_contents(
             &connection,
@@ -5396,7 +5566,16 @@ mod tests {
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
         insert_directory(&connection, 11, 1, "Music/Good", "complete");
-        insert_scanned_file(&connection, 5000, 1, 11, "Music/Good/track.wav", "audio");
+        insert_promoted_media_file(
+            &connection,
+            1,
+            5000,
+            1,
+            11,
+            "Music/Good/track.wav",
+            "audio",
+            "Track",
+        );
         insert_location(
             &connection,
             100,
@@ -5577,7 +5756,7 @@ mod tests {
             "user",
             "registered_subpath",
         );
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,
@@ -5640,7 +5819,7 @@ mod tests {
             "user",
             "registered_subpath",
         );
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,
@@ -5724,7 +5903,7 @@ mod tests {
             "user",
             "registered_subpath",
         );
-        insert_asset_file(
+        insert_promoted_media_file(
             &connection,
             1,
             1000,

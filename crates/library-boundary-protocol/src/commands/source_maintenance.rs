@@ -27,6 +27,9 @@ pub struct RunSourceMaintenanceRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub probe_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub promotion_limit: Option<usize>,
 }
 
 #[derive(
@@ -44,8 +47,10 @@ pub struct RunSourceMaintenanceReply {
     pub hash: SourceMaintenanceHashSummary,
     pub attachment_materialization: SourceMaintenanceAttachmentMaterializationSummary,
     pub probe: SourceMaintenanceProbeSummary,
+    pub primary_media_promotion: SourceMaintenancePrimaryMediaPromotionSummary,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
+    pub remaining_primary_media_promotion_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub attachment_links: Option<SourceMaintenanceAttachmentLinkSummary>,
@@ -86,6 +91,7 @@ pub struct ReadSourceMaintenanceReply {
     pub status: SourceMaintenanceSnapshotStatus,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
+    pub remaining_primary_media_promotion_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub attachment_links: Option<SourceMaintenanceAttachmentLinkSummary>,
@@ -114,6 +120,7 @@ pub struct SourceMaintenanceEffectiveLimits {
     pub hash_limit: usize,
     pub attachment_limit: usize,
     pub probe_limit: usize,
+    pub promotion_limit: usize,
 }
 
 #[derive(
@@ -197,6 +204,34 @@ pub struct SourceMaintenanceProbeSummary {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct SourceMaintenancePrimaryMediaPromotionSummary {
+    pub effective_limit: usize,
+    pub promoted_count: usize,
+    pub refreshed_count: usize,
+    pub skipped_unusable_source: usize,
+    pub skipped_unsupported_media_kind: usize,
+    pub skipped_no_facts: usize,
+    pub skipped_stale_facts: usize,
+    pub skipped_no_blake3: usize,
+    pub skipped_no_probe_facts: usize,
+    pub skipped_missing_attachment_link: usize,
+    pub skipped_stale_attachment_link: usize,
+    pub remaining_candidates: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct SourceMaintenanceAttachmentLinkSummary {
     pub current_links_count: usize,
     pub stale_links_count: usize,
@@ -216,8 +251,10 @@ pub struct SourceMaintenanceLastRunSummary {
     pub hash: SourceMaintenanceHashSummary,
     pub attachment_materialization: SourceMaintenanceAttachmentMaterializationSummary,
     pub probe: SourceMaintenanceProbeSummary,
+    pub primary_media_promotion: SourceMaintenancePrimaryMediaPromotionSummary,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
+    pub remaining_primary_media_promotion_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub source_failure: Option<SourceMaintenanceSourceFailure>,

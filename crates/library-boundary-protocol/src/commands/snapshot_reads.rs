@@ -514,6 +514,7 @@ pub struct ContentsCoverage {
 pub enum ContentsRowOrigin {
     LibraryAsset,
     SourceFile,
+    PrimaryMediaCandidate,
 }
 
 impl ContentsRowOrigin {
@@ -521,6 +522,7 @@ impl ContentsRowOrigin {
         match self {
             Self::LibraryAsset => "libraryAsset",
             Self::SourceFile => "sourceFile",
+            Self::PrimaryMediaCandidate => "primaryMediaCandidate",
         }
     }
 
@@ -528,6 +530,7 @@ impl ContentsRowOrigin {
         match value.as_bytes() {
             b"libraryAsset" => Some(Self::LibraryAsset),
             b"sourceFile" => Some(Self::SourceFile),
+            b"primaryMediaCandidate" => Some(Self::PrimaryMediaCandidate),
             _ => None,
         }
     }
@@ -583,6 +586,22 @@ pub struct PrimaryMediaSummary {
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
+    pub primary_media_candidate_id: Option<i64>,
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub attachment_id: Option<i64>,
+    pub content_hash_algorithm: Option<String>,
+    pub content_hash_value: Option<String>,
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub evidence_source_file_id: Option<i64>,
+    pub media_kind: Option<String>,
+    pub mime_type: Option<String>,
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
     pub library_asset_id: Option<i64>,
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
@@ -596,6 +615,10 @@ pub struct PrimaryMediaSummary {
     pub artist: Option<String>,
     pub album: Option<String>,
     pub duration_ms: Option<i64>,
+    pub sample_rate_hz: Option<i64>,
+    pub channels: Option<i64>,
+    pub bit_depth: Option<i64>,
+    pub codec: Option<String>,
     pub musical_key: Option<String>,
     pub tempo_bpm: Option<f64>,
     pub waveform_quality_current: Option<i64>,
@@ -2086,7 +2109,7 @@ pub enum SnapshotReadReply {
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     SourceLifecycle(ReadSourceLifecycleReply),
-    SourceMaintenance(ReadSourceMaintenanceReply),
+    SourceMaintenance(Box<ReadSourceMaintenanceReply>),
     SourceFileAttachment(ReadSourceFileAttachmentReply),
     AttachmentSourceFiles(ReadAttachmentSourceFilesReply),
     SourceAttachmentSummary(ReadSourceAttachmentSummaryReply),

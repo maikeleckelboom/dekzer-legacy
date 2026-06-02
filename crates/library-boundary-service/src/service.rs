@@ -148,6 +148,7 @@ impl LibraryBoundaryService {
                 .map(protocol::CommandReply::SourceFileHash),
             protocol::CommandRequest::SourceMaintenance(command) => self
                 .handle_source_maintenance_command(command)
+                .map(Box::new)
                 .map(protocol::CommandReply::SourceMaintenance),
             protocol::CommandRequest::SnapshotRead(command) => self
                 .handle_snapshot_read_command(command)
@@ -675,6 +676,10 @@ impl LibraryBoundaryService {
             "runSourceMaintenance attachmentLimit",
         )?;
         require_optional_positive_limit(request.probe_limit, "runSourceMaintenance probeLimit")?;
+        require_optional_positive_limit(
+            request.promotion_limit,
+            "runSourceMaintenance promotionLimit",
+        )?;
 
         let run = self.source_maintenance.run_manual(
             &self.durable_store,
@@ -684,6 +689,7 @@ impl LibraryBoundaryService {
                 hash_limit: request.hash_limit,
                 attachment_limit: request.attachment_limit,
                 probe_limit: request.probe_limit,
+                promotion_limit: request.promotion_limit,
             },
         )?;
         Ok(map_run_source_maintenance_reply(run))
@@ -702,6 +708,8 @@ impl LibraryBoundaryService {
             status: snapshot.status,
             remaining_hash_candidates: snapshot.remaining_hash_candidates,
             remaining_probe_candidates: snapshot.remaining_probe_candidates,
+            remaining_primary_media_promotion_candidates: snapshot
+                .remaining_primary_media_promotion_candidates,
             attachment_links: snapshot.attachment_links,
             source_failure: snapshot.source_failure,
             last_run: snapshot.last_run,
@@ -851,6 +859,7 @@ impl LibraryBoundaryService {
                 .map(protocol::SnapshotReadReply::SourceLifecycle),
             protocol::SnapshotReadCommand::ReadSourceMaintenance(request) => self
                 .read_source_maintenance(request)
+                .map(Box::new)
                 .map(protocol::SnapshotReadReply::SourceMaintenance),
             protocol::SnapshotReadCommand::ReadSourceFileAttachment(request) => self
                 .read_source_file_attachment(request)
@@ -1122,8 +1131,11 @@ fn map_run_source_maintenance_reply(
         hash: run.hash,
         attachment_materialization: run.attachment_materialization,
         probe: run.probe,
+        primary_media_promotion: run.primary_media_promotion,
         remaining_hash_candidates: run.remaining_hash_candidates,
         remaining_probe_candidates: run.remaining_probe_candidates,
+        remaining_primary_media_promotion_candidates: run
+            .remaining_primary_media_promotion_candidates,
         attachment_links: run.attachment_links,
         source_failure: run.source_failure,
     }
@@ -1497,16 +1509,16 @@ mod tests {
 
     fn expect_run_source_maintenance_reply(reply: CommandReply) -> RunSourceMaintenanceReply {
         match reply {
-            CommandReply::SourceMaintenance(SourceMaintenanceReply::RunSourceMaintenance(
-                reply,
-            )) => reply,
+            CommandReply::SourceMaintenance(reply) => match *reply {
+                SourceMaintenanceReply::RunSourceMaintenance(reply) => reply,
+            },
             other => panic!("expected run source maintenance reply, got {other:?}"),
         }
     }
 
     fn expect_read_source_maintenance_reply(reply: CommandReply) -> ReadSourceMaintenanceReply {
         match reply {
-            CommandReply::SnapshotRead(SnapshotReadReply::SourceMaintenance(reply)) => reply,
+            CommandReply::SnapshotRead(SnapshotReadReply::SourceMaintenance(reply)) => *reply,
             other => panic!("expected source maintenance snapshot reply, got {other:?}"),
         }
     }
@@ -1625,6 +1637,7 @@ mod tests {
         hash_limit: Option<usize>,
         attachment_limit: Option<usize>,
         probe_limit: Option<usize>,
+        promotion_limit: Option<usize>,
     ) -> RunSourceMaintenanceReply {
         expect_run_source_maintenance_reply(expect_success(service.handle_command(
             CommandRequest::SourceMaintenance(SourceMaintenanceCommand::RunSourceMaintenance(
@@ -1633,6 +1646,7 @@ mod tests {
                     hash_limit,
                     attachment_limit,
                     probe_limit,
+                    promotion_limit,
                 },
             )),
         )))
@@ -2285,8 +2299,14 @@ mod tests {
         record_present_source_file(&service, registered.root_id, 101, "video.mp4", 11);
         record_present_source_file(&service, registered.root_id, 102, "album.cue", 19);
 
-        let run =
-            run_source_maintenance(&service, registered.root_id, Some(10), Some(10), Some(10));
+        let run = run_source_maintenance(
+            &service,
+            registered.root_id,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(10),
+        );
 
         assert_eq!(
             run.status,
@@ -2689,8 +2709,14 @@ mod tests {
             .set_source_active_for_test(registered.root_id, true);
         let completed_before = service.source_maintenance.completed_runs_for_test().len();
 
-        let run =
-            run_source_maintenance(&service, registered.root_id, Some(10), Some(10), Some(10));
+        let run = run_source_maintenance(
+            &service,
+            registered.root_id,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(10),
+        );
 
         assert_eq!(
             run.status,
@@ -2744,8 +2770,14 @@ mod tests {
             vec![registered.root_id]
         );
 
-        let manual =
-            run_source_maintenance(&service, registered.root_id, Some(10), Some(10), Some(10));
+        let manual = run_source_maintenance(
+            &service,
+            registered.root_id,
+            Some(10),
+            Some(10),
+            Some(10),
+            Some(10),
+        );
         assert_eq!(manual.hash.hashed_count, 1);
 
         let queued = service
