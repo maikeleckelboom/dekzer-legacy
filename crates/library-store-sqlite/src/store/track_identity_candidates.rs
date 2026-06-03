@@ -518,6 +518,8 @@ fn read_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> 
     usize::try_from(count).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, count))
 }
 
+// Candidate production validates source rows before stored candidate evidence exists.
+// Stored evidence currentness is shared by read status and decision snapshot predicates.
 const CURRENT_PRIMARY_MEDIA_PREDICATE: &str = "file.presence_state = 'present'
     AND file.media_class = 'audio'
     AND file.file_kind = 'audio'

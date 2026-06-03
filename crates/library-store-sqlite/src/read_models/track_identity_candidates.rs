@@ -1,6 +1,8 @@
-use rusqlite::{Connection, Row};
+use rusqlite::{Connection, Row, params};
 
 use crate::LibrarySqliteResult;
+use crate::store::SOURCE_FILE_BLAKE3_ALGORITHM;
+use crate::track_identity_evidence_predicates::current_track_identity_candidate_evidence_predicate;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoreTrackIdentityCandidate {
@@ -165,9 +167,44 @@ fn read_track_identity_candidate_evidence(
     connection: &Connection,
     track_identity_candidate_id: i64,
 ) -> LibrarySqliteResult<Vec<StoreTrackIdentityCandidateEvidence>> {
+    let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
     connection
-        .prepare(EVIDENCE_SELECT_SQL)?
-        .query_map([track_identity_candidate_id], map_evidence_row)?
+        .prepare(&format!(
+            "SELECT evidence.track_identity_candidate_evidence_id,
+                   evidence.track_identity_candidate_id,
+                   evidence.primary_media_candidate_id,
+                   evidence.attachment_id,
+                   evidence.source_file_attachment_link_id,
+                   evidence.source_file_id,
+                   evidence.source_id,
+                   evidence.evidence_basis_fingerprint,
+                   evidence.content_hash_algorithm,
+                   evidence.content_hash_value,
+                   evidence.probe_accepted_artifact_id,
+                   CASE
+                       WHEN {current_evidence_predicate}
+                       THEN 'current'
+                       ELSE 'stale'
+                   END AS evidence_status,
+                   evidence.created_at,
+                   evidence.updated_at
+            FROM track_identity_candidate_evidence evidence
+            JOIN source_files file
+              ON file.source_file_id = evidence.source_file_id
+            LEFT JOIN SourceFacts facts
+              ON facts.source_file_id = evidence.source_file_id
+            LEFT JOIN source_file_attachment_links link
+              ON link.source_file_attachment_link_id = evidence.source_file_attachment_link_id
+            LEFT JOIN content_attachments attachment
+              ON attachment.attachment_id = evidence.attachment_id
+            WHERE evidence.track_identity_candidate_id = ?1
+            ORDER BY evidence.source_id ASC,
+                     evidence.source_file_id ASC",
+        ))?
+        .query_map(
+            params![track_identity_candidate_id, SOURCE_FILE_BLAKE3_ALGORITHM],
+            map_evidence_row,
+        )?
         .collect::<Result<Vec<_>, _>>()
         .map_err(Into::into)
 }
@@ -201,61 +238,3 @@ fn map_evidence_row(row: &Row<'_>) -> rusqlite::Result<StoreTrackIdentityCandida
         updated_at: row.get(13)?,
     })
 }
-
-const EVIDENCE_SELECT_SQL: &str = "SELECT evidence.track_identity_candidate_evidence_id,
-       evidence.track_identity_candidate_id,
-       evidence.primary_media_candidate_id,
-       evidence.attachment_id,
-       evidence.source_file_attachment_link_id,
-       evidence.source_file_id,
-       evidence.source_id,
-       evidence.evidence_basis_fingerprint,
-       evidence.content_hash_algorithm,
-       evidence.content_hash_value,
-       evidence.probe_accepted_artifact_id,
-       CASE
-           WHEN file.source_id = facts.basis_source_id
-            AND file.presence_state = 'present'
-            AND file.media_class = 'audio'
-            AND file.file_kind = 'audio'
-            AND facts.source_file_id IS NOT NULL
-            AND file.relative_path = facts.basis_relative_path
-            AND file.size_bytes IS facts.basis_size_bytes
-            AND file.mtime_ns IS facts.basis_mtime_ns
-            AND file.presence_state = facts.basis_presence_state
-            AND evidence.content_hash_algorithm = 'blake3'
-            AND facts.content_hash_algorithm = evidence.content_hash_algorithm
-            AND facts.content_hash_value = evidence.content_hash_value
-            AND link.source_file_attachment_link_id = evidence.source_file_attachment_link_id
-            AND link.source_file_id = evidence.source_file_id
-            AND link.source_id = evidence.source_id
-            AND link.attachment_id = evidence.attachment_id
-            AND attachment.content_hash_algorithm = evidence.content_hash_algorithm
-            AND attachment.content_hash_value = evidence.content_hash_value
-            AND facts.media_kind = 'audio'
-            AND (
-                facts.mime_type IS NOT NULL
-                OR facts.duration_ms IS NOT NULL
-                OR facts.sample_rate_hz IS NOT NULL
-                OR facts.channels IS NOT NULL
-                OR facts.bit_depth IS NOT NULL
-                OR facts.codec IS NOT NULL
-            )
-            AND facts.accepted_artifact_id = evidence.probe_accepted_artifact_id
-           THEN 'current'
-           ELSE 'stale'
-       END AS evidence_status,
-       evidence.created_at,
-       evidence.updated_at
-FROM track_identity_candidate_evidence evidence
-JOIN source_files file
-  ON file.source_file_id = evidence.source_file_id
-LEFT JOIN SourceFacts facts
-  ON facts.source_file_id = evidence.source_file_id
-LEFT JOIN source_file_attachment_links link
-  ON link.source_file_attachment_link_id = evidence.source_file_attachment_link_id
-LEFT JOIN content_attachments attachment
-  ON attachment.attachment_id = evidence.attachment_id
-WHERE evidence.track_identity_candidate_id = ?1
-ORDER BY evidence.source_id ASC,
-         evidence.source_file_id ASC";

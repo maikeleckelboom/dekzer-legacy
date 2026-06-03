@@ -9,6 +9,7 @@ mod schema;
 mod source_media;
 mod store;
 mod time;
+mod track_identity_evidence_predicates;
 mod work_control;
 
 pub fn canonical_baseline_generation() -> &'static str {
