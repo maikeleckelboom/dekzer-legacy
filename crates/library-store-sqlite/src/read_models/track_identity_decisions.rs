@@ -123,7 +123,8 @@ pub fn read_track_identity_decisions_for_source(
                         WHEN decision.superseded_by_decision_id IS NOT NULL
                           OR decision.decision_state = 'superseded'
                         THEN 'superseded'
-                        WHEN candidate.status = 'active'
+                        WHEN candidate.track_identity_candidate_id IS NOT NULL
+                         AND candidate.status = 'active'
                          AND EXISTS (
                              SELECT 1
                              FROM track_identity_candidate_evidence evidence
@@ -147,14 +148,13 @@ pub fn read_track_identity_decisions_for_source(
                     decision.created_at,
                     decision.updated_at
              FROM track_identity_decisions decision
-             JOIN track_identity_candidates candidate
+             LEFT JOIN track_identity_candidates candidate
                ON candidate.track_identity_candidate_id = decision.track_identity_candidate_id
              WHERE EXISTS (
                  SELECT 1
-                 FROM track_identity_candidate_evidence evidence
-                 WHERE evidence.track_identity_candidate_id =
-                       decision.track_identity_candidate_id
-                   AND evidence.source_id = ?1
+                 FROM track_identity_decision_evidence snapshot
+                 WHERE snapshot.track_identity_decision_id = decision.track_identity_decision_id
+                   AND snapshot.source_id = ?1
              )
              ORDER BY decision.track_identity_decision_id ASC
              LIMIT ?3",
@@ -195,7 +195,8 @@ pub fn read_track_identity_decisions_for_candidate(
                         WHEN decision.superseded_by_decision_id IS NOT NULL
                           OR decision.decision_state = 'superseded'
                         THEN 'superseded'
-                        WHEN candidate.status = 'active'
+                        WHEN candidate.track_identity_candidate_id IS NOT NULL
+                         AND candidate.status = 'active'
                          AND EXISTS (
                              SELECT 1
                              FROM track_identity_candidate_evidence evidence
@@ -219,7 +220,7 @@ pub fn read_track_identity_decisions_for_candidate(
                     decision.created_at,
                     decision.updated_at
              FROM track_identity_decisions decision
-             JOIN track_identity_candidates candidate
+             LEFT JOIN track_identity_candidates candidate
                ON candidate.track_identity_candidate_id = decision.track_identity_candidate_id
              WHERE decision.track_identity_candidate_id = ?1
              ORDER BY decision.track_identity_decision_id ASC
@@ -391,7 +392,12 @@ fn read_effective_decision_current_status(
         .query_row(
             &format!(
                 "SELECT CASE
-                    WHEN candidate.status = 'active'
+                    WHEN EXISTS (
+                         SELECT 1
+                         FROM track_identity_candidates c
+                         WHERE c.track_identity_candidate_id = ?1
+                           AND c.status = 'active'
+                     )
                      AND EXISTS (
                          SELECT 1
                          FROM track_identity_candidate_evidence evidence
@@ -404,15 +410,12 @@ fn read_effective_decision_current_status(
                               evidence.source_file_attachment_link_id
                          LEFT JOIN content_attachments attachment
                            ON attachment.attachment_id = evidence.attachment_id
-                         WHERE evidence.track_identity_candidate_id =
-                               candidate.track_identity_candidate_id
+                         WHERE evidence.track_identity_candidate_id = ?1
                            AND {current_evidence_predicate}
                      )
                     THEN 'current'
                     ELSE 'stale'
-                 END
-                 FROM track_identity_candidates candidate
-                 WHERE candidate.track_identity_candidate_id = ?1",
+                 END",
                 current_evidence_predicate = current_evidence_predicate,
             ),
             params![track_identity_candidate_id, SOURCE_FILE_BLAKE3_ALGORITHM],

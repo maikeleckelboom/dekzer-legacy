@@ -3,7 +3,7 @@ use library_store_sqlite::{
     SqliteDurableStore, StoreTrackIdentityDecisionState,
     StoreTrackIdentityEffectiveDecisionCurrentStatus,
     StoreTrackIdentityEffectiveDecisionPrecedence, StoreTrackIdentityUserBlockingDecisionState,
-    TrackIdentityDecisionCommandFailure, TrackIdentityDecisionCommandResult,
+    TrackIdentityDecisionChangeFailure, TrackIdentityDecisionChangeResult,
 };
 
 use crate::service::{map_store_error, require_positive_i64};
@@ -82,10 +82,10 @@ fn sanitize_track_identity_decision_reason(reason: Option<String>) -> Option<Str
 }
 
 fn map_track_identity_decisions_result(
-    result: TrackIdentityDecisionCommandResult,
+    result: TrackIdentityDecisionChangeResult,
 ) -> protocol::ProtocolResult<protocol::TrackIdentityDecisionCommandResult> {
     match result {
-        TrackIdentityDecisionCommandResult::Written(success) => {
+        TrackIdentityDecisionChangeResult::Written(success) => {
             Ok(protocol::TrackIdentityDecisionCommandResult::Written(
                 protocol::TrackIdentityDecisionCommandSuccess {
                     decision_id: success.track_identity_decision_id,
@@ -120,7 +120,7 @@ fn map_track_identity_decisions_result(
                 },
             ))
         }
-        TrackIdentityDecisionCommandResult::Failed(failure) => {
+        TrackIdentityDecisionChangeResult::Failed(failure) => {
             Ok(protocol::TrackIdentityDecisionCommandResult::Failed(
                 map_track_identity_decisions_failure(failure),
             ))
@@ -199,16 +199,16 @@ fn map_user_blocking_decision_state(
 }
 
 fn map_track_identity_decisions_failure(
-    failure: TrackIdentityDecisionCommandFailure,
+    failure: TrackIdentityDecisionChangeFailure,
 ) -> protocol::TrackIdentityDecisionCommandFailure {
     match failure {
-        TrackIdentityDecisionCommandFailure::CandidateNotFound => {
+        TrackIdentityDecisionChangeFailure::CandidateNotFound => {
             protocol::TrackIdentityDecisionCommandFailure::CandidateNotFound
         }
-        TrackIdentityDecisionCommandFailure::CandidateStaleForAccept => {
+        TrackIdentityDecisionChangeFailure::CandidateStaleForAccept => {
             protocol::TrackIdentityDecisionCommandFailure::CandidateStaleForAccept
         }
-        TrackIdentityDecisionCommandFailure::NoCurrentEvidenceForAccept => {
+        TrackIdentityDecisionChangeFailure::NoCurrentEvidenceForAccept => {
             protocol::TrackIdentityDecisionCommandFailure::NoCurrentEvidenceForAccept
         }
     }

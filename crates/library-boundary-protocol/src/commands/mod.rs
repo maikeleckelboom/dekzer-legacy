@@ -253,7 +253,7 @@ mod tests {
             ),
         );
         assert_eq!(
-            serde_json::to_value(&decision_command).expect("serialize decision command command"),
+            serde_json::to_value(&decision_command).expect("serialize decision command"),
             json!({
                 "type": "trackIdentityDecisions",
                 "payload": {
