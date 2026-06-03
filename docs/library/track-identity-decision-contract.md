@@ -33,6 +33,7 @@ The durable tables are:
 
 - `track_identity_decisions`
 - `track_identity_decision_evidence`
+- `track_identity_decision_source_scope`
 
 No `track_identities` table exists in v0. Adding canonical track shells would be a separate authority step because a
 canonical track must mean more than an accepted exact-content candidate.
@@ -154,6 +155,33 @@ The snapshot is provenance, not a new content identity authority. BLAKE3 evidenc
 primary-media, attachment, source-file attachment link, source-file, source, and probe artifact ids are retained as
 historical provenance ids, not live cascade authority. The snapshot may cascade only when the owning
 `track_identity_decisions` row is deleted as the explicit retention boundary.
+
+## Decision Source Scope
+
+`track_identity_decision_source_scope` is copied provenance used for source-scoped decision visibility. It records
+which `source_id` values an evidence group touched at decision time so source-scoped reads can find a decision without
+depending on live candidate evidence or decision evidence snapshot rows.
+
+Source scope rows carry:
+
+- `track_identity_decision_id`: references the owning decision (only FK, cascades on decision delete).
+- `track_identity_candidate_id`, `source_id`: copied provenance ids with no live FK to candidate or source tables.
+- `scope_basis`: backend-derived basis label recording how source scope was determined.
+
+Scope basis values:
+
+- `current_decision_evidence_source_v0`: derived from the distinct source ids in the decision evidence snapshot.
+- `candidate_source_provenance_v0`: derived from historical candidate evidence provenance when no current evidence
+  existed at decision time.
+
+Source scope is backend-derived and never caller-supplied. Protocol decision commands must not accept `source_id`,
+path, title, artist, album, or metadata. Source scope is not canonical track identity and does not prove semantic
+identity. Decision deletion is the source-scope retention boundary.
+
+Zero-evidence reject/defer decisions may remain source-visible through copied candidate source provenance when the
+decision's candidate had source-scoped provenance at decision time. Such decisions carry zero
+`track_identity_decision_evidence` rows but one or more `track_identity_decision_source_scope` rows with
+`scope_basis = candidate_source_provenance_v0`.
 
 ## Read Model
 

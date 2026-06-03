@@ -826,6 +826,25 @@ CREATE INDEX track_identity_decisions_candidate
 CREATE INDEX track_identity_decisions_state
     ON track_identity_decisions (decision_state);
 
+CREATE TABLE track_identity_decision_source_scope
+(
+    track_identity_decision_source_scope_id  INTEGER PRIMARY KEY,
+    track_identity_decision_id               INTEGER NOT NULL REFERENCES track_identity_decisions (track_identity_decision_id) ON DELETE CASCADE,
+    track_identity_candidate_id              INTEGER NOT NULL,
+    source_id                                INTEGER NOT NULL,
+    scope_basis                              TEXT    NOT NULL CHECK (scope_basis IN ('current_decision_evidence_source_v0', 'candidate_source_provenance_v0')),
+    created_at                               INTEGER NOT NULL,
+    updated_at                               INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    UNIQUE (track_identity_decision_id, source_id)
+) STRICT;
+
+CREATE INDEX track_identity_decision_source_scope_decision
+    ON track_identity_decision_source_scope (track_identity_decision_id);
+
+CREATE INDEX track_identity_decision_source_scope_source
+    ON track_identity_decision_source_scope (source_id);
+
 CREATE TABLE track_identity_decision_evidence
 (
     track_identity_decision_evidence_id  INTEGER PRIMARY KEY,

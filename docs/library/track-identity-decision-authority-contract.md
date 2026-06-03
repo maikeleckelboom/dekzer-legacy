@@ -99,6 +99,12 @@ Reject/defer require the candidate to exist, but may target a stale candidate. I
 snapshots it. If no current evidence exists, the decision is still recorded with the candidate status at decision time
 and zero evidence snapshot rows. Reject/defer must not fabricate stale evidence as supporting evidence.
 
+Source scope for every decision is derived by the backend at decision time. If the decision evidence snapshot has rows,
+source scope is populated from those distinct source ids with `scope_basis = current_decision_evidence_source_v0`.
+If no evidence was snapshotted, source scope falls back to historical candidate source provenance with
+`scope_basis = candidate_source_provenance_v0`. Source scope is never caller-supplied; protocol decision commands must
+not accept `source_id`, path, title, artist, album, or metadata.
+
 Old decision evidence snapshots are immutable copied provenance. Later source facts, attachment links, candidate,
 candidate-member, candidate-evidence, primary-media, attachment, source-file, source, probe, or replacement changes must
 not rewrite or cascade-delete historical snapshot rows. Decision deletion is the snapshot retention boundary.

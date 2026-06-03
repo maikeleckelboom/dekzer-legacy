@@ -134,6 +134,7 @@ mod tests {
         "track_identity_candidate_members",
         "track_identity_candidates",
         "track_identity_decision_evidence",
+        "track_identity_decision_source_scope",
         "track_identity_decisions",
         "WorkItems",
         "WorkRuns",
@@ -568,6 +569,35 @@ mod tests {
         assert!(
             table_index_names(&connection, "track_identity_decision_evidence")
                 .contains(&"track_identity_decision_evidence_source_file".to_string())
+        );
+        assert_eq!(
+            table_column_names(&connection, "track_identity_decision_source_scope"),
+            vec![
+                "track_identity_decision_source_scope_id",
+                "track_identity_decision_id",
+                "track_identity_candidate_id",
+                "source_id",
+                "scope_basis",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert!(
+            table_index_names(&connection, "track_identity_decision_source_scope")
+                .contains(&"track_identity_decision_source_scope_decision".to_string())
+        );
+        assert!(
+            table_index_names(&connection, "track_identity_decision_source_scope")
+                .contains(&"track_identity_decision_source_scope_source".to_string())
+        );
+        assert_eq!(
+            table_foreign_keys(&connection, "track_identity_decision_source_scope"),
+            vec![(
+                "track_identity_decisions".to_string(),
+                "track_identity_decision_id".to_string(),
+                "CASCADE".to_string(),
+            )],
+            "source scope should only cascade at the decision retention boundary"
         );
         assert_eq!(
             table_foreign_keys(&connection, "track_identity_decisions"),

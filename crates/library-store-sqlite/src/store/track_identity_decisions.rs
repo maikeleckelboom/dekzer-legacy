@@ -268,6 +268,12 @@ fn write_user_track_identity_decision(
         track_identity_candidate_id,
         decided_at,
     )?;
+    let _source_scope_count = insert_decision_source_scope(
+        write,
+        track_identity_decision_id,
+        track_identity_candidate_id,
+        decided_at,
+    )?;
     let effective_decision =
         read_effective_track_identity_decision_for_candidate(write, track_identity_candidate_id)?;
 
@@ -332,6 +338,12 @@ fn produce_track_identity_decisions_for_source(
             insert_system_exact_content_decision(write, &candidate, decided_at)?;
         result.decisions_created += 1;
         result.decision_evidence_created += insert_decision_evidence_snapshot(
+            write,
+            track_identity_decision_id,
+            candidate.track_identity_candidate_id,
+            decided_at,
+        )?;
+        insert_decision_source_scope(
             write,
             track_identity_decision_id,
             candidate.track_identity_candidate_id,
@@ -828,6 +840,94 @@ fn insert_decision_evidence_snapshot(
                 track_identity_candidate_id,
                 decided_at,
                 SOURCE_FILE_BLAKE3_ALGORITHM,
+            ],
+        )
+        .map_err(Into::into)
+}
+
+fn insert_decision_source_scope(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_decision_id: i64,
+    track_identity_candidate_id: i64,
+    decided_at: i64,
+) -> LibrarySqliteResult<usize> {
+    let count = insert_decision_source_scope_from_evidence_snapshot(
+        write,
+        track_identity_decision_id,
+        decided_at,
+    )?;
+    if count > 0 {
+        return Ok(count);
+    }
+    insert_decision_source_scope_from_candidate_provenance(
+        write,
+        track_identity_decision_id,
+        track_identity_candidate_id,
+        decided_at,
+    )
+}
+
+fn insert_decision_source_scope_from_evidence_snapshot(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_decision_id: i64,
+    decided_at: i64,
+) -> LibrarySqliteResult<usize> {
+    write
+        .execute(
+            "INSERT INTO track_identity_decision_source_scope (
+                 track_identity_decision_id,
+                 track_identity_candidate_id,
+                 source_id,
+                 scope_basis,
+                 created_at,
+                 updated_at
+             )
+             SELECT DISTINCT ?1,
+                    snapshot.track_identity_candidate_id,
+                    snapshot.source_id,
+                    'current_decision_evidence_source_v0',
+                    ?3,
+                    ?3
+             FROM track_identity_decision_evidence snapshot
+             WHERE snapshot.track_identity_decision_id = ?2",
+            params![
+                track_identity_decision_id,
+                track_identity_decision_id,
+                decided_at
+            ],
+        )
+        .map_err(Into::into)
+}
+
+fn insert_decision_source_scope_from_candidate_provenance(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_decision_id: i64,
+    track_identity_candidate_id: i64,
+    decided_at: i64,
+) -> LibrarySqliteResult<usize> {
+    write
+        .execute(
+            "INSERT INTO track_identity_decision_source_scope (
+                 track_identity_decision_id,
+                 track_identity_candidate_id,
+                 source_id,
+                 scope_basis,
+                 created_at,
+                 updated_at
+             )
+             SELECT DISTINCT ?1,
+                    ?2,
+                    evidence.source_id,
+                    'candidate_source_provenance_v0',
+                    ?4,
+                    ?4
+             FROM track_identity_candidate_evidence evidence
+             WHERE evidence.track_identity_candidate_id = ?3",
+            params![
+                track_identity_decision_id,
+                track_identity_candidate_id,
+                track_identity_candidate_id,
+                decided_at,
             ],
         )
         .map_err(Into::into)
@@ -2099,11 +2199,13 @@ mod tests {
 
         assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
         assert_eq!(
-            fixture.count_rows("track_identity_candidate_members"), 0,
+            fixture.count_rows("track_identity_candidate_members"),
+            0,
             "candidate members cascade-delete with candidate"
         );
         assert_eq!(
-            fixture.count_rows("track_identity_candidate_evidence"), 0,
+            fixture.count_rows("track_identity_candidate_evidence"),
+            0,
             "candidate evidence cascade-deletes with candidate"
         );
         assert_eq!(
@@ -2153,7 +2255,9 @@ mod tests {
         let accepted =
             TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
         assert_eq!(
-            accepted.effective_decision.effective_decision_current_status,
+            accepted
+                .effective_decision
+                .effective_decision_current_status,
             StoreTrackIdentityEffectiveDecisionCurrentStatus::Current
         );
 
@@ -2223,7 +2327,8 @@ mod tests {
 
         assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
         assert_eq!(
-            fixture.count_rows("track_identity_candidate_evidence"), 0,
+            fixture.count_rows("track_identity_candidate_evidence"),
+            0,
             "live candidate evidence must cascade-delete"
         );
         assert_eq!(
@@ -2248,5 +2353,282 @@ mod tests {
                 "forbidden table {forbidden_table} must be absent"
             );
         }
+    }
+
+    #[test]
+    fn reject_with_zero_evidence_still_source_readable_through_source_scope() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/reject-zero-evidence.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+
+        fixture.change_file_basis(100);
+        fixture
+            .store
+            .produce_track_identity_candidates_for_source(fixture.source_id, 10)
+            .expect("mark candidate stale");
+
+        let rejected =
+            TrackIdentityDecisionFixture::expect_written(fixture.reject_candidate(candidate_id));
+
+        assert_eq!(rejected.evidence_snapshot_count, 0);
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_evidence"),
+            0,
+            "no decision evidence rows for zero-current-evidence reject"
+        );
+        let source_scope_count = fixture.count_rows("track_identity_decision_source_scope");
+        assert!(
+            source_scope_count >= 1,
+            "source scope must be populated from candidate provenance, got {source_scope_count}"
+        );
+
+        let decisions = fixture
+            .store
+            .read_track_identity_decisions_for_source(fixture.source_id, 10)
+            .expect("read decisions for source");
+        assert_eq!(
+            decisions.len(),
+            1,
+            "reject decision must appear in source-scoped read"
+        );
+        assert_eq!(
+            decisions[0].current_status,
+            StoreTrackIdentityDecisionCurrentStatus::Stale
+        );
+        let effective = fixture
+            .store
+            .read_effective_track_identity_decision_for_candidate(candidate_id)
+            .expect("read effective decision");
+        assert_eq!(
+            effective.effective_decision_id,
+            Some(rejected.track_identity_decision_id)
+        );
+        assert_eq!(
+            effective.effective_decision_current_status,
+            StoreTrackIdentityEffectiveDecisionCurrentStatus::Stale
+        );
+        assert_eq!(
+            effective.effective_decision_precedence,
+            StoreTrackIdentityEffectiveDecisionPrecedence::User
+        );
+        assert_eq!(
+            effective.user_blocking_decision_state,
+            StoreTrackIdentityUserBlockingDecisionState::Rejected
+        );
+
+        let scope_bases = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .prepare(
+                "SELECT DISTINCT scope_basis
+                 FROM track_identity_decision_source_scope
+                 WHERE track_identity_decision_id = ?1",
+            )
+            .expect("prepare scope basis query")
+            .query_map([rejected.track_identity_decision_id], |row| {
+                row.get::<_, String>(0)
+            })
+            .expect("query scope bases")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect scope bases");
+        assert_eq!(
+            scope_bases,
+            vec!["candidate_source_provenance_v0".to_string()]
+        );
+    }
+
+    #[test]
+    fn defer_with_zero_evidence_still_source_readable_through_source_scope() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/defer-zero-evidence.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+
+        fixture.change_file_basis(100);
+        fixture
+            .store
+            .produce_track_identity_candidates_for_source(fixture.source_id, 10)
+            .expect("mark candidate stale");
+
+        let deferred =
+            TrackIdentityDecisionFixture::expect_written(fixture.defer_candidate(candidate_id));
+
+        assert_eq!(deferred.evidence_snapshot_count, 0);
+        assert_eq!(fixture.count_rows("track_identity_decision_evidence"), 0);
+
+        let decisions = fixture
+            .store
+            .read_track_identity_decisions_for_source(fixture.source_id, 10)
+            .expect("read decisions for source");
+        assert_eq!(
+            decisions.len(),
+            1,
+            "defer decision with zero evidence must appear in source-scoped read"
+        );
+        assert_eq!(
+            decisions[0].current_status,
+            StoreTrackIdentityDecisionCurrentStatus::Stale
+        );
+        assert_eq!(
+            decisions[0]
+                .candidate_effective_decision
+                .user_blocking_decision_state,
+            StoreTrackIdentityUserBlockingDecisionState::Deferred
+        );
+    }
+
+    #[test]
+    fn source_scope_survives_live_candidate_deletion() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/source-scope-survival.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+        let _accepted =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+
+        assert!(
+            fixture.count_rows("track_identity_decision_source_scope") >= 1,
+            "source scope must exist after accept"
+        );
+
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute(
+                    "DELETE FROM track_identity_candidates
+                     WHERE track_identity_candidate_id = ?1",
+                    [candidate_id],
+                )?;
+                Ok(())
+            })
+            .expect("delete live candidate");
+
+        assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
+        assert_eq!(fixture.count_rows("track_identity_candidate_evidence"), 0);
+        assert!(
+            fixture.count_rows("track_identity_decision_source_scope") >= 1,
+            "source scope must survive live candidate cascade-deletion"
+        );
+
+        let decisions = fixture
+            .store
+            .read_track_identity_decisions_for_source(fixture.source_id, 10)
+            .expect("read decisions for source");
+        assert_eq!(
+            decisions.len(),
+            1,
+            "decision must still appear in source-scoped read after candidate deletion"
+        );
+        assert_eq!(
+            decisions[0].current_status,
+            StoreTrackIdentityDecisionCurrentStatus::Stale
+        );
+    }
+
+    #[test]
+    fn accepted_decision_has_both_evidence_snapshot_and_source_scope() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/accept.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+
+        let system = fixture.produce_decisions(10);
+        assert_eq!(system.decisions_created, 1);
+        assert_eq!(system.decision_evidence_created, 1);
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_source_scope"),
+            1,
+            "system decision must have source scope"
+        );
+
+        let accepted =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+        assert!(accepted.evidence_snapshot_count >= 1);
+        assert!(
+            fixture.count_rows("track_identity_decision_source_scope") >= 2,
+            "user accept must also have source scope"
+        );
+
+        let scope_rows = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .prepare(
+                "SELECT scope_basis, source_id
+                 FROM track_identity_decision_source_scope
+                 WHERE track_identity_decision_id = ?1",
+            )
+            .expect("prepare scope query")
+            .query_map([accepted.track_identity_decision_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .expect("query scope rows")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect scope rows");
+        assert_eq!(scope_rows.len(), 1);
+        assert_eq!(scope_rows[0].0, "current_decision_evidence_source_v0");
+        assert_eq!(scope_rows[0].1, fixture.source_id);
+    }
+
+    #[test]
+    fn source_scope_has_no_live_fk_to_candidate_or_evidence() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/fk-check.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+        let accepted =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+
+        let foreign_keys = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .prepare("PRAGMA foreign_key_list(track_identity_decision_source_scope)")
+            .expect("prepare pragma")
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(2)?, row.get::<_, String>(3)?))
+            })
+            .expect("query foreign keys")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect foreign keys");
+
+        assert_eq!(
+            foreign_keys,
+            vec![(
+                "track_identity_decisions".to_string(),
+                "track_identity_decision_id".to_string(),
+            )],
+            "only track_identity_decisions should be FK parent for source scope"
+        );
+
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute(
+                    "DELETE FROM track_identity_decisions
+                     WHERE track_identity_decision_id = ?1",
+                    [accepted.track_identity_decision_id],
+                )?;
+                Ok(())
+            })
+            .expect("delete decision");
+
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_source_scope"),
+            0,
+            "source scope must cascade-delete with decision"
+        );
     }
 }

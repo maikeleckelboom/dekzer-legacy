@@ -152,9 +152,9 @@ pub fn read_track_identity_decisions_for_source(
                ON candidate.track_identity_candidate_id = decision.track_identity_candidate_id
              WHERE EXISTS (
                  SELECT 1
-                 FROM track_identity_decision_evidence snapshot
-                 WHERE snapshot.track_identity_decision_id = decision.track_identity_decision_id
-                   AND snapshot.source_id = ?1
+                 FROM track_identity_decision_source_scope scope
+                 WHERE scope.track_identity_decision_id = decision.track_identity_decision_id
+                   AND scope.source_id = ?1
              )
              ORDER BY decision.track_identity_decision_id ASC
              LIMIT ?3",
