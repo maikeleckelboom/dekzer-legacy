@@ -76,9 +76,9 @@ pub struct DeferTrackIdentityCandidateRequest {
 )]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
-pub enum TrackIdentityDecisionWriteResult {
-    Written(TrackIdentityDecisionWriteSuccess),
-    Failed(TrackIdentityDecisionWriteFailure),
+pub enum TrackIdentityDecisionCommandResult {
+    Written(TrackIdentityDecisionCommandSuccess),
+    Failed(TrackIdentityDecisionCommandFailure),
 }
 
 #[derive(
@@ -93,7 +93,7 @@ pub enum TrackIdentityDecisionWriteResult {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct TrackIdentityDecisionWriteSuccess {
+pub struct TrackIdentityDecisionCommandSuccess {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
     #[ts(as = "String")]
@@ -155,9 +155,12 @@ pub struct TrackIdentityEffectiveDecisionSummary {
     pub effective_decision_source: Option<String>,
     pub effective_decision_current_status: TrackIdentityEffectiveDecisionCurrentStatus,
     pub effective_decision_precedence: TrackIdentityEffectiveDecisionPrecedence,
+    pub user_blocking_decision_state: TrackIdentityUserBlockingDecisionState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub blocked_system_decision_reason: Option<TrackIdentityBlockedSystemDecisionReason>,
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub masked_system_decision_id: Option<i64>,
 }
 
 #[derive(
@@ -214,9 +217,10 @@ pub enum TrackIdentityEffectiveDecisionPrecedence {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum TrackIdentityBlockedSystemDecisionReason {
-    CurrentUserRejected,
-    CurrentUserDeferred,
+pub enum TrackIdentityUserBlockingDecisionState {
+    None,
+    Rejected,
+    Deferred,
 }
 
 #[derive(
@@ -233,7 +237,7 @@ pub enum TrackIdentityBlockedSystemDecisionReason {
 )]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
-pub enum TrackIdentityDecisionWriteFailure {
+pub enum TrackIdentityDecisionCommandFailure {
     CandidateNotFound,
     CandidateStaleForAccept,
     NoCurrentEvidenceForAccept,
@@ -251,7 +255,7 @@ pub enum TrackIdentityDecisionWriteFailure {
 )]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
-pub enum TrackIdentityDecisionWriteCommand {
+pub enum TrackIdentityDecisionCommand {
     AcceptTrackIdentityCandidate(AcceptTrackIdentityCandidateRequest),
     RejectTrackIdentityCandidate(RejectTrackIdentityCandidateRequest),
     DeferTrackIdentityCandidate(DeferTrackIdentityCandidateRequest),
@@ -269,26 +273,27 @@ pub enum TrackIdentityDecisionWriteCommand {
 )]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
-pub enum TrackIdentityDecisionWriteReply {
-    AcceptTrackIdentityCandidate(TrackIdentityDecisionWriteResult),
-    RejectTrackIdentityCandidate(TrackIdentityDecisionWriteResult),
-    DeferTrackIdentityCandidate(TrackIdentityDecisionWriteResult),
+pub enum TrackIdentityDecisionReply {
+    AcceptTrackIdentityCandidate(TrackIdentityDecisionCommandResult),
+    RejectTrackIdentityCandidate(TrackIdentityDecisionCommandResult),
+    DeferTrackIdentityCandidate(TrackIdentityDecisionCommandResult),
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        AcceptTrackIdentityCandidateRequest, TrackIdentityDecisionState,
-        TrackIdentityDecisionWriteCommand, TrackIdentityDecisionWriteFailure,
-        TrackIdentityDecisionWriteReply, TrackIdentityDecisionWriteResult,
-        TrackIdentityDecisionWriteSuccess, TrackIdentityEffectiveDecisionCurrentStatus,
+        AcceptTrackIdentityCandidateRequest, TrackIdentityDecisionCommand,
+        TrackIdentityDecisionCommandFailure, TrackIdentityDecisionCommandResult,
+        TrackIdentityDecisionCommandSuccess, TrackIdentityDecisionReply,
+        TrackIdentityDecisionState, TrackIdentityEffectiveDecisionCurrentStatus,
         TrackIdentityEffectiveDecisionPrecedence, TrackIdentityEffectiveDecisionSummary,
+        TrackIdentityUserBlockingDecisionState,
     };
     use serde_json::json;
 
     #[test]
-    fn track_identity_decision_write_commands_are_candidate_scoped() {
-        let command = TrackIdentityDecisionWriteCommand::AcceptTrackIdentityCandidate(
+    fn track_identity_decisions_commands_are_candidate_scoped() {
+        let command = TrackIdentityDecisionCommand::AcceptTrackIdentityCandidate(
             AcceptTrackIdentityCandidateRequest {
                 candidate_id: 7,
                 reason: Some("same recording".to_string()),
@@ -313,16 +318,16 @@ mod tests {
         assert!(json.pointer("/payload/album").is_none());
 
         assert_eq!(
-            serde_json::from_value::<TrackIdentityDecisionWriteCommand>(json)
+            serde_json::from_value::<TrackIdentityDecisionCommand>(json)
                 .expect("deserialize command"),
             command
         );
     }
 
     #[test]
-    fn track_identity_decision_write_reply_is_typed() {
-        let reply = TrackIdentityDecisionWriteReply::RejectTrackIdentityCandidate(
-            TrackIdentityDecisionWriteResult::Written(TrackIdentityDecisionWriteSuccess {
+    fn track_identity_decisions_reply_is_typed() {
+        let reply = TrackIdentityDecisionReply::RejectTrackIdentityCandidate(
+            TrackIdentityDecisionCommandResult::Written(TrackIdentityDecisionCommandSuccess {
                 decision_id: 11,
                 candidate_id: 7,
                 decision_state: TrackIdentityDecisionState::Rejected,
@@ -336,7 +341,8 @@ mod tests {
                     effective_decision_current_status:
                         TrackIdentityEffectiveDecisionCurrentStatus::Current,
                     effective_decision_precedence: TrackIdentityEffectiveDecisionPrecedence::User,
-                    blocked_system_decision_reason: None,
+                    user_blocking_decision_state: TrackIdentityUserBlockingDecisionState::Rejected,
+                    masked_system_decision_id: Some(10),
                 },
             }),
         );
@@ -346,13 +352,12 @@ mod tests {
         assert_eq!(json["payload"]["type"], json!("written"));
         assert_eq!(json["payload"]["payload"]["decisionId"], json!("11"));
         assert_eq!(
-            serde_json::from_value::<TrackIdentityDecisionWriteReply>(json)
-                .expect("deserialize reply"),
+            serde_json::from_value::<TrackIdentityDecisionReply>(json).expect("deserialize reply"),
             reply
         );
 
-        let failure = TrackIdentityDecisionWriteResult::Failed(
-            TrackIdentityDecisionWriteFailure::NoCurrentEvidenceForAccept,
+        let failure = TrackIdentityDecisionCommandResult::Failed(
+            TrackIdentityDecisionCommandFailure::NoCurrentEvidenceForAccept,
         );
         assert_eq!(
             serde_json::to_value(&failure).expect("serialize failure"),

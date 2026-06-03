@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: provisional
 last-reviewed: 2026-06-03
 owner: library-store-sqlite
 canonical-context:
@@ -8,7 +8,7 @@ canonical-context:
   - media-probe-observations-contract
   - primary-media-promotion-contract
   - track-identity-candidate-contract
-  - track-identity-decision-write-contract
+  - track-identity-decision-authority-contract
   - source-maintenance-orchestration-contract
 scope:
   - track-identity-decisions
@@ -80,8 +80,10 @@ Effective decision precedence:
 - superseded decisions are never effective;
 - stale candidates or stale evidence surface as explicit stale current status instead of disappearing silently.
 
-Read-model rows expose effective decision id, state, source, current status, precedence, and a blocked-system reason when
-there is a current user reject/defer blocking a system decision.
+Read-model rows carry a nested `candidate_effective_decision` summary. The summary exposes effective decision id, state,
+source, current status, precedence, `user_blocking_decision_state`, and optional `masked_system_decision_id`. User
+reject/defer blocks system production/effectiveness even when no system decision exists; `masked_system_decision_id`
+only appears when an existing current system decision is masked.
 
 ## V0 Production
 
@@ -148,11 +150,16 @@ stale evidence as supporting evidence.
 The snapshot is provenance, not a new content identity authority. BLAKE3 evidence remains exact bytes evidence and
 `LibraryAssets.equivalence_fingerprint` must not be used as content identity.
 
+`track_identity_decision_evidence` is a copied-provenance snapshot. Its candidate, member, candidate-evidence,
+primary-media, attachment, source-file attachment link, source-file, source, and probe artifact ids are retained as
+historical provenance ids, not live cascade authority. The snapshot may cascade only when the owning
+`track_identity_decisions` row is deleted as the explicit retention boundary.
+
 ## Read Model
 
 The store read model is diagnostic. It exposes decision id, candidate id, decision state, decision source, decision
-basis, decision reason, evidence key, supersession status, candidate-derived current/stale status, backend-owned
-effective-decision summary, provenance evidence, what the decision proves, and what it does not prove.
+basis, decision reason, evidence key, supersession status, candidate-derived current/stale status, the backend-owned
+candidate effective-decision summary, provenance evidence, what the decision proves, and what it does not prove.
 
 There is no renderer-owned identity decision precedence in v0. Renderer/preload/desktop code may forward explicit
 candidate-scoped decision commands, but the backend owns writes and effective semantics.

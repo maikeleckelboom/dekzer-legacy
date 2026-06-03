@@ -47,9 +47,9 @@ import {
   type RunSourceMaintenanceResult
 } from '../../../src/shared/librarySourceMaintenance/sourceMaintenance'
 import {
-  trackIdentityDecisionWriteChannels,
-  type TrackIdentityDecisionWriteResult
-} from '../../../src/shared/libraryTrackIdentityDecisionWrite/decisionWrite'
+  trackIdentityDecisionChannels,
+  type TrackIdentityDecisionCommandResult
+} from '../../../src/shared/libraryTrackIdentityDecisions/decisionCommands'
 import {
   boundaryEventChannels,
   type BoundaryEventDeliveryPayload
@@ -286,7 +286,7 @@ describe('preload renderer API', () => {
         remainingTrackIdentityDecisionProductionCandidates: 0
       }
     }
-    const acceptTrackIdentityCandidateResult: TrackIdentityDecisionWriteResult = {
+    const acceptTrackIdentityCandidateResult: TrackIdentityDecisionCommandResult = {
       state: 'completed',
       result: {
         type: 'written',
@@ -302,19 +302,20 @@ describe('preload renderer API', () => {
             effectiveDecisionState: 'accepted',
             effectiveDecisionSource: 'user_local_v0',
             effectiveDecisionCurrentStatus: 'current',
-            effectiveDecisionPrecedence: 'user'
+            effectiveDecisionPrecedence: 'user',
+            userBlockingDecisionState: 'none'
           }
         }
       }
     }
-    const rejectTrackIdentityCandidateResult: TrackIdentityDecisionWriteResult = {
+    const rejectTrackIdentityCandidateResult: TrackIdentityDecisionCommandResult = {
       state: 'completed',
       result: {
         type: 'failed',
         payload: { type: 'candidateNotFound' }
       }
     }
-    const deferTrackIdentityCandidateResult: TrackIdentityDecisionWriteResult = {
+    const deferTrackIdentityCandidateResult: TrackIdentityDecisionCommandResult = {
       state: 'completed',
       result: {
         type: 'written',
@@ -330,7 +331,8 @@ describe('preload renderer API', () => {
             effectiveDecisionState: 'deferred',
             effectiveDecisionSource: 'user_local_v0',
             effectiveDecisionCurrentStatus: 'stale',
-            effectiveDecisionPrecedence: 'user'
+            effectiveDecisionPrecedence: 'user',
+            userBlockingDecisionState: 'deferred'
           }
         }
       }
@@ -462,17 +464,17 @@ describe('preload renderer API', () => {
           return readSourceMaintenanceResult
         }
 
-        if (channel === trackIdentityDecisionWriteChannels.acceptTrackIdentityCandidate) {
+        if (channel === trackIdentityDecisionChannels.acceptTrackIdentityCandidate) {
           receivedAcceptTrackIdentityCandidateRequest = args[0]
           return acceptTrackIdentityCandidateResult
         }
 
-        if (channel === trackIdentityDecisionWriteChannels.rejectTrackIdentityCandidate) {
+        if (channel === trackIdentityDecisionChannels.rejectTrackIdentityCandidate) {
           receivedRejectTrackIdentityCandidateRequest = args[0]
           return rejectTrackIdentityCandidateResult
         }
 
-        if (channel === trackIdentityDecisionWriteChannels.deferTrackIdentityCandidate) {
+        if (channel === trackIdentityDecisionChannels.deferTrackIdentityCandidate) {
           receivedDeferTrackIdentityCandidateRequest = args[0]
           return deferTrackIdentityCandidateResult
         }

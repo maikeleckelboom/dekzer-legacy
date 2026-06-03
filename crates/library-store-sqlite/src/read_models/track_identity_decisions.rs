@@ -22,12 +22,7 @@ pub struct StoreTrackIdentityDecision {
     pub evidence_key_algorithm: String,
     pub evidence_key_value: String,
     pub current_status: StoreTrackIdentityDecisionCurrentStatus,
-    pub effective_decision_id: Option<i64>,
-    pub effective_decision_state: Option<StoreTrackIdentityDecisionState>,
-    pub effective_decision_source: Option<String>,
-    pub effective_decision_current_status: StoreTrackIdentityEffectiveDecisionCurrentStatus,
-    pub effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence,
-    pub blocked_system_decision_reason: Option<StoreTrackIdentityBlockedSystemDecisionReason>,
+    pub candidate_effective_decision: StoreTrackIdentityEffectiveDecisionSummary,
     pub proves: String,
     pub does_not_prove: String,
     pub superseded_by_decision_id: Option<i64>,
@@ -66,9 +61,10 @@ pub enum StoreTrackIdentityEffectiveDecisionPrecedence {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreTrackIdentityBlockedSystemDecisionReason {
-    CurrentUserRejected,
-    CurrentUserDeferred,
+pub enum StoreTrackIdentityUserBlockingDecisionState {
+    None,
+    Rejected,
+    Deferred,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -78,7 +74,8 @@ pub struct StoreTrackIdentityEffectiveDecisionSummary {
     pub effective_decision_source: Option<String>,
     pub effective_decision_current_status: StoreTrackIdentityEffectiveDecisionCurrentStatus,
     pub effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence,
-    pub blocked_system_decision_reason: Option<StoreTrackIdentityBlockedSystemDecisionReason>,
+    pub user_blocking_decision_state: StoreTrackIdentityUserBlockingDecisionState,
+    pub masked_system_decision_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -266,7 +263,8 @@ pub fn read_effective_track_identity_decision_for_candidate(
             effective_decision_current_status:
                 StoreTrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision,
             effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence::None,
-            blocked_system_decision_reason: None,
+            user_blocking_decision_state: StoreTrackIdentityUserBlockingDecisionState::None,
+            masked_system_decision_id: None,
         });
     };
 
@@ -278,8 +276,15 @@ pub fn read_effective_track_identity_decision_for_candidate(
         } else {
             StoreTrackIdentityEffectiveDecisionPrecedence::System
         };
-    let blocked_system_decision_reason =
-        blocked_system_decision_reason(&effective_decision, current_system_decision.as_ref());
+    let user_blocking_decision_state = user_blocking_decision_state(&effective_decision);
+    let masked_system_decision_id =
+        if user_blocking_decision_state != StoreTrackIdentityUserBlockingDecisionState::None {
+            current_system_decision
+                .as_ref()
+                .map(|decision| decision.track_identity_decision_id)
+        } else {
+            None
+        };
 
     Ok(StoreTrackIdentityEffectiveDecisionSummary {
         effective_decision_id: Some(effective_decision.track_identity_decision_id),
@@ -287,7 +292,8 @@ pub fn read_effective_track_identity_decision_for_candidate(
         effective_decision_source: Some(effective_decision.decision_source),
         effective_decision_current_status,
         effective_decision_precedence,
-        blocked_system_decision_reason,
+        user_blocking_decision_state,
+        masked_system_decision_id,
     })
 }
 
@@ -302,12 +308,7 @@ fn hydrate_decisions(
             connection,
             decision.track_identity_candidate_id,
         )?;
-        decision.effective_decision_id = effective.effective_decision_id;
-        decision.effective_decision_state = effective.effective_decision_state;
-        decision.effective_decision_source = effective.effective_decision_source;
-        decision.effective_decision_current_status = effective.effective_decision_current_status;
-        decision.effective_decision_precedence = effective.effective_decision_precedence;
-        decision.blocked_system_decision_reason = effective.blocked_system_decision_reason;
+        decision.candidate_effective_decision = effective;
     }
 
     Ok(())
@@ -327,13 +328,16 @@ fn map_decision_row(row: &Row<'_>) -> rusqlite::Result<StoreTrackIdentityDecisio
         evidence_key_algorithm: row.get(9)?,
         evidence_key_value: row.get(10)?,
         current_status: map_current_status(row.get::<_, String>(11)?.as_str()),
-        effective_decision_id: None,
-        effective_decision_state: None,
-        effective_decision_source: None,
-        effective_decision_current_status:
-            StoreTrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision,
-        effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence::None,
-        blocked_system_decision_reason: None,
+        candidate_effective_decision: StoreTrackIdentityEffectiveDecisionSummary {
+            effective_decision_id: None,
+            effective_decision_state: None,
+            effective_decision_source: None,
+            effective_decision_current_status:
+                StoreTrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision,
+            effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence::None,
+            user_blocking_decision_state: StoreTrackIdentityUserBlockingDecisionState::None,
+            masked_system_decision_id: None,
+        },
         proves: "a backend-owned decision classified the exact-content track identity candidate under its recorded evidence basis".to_string(),
         does_not_prove: "canonical track identity, same-song semantic identity, metadata reconciliation, CUE association, or multi-encode equivalence".to_string(),
         superseded_by_decision_id: row.get(12)?,
@@ -422,24 +426,22 @@ fn read_effective_decision_current_status(
         .map_err(Into::into)
 }
 
-fn blocked_system_decision_reason(
+fn user_blocking_decision_state(
     effective_decision: &CurrentDecision,
-    current_system_decision: Option<&CurrentDecision>,
-) -> Option<StoreTrackIdentityBlockedSystemDecisionReason> {
+) -> StoreTrackIdentityUserBlockingDecisionState {
     if effective_decision.decision_source != TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0 {
-        return None;
+        return StoreTrackIdentityUserBlockingDecisionState::None;
     }
-    current_system_decision?;
 
     match effective_decision.decision_state {
         StoreTrackIdentityDecisionState::Rejected => {
-            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserRejected)
+            StoreTrackIdentityUserBlockingDecisionState::Rejected
         }
         StoreTrackIdentityDecisionState::Deferred => {
-            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserDeferred)
+            StoreTrackIdentityUserBlockingDecisionState::Deferred
         }
         StoreTrackIdentityDecisionState::Accepted | StoreTrackIdentityDecisionState::Superseded => {
-            None
+            StoreTrackIdentityUserBlockingDecisionState::None
         }
     }
 }

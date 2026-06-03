@@ -50,10 +50,10 @@ import {
   type RunSourceMaintenanceResult
 } from '../shared/librarySourceMaintenance/sourceMaintenance'
 import {
-  trackIdentityDecisionWriteChannels,
-  type TrackIdentityDecisionWriteRequest,
-  type TrackIdentityDecisionWriteResult
-} from '../shared/libraryTrackIdentityDecisionWrite/decisionWrite'
+  trackIdentityDecisionChannels,
+  type TrackIdentityDecisionRequest,
+  type TrackIdentityDecisionCommandResult
+} from '../shared/libraryTrackIdentityDecisions/decisionCommands'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
@@ -193,28 +193,28 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       },
       trackIdentityDecisions: {
         async acceptTrackIdentityCandidate(
-          request: TrackIdentityDecisionWriteRequest
-        ): Promise<TrackIdentityDecisionWriteResult> {
+          request: TrackIdentityDecisionRequest
+        ): Promise<TrackIdentityDecisionCommandResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityDecisionWriteChannels.acceptTrackIdentityCandidate,
+            trackIdentityDecisionChannels.acceptTrackIdentityCandidate,
             request
-          )) as TrackIdentityDecisionWriteResult
+          )) as TrackIdentityDecisionCommandResult
         },
         async rejectTrackIdentityCandidate(
-          request: TrackIdentityDecisionWriteRequest
-        ): Promise<TrackIdentityDecisionWriteResult> {
+          request: TrackIdentityDecisionRequest
+        ): Promise<TrackIdentityDecisionCommandResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityDecisionWriteChannels.rejectTrackIdentityCandidate,
+            trackIdentityDecisionChannels.rejectTrackIdentityCandidate,
             request
-          )) as TrackIdentityDecisionWriteResult
+          )) as TrackIdentityDecisionCommandResult
         },
         async deferTrackIdentityCandidate(
-          request: TrackIdentityDecisionWriteRequest
-        ): Promise<TrackIdentityDecisionWriteResult> {
+          request: TrackIdentityDecisionRequest
+        ): Promise<TrackIdentityDecisionCommandResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityDecisionWriteChannels.deferTrackIdentityCandidate,
+            trackIdentityDecisionChannels.deferTrackIdentityCandidate,
             request
-          )) as TrackIdentityDecisionWriteResult
+          )) as TrackIdentityDecisionCommandResult
         }
       },
       contents: {

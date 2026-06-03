@@ -9,7 +9,7 @@ canonical-context:
   - primary-media-promotion-contract
   - track-identity-candidate-contract
   - track-identity-decision-contract
-  - track-identity-decision-write-contract
+  - track-identity-decision-authority-contract
 scope:
   - asset-identity
   - primary-media-authority
@@ -45,7 +45,7 @@ Reading order:
 | `content_attachments` / `source_file_attachment_links`                                                 | SQLite + `SqliteDurableStore::materialize_attachments_for_source` called by bounded service maintenance                                                                     | Current Rust/store/service attachment identity foundation from current BLAKE3 `SourceFacts` evidence. Not track identity, not `primaryMedia`, not CUE pairing. Exposed only through the narrow attachment identity read boundary.                                          |
 | `primary_media_candidates`                                                                             | SQLite + `SqliteDurableStore::promote_primary_media_for_source` called by bounded service maintenance                                                                       | Current evidence-backed primary-media v0 projection target. One row per attachment with current BLAKE3 attachment identity and current audio probe evidence. Not canonical track identity, not browser-row authority, not CUE pairing.                                     |
 | `track_identity_candidates` / `track_identity_candidate_members` / `track_identity_candidate_evidence` | SQLite + `SqliteDurableStore::produce_track_identity_candidates_for_source` called by bounded service maintenance                                                           | Current exact evidence candidate foundation from current `primary_media_candidates`. Groups exact current BLAKE3 primary-media content evidence with provenance. Not canonical track identity, not user identity, not semantic recording matching.                         |
-| `track_identity_decisions` / `track_identity_decision_evidence`                                        | SQLite + `SqliteDurableStore::produce_track_identity_decisions_for_source` called by bounded service maintenance, plus explicit accept/reject/defer decision write commands | Current backend-owned decision foundation over candidates. System maintenance may accept active exact-content candidates. Explicit user commands may accept, reject, or defer one candidate. Effective-decision precedence is backend-owned. Not canonical track identity. |
+| `track_identity_decisions` / `track_identity_decision_evidence`                                        | SQLite + `SqliteDurableStore::produce_track_identity_decisions_for_source` called by bounded service maintenance, plus explicit accept/reject/defer decision commands | Current backend-owned decision authority over candidates. System maintenance may accept active exact-content candidates. Explicit user commands may accept, reject, or defer one candidate. Effective-decision precedence is backend-owned and candidate-level. Decision evidence is copied provenance, not live cascade authority. Not canonical track identity. |
 | `readContents` `primaryMedia` policy                                                                   | Store read model + boundary protocol                                                                                                                                        | Current evidence-backed primary-media row profile. Reads only promoted `primary_media_candidates` revalidated against current scoped source files, attachment links, content attachments, and `SourceFacts`. No source-file fallback.                                      |
 | `source_media` write/read guards                                                                       | Store filesystem guard                                                                                                                                                      | Current guardrail for source-media read-only operations. CUE parsing operation names are reserved, not current parsing.                                                                                                                                                    |
 | `Playlists` / `PlaylistEntries`                                                                        | Boundary service + store                                                                                                                                                    | Live service/protocol/store surface. Desktop Main/Preload do not expose playlist writes yet. Playlist membership still targets `library_asset_id`.                                                                                                                         |
@@ -118,8 +118,10 @@ Evidence:
 - Store schema contains `track_identity_decisions` and `track_identity_decision_evidence`.
 - V0 decision production is backend-owned, source-scoped, and bounded.
 - Production creates current `accepted` decisions with `decision_source = system_exact_content_v0`.
-- Explicit decision write commands create `accepted`, `rejected`, or `deferred` user decisions with
+- Explicit decision commands create `accepted`, `rejected`, or `deferred` user decisions with
   `decision_source = user_local_v0`.
+- Decision evidence snapshots retain copied provenance ids and do not cascade from live candidate, evidence, source, or
+  attachment rows.
 - The read model exposes backend-owned effective-decision precedence: current user decisions win over system decisions,
   and current user reject/defer blocks system accept from being effective.
 - Production consumes only `active` exact-content candidates with current candidate evidence and skips candidates that
@@ -205,8 +207,9 @@ Current placement:
 - Track identity decision production consumes active exact-content candidates through
   `produce_track_identity_decisions_for_source(source_id, limit)`, called by the same bounded service-owned maintenance
   unit after candidate production. The v0 system decision source is `system_exact_content_v0` and remains a reversible
-  or supersedable decision record, not canonical track identity. Explicit user decision writes use `user_local_v0` and
+  or supersedable decision record, not canonical track identity. Explicit user decision commands use `user_local_v0` and
   supersede prior current user decisions for the same candidate without letting maintenance override user reject/defer.
+  Decision evidence snapshots retain copied provenance ids and do not cascade from live candidate/evidence/source rows.
 - `content_attachments` owns attachment hash authority. `source_file_attachment_links` stores the source-file occurrence
   relation and derives exposed link hash values from the joined attachment row; it does not store a duplicate hash copy.
 - Track identity must not rely on path identity.

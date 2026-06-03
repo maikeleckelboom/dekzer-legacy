@@ -570,6 +570,24 @@ mod tests {
                 .contains(&"track_identity_decision_evidence_source_file".to_string())
         );
         assert_eq!(
+            table_foreign_keys(&connection, "track_identity_decisions"),
+            vec![(
+                "track_identity_decisions".to_string(),
+                "superseded_by_decision_id".to_string(),
+                "SET NULL".to_string(),
+            )],
+            "decisions retain candidate ids as copied provenance instead of cascading from live candidates"
+        );
+        assert_eq!(
+            table_foreign_keys(&connection, "track_identity_decision_evidence"),
+            vec![(
+                "track_identity_decisions".to_string(),
+                "track_identity_decision_id".to_string(),
+                "CASCADE".to_string(),
+            )],
+            "decision evidence snapshots should only cascade at the decision retention boundary"
+        );
+        assert_eq!(
             table_column_names(&connection, "navigation_rows"),
             vec![
                 "navigation_row_id",

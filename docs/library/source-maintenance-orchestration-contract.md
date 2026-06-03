@@ -9,7 +9,7 @@ canonical-context:
   - primary-media-promotion-contract
   - track-identity-candidate-contract
   - track-identity-decision-contract
-  - track-identity-decision-write-contract
+  - track-identity-decision-authority-contract
   - source-lifecycle-backend-contract-gap
 scope:
   - source-maintenance-orchestration

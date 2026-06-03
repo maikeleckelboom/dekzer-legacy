@@ -8,7 +8,7 @@ import type {
   AcceptTrackIdentityCandidateRequest,
   DeferTrackIdentityCandidateRequest,
   RejectTrackIdentityCandidateRequest,
-  TrackIdentityDecisionWriteResult as ContractTrackIdentityDecisionWriteResult
+  TrackIdentityDecisionCommandResult as ContractTrackIdentityDecisionCommandResult
 } from '@dekzer/library-boundary-contract'
 import {
   boundaryStdioBinaryPathEnvVar,
@@ -19,13 +19,13 @@ import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
 import {
   acceptTrackIdentityCandidateThroughHost,
   deferTrackIdentityCandidateThroughHost,
-  registerTrackIdentityDecisionWriteIpc,
+  registerTrackIdentityDecisionIpc,
   rejectTrackIdentityCandidateThroughHost
-} from '../../../src/main/libraryTrackIdentityDecisionWrite/decisionWrite'
+} from '../../../src/main/libraryTrackIdentityDecisions/decisionCommands'
 import {
-  trackIdentityDecisionWriteChannels,
-  type TrackIdentityDecisionWriteResult
-} from '../../../src/shared/libraryTrackIdentityDecisionWrite/decisionWrite'
+  trackIdentityDecisionChannels,
+  type TrackIdentityDecisionCommandResult
+} from '../../../src/shared/libraryTrackIdentityDecisions/decisionCommands'
 import {
   createFakeClient,
   silentLogger,
@@ -41,7 +41,7 @@ afterEach(() => {
   }
 })
 
-describe('track identity decision writes through the host', () => {
+describe('track identity decision commands through the host', () => {
   it('validates candidate scope and forwards no paths or metadata', async () => {
     const config = hostConfig()
     const idleHost = new LibraryBoundaryHost(config, silentLogger())
@@ -173,15 +173,15 @@ describe('track identity decision writes through the host', () => {
     })
   })
 
-  it('registers track identity decision write IPC channels', () => {
+  it('registers track identity decision authority IPC channels', () => {
     const config = hostConfig()
     const idleHost = new LibraryBoundaryHost(config, silentLogger())
     const registration = new Map<
       string,
-      (request: unknown) => Promise<TrackIdentityDecisionWriteResult>
+      (request: unknown) => Promise<TrackIdentityDecisionCommandResult>
     >()
 
-    registerTrackIdentityDecisionWriteIpc(
+    registerTrackIdentityDecisionIpc(
       {
         handle(channel, listener): void {
           registration.set(channel, (request) => listener({}, request))
@@ -191,15 +191,9 @@ describe('track identity decision writes through the host', () => {
       silentDecisionLogger
     )
 
-    expect(registration.has(trackIdentityDecisionWriteChannels.acceptTrackIdentityCandidate)).toBe(
-      true
-    )
-    expect(registration.has(trackIdentityDecisionWriteChannels.rejectTrackIdentityCandidate)).toBe(
-      true
-    )
-    expect(registration.has(trackIdentityDecisionWriteChannels.deferTrackIdentityCandidate)).toBe(
-      true
-    )
+    expect(registration.has(trackIdentityDecisionChannels.acceptTrackIdentityCandidate)).toBe(true)
+    expect(registration.has(trackIdentityDecisionChannels.rejectTrackIdentityCandidate)).toBe(true)
+    expect(registration.has(trackIdentityDecisionChannels.deferTrackIdentityCandidate)).toBe(true)
   })
 })
 
@@ -213,7 +207,7 @@ function writtenDecision(
   decisionState: 'accepted' | 'rejected' | 'deferred',
   evidenceSnapshotCount: number,
   effectiveDecisionCurrentStatus: 'current' | 'stale'
-): ContractTrackIdentityDecisionWriteResult {
+): ContractTrackIdentityDecisionCommandResult {
   return {
     type: 'written',
     payload: {
@@ -228,14 +222,16 @@ function writtenDecision(
         effectiveDecisionState: decisionState,
         effectiveDecisionSource: 'user_local_v0',
         effectiveDecisionCurrentStatus,
-        effectiveDecisionPrecedence: 'user'
+        effectiveDecisionPrecedence: 'user',
+        userBlockingDecisionState:
+          decisionState === 'rejected' || decisionState === 'deferred' ? decisionState : 'none'
       }
     }
   }
 }
 
 function hostConfig(): LibraryBoundaryHostConfig {
-  const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-track-identity-decision-write-'))
+  const tempRoot = mkdtempSync(join(tmpdir(), 'dekzer-desktop-track-identity-decision-authority-'))
   tempRoots.push(tempRoot)
   const fakeBinaryPath = join(tempRoot, 'library-boundary-stdio')
   writeFileSync(fakeBinaryPath, '')

@@ -37,9 +37,9 @@ import type {
   RunSourceMaintenanceResult
 } from './librarySourceMaintenance/sourceMaintenance'
 import type {
-  TrackIdentityDecisionWriteRequest,
-  TrackIdentityDecisionWriteResult
-} from './libraryTrackIdentityDecisionWrite/decisionWrite'
+  TrackIdentityDecisionRequest,
+  TrackIdentityDecisionCommandResult
+} from './libraryTrackIdentityDecisions/decisionCommands'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
@@ -61,7 +61,7 @@ export type LibraryApi = {
   readonly attachmentIdentity: LibraryAttachmentIdentityApi
   readonly hashing: LibraryHashingApi
   readonly sourceMaintenance: LibrarySourceMaintenanceApi
-  readonly trackIdentityDecisions: LibraryTrackIdentityDecisionWriteApi
+  readonly trackIdentityDecisions: LibraryTrackIdentityDecisionApi
   readonly contents: LibraryContentsApi
   readonly roots: LibraryRootsApi
   readonly viewState: LibraryViewStateApi
@@ -116,16 +116,16 @@ export type LibrarySourceMaintenanceApi = {
   readSourceMaintenance(request: ReadSourceMaintenanceRequest): Promise<ReadSourceMaintenanceResult>
 }
 
-export type LibraryTrackIdentityDecisionWriteApi = {
+export type LibraryTrackIdentityDecisionApi = {
   acceptTrackIdentityCandidate(
-    request: TrackIdentityDecisionWriteRequest
-  ): Promise<TrackIdentityDecisionWriteResult>
+    request: TrackIdentityDecisionRequest
+  ): Promise<TrackIdentityDecisionCommandResult>
   rejectTrackIdentityCandidate(
-    request: TrackIdentityDecisionWriteRequest
-  ): Promise<TrackIdentityDecisionWriteResult>
+    request: TrackIdentityDecisionRequest
+  ): Promise<TrackIdentityDecisionCommandResult>
   deferTrackIdentityCandidate(
-    request: TrackIdentityDecisionWriteRequest
-  ): Promise<TrackIdentityDecisionWriteResult>
+    request: TrackIdentityDecisionRequest
+  ): Promise<TrackIdentityDecisionCommandResult>
 }
 
 export type LibraryRootsApi = {

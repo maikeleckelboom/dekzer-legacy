@@ -94,10 +94,11 @@ pub use read_models::track_identity_candidates::{
     StoreTrackIdentityCandidateStatus, read_track_identity_candidates_for_source,
 };
 pub use read_models::track_identity_decisions::{
-    StoreTrackIdentityBlockedSystemDecisionReason, StoreTrackIdentityDecision,
-    StoreTrackIdentityDecisionCurrentStatus, StoreTrackIdentityDecisionEvidence,
-    StoreTrackIdentityDecisionState, StoreTrackIdentityEffectiveDecisionCurrentStatus,
+    StoreTrackIdentityDecision, StoreTrackIdentityDecisionCurrentStatus,
+    StoreTrackIdentityDecisionEvidence, StoreTrackIdentityDecisionState,
+    StoreTrackIdentityEffectiveDecisionCurrentStatus,
     StoreTrackIdentityEffectiveDecisionPrecedence, StoreTrackIdentityEffectiveDecisionSummary,
+    StoreTrackIdentityUserBlockingDecisionState,
     read_effective_track_identity_decision_for_candidate,
     read_track_identity_decisions_for_candidate, read_track_identity_decisions_for_source,
 };
@@ -120,9 +121,10 @@ pub use store::{
     SourceFileMediaProbeCandidateReason, SourceFileMediaProbeFacts, SourceFileMediaProbeFailure,
     SourceFileMediaProbeSkipReason, SqliteDurableStore, SqliteDurableStoreAppOwnedState,
     StoreEnvironment, TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
-    TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionWriteFailure,
-    TrackIdentityDecisionWriteResult, TrackIdentityDecisionWriteSuccess, UnregisterLocalRootInput,
-    UnregisterLocalRootResult, durable_store_path, effective_hash_batch_limit,
-    effective_media_probe_batch_limit, effective_primary_media_promotion_limit,
-    effective_track_identity_candidate_limit, effective_track_identity_decision_limit,
+    TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionCommandFailure,
+    TrackIdentityDecisionCommandResult, TrackIdentityDecisionCommandSuccess,
+    UnregisterLocalRootInput, UnregisterLocalRootResult, durable_store_path,
+    effective_hash_batch_limit, effective_media_probe_batch_limit,
+    effective_primary_media_promotion_limit, effective_track_identity_candidate_limit,
+    effective_track_identity_decision_limit,
 };

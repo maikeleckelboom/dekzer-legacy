@@ -45,7 +45,7 @@ pub struct ProduceTrackIdentityDecisionsForSourceResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TrackIdentityDecisionWriteSuccess {
+pub struct TrackIdentityDecisionCommandSuccess {
     pub track_identity_decision_id: i64,
     pub track_identity_candidate_id: i64,
     pub decision_state: StoreTrackIdentityDecisionState,
@@ -56,16 +56,16 @@ pub struct TrackIdentityDecisionWriteSuccess {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TrackIdentityDecisionWriteFailure {
+pub enum TrackIdentityDecisionCommandFailure {
     CandidateNotFound,
     CandidateStaleForAccept,
     NoCurrentEvidenceForAccept,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TrackIdentityDecisionWriteResult {
-    Written(TrackIdentityDecisionWriteSuccess),
-    Failed(TrackIdentityDecisionWriteFailure),
+pub enum TrackIdentityDecisionCommandResult {
+    Written(TrackIdentityDecisionCommandSuccess),
+    Failed(TrackIdentityDecisionCommandFailure),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,7 +83,7 @@ impl SqliteDurableStore {
         &self,
         track_identity_candidate_id: i64,
         reason: Option<String>,
-    ) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+    ) -> LibrarySqliteResult<TrackIdentityDecisionCommandResult> {
         let decided_at = unix_time_ms()?;
         self.with_write(|write| {
             write_user_track_identity_decision(
@@ -100,7 +100,7 @@ impl SqliteDurableStore {
         &self,
         track_identity_candidate_id: i64,
         reason: Option<String>,
-    ) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+    ) -> LibrarySqliteResult<TrackIdentityDecisionCommandResult> {
         let decided_at = unix_time_ms()?;
         self.with_write(|write| {
             write_user_track_identity_decision(
@@ -117,7 +117,7 @@ impl SqliteDurableStore {
         &self,
         track_identity_candidate_id: i64,
         reason: Option<String>,
-    ) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+    ) -> LibrarySqliteResult<TrackIdentityDecisionCommandResult> {
         let decided_at = unix_time_ms()?;
         self.with_write(|write| {
             write_user_track_identity_decision(
@@ -201,12 +201,12 @@ fn write_user_track_identity_decision(
     decision_state: UserTrackIdentityDecisionState,
     reason: Option<String>,
     decided_at: i64,
-) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+) -> LibrarySqliteResult<TrackIdentityDecisionCommandResult> {
     let Some(candidate) =
         read_track_identity_candidate_for_decision(write, track_identity_candidate_id)?
     else {
-        return Ok(TrackIdentityDecisionWriteResult::Failed(
-            TrackIdentityDecisionWriteFailure::CandidateNotFound,
+        return Ok(TrackIdentityDecisionCommandResult::Failed(
+            TrackIdentityDecisionCommandFailure::CandidateNotFound,
         ));
     };
 
@@ -214,13 +214,13 @@ fn write_user_track_identity_decision(
         count_current_track_identity_candidate_evidence(write, track_identity_candidate_id)?;
     if decision_state == UserTrackIdentityDecisionState::Accepted {
         if candidate.candidate_status != "active" {
-            return Ok(TrackIdentityDecisionWriteResult::Failed(
-                TrackIdentityDecisionWriteFailure::CandidateStaleForAccept,
+            return Ok(TrackIdentityDecisionCommandResult::Failed(
+                TrackIdentityDecisionCommandFailure::CandidateStaleForAccept,
             ));
         }
         if current_evidence_count == 0 {
-            return Ok(TrackIdentityDecisionWriteResult::Failed(
-                TrackIdentityDecisionWriteFailure::NoCurrentEvidenceForAccept,
+            return Ok(TrackIdentityDecisionCommandResult::Failed(
+                TrackIdentityDecisionCommandFailure::NoCurrentEvidenceForAccept,
             ));
         }
     }
@@ -238,6 +238,10 @@ fn write_user_track_identity_decision(
     }
 
     let track_identity_decision_id = next_track_identity_decision_id(write)?;
+    // The current-source unique index allows only one current user decision per candidate.
+    // When replacing a current user decision, insert the new row temporarily as superseded
+    // by the old row, then point the old row at the new row and clear the new row. That
+    // preserves history without dropping the unique guard during the correction.
     insert_user_decision(
         write,
         track_identity_decision_id,
@@ -267,8 +271,8 @@ fn write_user_track_identity_decision(
     let effective_decision =
         read_effective_track_identity_decision_for_candidate(write, track_identity_candidate_id)?;
 
-    Ok(TrackIdentityDecisionWriteResult::Written(
-        TrackIdentityDecisionWriteSuccess {
+    Ok(TrackIdentityDecisionCommandResult::Written(
+        TrackIdentityDecisionCommandSuccess {
             track_identity_decision_id,
             track_identity_candidate_id,
             decision_state: decision_state.as_store_state(),
@@ -285,14 +289,14 @@ fn write_existing_user_decision_result(
     track_identity_decision_id: i64,
     track_identity_candidate_id: i64,
     decision_state: UserTrackIdentityDecisionState,
-) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+) -> LibrarySqliteResult<TrackIdentityDecisionCommandResult> {
     let evidence_snapshot_count =
         count_decision_evidence_snapshot_rows(write, track_identity_decision_id)?;
     let effective_decision =
         read_effective_track_identity_decision_for_candidate(write, track_identity_candidate_id)?;
 
-    Ok(TrackIdentityDecisionWriteResult::Written(
-        TrackIdentityDecisionWriteSuccess {
+    Ok(TrackIdentityDecisionCommandResult::Written(
+        TrackIdentityDecisionCommandSuccess {
             track_identity_decision_id,
             track_identity_candidate_id,
             decision_state: decision_state.as_store_state(),
@@ -853,13 +857,14 @@ mod tests {
         StoreContentsRowProfile, StoreContentsScope, StoreContentsState,
     };
     use crate::read_models::track_identity_decisions::{
-        StoreTrackIdentityBlockedSystemDecisionReason, StoreTrackIdentityDecisionCurrentStatus,
-        StoreTrackIdentityDecisionState, StoreTrackIdentityEffectiveDecisionCurrentStatus,
-        StoreTrackIdentityEffectiveDecisionPrecedence,
+        StoreTrackIdentityDecisionCurrentStatus, StoreTrackIdentityDecisionState,
+        StoreTrackIdentityEffectiveDecisionCurrentStatus,
+        StoreTrackIdentityEffectiveDecisionPrecedence, StoreTrackIdentityUserBlockingDecisionState,
     };
     use crate::{
         ProduceTrackIdentityDecisionsForSourceResult, SqliteDurableStore,
-        TrackIdentityDecisionWriteFailure, TrackIdentityDecisionWriteResult,
+        TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionCommandFailure,
+        TrackIdentityDecisionCommandResult,
     };
 
     const HASH_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -1167,7 +1172,7 @@ mod tests {
         fn accept_candidate(
             &self,
             track_identity_candidate_id: i64,
-        ) -> TrackIdentityDecisionWriteResult {
+        ) -> TrackIdentityDecisionCommandResult {
             self.store
                 .accept_track_identity_candidate(
                     track_identity_candidate_id,
@@ -1179,7 +1184,7 @@ mod tests {
         fn reject_candidate(
             &self,
             track_identity_candidate_id: i64,
-        ) -> TrackIdentityDecisionWriteResult {
+        ) -> TrackIdentityDecisionCommandResult {
             self.store
                 .reject_track_identity_candidate(
                     track_identity_candidate_id,
@@ -1191,7 +1196,7 @@ mod tests {
         fn defer_candidate(
             &self,
             track_identity_candidate_id: i64,
-        ) -> TrackIdentityDecisionWriteResult {
+        ) -> TrackIdentityDecisionCommandResult {
             self.store
                 .defer_track_identity_candidate(
                     track_identity_candidate_id,
@@ -1201,22 +1206,22 @@ mod tests {
         }
 
         fn expect_written(
-            result: TrackIdentityDecisionWriteResult,
-        ) -> crate::TrackIdentityDecisionWriteSuccess {
+            result: TrackIdentityDecisionCommandResult,
+        ) -> crate::TrackIdentityDecisionCommandSuccess {
             match result {
-                TrackIdentityDecisionWriteResult::Written(success) => success,
-                TrackIdentityDecisionWriteResult::Failed(failure) => {
+                TrackIdentityDecisionCommandResult::Written(success) => success,
+                TrackIdentityDecisionCommandResult::Failed(failure) => {
                     panic!("expected written decision, got {failure:?}")
                 }
             }
         }
 
         fn expect_failure(
-            result: TrackIdentityDecisionWriteResult,
-        ) -> TrackIdentityDecisionWriteFailure {
+            result: TrackIdentityDecisionCommandResult,
+        ) -> TrackIdentityDecisionCommandFailure {
             match result {
-                TrackIdentityDecisionWriteResult::Failed(failure) => failure,
-                TrackIdentityDecisionWriteResult::Written(success) => {
+                TrackIdentityDecisionCommandResult::Failed(failure) => failure,
+                TrackIdentityDecisionCommandResult::Written(success) => {
                     panic!("expected decision failure, got {success:?}")
                 }
             }
@@ -1378,7 +1383,9 @@ mod tests {
         assert_eq!(decisions[0].decision_reason, "user accepted");
         assert_eq!(decisions[0].evidence.len(), 1);
         assert_eq!(
-            decisions[0].effective_decision_id,
+            decisions[0]
+                .candidate_effective_decision
+                .effective_decision_id,
             Some(success.track_identity_decision_id)
         );
     }
@@ -1457,8 +1464,12 @@ mod tests {
             StoreTrackIdentityEffectiveDecisionPrecedence::User
         );
         assert_eq!(
-            effective.blocked_system_decision_reason,
-            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserRejected)
+            effective.user_blocking_decision_state,
+            StoreTrackIdentityUserBlockingDecisionState::Rejected
+        );
+        assert!(
+            effective.masked_system_decision_id.is_some(),
+            "existing current system decision should be identified as masked"
         );
     }
 
@@ -1489,8 +1500,12 @@ mod tests {
             Some(StoreTrackIdentityDecisionState::Deferred)
         );
         assert_eq!(
-            effective.blocked_system_decision_reason,
-            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserDeferred)
+            effective.user_blocking_decision_state,
+            StoreTrackIdentityUserBlockingDecisionState::Deferred
+        );
+        assert!(
+            effective.masked_system_decision_id.is_some(),
+            "existing current system decision should be identified as masked"
         );
     }
 
@@ -1539,8 +1554,17 @@ mod tests {
             StoreTrackIdentityDecisionCurrentStatus::Superseded
         );
         assert_eq!(
-            historical_reject.effective_decision_id,
+            historical_reject
+                .candidate_effective_decision
+                .effective_decision_id,
             Some(accepted.track_identity_decision_id)
+        );
+        assert_ne!(
+            historical_reject
+                .candidate_effective_decision
+                .effective_decision_id,
+            Some(rejected.track_identity_decision_id),
+            "superseded user decision remains historical but not effective"
         );
         assert_eq!(historical_reject.evidence.len(), 1);
         let current_accept = &decisions[1];
@@ -1550,9 +1574,27 @@ mod tests {
         );
         assert_eq!(current_accept.superseded_by_decision_id, None);
         assert_eq!(
-            current_accept.effective_decision_precedence,
+            current_accept
+                .candidate_effective_decision
+                .effective_decision_precedence,
             StoreTrackIdentityEffectiveDecisionPrecedence::User
         );
+        let current_user_decisions = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM track_identity_decisions
+                 WHERE track_identity_candidate_id = ?1
+                   AND decision_source = ?2
+                   AND superseded_by_decision_id IS NULL
+                   AND decision_state != 'superseded'",
+                params![candidate_id, TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("count current user decisions");
+        assert_eq!(current_user_decisions, 1);
     }
 
     #[test]
@@ -1584,6 +1626,11 @@ mod tests {
             effective.effective_decision_precedence,
             StoreTrackIdentityEffectiveDecisionPrecedence::User
         );
+        assert_eq!(
+            effective.user_blocking_decision_state,
+            StoreTrackIdentityUserBlockingDecisionState::Deferred
+        );
+        assert_eq!(effective.masked_system_decision_id, None);
     }
 
     #[test]
@@ -1593,7 +1640,7 @@ mod tests {
             TrackIdentityDecisionFixture::expect_failure(missing_fixture.accept_candidate(99_999));
         assert_eq!(
             missing_failure,
-            TrackIdentityDecisionWriteFailure::CandidateNotFound
+            TrackIdentityDecisionCommandFailure::CandidateNotFound
         );
 
         let stale_fixture = TrackIdentityDecisionFixture::new();
@@ -1613,7 +1660,7 @@ mod tests {
         );
         assert_eq!(
             stale_failure,
-            TrackIdentityDecisionWriteFailure::CandidateStaleForAccept
+            TrackIdentityDecisionCommandFailure::CandidateStaleForAccept
         );
 
         let no_evidence_fixture = TrackIdentityDecisionFixture::new();
@@ -1629,7 +1676,7 @@ mod tests {
         );
         assert_eq!(
             no_evidence_failure,
-            TrackIdentityDecisionWriteFailure::NoCurrentEvidenceForAccept
+            TrackIdentityDecisionCommandFailure::NoCurrentEvidenceForAccept
         );
     }
 
@@ -1670,7 +1717,9 @@ mod tests {
             .expect("read candidate decisions");
         assert_eq!(decisions[0].evidence.len(), 0);
         assert_eq!(
-            decisions[0].effective_decision_current_status,
+            decisions[0]
+                .candidate_effective_decision
+                .effective_decision_current_status,
             StoreTrackIdentityEffectiveDecisionCurrentStatus::Stale
         );
     }
@@ -1699,6 +1748,50 @@ mod tests {
         assert_eq!(
             decisions[0].evidence[0].content_hash_value, HASH_A,
             "old decision evidence snapshot must not be rewritten by later facts"
+        );
+    }
+
+    #[test]
+    fn decision_evidence_snapshot_survives_live_candidate_evidence_delete() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/copied-provenance.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+        let accepted =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+        assert_eq!(accepted.evidence_snapshot_count, 1);
+
+        let candidate_evidence_id = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .query_row(
+                "SELECT track_identity_candidate_evidence_id
+                 FROM track_identity_decision_evidence
+                 WHERE track_identity_decision_id = ?1",
+                [accepted.track_identity_decision_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("read copied evidence id");
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute(
+                    "DELETE FROM track_identity_candidate_evidence
+                     WHERE track_identity_candidate_evidence_id = ?1",
+                    [candidate_evidence_id],
+                )?;
+                Ok(())
+            })
+            .expect("delete live candidate evidence");
+
+        assert_eq!(fixture.count_rows("track_identity_candidate_evidence"), 0);
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_evidence"),
+            1,
+            "historical decision evidence must not cascade from live candidate evidence"
         );
     }
 

@@ -2,7 +2,7 @@
 // Source of truth: crates/library-boundary-protocol
 // Do not edit by hand.
 
-export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "playlistWrite", "payload": PlaylistWriteCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "sourceMaintenance", "payload": SourceMaintenanceCommand } | { "type": "trackIdentityDecisionWrite", "payload": TrackIdentityDecisionWriteCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
+export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "playlistWrite", "payload": PlaylistWriteCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "sourceMaintenance", "payload": SourceMaintenanceCommand } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
 
 export type LibraryBoundaryEventStreamCommand = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterRequest };
 
@@ -53,7 +53,7 @@ export type SourceMaintenanceCommand = { "type": "runSourceMaintenance", "payloa
 
 export type RunSourceMaintenanceRequest = { sourceId: string, hashLimit?: number, attachmentLimit?: number, probeLimit?: number, promotionLimit?: number, identityCandidateLimit?: number, identityDecisionLimit?: number, };
 
-export type TrackIdentityDecisionWriteCommand = { "type": "acceptTrackIdentityCandidate", "payload": AcceptTrackIdentityCandidateRequest } | { "type": "rejectTrackIdentityCandidate", "payload": RejectTrackIdentityCandidateRequest } | { "type": "deferTrackIdentityCandidate", "payload": DeferTrackIdentityCandidateRequest };
+export type TrackIdentityDecisionCommand = { "type": "acceptTrackIdentityCandidate", "payload": AcceptTrackIdentityCandidateRequest } | { "type": "rejectTrackIdentityCandidate", "payload": RejectTrackIdentityCandidateRequest } | { "type": "deferTrackIdentityCandidate", "payload": DeferTrackIdentityCandidateRequest };
 
 export type AcceptTrackIdentityCandidateRequest = { candidateId: string, reason?: string, };
 
@@ -111,7 +111,7 @@ export type ReadLibraryAssetWaveformOverviewRequest = { libraryAssetId: string, 
 
 export type ReadLibraryAssetPreparationDetailRequest = { libraryAssetId: string, };
 
-export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "playlistWrite", "payload": PlaylistWriteReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "sourceMaintenance", "payload": SourceMaintenanceReply } | { "type": "trackIdentityDecisionWrite", "payload": TrackIdentityDecisionWriteReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
+export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "playlistWrite", "payload": PlaylistWriteReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "sourceMaintenance", "payload": SourceMaintenanceReply } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
 
 export type LibraryBoundaryEventStreamReply = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterReply };
 
@@ -170,23 +170,23 @@ export type SourceMaintenanceReply = { "type": "runSourceMaintenance", "payload"
 
 export type RunSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceRunStatus, effectiveLimits: SourceMaintenanceEffectiveLimits, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, primaryMediaPromotion: SourceMaintenancePrimaryMediaPromotionSummary, trackIdentityCandidates: SourceMaintenanceTrackIdentityCandidateSummary, trackIdentityDecisions: SourceMaintenanceTrackIdentityDecisionSummary, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, };
 
-export type TrackIdentityDecisionWriteReply = { "type": "acceptTrackIdentityCandidate", "payload": TrackIdentityDecisionWriteResult } | { "type": "rejectTrackIdentityCandidate", "payload": TrackIdentityDecisionWriteResult } | { "type": "deferTrackIdentityCandidate", "payload": TrackIdentityDecisionWriteResult };
+export type TrackIdentityDecisionReply = { "type": "acceptTrackIdentityCandidate", "payload": TrackIdentityDecisionCommandResult } | { "type": "rejectTrackIdentityCandidate", "payload": TrackIdentityDecisionCommandResult } | { "type": "deferTrackIdentityCandidate", "payload": TrackIdentityDecisionCommandResult };
 
-export type TrackIdentityDecisionWriteResult = { "type": "written", "payload": TrackIdentityDecisionWriteSuccess } | { "type": "failed", "payload": TrackIdentityDecisionWriteFailure };
+export type TrackIdentityDecisionCommandResult = { "type": "written", "payload": TrackIdentityDecisionCommandSuccess } | { "type": "failed", "payload": TrackIdentityDecisionCommandFailure };
 
-export type TrackIdentityDecisionWriteSuccess = { decisionId: string, candidateId: string, decisionState: TrackIdentityDecisionState, decisionSource: string, evidenceSnapshotCount: number, decisionCreated: boolean, effectiveDecision: TrackIdentityEffectiveDecisionSummary, };
+export type TrackIdentityDecisionCommandSuccess = { decisionId: string, candidateId: string, decisionState: TrackIdentityDecisionState, decisionSource: string, evidenceSnapshotCount: number, decisionCreated: boolean, effectiveDecision: TrackIdentityEffectiveDecisionSummary, };
 
-export type TrackIdentityDecisionWriteFailure = { "type": "candidateNotFound" } | { "type": "candidateStaleForAccept" } | { "type": "noCurrentEvidenceForAccept" };
+export type TrackIdentityDecisionCommandFailure = { "type": "candidateNotFound" } | { "type": "candidateStaleForAccept" } | { "type": "noCurrentEvidenceForAccept" };
 
 export type TrackIdentityDecisionState = "accepted" | "rejected" | "deferred";
 
-export type TrackIdentityEffectiveDecisionSummary = { effectiveDecisionId?: string | null, effectiveDecisionState?: TrackIdentityDecisionState, effectiveDecisionSource?: string, effectiveDecisionCurrentStatus: TrackIdentityEffectiveDecisionCurrentStatus, effectiveDecisionPrecedence: TrackIdentityEffectiveDecisionPrecedence, blockedSystemDecisionReason?: TrackIdentityBlockedSystemDecisionReason, };
+export type TrackIdentityEffectiveDecisionSummary = { effectiveDecisionId?: string | null, effectiveDecisionState?: TrackIdentityDecisionState, effectiveDecisionSource?: string, effectiveDecisionCurrentStatus: TrackIdentityEffectiveDecisionCurrentStatus, effectiveDecisionPrecedence: TrackIdentityEffectiveDecisionPrecedence, userBlockingDecisionState: TrackIdentityUserBlockingDecisionState, maskedSystemDecisionId?: string | null, };
 
 export type TrackIdentityEffectiveDecisionCurrentStatus = "current" | "stale" | "noCurrentDecision";
 
 export type TrackIdentityEffectiveDecisionPrecedence = "user" | "system" | "none";
 
-export type TrackIdentityBlockedSystemDecisionReason = "currentUserRejected" | "currentUserDeferred";
+export type TrackIdentityUserBlockingDecisionState = "none" | "rejected" | "deferred";
 
 export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 

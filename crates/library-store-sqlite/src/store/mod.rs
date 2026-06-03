@@ -75,8 +75,8 @@ pub use track_identity_candidates::{
 pub use track_identity_decisions::{
     ProduceTrackIdentityDecisionsForSourceResult,
     TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
-    TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionWriteFailure,
-    TrackIdentityDecisionWriteResult, TrackIdentityDecisionWriteSuccess,
+    TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionCommandFailure,
+    TrackIdentityDecisionCommandResult, TrackIdentityDecisionCommandSuccess,
     effective_track_identity_decision_limit,
 };
 

@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: provisional
 last-reviewed: 2026-06-03
 owner: library-boundary-service
 canonical-context:
@@ -7,16 +7,16 @@ canonical-context:
   - track-identity-decision-contract
   - source-maintenance-orchestration-contract
 scope:
-  - track-identity-decision-writes
+  - track-identity-decision-authority
   - explicit-user-decision-authority
   - effective-decision-semantics
 ---
 
-# Track Identity Decision Write Contract
+# Track Identity Decision Authority Contract
 
 ## Purpose
 
-Track identity decision writes are the explicit backend-owned command surface for accepting, rejecting, or deferring a
+Track identity decision commands are the explicit backend-owned command surface for accepting, rejecting, or deferring a
 track identity candidate before canonical track identity exists.
 
 This contract adds decision authority, not track authority. It records user intent over an existing
@@ -25,7 +25,8 @@ which current decision is effective now.
 
 ## Command Family
 
-The public command family is `TrackIdentityDecisionWriteCommand`.
+The public command family is `TrackIdentityDecisionCommand`, carried by the outer `trackIdentityDecisions` command
+family. The family is decision authority, not a transport write surface.
 
 Commands:
 
@@ -39,7 +40,7 @@ Requests contain:
 - optional `reason`
 
 Requests must not contain filesystem paths, source paths, title, artist, album, metadata, canonical track ids, or track
-ids. Renderer and preload code may forward decision intent, but the service/store own validation, write behavior, and
+ids. Renderer and preload code may forward decision intent, but the service/store own validation, command behavior, and
 effective-decision semantics.
 
 ## Decision Source Model
@@ -69,7 +70,8 @@ Precedence:
 - superseded decisions are never effective;
 - stale candidates or stale evidence produce explicit stale current status in the backend read model.
 
-The renderer must not compute precedence.
+Effective-decision summaries are candidate-level resolution. Historical decision rows may expose that candidate summary,
+but the summary is not owned by the historical row itself. The renderer must not compute precedence.
 
 ## Supersession Behavior
 
@@ -77,8 +79,8 @@ Accept/reject/defer commands supersede prior current `user_local_v0` decisions f
 decision becomes current. Prior user decision rows remain readable as history and retain their original evidence
 snapshots.
 
-System maintenance does not supersede user decisions. Public supersession is not exposed in v0; correction is expressed
-by writing a new accept/reject/defer user decision.
+System maintenance does not supersede user decisions. Public supersession remains future; v0 correction is expressed by
+running a new accept/reject/defer user command.
 
 Repeated same-source same-state user decisions are idempotent and return the existing current decision instead of
 creating duplicate current user rows.
@@ -97,8 +99,9 @@ Reject/defer require the candidate to exist, but may target a stale candidate. I
 snapshots it. If no current evidence exists, the decision is still recorded with the candidate status at decision time
 and zero evidence snapshot rows. Reject/defer must not fabricate stale evidence as supporting evidence.
 
-Old decision evidence snapshots are immutable. Later source facts, attachment links, candidate evidence staleness, or
-replacement decisions must not rewrite historical snapshot rows.
+Old decision evidence snapshots are immutable copied provenance. Later source facts, attachment links, candidate,
+candidate-member, candidate-evidence, primary-media, attachment, source-file, source, probe, or replacement changes must
+not rewrite or cascade-delete historical snapshot rows. Decision deletion is the snapshot retention boundary.
 
 ## Source Maintenance Interaction
 

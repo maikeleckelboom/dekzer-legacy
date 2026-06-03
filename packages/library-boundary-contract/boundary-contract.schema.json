@@ -282,11 +282,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/TrackIdentityDecisionWriteReply"
+              "$ref": "#/$defs/TrackIdentityDecisionReply"
             },
             "type": {
               "type": "string",
-              "const": "trackIdentityDecisionWrite"
+              "const": "trackIdentityDecisions"
             }
           },
           "required": [
@@ -398,11 +398,11 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/TrackIdentityDecisionWriteCommand"
+              "$ref": "#/$defs/TrackIdentityDecisionCommand"
             },
             "type": {
               "type": "string",
-              "const": "trackIdentityDecisionWrite"
+              "const": "trackIdentityDecisions"
             }
           },
           "required": [
@@ -5614,22 +5614,7 @@
         "rootId"
       ]
     },
-    "TrackIdentityBlockedSystemDecisionReason": {
-      "type": "string",
-      "enum": [
-        "currentUserRejected",
-        "currentUserDeferred"
-      ]
-    },
-    "TrackIdentityDecisionState": {
-      "type": "string",
-      "enum": [
-        "accepted",
-        "rejected",
-        "deferred"
-      ]
-    },
-    "TrackIdentityDecisionWriteCommand": {
+    "TrackIdentityDecisionCommand": {
       "oneOf": [
         {
           "type": "object",
@@ -5681,7 +5666,7 @@
         }
       ]
     },
-    "TrackIdentityDecisionWriteFailure": {
+    "TrackIdentityDecisionCommandFailure": {
       "oneOf": [
         {
           "type": "object",
@@ -5721,65 +5706,13 @@
         }
       ]
     },
-    "TrackIdentityDecisionWriteReply": {
+    "TrackIdentityDecisionCommandResult": {
       "oneOf": [
         {
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/TrackIdentityDecisionWriteResult"
-            },
-            "type": {
-              "type": "string",
-              "const": "acceptTrackIdentityCandidate"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/TrackIdentityDecisionWriteResult"
-            },
-            "type": {
-              "type": "string",
-              "const": "rejectTrackIdentityCandidate"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/TrackIdentityDecisionWriteResult"
-            },
-            "type": {
-              "type": "string",
-              "const": "deferTrackIdentityCandidate"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        }
-      ]
-    },
-    "TrackIdentityDecisionWriteResult": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/TrackIdentityDecisionWriteSuccess"
+              "$ref": "#/$defs/TrackIdentityDecisionCommandSuccess"
             },
             "type": {
               "type": "string",
@@ -5795,7 +5728,7 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/TrackIdentityDecisionWriteFailure"
+              "$ref": "#/$defs/TrackIdentityDecisionCommandFailure"
             },
             "type": {
               "type": "string",
@@ -5809,7 +5742,7 @@
         }
       ]
     },
-    "TrackIdentityDecisionWriteSuccess": {
+    "TrackIdentityDecisionCommandSuccess": {
       "type": "object",
       "properties": {
         "candidateId": {
@@ -5846,6 +5779,66 @@
         "effectiveDecision"
       ]
     },
+    "TrackIdentityDecisionReply": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionCommandResult"
+            },
+            "type": {
+              "type": "string",
+              "const": "acceptTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionCommandResult"
+            },
+            "type": {
+              "type": "string",
+              "const": "rejectTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionCommandResult"
+            },
+            "type": {
+              "type": "string",
+              "const": "deferTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "TrackIdentityDecisionState": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "rejected",
+        "deferred"
+      ]
+    },
     "TrackIdentityEffectiveDecisionCurrentStatus": {
       "type": "string",
       "enum": [
@@ -5865,16 +5858,6 @@
     "TrackIdentityEffectiveDecisionSummary": {
       "type": "object",
       "properties": {
-        "blockedSystemDecisionReason": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/TrackIdentityBlockedSystemDecisionReason"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "effectiveDecisionCurrentStatus": {
           "$ref": "#/$defs/TrackIdentityEffectiveDecisionCurrentStatus"
         },
@@ -5902,11 +5885,29 @@
               "type": "null"
             }
           ]
+        },
+        "maskedSystemDecisionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "userBlockingDecisionState": {
+          "$ref": "#/$defs/TrackIdentityUserBlockingDecisionState"
         }
       },
       "required": [
         "effectiveDecisionCurrentStatus",
-        "effectiveDecisionPrecedence"
+        "effectiveDecisionPrecedence",
+        "userBlockingDecisionState"
+      ]
+    },
+    "TrackIdentityUserBlockingDecisionState": {
+      "type": "string",
+      "enum": [
+        "none",
+        "rejected",
+        "deferred"
       ]
     },
     "UnregisterLocalRootReply": {

@@ -48,7 +48,7 @@ import type {
   StartRootScanRequest,
   SearchNavigationNodeLibraryBrowserWindowReply,
   SearchNavigationNodeLibraryBrowserWindowRequest,
-  TrackIdentityDecisionWriteResult,
+  TrackIdentityDecisionCommandResult,
   UnregisterLocalRootReply,
   UnregisterLocalRootRequest
 } from '@dekzer/library-boundary-contract'
@@ -153,39 +153,39 @@ export class LibraryBoundaryClient {
 
   acceptTrackIdentityCandidate(
     request: AcceptTrackIdentityCandidateRequest
-  ): Promise<TrackIdentityDecisionWriteResult> {
+  ): Promise<TrackIdentityDecisionCommandResult> {
     return this.sendAndExpect(
       {
-        type: 'trackIdentityDecisionWrite',
+        type: 'trackIdentityDecisions',
         payload: { type: 'acceptTrackIdentityCandidate', payload: request }
       },
-      'trackIdentityDecisionWrite',
+      'trackIdentityDecisions',
       'acceptTrackIdentityCandidate'
     )
   }
 
   rejectTrackIdentityCandidate(
     request: RejectTrackIdentityCandidateRequest
-  ): Promise<TrackIdentityDecisionWriteResult> {
+  ): Promise<TrackIdentityDecisionCommandResult> {
     return this.sendAndExpect(
       {
-        type: 'trackIdentityDecisionWrite',
+        type: 'trackIdentityDecisions',
         payload: { type: 'rejectTrackIdentityCandidate', payload: request }
       },
-      'trackIdentityDecisionWrite',
+      'trackIdentityDecisions',
       'rejectTrackIdentityCandidate'
     )
   }
 
   deferTrackIdentityCandidate(
     request: DeferTrackIdentityCandidateRequest
-  ): Promise<TrackIdentityDecisionWriteResult> {
+  ): Promise<TrackIdentityDecisionCommandResult> {
     return this.sendAndExpect(
       {
-        type: 'trackIdentityDecisionWrite',
+        type: 'trackIdentityDecisions',
         payload: { type: 'deferTrackIdentityCandidate', payload: request }
       },
-      'trackIdentityDecisionWrite',
+      'trackIdentityDecisions',
       'deferTrackIdentityCandidate'
     )
   }

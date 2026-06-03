@@ -2,7 +2,7 @@ import type {
   AcceptTrackIdentityCandidateRequest as ContractAcceptTrackIdentityCandidateRequest,
   DeferTrackIdentityCandidateRequest as ContractDeferTrackIdentityCandidateRequest,
   RejectTrackIdentityCandidateRequest as ContractRejectTrackIdentityCandidateRequest,
-  TrackIdentityDecisionWriteResult as ContractTrackIdentityDecisionWriteResult
+  TrackIdentityDecisionCommandResult as ContractTrackIdentityDecisionCommandResult
 } from '@dekzer/library-boundary-contract'
 
 import {
@@ -14,133 +14,130 @@ import {
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
-  trackIdentityDecisionWriteChannels,
-  type TrackIdentityDecisionWriteErrorCode,
-  type TrackIdentityDecisionWriteErrorState,
-  type TrackIdentityDecisionWriteRequest,
-  type TrackIdentityDecisionWriteResult
-} from '../../shared/libraryTrackIdentityDecisionWrite/decisionWrite'
+  trackIdentityDecisionChannels,
+  type TrackIdentityDecisionCommandErrorCode,
+  type TrackIdentityDecisionCommandErrorState,
+  type TrackIdentityDecisionRequest,
+  type TrackIdentityDecisionCommandResult
+} from '../../shared/libraryTrackIdentityDecisions/decisionCommands'
 
-export type TrackIdentityDecisionWriteLogger = {
+export type TrackIdentityDecisionCommandLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
 }
 
-export type TrackIdentityDecisionWriteIpcMain = {
+export type TrackIdentityDecisionCommandIpcMain = {
   handle(
     channel: string,
-    listener: (event: unknown, request: unknown) => Promise<TrackIdentityDecisionWriteResult>
+    listener: (event: unknown, request: unknown) => Promise<TrackIdentityDecisionCommandResult>
   ): void
 }
 
-type DecisionWriteIntent = 'accept' | 'reject' | 'defer'
+type DecisionCommandIntent = 'accept' | 'reject' | 'defer'
 
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 const maxReasonCharacters = 512
 
-export function registerTrackIdentityDecisionWriteIpc(
-  ipcMain: TrackIdentityDecisionWriteIpcMain,
+export function registerTrackIdentityDecisionIpc(
+  ipcMain: TrackIdentityDecisionCommandIpcMain,
   host: LibraryBoundaryHost,
-  logger: TrackIdentityDecisionWriteLogger = console
+  logger: TrackIdentityDecisionCommandLogger = console
 ): void {
-  ipcMain.handle(
-    trackIdentityDecisionWriteChannels.acceptTrackIdentityCandidate,
-    (_event, request) => acceptTrackIdentityCandidateThroughHost(host, request, logger)
+  ipcMain.handle(trackIdentityDecisionChannels.acceptTrackIdentityCandidate, (_event, request) =>
+    acceptTrackIdentityCandidateThroughHost(host, request, logger)
   )
-  ipcMain.handle(
-    trackIdentityDecisionWriteChannels.rejectTrackIdentityCandidate,
-    (_event, request) => rejectTrackIdentityCandidateThroughHost(host, request, logger)
+  ipcMain.handle(trackIdentityDecisionChannels.rejectTrackIdentityCandidate, (_event, request) =>
+    rejectTrackIdentityCandidateThroughHost(host, request, logger)
   )
-  ipcMain.handle(
-    trackIdentityDecisionWriteChannels.deferTrackIdentityCandidate,
-    (_event, request) => deferTrackIdentityCandidateThroughHost(host, request, logger)
+  ipcMain.handle(trackIdentityDecisionChannels.deferTrackIdentityCandidate, (_event, request) =>
+    deferTrackIdentityCandidateThroughHost(host, request, logger)
   )
 }
 
 export async function acceptTrackIdentityCandidateThroughHost(
   host: LibraryBoundaryHost,
   request: unknown,
-  logger: TrackIdentityDecisionWriteLogger = console
-): Promise<TrackIdentityDecisionWriteResult> {
-  return writeTrackIdentityDecisionThroughHost(host, 'accept', request, logger)
+  logger: TrackIdentityDecisionCommandLogger = console
+): Promise<TrackIdentityDecisionCommandResult> {
+  return sendTrackIdentityDecisionCommandThroughHost(host, 'accept', request, logger)
 }
 
 export async function rejectTrackIdentityCandidateThroughHost(
   host: LibraryBoundaryHost,
   request: unknown,
-  logger: TrackIdentityDecisionWriteLogger = console
-): Promise<TrackIdentityDecisionWriteResult> {
-  return writeTrackIdentityDecisionThroughHost(host, 'reject', request, logger)
+  logger: TrackIdentityDecisionCommandLogger = console
+): Promise<TrackIdentityDecisionCommandResult> {
+  return sendTrackIdentityDecisionCommandThroughHost(host, 'reject', request, logger)
 }
 
 export async function deferTrackIdentityCandidateThroughHost(
   host: LibraryBoundaryHost,
   request: unknown,
-  logger: TrackIdentityDecisionWriteLogger = console
-): Promise<TrackIdentityDecisionWriteResult> {
-  return writeTrackIdentityDecisionThroughHost(host, 'defer', request, logger)
+  logger: TrackIdentityDecisionCommandLogger = console
+): Promise<TrackIdentityDecisionCommandResult> {
+  return sendTrackIdentityDecisionCommandThroughHost(host, 'defer', request, logger)
 }
 
-async function writeTrackIdentityDecisionThroughHost(
+async function sendTrackIdentityDecisionCommandThroughHost(
   host: LibraryBoundaryHost,
-  intent: DecisionWriteIntent,
+  intent: DecisionCommandIntent,
   request: unknown,
-  logger: TrackIdentityDecisionWriteLogger
-): Promise<TrackIdentityDecisionWriteResult> {
+  logger: TrackIdentityDecisionCommandLogger
+): Promise<TrackIdentityDecisionCommandResult> {
   const normalizedRequest = normalizeRequest(request)
 
-  if (isTrackIdentityDecisionWriteResult(normalizedRequest)) {
+  if (isTrackIdentityDecisionCommandResult(normalizedRequest)) {
     return normalizedRequest
   }
 
   const client = getStartedClient(host)
 
-  if (isTrackIdentityDecisionWriteResult(client)) {
+  if (isTrackIdentityDecisionCommandResult(client)) {
     return client
   }
 
   try {
     const contractRequest = contractRequestFromNormalized(normalizedRequest)
-    const result = await sendDecisionWrite(client, intent, contractRequest)
+    const result = await sendDecisionCommand(client, intent, contractRequest)
 
     return {
       state: 'completed',
       result
     }
   } catch (error: unknown) {
-    logger.error('[track-identity-decision-write] failed', {
+    logger.error('[track-identity-decision-authority] failed', {
       intent,
       candidateId: normalizedRequest.candidateId,
       error
     })
 
-    const { code, message, detail } = classifyWriteError(error)
+    const { code, message, detail } = classifyCommandError(error)
 
-    return createWriteErrorResult('writeFailed', code, message, detail)
+    return createCommandErrorResult('commandFailed', code, message, detail)
   }
 }
 
 function normalizeRequest(
   request: unknown
-): TrackIdentityDecisionWriteRequest | TrackIdentityDecisionWriteResult {
+): TrackIdentityDecisionRequest | TrackIdentityDecisionCommandResult {
   if (!isRecord(request)) {
-    return createWriteErrorResult(
+    return createCommandErrorResult(
       'invalidRequest',
       'invalidRequest',
-      'Track identity decision writes require a request object.'
+      'Track identity decision commands require a request object.'
     )
   }
 
   if (!isPositiveOpaqueId(request.candidateId)) {
-    return createWriteErrorResult(
+    return createCommandErrorResult(
       'invalidRequest',
       'invalidRequest',
-      'Track identity decision writes require a positive candidateId.'
+      'Track identity decision commands require a positive candidateId.'
     )
   }
 
   const reason = normalizeReason(request.reason)
 
-  if (isTrackIdentityDecisionWriteResult(reason)) {
+  if (isTrackIdentityDecisionCommandResult(reason)) {
     return reason
   }
 
@@ -150,16 +147,16 @@ function normalizeRequest(
   }
 }
 
-function normalizeReason(value: unknown): string | undefined | TrackIdentityDecisionWriteResult {
+function normalizeReason(value: unknown): string | undefined | TrackIdentityDecisionCommandResult {
   if (value === undefined || value === null) {
     return undefined
   }
 
   if (typeof value !== 'string') {
-    return createWriteErrorResult(
+    return createCommandErrorResult(
       'invalidRequest',
       'invalidRequest',
-      'Track identity decision write reason must be text.'
+      'Track identity decision command reason must be text.'
     )
   }
 
@@ -172,7 +169,7 @@ function normalizeReason(value: unknown): string | undefined | TrackIdentityDeci
 }
 
 function contractRequestFromNormalized(
-  request: TrackIdentityDecisionWriteRequest
+  request: TrackIdentityDecisionRequest
 ):
   | ContractAcceptTrackIdentityCandidateRequest
   | ContractRejectTrackIdentityCandidateRequest
@@ -183,14 +180,14 @@ function contractRequestFromNormalized(
   }
 }
 
-async function sendDecisionWrite(
+async function sendDecisionCommand(
   client: LibraryBoundaryHostClient,
-  intent: DecisionWriteIntent,
+  intent: DecisionCommandIntent,
   request:
     | ContractAcceptTrackIdentityCandidateRequest
     | ContractRejectTrackIdentityCandidateRequest
     | ContractDeferTrackIdentityCandidateRequest
-): Promise<ContractTrackIdentityDecisionWriteResult> {
+): Promise<ContractTrackIdentityDecisionCommandResult> {
   switch (intent) {
     case 'accept':
       return client.acceptTrackIdentityCandidate(request)
@@ -203,7 +200,7 @@ async function sendDecisionWrite(
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | TrackIdentityDecisionWriteResult {
+): LibraryBoundaryHostClient | TrackIdentityDecisionCommandResult {
   try {
     return host.client
   } catch (error: unknown) {
@@ -211,7 +208,7 @@ function getStartedClient(
       return hostUnavailableResult(host, error)
     }
 
-    return createWriteErrorResult(
+    return createCommandErrorResult(
       'hostUnavailable',
       'hostFailed',
       'The library boundary host is unavailable.'
@@ -222,8 +219,8 @@ function getStartedClient(
 function hostUnavailableResult(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): TrackIdentityDecisionWriteResult {
-  return createWriteErrorResult(
+): TrackIdentityDecisionCommandResult {
+  return createCommandErrorResult(
     'hostUnavailable',
     hostErrorCode(host, error),
     hostErrorMessage(host, error)
@@ -233,7 +230,7 @@ function hostUnavailableResult(
 function hostErrorCode(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
-): TrackIdentityDecisionWriteErrorCode {
+): TrackIdentityDecisionCommandErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }
@@ -268,16 +265,16 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
   }
 }
 
-function classifyWriteError(error: unknown): {
-  readonly code: TrackIdentityDecisionWriteErrorCode
+function classifyCommandError(error: unknown): {
+  readonly code: TrackIdentityDecisionCommandErrorCode
   readonly message: string
   readonly detail?: string
 } {
   if (error instanceof LibraryBoundaryProtocolError) {
     const payload = error.protocolError.payload
     return {
-      code: 'writeFailed',
-      message: 'Track identity decision write failed due to a protocol error.',
+      code: 'commandFailed',
+      message: 'Track identity decision command failed due to a protocol error.',
       ...(payload?.detail === undefined
         ? { detail: error.protocolError.type }
         : { detail: payload.detail })
@@ -286,40 +283,40 @@ function classifyWriteError(error: unknown): {
 
   if (error instanceof LibraryBoundaryReplyMismatchError) {
     return {
-      code: 'writeFailed',
-      message: 'Track identity decision write received an unexpected response.',
+      code: 'commandFailed',
+      message: 'Track identity decision command received an unexpected response.',
       detail: `Reply mismatch: expected ${error.expectedFamily}/${error.expectedVariant}, received ${error.actualFamily}/${error.actualVariant}`
     }
   }
 
   if (error instanceof LibraryBoundaryTransportError) {
     return {
-      code: 'writeFailed',
-      message: 'Track identity decision write failed due to a transport error.',
+      code: 'commandFailed',
+      message: 'Track identity decision command failed due to a transport error.',
       ...(error.cause instanceof Error ? { detail: error.cause.message } : {})
     }
   }
 
   if (error instanceof Error) {
     return {
-      code: 'writeFailed',
-      message: 'Unable to write track identity decision.',
+      code: 'commandFailed',
+      message: 'Unable to run track identity decision command.',
       detail: error.message
     }
   }
 
   return {
-    code: 'writeFailed',
-    message: 'Unable to write track identity decision.'
+    code: 'commandFailed',
+    message: 'Unable to run track identity decision command.'
   }
 }
 
-function createWriteErrorResult(
-  state: TrackIdentityDecisionWriteErrorState,
-  code: TrackIdentityDecisionWriteErrorCode,
+function createCommandErrorResult(
+  state: TrackIdentityDecisionCommandErrorState,
+  code: TrackIdentityDecisionCommandErrorCode,
   message: string,
   detail?: string
-): TrackIdentityDecisionWriteResult {
+): TrackIdentityDecisionCommandResult {
   return {
     state,
     error: {
@@ -330,9 +327,9 @@ function createWriteErrorResult(
   }
 }
 
-function isTrackIdentityDecisionWriteResult(
+function isTrackIdentityDecisionCommandResult(
   value: unknown
-): value is TrackIdentityDecisionWriteResult {
+): value is TrackIdentityDecisionCommandResult {
   return isRecord(value) && typeof value.state === 'string'
 }
 

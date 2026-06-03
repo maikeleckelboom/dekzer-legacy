@@ -11,7 +11,7 @@ import type {
   ReadSourceFileAttachmentReply,
   RegisterLocalRootReply,
   RunSourceMaintenanceReply,
-  TrackIdentityDecisionWriteResult
+  TrackIdentityDecisionCommandResult
 } from '@dekzer/library-boundary-contract'
 
 import {
@@ -62,7 +62,7 @@ type RunSourceMaintenanceReturnIsGenerated = AssertType<
 type AcceptTrackIdentityCandidateReturnIsGenerated = AssertType<
   EqualTypes<
     Awaited<ReturnType<LibraryBoundaryClient['acceptTrackIdentityCandidate']>>,
-    TrackIdentityDecisionWriteResult
+    TrackIdentityDecisionCommandResult
   >
 >
 
@@ -528,11 +528,11 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
   )
 }
 
-async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<void> {
+async function validatesTrackIdentityDecisionRequestsAndReplies(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
-      type: 'trackIdentityDecisionWrite',
+      type: 'trackIdentityDecisions',
       payload: {
         type: 'acceptTrackIdentityCandidate',
         payload: {
@@ -549,7 +549,8 @@ async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<
               effectiveDecisionState: 'accepted',
               effectiveDecisionSource: 'user_local_v0',
               effectiveDecisionCurrentStatus: 'current',
-              effectiveDecisionPrecedence: 'user'
+              effectiveDecisionPrecedence: 'user',
+              userBlockingDecisionState: 'none'
             }
           }
         }
@@ -558,7 +559,7 @@ async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<
   )
   transport.enqueueOutcome(
     success({
-      type: 'trackIdentityDecisionWrite',
+      type: 'trackIdentityDecisions',
       payload: {
         type: 'rejectTrackIdentityCandidate',
         payload: {
@@ -572,7 +573,7 @@ async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<
   )
   transport.enqueueOutcome(
     success({
-      type: 'trackIdentityDecisionWrite',
+      type: 'trackIdentityDecisions',
       payload: {
         type: 'deferTrackIdentityCandidate',
         payload: {
@@ -589,7 +590,8 @@ async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<
               effectiveDecisionState: 'deferred',
               effectiveDecisionSource: 'user_local_v0',
               effectiveDecisionCurrentStatus: 'stale',
-              effectiveDecisionPrecedence: 'user'
+              effectiveDecisionPrecedence: 'user',
+              userBlockingDecisionState: 'deferred'
             }
           }
         }
@@ -613,7 +615,7 @@ async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<
   deepEqual(
     transport.sentRequests[0],
     {
-      type: 'trackIdentityDecisionWrite',
+      type: 'trackIdentityDecisions',
       payload: {
         type: 'acceptTrackIdentityCandidate',
         payload: {
@@ -627,7 +629,7 @@ async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<
   deepEqual(
     transport.sentRequests[1],
     {
-      type: 'trackIdentityDecisionWrite',
+      type: 'trackIdentityDecisions',
       payload: {
         type: 'rejectTrackIdentityCandidate',
         payload: {
@@ -640,7 +642,7 @@ async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<
   deepEqual(
     transport.sentRequests[2],
     {
-      type: 'trackIdentityDecisionWrite',
+      type: 'trackIdentityDecisions',
       payload: {
         type: 'deferTrackIdentityCandidate',
         payload: {
@@ -1129,7 +1131,7 @@ async function rejects<ErrorType extends Error>(
 await validatesRegisterLocalRootRequestAndReply()
 await validatesHashSourceFilesBlake3RequestAndReply()
 await validatesSourceMaintenanceRequestsAndReplies()
-await validatesTrackIdentityDecisionWriteRequestsAndReplies()
+await validatesTrackIdentityDecisionRequestsAndReplies()
 await validatesAttachmentIdentityReadRequestsAndReplies()
 await validatesProtocolErrorsArePreserved()
 await validatesReplyFamilyMismatch()

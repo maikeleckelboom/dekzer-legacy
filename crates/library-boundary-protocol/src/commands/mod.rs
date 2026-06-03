@@ -4,7 +4,7 @@ pub mod session_events;
 pub mod snapshot_reads;
 pub mod source_file_hash;
 pub mod source_maintenance;
-pub mod track_identity_decision_write;
+pub mod track_identity_decisions;
 
 pub use library_roots::*;
 pub use playlist_writes::*;
@@ -12,7 +12,7 @@ pub use session_events::*;
 pub use snapshot_reads::*;
 pub use source_file_hash::*;
 pub use source_maintenance::*;
-pub use track_identity_decision_write::*;
+pub use track_identity_decisions::*;
 
 use crate::ProtocolError;
 
@@ -27,7 +27,7 @@ pub enum CommandRequest {
     PlaylistWrite(PlaylistWriteCommand),
     SourceFileHash(SourceFileHashCommand),
     SourceMaintenance(SourceMaintenanceCommand),
-    TrackIdentityDecisionWrite(TrackIdentityDecisionWriteCommand),
+    TrackIdentityDecisions(TrackIdentityDecisionCommand),
     SnapshotRead(SnapshotReadCommand),
 }
 
@@ -42,7 +42,7 @@ pub enum CommandReply {
     PlaylistWrite(PlaylistWriteReply),
     SourceFileHash(SourceFileHashReply),
     SourceMaintenance(Box<SourceMaintenanceReply>),
-    TrackIdentityDecisionWrite(TrackIdentityDecisionWriteReply),
+    TrackIdentityDecisions(TrackIdentityDecisionReply),
     SnapshotRead(SnapshotReadReply),
 }
 
@@ -92,10 +92,11 @@ mod tests {
         ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
         SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
-        StartRootScanRequest, TrackIdentityDecisionState, TrackIdentityDecisionWriteCommand,
-        TrackIdentityDecisionWriteReply, TrackIdentityDecisionWriteResult,
-        TrackIdentityDecisionWriteSuccess, TrackIdentityEffectiveDecisionCurrentStatus,
+        StartRootScanRequest, TrackIdentityDecisionCommand, TrackIdentityDecisionCommandResult,
+        TrackIdentityDecisionCommandSuccess, TrackIdentityDecisionReply,
+        TrackIdentityDecisionState, TrackIdentityEffectiveDecisionCurrentStatus,
         TrackIdentityEffectiveDecisionPrecedence, TrackIdentityEffectiveDecisionSummary,
+        TrackIdentityUserBlockingDecisionState,
     };
     use serde_json::json;
 
@@ -142,8 +143,8 @@ mod tests {
                 identity_decision_limit: Some(4),
             }),
         );
-        let identity_decision_write = CommandRequest::TrackIdentityDecisionWrite(
-            TrackIdentityDecisionWriteCommand::AcceptTrackIdentityCandidate(
+        let identity_decision_command = CommandRequest::TrackIdentityDecisions(
+            TrackIdentityDecisionCommand::AcceptTrackIdentityCandidate(
                 super::AcceptTrackIdentityCandidateRequest {
                     candidate_id: 7,
                     reason: None,
@@ -158,7 +159,7 @@ mod tests {
             snapshot,
             hash,
             maintenance,
-            identity_decision_write,
+            identity_decision_command,
         ] {
             match command {
                 CommandRequest::LibraryBoundaryEvents(_) => {}
@@ -166,7 +167,7 @@ mod tests {
                 CommandRequest::PlaylistWrite(_) => {}
                 CommandRequest::SourceFileHash(_) => {}
                 CommandRequest::SourceMaintenance(_) => {}
-                CommandRequest::TrackIdentityDecisionWrite(_) => {}
+                CommandRequest::TrackIdentityDecisions(_) => {}
                 CommandRequest::SnapshotRead(_) => {}
             }
         }
@@ -243,8 +244,8 @@ mod tests {
             })
         );
 
-        let decision_write = CommandRequest::TrackIdentityDecisionWrite(
-            TrackIdentityDecisionWriteCommand::RejectTrackIdentityCandidate(
+        let decision_command = CommandRequest::TrackIdentityDecisions(
+            TrackIdentityDecisionCommand::RejectTrackIdentityCandidate(
                 super::RejectTrackIdentityCandidateRequest {
                     candidate_id: 7,
                     reason: Some("not the same item".to_string()),
@@ -252,9 +253,9 @@ mod tests {
             ),
         );
         assert_eq!(
-            serde_json::to_value(&decision_write).expect("serialize decision write command"),
+            serde_json::to_value(&decision_command).expect("serialize decision command command"),
             json!({
-                "type": "trackIdentityDecisionWrite",
+                "type": "trackIdentityDecisions",
                 "payload": {
                     "type": "rejectTrackIdentityCandidate",
                     "payload": {
@@ -412,9 +413,9 @@ mod tests {
             maintenance_reply
         );
 
-        let decision_write_reply = CommandReply::TrackIdentityDecisionWrite(
-            TrackIdentityDecisionWriteReply::AcceptTrackIdentityCandidate(
-                TrackIdentityDecisionWriteResult::Written(TrackIdentityDecisionWriteSuccess {
+        let decision_command_reply = CommandReply::TrackIdentityDecisions(
+            TrackIdentityDecisionReply::AcceptTrackIdentityCandidate(
+                TrackIdentityDecisionCommandResult::Written(TrackIdentityDecisionCommandSuccess {
                     decision_id: 9,
                     candidate_id: 7,
                     decision_state: TrackIdentityDecisionState::Accepted,
@@ -429,22 +430,24 @@ mod tests {
                             TrackIdentityEffectiveDecisionCurrentStatus::Current,
                         effective_decision_precedence:
                             TrackIdentityEffectiveDecisionPrecedence::User,
-                        blocked_system_decision_reason: None,
+                        user_blocking_decision_state: TrackIdentityUserBlockingDecisionState::None,
+                        masked_system_decision_id: None,
                     },
                 }),
             ),
         );
-        let json =
-            serde_json::to_value(&decision_write_reply).expect("serialize decision write reply");
-        assert_eq!(json["type"], json!("trackIdentityDecisionWrite"));
+        let json = serde_json::to_value(&decision_command_reply)
+            .expect("serialize decision command reply");
+        assert_eq!(json["type"], json!("trackIdentityDecisions"));
         assert_eq!(
             json["payload"]["type"],
             json!("acceptTrackIdentityCandidate")
         );
         assert_eq!(json["payload"]["payload"]["type"], json!("written"));
         assert_eq!(
-            serde_json::from_value::<CommandReply>(json).expect("deserialize decision write reply"),
-            decision_write_reply
+            serde_json::from_value::<CommandReply>(json)
+                .expect("deserialize decision command reply"),
+            decision_command_reply
         );
     }
 
