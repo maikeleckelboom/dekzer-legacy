@@ -60,6 +60,7 @@ pub enum TrackIdentityDecisionChangeFailure {
     CandidateNotFound,
     CandidateStaleForAccept,
     NoCurrentEvidenceForAccept,
+    NoSourceScopeForDecision,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -221,6 +222,16 @@ fn write_user_track_identity_decision(
         if current_evidence_count == 0 {
             return Ok(TrackIdentityDecisionChangeResult::Failed(
                 TrackIdentityDecisionChangeFailure::NoCurrentEvidenceForAccept,
+            ));
+        }
+    }
+
+    if current_evidence_count == 0 {
+        let candidate_evidence_count =
+            count_candidate_evidence_rows(write, track_identity_candidate_id)?;
+        if candidate_evidence_count == 0 {
+            return Ok(TrackIdentityDecisionChangeResult::Failed(
+                TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision,
             ));
         }
     }
@@ -417,6 +428,21 @@ fn count_current_track_identity_candidate_evidence(
                 current_evidence_predicate = current_evidence_predicate,
             ),
             params![track_identity_candidate_id, SOURCE_FILE_BLAKE3_ALGORITHM],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
+}
+
+fn count_candidate_evidence_rows(
+    connection: &rusqlite::Connection,
+    track_identity_candidate_id: i64,
+) -> LibrarySqliteResult<usize> {
+    connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM track_identity_candidate_evidence
+             WHERE track_identity_candidate_id = ?1",
+            [track_identity_candidate_id],
             |row| read_count(row, 0),
         )
         .map_err(Into::into)
@@ -2578,6 +2604,280 @@ mod tests {
         assert_eq!(scope_rows.len(), 1);
         assert_eq!(scope_rows[0].0, "current_decision_evidence_source_v0");
         assert_eq!(scope_rows[0].1, fixture.source_id);
+    }
+
+    #[test]
+    fn reject_and_defer_with_no_source_scope_return_typed_failure_and_create_no_rows() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/no-source-scope.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute(
+                    "DELETE FROM track_identity_candidate_evidence
+                     WHERE track_identity_candidate_id = ?1",
+                    [candidate_id],
+                )?;
+                Ok(())
+            })
+            .expect("delete candidate evidence");
+
+        assert_eq!(fixture.count_rows("track_identity_candidate_evidence"), 0);
+        assert_eq!(fixture.count_rows("track_identity_candidates"), 1);
+
+        let rejected = fixture.reject_candidate(candidate_id);
+        let failure =
+            TrackIdentityDecisionFixture::expect_failure(rejected);
+        assert_eq!(
+            failure,
+            TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision
+        );
+
+        assert_eq!(
+            fixture.count_rows("track_identity_decisions"),
+            0,
+            "no decision row must be created on no-source-scope failure"
+        );
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_source_scope"),
+            0,
+            "no source-scope row must be created on no-source-scope failure"
+        );
+
+        let deferred = fixture.defer_candidate(candidate_id);
+        let failure2 =
+            TrackIdentityDecisionFixture::expect_failure(deferred);
+        assert_eq!(
+            failure2,
+            TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision
+        );
+    }
+
+    #[test]
+    fn multi_source_candidate_yields_multi_source_scope() {
+        let fixture = TrackIdentityDecisionFixture::new();
+
+        fixture.insert_source_file(100, "Album/source-a.wav");
+        let attachment_id = fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+
+        let source2_id: i64 = 2;
+
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute(
+                    "INSERT INTO sources (
+                         source_id, source_class, authority, identity_key,
+                         display_name, created_at, updated_at
+                     )
+                     VALUES (2, 'internal', 'system', 'source:test-multi',
+                             'Multi Source', 1, 1)",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT INTO source_state (
+                         source_id, mount_status, mount_epoch, access_state,
+                         access_checked_at, effective_path, updated_at
+                     )
+                     VALUES (2, 'mounted', 1, 'accessible', 1, 'root', 1)",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT INTO source_scan_state (
+                         source_id, scan_phase, last_scan_started_at,
+                         last_scan_finished_at, last_successful_scan_at,
+                         updated_at
+                     )
+                     VALUES (2, 'complete', 1, 2, 2, 2)",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT INTO source_files (
+                         source_file_id, source_id, name, relative_path,
+                         size_bytes, mtime_ns, file_kind, media_class,
+                         presence_state, first_discovered_at,
+                         last_observed_at, last_presence_change_at,
+                         created_at, updated_at
+                     )
+                     VALUES (200, 2, 'source-b.wav', 'Album/source-b.wav',
+                             10, 100, 'audio', 'audio', 'present', 1, 1, 1,
+                             1, 1)",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT OR IGNORE INTO WorkItems (
+                         work_item_id, subject_kind, subject_id, work_kind,
+                         basis_fingerprint, state, priority_class,
+                         created_at, updated_at
+                     )
+                     VALUES (10, 'source_file', 'fixture-multi',
+                             'inspect_source', 'fixture-multi',
+                             'completed', 'interactive', 1, 1)",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT OR IGNORE INTO WorkRuns (
+                         work_run_id, work_item_id, adapter_key,
+                         adapter_version, started_at, outcome
+                     )
+                     VALUES (10, 10, 'test.multi_source', '1', 1, 'ok')",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT OR REPLACE INTO Artifacts (
+                         artifact_id, work_run_id, subject_kind,
+                         subject_id, artifact_kind, artifact_role,
+                         adapter_key, adapter_version, basis_fingerprint,
+                         media_type, storage_kind, payload_hash, created_at
+                     )
+                     VALUES (20000, 10, 'source_file', '200',
+                             'inspection_result', 'primary_result',
+                             'test.multi_source', '1',
+                             'basis:200', 'application/json',
+                             'inline_payload', 'payload:200', 1)",
+                    [],
+                )?;
+                write.execute(
+                    "INSERT INTO SourceFacts (
+                         source_file_id, fact_kind, basis_fingerprint,
+                         basis_source_id, basis_relative_path,
+                         basis_size_bytes, basis_mtime_ns,
+                         basis_presence_state, observed_at_ms,
+                         content_hash_algorithm, content_hash_value,
+                         media_kind, mime_type, duration_ms,
+                         sample_rate_hz, channels, bit_depth, codec,
+                         updated_at, accepted_artifact_id
+                     )
+                     VALUES (200, 'source_inspection', 'basis:200', 2,
+                             'Album/source-b.wav', 10, 100, 'present', 1,
+                             'blake3', ?1, 'audio', 'audio/wav', 100,
+                             44100, 2, 16, 'pcm', 1, 20000)
+                     ON CONFLICT(source_file_id) DO UPDATE SET
+                         basis_fingerprint = excluded.basis_fingerprint,
+                         basis_source_id = excluded.basis_source_id,
+                         basis_relative_path = excluded.basis_relative_path,
+                         basis_size_bytes = excluded.basis_size_bytes,
+                         basis_mtime_ns = excluded.basis_mtime_ns,
+                         basis_presence_state = excluded.basis_presence_state,
+                         content_hash_algorithm = excluded.content_hash_algorithm,
+                         content_hash_value = excluded.content_hash_value,
+                         media_kind = excluded.media_kind,
+                         mime_type = excluded.mime_type,
+                         duration_ms = excluded.duration_ms,
+                         sample_rate_hz = excluded.sample_rate_hz,
+                         channels = excluded.channels,
+                         bit_depth = excluded.bit_depth,
+                         codec = excluded.codec,
+                         updated_at = excluded.updated_at,
+                         accepted_artifact_id = excluded.accepted_artifact_id",
+                    params![HASH_A],
+                )?;
+                write.execute(
+                    "INSERT OR REPLACE INTO source_file_attachment_links (
+                         attachment_id, source_file_id, source_id,
+                         file_kind, created_at, updated_at
+                     )
+                     VALUES (?1, 200, 2, 'audio', 1, 1)",
+                    params![attachment_id],
+                )?;
+                Ok(())
+            })
+            .expect("set up source 2");
+
+        fixture.promote_and_candidate();
+        assert_eq!(fixture.count_rows("track_identity_candidates"), 1);
+
+        fixture
+            .store
+            .promote_primary_media_for_source(source2_id, 10)
+            .expect("promote source 2");
+        fixture
+            .store
+            .produce_track_identity_candidates_for_source(source2_id, 10)
+            .expect("candidates source 2");
+
+        assert_eq!(
+            fixture.count_rows("track_identity_candidates"),
+            1,
+            "same hash groups into same candidate"
+        );
+        assert_eq!(
+            fixture.count_rows("track_identity_candidate_evidence"),
+            2,
+            "candidate must have evidence from both sources"
+        );
+
+        let result = fixture.produce_decisions(10);
+        assert_eq!(result.decisions_created, 1);
+
+        let scope_rows = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .prepare(
+                "SELECT source_id, scope_basis
+                 FROM track_identity_decision_source_scope
+                 ORDER BY source_id ASC",
+            )
+            .expect("prepare scope query")
+            .query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .expect("query scope rows")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect scope rows");
+
+        assert_eq!(
+            scope_rows.len(),
+            2,
+            "source scope must contain both source ids, got {scope_rows:?}"
+        );
+        assert_eq!(scope_rows[0].0, 1);
+        assert_eq!(scope_rows[1].0, 2);
+        assert_eq!(
+            scope_rows[0].1, "current_decision_evidence_source_v0"
+        );
+
+        let decisions_a = fixture
+            .store
+            .read_track_identity_decisions_for_source(1, 10)
+            .expect("read decisions for source 1");
+        let decisions_b = fixture
+            .store
+            .read_track_identity_decisions_for_source(2, 10)
+            .expect("read decisions for source 2");
+        assert_eq!(decisions_a.len(), 1);
+        assert_eq!(decisions_b.len(), 1);
+        assert_eq!(
+            decisions_a[0].track_identity_decision_id,
+            decisions_b[0].track_identity_decision_id,
+            "both source-scoped reads must return the same decision"
+        );
+
+        let distinct_scope_count: i64 = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM (
+                     SELECT DISTINCT track_identity_decision_id, source_id
+                     FROM track_identity_decision_source_scope
+                 )",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count distinct scope rows");
+        assert_eq!(
+            distinct_scope_count, 2,
+            "unique guard must prevent duplicate (decision_id, source_id) scope rows"
+        );
     }
 
     #[test]

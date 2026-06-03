@@ -241,6 +241,7 @@ pub enum TrackIdentityDecisionCommandFailure {
     CandidateNotFound,
     CandidateStaleForAccept,
     NoCurrentEvidenceForAccept,
+    NoSourceScopeForDecision,
 }
 
 #[derive(

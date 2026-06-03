@@ -211,5 +211,8 @@ fn map_track_identity_decisions_failure(
         TrackIdentityDecisionChangeFailure::NoCurrentEvidenceForAccept => {
             protocol::TrackIdentityDecisionCommandFailure::NoCurrentEvidenceForAccept
         }
+        TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision => {
+            protocol::TrackIdentityDecisionCommandFailure::NoSourceScopeForDecision
+        }
     }
 }

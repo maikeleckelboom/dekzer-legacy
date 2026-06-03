@@ -183,6 +183,10 @@ decision's candidate had source-scoped provenance at decision time. Such decisio
 `track_identity_decision_evidence` rows but one or more `track_identity_decision_source_scope` rows with
 `scope_basis = candidate_source_provenance_v0`.
 
+If no source scope can be derived (zero decision evidence rows and zero candidate evidence provenance rows), the
+decision command must be rejected with a typed `NoSourceScopeForDecision` failure. No decision row or source-scope row
+may be created in that case.
+
 ## Read Model
 
 The store read model is diagnostic. It exposes decision id, candidate id, decision state, decision source, decision
