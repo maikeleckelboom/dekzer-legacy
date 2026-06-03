@@ -1,7 +1,11 @@
-use rusqlite::params;
+use rusqlite::{OptionalExtension, params};
 
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
+use crate::read_models::track_identity_decisions::{
+    StoreTrackIdentityDecisionState, StoreTrackIdentityEffectiveDecisionSummary,
+    read_effective_track_identity_decision_for_candidate,
+};
 use crate::store::source_file_hash::SOURCE_FILE_BLAKE3_ALGORITHM;
 use crate::time::unix_time_ms;
 use crate::track_identity_evidence_predicates::current_track_identity_candidate_evidence_predicate;
@@ -13,11 +17,22 @@ pub const MAX_TRACK_IDENTITY_DECISION_LIMIT: usize = 128;
 const TRACK_IDENTITY_CANDIDATE_KIND: &str = "exact_primary_media_content";
 const TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS: &str = "current_primary_media_exact_blake3";
 const TRACK_IDENTITY_DECISION_STATE_ACCEPTED: &str = "accepted";
-const TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0: &str = "system_exact_content_v0";
+const TRACK_IDENTITY_DECISION_STATE_REJECTED: &str = "rejected";
+const TRACK_IDENTITY_DECISION_STATE_DEFERRED: &str = "deferred";
+pub const TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0: &str = "system_exact_content_v0";
+pub const TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0: &str = "user_local_v0";
 const TRACK_IDENTITY_DECISION_BASIS_SYSTEM_EXACT_CONTENT_V0: &str =
     "active_exact_content_candidate_current_evidence_v0";
 const TRACK_IDENTITY_DECISION_REASON_SYSTEM_EXACT_CONTENT_V0: &str =
     "accepted active exact-content track identity candidate from current primary-media evidence";
+const TRACK_IDENTITY_DECISION_BASIS_USER_LOCAL_V0: &str = "explicit_user_local_decision_v0";
+const TRACK_IDENTITY_DECISION_REASON_USER_ACCEPTED_V0: &str =
+    "user explicitly accepted track identity candidate";
+const TRACK_IDENTITY_DECISION_REASON_USER_REJECTED_V0: &str =
+    "user explicitly rejected track identity candidate";
+const TRACK_IDENTITY_DECISION_REASON_USER_DEFERRED_V0: &str =
+    "user explicitly deferred track identity candidate";
+const MAX_TRACK_IDENTITY_DECISION_REASON_CHARS: usize = 512;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProduceTrackIdentityDecisionsForSourceResult {
@@ -25,7 +40,32 @@ pub struct ProduceTrackIdentityDecisionsForSourceResult {
     pub decision_evidence_created: usize,
     pub skipped_stale_candidates: usize,
     pub skipped_existing_current_decisions: usize,
+    pub skipped_user_blocked_candidates: usize,
     pub remaining_candidates: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrackIdentityDecisionWriteSuccess {
+    pub track_identity_decision_id: i64,
+    pub track_identity_candidate_id: i64,
+    pub decision_state: StoreTrackIdentityDecisionState,
+    pub decision_source: String,
+    pub evidence_snapshot_count: usize,
+    pub decision_created: bool,
+    pub effective_decision: StoreTrackIdentityEffectiveDecisionSummary,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrackIdentityDecisionWriteFailure {
+    CandidateNotFound,
+    CandidateStaleForAccept,
+    NoCurrentEvidenceForAccept,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrackIdentityDecisionWriteResult {
+    Written(TrackIdentityDecisionWriteSuccess),
+    Failed(TrackIdentityDecisionWriteFailure),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,6 +79,57 @@ struct TrackIdentityDecisionProductionCandidate {
 }
 
 impl SqliteDurableStore {
+    pub fn accept_track_identity_candidate(
+        &self,
+        track_identity_candidate_id: i64,
+        reason: Option<String>,
+    ) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+        let decided_at = unix_time_ms()?;
+        self.with_write(|write| {
+            write_user_track_identity_decision(
+                write,
+                track_identity_candidate_id,
+                UserTrackIdentityDecisionState::Accepted,
+                reason,
+                decided_at,
+            )
+        })
+    }
+
+    pub fn reject_track_identity_candidate(
+        &self,
+        track_identity_candidate_id: i64,
+        reason: Option<String>,
+    ) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+        let decided_at = unix_time_ms()?;
+        self.with_write(|write| {
+            write_user_track_identity_decision(
+                write,
+                track_identity_candidate_id,
+                UserTrackIdentityDecisionState::Rejected,
+                reason,
+                decided_at,
+            )
+        })
+    }
+
+    pub fn defer_track_identity_candidate(
+        &self,
+        track_identity_candidate_id: i64,
+        reason: Option<String>,
+    ) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+        let decided_at = unix_time_ms()?;
+        self.with_write(|write| {
+            write_user_track_identity_decision(
+                write,
+                track_identity_candidate_id,
+                UserTrackIdentityDecisionState::Deferred,
+                reason,
+                decided_at,
+            )
+        })
+    }
+
     pub fn produce_track_identity_decisions_for_source(
         &self,
         source_id: i64,
@@ -59,10 +150,158 @@ impl SqliteDurableStore {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UserTrackIdentityDecisionState {
+    Accepted,
+    Rejected,
+    Deferred,
+}
+
+impl UserTrackIdentityDecisionState {
+    fn as_store_state(self) -> StoreTrackIdentityDecisionState {
+        match self {
+            Self::Accepted => StoreTrackIdentityDecisionState::Accepted,
+            Self::Rejected => StoreTrackIdentityDecisionState::Rejected,
+            Self::Deferred => StoreTrackIdentityDecisionState::Deferred,
+        }
+    }
+
+    fn as_sql(self) -> &'static str {
+        match self {
+            Self::Accepted => TRACK_IDENTITY_DECISION_STATE_ACCEPTED,
+            Self::Rejected => TRACK_IDENTITY_DECISION_STATE_REJECTED,
+            Self::Deferred => TRACK_IDENTITY_DECISION_STATE_DEFERRED,
+        }
+    }
+
+    fn default_reason(self) -> &'static str {
+        match self {
+            Self::Accepted => TRACK_IDENTITY_DECISION_REASON_USER_ACCEPTED_V0,
+            Self::Rejected => TRACK_IDENTITY_DECISION_REASON_USER_REJECTED_V0,
+            Self::Deferred => TRACK_IDENTITY_DECISION_REASON_USER_DEFERRED_V0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CurrentDecision {
+    track_identity_decision_id: i64,
+    decision_state: StoreTrackIdentityDecisionState,
+}
+
 pub fn effective_track_identity_decision_limit(limit: Option<usize>) -> usize {
     limit
         .unwrap_or(DEFAULT_TRACK_IDENTITY_DECISION_LIMIT)
         .clamp(1, MAX_TRACK_IDENTITY_DECISION_LIMIT)
+}
+
+fn write_user_track_identity_decision(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_candidate_id: i64,
+    decision_state: UserTrackIdentityDecisionState,
+    reason: Option<String>,
+    decided_at: i64,
+) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+    let Some(candidate) =
+        read_track_identity_candidate_for_decision(write, track_identity_candidate_id)?
+    else {
+        return Ok(TrackIdentityDecisionWriteResult::Failed(
+            TrackIdentityDecisionWriteFailure::CandidateNotFound,
+        ));
+    };
+
+    let current_evidence_count =
+        count_current_track_identity_candidate_evidence(write, track_identity_candidate_id)?;
+    if decision_state == UserTrackIdentityDecisionState::Accepted {
+        if candidate.candidate_status != "active" {
+            return Ok(TrackIdentityDecisionWriteResult::Failed(
+                TrackIdentityDecisionWriteFailure::CandidateStaleForAccept,
+            ));
+        }
+        if current_evidence_count == 0 {
+            return Ok(TrackIdentityDecisionWriteResult::Failed(
+                TrackIdentityDecisionWriteFailure::NoCurrentEvidenceForAccept,
+            ));
+        }
+    }
+
+    let current_user_decision = read_current_user_decision(write, track_identity_candidate_id)?;
+    if let Some(current_decision) = &current_user_decision
+        && current_decision.decision_state == decision_state.as_store_state()
+    {
+        return write_existing_user_decision_result(
+            write,
+            current_decision.track_identity_decision_id,
+            track_identity_candidate_id,
+            decision_state,
+        );
+    }
+
+    let track_identity_decision_id = next_track_identity_decision_id(write)?;
+    insert_user_decision(
+        write,
+        track_identity_decision_id,
+        &candidate,
+        decision_state,
+        reason,
+        current_user_decision
+            .as_ref()
+            .map(|decision| decision.track_identity_decision_id),
+        decided_at,
+    )?;
+    if current_user_decision.is_some() {
+        supersede_current_user_decision(
+            write,
+            track_identity_candidate_id,
+            track_identity_decision_id,
+            decided_at,
+        )?;
+        make_user_decision_current(write, track_identity_decision_id, decided_at)?;
+    }
+    let evidence_snapshot_count = insert_decision_evidence_snapshot(
+        write,
+        track_identity_decision_id,
+        track_identity_candidate_id,
+        decided_at,
+    )?;
+    let effective_decision =
+        read_effective_track_identity_decision_for_candidate(write, track_identity_candidate_id)?;
+
+    Ok(TrackIdentityDecisionWriteResult::Written(
+        TrackIdentityDecisionWriteSuccess {
+            track_identity_decision_id,
+            track_identity_candidate_id,
+            decision_state: decision_state.as_store_state(),
+            decision_source: TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0.to_string(),
+            evidence_snapshot_count,
+            decision_created: true,
+            effective_decision,
+        },
+    ))
+}
+
+fn write_existing_user_decision_result(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_decision_id: i64,
+    track_identity_candidate_id: i64,
+    decision_state: UserTrackIdentityDecisionState,
+) -> LibrarySqliteResult<TrackIdentityDecisionWriteResult> {
+    let evidence_snapshot_count =
+        count_decision_evidence_snapshot_rows(write, track_identity_decision_id)?;
+    let effective_decision =
+        read_effective_track_identity_decision_for_candidate(write, track_identity_candidate_id)?;
+
+    Ok(TrackIdentityDecisionWriteResult::Written(
+        TrackIdentityDecisionWriteSuccess {
+            track_identity_decision_id,
+            track_identity_candidate_id,
+            decision_state: decision_state.as_store_state(),
+            decision_source: TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0.to_string(),
+            evidence_snapshot_count,
+            decision_created: false,
+            effective_decision,
+        },
+    ))
 }
 
 fn produce_track_identity_decisions_for_source(
@@ -74,10 +313,12 @@ fn produce_track_identity_decisions_for_source(
     let skipped_stale_candidates = count_stale_track_identity_candidates(write, source_id)?;
     let skipped_existing_current_decisions =
         count_existing_current_system_decisions(write, source_id)?;
+    let skipped_user_blocked_candidates = count_user_blocked_candidates(write, source_id)?;
     let candidates = read_track_identity_decision_production_candidates(write, source_id)?;
     let mut result = ProduceTrackIdentityDecisionsForSourceResult {
         skipped_stale_candidates,
         skipped_existing_current_decisions,
+        skipped_user_blocked_candidates,
         remaining_candidates: candidates.len().saturating_sub(limit),
         ..Default::default()
     };
@@ -106,6 +347,221 @@ fn count_track_identity_decision_production_candidates(
     read_track_identity_decision_production_candidates(connection, source_id).map(|rows| rows.len())
 }
 
+fn read_track_identity_candidate_for_decision(
+    connection: &rusqlite::Connection,
+    track_identity_candidate_id: i64,
+) -> LibrarySqliteResult<Option<TrackIdentityDecisionProductionCandidate>> {
+    connection
+        .query_row(
+            "SELECT track_identity_candidate_id,
+                    candidate_kind,
+                    evidence_basis,
+                    evidence_key_algorithm,
+                    evidence_key_value,
+                    status
+             FROM track_identity_candidates
+             WHERE track_identity_candidate_id = ?1",
+            [track_identity_candidate_id],
+            |row| {
+                Ok(TrackIdentityDecisionProductionCandidate {
+                    track_identity_candidate_id: row.get(0)?,
+                    candidate_kind: row.get(1)?,
+                    candidate_evidence_basis: row.get(2)?,
+                    evidence_key_algorithm: row.get(3)?,
+                    evidence_key_value: row.get(4)?,
+                    candidate_status: row.get(5)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn count_current_track_identity_candidate_evidence(
+    connection: &rusqlite::Connection,
+    track_identity_candidate_id: i64,
+) -> LibrarySqliteResult<usize> {
+    let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
+    connection
+        .query_row(
+            &format!(
+                "SELECT COUNT(*)
+                 FROM track_identity_candidate_evidence evidence
+                 JOIN source_files file
+                   ON file.source_file_id = evidence.source_file_id
+                 LEFT JOIN SourceFacts facts
+                   ON facts.source_file_id = evidence.source_file_id
+                 LEFT JOIN source_file_attachment_links link
+                   ON link.source_file_attachment_link_id =
+                      evidence.source_file_attachment_link_id
+                 LEFT JOIN content_attachments attachment
+                   ON attachment.attachment_id = evidence.attachment_id
+                 WHERE evidence.track_identity_candidate_id = ?1
+                   AND {current_evidence_predicate}",
+                current_evidence_predicate = current_evidence_predicate,
+            ),
+            params![track_identity_candidate_id, SOURCE_FILE_BLAKE3_ALGORITHM],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
+}
+
+fn read_current_user_decision(
+    connection: &rusqlite::Connection,
+    track_identity_candidate_id: i64,
+) -> LibrarySqliteResult<Option<CurrentDecision>> {
+    connection
+        .query_row(
+            "SELECT track_identity_decision_id,
+                    decision_state
+             FROM track_identity_decisions
+             WHERE track_identity_candidate_id = ?1
+               AND decision_source = ?2
+               AND superseded_by_decision_id IS NULL
+               AND decision_state != 'superseded'",
+            params![
+                track_identity_candidate_id,
+                TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+            ],
+            |row| {
+                Ok(CurrentDecision {
+                    track_identity_decision_id: row.get(0)?,
+                    decision_state: map_store_decision_state(row.get::<_, String>(1)?.as_str()),
+                })
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn next_track_identity_decision_id(connection: &rusqlite::Connection) -> LibrarySqliteResult<i64> {
+    connection
+        .query_row(
+            "SELECT COALESCE(MAX(track_identity_decision_id), 0) + 1
+             FROM track_identity_decisions",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+}
+
+fn supersede_current_user_decision(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_candidate_id: i64,
+    superseded_by_decision_id: i64,
+    superseded_at: i64,
+) -> LibrarySqliteResult<usize> {
+    write
+        .execute(
+            "UPDATE track_identity_decisions
+             SET superseded_by_decision_id = ?2,
+                 updated_at = ?3
+             WHERE track_identity_candidate_id = ?1
+               AND decision_source = ?4
+               AND superseded_by_decision_id IS NULL
+               AND decision_state != 'superseded'",
+            params![
+                track_identity_candidate_id,
+                superseded_by_decision_id,
+                superseded_at,
+                TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+            ],
+        )
+        .map_err(Into::into)
+}
+
+fn insert_user_decision(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_decision_id: i64,
+    candidate: &TrackIdentityDecisionProductionCandidate,
+    decision_state: UserTrackIdentityDecisionState,
+    reason: Option<String>,
+    temporary_superseded_by_decision_id: Option<i64>,
+    decided_at: i64,
+) -> LibrarySqliteResult<()> {
+    let decision_reason = normalized_decision_reason(reason, decision_state.default_reason());
+    write.execute(
+        "INSERT INTO track_identity_decisions (
+             track_identity_decision_id,
+             track_identity_candidate_id,
+             decision_state,
+             decision_source,
+             decision_basis,
+             decision_reason,
+             candidate_kind,
+             candidate_evidence_basis,
+             candidate_status_at_decision,
+             evidence_key_algorithm,
+             evidence_key_value,
+             superseded_by_decision_id,
+             created_at,
+             updated_at
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
+        params![
+            track_identity_decision_id,
+            candidate.track_identity_candidate_id,
+            decision_state.as_sql(),
+            TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+            TRACK_IDENTITY_DECISION_BASIS_USER_LOCAL_V0,
+            decision_reason,
+            candidate.candidate_kind,
+            candidate.candidate_evidence_basis,
+            candidate.candidate_status,
+            candidate.evidence_key_algorithm,
+            candidate.evidence_key_value,
+            temporary_superseded_by_decision_id,
+            decided_at,
+        ],
+    )?;
+    Ok(())
+}
+
+fn make_user_decision_current(
+    write: &mut AdmittedWrite<'_>,
+    track_identity_decision_id: i64,
+    updated_at: i64,
+) -> LibrarySqliteResult<usize> {
+    write
+        .execute(
+            "UPDATE track_identity_decisions
+             SET superseded_by_decision_id = NULL,
+                 updated_at = ?2
+             WHERE track_identity_decision_id = ?1",
+            params![track_identity_decision_id, updated_at],
+        )
+        .map_err(Into::into)
+}
+
+fn normalized_decision_reason(reason: Option<String>, default_reason: &str) -> String {
+    let Some(reason) = reason else {
+        return default_reason.to_string();
+    };
+    let trimmed = reason.trim();
+    if trimmed.is_empty() {
+        return default_reason.to_string();
+    }
+    trimmed
+        .chars()
+        .take(MAX_TRACK_IDENTITY_DECISION_REASON_CHARS)
+        .collect()
+}
+
+fn count_decision_evidence_snapshot_rows(
+    connection: &rusqlite::Connection,
+    track_identity_decision_id: i64,
+) -> LibrarySqliteResult<usize> {
+    connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM track_identity_decision_evidence
+             WHERE track_identity_decision_id = ?1",
+            [track_identity_decision_id],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
+}
+
 fn count_stale_track_identity_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
@@ -119,6 +575,33 @@ fn count_stale_track_identity_candidates(
              WHERE evidence.source_id = ?1
                AND candidate.status != 'active'",
             [source_id],
+            |row| read_count(row, 0),
+        )
+        .map_err(Into::into)
+}
+
+fn count_user_blocked_candidates(
+    connection: &rusqlite::Connection,
+    source_id: i64,
+) -> LibrarySqliteResult<usize> {
+    connection
+        .query_row(
+            "SELECT COUNT(DISTINCT candidate.track_identity_candidate_id)
+             FROM track_identity_candidates candidate
+             JOIN track_identity_candidate_evidence evidence
+               ON evidence.track_identity_candidate_id = candidate.track_identity_candidate_id
+             JOIN track_identity_decisions decision
+               ON decision.track_identity_candidate_id = candidate.track_identity_candidate_id
+             WHERE evidence.source_id = ?1
+               AND decision.decision_source = ?2
+               AND decision.decision_state IN (?3, ?4)
+               AND decision.superseded_by_decision_id IS NULL",
+            params![
+                source_id,
+                TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+                TRACK_IDENTITY_DECISION_STATE_REJECTED,
+                TRACK_IDENTITY_DECISION_STATE_DEFERRED,
+            ],
             |row| read_count(row, 0),
         )
         .map_err(Into::into)
@@ -185,6 +668,15 @@ fn read_track_identity_decision_production_candidates(
                      AND decision.decision_source = ?5
                      AND decision.superseded_by_decision_id IS NULL
                )
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM track_identity_decisions user_decision
+                   WHERE user_decision.track_identity_candidate_id =
+                         candidate.track_identity_candidate_id
+                     AND user_decision.decision_source = ?6
+                     AND user_decision.decision_state IN (?7, ?8)
+                     AND user_decision.superseded_by_decision_id IS NULL
+               )
              ORDER BY candidate.track_identity_candidate_id ASC",
             current_evidence_predicate = current_evidence_predicate,
         ))?
@@ -195,6 +687,9 @@ fn read_track_identity_decision_production_candidates(
                 TRACK_IDENTITY_CANDIDATE_KIND,
                 TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS,
                 TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+                TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+                TRACK_IDENTITY_DECISION_STATE_REJECTED,
+                TRACK_IDENTITY_DECISION_STATE_DEFERRED,
             ],
             |row| {
                 Ok(TrackIdentityDecisionProductionCandidate {
@@ -339,6 +834,15 @@ fn read_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> 
     usize::try_from(count).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, count))
 }
 
+fn map_store_decision_state(raw: &str) -> StoreTrackIdentityDecisionState {
+    match raw {
+        TRACK_IDENTITY_DECISION_STATE_ACCEPTED => StoreTrackIdentityDecisionState::Accepted,
+        TRACK_IDENTITY_DECISION_STATE_REJECTED => StoreTrackIdentityDecisionState::Rejected,
+        TRACK_IDENTITY_DECISION_STATE_DEFERRED => StoreTrackIdentityDecisionState::Deferred,
+        _ => StoreTrackIdentityDecisionState::Superseded,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::params;
@@ -349,9 +853,14 @@ mod tests {
         StoreContentsRowProfile, StoreContentsScope, StoreContentsState,
     };
     use crate::read_models::track_identity_decisions::{
-        StoreTrackIdentityDecisionCurrentStatus, StoreTrackIdentityDecisionState,
+        StoreTrackIdentityBlockedSystemDecisionReason, StoreTrackIdentityDecisionCurrentStatus,
+        StoreTrackIdentityDecisionState, StoreTrackIdentityEffectiveDecisionCurrentStatus,
+        StoreTrackIdentityEffectiveDecisionPrecedence,
     };
-    use crate::{ProduceTrackIdentityDecisionsForSourceResult, SqliteDurableStore};
+    use crate::{
+        ProduceTrackIdentityDecisionsForSourceResult, SqliteDurableStore,
+        TrackIdentityDecisionWriteFailure, TrackIdentityDecisionWriteResult,
+    };
 
     const HASH_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const HASH_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -646,6 +1155,73 @@ mod tests {
                 .expect("produce track identity decisions")
         }
 
+        fn single_candidate_id(&self) -> i64 {
+            let candidates = self
+                .store
+                .read_track_identity_candidates_for_source(self.source_id, 10)
+                .expect("read candidates");
+            assert_eq!(candidates.len(), 1);
+            candidates[0].track_identity_candidate_id
+        }
+
+        fn accept_candidate(
+            &self,
+            track_identity_candidate_id: i64,
+        ) -> TrackIdentityDecisionWriteResult {
+            self.store
+                .accept_track_identity_candidate(
+                    track_identity_candidate_id,
+                    Some(" user accepted ".to_string()),
+                )
+                .expect("accept candidate")
+        }
+
+        fn reject_candidate(
+            &self,
+            track_identity_candidate_id: i64,
+        ) -> TrackIdentityDecisionWriteResult {
+            self.store
+                .reject_track_identity_candidate(
+                    track_identity_candidate_id,
+                    Some(" user rejected ".to_string()),
+                )
+                .expect("reject candidate")
+        }
+
+        fn defer_candidate(
+            &self,
+            track_identity_candidate_id: i64,
+        ) -> TrackIdentityDecisionWriteResult {
+            self.store
+                .defer_track_identity_candidate(
+                    track_identity_candidate_id,
+                    Some(" user deferred ".to_string()),
+                )
+                .expect("defer candidate")
+        }
+
+        fn expect_written(
+            result: TrackIdentityDecisionWriteResult,
+        ) -> crate::TrackIdentityDecisionWriteSuccess {
+            match result {
+                TrackIdentityDecisionWriteResult::Written(success) => success,
+                TrackIdentityDecisionWriteResult::Failed(failure) => {
+                    panic!("expected written decision, got {failure:?}")
+                }
+            }
+        }
+
+        fn expect_failure(
+            result: TrackIdentityDecisionWriteResult,
+        ) -> TrackIdentityDecisionWriteFailure {
+            match result {
+                TrackIdentityDecisionWriteResult::Failed(failure) => failure,
+                TrackIdentityDecisionWriteResult::Written(success) => {
+                    panic!("expected decision failure, got {success:?}")
+                }
+            }
+        }
+
         fn count_rows(&self, table: &str) -> i64 {
             self.store
                 .open_read_connection()
@@ -755,6 +1331,375 @@ mod tests {
         assert_eq!(evidence.attachment_id, attachment_id);
         assert_eq!(evidence.source_file_id, 100);
         assert_eq!(evidence.content_hash_value, HASH_A);
+    }
+
+    #[test]
+    fn user_accept_creates_accepted_decision_with_evidence_snapshot() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/track.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+
+        let success =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+
+        assert_eq!(success.track_identity_candidate_id, candidate_id);
+        assert_eq!(
+            success.decision_state,
+            StoreTrackIdentityDecisionState::Accepted
+        );
+        assert_eq!(success.decision_source, "user_local_v0");
+        assert_eq!(success.evidence_snapshot_count, 1);
+        assert!(success.decision_created);
+        assert_eq!(
+            success.effective_decision.effective_decision_id,
+            Some(success.track_identity_decision_id)
+        );
+        assert_eq!(
+            success.effective_decision.effective_decision_current_status,
+            StoreTrackIdentityEffectiveDecisionCurrentStatus::Current
+        );
+        assert_eq!(
+            success.effective_decision.effective_decision_precedence,
+            StoreTrackIdentityEffectiveDecisionPrecedence::User
+        );
+
+        let decisions = fixture
+            .store
+            .read_track_identity_decisions_for_candidate(candidate_id, 10)
+            .expect("read candidate decisions");
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(
+            decisions[0].decision_state,
+            StoreTrackIdentityDecisionState::Accepted
+        );
+        assert_eq!(decisions[0].decision_reason, "user accepted");
+        assert_eq!(decisions[0].evidence.len(), 1);
+        assert_eq!(
+            decisions[0].effective_decision_id,
+            Some(success.track_identity_decision_id)
+        );
+    }
+
+    #[test]
+    fn user_reject_and_defer_create_explicit_user_decisions() {
+        let reject_fixture = TrackIdentityDecisionFixture::new();
+        reject_fixture.insert_source_file(100, "Album/reject.wav");
+        reject_fixture.link_attachment(100, HASH_A);
+        reject_fixture.commit_current_facts(100, HASH_A);
+        reject_fixture.promote_and_candidate();
+        let reject_candidate_id = reject_fixture.single_candidate_id();
+
+        let rejected = TrackIdentityDecisionFixture::expect_written(
+            reject_fixture.reject_candidate(reject_candidate_id),
+        );
+
+        assert_eq!(
+            rejected.decision_state,
+            StoreTrackIdentityDecisionState::Rejected
+        );
+        assert_eq!(rejected.decision_source, "user_local_v0");
+        assert_eq!(rejected.evidence_snapshot_count, 1);
+
+        let defer_fixture = TrackIdentityDecisionFixture::new();
+        defer_fixture.insert_source_file(100, "Album/defer.wav");
+        defer_fixture.link_attachment(100, HASH_A);
+        defer_fixture.commit_current_facts(100, HASH_A);
+        defer_fixture.promote_and_candidate();
+        let defer_candidate_id = defer_fixture.single_candidate_id();
+
+        let deferred = TrackIdentityDecisionFixture::expect_written(
+            defer_fixture.defer_candidate(defer_candidate_id),
+        );
+
+        assert_eq!(
+            deferred.decision_state,
+            StoreTrackIdentityDecisionState::Deferred
+        );
+        assert_eq!(deferred.decision_source, "user_local_v0");
+        assert_eq!(deferred.evidence_snapshot_count, 1);
+    }
+
+    #[test]
+    fn user_reject_blocks_system_decision_from_being_effective() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/reject-blocks.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+        let system = fixture.produce_decisions(10);
+        assert_eq!(system.decisions_created, 1);
+
+        let rejected =
+            TrackIdentityDecisionFixture::expect_written(fixture.reject_candidate(candidate_id));
+
+        assert_eq!(
+            rejected.decision_state,
+            StoreTrackIdentityDecisionState::Rejected
+        );
+        let effective = fixture
+            .store
+            .read_effective_track_identity_decision_for_candidate(candidate_id)
+            .expect("read effective decision");
+        assert_eq!(
+            effective.effective_decision_id,
+            Some(rejected.track_identity_decision_id)
+        );
+        assert_eq!(
+            effective.effective_decision_state,
+            Some(StoreTrackIdentityDecisionState::Rejected)
+        );
+        assert_eq!(
+            effective.effective_decision_precedence,
+            StoreTrackIdentityEffectiveDecisionPrecedence::User
+        );
+        assert_eq!(
+            effective.blocked_system_decision_reason,
+            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserRejected)
+        );
+    }
+
+    #[test]
+    fn user_defer_blocks_system_decision_from_being_effective() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/defer-blocks.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+        let system = fixture.produce_decisions(10);
+        assert_eq!(system.decisions_created, 1);
+
+        let deferred =
+            TrackIdentityDecisionFixture::expect_written(fixture.defer_candidate(candidate_id));
+
+        let effective = fixture
+            .store
+            .read_effective_track_identity_decision_for_candidate(candidate_id)
+            .expect("read effective decision");
+        assert_eq!(
+            effective.effective_decision_id,
+            Some(deferred.track_identity_decision_id)
+        );
+        assert_eq!(
+            effective.effective_decision_state,
+            Some(StoreTrackIdentityDecisionState::Deferred)
+        );
+        assert_eq!(
+            effective.blocked_system_decision_reason,
+            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserDeferred)
+        );
+    }
+
+    #[test]
+    fn user_accept_after_reject_supersedes_reject_and_preserves_history() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/user-correction.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+
+        let rejected =
+            TrackIdentityDecisionFixture::expect_written(fixture.reject_candidate(candidate_id));
+        let accepted =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+
+        assert_ne!(
+            rejected.track_identity_decision_id,
+            accepted.track_identity_decision_id
+        );
+        let repeated =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+        assert_eq!(
+            repeated.track_identity_decision_id, accepted.track_identity_decision_id,
+            "same-source same-state user decision is idempotent"
+        );
+        assert!(!repeated.decision_created);
+
+        let decisions = fixture
+            .store
+            .read_track_identity_decisions_for_candidate(candidate_id, 10)
+            .expect("read candidate decisions");
+        assert_eq!(decisions.len(), 2);
+        let historical_reject = &decisions[0];
+        assert_eq!(
+            historical_reject.decision_state,
+            StoreTrackIdentityDecisionState::Rejected
+        );
+        assert_eq!(
+            historical_reject.superseded_by_decision_id,
+            Some(accepted.track_identity_decision_id)
+        );
+        assert_eq!(
+            historical_reject.current_status,
+            StoreTrackIdentityDecisionCurrentStatus::Superseded
+        );
+        assert_eq!(
+            historical_reject.effective_decision_id,
+            Some(accepted.track_identity_decision_id)
+        );
+        assert_eq!(historical_reject.evidence.len(), 1);
+        let current_accept = &decisions[1];
+        assert_eq!(
+            current_accept.decision_state,
+            StoreTrackIdentityDecisionState::Accepted
+        );
+        assert_eq!(current_accept.superseded_by_decision_id, None);
+        assert_eq!(
+            current_accept.effective_decision_precedence,
+            StoreTrackIdentityEffectiveDecisionPrecedence::User
+        );
+    }
+
+    #[test]
+    fn system_maintenance_does_not_override_current_user_blocking_decision() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/user-blocked.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+        let deferred =
+            TrackIdentityDecisionFixture::expect_written(fixture.defer_candidate(candidate_id));
+
+        let result = fixture.produce_decisions(10);
+
+        assert_eq!(result.decisions_created, 0);
+        assert_eq!(result.decision_evidence_created, 0);
+        assert_eq!(result.skipped_user_blocked_candidates, 1);
+        assert_eq!(fixture.count_rows("track_identity_decisions"), 1);
+        let effective = fixture
+            .store
+            .read_effective_track_identity_decision_for_candidate(candidate_id)
+            .expect("read effective decision");
+        assert_eq!(
+            effective.effective_decision_id,
+            Some(deferred.track_identity_decision_id)
+        );
+        assert_eq!(
+            effective.effective_decision_precedence,
+            StoreTrackIdentityEffectiveDecisionPrecedence::User
+        );
+    }
+
+    #[test]
+    fn user_accept_requires_active_candidate_with_current_evidence() {
+        let missing_fixture = TrackIdentityDecisionFixture::new();
+        let missing_failure =
+            TrackIdentityDecisionFixture::expect_failure(missing_fixture.accept_candidate(99_999));
+        assert_eq!(
+            missing_failure,
+            TrackIdentityDecisionWriteFailure::CandidateNotFound
+        );
+
+        let stale_fixture = TrackIdentityDecisionFixture::new();
+        stale_fixture.insert_source_file(100, "Album/stale-accept.wav");
+        stale_fixture.link_attachment(100, HASH_A);
+        stale_fixture.commit_current_facts(100, HASH_A);
+        stale_fixture.promote_and_candidate();
+        let stale_candidate_id = stale_fixture.single_candidate_id();
+        stale_fixture.change_file_basis(100);
+        stale_fixture
+            .store
+            .produce_track_identity_candidates_for_source(stale_fixture.source_id, 10)
+            .expect("mark candidate stale");
+
+        let stale_failure = TrackIdentityDecisionFixture::expect_failure(
+            stale_fixture.accept_candidate(stale_candidate_id),
+        );
+        assert_eq!(
+            stale_failure,
+            TrackIdentityDecisionWriteFailure::CandidateStaleForAccept
+        );
+
+        let no_evidence_fixture = TrackIdentityDecisionFixture::new();
+        no_evidence_fixture.insert_source_file(100, "Album/no-current-evidence.wav");
+        no_evidence_fixture.link_attachment(100, HASH_A);
+        no_evidence_fixture.commit_current_facts(100, HASH_A);
+        no_evidence_fixture.promote_and_candidate();
+        let no_evidence_candidate_id = no_evidence_fixture.single_candidate_id();
+        no_evidence_fixture.change_file_basis(100);
+
+        let no_evidence_failure = TrackIdentityDecisionFixture::expect_failure(
+            no_evidence_fixture.accept_candidate(no_evidence_candidate_id),
+        );
+        assert_eq!(
+            no_evidence_failure,
+            TrackIdentityDecisionWriteFailure::NoCurrentEvidenceForAccept
+        );
+    }
+
+    #[test]
+    fn user_reject_and_defer_do_not_fabricate_stale_evidence_snapshots() {
+        let reject_fixture = TrackIdentityDecisionFixture::new();
+        reject_fixture.insert_source_file(100, "Album/reject-no-evidence.wav");
+        reject_fixture.link_attachment(100, HASH_A);
+        reject_fixture.commit_current_facts(100, HASH_A);
+        reject_fixture.promote_and_candidate();
+        let reject_candidate_id = reject_fixture.single_candidate_id();
+        reject_fixture.change_file_basis(100);
+
+        let rejected = TrackIdentityDecisionFixture::expect_written(
+            reject_fixture.reject_candidate(reject_candidate_id),
+        );
+        assert_eq!(rejected.evidence_snapshot_count, 0);
+
+        let defer_fixture = TrackIdentityDecisionFixture::new();
+        defer_fixture.insert_source_file(100, "Album/defer-stale-no-evidence.wav");
+        defer_fixture.link_attachment(100, HASH_A);
+        defer_fixture.commit_current_facts(100, HASH_A);
+        defer_fixture.promote_and_candidate();
+        let defer_candidate_id = defer_fixture.single_candidate_id();
+        defer_fixture.change_file_basis(100);
+        defer_fixture
+            .store
+            .produce_track_identity_candidates_for_source(defer_fixture.source_id, 10)
+            .expect("mark candidate stale");
+
+        let deferred = TrackIdentityDecisionFixture::expect_written(
+            defer_fixture.defer_candidate(defer_candidate_id),
+        );
+        assert_eq!(deferred.evidence_snapshot_count, 0);
+        let decisions = defer_fixture
+            .store
+            .read_track_identity_decisions_for_candidate(defer_candidate_id, 10)
+            .expect("read candidate decisions");
+        assert_eq!(decisions[0].evidence.len(), 0);
+        assert_eq!(
+            decisions[0].effective_decision_current_status,
+            StoreTrackIdentityEffectiveDecisionCurrentStatus::Stale
+        );
+    }
+
+    #[test]
+    fn decision_evidence_snapshots_are_immutable_after_later_facts_change() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/immutable.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+        let accepted =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+        assert_eq!(accepted.evidence_snapshot_count, 1);
+
+        fixture.commit_current_facts(100, HASH_B);
+        fixture.link_attachment(100, HASH_B);
+
+        let decisions = fixture
+            .store
+            .read_track_identity_decisions_for_candidate(candidate_id, 10)
+            .expect("read candidate decisions");
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(decisions[0].evidence.len(), 1);
+        assert_eq!(
+            decisions[0].evidence[0].content_hash_value, HASH_A,
+            "old decision evidence snapshot must not be rewritten by later facts"
+        );
     }
 
     #[test]
@@ -886,6 +1831,10 @@ mod tests {
             assert_eq!(fixture.count_rows(table), 0, "{table} must remain empty");
         }
         for absent_or_future_table in [
+            "canonical_tracks",
+            "tracks",
+            "library_tracks",
+            "track_identities",
             "Tracks",
             "TrackRows",
             "LibraryTracks",

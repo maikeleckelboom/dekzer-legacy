@@ -36,6 +36,10 @@ import type {
   RunSourceMaintenanceRequest,
   RunSourceMaintenanceResult
 } from './librarySourceMaintenance/sourceMaintenance'
+import type {
+  TrackIdentityDecisionWriteRequest,
+  TrackIdentityDecisionWriteResult
+} from './libraryTrackIdentityDecisionWrite/decisionWrite'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
@@ -57,6 +61,7 @@ export type LibraryApi = {
   readonly attachmentIdentity: LibraryAttachmentIdentityApi
   readonly hashing: LibraryHashingApi
   readonly sourceMaintenance: LibrarySourceMaintenanceApi
+  readonly trackIdentityDecisions: LibraryTrackIdentityDecisionWriteApi
   readonly contents: LibraryContentsApi
   readonly roots: LibraryRootsApi
   readonly viewState: LibraryViewStateApi
@@ -109,6 +114,18 @@ export type LibraryHashingApi = {
 export type LibrarySourceMaintenanceApi = {
   runSourceMaintenance(request: RunSourceMaintenanceRequest): Promise<RunSourceMaintenanceResult>
   readSourceMaintenance(request: ReadSourceMaintenanceRequest): Promise<ReadSourceMaintenanceResult>
+}
+
+export type LibraryTrackIdentityDecisionWriteApi = {
+  acceptTrackIdentityCandidate(
+    request: TrackIdentityDecisionWriteRequest
+  ): Promise<TrackIdentityDecisionWriteResult>
+  rejectTrackIdentityCandidate(
+    request: TrackIdentityDecisionWriteRequest
+  ): Promise<TrackIdentityDecisionWriteResult>
+  deferTrackIdentityCandidate(
+    request: TrackIdentityDecisionWriteRequest
+  ): Promise<TrackIdentityDecisionWriteResult>
 }
 
 export type LibraryRootsApi = {

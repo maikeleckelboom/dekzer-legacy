@@ -1,6 +1,6 @@
 ---
 status: accepted
-last-reviewed: 2026-06-02
+last-reviewed: 2026-06-03
 owner: library-boundary-service
 canonical-context:
   - observed-file-facts-contract
@@ -9,6 +9,7 @@ canonical-context:
   - primary-media-promotion-contract
   - track-identity-candidate-contract
   - track-identity-decision-contract
+  - track-identity-decision-write-contract
   - source-lifecycle-backend-contract-gap
 scope:
   - source-maintenance-orchestration
@@ -61,7 +62,8 @@ probe fact. Track identity candidate production follows primary-media promotion 
 evidence-backed `primary_media_candidates` rows and revalidates the source-file, attachment, BLAKE3, and probe evidence
 before producing or refreshing candidate rows. Track identity decision production follows candidate production because it
 consumes only active exact-content candidates with current candidate evidence and produces current
-`system_exact_content_v0` accepted decision records only when a current system decision does not already exist.
+`system_exact_content_v0` accepted decision records only when a current system decision does not already exist and no
+current user `rejected` or `deferred` decision blocks the candidate.
 
 The order must not be interpreted as product preparation. Remaining candidates are expected after a bounded unit.
 
@@ -105,10 +107,10 @@ cleanup path.
 
 The boundary command is:
 
-| Layer | Command |
-| --- | --- |
-| Rust protocol | `SourceMaintenance.RunSourceMaintenance` |
-| Generated TS contract | `runSourceMaintenance` |
+| Layer                   | Command                                                                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rust protocol           | `SourceMaintenance.RunSourceMaintenance`                                                                                                                                    |
+| Generated TS contract   | `runSourceMaintenance`                                                                                                                                                      |
 | Desktop IPC/preload API | `library.sourceMaintenance.runSourceMaintenance({ sourceId, hashLimit?, attachmentLimit?, probeLimit?, promotionLimit?, identityCandidateLimit?, identityDecisionLimit? })` |
 
 The reply includes:
@@ -120,7 +122,8 @@ The reply includes:
 - probe summary counts and remaining probe candidates
 - primary-media promotion summary counts and remaining promotion candidates
 - track identity candidate production summary counts and remaining candidate production candidates
-- track identity decision production summary counts and remaining decision production candidates
+- track identity decision production summary counts, user-blocked skip counts, and remaining decision production
+  candidates
 - current/stale/missing attachment-link summary when the source attachment read model can answer
 - typed `sourceFailure` for unavailable, missing, blocked, or not-found source state
 - coarse run status: `completed`, `partial`, `skipped`, or `failed`
@@ -131,10 +134,10 @@ The command does not expose local filesystem paths.
 
 The snapshot read is:
 
-| Layer | Read |
-| --- | --- |
-| Rust protocol | `SnapshotRead.ReadSourceMaintenance` |
-| Generated TS contract | `readSourceMaintenance` |
+| Layer                   | Read                                                            |
+| ----------------------- | --------------------------------------------------------------- |
+| Rust protocol           | `SnapshotRead.ReadSourceMaintenance`                            |
+| Generated TS contract   | `readSourceMaintenance`                                         |
 | Desktop IPC/preload API | `library.sourceMaintenance.readSourceMaintenance({ sourceId })` |
 
 The snapshot computes:
@@ -182,7 +185,8 @@ Each phase commits through the existing authority path:
   `track_identity_candidate_members`, and `track_identity_candidate_evidence` from current evidence-backed
   primary-media candidates.
 - Track identity decision production updates `track_identity_decisions` and `track_identity_decision_evidence` from
-  active exact-content candidates and preserves candidate/member/evidence provenance.
+  active exact-content candidates, preserves candidate/member/evidence provenance, and skips candidates with current
+  user reject/defer decisions.
 
 After each phase, the service publishes maintained snapshot invalidations from current maintained revisions. The narrow
 honest maintained scope today is `LibraryBrowser`; attachment identity reads remain explicit until a precise maintained
@@ -211,5 +215,5 @@ Future work remains separate:
 - video probe adapter selection;
 - CUE parse observations owned by CUE source-file rows;
 - video-capable or richer `primaryMedia` promotion beyond audio v0;
-- canonical track identity and user-authored identity decisions;
+- canonical track identity beyond explicit candidate decisions;
 - preparation, waveform, stems, and artwork work.

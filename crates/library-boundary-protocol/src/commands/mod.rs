@@ -4,6 +4,7 @@ pub mod session_events;
 pub mod snapshot_reads;
 pub mod source_file_hash;
 pub mod source_maintenance;
+pub mod track_identity_decision_write;
 
 pub use library_roots::*;
 pub use playlist_writes::*;
@@ -11,6 +12,7 @@ pub use session_events::*;
 pub use snapshot_reads::*;
 pub use source_file_hash::*;
 pub use source_maintenance::*;
+pub use track_identity_decision_write::*;
 
 use crate::ProtocolError;
 
@@ -25,6 +27,7 @@ pub enum CommandRequest {
     PlaylistWrite(PlaylistWriteCommand),
     SourceFileHash(SourceFileHashCommand),
     SourceMaintenance(SourceMaintenanceCommand),
+    TrackIdentityDecisionWrite(TrackIdentityDecisionWriteCommand),
     SnapshotRead(SnapshotReadCommand),
 }
 
@@ -39,6 +42,7 @@ pub enum CommandReply {
     PlaylistWrite(PlaylistWriteReply),
     SourceFileHash(SourceFileHashReply),
     SourceMaintenance(Box<SourceMaintenanceReply>),
+    TrackIdentityDecisionWrite(TrackIdentityDecisionWriteReply),
     SnapshotRead(SnapshotReadReply),
 }
 
@@ -88,7 +92,10 @@ mod tests {
         ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
         SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
-        StartRootScanRequest,
+        StartRootScanRequest, TrackIdentityDecisionState, TrackIdentityDecisionWriteCommand,
+        TrackIdentityDecisionWriteReply, TrackIdentityDecisionWriteResult,
+        TrackIdentityDecisionWriteSuccess, TrackIdentityEffectiveDecisionCurrentStatus,
+        TrackIdentityEffectiveDecisionPrecedence, TrackIdentityEffectiveDecisionSummary,
     };
     use serde_json::json;
 
@@ -135,6 +142,14 @@ mod tests {
                 identity_decision_limit: Some(4),
             }),
         );
+        let identity_decision_write = CommandRequest::TrackIdentityDecisionWrite(
+            TrackIdentityDecisionWriteCommand::AcceptTrackIdentityCandidate(
+                super::AcceptTrackIdentityCandidateRequest {
+                    candidate_id: 7,
+                    reason: None,
+                },
+            ),
+        );
 
         for command in [
             session_events,
@@ -143,6 +158,7 @@ mod tests {
             snapshot,
             hash,
             maintenance,
+            identity_decision_write,
         ] {
             match command {
                 CommandRequest::LibraryBoundaryEvents(_) => {}
@@ -150,6 +166,7 @@ mod tests {
                 CommandRequest::PlaylistWrite(_) => {}
                 CommandRequest::SourceFileHash(_) => {}
                 CommandRequest::SourceMaintenance(_) => {}
+                CommandRequest::TrackIdentityDecisionWrite(_) => {}
                 CommandRequest::SnapshotRead(_) => {}
             }
         }
@@ -221,6 +238,28 @@ mod tests {
                         "sourceId": "7",
                         "hashLimit": 8,
                         "attachmentLimit": 4
+                    }
+                }
+            })
+        );
+
+        let decision_write = CommandRequest::TrackIdentityDecisionWrite(
+            TrackIdentityDecisionWriteCommand::RejectTrackIdentityCandidate(
+                super::RejectTrackIdentityCandidateRequest {
+                    candidate_id: 7,
+                    reason: Some("not the same item".to_string()),
+                },
+            ),
+        );
+        assert_eq!(
+            serde_json::to_value(&decision_write).expect("serialize decision write command"),
+            json!({
+                "type": "trackIdentityDecisionWrite",
+                "payload": {
+                    "type": "rejectTrackIdentityCandidate",
+                    "payload": {
+                        "candidateId": "7",
+                        "reason": "not the same item"
                     }
                 }
             })
@@ -352,6 +391,7 @@ mod tests {
                     decision_evidence_created: 1,
                     skipped_stale_candidates: 0,
                     skipped_existing_current_decisions: 0,
+                    skipped_user_blocked_candidates: 0,
                     remaining_candidates: 0,
                 },
                 remaining_hash_candidates: 0,
@@ -370,6 +410,41 @@ mod tests {
         assert_eq!(
             serde_json::from_value::<CommandReply>(json).expect("deserialize maintenance reply"),
             maintenance_reply
+        );
+
+        let decision_write_reply = CommandReply::TrackIdentityDecisionWrite(
+            TrackIdentityDecisionWriteReply::AcceptTrackIdentityCandidate(
+                TrackIdentityDecisionWriteResult::Written(TrackIdentityDecisionWriteSuccess {
+                    decision_id: 9,
+                    candidate_id: 7,
+                    decision_state: TrackIdentityDecisionState::Accepted,
+                    decision_source: "user_local_v0".to_string(),
+                    evidence_snapshot_count: 1,
+                    decision_created: true,
+                    effective_decision: TrackIdentityEffectiveDecisionSummary {
+                        effective_decision_id: Some(9),
+                        effective_decision_state: Some(TrackIdentityDecisionState::Accepted),
+                        effective_decision_source: Some("user_local_v0".to_string()),
+                        effective_decision_current_status:
+                            TrackIdentityEffectiveDecisionCurrentStatus::Current,
+                        effective_decision_precedence:
+                            TrackIdentityEffectiveDecisionPrecedence::User,
+                        blocked_system_decision_reason: None,
+                    },
+                }),
+            ),
+        );
+        let json =
+            serde_json::to_value(&decision_write_reply).expect("serialize decision write reply");
+        assert_eq!(json["type"], json!("trackIdentityDecisionWrite"));
+        assert_eq!(
+            json["payload"]["type"],
+            json!("acceptTrackIdentityCandidate")
+        );
+        assert_eq!(json["payload"]["payload"]["type"], json!("written"));
+        assert_eq!(
+            serde_json::from_value::<CommandReply>(json).expect("deserialize decision write reply"),
+            decision_write_reply
         );
     }
 

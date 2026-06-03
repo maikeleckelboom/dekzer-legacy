@@ -49,6 +49,11 @@ import {
   type RunSourceMaintenanceRequest,
   type RunSourceMaintenanceResult
 } from '../shared/librarySourceMaintenance/sourceMaintenance'
+import {
+  trackIdentityDecisionWriteChannels,
+  type TrackIdentityDecisionWriteRequest,
+  type TrackIdentityDecisionWriteResult
+} from '../shared/libraryTrackIdentityDecisionWrite/decisionWrite'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
@@ -184,6 +189,32 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             sourceMaintenanceChannels.readSourceMaintenance,
             request
           )) as ReadSourceMaintenanceResult
+        }
+      },
+      trackIdentityDecisions: {
+        async acceptTrackIdentityCandidate(
+          request: TrackIdentityDecisionWriteRequest
+        ): Promise<TrackIdentityDecisionWriteResult> {
+          return (await ipcRenderer.invoke(
+            trackIdentityDecisionWriteChannels.acceptTrackIdentityCandidate,
+            request
+          )) as TrackIdentityDecisionWriteResult
+        },
+        async rejectTrackIdentityCandidate(
+          request: TrackIdentityDecisionWriteRequest
+        ): Promise<TrackIdentityDecisionWriteResult> {
+          return (await ipcRenderer.invoke(
+            trackIdentityDecisionWriteChannels.rejectTrackIdentityCandidate,
+            request
+          )) as TrackIdentityDecisionWriteResult
+        },
+        async deferTrackIdentityCandidate(
+          request: TrackIdentityDecisionWriteRequest
+        ): Promise<TrackIdentityDecisionWriteResult> {
+          return (await ipcRenderer.invoke(
+            trackIdentityDecisionWriteChannels.deferTrackIdentityCandidate,
+            request
+          )) as TrackIdentityDecisionWriteResult
         }
       },
       contents: {

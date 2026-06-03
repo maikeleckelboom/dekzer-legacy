@@ -23,6 +23,23 @@
     "libraryBoundaryEvent"
   ],
   "$defs": {
+    "AcceptTrackIdentityCandidateRequest": {
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "candidateId"
+      ]
+    },
     "AppendLibraryAssetToPlaylistReply": {
       "type": "object",
       "properties": {
@@ -265,6 +282,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionWriteReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "trackIdentityDecisionWrite"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/SnapshotReadReply"
             },
             "type": {
@@ -354,6 +387,22 @@
             "type": {
               "type": "string",
               "const": "sourceMaintenance"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionWriteCommand"
+            },
+            "type": {
+              "type": "string",
+              "const": "trackIdentityDecisionWrite"
             }
           },
           "required": [
@@ -802,6 +851,23 @@
       },
       "required": [
         "displayName"
+      ]
+    },
+    "DeferTrackIdentityCandidateRequest": {
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "candidateId"
       ]
     },
     "DeletePlaylistReply": {
@@ -3740,6 +3806,23 @@
         "absolutePath"
       ]
     },
+    "RejectTrackIdentityCandidateRequest": {
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "candidateId"
+      ]
+    },
     "RemoveLibraryAssetFromPlaylistReply": {
       "type": "object",
       "properties": {
@@ -5390,6 +5473,11 @@
           "type": "integer",
           "format": "uint",
           "minimum": 0
+        },
+        "skippedUserBlockedCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
         }
       },
       "required": [
@@ -5398,6 +5486,7 @@
         "decisionEvidenceCreated",
         "skippedStaleCandidates",
         "skippedExistingCurrentDecisions",
+        "skippedUserBlockedCandidates",
         "remainingCandidates"
       ]
     },
@@ -5523,6 +5612,301 @@
       },
       "required": [
         "rootId"
+      ]
+    },
+    "TrackIdentityBlockedSystemDecisionReason": {
+      "type": "string",
+      "enum": [
+        "currentUserRejected",
+        "currentUserDeferred"
+      ]
+    },
+    "TrackIdentityDecisionState": {
+      "type": "string",
+      "enum": [
+        "accepted",
+        "rejected",
+        "deferred"
+      ]
+    },
+    "TrackIdentityDecisionWriteCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AcceptTrackIdentityCandidateRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "acceptTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RejectTrackIdentityCandidateRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "rejectTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/DeferTrackIdentityCandidateRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "deferTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "TrackIdentityDecisionWriteFailure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "candidateNotFound"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "candidateStaleForAccept"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "noCurrentEvidenceForAccept"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        }
+      ]
+    },
+    "TrackIdentityDecisionWriteReply": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionWriteResult"
+            },
+            "type": {
+              "type": "string",
+              "const": "acceptTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionWriteResult"
+            },
+            "type": {
+              "type": "string",
+              "const": "rejectTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionWriteResult"
+            },
+            "type": {
+              "type": "string",
+              "const": "deferTrackIdentityCandidate"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "TrackIdentityDecisionWriteResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionWriteSuccess"
+            },
+            "type": {
+              "type": "string",
+              "const": "written"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TrackIdentityDecisionWriteFailure"
+            },
+            "type": {
+              "type": "string",
+              "const": "failed"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "TrackIdentityDecisionWriteSuccess": {
+      "type": "object",
+      "properties": {
+        "candidateId": {
+          "type": "string"
+        },
+        "decisionCreated": {
+          "type": "boolean"
+        },
+        "decisionId": {
+          "type": "string"
+        },
+        "decisionSource": {
+          "type": "string"
+        },
+        "decisionState": {
+          "$ref": "#/$defs/TrackIdentityDecisionState"
+        },
+        "effectiveDecision": {
+          "$ref": "#/$defs/TrackIdentityEffectiveDecisionSummary"
+        },
+        "evidenceSnapshotCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "decisionId",
+        "candidateId",
+        "decisionState",
+        "decisionSource",
+        "evidenceSnapshotCount",
+        "decisionCreated",
+        "effectiveDecision"
+      ]
+    },
+    "TrackIdentityEffectiveDecisionCurrentStatus": {
+      "type": "string",
+      "enum": [
+        "current",
+        "stale",
+        "noCurrentDecision"
+      ]
+    },
+    "TrackIdentityEffectiveDecisionPrecedence": {
+      "type": "string",
+      "enum": [
+        "user",
+        "system",
+        "none"
+      ]
+    },
+    "TrackIdentityEffectiveDecisionSummary": {
+      "type": "object",
+      "properties": {
+        "blockedSystemDecisionReason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackIdentityBlockedSystemDecisionReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effectiveDecisionCurrentStatus": {
+          "$ref": "#/$defs/TrackIdentityEffectiveDecisionCurrentStatus"
+        },
+        "effectiveDecisionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effectiveDecisionPrecedence": {
+          "$ref": "#/$defs/TrackIdentityEffectiveDecisionPrecedence"
+        },
+        "effectiveDecisionSource": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effectiveDecisionState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackIdentityDecisionState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "effectiveDecisionCurrentStatus",
+        "effectiveDecisionPrecedence"
       ]
     },
     "UnregisterLocalRootReply": {

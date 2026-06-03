@@ -1,7 +1,12 @@
-use rusqlite::{Connection, Row};
+use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::LibrarySqliteResult;
 use crate::read_models::track_identity_candidates::StoreTrackIdentityCandidateStatus;
+use crate::store::{
+    SOURCE_FILE_BLAKE3_ALGORITHM, TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+    TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+};
+use crate::track_identity_evidence_predicates::current_track_identity_candidate_evidence_predicate;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoreTrackIdentityDecision {
@@ -17,6 +22,12 @@ pub struct StoreTrackIdentityDecision {
     pub evidence_key_algorithm: String,
     pub evidence_key_value: String,
     pub current_status: StoreTrackIdentityDecisionCurrentStatus,
+    pub effective_decision_id: Option<i64>,
+    pub effective_decision_state: Option<StoreTrackIdentityDecisionState>,
+    pub effective_decision_source: Option<String>,
+    pub effective_decision_current_status: StoreTrackIdentityEffectiveDecisionCurrentStatus,
+    pub effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence,
+    pub blocked_system_decision_reason: Option<StoreTrackIdentityBlockedSystemDecisionReason>,
     pub proves: String,
     pub does_not_prove: String,
     pub superseded_by_decision_id: Option<i64>,
@@ -38,6 +49,36 @@ pub enum StoreTrackIdentityDecisionCurrentStatus {
     Current,
     Stale,
     Superseded,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreTrackIdentityEffectiveDecisionCurrentStatus {
+    Current,
+    Stale,
+    NoCurrentDecision,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreTrackIdentityEffectiveDecisionPrecedence {
+    User,
+    System,
+    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StoreTrackIdentityBlockedSystemDecisionReason {
+    CurrentUserRejected,
+    CurrentUserDeferred,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreTrackIdentityEffectiveDecisionSummary {
+    pub effective_decision_id: Option<i64>,
+    pub effective_decision_state: Option<StoreTrackIdentityDecisionState>,
+    pub effective_decision_source: Option<String>,
+    pub effective_decision_current_status: StoreTrackIdentityEffectiveDecisionCurrentStatus,
+    pub effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence,
+    pub blocked_system_decision_reason: Option<StoreTrackIdentityBlockedSystemDecisionReason>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,9 +108,10 @@ pub fn read_track_identity_decisions_for_source(
 ) -> LibrarySqliteResult<Vec<StoreTrackIdentityDecision>> {
     let limit_i64 =
         i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
+    let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
     let mut decisions = connection
-        .prepare(
-            "SELECT DISTINCT decision.track_identity_decision_id,
+        .prepare(&format!(
+            "SELECT decision.track_identity_decision_id,
                     decision.track_identity_candidate_id,
                     decision.decision_state,
                     decision.decision_source,
@@ -84,53 +126,322 @@ pub fn read_track_identity_decisions_for_source(
                         WHEN decision.superseded_by_decision_id IS NOT NULL
                           OR decision.decision_state = 'superseded'
                         THEN 'superseded'
-                        WHEN candidate.status = 'active' THEN 'current'
+                        WHEN candidate.status = 'active'
+                         AND EXISTS (
+                             SELECT 1
+                             FROM track_identity_candidate_evidence evidence
+                             JOIN source_files file
+                               ON file.source_file_id = evidence.source_file_id
+                             LEFT JOIN SourceFacts facts
+                               ON facts.source_file_id = evidence.source_file_id
+                             LEFT JOIN source_file_attachment_links link
+                               ON link.source_file_attachment_link_id =
+                                  evidence.source_file_attachment_link_id
+                             LEFT JOIN content_attachments attachment
+                               ON attachment.attachment_id = evidence.attachment_id
+                             WHERE evidence.track_identity_candidate_id =
+                                   decision.track_identity_candidate_id
+                               AND {current_evidence_predicate}
+                         )
+                        THEN 'current'
                         ELSE 'stale'
                     END AS current_status,
                     decision.superseded_by_decision_id,
                     decision.created_at,
                     decision.updated_at
              FROM track_identity_decisions decision
-             JOIN track_identity_decision_evidence evidence
-               ON evidence.track_identity_decision_id = decision.track_identity_decision_id
-             LEFT JOIN track_identity_candidates candidate
+             JOIN track_identity_candidates candidate
                ON candidate.track_identity_candidate_id = decision.track_identity_candidate_id
-             WHERE evidence.source_id = ?1
+             WHERE EXISTS (
+                 SELECT 1
+                 FROM track_identity_candidate_evidence evidence
+                 WHERE evidence.track_identity_candidate_id =
+                       decision.track_identity_candidate_id
+                   AND evidence.source_id = ?1
+             )
              ORDER BY decision.track_identity_decision_id ASC
-             LIMIT ?2",
+             LIMIT ?3",
+            current_evidence_predicate = current_evidence_predicate,
+        ))?
+        .query_map(
+            params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM, limit_i64],
+            map_decision_row,
         )?
-        .query_map(rusqlite::params![source_id, limit_i64], |row| {
-            Ok(StoreTrackIdentityDecision {
-                track_identity_decision_id: row.get(0)?,
-                track_identity_candidate_id: row.get(1)?,
-                decision_state: map_decision_state(row.get::<_, String>(2)?.as_str()),
-                decision_source: row.get(3)?,
-                decision_basis: row.get(4)?,
-                decision_reason: row.get(5)?,
-                candidate_kind: row.get(6)?,
-                candidate_evidence_basis: row.get(7)?,
-                candidate_status_at_decision: map_candidate_status(
-                    row.get::<_, String>(8)?.as_str(),
-                ),
-                evidence_key_algorithm: row.get(9)?,
-                evidence_key_value: row.get(10)?,
-                current_status: map_current_status(row.get::<_, String>(11)?.as_str()),
-                proves: "a backend-owned decision accepted the exact-content track identity candidate under its recorded evidence basis".to_string(),
-                does_not_prove: "canonical track identity, same-song semantic identity, metadata reconciliation, CUE association, or multi-encode equivalence".to_string(),
-                superseded_by_decision_id: row.get(12)?,
-                evidence: Vec::new(),
-                created_at: row.get(13)?,
-                updated_at: row.get(14)?,
-            })
-        })?
         .collect::<Result<Vec<_>, _>>()?;
 
-    for decision in &mut decisions {
+    hydrate_decisions(connection, &mut decisions)?;
+    Ok(decisions)
+}
+
+pub fn read_track_identity_decisions_for_candidate(
+    connection: &Connection,
+    track_identity_candidate_id: i64,
+    limit: usize,
+) -> LibrarySqliteResult<Vec<StoreTrackIdentityDecision>> {
+    let limit_i64 =
+        i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
+    let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
+    let mut decisions = connection
+        .prepare(&format!(
+            "SELECT decision.track_identity_decision_id,
+                    decision.track_identity_candidate_id,
+                    decision.decision_state,
+                    decision.decision_source,
+                    decision.decision_basis,
+                    decision.decision_reason,
+                    decision.candidate_kind,
+                    decision.candidate_evidence_basis,
+                    decision.candidate_status_at_decision,
+                    decision.evidence_key_algorithm,
+                    decision.evidence_key_value,
+                    CASE
+                        WHEN decision.superseded_by_decision_id IS NOT NULL
+                          OR decision.decision_state = 'superseded'
+                        THEN 'superseded'
+                        WHEN candidate.status = 'active'
+                         AND EXISTS (
+                             SELECT 1
+                             FROM track_identity_candidate_evidence evidence
+                             JOIN source_files file
+                               ON file.source_file_id = evidence.source_file_id
+                             LEFT JOIN SourceFacts facts
+                               ON facts.source_file_id = evidence.source_file_id
+                             LEFT JOIN source_file_attachment_links link
+                               ON link.source_file_attachment_link_id =
+                                  evidence.source_file_attachment_link_id
+                             LEFT JOIN content_attachments attachment
+                               ON attachment.attachment_id = evidence.attachment_id
+                             WHERE evidence.track_identity_candidate_id =
+                                   decision.track_identity_candidate_id
+                               AND {current_evidence_predicate}
+                         )
+                        THEN 'current'
+                        ELSE 'stale'
+                    END AS current_status,
+                    decision.superseded_by_decision_id,
+                    decision.created_at,
+                    decision.updated_at
+             FROM track_identity_decisions decision
+             JOIN track_identity_candidates candidate
+               ON candidate.track_identity_candidate_id = decision.track_identity_candidate_id
+             WHERE decision.track_identity_candidate_id = ?1
+             ORDER BY decision.track_identity_decision_id ASC
+             LIMIT ?3",
+            current_evidence_predicate = current_evidence_predicate,
+        ))?
+        .query_map(
+            params![
+                track_identity_candidate_id,
+                SOURCE_FILE_BLAKE3_ALGORITHM,
+                limit_i64
+            ],
+            map_decision_row,
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    hydrate_decisions(connection, &mut decisions)?;
+    Ok(decisions)
+}
+
+pub fn read_effective_track_identity_decision_for_candidate(
+    connection: &Connection,
+    track_identity_candidate_id: i64,
+) -> LibrarySqliteResult<StoreTrackIdentityEffectiveDecisionSummary> {
+    let current_user_decision = read_current_decision_for_source(
+        connection,
+        track_identity_candidate_id,
+        TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0,
+    )?;
+    let current_system_decision = read_current_decision_for_source(
+        connection,
+        track_identity_candidate_id,
+        TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+    )?;
+
+    let Some(effective_decision) = current_user_decision.or(current_system_decision.clone()) else {
+        return Ok(StoreTrackIdentityEffectiveDecisionSummary {
+            effective_decision_id: None,
+            effective_decision_state: None,
+            effective_decision_source: None,
+            effective_decision_current_status:
+                StoreTrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision,
+            effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence::None,
+            blocked_system_decision_reason: None,
+        });
+    };
+
+    let effective_decision_current_status =
+        read_effective_decision_current_status(connection, track_identity_candidate_id)?;
+    let effective_decision_precedence =
+        if effective_decision.decision_source == TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0 {
+            StoreTrackIdentityEffectiveDecisionPrecedence::User
+        } else {
+            StoreTrackIdentityEffectiveDecisionPrecedence::System
+        };
+    let blocked_system_decision_reason =
+        blocked_system_decision_reason(&effective_decision, current_system_decision.as_ref());
+
+    Ok(StoreTrackIdentityEffectiveDecisionSummary {
+        effective_decision_id: Some(effective_decision.track_identity_decision_id),
+        effective_decision_state: Some(effective_decision.decision_state),
+        effective_decision_source: Some(effective_decision.decision_source),
+        effective_decision_current_status,
+        effective_decision_precedence,
+        blocked_system_decision_reason,
+    })
+}
+
+fn hydrate_decisions(
+    connection: &Connection,
+    decisions: &mut [StoreTrackIdentityDecision],
+) -> LibrarySqliteResult<()> {
+    for decision in decisions {
         decision.evidence =
             read_track_identity_decision_evidence(connection, decision.track_identity_decision_id)?;
+        let effective = read_effective_track_identity_decision_for_candidate(
+            connection,
+            decision.track_identity_candidate_id,
+        )?;
+        decision.effective_decision_id = effective.effective_decision_id;
+        decision.effective_decision_state = effective.effective_decision_state;
+        decision.effective_decision_source = effective.effective_decision_source;
+        decision.effective_decision_current_status = effective.effective_decision_current_status;
+        decision.effective_decision_precedence = effective.effective_decision_precedence;
+        decision.blocked_system_decision_reason = effective.blocked_system_decision_reason;
     }
 
-    Ok(decisions)
+    Ok(())
+}
+
+fn map_decision_row(row: &Row<'_>) -> rusqlite::Result<StoreTrackIdentityDecision> {
+    Ok(StoreTrackIdentityDecision {
+        track_identity_decision_id: row.get(0)?,
+        track_identity_candidate_id: row.get(1)?,
+        decision_state: map_decision_state(row.get::<_, String>(2)?.as_str()),
+        decision_source: row.get(3)?,
+        decision_basis: row.get(4)?,
+        decision_reason: row.get(5)?,
+        candidate_kind: row.get(6)?,
+        candidate_evidence_basis: row.get(7)?,
+        candidate_status_at_decision: map_candidate_status(row.get::<_, String>(8)?.as_str()),
+        evidence_key_algorithm: row.get(9)?,
+        evidence_key_value: row.get(10)?,
+        current_status: map_current_status(row.get::<_, String>(11)?.as_str()),
+        effective_decision_id: None,
+        effective_decision_state: None,
+        effective_decision_source: None,
+        effective_decision_current_status:
+            StoreTrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision,
+        effective_decision_precedence: StoreTrackIdentityEffectiveDecisionPrecedence::None,
+        blocked_system_decision_reason: None,
+        proves: "a backend-owned decision classified the exact-content track identity candidate under its recorded evidence basis".to_string(),
+        does_not_prove: "canonical track identity, same-song semantic identity, metadata reconciliation, CUE association, or multi-encode equivalence".to_string(),
+        superseded_by_decision_id: row.get(12)?,
+        evidence: Vec::new(),
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CurrentDecision {
+    track_identity_decision_id: i64,
+    decision_state: StoreTrackIdentityDecisionState,
+    decision_source: String,
+}
+
+fn read_current_decision_for_source(
+    connection: &Connection,
+    track_identity_candidate_id: i64,
+    decision_source: &str,
+) -> LibrarySqliteResult<Option<CurrentDecision>> {
+    connection
+        .query_row(
+            "SELECT track_identity_decision_id,
+                    decision_state,
+                    decision_source
+             FROM track_identity_decisions
+             WHERE track_identity_candidate_id = ?1
+               AND decision_source = ?2
+               AND superseded_by_decision_id IS NULL
+               AND decision_state != 'superseded'",
+            params![track_identity_candidate_id, decision_source],
+            |row| {
+                Ok(CurrentDecision {
+                    track_identity_decision_id: row.get(0)?,
+                    decision_state: map_decision_state(row.get::<_, String>(1)?.as_str()),
+                    decision_source: row.get(2)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn read_effective_decision_current_status(
+    connection: &Connection,
+    track_identity_candidate_id: i64,
+) -> LibrarySqliteResult<StoreTrackIdentityEffectiveDecisionCurrentStatus> {
+    let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
+    connection
+        .query_row(
+            &format!(
+                "SELECT CASE
+                    WHEN candidate.status = 'active'
+                     AND EXISTS (
+                         SELECT 1
+                         FROM track_identity_candidate_evidence evidence
+                         JOIN source_files file
+                           ON file.source_file_id = evidence.source_file_id
+                         LEFT JOIN SourceFacts facts
+                           ON facts.source_file_id = evidence.source_file_id
+                         LEFT JOIN source_file_attachment_links link
+                           ON link.source_file_attachment_link_id =
+                              evidence.source_file_attachment_link_id
+                         LEFT JOIN content_attachments attachment
+                           ON attachment.attachment_id = evidence.attachment_id
+                         WHERE evidence.track_identity_candidate_id =
+                               candidate.track_identity_candidate_id
+                           AND {current_evidence_predicate}
+                     )
+                    THEN 'current'
+                    ELSE 'stale'
+                 END
+                 FROM track_identity_candidates candidate
+                 WHERE candidate.track_identity_candidate_id = ?1",
+                current_evidence_predicate = current_evidence_predicate,
+            ),
+            params![track_identity_candidate_id, SOURCE_FILE_BLAKE3_ALGORITHM],
+            |row| {
+                Ok(match row.get::<_, String>(0)?.as_str() {
+                    "current" => StoreTrackIdentityEffectiveDecisionCurrentStatus::Current,
+                    _ => StoreTrackIdentityEffectiveDecisionCurrentStatus::Stale,
+                })
+            },
+        )
+        .map_err(Into::into)
+}
+
+fn blocked_system_decision_reason(
+    effective_decision: &CurrentDecision,
+    current_system_decision: Option<&CurrentDecision>,
+) -> Option<StoreTrackIdentityBlockedSystemDecisionReason> {
+    if effective_decision.decision_source != TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0 {
+        return None;
+    }
+    current_system_decision?;
+
+    match effective_decision.decision_state {
+        StoreTrackIdentityDecisionState::Rejected => {
+            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserRejected)
+        }
+        StoreTrackIdentityDecisionState::Deferred => {
+            Some(StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserDeferred)
+        }
+        StoreTrackIdentityDecisionState::Accepted | StoreTrackIdentityDecisionState::Superseded => {
+            None
+        }
+    }
 }
 
 fn read_track_identity_decision_evidence(

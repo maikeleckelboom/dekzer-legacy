@@ -13,7 +13,10 @@ use library_store_sqlite::{
     LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
     RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
     RootScanObservation, SourceFileBlake3HashAdmissionScope, SqliteDurableStore,
-    UnregisterLocalRootInput,
+    StoreTrackIdentityBlockedSystemDecisionReason, StoreTrackIdentityDecisionState,
+    StoreTrackIdentityEffectiveDecisionCurrentStatus,
+    StoreTrackIdentityEffectiveDecisionPrecedence, TrackIdentityDecisionWriteFailure,
+    TrackIdentityDecisionWriteResult, UnregisterLocalRootInput,
 };
 
 use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
@@ -37,6 +40,8 @@ use crate::source_maintenance::{
     SourceMaintenanceRun, SourceMaintenanceRunInput,
 };
 use crate::storage_environment::resolve_library_storage_environment;
+
+const MAX_TRACK_IDENTITY_DECISION_REASON_CHARS: usize = 512;
 
 struct ActiveScanJob {
     #[allow(dead_code)]
@@ -150,6 +155,9 @@ impl LibraryBoundaryService {
                 .handle_source_maintenance_command(command)
                 .map(Box::new)
                 .map(protocol::CommandReply::SourceMaintenance),
+            protocol::CommandRequest::TrackIdentityDecisionWrite(command) => self
+                .handle_track_identity_decision_write_command(command)
+                .map(protocol::CommandReply::TrackIdentityDecisionWrite),
             protocol::CommandRequest::SnapshotRead(command) => self
                 .handle_snapshot_read_command(command)
                 .map(protocol::CommandReply::SnapshotRead),
@@ -705,6 +713,45 @@ impl LibraryBoundaryService {
         Ok(map_run_source_maintenance_reply(run))
     }
 
+    pub fn accept_track_identity_candidate(
+        &self,
+        request: protocol::AcceptTrackIdentityCandidateRequest,
+    ) -> protocol::ProtocolResult<protocol::TrackIdentityDecisionWriteResult> {
+        let candidate_id = require_positive_i64(request.candidate_id, "candidateId")?;
+        let reason = sanitize_track_identity_decision_reason(request.reason);
+        let result = self
+            .durable_store
+            .accept_track_identity_candidate(candidate_id, reason)
+            .map_err(map_store_error)?;
+        map_track_identity_decision_write_result(result)
+    }
+
+    pub fn reject_track_identity_candidate(
+        &self,
+        request: protocol::RejectTrackIdentityCandidateRequest,
+    ) -> protocol::ProtocolResult<protocol::TrackIdentityDecisionWriteResult> {
+        let candidate_id = require_positive_i64(request.candidate_id, "candidateId")?;
+        let reason = sanitize_track_identity_decision_reason(request.reason);
+        let result = self
+            .durable_store
+            .reject_track_identity_candidate(candidate_id, reason)
+            .map_err(map_store_error)?;
+        map_track_identity_decision_write_result(result)
+    }
+
+    pub fn defer_track_identity_candidate(
+        &self,
+        request: protocol::DeferTrackIdentityCandidateRequest,
+    ) -> protocol::ProtocolResult<protocol::TrackIdentityDecisionWriteResult> {
+        let candidate_id = require_positive_i64(request.candidate_id, "candidateId")?;
+        let reason = sanitize_track_identity_decision_reason(request.reason);
+        let result = self
+            .durable_store
+            .defer_track_identity_candidate(candidate_id, reason)
+            .map_err(map_store_error)?;
+        map_track_identity_decision_write_result(result)
+    }
+
     pub fn read_source_maintenance(
         &self,
         request: protocol::ReadSourceMaintenanceRequest,
@@ -848,6 +895,26 @@ impl LibraryBoundaryService {
             protocol::SourceMaintenanceCommand::RunSourceMaintenance(request) => self
                 .run_source_maintenance(request)
                 .map(protocol::SourceMaintenanceReply::RunSourceMaintenance),
+        }
+    }
+
+    fn handle_track_identity_decision_write_command(
+        &self,
+        command: protocol::TrackIdentityDecisionWriteCommand,
+    ) -> protocol::ProtocolResult<protocol::TrackIdentityDecisionWriteReply> {
+        match command {
+            protocol::TrackIdentityDecisionWriteCommand::AcceptTrackIdentityCandidate(request) => {
+                self.accept_track_identity_candidate(request)
+                    .map(protocol::TrackIdentityDecisionWriteReply::AcceptTrackIdentityCandidate)
+            }
+            protocol::TrackIdentityDecisionWriteCommand::RejectTrackIdentityCandidate(request) => {
+                self.reject_track_identity_candidate(request)
+                    .map(protocol::TrackIdentityDecisionWriteReply::RejectTrackIdentityCandidate)
+            }
+            protocol::TrackIdentityDecisionWriteCommand::DeferTrackIdentityCandidate(request) => {
+                self.defer_track_identity_candidate(request)
+                    .map(protocol::TrackIdentityDecisionWriteReply::DeferTrackIdentityCandidate)
+            }
         }
     }
 
@@ -1161,6 +1228,149 @@ fn map_run_source_maintenance_reply(
     }
 }
 
+fn sanitize_track_identity_decision_reason(reason: Option<String>) -> Option<String> {
+    let reason = reason?;
+    let trimmed = reason.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    Some(
+        trimmed
+            .chars()
+            .take(MAX_TRACK_IDENTITY_DECISION_REASON_CHARS)
+            .collect(),
+    )
+}
+
+fn map_track_identity_decision_write_result(
+    result: TrackIdentityDecisionWriteResult,
+) -> protocol::ProtocolResult<protocol::TrackIdentityDecisionWriteResult> {
+    match result {
+        TrackIdentityDecisionWriteResult::Written(success) => {
+            Ok(protocol::TrackIdentityDecisionWriteResult::Written(
+                protocol::TrackIdentityDecisionWriteSuccess {
+                    decision_id: success.track_identity_decision_id,
+                    candidate_id: success.track_identity_candidate_id,
+                    decision_state: map_track_identity_decision_state(success.decision_state)?,
+                    decision_source: success.decision_source,
+                    evidence_snapshot_count: success.evidence_snapshot_count,
+                    decision_created: success.decision_created,
+                    effective_decision: protocol::TrackIdentityEffectiveDecisionSummary {
+                        effective_decision_id: success.effective_decision.effective_decision_id,
+                        effective_decision_state: success
+                            .effective_decision
+                            .effective_decision_state
+                            .map(map_track_identity_decision_state)
+                            .transpose()?,
+                        effective_decision_source: success
+                            .effective_decision
+                            .effective_decision_source,
+                        effective_decision_current_status: map_effective_decision_current_status(
+                            success.effective_decision.effective_decision_current_status,
+                        ),
+                        effective_decision_precedence: map_effective_decision_precedence(
+                            success.effective_decision.effective_decision_precedence,
+                        ),
+                        blocked_system_decision_reason: success
+                            .effective_decision
+                            .blocked_system_decision_reason
+                            .map(map_blocked_system_decision_reason),
+                    },
+                },
+            ))
+        }
+        TrackIdentityDecisionWriteResult::Failed(failure) => {
+            Ok(protocol::TrackIdentityDecisionWriteResult::Failed(
+                map_track_identity_decision_write_failure(failure),
+            ))
+        }
+    }
+}
+
+fn map_track_identity_decision_state(
+    state: StoreTrackIdentityDecisionState,
+) -> protocol::ProtocolResult<protocol::TrackIdentityDecisionState> {
+    match state {
+        StoreTrackIdentityDecisionState::Accepted => {
+            Ok(protocol::TrackIdentityDecisionState::Accepted)
+        }
+        StoreTrackIdentityDecisionState::Rejected => {
+            Ok(protocol::TrackIdentityDecisionState::Rejected)
+        }
+        StoreTrackIdentityDecisionState::Deferred => {
+            Ok(protocol::TrackIdentityDecisionState::Deferred)
+        }
+        StoreTrackIdentityDecisionState::Superseded => {
+            Err(protocol::ProtocolError::DurableStoreFailure {
+                detail: "effective track identity decision unexpectedly resolved to superseded"
+                    .to_string(),
+            })
+        }
+    }
+}
+
+fn map_effective_decision_current_status(
+    status: StoreTrackIdentityEffectiveDecisionCurrentStatus,
+) -> protocol::TrackIdentityEffectiveDecisionCurrentStatus {
+    match status {
+        StoreTrackIdentityEffectiveDecisionCurrentStatus::Current => {
+            protocol::TrackIdentityEffectiveDecisionCurrentStatus::Current
+        }
+        StoreTrackIdentityEffectiveDecisionCurrentStatus::Stale => {
+            protocol::TrackIdentityEffectiveDecisionCurrentStatus::Stale
+        }
+        StoreTrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision => {
+            protocol::TrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision
+        }
+    }
+}
+
+fn map_effective_decision_precedence(
+    precedence: StoreTrackIdentityEffectiveDecisionPrecedence,
+) -> protocol::TrackIdentityEffectiveDecisionPrecedence {
+    match precedence {
+        StoreTrackIdentityEffectiveDecisionPrecedence::User => {
+            protocol::TrackIdentityEffectiveDecisionPrecedence::User
+        }
+        StoreTrackIdentityEffectiveDecisionPrecedence::System => {
+            protocol::TrackIdentityEffectiveDecisionPrecedence::System
+        }
+        StoreTrackIdentityEffectiveDecisionPrecedence::None => {
+            protocol::TrackIdentityEffectiveDecisionPrecedence::None
+        }
+    }
+}
+
+fn map_blocked_system_decision_reason(
+    reason: StoreTrackIdentityBlockedSystemDecisionReason,
+) -> protocol::TrackIdentityBlockedSystemDecisionReason {
+    match reason {
+        StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserRejected => {
+            protocol::TrackIdentityBlockedSystemDecisionReason::CurrentUserRejected
+        }
+        StoreTrackIdentityBlockedSystemDecisionReason::CurrentUserDeferred => {
+            protocol::TrackIdentityBlockedSystemDecisionReason::CurrentUserDeferred
+        }
+    }
+}
+
+fn map_track_identity_decision_write_failure(
+    failure: TrackIdentityDecisionWriteFailure,
+) -> protocol::TrackIdentityDecisionWriteFailure {
+    match failure {
+        TrackIdentityDecisionWriteFailure::CandidateNotFound => {
+            protocol::TrackIdentityDecisionWriteFailure::CandidateNotFound
+        }
+        TrackIdentityDecisionWriteFailure::CandidateStaleForAccept => {
+            protocol::TrackIdentityDecisionWriteFailure::CandidateStaleForAccept
+        }
+        TrackIdentityDecisionWriteFailure::NoCurrentEvidenceForAccept => {
+            protocol::TrackIdentityDecisionWriteFailure::NoCurrentEvidenceForAccept
+        }
+    }
+}
+
 fn validate_contents_scope(scope: &protocol::ContentsScope) -> protocol::ProtocolResult<()> {
     match scope {
         protocol::ContentsScope::Source { source_id } => {
@@ -1233,12 +1443,13 @@ pub(crate) fn map_store_error(
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
-        AttachmentIdentityReadStatus, CancelRootScanReply, CancelRootScanRequest,
-        CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest, ContentsMediaClass,
-        ContentsReadPolicy, ContentsReadRequest, ContentsRecursion, ContentsRowProfile,
-        ContentsScope, CreatePlaylistReply, CreatePlaylistRequest, DeletePlaylistReply,
-        DeletePlaylistRequest, DirectoryImageMediaState, DirectoryPrimaryMediaState,
-        DirectoryScanState, HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
+        AcceptTrackIdentityCandidateRequest, AttachmentIdentityReadStatus, CancelRootScanReply,
+        CancelRootScanRequest, CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest,
+        ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
+        ContentsRowProfile, ContentsScope, CreatePlaylistReply, CreatePlaylistRequest,
+        DeferTrackIdentityCandidateRequest, DeletePlaylistReply, DeletePlaylistRequest,
+        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
+        HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
         HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
         LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
@@ -1250,11 +1461,16 @@ mod tests {
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
         ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
         ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest, RegisterLocalRootReply,
-        RegisterLocalRootRequest, RenamePlaylistReply, RenamePlaylistRequest,
-        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SnapshotReadCommand,
-        SnapshotReadReply, SourceFileAttachmentLinkStatus, SourceFileHashCommand,
-        SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
-        StartRootScanRequest, UnregisterLocalRootReply, UnregisterLocalRootRequest,
+        RegisterLocalRootRequest, RejectTrackIdentityCandidateRequest, RenamePlaylistReply,
+        RenamePlaylistRequest, RunSourceMaintenanceReply, RunSourceMaintenanceRequest,
+        SnapshotReadCommand, SnapshotReadReply, SourceFileAttachmentLinkStatus,
+        SourceFileHashCommand, SourceFileHashReply, SourceMaintenanceCommand,
+        SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
+        TrackIdentityBlockedSystemDecisionReason, TrackIdentityDecisionState,
+        TrackIdentityDecisionWriteCommand, TrackIdentityDecisionWriteFailure,
+        TrackIdentityDecisionWriteReply, TrackIdentityDecisionWriteResult,
+        TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
+        UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use rusqlite::Connection;
     use serde_json::json;
@@ -1533,6 +1749,15 @@ mod tests {
                 SourceMaintenanceReply::RunSourceMaintenance(reply) => reply,
             },
             other => panic!("expected run source maintenance reply, got {other:?}"),
+        }
+    }
+
+    fn expect_track_identity_decision_write_reply(
+        reply: CommandReply,
+    ) -> TrackIdentityDecisionWriteReply {
+        match reply {
+            CommandReply::TrackIdentityDecisionWrite(reply) => reply,
+            other => panic!("expected track identity decision write reply, got {other:?}"),
         }
     }
 
@@ -2527,6 +2752,196 @@ mod tests {
         );
         assert_eq!(count_rows(&context, "track_identity_decisions"), 1);
         assert_eq!(count_rows(&context, "track_identity_decision_evidence"), 1);
+    }
+
+    #[test]
+    fn track_identity_decision_write_commands_are_service_owned_and_candidate_scoped() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("track-identity-decision-write-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let wav = tiny_wav_bytes(44_100, 2, 16, 4_410);
+        std::fs::write(source_root.join("track.wav"), &wav).expect("write wav");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(&service, registered.root_id, 100, "track.wav", wav.len());
+
+        let maintenance = run_source_maintenance_with_request(
+            &service,
+            RunSourceMaintenanceRequest {
+                source_id: registered.root_id,
+                hash_limit: Some(10),
+                attachment_limit: Some(10),
+                probe_limit: Some(10),
+                promotion_limit: Some(10),
+                identity_candidate_limit: Some(10),
+                identity_decision_limit: Some(10),
+            },
+        );
+        assert_eq!(maintenance.track_identity_candidates.candidates_created, 1);
+        assert_eq!(maintenance.track_identity_decisions.decisions_created, 1);
+
+        let candidate_id = service
+            .durable_store
+            .read_track_identity_candidates_for_source(registered.root_id, 10)
+            .expect("read track identity candidates")
+            .into_iter()
+            .next()
+            .expect("candidate exists")
+            .track_identity_candidate_id;
+
+        let reject_reply = expect_track_identity_decision_write_reply(expect_success(
+            service.handle_command(CommandRequest::TrackIdentityDecisionWrite(
+                TrackIdentityDecisionWriteCommand::RejectTrackIdentityCandidate(
+                    RejectTrackIdentityCandidateRequest {
+                        candidate_id,
+                        reason: Some("  not this identity  ".to_string()),
+                    },
+                ),
+            )),
+        ));
+        let reject_success = match reject_reply {
+            TrackIdentityDecisionWriteReply::RejectTrackIdentityCandidate(
+                TrackIdentityDecisionWriteResult::Written(success),
+            ) => success,
+            other => panic!("expected reject success, got {other:?}"),
+        };
+        assert_eq!(reject_success.candidate_id, candidate_id);
+        assert_eq!(
+            reject_success.decision_state,
+            TrackIdentityDecisionState::Rejected
+        );
+        assert_eq!(reject_success.decision_source, "user_local_v0");
+        assert_eq!(reject_success.evidence_snapshot_count, 1);
+        assert_eq!(
+            reject_success
+                .effective_decision
+                .effective_decision_current_status,
+            TrackIdentityEffectiveDecisionCurrentStatus::Current
+        );
+        assert_eq!(
+            reject_success
+                .effective_decision
+                .effective_decision_precedence,
+            TrackIdentityEffectiveDecisionPrecedence::User
+        );
+        assert_eq!(
+            reject_success
+                .effective_decision
+                .blocked_system_decision_reason,
+            Some(TrackIdentityBlockedSystemDecisionReason::CurrentUserRejected)
+        );
+
+        let decisions_after_reject = service
+            .durable_store
+            .read_track_identity_decisions_for_candidate(candidate_id, 10)
+            .expect("read decisions after reject");
+        let user_reject = decisions_after_reject
+            .iter()
+            .find(|decision| decision.decision_source == "user_local_v0")
+            .expect("user reject decision exists");
+        assert_eq!(user_reject.decision_reason, "not this identity");
+
+        let blocked_maintenance = run_source_maintenance_with_request(
+            &service,
+            RunSourceMaintenanceRequest {
+                source_id: registered.root_id,
+                hash_limit: Some(10),
+                attachment_limit: Some(10),
+                probe_limit: Some(10),
+                promotion_limit: Some(10),
+                identity_candidate_limit: Some(10),
+                identity_decision_limit: Some(10),
+            },
+        );
+        assert_eq!(
+            blocked_maintenance
+                .track_identity_decisions
+                .decisions_created,
+            0
+        );
+        assert_eq!(
+            blocked_maintenance
+                .track_identity_decisions
+                .skipped_user_blocked_candidates,
+            1
+        );
+
+        let accept_reply = expect_track_identity_decision_write_reply(expect_success(
+            service.handle_command(CommandRequest::TrackIdentityDecisionWrite(
+                TrackIdentityDecisionWriteCommand::AcceptTrackIdentityCandidate(
+                    AcceptTrackIdentityCandidateRequest {
+                        candidate_id,
+                        reason: Some("same identity".to_string()),
+                    },
+                ),
+            )),
+        ));
+        let accept_success = match accept_reply {
+            TrackIdentityDecisionWriteReply::AcceptTrackIdentityCandidate(
+                TrackIdentityDecisionWriteResult::Written(success),
+            ) => success,
+            other => panic!("expected accept success, got {other:?}"),
+        };
+        assert_eq!(
+            accept_success.decision_state,
+            TrackIdentityDecisionState::Accepted
+        );
+        assert_eq!(
+            accept_success
+                .effective_decision
+                .effective_decision_precedence,
+            TrackIdentityEffectiveDecisionPrecedence::User
+        );
+        assert_eq!(
+            accept_success
+                .effective_decision
+                .blocked_system_decision_reason,
+            None
+        );
+
+        let decisions_after_accept = service
+            .durable_store
+            .read_track_identity_decisions_for_candidate(candidate_id, 10)
+            .expect("read decisions after accept");
+        assert!(
+            decisions_after_accept
+                .iter()
+                .any(
+                    |decision| decision.track_identity_decision_id == reject_success.decision_id
+                        && decision.superseded_by_decision_id == Some(accept_success.decision_id)
+                ),
+            "user accept should supersede the prior current user reject"
+        );
+
+        let missing_reply = expect_track_identity_decision_write_reply(expect_success(
+            service.handle_command(CommandRequest::TrackIdentityDecisionWrite(
+                TrackIdentityDecisionWriteCommand::AcceptTrackIdentityCandidate(
+                    AcceptTrackIdentityCandidateRequest {
+                        candidate_id: 99_999,
+                        reason: None,
+                    },
+                ),
+            )),
+        ));
+        assert!(matches!(
+            missing_reply,
+            TrackIdentityDecisionWriteReply::AcceptTrackIdentityCandidate(
+                TrackIdentityDecisionWriteResult::Failed(
+                    TrackIdentityDecisionWriteFailure::CandidateNotFound
+                )
+            )
+        ));
+
+        let invalid = service.try_handle_command(CommandRequest::TrackIdentityDecisionWrite(
+            TrackIdentityDecisionWriteCommand::DeferTrackIdentityCandidate(
+                DeferTrackIdentityCandidateRequest {
+                    candidate_id: 0,
+                    reason: None,
+                },
+            ),
+        ));
+        assert!(matches!(invalid, Err(ProtocolError::InvalidRequest { .. })));
     }
 
     #[test]

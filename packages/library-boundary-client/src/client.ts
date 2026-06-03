@@ -1,10 +1,12 @@
 import type {
+  AcceptTrackIdentityCandidateRequest,
   CancelRootScanReply,
   CancelRootScanRequest,
   CommandReply,
   CommandRequest,
   CreatePlaylistReply,
   CreatePlaylistRequest,
+  DeferTrackIdentityCandidateRequest,
   DeletePlaylistReply,
   DeletePlaylistRequest,
   HashSourceFilesBlake3Reply,
@@ -37,6 +39,7 @@ import type {
   ContentsReadRequest,
   RegisterLocalRootReply,
   RegisterLocalRootRequest,
+  RejectTrackIdentityCandidateRequest,
   RenamePlaylistReply,
   RenamePlaylistRequest,
   RunSourceMaintenanceReply,
@@ -45,90 +48,83 @@ import type {
   StartRootScanRequest,
   SearchNavigationNodeLibraryBrowserWindowReply,
   SearchNavigationNodeLibraryBrowserWindowRequest,
+  TrackIdentityDecisionWriteResult,
   UnregisterLocalRootReply,
   UnregisterLocalRootRequest
-} from "@dekzer/library-boundary-contract";
+} from '@dekzer/library-boundary-contract'
 
 import {
   executeLibraryBoundaryCommand,
   type LibraryBoundaryCommandReplyPayload,
   type LibraryBoundaryCommandReplyVariant
-} from "./commandExecutor.js";
-import type { LibraryBoundaryCommandExecutor } from "./transport.js";
+} from './commandExecutor.js'
+import type { LibraryBoundaryCommandExecutor } from './transport.js'
 
 type VariantPayload<
-  Family extends CommandReply["type"],
+  Family extends CommandReply['type'],
   Variant extends LibraryBoundaryCommandReplyVariant<Family>
-> = LibraryBoundaryCommandReplyPayload<Family, Variant>;
+> = LibraryBoundaryCommandReplyPayload<Family, Variant>
 
 export class LibraryBoundaryClient {
-  readonly #executor: LibraryBoundaryCommandExecutor;
+  readonly #executor: LibraryBoundaryCommandExecutor
 
   constructor(executor: LibraryBoundaryCommandExecutor) {
-    this.#executor = executor;
+    this.#executor = executor
   }
 
-  registerLocalRoot(
-    request: RegisterLocalRootRequest
-  ): Promise<RegisterLocalRootReply> {
+  registerLocalRoot(request: RegisterLocalRootRequest): Promise<RegisterLocalRootReply> {
     return this.sendAndExpect(
       {
-        type: "libraryRoots",
-        payload: { type: "registerLocalRoot", payload: request }
+        type: 'libraryRoots',
+        payload: { type: 'registerLocalRoot', payload: request }
       },
-      "libraryRoots",
-      "registerLocalRoot"
-    );
+      'libraryRoots',
+      'registerLocalRoot'
+    )
   }
 
   startRootScan(request: StartRootScanRequest): Promise<StartRootScanReply> {
     return this.sendAndExpect(
       {
-        type: "libraryRoots",
-        payload: { type: "startRootScan", payload: request }
+        type: 'libraryRoots',
+        payload: { type: 'startRootScan', payload: request }
       },
-      "libraryRoots",
-      "startRootScan"
-    );
+      'libraryRoots',
+      'startRootScan'
+    )
   }
 
-  readLocalRoots(
-    request: ReadLocalRootsRequest
-  ): Promise<ReadLocalRootsReply> {
+  readLocalRoots(request: ReadLocalRootsRequest): Promise<ReadLocalRootsReply> {
     return this.sendAndExpect(
       {
-        type: "libraryRoots",
-        payload: { type: "readLocalRoots", payload: request }
+        type: 'libraryRoots',
+        payload: { type: 'readLocalRoots', payload: request }
       },
-      "libraryRoots",
-      "readLocalRoots"
-    );
+      'libraryRoots',
+      'readLocalRoots'
+    )
   }
 
-  unregisterLocalRoot(
-    request: UnregisterLocalRootRequest
-  ): Promise<UnregisterLocalRootReply> {
+  unregisterLocalRoot(request: UnregisterLocalRootRequest): Promise<UnregisterLocalRootReply> {
     return this.sendAndExpect(
       {
-        type: "libraryRoots",
-        payload: { type: "unregisterLocalRoot", payload: request }
+        type: 'libraryRoots',
+        payload: { type: 'unregisterLocalRoot', payload: request }
       },
-      "libraryRoots",
-      "unregisterLocalRoot"
-    );
+      'libraryRoots',
+      'unregisterLocalRoot'
+    )
   }
 
-  cancelRootScan(
-    request: CancelRootScanRequest
-  ): Promise<CancelRootScanReply> {
+  cancelRootScan(request: CancelRootScanRequest): Promise<CancelRootScanReply> {
     return this.sendAndExpect(
       {
-        type: "libraryRoots",
-        payload: { type: "cancelRootScan", payload: request }
+        type: 'libraryRoots',
+        payload: { type: 'cancelRootScan', payload: request }
       },
-      "libraryRoots",
-      "cancelRootScan"
-    );
+      'libraryRoots',
+      'cancelRootScan'
+    )
   }
 
   hashSourceFilesBlake3(
@@ -136,51 +132,84 @@ export class LibraryBoundaryClient {
   ): Promise<HashSourceFilesBlake3Reply> {
     return this.sendAndExpect(
       {
-        type: "sourceFileHash",
-        payload: { type: "hashSourceFilesBlake3", payload: request }
+        type: 'sourceFileHash',
+        payload: { type: 'hashSourceFilesBlake3', payload: request }
       },
-      "sourceFileHash",
-      "hashSourceFilesBlake3"
-    );
+      'sourceFileHash',
+      'hashSourceFilesBlake3'
+    )
   }
 
-  runSourceMaintenance(
-    request: RunSourceMaintenanceRequest
-  ): Promise<RunSourceMaintenanceReply> {
+  runSourceMaintenance(request: RunSourceMaintenanceRequest): Promise<RunSourceMaintenanceReply> {
     return this.sendAndExpect(
       {
-        type: "sourceMaintenance",
-        payload: { type: "runSourceMaintenance", payload: request }
+        type: 'sourceMaintenance',
+        payload: { type: 'runSourceMaintenance', payload: request }
       },
-      "sourceMaintenance",
-      "runSourceMaintenance"
-    );
+      'sourceMaintenance',
+      'runSourceMaintenance'
+    )
   }
 
-  readNavigationRows(
-    request: ReadNavigationRowsRequest
-  ): Promise<ReadNavigationRowsReply> {
+  acceptTrackIdentityCandidate(
+    request: AcceptTrackIdentityCandidateRequest
+  ): Promise<TrackIdentityDecisionWriteResult> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
-        payload: { type: "readNavigationRows", payload: request }
+        type: 'trackIdentityDecisionWrite',
+        payload: { type: 'acceptTrackIdentityCandidate', payload: request }
       },
-      "snapshotRead",
-      "navigationRows"
-    );
+      'trackIdentityDecisionWrite',
+      'acceptTrackIdentityCandidate'
+    )
   }
 
-  loadNavigationRow(
-    request: LoadNavigationRowRequest
-  ): Promise<LoadNavigationRowReply> {
+  rejectTrackIdentityCandidate(
+    request: RejectTrackIdentityCandidateRequest
+  ): Promise<TrackIdentityDecisionWriteResult> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
-        payload: { type: "loadNavigationRow", payload: request }
+        type: 'trackIdentityDecisionWrite',
+        payload: { type: 'rejectTrackIdentityCandidate', payload: request }
       },
-      "snapshotRead",
-      "navigationRow"
-    );
+      'trackIdentityDecisionWrite',
+      'rejectTrackIdentityCandidate'
+    )
+  }
+
+  deferTrackIdentityCandidate(
+    request: DeferTrackIdentityCandidateRequest
+  ): Promise<TrackIdentityDecisionWriteResult> {
+    return this.sendAndExpect(
+      {
+        type: 'trackIdentityDecisionWrite',
+        payload: { type: 'deferTrackIdentityCandidate', payload: request }
+      },
+      'trackIdentityDecisionWrite',
+      'deferTrackIdentityCandidate'
+    )
+  }
+
+  readNavigationRows(request: ReadNavigationRowsRequest): Promise<ReadNavigationRowsReply> {
+    return this.sendAndExpect(
+      {
+        type: 'snapshotRead',
+        payload: { type: 'readNavigationRows', payload: request }
+      },
+      'snapshotRead',
+      'navigationRows'
+    )
+  }
+
+  loadNavigationRow(request: LoadNavigationRowRequest): Promise<LoadNavigationRowReply> {
+    return this.sendAndExpect(
+      {
+        type: 'snapshotRead',
+        payload: { type: 'loadNavigationRow', payload: request }
+      },
+      'snapshotRead',
+      'navigationRow'
+    )
   }
 
   loadNavigationRowByStableKey(
@@ -188,12 +217,12 @@ export class LibraryBoundaryClient {
   ): Promise<LoadNavigationRowByStableKeyReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
-        payload: { type: "loadNavigationRowByStableKey", payload: request }
+        type: 'snapshotRead',
+        payload: { type: 'loadNavigationRowByStableKey', payload: request }
       },
-      "snapshotRead",
-      "navigationRowByStableKey"
-    );
+      'snapshotRead',
+      'navigationRowByStableKey'
+    )
   }
 
   readLibraryTreeChildren(
@@ -201,31 +230,29 @@ export class LibraryBoundaryClient {
   ): Promise<ReadLibraryTreeChildrenReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "readLibraryTreeChildren",
+          type: 'readLibraryTreeChildren',
           payload: request
         }
       },
-      "snapshotRead",
-      "libraryTreeChildren"
-    );
+      'snapshotRead',
+      'libraryTreeChildren'
+    )
   }
 
-  readSourceLifecycle(
-    request: ReadSourceLifecycleRequest
-  ): Promise<ReadSourceLifecycleReply> {
+  readSourceLifecycle(request: ReadSourceLifecycleRequest): Promise<ReadSourceLifecycleReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "readSourceLifecycle",
+          type: 'readSourceLifecycle',
           payload: request
         }
       },
-      "snapshotRead",
-      "sourceLifecycle"
-    );
+      'snapshotRead',
+      'sourceLifecycle'
+    )
   }
 
   readSourceMaintenance(
@@ -233,15 +260,15 @@ export class LibraryBoundaryClient {
   ): Promise<ReadSourceMaintenanceReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "readSourceMaintenance",
+          type: 'readSourceMaintenance',
           payload: request
         }
       },
-      "snapshotRead",
-      "sourceMaintenance"
-    );
+      'snapshotRead',
+      'sourceMaintenance'
+    )
   }
 
   readSourceFileAttachment(
@@ -249,15 +276,15 @@ export class LibraryBoundaryClient {
   ): Promise<ReadSourceFileAttachmentReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "readSourceFileAttachment",
+          type: 'readSourceFileAttachment',
           payload: request
         }
       },
-      "snapshotRead",
-      "sourceFileAttachment"
-    );
+      'snapshotRead',
+      'sourceFileAttachment'
+    )
   }
 
   readAttachmentSourceFiles(
@@ -265,15 +292,15 @@ export class LibraryBoundaryClient {
   ): Promise<ReadAttachmentSourceFilesReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "readAttachmentSourceFiles",
+          type: 'readAttachmentSourceFiles',
           payload: request
         }
       },
-      "snapshotRead",
-      "attachmentSourceFiles"
-    );
+      'snapshotRead',
+      'attachmentSourceFiles'
+    )
   }
 
   readSourceAttachmentSummary(
@@ -281,15 +308,15 @@ export class LibraryBoundaryClient {
   ): Promise<ReadSourceAttachmentSummaryReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "readSourceAttachmentSummary",
+          type: 'readSourceAttachmentSummary',
           payload: request
         }
       },
-      "snapshotRead",
-      "sourceAttachmentSummary"
-    );
+      'snapshotRead',
+      'sourceAttachmentSummary'
+    )
   }
 
   readNavigationNodeLibraryBrowserWindow(
@@ -297,15 +324,15 @@ export class LibraryBoundaryClient {
   ): Promise<ReadNavigationNodeLibraryBrowserWindowReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "readNavigationNodeLibraryBrowserWindow",
+          type: 'readNavigationNodeLibraryBrowserWindow',
           payload: request
         }
       },
-      "snapshotRead",
-      "navigationNodeLibraryBrowserWindow"
-    );
+      'snapshotRead',
+      'navigationNodeLibraryBrowserWindow'
+    )
   }
 
   searchNavigationNodeLibraryBrowserWindow(
@@ -313,70 +340,62 @@ export class LibraryBoundaryClient {
   ): Promise<SearchNavigationNodeLibraryBrowserWindowReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "searchNavigationNodeLibraryBrowserWindow",
+          type: 'searchNavigationNodeLibraryBrowserWindow',
           payload: request
         }
       },
-      "snapshotRead",
-      "navigationNodeLibraryBrowserSearch"
-    );
+      'snapshotRead',
+      'navigationNodeLibraryBrowserSearch'
+    )
   }
 
-  readContents(
-    request: ContentsReadRequest
-  ): Promise<ContentsReadReply> {
+  readContents(request: ContentsReadRequest): Promise<ContentsReadReply> {
     return this.sendAndExpect(
       {
-        type: "snapshotRead",
+        type: 'snapshotRead',
         payload: {
-          type: "contentsRead",
+          type: 'contentsRead',
           payload: request
         }
       },
-      "snapshotRead",
-      "contents"
-    );
+      'snapshotRead',
+      'contents'
+    )
   }
 
-  createPlaylist(
-    request: CreatePlaylistRequest
-  ): Promise<CreatePlaylistReply> {
+  createPlaylist(request: CreatePlaylistRequest): Promise<CreatePlaylistReply> {
     return this.sendAndExpect(
       {
-        type: "playlistWrite",
-        payload: { type: "createPlaylist", payload: request }
+        type: 'playlistWrite',
+        payload: { type: 'createPlaylist', payload: request }
       },
-      "playlistWrite",
-      "createPlaylist"
-    );
+      'playlistWrite',
+      'createPlaylist'
+    )
   }
 
-  renamePlaylist(
-    request: RenamePlaylistRequest
-  ): Promise<RenamePlaylistReply> {
+  renamePlaylist(request: RenamePlaylistRequest): Promise<RenamePlaylistReply> {
     return this.sendAndExpect(
       {
-        type: "playlistWrite",
-        payload: { type: "renamePlaylist", payload: request }
+        type: 'playlistWrite',
+        payload: { type: 'renamePlaylist', payload: request }
       },
-      "playlistWrite",
-      "renamePlaylist"
-    );
+      'playlistWrite',
+      'renamePlaylist'
+    )
   }
 
-  deletePlaylist(
-    request: DeletePlaylistRequest
-  ): Promise<DeletePlaylistReply> {
+  deletePlaylist(request: DeletePlaylistRequest): Promise<DeletePlaylistReply> {
     return this.sendAndExpect(
       {
-        type: "playlistWrite",
-        payload: { type: "deletePlaylist", payload: request }
+        type: 'playlistWrite',
+        payload: { type: 'deletePlaylist', payload: request }
       },
-      "playlistWrite",
-      "deletePlaylist"
-    );
+      'playlistWrite',
+      'deletePlaylist'
+    )
   }
 
   readAfterBoundaryEvents(
@@ -384,33 +403,28 @@ export class LibraryBoundaryClient {
   ): Promise<ReadLibraryBoundaryEventsAfterReply> {
     return this.sendAndExpect(
       {
-        type: "libraryBoundaryEvents",
-        payload: { type: "readAfter", payload: request }
+        type: 'libraryBoundaryEvents',
+        payload: { type: 'readAfter', payload: request }
       },
-      "libraryBoundaryEvents",
-      "readAfter"
-    );
+      'libraryBoundaryEvents',
+      'readAfter'
+    )
   }
 
   private async sendAndExpect<
-    Family extends CommandReply["type"],
+    Family extends CommandReply['type'],
     Variant extends LibraryBoundaryCommandReplyVariant<Family>
   >(
     request: CommandRequest,
     expectedFamily: Family,
     expectedVariant: Variant
   ): Promise<VariantPayload<Family, Variant>> {
-    return executeLibraryBoundaryCommand(
-      this.#executor,
-      request,
-      expectedFamily,
-      expectedVariant
-    );
+    return executeLibraryBoundaryCommand(this.#executor, request, expectedFamily, expectedVariant)
   }
 }
 
 export function createLibraryBoundaryClient(
   executor: LibraryBoundaryCommandExecutor
 ): LibraryBoundaryClient {
-  return new LibraryBoundaryClient(executor);
+  return new LibraryBoundaryClient(executor)
 }

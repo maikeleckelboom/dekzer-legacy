@@ -10,8 +10,9 @@ import type {
   ReadSourceMaintenanceReply,
   ReadSourceFileAttachmentReply,
   RegisterLocalRootReply,
-  RunSourceMaintenanceReply
-} from "@dekzer/library-boundary-contract";
+  RunSourceMaintenanceReply,
+  TrackIdentityDecisionWriteResult
+} from '@dekzer/library-boundary-contract'
 
 import {
   LIBRARY_BOUNDARY_LISTENER_ERROR_RETENTION_LIMIT,
@@ -24,127 +25,132 @@ import {
   LibraryBoundarySessionStateError,
   LibraryBoundaryTransportError,
   type LibraryBoundaryTransport
-} from "../src/index.js";
+} from '../src/index.js'
 
-type EqualTypes<Left, Right> = (<Value>() => Value extends Left
-  ? 1
-  : 2) extends <Value>() => Value extends Right ? 1 : 2
-  ? true
-  : false;
+type EqualTypes<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? true
+    : false
 
-type AssertType<Condition extends true> = Condition;
+type AssertType<Condition extends true> = Condition
 
 type RegisterLocalRootReturnIsGenerated = AssertType<
   EqualTypes<
-    Awaited<ReturnType<LibraryBoundaryClient["registerLocalRoot"]>>,
+    Awaited<ReturnType<LibraryBoundaryClient['registerLocalRoot']>>,
     RegisterLocalRootReply
   >
->;
+>
 
 type RegisterLocalRootIdStaysString = AssertType<
-  EqualTypes<RegisterLocalRootReply["rootId"], string>
->;
+  EqualTypes<RegisterLocalRootReply['rootId'], string>
+>
 
 type HashSourceFilesBlake3ReturnIsGenerated = AssertType<
   EqualTypes<
-    Awaited<ReturnType<LibraryBoundaryClient["hashSourceFilesBlake3"]>>,
+    Awaited<ReturnType<LibraryBoundaryClient['hashSourceFilesBlake3']>>,
     HashSourceFilesBlake3Reply
   >
->;
+>
 
 type RunSourceMaintenanceReturnIsGenerated = AssertType<
   EqualTypes<
-    Awaited<ReturnType<LibraryBoundaryClient["runSourceMaintenance"]>>,
+    Awaited<ReturnType<LibraryBoundaryClient['runSourceMaintenance']>>,
     RunSourceMaintenanceReply
   >
->;
+>
+
+type AcceptTrackIdentityCandidateReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient['acceptTrackIdentityCandidate']>>,
+    TrackIdentityDecisionWriteResult
+  >
+>
 
 type ReadSourceMaintenanceReturnIsGenerated = AssertType<
   EqualTypes<
-    Awaited<ReturnType<LibraryBoundaryClient["readSourceMaintenance"]>>,
+    Awaited<ReturnType<LibraryBoundaryClient['readSourceMaintenance']>>,
     ReadSourceMaintenanceReply
   >
->;
+>
 
 type ReadSourceFileAttachmentReturnIsGenerated = AssertType<
   EqualTypes<
-    Awaited<ReturnType<LibraryBoundaryClient["readSourceFileAttachment"]>>,
+    Awaited<ReturnType<LibraryBoundaryClient['readSourceFileAttachment']>>,
     ReadSourceFileAttachmentReply
   >
->;
+>
 
 const compileTimeAssertions: [
   RegisterLocalRootReturnIsGenerated,
   RegisterLocalRootIdStaysString,
   HashSourceFilesBlake3ReturnIsGenerated,
   RunSourceMaintenanceReturnIsGenerated,
+  AcceptTrackIdentityCandidateReturnIsGenerated,
   ReadSourceMaintenanceReturnIsGenerated,
   ReadSourceFileAttachmentReturnIsGenerated
-] = [true, true, true, true, true, true];
-void compileTimeAssertions;
+] = [true, true, true, true, true, true, true]
+void compileTimeAssertions
 
-type Resolve<T> = (value: T | PromiseLike<T>) => void;
-type Reject = (reason?: unknown) => void;
+type Resolve<T> = (value: T | PromiseLike<T>) => void
+type Reject = (reason?: unknown) => void
 
 type Deferred<T> = {
-  readonly promise: Promise<T>;
-  readonly resolve: Resolve<T>;
-  readonly reject: Reject;
-};
+  readonly promise: Promise<T>
+  readonly resolve: Resolve<T>
+  readonly reject: Reject
+}
 
 function deferred<T>(): Deferred<T> {
-  let resolve: Resolve<T> | null = null;
-  let reject: Reject | null = null;
+  let resolve: Resolve<T> | null = null
+  let reject: Reject | null = null
   const promise = new Promise<T>((innerResolve, innerReject) => {
-    resolve = innerResolve;
-    reject = innerReject;
-  });
+    resolve = innerResolve
+    reject = innerReject
+  })
 
   return {
     promise,
     resolve: (value) => {
-      must(resolve !== null, "deferred resolve was not initialized");
-      resolve(value);
+      must(resolve !== null, 'deferred resolve was not initialized')
+      resolve(value)
     },
     reject: (reason) => {
-      must(reject !== null, "deferred reject was not initialized");
-      reject(reason);
+      must(reject !== null, 'deferred reject was not initialized')
+      reject(reason)
     }
-  };
+  }
 }
 
 function success(reply: CommandReply): CommandOutcome {
   return {
-    type: "success",
+    type: 'success',
     payload: { reply }
-  };
+  }
 }
 
 function protocolFailure(error: ProtocolError): CommandOutcome {
   return {
-    type: "error",
+    type: 'error',
     payload: { error }
-  };
+  }
 }
 
-function event(
-  invalidation: MaintainedSnapshotInvalidation
-): LibraryBoundaryEvent {
+function event(invalidation: MaintainedSnapshotInvalidation): LibraryBoundaryEvent {
   return {
-    type: "maintainedSnapshotInvalidated",
+    type: 'maintainedSnapshotInvalidated',
     payload: {
       eventSequence: 0,
       occurredAtMs: 0,
       invalidation
     } satisfies MaintainedSnapshotEvent
-  };
+  }
 }
 
 function eventsReply(events: readonly LibraryBoundaryEvent[]): CommandOutcome {
   return success({
-    type: "libraryBoundaryEvents",
+    type: 'libraryBoundaryEvents',
     payload: {
-      type: "readAfter",
+      type: 'readAfter',
       payload: {
         events: [...events],
         latestEventSequence: null,
@@ -152,111 +158,109 @@ function eventsReply(events: readonly LibraryBoundaryEvent[]): CommandOutcome {
         gapDetected: false
       }
     }
-  });
+  })
 }
 
 class RecordingTransport implements LibraryBoundaryTransport {
-  readonly sentRequests: CommandRequest[] = [];
-  closeCount = 0;
-  private readonly outcomes: Array<
-    CommandOutcome | Deferred<CommandOutcome> | Error
-  > = [];
+  readonly sentRequests: CommandRequest[] = []
+  closeCount = 0
+  private readonly outcomes: Array<CommandOutcome | Deferred<CommandOutcome> | Error> = []
 
   enqueueOutcome(outcome: CommandOutcome): void {
-    this.outcomes.push(outcome);
+    this.outcomes.push(outcome)
   }
 
   enqueueEvents(events: readonly LibraryBoundaryEvent[]): void {
-    this.enqueueOutcome(eventsReply(events));
+    this.enqueueOutcome(eventsReply(events))
   }
 
   enqueueRejection(cause: Error): void {
-    this.outcomes.push(cause);
+    this.outcomes.push(cause)
   }
 
   enqueueDeferredOutcome(): Deferred<CommandOutcome> {
-    const pending = deferred<CommandOutcome>();
-    this.outcomes.push(pending);
-    return pending;
+    const pending = deferred<CommandOutcome>()
+    this.outcomes.push(pending)
+    return pending
   }
 
   async execute(request: CommandRequest): Promise<CommandOutcome> {
-    this.sentRequests.push(request);
-    const outcome = this.outcomes.shift();
+    this.sentRequests.push(request)
+    const outcome = this.outcomes.shift()
     if (outcome === undefined) {
-      throw new Error(`missing test outcome for ${request.type}`);
+      throw new Error(`missing test outcome for ${request.type}`)
     }
     if (outcome instanceof Error) {
-      throw outcome;
+      throw outcome
     }
-    if ("promise" in outcome) {
-      return outcome.promise;
+    if ('promise' in outcome) {
+      return outcome.promise
     }
 
-    return outcome;
+    return outcome
   }
 
   close(): void {
-    this.closeCount += 1;
+    this.closeCount += 1
   }
 }
 
 async function validatesRegisterLocalRootRequestAndReply(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
-      type: "libraryRoots",
+      type: 'libraryRoots',
       payload: {
-        type: "registerLocalRoot",
+        type: 'registerLocalRoot',
         payload: {
-          rootId: "root-1",
-          canonicalPath: "C:/Music"
+          rootId: 'root-1',
+          canonicalPath: 'C:/Music'
         }
       }
     })
-  );
-  const client = new LibraryBoundaryClient(transport);
+  )
+  const client = new LibraryBoundaryClient(transport)
 
   const reply = await client.registerLocalRoot({
-    absolutePath: "C:/Music"
-  });
+    absolutePath: 'C:/Music'
+  })
 
   deepEqual(
     transport.sentRequests[0],
     {
-      type: "libraryRoots",
+      type: 'libraryRoots',
       payload: {
-        type: "registerLocalRoot",
-        payload: { absolutePath: "C:/Music" }
+        type: 'registerLocalRoot',
+        payload: { absolutePath: 'C:/Music' }
       }
     } satisfies CommandRequest,
-    "registerLocalRoot sends the generated boundary command"
-  );
-  equal(reply.rootId, "root-1", "registerLocalRoot unwraps the reply payload");
-  equal(typeof reply.rootId, "string", "rootId remains a generated string id");
+    'registerLocalRoot sends the generated boundary command'
+  )
+  equal(reply.rootId, 'root-1', 'registerLocalRoot unwraps the reply payload')
+  equal(typeof reply.rootId, 'string', 'rootId remains a generated string id')
 }
 
 async function validatesHashSourceFilesBlake3RequestAndReply(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
-      type: "sourceFileHash",
+      type: 'sourceFileHash',
       payload: {
-        type: "hashSourceFilesBlake3",
+        type: 'hashSourceFilesBlake3',
         payload: {
           effectiveLimit: 1,
           outcomes: [
             {
-              sourceFileId: "11",
-              sourceId: "7",
-              relativePath: "a.flac",
+              sourceFileId: '11',
+              sourceId: '7',
+              relativePath: 'a.flac',
               status: {
-                type: "hashed",
+                type: 'hashed',
                 payload: {
-                  contentHashAlgorithm: "blake3",
-                  contentHashValue: "abc",
-                  acceptedArtifactId: "90",
-                  workItemId: "91"
+                  contentHashAlgorithm: 'blake3',
+                  contentHashValue: 'abc',
+                  acceptedArtifactId: '90',
+                  workItemId: '91'
                 }
               }
             }
@@ -268,43 +272,39 @@ async function validatesHashSourceFilesBlake3RequestAndReply(): Promise<void> {
         }
       }
     })
-  );
-  const client = new LibraryBoundaryClient(transport);
+  )
+  const client = new LibraryBoundaryClient(transport)
 
   const reply = await client.hashSourceFilesBlake3({
-    sourceId: "7",
+    sourceId: '7',
     limit: 1
-  });
+  })
 
   deepEqual(
     transport.sentRequests[0],
     {
-      type: "sourceFileHash",
+      type: 'sourceFileHash',
       payload: {
-        type: "hashSourceFilesBlake3",
-        payload: { sourceId: "7", limit: 1 }
+        type: 'hashSourceFilesBlake3',
+        payload: { sourceId: '7', limit: 1 }
       }
     } satisfies CommandRequest,
-    "hashSourceFilesBlake3 sends the generated boundary command"
-  );
-  equal(reply.outcomes[0]?.sourceFileId, "11", "hash outcome keeps string source file id");
-  equal(
-    reply.outcomes[0]?.status.type,
-    "hashed",
-    "hashSourceFilesBlake3 unwraps the reply payload"
-  );
+    'hashSourceFilesBlake3 sends the generated boundary command'
+  )
+  equal(reply.outcomes[0]?.sourceFileId, '11', 'hash outcome keeps string source file id')
+  equal(reply.outcomes[0]?.status.type, 'hashed', 'hashSourceFilesBlake3 unwraps the reply payload')
 }
 
 async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
-      type: "sourceMaintenance",
+      type: 'sourceMaintenance',
       payload: {
-        type: "runSourceMaintenance",
+        type: 'runSourceMaintenance',
         payload: {
-          sourceId: "7",
-          status: "completed",
+          sourceId: '7',
+          status: 'completed',
           effectiveLimits: {
             hashLimit: 8,
             attachmentLimit: 4,
@@ -371,6 +371,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             decisionEvidenceCreated: 1,
             skippedStaleCandidates: 0,
             skippedExistingCurrentDecisions: 0,
+            skippedUserBlockedCandidates: 0,
             remainingCandidates: 0
           },
           remainingHashCandidates: 0,
@@ -381,15 +382,15 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
         }
       }
     })
-  );
+  )
   transport.enqueueOutcome(
     success({
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "sourceMaintenance",
+        type: 'sourceMaintenance',
         payload: {
-          sourceId: "7",
-          status: "idle",
+          sourceId: '7',
+          status: 'idle',
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
           remainingPrimaryMediaPromotionCandidates: 0,
@@ -404,7 +405,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             unmaterializedBlake3FactsCount: 0
           },
           lastRun: {
-            status: "completed",
+            status: 'completed',
             hash: {
               effectiveLimit: 8,
               hashedCount: 1,
@@ -463,6 +464,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
               decisionEvidenceCreated: 1,
               skippedStaleCandidates: 0,
               skippedExistingCurrentDecisions: 0,
+              skippedUserBlockedCandidates: 0,
               remainingCandidates: 0
             },
             remainingHashCandidates: 0,
@@ -474,28 +476,28 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
         }
       }
     })
-  );
-  const client = new LibraryBoundaryClient(transport);
+  )
+  const client = new LibraryBoundaryClient(transport)
 
   const runReply = await client.runSourceMaintenance({
-    sourceId: "7",
+    sourceId: '7',
     hashLimit: 8,
     attachmentLimit: 4,
     probeLimit: 4,
     promotionLimit: 4,
     identityCandidateLimit: 4,
     identityDecisionLimit: 4
-  });
-  const readReply = await client.readSourceMaintenance({ sourceId: "7" });
+  })
+  const readReply = await client.readSourceMaintenance({ sourceId: '7' })
 
   deepEqual(
     transport.sentRequests[0],
     {
-      type: "sourceMaintenance",
+      type: 'sourceMaintenance',
       payload: {
-        type: "runSourceMaintenance",
+        type: 'runSourceMaintenance',
         payload: {
-          sourceId: "7",
+          sourceId: '7',
           hashLimit: 8,
           attachmentLimit: 4,
           probeLimit: 4,
@@ -505,62 +507,197 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
         }
       }
     } satisfies CommandRequest,
-    "runSourceMaintenance sends the generated boundary command"
-  );
+    'runSourceMaintenance sends the generated boundary command'
+  )
   deepEqual(
     transport.sentRequests[1],
     {
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "readSourceMaintenance",
-        payload: { sourceId: "7" }
+        type: 'readSourceMaintenance',
+        payload: { sourceId: '7' }
       }
     } satisfies CommandRequest,
-    "readSourceMaintenance sends the generated snapshot command"
-  );
-  equal(runReply.probe.probedCount, 1, "runSourceMaintenance unwraps probe summary");
+    'readSourceMaintenance sends the generated snapshot command'
+  )
+  equal(runReply.probe.probedCount, 1, 'runSourceMaintenance unwraps probe summary')
   equal(
     readReply.attachmentLinks?.currentLinksCount,
     1,
-    "readSourceMaintenance unwraps attachment link summary"
-  );
+    'readSourceMaintenance unwraps attachment link summary'
+  )
+}
+
+async function validatesTrackIdentityDecisionWriteRequestsAndReplies(): Promise<void> {
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(
+    success({
+      type: 'trackIdentityDecisionWrite',
+      payload: {
+        type: 'acceptTrackIdentityCandidate',
+        payload: {
+          type: 'written',
+          payload: {
+            decisionId: '11',
+            candidateId: '7',
+            decisionState: 'accepted',
+            decisionSource: 'user_local_v0',
+            evidenceSnapshotCount: 1,
+            decisionCreated: true,
+            effectiveDecision: {
+              effectiveDecisionId: '11',
+              effectiveDecisionState: 'accepted',
+              effectiveDecisionSource: 'user_local_v0',
+              effectiveDecisionCurrentStatus: 'current',
+              effectiveDecisionPrecedence: 'user'
+            }
+          }
+        }
+      }
+    })
+  )
+  transport.enqueueOutcome(
+    success({
+      type: 'trackIdentityDecisionWrite',
+      payload: {
+        type: 'rejectTrackIdentityCandidate',
+        payload: {
+          type: 'failed',
+          payload: {
+            type: 'candidateNotFound'
+          }
+        }
+      }
+    })
+  )
+  transport.enqueueOutcome(
+    success({
+      type: 'trackIdentityDecisionWrite',
+      payload: {
+        type: 'deferTrackIdentityCandidate',
+        payload: {
+          type: 'written',
+          payload: {
+            decisionId: '12',
+            candidateId: '8',
+            decisionState: 'deferred',
+            decisionSource: 'user_local_v0',
+            evidenceSnapshotCount: 0,
+            decisionCreated: true,
+            effectiveDecision: {
+              effectiveDecisionId: '12',
+              effectiveDecisionState: 'deferred',
+              effectiveDecisionSource: 'user_local_v0',
+              effectiveDecisionCurrentStatus: 'stale',
+              effectiveDecisionPrecedence: 'user'
+            }
+          }
+        }
+      }
+    })
+  )
+  const client = new LibraryBoundaryClient(transport)
+
+  const acceptReply = await client.acceptTrackIdentityCandidate({
+    candidateId: '7',
+    reason: 'same identity'
+  })
+  const rejectReply = await client.rejectTrackIdentityCandidate({
+    candidateId: '999'
+  })
+  const deferReply = await client.deferTrackIdentityCandidate({
+    candidateId: '8',
+    reason: 'decide later'
+  })
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: 'trackIdentityDecisionWrite',
+      payload: {
+        type: 'acceptTrackIdentityCandidate',
+        payload: {
+          candidateId: '7',
+          reason: 'same identity'
+        }
+      }
+    } satisfies CommandRequest,
+    'acceptTrackIdentityCandidate sends only candidate id and decision intent'
+  )
+  deepEqual(
+    transport.sentRequests[1],
+    {
+      type: 'trackIdentityDecisionWrite',
+      payload: {
+        type: 'rejectTrackIdentityCandidate',
+        payload: {
+          candidateId: '999'
+        }
+      }
+    } satisfies CommandRequest,
+    'rejectTrackIdentityCandidate sends only candidate id and decision intent'
+  )
+  deepEqual(
+    transport.sentRequests[2],
+    {
+      type: 'trackIdentityDecisionWrite',
+      payload: {
+        type: 'deferTrackIdentityCandidate',
+        payload: {
+          candidateId: '8',
+          reason: 'decide later'
+        }
+      }
+    } satisfies CommandRequest,
+    'deferTrackIdentityCandidate sends only candidate id and decision intent'
+  )
+  equal(acceptReply.type, 'written', 'accept reply unwraps the result')
+  if (acceptReply.type === 'written') {
+    equal(
+      acceptReply.payload.effectiveDecision.effectiveDecisionPrecedence,
+      'user',
+      'effective decision precedence remains backend-owned in the reply'
+    )
+  }
+  equal(rejectReply.type, 'failed', 'reject reply unwraps typed failure')
+  equal(deferReply.type, 'written', 'defer reply unwraps the result')
 }
 
 async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "sourceFileAttachment",
+        type: 'sourceFileAttachment',
         payload: {
-          status: "ok",
+          status: 'ok',
           attachmentLink: {
-            attachmentId: "7",
-            sourceFileId: "11",
-            sourceId: "3",
-            contentHashAlgorithm: "blake3",
-            contentHashValue: "abc",
-            fileKind: "audio",
-            linkStatus: "current",
+            attachmentId: '7',
+            sourceFileId: '11',
+            sourceId: '3',
+            contentHashAlgorithm: 'blake3',
+            contentHashValue: 'abc',
+            fileKind: 'audio',
+            linkStatus: 'current',
             createdAtMs: 100,
             updatedAtMs: 200
           }
         }
       }
     })
-  );
+  )
   transport.enqueueOutcome(
     success({
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "attachmentSourceFiles",
+        type: 'attachmentSourceFiles',
         payload: {
-          status: "ok",
+          status: 'ok',
           attachment: {
-            attachmentId: "7",
-            contentHashAlgorithm: "blake3",
-            contentHashValue: "abc"
+            attachmentId: '7',
+            contentHashAlgorithm: 'blake3',
+            contentHashValue: 'abc'
           },
           sourceFileLinks: [],
           effectiveLimit: 25,
@@ -568,16 +705,16 @@ async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void
         }
       }
     })
-  );
+  )
   transport.enqueueOutcome(
     success({
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "sourceAttachmentSummary",
+        type: 'sourceAttachmentSummary',
         payload: {
-          status: "ok",
+          status: 'ok',
           summary: {
-            sourceId: "3",
+            sourceId: '3',
             currentLinksCount: 1,
             staleLinksCount: 0,
             sourceFilesWithCurrentBlake3FactsCount: 1,
@@ -588,388 +725,368 @@ async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void
         }
       }
     })
-  );
-  const client = new LibraryBoundaryClient(transport);
+  )
+  const client = new LibraryBoundaryClient(transport)
 
   const sourceFileReply = await client.readSourceFileAttachment({
-    sourceFileId: "11"
-  });
+    sourceFileId: '11'
+  })
   const attachmentReply = await client.readAttachmentSourceFiles({
-    attachmentId: "7",
+    attachmentId: '7',
     limit: 25
-  });
+  })
   const summaryReply = await client.readSourceAttachmentSummary({
-    sourceId: "3"
-  });
+    sourceId: '3'
+  })
 
   deepEqual(
     transport.sentRequests[0],
     {
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "readSourceFileAttachment",
-        payload: { sourceFileId: "11" }
+        type: 'readSourceFileAttachment',
+        payload: { sourceFileId: '11' }
       }
     } satisfies CommandRequest,
-    "readSourceFileAttachment sends the generated snapshot command"
-  );
+    'readSourceFileAttachment sends the generated snapshot command'
+  )
   deepEqual(
     transport.sentRequests[1],
     {
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "readAttachmentSourceFiles",
-        payload: { attachmentId: "7", limit: 25 }
+        type: 'readAttachmentSourceFiles',
+        payload: { attachmentId: '7', limit: 25 }
       }
     } satisfies CommandRequest,
-    "readAttachmentSourceFiles sends the generated snapshot command"
-  );
+    'readAttachmentSourceFiles sends the generated snapshot command'
+  )
   deepEqual(
     transport.sentRequests[2],
     {
-      type: "snapshotRead",
+      type: 'snapshotRead',
       payload: {
-        type: "readSourceAttachmentSummary",
-        payload: { sourceId: "3" }
+        type: 'readSourceAttachmentSummary',
+        payload: { sourceId: '3' }
       }
     } satisfies CommandRequest,
-    "readSourceAttachmentSummary sends the generated snapshot command"
-  );
+    'readSourceAttachmentSummary sends the generated snapshot command'
+  )
   equal(
     sourceFileReply.attachmentLink?.linkStatus,
-    "current",
-    "source-file attachment reply unwraps the link"
-  );
+    'current',
+    'source-file attachment reply unwraps the link'
+  )
   equal(
     attachmentReply.attachment?.attachmentId,
-    "7",
-    "attachment source-files reply unwraps the attachment identity"
-  );
+    '7',
+    'attachment source-files reply unwraps the attachment identity'
+  )
   equal(
     summaryReply.summary?.currentLinksCount,
     1,
-    "source attachment summary reply unwraps counts"
-  );
+    'source attachment summary reply unwraps counts'
+  )
 }
 
 async function validatesProtocolErrorsArePreserved(): Promise<void> {
   const protocolError: ProtocolError = {
-    type: "invalidRequest",
-    payload: { detail: "fixture invalid request" }
-  };
-  const transport = new RecordingTransport();
-  transport.enqueueOutcome(protocolFailure(protocolError));
-  const client = new LibraryBoundaryClient(transport);
+    type: 'invalidRequest',
+    payload: { detail: 'fixture invalid request' }
+  }
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(protocolFailure(protocolError))
+  const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: "" }),
+    () => client.registerLocalRoot({ absolutePath: '' }),
     LibraryBoundaryProtocolError,
-    "protocol error outcomes reject with a typed client error"
-  );
+    'protocol error outcomes reject with a typed client error'
+  )
 
-  equal(
-    error.protocolError,
-    protocolError,
-    "protocol error payload object is preserved"
-  );
+  equal(error.protocolError, protocolError, 'protocol error payload object is preserved')
 }
 
 async function validatesReplyFamilyMismatch(): Promise<void> {
-  const transport = new RecordingTransport();
-  transport.enqueueOutcome(eventsReply([]));
-  const client = new LibraryBoundaryClient(transport);
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(eventsReply([]))
+  const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: "C:/Music" }),
+    () => client.registerLocalRoot({ absolutePath: 'C:/Music' }),
     LibraryBoundaryReplyMismatchError,
-    "unexpected reply family is rejected"
-  );
+    'unexpected reply family is rejected'
+  )
 
-  equal(error.expectedFamily, "libraryRoots", "expected family is captured");
-  equal(
-    error.actualFamily,
-    "libraryBoundaryEvents",
-    "actual family is captured"
-  );
+  equal(error.expectedFamily, 'libraryRoots', 'expected family is captured')
+  equal(error.actualFamily, 'libraryBoundaryEvents', 'actual family is captured')
 }
 
 async function validatesReplyVariantMismatch(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueOutcome(
     success({
-      type: "libraryRoots",
+      type: 'libraryRoots',
       payload: {
-        type: "startRootScan",
+        type: 'startRootScan',
         payload: {
-          scanRunId: "scan-1"
+          scanRunId: 'scan-1'
         }
       }
     })
-  );
-  const client = new LibraryBoundaryClient(transport);
+  )
+  const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: "C:/Music" }),
+    () => client.registerLocalRoot({ absolutePath: 'C:/Music' }),
     LibraryBoundaryReplyMismatchError,
-    "unexpected reply variant is rejected"
-  );
+    'unexpected reply variant is rejected'
+  )
 
-  equal(
-    error.expectedVariant,
-    "registerLocalRoot",
-    "expected variant is captured"
-  );
-  equal(error.actualVariant, "startRootScan", "actual variant is captured");
+  equal(error.expectedVariant, 'registerLocalRoot', 'expected variant is captured')
+  equal(error.actualVariant, 'startRootScan', 'actual variant is captured')
 }
 
 async function validatesExecutorRejectionBecomesTransportFailure(): Promise<void> {
-  const transport = new RecordingTransport();
-  const cause = new Error("fixture transport failure");
-  transport.enqueueRejection(cause);
-  const client = new LibraryBoundaryClient(transport);
+  const transport = new RecordingTransport()
+  const cause = new Error('fixture transport failure')
+  transport.enqueueRejection(cause)
+  const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: "C:/Music" }),
+    () => client.registerLocalRoot({ absolutePath: 'C:/Music' }),
     LibraryBoundaryTransportError,
-    "executor rejection is surfaced as transport failure"
-  );
+    'executor rejection is surfaced as transport failure'
+  )
 
-  equal(error.cause, cause, "transport failure keeps the original cause");
+  equal(error.cause, cause, 'transport failure keeps the original cause')
 }
 
 async function validatesSessionPumpFlow(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueEvents([
-    event({ scope: "navigationRows", revision: "1" }),
-    event({ scope: "libraryBrowser", revision: "5" })
-  ]);
-  const session = new LibraryBoundarySession(transport);
-  let listenerBatch: unknown = null;
+    event({ scope: 'navigationRows', revision: '1' }),
+    event({ scope: 'libraryBrowser', revision: '5' })
+  ])
+  const session = new LibraryBoundarySession(transport)
+  let listenerBatch: unknown = null
   session.subscribeInvalidations((batch) => {
-    listenerBatch = batch;
-  });
+    listenerBatch = batch
+  })
 
-  const batch = await session.pumpEvents(8);
+  const batch = await session.pumpEvents(8)
 
   deepEqual(
     transport.sentRequests[0],
     {
-      type: "libraryBoundaryEvents",
+      type: 'libraryBoundaryEvents',
       payload: {
-        type: "readAfter",
+        type: 'readAfter',
         payload: { lastSeenEventSequence: null, maxEvents: 8 }
       }
     } satisfies CommandRequest,
-    "session pump sends the explicit event cursor read command"
-  );
+    'session pump sends the explicit event cursor read command'
+  )
   deepEqual(
     batch.changedScopes,
-    ["navigationRows", "libraryBrowser"],
-    "session pump reports changed scopes"
-  );
+    ['navigationRows', 'libraryBrowser'],
+    'session pump reports changed scopes'
+  )
   deepEqual(
     batch.changedRevisions,
     [
-      { scope: "navigationRows", revision: "1" },
-      { scope: "libraryBrowser", revision: "5" }
+      { scope: 'navigationRows', revision: '1' },
+      { scope: 'libraryBrowser', revision: '5' }
     ],
-    "session pump reports changed revisions"
-  );
+    'session pump reports changed revisions'
+  )
   equal(
-    batch.lastSeenRevisions.get("libraryBrowser"),
-    "5",
-    "session pump returns last-seen revisions"
-  );
+    batch.lastSeenRevisions.get('libraryBrowser'),
+    '5',
+    'session pump returns last-seen revisions'
+  )
   equal(
-    session.getLastSeenRevision("navigationRows"),
-    "1",
-    "session records the last seen revision by scope"
-  );
-  equal(listenerBatch, batch, "invalidation listener receives the pump batch");
+    session.getLastSeenRevision('navigationRows'),
+    '1',
+    'session records the last seen revision by scope'
+  )
+  equal(listenerBatch, batch, 'invalidation listener receives the pump batch')
 }
 
 async function validatesStaleDuplicateInvalidationsAreIgnored(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueEvents([
-    event({ scope: "navigationRows", revision: "1" }),
-    event({ scope: "navigationRows", revision: "3" }),
-    event({ scope: "navigationRows", revision: "2" })
-  ]);
+    event({ scope: 'navigationRows', revision: '1' }),
+    event({ scope: 'navigationRows', revision: '3' }),
+    event({ scope: 'navigationRows', revision: '2' })
+  ])
   transport.enqueueEvents([
-    event({ scope: "navigationRows", revision: "3" }),
-    event({ scope: "navigationRows", revision: "1" }),
-    event({ scope: "libraryBrowser", revision: "4" })
-  ]);
-  const session = new LibraryBoundarySession(transport);
+    event({ scope: 'navigationRows', revision: '3' }),
+    event({ scope: 'navigationRows', revision: '1' }),
+    event({ scope: 'libraryBrowser', revision: '4' })
+  ])
+  const session = new LibraryBoundarySession(transport)
 
-  const first = await session.pumpEvents(8);
-  const second = await session.pumpEvents(8);
+  const first = await session.pumpEvents(8)
+  const second = await session.pumpEvents(8)
 
   equal(
     first.invalidations[0]?.revision,
-    "3",
-    "duplicate scope invalidations keep the highest fresh revision"
-  );
+    '3',
+    'duplicate scope invalidations keep the highest fresh revision'
+  )
   deepEqual(
     second.changedScopes,
-    ["libraryBrowser"],
-    "stale duplicate revisions are ignored by scope"
-  );
+    ['libraryBrowser'],
+    'stale duplicate revisions are ignored by scope'
+  )
   equal(
-    session.getLastSeenRevision("navigationRows"),
-    "3",
-    "stale duplicate revisions do not roll back last-seen state"
-  );
+    session.getLastSeenRevision('navigationRows'),
+    '3',
+    'stale duplicate revisions do not roll back last-seen state'
+  )
 }
 
 async function validatesConcurrentDrainsAreRejected(): Promise<void> {
-  const transport = new RecordingTransport();
-  const pending = transport.enqueueDeferredOutcome();
-  const session = new LibraryBoundarySession(transport);
+  const transport = new RecordingTransport()
+  const pending = transport.enqueueDeferredOutcome()
+  const session = new LibraryBoundarySession(transport)
 
-  const firstPump = session.pumpEvents(8);
+  const firstPump = session.pumpEvents(8)
   throws(
     () => session.pumpEvents(8),
     LibraryBoundarySessionDrainInProgressError,
-    "overlapping event drain is rejected"
-  );
+    'overlapping event drain is rejected'
+  )
 
-  pending.resolve(eventsReply([]));
-  await firstPump;
+  pending.resolve(eventsReply([]))
+  await firstPump
 }
 
 function validatesInvalidMaxEvents(): void {
-  const transport = new RecordingTransport();
-  const session = new LibraryBoundarySession(transport);
+  const transport = new RecordingTransport()
+  const session = new LibraryBoundarySession(transport)
 
   for (const maxEvents of [0, -1, 1.5, Number.NaN]) {
     throws(
       () => session.pumpEvents(maxEvents),
       LibraryBoundarySessionInvalidMaxEventsError,
       `invalid maxEvents ${String(maxEvents)} is rejected`
-    );
+    )
   }
 
-  equal(
-    transport.sentRequests.length,
-    0,
-    "invalid maxEvents is rejected before sending a command"
-  );
+  equal(transport.sentRequests.length, 0, 'invalid maxEvents is rejected before sending a command')
 }
 
 async function validatesCloseAndClosedState(): Promise<void> {
-  const transport = new RecordingTransport();
-  const session = new LibraryBoundarySession(transport);
+  const transport = new RecordingTransport()
+  const session = new LibraryBoundarySession(transport)
 
-  await session.close();
-  await session.close();
+  await session.close()
+  await session.close()
 
-  equal(session.state, "closed", "close marks the session closed");
-  equal(transport.closeCount, 1, "close calls injected close only once");
+  equal(session.state, 'closed', 'close marks the session closed')
+  equal(transport.closeCount, 1, 'close calls injected close only once')
   throws(
     () => session.pumpEvents(1),
     LibraryBoundarySessionStateError,
-    "closed session rejects pump"
-  );
+    'closed session rejects pump'
+  )
   throws(
     () => session.subscribeInvalidations(() => undefined),
     LibraryBoundarySessionStateError,
-    "closed session rejects new listeners"
-  );
+    'closed session rejects new listeners'
+  )
 }
 
 async function validatesListenerErrorsAreRetainedWithLimit(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   const listenerFailures = Array.from(
     { length: LIBRARY_BOUNDARY_LISTENER_ERROR_RETENTION_LIMIT + 1 },
     (_, index) => new Error(`listener failure ${index}`)
-  );
-  const reportedErrors: unknown[] = [];
-  transport.enqueueEvents([
-    event({ scope: "libraryBrowser", revision: "9" })
-  ]);
+  )
+  const reportedErrors: unknown[] = []
+  transport.enqueueEvents([event({ scope: 'libraryBrowser', revision: '9' })])
   const session = new LibraryBoundarySession(transport, {
     onListenerError: (report) => {
-      reportedErrors.push(report.error);
+      reportedErrors.push(report.error)
     }
-  });
+  })
   for (const failure of listenerFailures) {
     session.subscribeInvalidations(() => {
-      throw failure;
-    });
+      throw failure
+    })
   }
 
-  await session.pumpEvents(8);
-  const drained = session.takeListenerErrors();
+  await session.pumpEvents(8)
+  const drained = session.takeListenerErrors()
 
   equal(
     reportedErrors.length,
     listenerFailures.length,
-    "listener error hook observes every listener failure"
-  );
+    'listener error hook observes every listener failure'
+  )
   equal(
     drained.retentionLimit,
     LIBRARY_BOUNDARY_LISTENER_ERROR_RETENTION_LIMIT,
-    "listener error drain exposes the retention limit"
-  );
+    'listener error drain exposes the retention limit'
+  )
   equal(
     drained.retainedReportCount,
     LIBRARY_BOUNDARY_LISTENER_ERROR_RETENTION_LIMIT,
-    "listener error reports are bounded"
-  );
-  equal(drained.droppedReportCount, 1, "oldest listener error is dropped");
+    'listener error reports are bounded'
+  )
+  equal(drained.droppedReportCount, 1, 'oldest listener error is dropped')
   equal(
     drained.reports[0]?.error,
     listenerFailures[1],
-    "retained listener errors keep the newest reports"
-  );
+    'retained listener errors keep the newest reports'
+  )
 }
 
 async function validatesFailedPumpState(): Promise<void> {
-  const transport = new RecordingTransport();
+  const transport = new RecordingTransport()
   transport.enqueueOutcome(
     protocolFailure({
-      type: "hostFailure",
-      payload: { detail: "fixture host failure" }
+      type: 'hostFailure',
+      payload: { detail: 'fixture host failure' }
     })
-  );
-  const session = new LibraryBoundarySession(transport);
+  )
+  const session = new LibraryBoundarySession(transport)
 
   await rejects(
     () => session.pumpEvents(8),
     LibraryBoundaryProtocolError,
-    "event protocol failure remains typed"
-  );
+    'event protocol failure remains typed'
+  )
 
-  equal(session.state, "failed", "failed pump marks the session failed");
+  equal(session.state, 'failed', 'failed pump marks the session failed')
   throws(
     () => session.pumpEvents(8),
     LibraryBoundarySessionStateError,
-    "failed session rejects more pumps"
-  );
-  await session.close();
-  equal(session.state, "closed", "failed session can still be closed");
+    'failed session rejects more pumps'
+  )
+  await session.close()
+  equal(session.state, 'closed', 'failed session can still be closed')
 }
 
 function must(condition: boolean, message: string): asserts condition {
   if (!condition) {
-    throw new Error(message);
+    throw new Error(message)
   }
 }
 
 function equal<T>(actual: T, expected: T, message: string): void {
   if (actual !== expected) {
-    throw new Error(`${message}: expected ${String(expected)}, received ${String(actual)}`);
+    throw new Error(`${message}: expected ${String(expected)}, received ${String(actual)}`)
   }
 }
 
 function deepEqual(actual: unknown, expected: unknown, message: string): void {
-  const actualJson = JSON.stringify(actual);
-  const expectedJson = JSON.stringify(expected);
+  const actualJson = JSON.stringify(actual)
+  const expectedJson = JSON.stringify(expected)
   if (actualJson !== expectedJson) {
-    throw new Error(
-      `${message}: expected ${expectedJson}, received ${actualJson}`
-    );
+    throw new Error(`${message}: expected ${expectedJson}, received ${actualJson}`)
   }
 }
 
@@ -979,16 +1096,16 @@ function throws<ErrorType extends Error>(
   message: string
 ): ErrorType {
   try {
-    action();
+    action()
   } catch (error) {
     if (error instanceof errorType) {
-      return error;
+      return error
     }
 
-    throw new Error(`${message}: wrong error ${String(error)}`);
+    throw new Error(`${message}: wrong error ${String(error)}`)
   }
 
-  throw new Error(`${message}: no error thrown`);
+  throw new Error(`${message}: no error thrown`)
 }
 
 async function rejects<ErrorType extends Error>(
@@ -997,32 +1114,33 @@ async function rejects<ErrorType extends Error>(
   message: string
 ): Promise<ErrorType> {
   try {
-    await action();
+    await action()
   } catch (error) {
     if (error instanceof errorType) {
-      return error;
+      return error
     }
 
-    throw new Error(`${message}: wrong error ${String(error)}`);
+    throw new Error(`${message}: wrong error ${String(error)}`)
   }
 
-  throw new Error(`${message}: no error thrown`);
+  throw new Error(`${message}: no error thrown`)
 }
 
-await validatesRegisterLocalRootRequestAndReply();
-await validatesHashSourceFilesBlake3RequestAndReply();
-await validatesSourceMaintenanceRequestsAndReplies();
-await validatesAttachmentIdentityReadRequestsAndReplies();
-await validatesProtocolErrorsArePreserved();
-await validatesReplyFamilyMismatch();
-await validatesReplyVariantMismatch();
-await validatesExecutorRejectionBecomesTransportFailure();
-await validatesSessionPumpFlow();
-await validatesStaleDuplicateInvalidationsAreIgnored();
-await validatesConcurrentDrainsAreRejected();
-validatesInvalidMaxEvents();
-await validatesCloseAndClosedState();
-await validatesListenerErrorsAreRetainedWithLimit();
-await validatesFailedPumpState();
+await validatesRegisterLocalRootRequestAndReply()
+await validatesHashSourceFilesBlake3RequestAndReply()
+await validatesSourceMaintenanceRequestsAndReplies()
+await validatesTrackIdentityDecisionWriteRequestsAndReplies()
+await validatesAttachmentIdentityReadRequestsAndReplies()
+await validatesProtocolErrorsArePreserved()
+await validatesReplyFamilyMismatch()
+await validatesReplyVariantMismatch()
+await validatesExecutorRejectionBecomesTransportFailure()
+await validatesSessionPumpFlow()
+await validatesStaleDuplicateInvalidationsAreIgnored()
+await validatesConcurrentDrainsAreRejected()
+validatesInvalidMaxEvents()
+await validatesCloseAndClosedState()
+await validatesListenerErrorsAreRetainedWithLimit()
+await validatesFailedPumpState()
 
-console.log("boundary client/session validation passed");
+console.log('boundary client/session validation passed')

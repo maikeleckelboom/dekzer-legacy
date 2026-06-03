@@ -47,6 +47,10 @@ import {
   type RunSourceMaintenanceResult
 } from '../../../src/shared/librarySourceMaintenance/sourceMaintenance'
 import {
+  trackIdentityDecisionWriteChannels,
+  type TrackIdentityDecisionWriteResult
+} from '../../../src/shared/libraryTrackIdentityDecisionWrite/decisionWrite'
+import {
   boundaryEventChannels,
   type BoundaryEventDeliveryPayload
 } from '../../../src/shared/libraryBoundary/events'
@@ -85,6 +89,15 @@ describe('preload renderer API', () => {
       identityDecisionLimit: 7
     }
     const readSourceMaintenanceRequest = { sourceId: '7' }
+    const acceptTrackIdentityCandidateRequest = {
+      candidateId: '7',
+      reason: 'same identity'
+    }
+    const rejectTrackIdentityCandidateRequest = { candidateId: '8' }
+    const deferTrackIdentityCandidateRequest = {
+      candidateId: '9',
+      reason: 'decide later'
+    }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
       version: 1,
@@ -263,6 +276,7 @@ describe('preload renderer API', () => {
           decisionEvidenceCreated: 1,
           skippedStaleCandidates: 0,
           skippedExistingCurrentDecisions: 0,
+          skippedUserBlockedCandidates: 0,
           remainingCandidates: 0
         },
         remainingHashCandidates: 0,
@@ -270,6 +284,55 @@ describe('preload renderer API', () => {
         remainingPrimaryMediaPromotionCandidates: 0,
         remainingTrackIdentityCandidateProductionCandidates: 0,
         remainingTrackIdentityDecisionProductionCandidates: 0
+      }
+    }
+    const acceptTrackIdentityCandidateResult: TrackIdentityDecisionWriteResult = {
+      state: 'completed',
+      result: {
+        type: 'written',
+        payload: {
+          decisionId: '11',
+          candidateId: '7',
+          decisionState: 'accepted',
+          decisionSource: 'user_local_v0',
+          evidenceSnapshotCount: 1,
+          decisionCreated: true,
+          effectiveDecision: {
+            effectiveDecisionId: '11',
+            effectiveDecisionState: 'accepted',
+            effectiveDecisionSource: 'user_local_v0',
+            effectiveDecisionCurrentStatus: 'current',
+            effectiveDecisionPrecedence: 'user'
+          }
+        }
+      }
+    }
+    const rejectTrackIdentityCandidateResult: TrackIdentityDecisionWriteResult = {
+      state: 'completed',
+      result: {
+        type: 'failed',
+        payload: { type: 'candidateNotFound' }
+      }
+    }
+    const deferTrackIdentityCandidateResult: TrackIdentityDecisionWriteResult = {
+      state: 'completed',
+      result: {
+        type: 'written',
+        payload: {
+          decisionId: '12',
+          candidateId: '9',
+          decisionState: 'deferred',
+          decisionSource: 'user_local_v0',
+          evidenceSnapshotCount: 0,
+          decisionCreated: true,
+          effectiveDecision: {
+            effectiveDecisionId: '12',
+            effectiveDecisionState: 'deferred',
+            effectiveDecisionSource: 'user_local_v0',
+            effectiveDecisionCurrentStatus: 'stale',
+            effectiveDecisionPrecedence: 'user'
+          }
+        }
       }
     }
     const readSourceMaintenanceResult: ReadSourceMaintenanceResult = {
@@ -335,6 +398,9 @@ describe('preload renderer API', () => {
     let receivedHashRequest: unknown
     let receivedRunSourceMaintenanceRequest: unknown
     let receivedReadSourceMaintenanceRequest: unknown
+    let receivedAcceptTrackIdentityCandidateRequest: unknown
+    let receivedRejectTrackIdentityCandidateRequest: unknown
+    let receivedDeferTrackIdentityCandidateRequest: unknown
     let receivedViewStatePayload: unknown
     let subscribeCount = 0
     let unsubscribeCount = 0
@@ -394,6 +460,21 @@ describe('preload renderer API', () => {
         if (channel === sourceMaintenanceChannels.readSourceMaintenance) {
           receivedReadSourceMaintenanceRequest = args[0]
           return readSourceMaintenanceResult
+        }
+
+        if (channel === trackIdentityDecisionWriteChannels.acceptTrackIdentityCandidate) {
+          receivedAcceptTrackIdentityCandidateRequest = args[0]
+          return acceptTrackIdentityCandidateResult
+        }
+
+        if (channel === trackIdentityDecisionWriteChannels.rejectTrackIdentityCandidate) {
+          receivedRejectTrackIdentityCandidateRequest = args[0]
+          return rejectTrackIdentityCandidateResult
+        }
+
+        if (channel === trackIdentityDecisionWriteChannels.deferTrackIdentityCandidate) {
+          receivedDeferTrackIdentityCandidateRequest = args[0]
+          return deferTrackIdentityCandidateResult
         }
 
         if (channel === rootChannels.chooseAndRegisterLocal) {
@@ -520,6 +601,24 @@ describe('preload renderer API', () => {
       api.library.sourceMaintenance.readSourceMaintenance(readSourceMaintenanceRequest)
     ).resolves.toBe(readSourceMaintenanceResult)
     expect(receivedReadSourceMaintenanceRequest).toBe(readSourceMaintenanceRequest)
+    await expect(
+      api.library.trackIdentityDecisions.acceptTrackIdentityCandidate(
+        acceptTrackIdentityCandidateRequest
+      )
+    ).resolves.toBe(acceptTrackIdentityCandidateResult)
+    expect(receivedAcceptTrackIdentityCandidateRequest).toBe(acceptTrackIdentityCandidateRequest)
+    await expect(
+      api.library.trackIdentityDecisions.rejectTrackIdentityCandidate(
+        rejectTrackIdentityCandidateRequest
+      )
+    ).resolves.toBe(rejectTrackIdentityCandidateResult)
+    expect(receivedRejectTrackIdentityCandidateRequest).toBe(rejectTrackIdentityCandidateRequest)
+    await expect(
+      api.library.trackIdentityDecisions.deferTrackIdentityCandidate(
+        deferTrackIdentityCandidateRequest
+      )
+    ).resolves.toBe(deferTrackIdentityCandidateResult)
+    expect(receivedDeferTrackIdentityCandidateRequest).toBe(deferTrackIdentityCandidateRequest)
     await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)
     await expect(api.library.viewState.writeViewState(persistedViewState)).resolves.toBe(
       viewStateWriteResult

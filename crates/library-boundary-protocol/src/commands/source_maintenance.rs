@@ -278,6 +278,7 @@ pub struct SourceMaintenanceTrackIdentityDecisionSummary {
     pub decision_evidence_created: usize,
     pub skipped_stale_candidates: usize,
     pub skipped_existing_current_decisions: usize,
+    pub skipped_user_blocked_candidates: usize,
     pub remaining_candidates: usize,
 }
 

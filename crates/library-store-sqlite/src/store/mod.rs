@@ -73,7 +73,11 @@ pub use track_identity_candidates::{
     ProduceTrackIdentityCandidatesForSourceResult, effective_track_identity_candidate_limit,
 };
 pub use track_identity_decisions::{
-    ProduceTrackIdentityDecisionsForSourceResult, effective_track_identity_decision_limit,
+    ProduceTrackIdentityDecisionsForSourceResult,
+    TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+    TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionWriteFailure,
+    TrackIdentityDecisionWriteResult, TrackIdentityDecisionWriteSuccess,
+    effective_track_identity_decision_limit,
 };
 
 #[cfg(test)]

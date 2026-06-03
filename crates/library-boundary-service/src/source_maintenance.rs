@@ -568,6 +568,7 @@ fn empty_run(
             decision_evidence_created: 0,
             skipped_stale_candidates: 0,
             skipped_existing_current_decisions: 0,
+            skipped_user_blocked_candidates: 0,
             remaining_candidates: 0,
         },
         remaining_hash_candidates: 0,
@@ -684,6 +685,7 @@ fn map_track_identity_decision_summary(
         decision_evidence_created: result.decision_evidence_created,
         skipped_stale_candidates: result.skipped_stale_candidates,
         skipped_existing_current_decisions: result.skipped_existing_current_decisions,
+        skipped_user_blocked_candidates: result.skipped_user_blocked_candidates,
         remaining_candidates: result.remaining_candidates,
     }
 }

@@ -127,6 +127,7 @@ describe('source maintenance through the host', () => {
               decisionEvidenceCreated: 1,
               skippedStaleCandidates: 0,
               skippedExistingCurrentDecisions: 0,
+              skippedUserBlockedCandidates: 0,
               remainingCandidates: 0
             },
             remainingHashCandidates: 0,

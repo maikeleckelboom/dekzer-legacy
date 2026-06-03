@@ -1,6 +1,6 @@
 ---
 status: accepted
-last-reviewed: 2026-06-02
+last-reviewed: 2026-06-03
 owner: library-store-sqlite
 canonical-context:
   - observed-file-facts-contract
@@ -8,9 +8,11 @@ canonical-context:
   - media-probe-observations-contract
   - primary-media-promotion-contract
   - track-identity-candidate-contract
+  - track-identity-decision-write-contract
   - source-maintenance-orchestration-contract
 scope:
   - track-identity-decisions
+  - effective-track-identity-decisions
   - exact-content-candidate-decisions
   - decision-provenance
 ---
@@ -43,21 +45,43 @@ The candidate remains the evidence group. The decision records how that candidat
 The decision does not own source-file inventory, attachment identity, primary-media promotion, CUE association, metadata
 reconciliation, preparation state, playlist membership, browser rows, waveform state, stem state, or artwork state.
 
-V0 automatic production creates only `accepted` decisions with `decision_source = system_exact_content_v0`. That source
-means the backend accepted an active exact-primary-media-content candidate under the v0 exact-content decision basis. It
-does not mean a user accepted the candidate and does not claim semantic identity beyond exact current content evidence.
+V0 automatic production creates `accepted` decisions with `decision_source = system_exact_content_v0`. Explicit local
+user commands create `accepted`, `rejected`, or `deferred` decisions with `decision_source = user_local_v0`.
+
+`system_exact_content_v0` means the backend accepted an active exact-primary-media-content candidate under the v0
+exact-content decision basis. It does not mean a user accepted the candidate and does not claim semantic identity beyond
+exact current content evidence.
+
+`user_local_v0` means a backend command recorded explicit local user intent for a candidate. Protocol callers cannot
+provide arbitrary decision-source strings.
 
 ## Decision States
 
 `track_identity_decisions.decision_state` is:
 
 - `accepted`: the decision source accepted the candidate under the recorded decision basis.
-- `rejected`: reserved for a future explicit decision path.
-- `deferred`: reserved for a future explicit decision path.
-- `superseded`: reserved for decisions replaced by a later decision.
+- `rejected`: the decision source rejected the candidate under the recorded decision basis.
+- `deferred`: the decision source deferred the candidate under the recorded decision basis.
+- `superseded`: reserved for historical rows replaced by a later decision.
 
-Current decisions are rows with `superseded_by_decision_id IS NULL`. A future correction path may create a replacement
-decision and set `superseded_by_decision_id` on the older decision. Superseded rows remain historical provenance.
+Current decisions are rows with `superseded_by_decision_id IS NULL` and `decision_state != 'superseded'`.
+Accept/reject/defer user commands supersede prior current `user_local_v0` rows for the same candidate. Superseded rows
+remain historical provenance and retain their evidence snapshots.
+
+## Effective Decision Semantics
+
+The backend read model owns effective-decision resolution.
+
+Effective decision precedence:
+
+- current user decision wins over current system decision;
+- if no current user decision exists, a current system decision may be effective;
+- current user `rejected` or `deferred` blocks a current system `accepted` decision from being effective;
+- superseded decisions are never effective;
+- stale candidates or stale evidence surface as explicit stale current status instead of disappearing silently.
+
+Read-model rows expose effective decision id, state, source, current status, precedence, and a blocked-system reason when
+there is a current user reject/defer blocking a system decision.
 
 ## V0 Production
 
@@ -71,6 +95,7 @@ V0 production may create an automatic accepted decision only when all of these a
 - at least one source-scoped candidate evidence row validates as current against source-file, attachment, BLAKE3 facts,
   audio probe fields, and probe artifact evidence;
 - the candidate does not already have a current `system_exact_content_v0` decision.
+- the candidate does not have a current blocking `user_local_v0` rejected/deferred decision.
 
 Stale candidates cannot receive new automatic accepted decisions. Existing decisions over later-stale candidates remain
 historical records and can be superseded later.
@@ -111,10 +136,14 @@ Decision evidence snapshots must preserve:
 - evidence basis fingerprint;
 - probe artifact id.
 
-Only candidate evidence rows that validate as current under the decision's evidence predicate are snapshotted.
-Stale evidence rows belonging to the same candidate are excluded from the snapshot even if they remain durable
-in `track_identity_candidate_evidence`. This ensures provenance reflects only the evidence that actually
-supported the decision at the time it was made.
+Only candidate evidence rows that validate as current under the decision's evidence predicate are snapshotted. Stale
+evidence rows belonging to the same candidate are excluded from the snapshot even if they remain durable in
+`track_identity_candidate_evidence`. This ensures provenance reflects only the evidence that actually supported the
+decision at the time it was made.
+
+User accept requires current supporting evidence and snapshots it. User reject/defer may target a stale candidate; they
+snapshot current evidence if any exists and otherwise record zero decision evidence rows. Reject/defer must not fabricate
+stale evidence as supporting evidence.
 
 The snapshot is provenance, not a new content identity authority. BLAKE3 evidence remains exact bytes evidence and
 `LibraryAssets.equivalence_fingerprint` must not be used as content identity.
@@ -122,16 +151,17 @@ The snapshot is provenance, not a new content identity authority. BLAKE3 evidenc
 ## Read Model
 
 The store read model is diagnostic. It exposes decision id, candidate id, decision state, decision source, decision
-basis, decision reason, evidence key, supersession status, candidate-derived current/stale status, provenance evidence,
-what the decision proves, and what it does not prove.
+basis, decision reason, evidence key, supersession status, candidate-derived current/stale status, backend-owned
+effective-decision summary, provenance evidence, what the decision proves, and what it does not prove.
 
-There is no renderer-owned identity decision surface in v0.
+There is no renderer-owned identity decision precedence in v0. Renderer/preload/desktop code may forward explicit
+candidate-scoped decision commands, but the backend owns writes and effective semantics.
 
 ## Future Work
 
 Future work may add:
 
-- user-authored accept/reject/defer/supersede commands;
+- public supersede-specific commands after a broader correction model exists;
 - canonical track identity after additional authority is defined;
 - multiple candidates mapping to one canonical identity;
 - splitting one candidate into multiple identities;

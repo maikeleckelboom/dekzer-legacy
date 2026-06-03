@@ -47,6 +47,10 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::HashSourceFilesBlake3Request>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceCommand>(&cfg, &mut output);
     push_ts_decl::<crate::RunSourceMaintenanceRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityDecisionWriteCommand>(&cfg, &mut output);
+    push_ts_decl::<crate::AcceptTrackIdentityCandidateRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::RejectTrackIdentityCandidateRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::DeferTrackIdentityCandidateRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SnapshotReadCommand>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationRowsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowRequest>(&cfg, &mut output);
@@ -92,6 +96,15 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::HashSourceFilesBlake3Reply>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceReply>(&cfg, &mut output);
     push_ts_decl::<crate::RunSourceMaintenanceReply>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityDecisionWriteReply>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityDecisionWriteResult>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityDecisionWriteSuccess>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityDecisionWriteFailure>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityDecisionState>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityEffectiveDecisionSummary>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityEffectiveDecisionCurrentStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityEffectiveDecisionPrecedence>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityBlockedSystemDecisionReason>(&cfg, &mut output);
     push_ts_decl::<crate::SnapshotReadReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationRowsReply>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowReply>(&cfg, &mut output);
@@ -257,6 +270,8 @@ mod tests {
         assert!(ts.contains("readNavigationNodeLibraryBrowserWindow"));
         assert!(ts.contains("searchNavigationNodeLibraryBrowserWindow"));
         assert!(ts.contains("readLibraryAssetPreparationDetail"));
+        assert!(ts.contains("acceptTrackIdentityCandidate"));
+        assert!(ts.contains("TrackIdentityDecisionWriteCommand"));
         assert!(ts.contains("LibraryAssetPreparationDetailGroupKey"));
         assert!(!ts.contains("readLibraryBrowserWindow"));
         assert!(!ts.contains("searchLibraryBrowserWindow"));
@@ -274,6 +289,7 @@ mod tests {
         assert!(schema.contains("\"registerLocalRoot\""));
         assert!(schema.contains("\"readSourceLifecycle\""));
         assert!(schema.contains("\"readLibraryTreeChildren\""));
+        assert!(schema.contains("\"acceptTrackIdentityCandidate\""));
         assert!(schema.contains("\"protocolError\""));
         assert!(schema.contains("\"navigationRowId\""));
         assert!(schema.contains("\"type\": \"string\""));

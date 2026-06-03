@@ -94,9 +94,12 @@ pub use read_models::track_identity_candidates::{
     StoreTrackIdentityCandidateStatus, read_track_identity_candidates_for_source,
 };
 pub use read_models::track_identity_decisions::{
-    StoreTrackIdentityDecision, StoreTrackIdentityDecisionCurrentStatus,
-    StoreTrackIdentityDecisionEvidence, StoreTrackIdentityDecisionState,
-    read_track_identity_decisions_for_source,
+    StoreTrackIdentityBlockedSystemDecisionReason, StoreTrackIdentityDecision,
+    StoreTrackIdentityDecisionCurrentStatus, StoreTrackIdentityDecisionEvidence,
+    StoreTrackIdentityDecisionState, StoreTrackIdentityEffectiveDecisionCurrentStatus,
+    StoreTrackIdentityEffectiveDecisionPrecedence, StoreTrackIdentityEffectiveDecisionSummary,
+    read_effective_track_identity_decision_for_candidate,
+    read_track_identity_decisions_for_candidate, read_track_identity_decisions_for_source,
 };
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
@@ -116,8 +119,10 @@ pub use store::{
     SourceFileMediaProbeAdmissionScope, SourceFileMediaProbeCandidate,
     SourceFileMediaProbeCandidateReason, SourceFileMediaProbeFacts, SourceFileMediaProbeFailure,
     SourceFileMediaProbeSkipReason, SqliteDurableStore, SqliteDurableStoreAppOwnedState,
-    StoreEnvironment, UnregisterLocalRootInput, UnregisterLocalRootResult, durable_store_path,
-    effective_hash_batch_limit, effective_media_probe_batch_limit,
-    effective_primary_media_promotion_limit, effective_track_identity_candidate_limit,
-    effective_track_identity_decision_limit,
+    StoreEnvironment, TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
+    TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionWriteFailure,
+    TrackIdentityDecisionWriteResult, TrackIdentityDecisionWriteSuccess, UnregisterLocalRootInput,
+    UnregisterLocalRootResult, durable_store_path, effective_hash_batch_limit,
+    effective_media_probe_batch_limit, effective_primary_media_promotion_limit,
+    effective_track_identity_candidate_limit, effective_track_identity_decision_limit,
 };
