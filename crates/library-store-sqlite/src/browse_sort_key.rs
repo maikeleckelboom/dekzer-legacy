@@ -1,59 +1,65 @@
 pub(crate) fn compute_name_browse_sort_key(name: &str) -> String {
-    const VERSION_BYTE: u8 = 0x01;
-    const TEXT_SEGMENT: u8 = 0x02;
-    const DIGIT_SEGMENT: u8 = 0x03;
-    const ORIGINAL_LENGTH: u8 = 0x05;
-    const END_MARKER: u8 = 0x04;
-
-    let mut key = Vec::with_capacity(name.len() * 3);
-    key.push(VERSION_BYTE);
+    let mut key = String::with_capacity(name.len() * 4 + 8);
+    key.push_str("v1|");
 
     let mut chars = name.chars().peekable();
     while let Some(&ch) = chars.peek() {
         if ch.is_ascii_digit() {
-            let mut digit_str = String::new();
+            let mut digit_chars = String::new();
             while let Some(&d) = chars.peek() {
                 if d.is_ascii_digit() {
-                    digit_str.push(d);
+                    digit_chars.push(d);
                     chars.next();
                 } else {
                     break;
                 }
             }
-            let numeric_value: i64 = digit_str.parse().unwrap_or(0);
-            key.push(DIGIT_SEGMENT);
-            write_zero_padded_i64(&mut key, numeric_value);
-            key.push(ORIGINAL_LENGTH);
-            key.push(digit_str.len() as u8);
-            key.extend_from_slice(digit_str.as_bytes());
+
+            let significant = strip_leading_zeros(&digit_chars);
+            write_digit_run(&mut key, &significant, &digit_chars);
         } else {
-            key.push(TEXT_SEGMENT);
-            for lower_ch in ch.to_lowercase() {
-                key.extend_from_slice(lower_ch.to_string().as_bytes());
+            let mut text_chars = String::new();
+            while let Some(&c) = chars.peek() {
+                if c.is_ascii_digit() {
+                    break;
+                }
+                for lower_ch in c.to_lowercase() {
+                    text_chars.push(lower_ch);
+                }
+                chars.next();
             }
-            chars.next();
+            write_text_chars(&mut key, &text_chars);
         }
     }
 
-    key.push(END_MARKER);
-    String::from_utf8(key).expect("browse sort key must be valid UTF-8")
+    key
 }
 
-fn write_zero_padded_i64(buf: &mut Vec<u8>, value: i64) {
-    const WIDTH: usize = 19;
-    let unsigned = if value < 0 {
-        buf.push(b'-');
-        (value as u128).wrapping_neg() as u64
+fn strip_leading_zeros(s: &str) -> String {
+    let trimmed = s.trim_start_matches('0');
+    if trimmed.is_empty() {
+        "0".to_string()
     } else {
-        value as u64
-    };
-    let divisor = 1_000_000_000_000_000_000u64;
-    let mut remaining = unsigned;
-    for _ in 0..WIDTH {
-        let digit = (remaining / divisor) as u8;
-        buf.push(b'0' + digit);
-        remaining = (remaining % divisor) * 10;
+        trimmed.to_string()
     }
+}
+
+fn write_text_chars(key: &mut String, text: &str) {
+    for ch in text.chars() {
+        key.push('t');
+        key.push(ch);
+    }
+}
+
+fn write_digit_run(key: &mut String, significant: &str, original: &str) {
+    key.push('d');
+    key.push_str(&format!("{:05}", significant.len()));
+    key.push(':');
+    key.push_str(significant);
+    key.push(':');
+    key.push_str(&format!("{:05}", original.len()));
+    key.push(':');
+    key.push_str(original);
 }
 
 #[cfg(test)]
@@ -78,8 +84,39 @@ mod tests {
     }
 
     #[test]
+    fn natural_sort_orders_leading_zeros_deterministic() {
+        assert_order(&["[1]", "[01]", "[001]", "[2]", "[10]"]);
+    }
+
+    #[test]
     fn natural_sort_orders_track_numbers() {
         assert_order(&["Track 1.wav", "Track 2.wav", "Track 10.wav"]);
+    }
+
+    #[test]
+    fn natural_sort_orders_track_numbers_with_leading_zeros() {
+        assert_order(&[
+            "Track 1.wav",
+            "Track 01.wav",
+            "Track 001.wav",
+            "Track 2.wav",
+            "Track 10.wav",
+        ]);
+    }
+
+    #[test]
+    fn natural_sort_leading_zeros_deterministic_individual() {
+        let key_01 = compute_name_browse_sort_key("Track 01.wav");
+        let key_1 = compute_name_browse_sort_key("Track 1.wav");
+        let key_001 = compute_name_browse_sort_key("Track 001.wav");
+        assert!(
+            key_1 < key_01,
+            "1 should sort before 01 (shorter original digit string first)"
+        );
+        assert!(
+            key_01 < key_001,
+            "01 should sort before 001 (shorter original digit string first)"
+        );
     }
 
     #[test]
@@ -89,21 +126,6 @@ mod tests {
         assert_eq!(
             key_lower, key_upper,
             "case-folded keys must be identical for deterministic tie-breaking by id"
-        );
-    }
-
-    #[test]
-    fn natural_sort_leading_zeros_deterministic() {
-        let key_01 = compute_name_browse_sort_key("Track 01.wav");
-        let key_1 = compute_name_browse_sort_key("Track 1.wav");
-        let key_001 = compute_name_browse_sort_key("Track 001.wav");
-        assert!(
-            key_1 < key_01,
-            "1 should sort before 01 (shorter digit string first)"
-        );
-        assert!(
-            key_01 < key_001,
-            "01 should sort before 001 (shorter digit string first)"
         );
     }
 
@@ -160,5 +182,87 @@ mod tests {
         keyed.sort_by(|a, b| a.0.cmp(&b.0));
         let sorted: Vec<&&str> = keyed.iter().map(|(_, n)| n).collect();
         assert_eq!(sorted, vec![&"[1]", &"[2]", &"[3]", &"[10]", &"[11]", &"[20]"]);
+    }
+
+    #[test]
+    fn large_number_does_not_overflow_and_sorts_after_smaller() {
+        let key_9 = compute_name_browse_sort_key("Track 9.wav");
+        let key_10 = compute_name_browse_sort_key("Track 10.wav");
+        let key_huge = compute_name_browse_sort_key(
+            "Track 999999999999999999999999999999.wav",
+        );
+        assert!(
+            key_9 < key_10,
+            "Track 9 must sort before Track 10"
+        );
+        assert!(
+            key_10 < key_huge,
+            "Track 10 must sort before huge-number Track"
+        );
+        assert!(
+            key_9 < key_huge,
+            "Track 9 must sort before huge-number Track"
+        );
+    }
+
+    #[test]
+    fn large_number_with_many_leading_zeros_sorts_by_numeric_value_9() {
+        let key_9 = compute_name_browse_sort_key("Track 9.wav");
+        let key_padded = compute_name_browse_sort_key(
+            "Track 000000000000000000000000000009.wav",
+        );
+        let key_10 = compute_name_browse_sort_key("Track 10.wav");
+
+        assert!(
+            key_9 < key_padded,
+            "Track 9 must sort before padded-zero variant (shorter original length wins)"
+        );
+        assert!(
+            key_padded < key_10,
+            "padded-zero variant (value 9) must sort before Track 10"
+        );
+    }
+
+    #[test]
+    fn all_zero_digit_run_collapses_to_single_zero() {
+        let key_000 = compute_name_browse_sort_key("Track 000.wav");
+        let key_0 = compute_name_browse_sort_key("Track 0.wav");
+        assert!(
+            key_0 < key_000,
+            "Track 0 must sort before Track 000 (shorter original length)"
+        );
+        assert_order(&["Track 0.wav", "Track 000.wav", "Track 1.wav"]);
+    }
+
+    #[test]
+    fn key_is_printable_ascii() {
+        let key = compute_name_browse_sort_key("Track 10.wav");
+        assert!(key.chars().all(|c| c.is_ascii_graphic() || c == ' ' || c == ':'));
+        assert!(key.starts_with("v1|"));
+    }
+
+    #[test]
+    fn sort_key_never_empty_for_any_valid_input() {
+        let names = [
+            "",
+            "a",
+            "1",
+            "[1]",
+            "Track 1.wav",
+            "a very long file name with spaces and 123 numbers.mp3",
+            "0",
+            "000",
+        ];
+        for name in &names {
+            let key = compute_name_browse_sort_key(name);
+            assert!(
+                !key.is_empty(),
+                "sort key must not be empty for name: {name:?}"
+            );
+            assert!(
+                key.starts_with("v1|"),
+                "sort key must have v1| prefix for name: {name:?}"
+            );
+        }
     }
 }

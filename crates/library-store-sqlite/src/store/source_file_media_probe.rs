@@ -1118,6 +1118,8 @@ mod tests {
             mtime_ns: i64,
         ) {
             let name = relative_path.rsplit('/').next().expect("file name");
+            let name_browse_sort_key =
+                crate::browse_sort_key::compute_name_browse_sort_key(name);
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -1139,10 +1141,11 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                        VALUES (?1, 1, NULL, ?2, '', ?3, ?4, ?5, ?6, ?7, 'present', 10, 10, 10, 10, 10)",
+                        VALUES (?1, 1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'present', 10, 10, 10, 10, 10)",
                         params![
                             source_file_id,
                             name,
+                            name_browse_sort_key,
                             relative_path,
                             size_bytes,
                             mtime_ns,

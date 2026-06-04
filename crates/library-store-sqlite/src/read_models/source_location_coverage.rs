@@ -236,31 +236,34 @@ mod tests {
             .rsplit('/')
             .next()
             .unwrap_or(&fix.relative_path);
+        let name_browse_sort_key =
+            crate::browse_sort_key::compute_name_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
                      source_directory_id,
                      source_id,
                      parent_source_directory_id,
-name,
-                      name_browse_sort_key,
-                      relative_path,
-                      presence_state,
-                      has_child_directories,
-                      has_primary_media_descendant,
-                      has_image_media_descendant,
-                      dir_scan_state,
-                      dir_scan_issue_kind,
-                      dir_scan_updated_at,
-                      created_at,
-                      updated_at
-                  )
-                  VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, 0, 0, 0, ?7, ?8, 1, 1, 1)",
+                     name,
+                     name_browse_sort_key,
+                     relative_path,
+                     presence_state,
+                     has_child_directories,
+                     has_primary_media_descendant,
+                     has_image_media_descendant,
+                     dir_scan_state,
+                     dir_scan_issue_kind,
+                     dir_scan_updated_at,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 0, 0, ?8, ?9, 1, 1, 1)",
                 rusqlite::params![
                     fix.source_directory_id,
                     fix.source_id,
                     fix.parent_source_directory_id,
                     name,
+                    name_browse_sort_key,
                     fix.relative_path,
                     fix.presence_state,
                     fix.dir_scan_state,

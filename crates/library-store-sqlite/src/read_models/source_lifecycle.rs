@@ -281,7 +281,7 @@ name,
                       created_at,
                       updated_at
                   )
-                  VALUES (21, 7, NULL, 'Music', '', 'Music', 'present', 0, 0, 'complete', 1, 1, 1)",
+                  VALUES (21, 7, NULL, 'Music', 'v1|tmtutstitc', 'Music', 'present', 0, 0, 'complete', 1, 1, 1)",
                 [],
             )
             .expect("insert directory that lifecycle must not synthesize");

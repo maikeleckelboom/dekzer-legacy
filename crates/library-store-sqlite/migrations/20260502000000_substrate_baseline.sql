@@ -236,7 +236,7 @@ CREATE TABLE source_directories
     source_id                   INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
     parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                        TEXT    NOT NULL,
-    name_browse_sort_key        TEXT    NOT NULL DEFAULT '',
+    name_browse_sort_key        TEXT    NOT NULL,
     relative_path               TEXT    NOT NULL,
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
@@ -295,7 +295,7 @@ CREATE TABLE source_files
     source_id                   INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
     parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                        TEXT    NOT NULL CHECK (length(name) > 0),
-    name_browse_sort_key        TEXT    NOT NULL DEFAULT '',
+    name_browse_sort_key        TEXT    NOT NULL,
     relative_path               TEXT    NOT NULL CHECK (length(relative_path) > 0),
     size_bytes                  INTEGER CHECK (size_bytes IS NULL OR size_bytes >= 0),
     mtime_ns                    INTEGER CHECK (mtime_ns IS NULL OR mtime_ns >= 0),

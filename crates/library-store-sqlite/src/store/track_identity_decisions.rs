@@ -2808,7 +2808,7 @@ mod tests {
                          last_observed_at, last_presence_change_at,
                          created_at, updated_at
                      )
-                     VALUES (200, 2, 'source-b.wav', '', 'Album/source-b.wav',
+                      VALUES (200, 2, 'source-b.wav', 'v1|tstotutrctet-tbt.twtatv', 'Album/source-b.wav',
                              10, 100, 'audio', 'audio', 'present', 1, 1, 1,
                              1, 1)",
                     [],

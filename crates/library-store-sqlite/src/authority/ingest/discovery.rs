@@ -2722,7 +2722,7 @@ name,
                   created_at,
                   updated_at
               )
-              VALUES (60, ?1, NULL, 'Locked', '', 'Locked', 'present', 'blocked', 1, 1, 1)",
+              VALUES (60, ?1, NULL, 'Locked', 'v1|tltotctkteted', 'Locked', 'present', 'blocked', 1, 1, 1)",
             [source_id],
         );
 
@@ -2771,7 +2771,7 @@ name,
                   created_at,
                   updated_at
               )
-              VALUES (61, ?1, NULL, 'Failed', '', 'Failed', 'present', 'failed', 1, 1, 1)",
+              VALUES (61, ?1, NULL, 'Failed', 'v1|tftaitlteted', 'Failed', 'present', 'failed', 1, 1, 1)",
             [source_id],
         );
 

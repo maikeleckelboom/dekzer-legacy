@@ -2206,4 +2206,169 @@ fn insert_directory(
             "longer digit string sorts last (leading zero tie-break)"
         );
     }
+
+    #[test]
+    fn natural_order_directories_leading_zero_order() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        for (id, name) in [
+            (100, "[10]"),
+            (101, "[01]"),
+            (102, "[2]"),
+            (103, "[001]"),
+            (104, "[1]"),
+        ] {
+            insert_directory(
+                &connection,
+                id,
+                None,
+                name,
+                DirectoryFacts {
+                    has_child_directories: false,
+                    has_primary_media_descendant: true,
+                    has_image_media_descendant: false,
+                },
+                "complete",
+                None,
+            );
+        }
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::PerformanceAndImages,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["[1]", "[01]", "[001]", "[2]", "[10]"],
+            "directories must sort: [1] < [01] < [001] < [2] < [10]"
+        );
+    }
+
+    #[test]
+    fn natural_order_files_leading_zero_order() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        for (id, name) in [
+            (200, "Track 001.wav"),
+            (201, "Track 01.wav"),
+            (202, "Track 10.wav"),
+            (203, "Track 2.wav"),
+            (204, "Track 1.wav"),
+        ] {
+            insert_file(&connection, id, name, "audio");
+        }
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Track 1.wav",
+                "Track 01.wav",
+                "Track 001.wav",
+                "Track 2.wav",
+                "Track 10.wav",
+            ],
+            "files must sort: 1 < 01 < 001 < 2 < 10"
+        );
+    }
+
+    #[test]
+    fn natural_order_large_numbers() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_file(&connection, 200, "Track 999999999999999999999999999999.wav", "audio");
+        insert_file(&connection, 201, "Track 10.wav", "audio");
+        insert_file(&connection, 202, "Track 9.wav", "audio");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "Track 9.wav",
+                "Track 10.wav",
+                "Track 999999999999999999999999999999.wav",
+            ],
+            "large numeric run must sort after smaller values without overflow collapse"
+        );
+    }
+
+    #[test]
+    fn natural_order_padded_zero_sort_by_numeric_value() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_file(
+            &connection,
+            200,
+            "Track 000000000000000000000000000009.wav",
+            "audio",
+        );
+        insert_file(&connection, 201, "Track 10.wav", "audio");
+        insert_file(&connection, 202, "Track 9.wav", "audio");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        let names: Vec<&str> = window
+            .rows
+            .iter()
+            .map(|row| row.display_name.as_str())
+            .collect();
+        assert_eq!(names[0], "Track 9.wav",
+            "Track 9 must sort first (shorter original digit length)");
+        assert_eq!(
+            names[1], "Track 000000000000000000000000000009.wav",
+            "padded zeros have numeric value 9, sort after Track 9 (longer original length)"
+        );
+        assert_eq!(
+            names[2], "Track 10.wav",
+            "Track 10 must sort after the 9-valued runs"
+        );
+    }
 }

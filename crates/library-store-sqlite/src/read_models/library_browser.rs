@@ -1652,6 +1652,8 @@ mod tests {
         name: &str,
         relative_path: &str,
     ) {
+        let name_browse_sort_key =
+            crate::browse_sort_key::compute_name_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -1666,12 +1668,13 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, '', ?5, 'present', 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'present', 1, 1, 1)",
                 params![
                     source_directory_id,
                     source_id,
                     parent_source_directory_id,
                     name,
+                    name_browse_sort_key,
                     relative_path,
                 ],
             )
@@ -1771,6 +1774,9 @@ mod tests {
     ) {
         let source_segment_set_id = source_file_id + 1_000;
         let source_segment_id = source_file_id + 2_000;
+        let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
+        let name_browse_sort_key =
+            crate::browse_sort_key::compute_name_browse_sort_key(file_name);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -1789,12 +1795,13 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, '', ?5, 1, 1, 'present', 1, 1, 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, 1, 'present', 1, 1, 1, 1, 1)",
                 params![
                     source_file_id,
                     source_id,
                     parent_source_directory_id,
-                    relative_path.rsplit('/').next().unwrap_or(relative_path),
+                    file_name,
+                    name_browse_sort_key,
                     relative_path,
                 ],
             )
