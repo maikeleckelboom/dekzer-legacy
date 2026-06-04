@@ -366,6 +366,10 @@ mod tests {
                 .contains(&"source_files_source_relative_path_binary".to_string())
         );
         assert!(
+            table_index_names(&connection, "source_files")
+                .contains(&"source_files_source_browse_order".to_string())
+        );
+        assert!(
             table_foreign_keys(&connection, "source_directories").contains(&(
                 "source_directories".to_string(),
                 "parent_source_directory_id".to_string(),

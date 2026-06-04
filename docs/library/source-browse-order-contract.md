@@ -9,14 +9,14 @@ The renderer must not reorder backend windows.
 
 This contract applies to:
 
-- **Literal hierarchy** source browsing (sibling directory/file rows)
-- **Contents source-file** read surface (media-relevant file inventory)
-- **Contents primary-media relative-path tie-break** (metadata-first, natural fallback)
+- **Literal hierarchy** source browsing, which is fixed and uses
+  `name_browse_sort_key` for sibling directory/file rows
+- **Contents source-file** ordering, which is fixed and uses
+  `relative_path_browse_sort_key`
 
-Library browser ordering remains metadata-first with natural relative-path tie-breaks
-only where `source_files.relative_path_browse_sort_key` is available in the query.
-Library browser does not use cursor pagination and is not fully converted to browse
-sort key ordering for metadata columns.
+Contents primary-media remains metadata-first, and its `relative_path` fallback
+is not converted yet. Library browser remains metadata-first and is not fully
+converted. The renderer must not reorder backend windows.
 
 ## Ordering rule
 
@@ -118,7 +118,9 @@ Contents source-file cursors (`CONTENTS_CURSOR_VERSION = 2`) carry:
 - `source_file_id`: the stable row ID
 
 The cursor clause compares these three fields in order. Cursor version 1
-cursors (which used `lower(relative_path)`) are invalidated.
+cursors (which used `lower(relative_path)`) are invalidated. The cursor carries
+the exact persisted `relative_path_browse_sort_key` selected from SQLite; read
+models do not recompute it from `relative_path`.
 
 ## Non-goals
 
@@ -159,7 +161,18 @@ Literal hierarchy and contents source-file ordering are now fixed.
 ```sql
 source_directories.relative_path_browse_sort_key TEXT NOT NULL
 source_files.relative_path_browse_sort_key TEXT NOT NULL
+
+CREATE INDEX source_files_source_browse_order
+    ON source_files (
+        source_id,
+        relative_path_browse_sort_key,
+        relative_path,
+        source_file_id
+    );
 ```
 
 Both columns are populated by the authority write paths (`source_directories.rs`,
 `source_files.rs`, and `discovery.rs`) with no `DEFAULT ''` fallback.
+The source-file browse-order index matches the whole-source contents ordering;
+more selective path-scoped queries may continue to use the binary relative-path
+index for scope filtering.

@@ -332,6 +332,9 @@ CREATE INDEX source_files_parent_source_directory
 CREATE INDEX source_files_source_relative_path_binary
     ON source_files (source_id, relative_path COLLATE BINARY);
 
+CREATE INDEX source_files_source_browse_order
+    ON source_files (source_id, relative_path_browse_sort_key, relative_path, source_file_id);
+
 CREATE INDEX source_files_parent_browse
     ON source_files (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name, media_class, file_kind);
 

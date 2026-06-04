@@ -209,7 +209,10 @@ fn compute_cursor_position(
 ) -> ContentsCursorPosition {
     match row_profile {
         StoreContentsRowProfile::SourceFile => ContentsCursorPosition::SourceFile {
-            relative_path_browse_sort_key: compute_source_file_browse_sort_key(row),
+            relative_path_browse_sort_key: row
+                .relative_path_browse_sort_key
+                .clone()
+                .expect("source-file contents rows select relative_path_browse_sort_key"),
             relative_path: row.relative_path.clone(),
             source_file_id: row.source_file_id,
         },
@@ -222,10 +225,6 @@ fn compute_cursor_position(
             source_file_id: row.source_file_id,
         },
     }
-}
-
-fn compute_source_file_browse_sort_key(row: &StoreContentsFileRow) -> String {
-    crate::browse_sort_key::compute_relative_path_browse_sort_key(&row.relative_path)
 }
 
 fn availability_priority(availability_state: &Option<String>) -> i64 {
@@ -466,6 +465,7 @@ pub struct StoreContentsFileRow {
     pub availability_state: Option<String>,
     pub primary_media: Option<StorePrimaryMediaSummary>,
     pub updated_at: i64,
+    pub(crate) relative_path_browse_sort_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1820,7 +1820,8 @@ SELECT sf.source_file_id, \
        NULL AS sample_rate_hz, \
        NULL AS channels, \
        NULL AS bit_depth, \
-       NULL AS codec \
+       NULL AS codec, \
+       sf.relative_path_browse_sort_key \
    FROM source_files sf \
  WHERE {media_predicate} \
    AND {source_predicate}{cursor_clause} \
@@ -2098,7 +2099,8 @@ fn primary_media_rows_sql(
                   sample_rate_hz, \
                   channels, \
                   bit_depth, \
-                  codec \
+                  codec, \
+                  NULL AS relative_path_browse_sort_key \
            FROM promoted{cursor_clause} \
            ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL} \
            LIMIT ?{limit_param}"
@@ -2197,6 +2199,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let channels: Option<i64> = row.get(31)?;
     let bit_depth: Option<i64> = row.get(32)?;
     let codec: Option<String> = row.get(33)?;
+    let relative_path_browse_sort_key: Option<String> = row.get(34)?;
 
     let primary_media = availability_state.as_ref().map(|availability_state| {
         let origin = if primary_media_candidate_id.is_some() {
@@ -2267,6 +2270,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
         availability_state,
         primary_media,
         updated_at,
+        relative_path_browse_sort_key,
     })
 }
 
@@ -4792,6 +4796,44 @@ mod tests {
     }
 
     #[test]
+    fn source_file_contents_whole_source_uses_browse_order_index() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for i in 0..30 {
+            insert_scanned_file(
+                &connection,
+                1000 + i,
+                1,
+                10,
+                &format!("Music/track_{:02}.wav", i),
+                "audio",
+            );
+        }
+
+        let media_predicate = super::media_classes_predicate_sql(
+            "sf.media_class",
+            "sf.file_kind",
+            &[StoreContentsMediaClass::Audio],
+        );
+        let sql =
+            super::source_file_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
+        let plan = dump_query_plan(
+            &connection,
+            &sql,
+            &[
+                rusqlite::types::Value::Integer(1),
+                rusqlite::types::Value::Integer(100),
+            ],
+        );
+
+        assert!(
+            plan.contains("source_files_source_browse_order"),
+            "whole-source source-file contents should use browse-order index, observed:\n{plan}"
+        );
+    }
+
+    #[test]
     fn contents_directory_prefix_uses_indexed_relative_path_scope() {
         let connection = open_connection();
         insert_source(&connection, 1);
@@ -6137,6 +6179,49 @@ mod tests {
             "last page should have no next_cursor"
         );
         assert_eq!(page2.state, StoreContentsState::Ready);
+    }
+
+    #[test]
+    fn source_file_contents_cursor_uses_selected_persisted_browse_sort_key() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Music/Track 1.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Music/Track 2.wav", "audio");
+        connection
+            .execute(
+                "UPDATE source_files
+                 SET relative_path_browse_sort_key = 'persisted-authority-key'
+                 WHERE source_file_id = 1000",
+                [],
+            )
+            .expect("set persisted browse sort key");
+
+        let page = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            1,
+            None,
+        )
+        .expect("read contents");
+
+        assert_eq!(page.rows[0].source_file_id, 1000);
+        let cursor = super::decode_cursor(page.next_cursor.as_deref().expect("next cursor"))
+            .expect("decode next cursor");
+        assert!(matches!(
+            cursor.position,
+            super::ContentsCursorPosition::SourceFile {
+                relative_path_browse_sort_key,
+                relative_path,
+                source_file_id: 1000,
+            } if relative_path_browse_sort_key == "persisted-authority-key"
+                && relative_path == "Music/Track 1.wav"
+        ));
     }
 
     #[test]
