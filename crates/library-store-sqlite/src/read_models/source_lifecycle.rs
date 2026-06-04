@@ -270,17 +270,18 @@ mod tests {
                      source_directory_id,
                      source_id,
                      parent_source_directory_id,
-                     name,
-                     relative_path,
-                     presence_state,
-                     has_child_directories,
-                     has_primary_media_descendant,
-                     dir_scan_state,
-                     dir_scan_updated_at,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (21, 7, NULL, 'Music', 'Music', 'present', 0, 0, 'complete', 1, 1, 1)",
+name,
+                      name_browse_sort_key,
+                      relative_path,
+                      presence_state,
+                      has_child_directories,
+                      has_primary_media_descendant,
+                      dir_scan_state,
+                      dir_scan_updated_at,
+                      created_at,
+                      updated_at
+                  )
+                  VALUES (21, 7, NULL, 'Music', '', 'Music', 'present', 0, 0, 'complete', 1, 1, 1)",
                 [],
             )
             .expect("insert directory that lifecycle must not synthesize");

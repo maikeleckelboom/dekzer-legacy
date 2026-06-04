@@ -2,6 +2,7 @@
 
 mod authority;
 mod browse_media;
+mod browse_sort_key;
 mod error;
 mod publication;
 mod read_models;

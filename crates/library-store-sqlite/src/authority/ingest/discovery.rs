@@ -2713,15 +2713,16 @@ mod tests {
                  source_directory_id,
                  source_id,
                  parent_source_directory_id,
-                 name,
-                 relative_path,
-                 presence_state,
-                 dir_scan_state,
-                 dir_scan_updated_at,
-                 created_at,
-                 updated_at
-             )
-             VALUES (60, ?1, NULL, 'Locked', 'Locked', 'present', 'blocked', 1, 1, 1)",
+name,
+                  name_browse_sort_key,
+                  relative_path,
+                  presence_state,
+                  dir_scan_state,
+                  dir_scan_updated_at,
+                  created_at,
+                  updated_at
+              )
+              VALUES (60, ?1, NULL, 'Locked', '', 'Locked', 'present', 'blocked', 1, 1, 1)",
             [source_id],
         );
 
@@ -2761,15 +2762,16 @@ mod tests {
                  source_directory_id,
                  source_id,
                  parent_source_directory_id,
-                 name,
-                 relative_path,
-                 presence_state,
-                 dir_scan_state,
-                 dir_scan_updated_at,
-                 created_at,
-                 updated_at
-             )
-             VALUES (61, ?1, NULL, 'Failed', 'Failed', 'present', 'failed', 1, 1, 1)",
+name,
+                  name_browse_sort_key,
+                  relative_path,
+                  presence_state,
+                  dir_scan_state,
+                  dir_scan_updated_at,
+                  created_at,
+                  updated_at
+              )
+              VALUES (61, ?1, NULL, 'Failed', '', 'Failed', 'present', 'failed', 1, 1, 1)",
             [source_id],
         );
 

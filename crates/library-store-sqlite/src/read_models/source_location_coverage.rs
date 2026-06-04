@@ -242,19 +242,20 @@ mod tests {
                      source_directory_id,
                      source_id,
                      parent_source_directory_id,
-                     name,
-                     relative_path,
-                     presence_state,
-                     has_child_directories,
-                     has_primary_media_descendant,
-                     has_image_media_descendant,
-                     dir_scan_state,
-                     dir_scan_issue_kind,
-                     dir_scan_updated_at,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0, 0, ?7, ?8, 1, 1, 1)",
+name,
+                      name_browse_sort_key,
+                      relative_path,
+                      presence_state,
+                      has_child_directories,
+                      has_primary_media_descendant,
+                      has_image_media_descendant,
+                      dir_scan_state,
+                      dir_scan_issue_kind,
+                      dir_scan_updated_at,
+                      created_at,
+                      updated_at
+                  )
+                  VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, 0, 0, 0, ?7, ?8, 1, 1, 1)",
                 rusqlite::params![
                     fix.source_directory_id,
                     fix.source_id,

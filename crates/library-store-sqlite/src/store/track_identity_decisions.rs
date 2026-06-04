@@ -1096,6 +1096,7 @@ mod tests {
                              source_file_id,
                              source_id,
                              name,
+                             name_browse_sort_key,
                              relative_path,
                              size_bytes,
                              mtime_ns,
@@ -1108,7 +1109,7 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (?1, ?2, ?3, ?4, 10, 100, ?5, ?6, 'present', 1, 1, 1, 1, 1)",
+                         VALUES (?1, ?2, ?3, '', ?4, 10, 100, ?5, ?6, 'present', 1, 1, 1, 1, 1)",
                         params![
                             source_file_id,
                             self.source_id,
@@ -2801,13 +2802,13 @@ mod tests {
                 )?;
                 write.execute(
                     "INSERT INTO source_files (
-                         source_file_id, source_id, name, relative_path,
+                         source_file_id, source_id, name, name_browse_sort_key, relative_path,
                          size_bytes, mtime_ns, file_kind, media_class,
                          presence_state, first_discovered_at,
                          last_observed_at, last_presence_change_at,
                          created_at, updated_at
                      )
-                     VALUES (200, 2, 'source-b.wav', 'Album/source-b.wav',
+                     VALUES (200, 2, 'source-b.wav', '', 'Album/source-b.wav',
                              10, 100, 'audio', 'audio', 'present', 1, 1, 1,
                              1, 1)",
                     [],

@@ -1659,13 +1659,14 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
+                     name_browse_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_updated_at,
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, 'present', 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, '', ?5, 'present', 1, 1, 1)",
                 params![
                     source_directory_id,
                     source_id,
@@ -1777,6 +1778,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
+                     name_browse_sort_key,
                      relative_path,
                      size_bytes,
                      mtime_ns,
@@ -1787,7 +1789,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, 1, 1, 'present', 1, 1, 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, '', ?5, 1, 1, 'present', 1, 1, 1, 1, 1)",
                 params![
                     source_file_id,
                     source_id,

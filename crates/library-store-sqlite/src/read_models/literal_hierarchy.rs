@@ -764,7 +764,8 @@ fn read_child_rows(
                     has_child_directories,
                     has_primary_media_descendant,
                     has_image_media_descendant,
-                    dir_scan_state
+                    dir_scan_state,
+                    name_browse_sort_key
              FROM source_directories
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -790,7 +791,8 @@ fn read_child_rows(
                     NULL AS has_child_directories,
                     NULL AS has_primary_media_descendant,
                     NULL AS has_image_media_descendant,
-                    NULL AS dir_scan_state
+                    NULL AS dir_scan_state,
+                    name_browse_sort_key
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -801,9 +803,9 @@ fn read_child_rows(
                )
          )
          ORDER BY sort_kind ASC,
-                  lower(display_name) ASC,
+                  name_browse_sort_key ASC,
                   display_name ASC,
-                  relative_path ASC
+                  COALESCE(source_directory_id, source_file_id) ASC
          LIMIT ?3
          OFFSET ?4"
     ))?;
@@ -964,7 +966,7 @@ mod tests {
         has_image_media_descendant: bool,
     }
 
-    fn insert_directory(
+fn insert_directory(
         connection: &Connection,
         source_directory_id: i64,
         parent_source_directory_id: Option<i64>,
@@ -973,6 +975,7 @@ mod tests {
         dir_scan_state: &str,
         dir_scan_issue_kind: Option<&str>,
     ) {
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -980,6 +983,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
+                     name_browse_sort_key,
                      relative_path,
                      presence_state,
                      has_child_directories,
@@ -991,11 +995,12 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 7, ?2, ?3, ?3, 'present', ?4, ?5, ?6, ?7, ?8, 1, 1, 1)",
+                 VALUES (?1, 7, ?2, ?3, ?4, ?3, 'present', ?5, ?6, ?7, ?8, ?9, 1, 1, 1)",
                 params![
                     source_directory_id,
                     parent_source_directory_id,
                     name,
+                    name_browse_sort_key,
                     facts.has_child_directories,
                     facts.has_primary_media_descendant,
                     facts.has_image_media_descendant,
@@ -1017,6 +1022,7 @@ mod tests {
         name: &str,
         media_class: &str,
     ) {
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -1024,6 +1030,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
+                     name_browse_sort_key,
                      relative_path,
                      media_class,
                      presence_state,
@@ -1033,11 +1040,12 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 7, ?2, ?3, ?3, ?4, 'present', 1, 1, 1, 1, 1)",
+                 VALUES (?1, 7, ?2, ?3, ?4, ?3, ?5, 'present', 1, 1, 1, 1, 1)",
                 params![
                     source_file_id,
                     parent_source_directory_id,
                     name,
+                    name_browse_sort_key,
                     media_class
                 ],
             )
@@ -1921,5 +1929,281 @@ mod tests {
             "source location under blocked parent must be blocked, not missing"
         );
         assert!(!window.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn natural_order_directories_sort_numerically_within_brackets() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            100,
+            None,
+            "[10]",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            101,
+            None,
+            "[1]",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            102,
+            None,
+            "[2]",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::PerformanceAndImages,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["[1]", "[2]", "[10]"],
+            "directories must sort by natural numeric order: [1], [2], [10]"
+        );
+    }
+
+    #[test]
+    fn natural_order_files_sort_numerically_within_track_names() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_file(&connection, 200, "Track 10.wav", "audio");
+        insert_file(&connection, 201, "Track 1.wav", "audio");
+        insert_file(&connection, 202, "Track 2.wav", "audio");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(
+            window
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Track 1.wav", "Track 2.wav", "Track 10.wav"],
+            "files must sort by natural numeric order: Track 1, Track 2, Track 10"
+        );
+    }
+
+    #[test]
+    fn natural_order_mixed_directories_and_files() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            100,
+            None,
+            "[2]",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file(&connection, 200, "[10].wav", "audio");
+        insert_directory(
+            &connection,
+            101,
+            None,
+            "[1]",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file(&connection, 201, "[1].wav", "audio");
+        insert_file(&connection, 202, "[2].wav", "audio");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::PerformanceAndImages,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        let kinds_and_names: Vec<(&str, &str)> = window
+            .rows
+            .iter()
+            .map(|row| (row.node_kind.as_str(), row.display_name.as_str()))
+            .collect();
+        assert_eq!(
+            kinds_and_names,
+            vec![
+                ("directory", "[1]"),
+                ("directory", "[2]"),
+                ("file", "[1].wav"),
+                ("file", "[2].wav"),
+                ("file", "[10].wav"),
+            ],
+            "directories must precede files, each group in natural order"
+        );
+    }
+
+    #[test]
+    fn natural_order_stable_pagination() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] {
+            insert_file(
+                &connection,
+                100 + i,
+                &format!("Track {}.wav", i),
+                "audio",
+            );
+        }
+
+        let first = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            5,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read first page")
+        .expect("source window");
+
+        let second = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            5,
+            5,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read second page")
+        .expect("source window");
+
+        let third = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            10,
+            5,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read third page")
+        .expect("source window");
+
+        assert_eq!(first.total_rows, 12);
+        assert_eq!(first.rows.len(), 5);
+        assert_eq!(second.rows.len(), 5);
+        assert_eq!(third.rows.len(), 2);
+
+        assert_eq!(
+            first
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Track 1.wav", "Track 2.wav", "Track 3.wav", "Track 4.wav", "Track 5.wav"]
+        );
+        assert_eq!(
+            second
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Track 6.wav", "Track 7.wav", "Track 8.wav", "Track 9.wav", "Track 10.wav"]
+        );
+        assert_eq!(
+            third
+                .rows
+                .iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Track 11.wav", "Track 12.wav"]
+        );
+    }
+
+    #[test]
+    fn natural_order_case_folding_and_tie_stability() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_file(&connection, 201, "track 1.wav", "audio");
+        insert_file(&connection, 200, "Track 1.wav", "audio");
+        insert_file(&connection, 202, "track 01.wav", "audio");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::Performance,
+        )
+        .expect("read literal hierarchy")
+        .expect("source window");
+
+        assert_eq!(window.total_rows, 3);
+        let names: Vec<&str> = window
+            .rows
+            .iter()
+            .map(|row| row.display_name.as_str())
+            .collect();
+        assert_eq!(
+            names[0],
+            "Track 1.wav",
+            "shorter digit string sorts first, display_name tie-break"
+        );
+        assert!(
+            names.contains(&"track 1.wav"),
+            "track 1.wav must be in results"
+        );
+        assert_eq!(
+            names[2], "track 01.wav",
+            "longer digit string sorts last (leading zero tie-break)"
+        );
     }
 }

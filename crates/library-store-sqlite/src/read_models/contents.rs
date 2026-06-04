@@ -2461,15 +2461,16 @@ mod tests {
                      source_directory_id,
                      source_id,
                      parent_source_directory_id,
-                     name,
-                     relative_path,
-                     presence_state,
-                     dir_scan_state,
-                     dir_scan_updated_at,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (?1, ?2, NULL, ?3, ?4, 'present', ?5, 1, 1, 1)",
+name,
+                      name_browse_sort_key,
+                      relative_path,
+                      presence_state,
+                      dir_scan_state,
+                      dir_scan_updated_at,
+                      created_at,
+                      updated_at
+                  )
+                  VALUES (?1, ?2, NULL, ?3, '', ?4, 'present', ?5, 1, 1, 1)",
                 params![
                     source_directory_id,
                     source_id,
@@ -3099,18 +3100,19 @@ mod tests {
                      source_file_id,
                      source_id,
                      parent_source_directory_id,
-                     name,
-                     relative_path,
-                     file_kind,
-                     media_class,
-                     presence_state,
-                     first_discovered_at,
-                     last_observed_at,
-                     last_presence_change_at,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'present', 1, 1, 1, 1, 1)",
+name,
+                      name_browse_sort_key,
+                      relative_path,
+                      file_kind,
+                      media_class,
+                      presence_state,
+                      first_discovered_at,
+                      last_observed_at,
+                      last_presence_change_at,
+                      created_at,
+                      updated_at
+                  )
+                  VALUES (?1, ?2, ?3, ?4, '', ?5, ?6, ?7, 'present', 1, 1, 1, 1, 1)",
                 params![
                     source_file_id,
                     source_id,

@@ -392,20 +392,21 @@ mod tests {
                      source_file_id,
                      source_id,
                      parent_source_directory_id,
-                     name,
-                     relative_path,
-                     size_bytes,
-                     mtime_ns,
-                     file_kind,
-                     media_class,
-                     presence_state,
-                     first_discovered_at,
-                     last_observed_at,
-                     last_presence_change_at,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (?1, 1, NULL, ?2, ?3, ?4, ?5, 'audio', 'audio', 'present', 10, 10, 10, 10, 10)",
+name,
+                      name_browse_sort_key,
+                      relative_path,
+                      size_bytes,
+                      mtime_ns,
+                      file_kind,
+                      media_class,
+                      presence_state,
+                      first_discovered_at,
+                      last_observed_at,
+                      last_presence_change_at,
+                      created_at,
+                      updated_at
+                  )
+                  VALUES (?1, 1, NULL, ?2, '', ?3, ?4, ?5, 'audio', 'audio', 'present', 10, 10, 10, 10, 10)",
                 params![source_file_id, name, relative_path, size_bytes, mtime_ns],
             )
             .expect("insert source file");

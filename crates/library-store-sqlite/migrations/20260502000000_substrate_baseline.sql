@@ -236,6 +236,7 @@ CREATE TABLE source_directories
     source_id                   INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
     parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                        TEXT    NOT NULL,
+    name_browse_sort_key        TEXT    NOT NULL DEFAULT '',
     relative_path               TEXT    NOT NULL,
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
@@ -285,12 +286,16 @@ CREATE INDEX source_directories_parent
 CREATE INDEX source_directories_source_relative_path_binary
     ON source_directories (source_id, relative_path COLLATE BINARY);
 
+CREATE INDEX source_directories_parent_browse
+    ON source_directories (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name);
+
 CREATE TABLE source_files
 (
     source_file_id              INTEGER PRIMARY KEY,
     source_id                   INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
     parent_source_directory_id  INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                        TEXT    NOT NULL CHECK (length(name) > 0),
+    name_browse_sort_key        TEXT    NOT NULL DEFAULT '',
     relative_path               TEXT    NOT NULL CHECK (length(relative_path) > 0),
     size_bytes                  INTEGER CHECK (size_bytes IS NULL OR size_bytes >= 0),
     mtime_ns                    INTEGER CHECK (mtime_ns IS NULL OR mtime_ns >= 0),
@@ -324,6 +329,9 @@ CREATE INDEX source_files_parent_source_directory
 
 CREATE INDEX source_files_source_relative_path_binary
     ON source_files (source_id, relative_path COLLATE BINARY);
+
+CREATE INDEX source_files_parent_browse
+    ON source_files (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name, media_class, file_kind);
 
 -- TOMBSTONE: LibraryAssets is dormant for new content identity work. It is
 -- replaced by content_attachments plus future track/media layers, and the

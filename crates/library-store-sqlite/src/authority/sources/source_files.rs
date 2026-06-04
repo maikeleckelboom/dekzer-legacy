@@ -6,6 +6,7 @@ use crate::browse_media::{
     LibraryTreeRowAdmission, file_kind_str_from_path, is_image_media_class, is_primary_media_class,
     library_tree_row_admission_predicate_sql_for_column, media_class_str_from_path,
 };
+use crate::browse_sort_key::compute_name_browse_sort_key;
 use library_domain::SourcePresenceState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,21 +60,23 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                  SET source_id = ?2,
                      parent_source_directory_id = ?3,
                      name = ?4,
-                     relative_path = ?5,
-                     size_bytes = ?6,
-                     mtime_ns = ?7,
-                     presence_state = ?8,
-                     media_class = ?12,
-                     file_kind = ?13,
-                     last_observed_at = COALESCE(?9, last_observed_at),
-                     last_presence_change_at = COALESCE(?10, last_presence_change_at),
-                     updated_at = ?11
+                     name_browse_sort_key = ?5,
+                     relative_path = ?6,
+                     size_bytes = ?7,
+                     mtime_ns = ?8,
+                     presence_state = ?9,
+                     media_class = ?13,
+                     file_kind = ?14,
+                     last_observed_at = COALESCE(?10, last_observed_at),
+                     last_presence_change_at = COALESCE(?11, last_presence_change_at),
+                     updated_at = ?12
                  WHERE source_file_id = ?1",
                 params![
                     existing.source_file_id,
                     input.source_id,
                     input.parent_source_directory_id,
                     input.name,
+                    compute_name_browse_sort_key(&input.name),
                     input.relative_path,
                     input.size_bytes,
                     input.mtime_ns,
@@ -99,6 +102,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          source_id,
                          parent_source_directory_id,
                          name,
+                         name_browse_sort_key,
                          relative_path,
                          size_bytes,
                          mtime_ns,
@@ -111,12 +115,13 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)",
                     params![
                         source_file_id,
                         input.source_id,
                         input.parent_source_directory_id,
                         input.name,
+                        compute_name_browse_sort_key(&input.name),
                         input.relative_path,
                         input.size_bytes,
                         input.mtime_ns,
@@ -137,6 +142,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          source_id,
                          parent_source_directory_id,
                          name,
+                         name_browse_sort_key,
                          relative_path,
                          size_bytes,
                          mtime_ns,
@@ -149,11 +155,12 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)",
                     params![
                         input.source_id,
                         input.parent_source_directory_id,
                         input.name,
+                        compute_name_browse_sort_key(&input.name),
                         input.relative_path,
                         input.size_bytes,
                         input.mtime_ns,

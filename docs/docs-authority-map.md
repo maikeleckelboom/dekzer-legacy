@@ -75,6 +75,7 @@ No two active docs may define the same authority._
 | `docs/local-source-icon-doctrine.md` | Icon doctrine             | Canonical for iconography rules. Depends on scan admission contract for root classification vocabulary. |
 | `docs/first-slice-substrate-map.md`  | First slice authority map | Defines the first product slice. Not architecture authority.                                            |
 | `docs/source-hierarchy-contract.md`  | Source hierarchy contract | Defines hierarchy read boundary, pagination, coverage, and renderer cache permissions.                  |
+| `docs/library/source-browse-order-contract.md` | Source browse order contract | Defines backend-owned natural ordering for source/folder/file browsing, sort key ownership, non-goals. |
 
 ## Schema and substrate decisions
 
