@@ -386,8 +386,7 @@ mod tests {
             .rsplit('/')
             .next()
             .expect("relative path has file name");
-        let name_browse_sort_key =
-            crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
         let relative_path_browse_sort_key =
             crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
         connection

@@ -236,8 +236,7 @@ mod tests {
             .rsplit('/')
             .next()
             .unwrap_or(&fix.relative_path);
-        let name_browse_sort_key =
-            crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (

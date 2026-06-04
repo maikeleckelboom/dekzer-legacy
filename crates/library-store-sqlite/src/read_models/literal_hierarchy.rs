@@ -966,7 +966,7 @@ mod tests {
         has_image_media_descendant: bool,
     }
 
-fn insert_directory(
+    fn insert_directory(
         connection: &Connection,
         source_directory_id: i64,
         parent_source_directory_id: Option<i64>,
@@ -2086,12 +2086,7 @@ fn insert_directory(
         let connection = test_connection();
         insert_source(&connection, 7);
         for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] {
-            insert_file(
-                &connection,
-                100 + i,
-                &format!("Track {}.wav", i),
-                "audio",
-            );
+            insert_file(&connection, 100 + i, &format!("Track {}.wav", i), "audio");
         }
 
         let first = read_children(
@@ -2138,7 +2133,13 @@ fn insert_directory(
                 .iter()
                 .map(|row| row.display_name.as_str())
                 .collect::<Vec<_>>(),
-            vec!["Track 1.wav", "Track 2.wav", "Track 3.wav", "Track 4.wav", "Track 5.wav"]
+            vec![
+                "Track 1.wav",
+                "Track 2.wav",
+                "Track 3.wav",
+                "Track 4.wav",
+                "Track 5.wav"
+            ]
         );
         assert_eq!(
             second
@@ -2146,7 +2147,13 @@ fn insert_directory(
                 .iter()
                 .map(|row| row.display_name.as_str())
                 .collect::<Vec<_>>(),
-            vec!["Track 6.wav", "Track 7.wav", "Track 8.wav", "Track 9.wav", "Track 10.wav"]
+            vec![
+                "Track 6.wav",
+                "Track 7.wav",
+                "Track 8.wav",
+                "Track 9.wav",
+                "Track 10.wav"
+            ]
         );
         assert_eq!(
             third
@@ -2184,8 +2191,7 @@ fn insert_directory(
             .map(|row| row.display_name.as_str())
             .collect();
         assert_eq!(
-            names[0],
-            "Track 1.wav",
+            names[0], "Track 1.wav",
             "shorter digit string sorts first, display_name tie-break"
         );
         assert!(
@@ -2328,8 +2334,10 @@ fn insert_directory(
             .iter()
             .map(|row| row.display_name.as_str())
             .collect();
-        assert_eq!(names[0], "Track 9.wav",
-            "Track 9 must sort first (shorter original digit length)");
+        assert_eq!(
+            names[0], "Track 9.wav",
+            "Track 9 must sort first (shorter original digit length)"
+        );
         assert_eq!(
             names[1], "Track 000000000000000000000000000009.wav",
             "padded zeros have numeric value 9, sort after Track 9 (longer original length)"

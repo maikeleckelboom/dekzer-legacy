@@ -1652,8 +1652,7 @@ mod tests {
         name: &str,
         relative_path: &str,
     ) {
-        let name_browse_sort_key =
-            crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -1775,8 +1774,7 @@ mod tests {
         let source_segment_set_id = source_file_id + 1_000;
         let source_segment_id = source_file_id + 2_000;
         let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
-        let name_browse_sort_key =
-            crate::browse_sort_key::compute_name_browse_sort_key(file_name);
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(file_name);
         let relative_path_browse_sort_key =
             crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
         connection

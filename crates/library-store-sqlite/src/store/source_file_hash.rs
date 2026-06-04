@@ -1323,8 +1323,7 @@ mod tests {
             mtime_ns: i64,
         ) {
             let name = relative_path.rsplit('/').next().expect("file name");
-            let name_browse_sort_key =
-                crate::browse_sort_key::compute_name_browse_sort_key(name);
+            let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
             let relative_path_browse_sort_key =
                 crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
             self.store

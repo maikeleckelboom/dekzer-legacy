@@ -2471,8 +2471,7 @@ mod tests {
         dir_scan_state: &str,
     ) {
         let name = relative_path.rsplit('/').next().unwrap_or(relative_path);
-        let name_browse_sort_key =
-            crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -3113,8 +3112,7 @@ mod tests {
     ) {
         let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
         let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
-        let name_browse_sort_key =
-            crate::browse_sort_key::compute_name_browse_sort_key(file_name);
+        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(file_name);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -4840,8 +4838,7 @@ mod tests {
             "sf.file_kind",
             &[StoreContentsMediaClass::Audio],
         );
-        let sql =
-            super::source_file_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
+        let sql = super::source_file_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
         let plan = dump_query_plan(
             &connection,
             &sql,

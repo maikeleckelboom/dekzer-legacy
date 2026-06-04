@@ -196,20 +196,18 @@ mod tests {
             .collect();
         keyed.sort_by(|a, b| a.0.cmp(&b.0));
         let sorted: Vec<&&str> = keyed.iter().map(|(_, n)| n).collect();
-        assert_eq!(sorted, vec![&"[1]", &"[2]", &"[3]", &"[10]", &"[11]", &"[20]"]);
+        assert_eq!(
+            sorted,
+            vec![&"[1]", &"[2]", &"[3]", &"[10]", &"[11]", &"[20]"]
+        );
     }
 
     #[test]
     fn large_number_does_not_overflow_and_sorts_after_smaller() {
         let key_9 = compute_name_browse_sort_key("Track 9.wav");
         let key_10 = compute_name_browse_sort_key("Track 10.wav");
-        let key_huge = compute_name_browse_sort_key(
-            "Track 999999999999999999999999999999.wav",
-        );
-        assert!(
-            key_9 < key_10,
-            "Track 9 must sort before Track 10"
-        );
+        let key_huge = compute_name_browse_sort_key("Track 999999999999999999999999999999.wav");
+        assert!(key_9 < key_10, "Track 9 must sort before Track 10");
         assert!(
             key_10 < key_huge,
             "Track 10 must sort before huge-number Track"
@@ -223,9 +221,7 @@ mod tests {
     #[test]
     fn large_number_with_many_leading_zeros_sorts_by_numeric_value_9() {
         let key_9 = compute_name_browse_sort_key("Track 9.wav");
-        let key_padded = compute_name_browse_sort_key(
-            "Track 000000000000000000000000000009.wav",
-        );
+        let key_padded = compute_name_browse_sort_key("Track 000000000000000000000000000009.wav");
         let key_10 = compute_name_browse_sort_key("Track 10.wav");
 
         assert!(
@@ -252,7 +248,10 @@ mod tests {
     #[test]
     fn key_is_printable_ascii_for_ascii_input() {
         let key = compute_name_browse_sort_key("Track 10.wav");
-        assert!(key.chars().all(|c| c.is_ascii_graphic() || c == ' ' || c == ':'));
+        assert!(
+            key.chars()
+                .all(|c| c.is_ascii_graphic() || c == ' ' || c == ':')
+        );
         assert!(key.starts_with("v1|"));
     }
 
