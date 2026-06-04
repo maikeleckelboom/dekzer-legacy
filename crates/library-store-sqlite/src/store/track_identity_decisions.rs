@@ -1391,6 +1391,20 @@ mod tests {
                 .expect("count rows")
         }
 
+        fn assert_no_partial_decision_rows(&self) {
+            for table in [
+                "track_identity_decisions",
+                "track_identity_decision_evidence",
+                "track_identity_decision_source_scope",
+            ] {
+                assert_eq!(
+                    self.count_rows(table),
+                    0,
+                    "no partial decision rows may remain in {table}"
+                );
+            }
+        }
+
         fn count_table_if_exists(&self, table: &str) -> Option<i64> {
             let connection = self.store.open_read_connection().expect("open read");
             let exists = connection
@@ -2665,21 +2679,7 @@ mod tests {
             TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision
         );
 
-        assert_eq!(
-            fixture.count_rows("track_identity_decisions"),
-            0,
-            "no decision row must be created on no-source-scope failure"
-        );
-        assert_eq!(
-            fixture.count_rows("track_identity_decision_evidence"),
-            0,
-            "no decision evidence row must be created on no-source-scope failure"
-        );
-        assert_eq!(
-            fixture.count_rows("track_identity_decision_source_scope"),
-            0,
-            "no source-scope row must be created on no-source-scope failure"
-        );
+        fixture.assert_no_partial_decision_rows();
 
         let deferred = fixture.defer_candidate(candidate_id);
         let failure2 = TrackIdentityDecisionFixture::expect_failure(deferred);
@@ -2688,21 +2688,7 @@ mod tests {
             TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision
         );
 
-        assert_eq!(
-            fixture.count_rows("track_identity_decisions"),
-            0,
-            "no decision row must remain after no-source-scope defer failure"
-        );
-        assert_eq!(
-            fixture.count_rows("track_identity_decision_evidence"),
-            0,
-            "no decision evidence row must remain after no-source-scope defer failure"
-        );
-        assert_eq!(
-            fixture.count_rows("track_identity_decision_source_scope"),
-            0,
-            "no source-scope row must remain after no-source-scope defer failure"
-        );
+        fixture.assert_no_partial_decision_rows();
     }
 
     #[test]

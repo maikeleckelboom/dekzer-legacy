@@ -1015,6 +1015,39 @@ fn insert_directory(
         insert_file_in_directory(connection, source_file_id, None, name, media_class);
     }
 
+    fn insert_media_directories(connection: &Connection, directories: &[(i64, &str)]) {
+        for (source_directory_id, name) in directories {
+            insert_directory(
+                connection,
+                *source_directory_id,
+                None,
+                name,
+                DirectoryFacts {
+                    has_child_directories: false,
+                    has_primary_media_descendant: true,
+                    has_image_media_descendant: false,
+                },
+                "complete",
+                None,
+            );
+        }
+    }
+
+    fn insert_audio_files(connection: &Connection, files: &[(i64, &str)]) {
+        for (source_file_id, name) in files {
+            insert_file(connection, *source_file_id, name, "audio");
+        }
+    }
+
+    fn assert_display_names(rows: &[super::StoreLiteralHierarchyNode], expected: &[&str]) {
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.display_name.as_str())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+
     fn insert_file_in_directory(
         connection: &Connection,
         source_file_id: i64,
@@ -1939,45 +1972,7 @@ fn insert_directory(
     fn natural_order_directories_sort_numerically_within_brackets() {
         let connection = test_connection();
         insert_source(&connection, 7);
-        insert_directory(
-            &connection,
-            100,
-            None,
-            "[10]",
-            DirectoryFacts {
-                has_child_directories: false,
-                has_primary_media_descendant: true,
-                has_image_media_descendant: false,
-            },
-            "complete",
-            None,
-        );
-        insert_directory(
-            &connection,
-            101,
-            None,
-            "[1]",
-            DirectoryFacts {
-                has_child_directories: false,
-                has_primary_media_descendant: true,
-                has_image_media_descendant: false,
-            },
-            "complete",
-            None,
-        );
-        insert_directory(
-            &connection,
-            102,
-            None,
-            "[2]",
-            DirectoryFacts {
-                has_child_directories: false,
-                has_primary_media_descendant: true,
-                has_image_media_descendant: false,
-            },
-            "complete",
-            None,
-        );
+        insert_media_directories(&connection, &[(100, "[10]"), (101, "[1]"), (102, "[2]")]);
 
         let window = read_children(
             &connection,
@@ -1990,24 +1985,21 @@ fn insert_directory(
         .expect("read literal hierarchy")
         .expect("source window");
 
-        assert_eq!(
-            window
-                .rows
-                .iter()
-                .map(|row| row.display_name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["[1]", "[2]", "[10]"],
-            "directories must sort by natural numeric order: [1], [2], [10]"
-        );
+        assert_display_names(&window.rows, &["[1]", "[2]", "[10]"]);
     }
 
     #[test]
     fn natural_order_files_sort_numerically_within_track_names() {
         let connection = test_connection();
         insert_source(&connection, 7);
-        insert_file(&connection, 200, "Track 10.wav", "audio");
-        insert_file(&connection, 201, "Track 1.wav", "audio");
-        insert_file(&connection, 202, "Track 2.wav", "audio");
+        insert_audio_files(
+            &connection,
+            &[
+                (200, "Track 10.wav"),
+                (201, "Track 1.wav"),
+                (202, "Track 2.wav"),
+            ],
+        );
 
         let window = read_children(
             &connection,
@@ -2020,14 +2012,9 @@ fn insert_directory(
         .expect("read literal hierarchy")
         .expect("source window");
 
-        assert_eq!(
-            window
-                .rows
-                .iter()
-                .map(|row| row.display_name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["Track 1.wav", "Track 2.wav", "Track 10.wav"],
-            "files must sort by natural numeric order: Track 1, Track 2, Track 10"
+        assert_display_names(
+            &window.rows,
+            &["Track 1.wav", "Track 2.wav", "Track 10.wav"],
         );
     }
 
@@ -2215,27 +2202,16 @@ fn insert_directory(
     fn natural_order_directories_leading_zero_order() {
         let connection = test_connection();
         insert_source(&connection, 7);
-        for (id, name) in [
-            (100, "[10]"),
-            (101, "[01]"),
-            (102, "[2]"),
-            (103, "[001]"),
-            (104, "[1]"),
-        ] {
-            insert_directory(
-                &connection,
-                id,
-                None,
-                name,
-                DirectoryFacts {
-                    has_child_directories: false,
-                    has_primary_media_descendant: true,
-                    has_image_media_descendant: false,
-                },
-                "complete",
-                None,
-            );
-        }
+        insert_media_directories(
+            &connection,
+            &[
+                (100, "[10]"),
+                (101, "[01]"),
+                (102, "[2]"),
+                (103, "[001]"),
+                (104, "[1]"),
+            ],
+        );
 
         let window = read_children(
             &connection,
@@ -2248,30 +2224,23 @@ fn insert_directory(
         .expect("read literal hierarchy")
         .expect("source window");
 
-        assert_eq!(
-            window
-                .rows
-                .iter()
-                .map(|row| row.display_name.as_str())
-                .collect::<Vec<_>>(),
-            vec!["[1]", "[01]", "[001]", "[2]", "[10]"],
-            "directories must sort: [1] < [01] < [001] < [2] < [10]"
-        );
+        assert_display_names(&window.rows, &["[1]", "[01]", "[001]", "[2]", "[10]"]);
     }
 
     #[test]
     fn natural_order_files_leading_zero_order() {
         let connection = test_connection();
         insert_source(&connection, 7);
-        for (id, name) in [
-            (200, "Track 001.wav"),
-            (201, "Track 01.wav"),
-            (202, "Track 10.wav"),
-            (203, "Track 2.wav"),
-            (204, "Track 1.wav"),
-        ] {
-            insert_file(&connection, id, name, "audio");
-        }
+        insert_audio_files(
+            &connection,
+            &[
+                (200, "Track 001.wav"),
+                (201, "Track 01.wav"),
+                (202, "Track 10.wav"),
+                (203, "Track 2.wav"),
+                (204, "Track 1.wav"),
+            ],
+        );
 
         let window = read_children(
             &connection,
@@ -2284,20 +2253,15 @@ fn insert_directory(
         .expect("read literal hierarchy")
         .expect("source window");
 
-        assert_eq!(
-            window
-                .rows
-                .iter()
-                .map(|row| row.display_name.as_str())
-                .collect::<Vec<_>>(),
-            vec![
+        assert_display_names(
+            &window.rows,
+            &[
                 "Track 1.wav",
                 "Track 01.wav",
                 "Track 001.wav",
                 "Track 2.wav",
                 "Track 10.wav",
             ],
-            "files must sort: 1 < 01 < 001 < 2 < 10"
         );
     }
 
@@ -2305,9 +2269,14 @@ fn insert_directory(
     fn natural_order_large_numbers() {
         let connection = test_connection();
         insert_source(&connection, 7);
-        insert_file(&connection, 200, "Track 999999999999999999999999999999.wav", "audio");
-        insert_file(&connection, 201, "Track 10.wav", "audio");
-        insert_file(&connection, 202, "Track 9.wav", "audio");
+        insert_audio_files(
+            &connection,
+            &[
+                (200, "Track 999999999999999999999999999999.wav"),
+                (201, "Track 10.wav"),
+                (202, "Track 9.wav"),
+            ],
+        );
 
         let window = read_children(
             &connection,
@@ -2320,18 +2289,13 @@ fn insert_directory(
         .expect("read literal hierarchy")
         .expect("source window");
 
-        assert_eq!(
-            window
-                .rows
-                .iter()
-                .map(|row| row.display_name.as_str())
-                .collect::<Vec<_>>(),
-            vec![
+        assert_display_names(
+            &window.rows,
+            &[
                 "Track 9.wav",
                 "Track 10.wav",
                 "Track 999999999999999999999999999999.wav",
             ],
-            "large numeric run must sort after smaller values without overflow collapse"
         );
     }
 

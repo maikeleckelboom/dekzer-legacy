@@ -3150,6 +3150,32 @@ mod tests {
             .expect("insert scanned source file");
     }
 
+    fn insert_audio_source_files(
+        connection: &Connection,
+        parent_directory_id: i64,
+        files: &[(i64, &str)],
+    ) {
+        for (source_file_id, relative_path) in files {
+            insert_scanned_file(
+                connection,
+                *source_file_id,
+                1,
+                parent_directory_id,
+                relative_path,
+                "audio",
+            );
+        }
+    }
+
+    fn assert_relative_paths(rows: &[super::StoreContentsFileRow], expected: &[&str]) {
+        assert_eq!(
+            rows.iter()
+                .map(|row| row.relative_path.as_str())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+
     #[test]
     fn source_scope_returns_empty_primary_media_without_promotion() {
         let connection = open_connection();
@@ -6036,15 +6062,17 @@ mod tests {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
-        for (id, name) in [
-            (1000, "Music/Track 001.wav"),
-            (1001, "Music/Track 01.wav"),
-            (1002, "Music/Track 10.wav"),
-            (1003, "Music/Track 2.wav"),
-            (1004, "Music/Track 1.wav"),
-        ] {
-            insert_scanned_file(&connection, id, 1, 10, name, "audio");
-        }
+        insert_audio_source_files(
+            &connection,
+            10,
+            &[
+                (1000, "Music/Track 001.wav"),
+                (1001, "Music/Track 01.wav"),
+                (1002, "Music/Track 10.wav"),
+                (1003, "Music/Track 2.wav"),
+                (1004, "Music/Track 1.wav"),
+            ],
+        );
 
         let result = read_contents(
             &connection,
@@ -6060,21 +6088,15 @@ mod tests {
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Ready);
-        let paths: Vec<&str> = result
-            .rows
-            .iter()
-            .map(|row| row.relative_path.as_str())
-            .collect();
-        assert_eq!(
-            paths,
-            vec![
+        assert_relative_paths(
+            &result.rows,
+            &[
                 "Music/Track 1.wav",
                 "Music/Track 01.wav",
                 "Music/Track 001.wav",
                 "Music/Track 2.wav",
                 "Music/Track 10.wav",
             ],
-            "source-file contents must order: 1 < 01 < 001 < 2 < 10"
         );
     }
 
@@ -6086,11 +6108,17 @@ mod tests {
         insert_directory(&connection, 11, 1, "Music/Folder [2]", "complete");
         insert_directory(&connection, 12, 1, "Music/Folder [1]", "complete");
         insert_directory(&connection, 13, 1, "Music/Folder [10]", "complete");
-        insert_scanned_file(&connection, 1000, 1, 12, "Music/Folder [1]/Track 10.wav", "audio");
-        insert_scanned_file(&connection, 1001, 1, 12, "Music/Folder [1]/Track 2.wav", "audio");
-        insert_scanned_file(&connection, 1002, 1, 12, "Music/Folder [1]/Track 1.wav", "audio");
-        insert_scanned_file(&connection, 1003, 1, 11, "Music/Folder [2]/Track 1.wav", "audio");
-        insert_scanned_file(&connection, 1004, 1, 13, "Music/Folder [10]/Track 1.wav", "audio");
+        insert_audio_source_files(
+            &connection,
+            12,
+            &[
+                (1000, "Music/Folder [1]/Track 10.wav"),
+                (1001, "Music/Folder [1]/Track 2.wav"),
+                (1002, "Music/Folder [1]/Track 1.wav"),
+            ],
+        );
+        insert_audio_source_files(&connection, 11, &[(1003, "Music/Folder [2]/Track 1.wav")]);
+        insert_audio_source_files(&connection, 13, &[(1004, "Music/Folder [10]/Track 1.wav")]);
 
         let result = read_contents(
             &connection,
@@ -6106,77 +6134,16 @@ mod tests {
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Ready);
-        let paths: Vec<&str> = result
-            .rows
-            .iter()
-            .map(|row| row.relative_path.as_str())
-            .collect();
-        assert_eq!(
-            paths,
-            vec![
+        assert_relative_paths(
+            &result.rows,
+            &[
                 "Music/Folder [1]/Track 1.wav",
                 "Music/Folder [1]/Track 2.wav",
                 "Music/Folder [1]/Track 10.wav",
                 "Music/Folder [2]/Track 1.wav",
                 "Music/Folder [10]/Track 1.wav",
             ],
-            "recursive path must order by component natural order"
         );
-    }
-
-    #[test]
-    fn source_file_contents_cursor_pagination_natural_order() {
-        let connection = open_connection();
-        insert_source(&connection, 1);
-        insert_directory(&connection, 10, 1, "Music", "complete");
-        insert_scanned_file(&connection, 1000, 1, 10, "Music/Track 1.wav", "audio");
-        insert_scanned_file(&connection, 1001, 1, 10, "Music/Track 2.wav", "audio");
-        insert_scanned_file(&connection, 1002, 1, 10, "Music/Track 10.wav", "audio");
-        insert_scanned_file(&connection, 1003, 1, 10, "Music/Track 11.wav", "audio");
-
-        let page1 = read_contents(
-            &connection,
-            StoreContentsScope::Directory {
-                source_id: 1,
-                source_directory_id: 10,
-            },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
-            StoreContentsRecursion::Recursive,
-            2,
-            None,
-        )
-        .expect("read page 1");
-
-        assert_eq!(page1.rows.len(), 2);
-        assert_eq!(page1.rows[0].relative_path, "Music/Track 1.wav");
-        assert_eq!(page1.rows[1].relative_path, "Music/Track 2.wav");
-        assert!(
-            page1.next_cursor.is_some(),
-            "expected next_cursor when more rows exist"
-        );
-
-        let cursor = page1.next_cursor.unwrap();
-        let page2 = read_contents(
-            &connection,
-            StoreContentsScope::Directory {
-                source_id: 1,
-                source_directory_id: 10,
-            },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
-            StoreContentsRecursion::Recursive,
-            2,
-            Some(&cursor),
-        )
-        .expect("read page 2");
-
-        assert_eq!(page2.rows.len(), 2);
-        assert_eq!(page2.rows[0].relative_path, "Music/Track 10.wav");
-        assert_eq!(page2.rows[1].relative_path, "Music/Track 11.wav");
-        assert!(
-            page2.next_cursor.is_none(),
-            "last page should have no next_cursor"
-        );
-        assert_eq!(page2.state, StoreContentsState::Ready);
     }
 
     #[test]
@@ -6223,17 +6190,19 @@ mod tests {
     }
 
     #[test]
-    fn source_file_contents_no_digit_before_two_digit_after_pagination() {
+    fn source_file_contents_cursor_pagination_matches_natural_sql_order() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
-        for (id, name) in [
-            (1000, "Music/[1].wav"),
-            (1001, "Music/[10].wav"),
-            (1002, "Music/[2].wav"),
-        ] {
-            insert_scanned_file(&connection, id, 1, 10, name, "audio");
-        }
+        insert_audio_source_files(
+            &connection,
+            10,
+            &[
+                (1000, "Music/[1].wav"),
+                (1001, "Music/[10].wav"),
+                (1002, "Music/[2].wav"),
+            ],
+        );
 
         let result = read_contents(
             &connection,
@@ -6248,8 +6217,7 @@ mod tests {
         )
         .expect("read first page");
 
-        assert_eq!(result.rows[0].relative_path, "Music/[1].wav");
-        assert_eq!(result.rows[1].relative_path, "Music/[2].wav");
+        assert_relative_paths(&result.rows, &["Music/[1].wav", "Music/[2].wav"]);
         assert!(result.next_cursor.is_some());
 
         let cursor = result.next_cursor.unwrap();
@@ -6266,7 +6234,8 @@ mod tests {
         )
         .expect("read second page");
 
-        assert_eq!(page2.rows[0].relative_path, "Music/[10].wav");
+        assert_relative_paths(&page2.rows, &["Music/[10].wav"]);
         assert!(page2.next_cursor.is_none());
+        assert_eq!(page2.state, StoreContentsState::Ready);
     }
 }
