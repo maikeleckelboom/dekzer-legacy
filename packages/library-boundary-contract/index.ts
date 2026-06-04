@@ -176,7 +176,7 @@ export type TrackIdentityDecisionCommandResult = { "type": "written", "payload":
 
 export type TrackIdentityDecisionCommandSuccess = { decisionId: string, candidateId: string, decisionState: TrackIdentityDecisionState, decisionSource: string, evidenceSnapshotCount: number, decisionCreated: boolean, effectiveDecision: TrackIdentityEffectiveDecisionSummary, };
 
-export type TrackIdentityDecisionCommandFailure = { "type": "candidateNotFound" } | { "type": "candidateStaleForAccept" } | { "type": "noCurrentEvidenceForAccept" };
+export type TrackIdentityDecisionCommandFailure = { "type": "candidateNotFound" } | { "type": "candidateStaleForAccept" } | { "type": "noCurrentEvidenceForAccept" } | { "type": "noSourceScopeForDecision" };
 
 export type TrackIdentityDecisionState = "accepted" | "rejected" | "deferred";
 

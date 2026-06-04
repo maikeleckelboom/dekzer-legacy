@@ -279,12 +279,35 @@ fn write_user_track_identity_decision(
         track_identity_candidate_id,
         decided_at,
     )?;
-    let _source_scope_count = insert_decision_source_scope(
+    let source_scope_count = insert_decision_source_scope(
         write,
         track_identity_decision_id,
         track_identity_candidate_id,
         decided_at,
     )?;
+    if source_scope_count == 0 {
+        // The preflight guard (current_evidence == 0 && candidate_evidence == 0) should
+        // prevent reaching this point, but enforce the contract as a safety net.
+        // Delete the decision row (cascades to evidence snapshot and source scope).
+        write.execute(
+            "DELETE FROM track_identity_decisions
+             WHERE track_identity_decision_id = ?1",
+            params![track_identity_decision_id],
+        )?;
+        // Restore any previously-current decision that was superseded.
+        if let Some(old_decision) = &current_user_decision {
+            write.execute(
+                "UPDATE track_identity_decisions
+                 SET superseded_by_decision_id = NULL,
+                     updated_at = ?1
+                 WHERE track_identity_decision_id = ?2",
+                params![decided_at, old_decision.track_identity_decision_id],
+            )?;
+        }
+        return Ok(TrackIdentityDecisionChangeResult::Failed(
+            TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision,
+        ));
+    }
     let effective_decision =
         read_effective_track_identity_decision_for_candidate(write, track_identity_candidate_id)?;
 
@@ -2631,8 +2654,7 @@ mod tests {
         assert_eq!(fixture.count_rows("track_identity_candidates"), 1);
 
         let rejected = fixture.reject_candidate(candidate_id);
-        let failure =
-            TrackIdentityDecisionFixture::expect_failure(rejected);
+        let failure = TrackIdentityDecisionFixture::expect_failure(rejected);
         assert_eq!(
             failure,
             TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision
@@ -2644,17 +2666,97 @@ mod tests {
             "no decision row must be created on no-source-scope failure"
         );
         assert_eq!(
+            fixture.count_rows("track_identity_decision_evidence"),
+            0,
+            "no decision evidence row must be created on no-source-scope failure"
+        );
+        assert_eq!(
             fixture.count_rows("track_identity_decision_source_scope"),
             0,
             "no source-scope row must be created on no-source-scope failure"
         );
 
         let deferred = fixture.defer_candidate(candidate_id);
-        let failure2 =
-            TrackIdentityDecisionFixture::expect_failure(deferred);
+        let failure2 = TrackIdentityDecisionFixture::expect_failure(deferred);
         assert_eq!(
             failure2,
             TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision
+        );
+
+        assert_eq!(
+            fixture.count_rows("track_identity_decisions"),
+            0,
+            "no decision row must remain after no-source-scope defer failure"
+        );
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_evidence"),
+            0,
+            "no decision evidence row must remain after no-source-scope defer failure"
+        );
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_source_scope"),
+            0,
+            "no source-scope row must remain after no-source-scope defer failure"
+        );
+    }
+
+    #[test]
+    fn no_source_scope_reject_does_not_supersede_prior_decision() {
+        let fixture = TrackIdentityDecisionFixture::new();
+        fixture.insert_source_file(100, "Album/prior-decision.wav");
+        fixture.link_attachment(100, HASH_A);
+        fixture.commit_current_facts(100, HASH_A);
+        fixture.promote_and_candidate();
+        let candidate_id = fixture.single_candidate_id();
+
+        let accepted =
+            TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
+        assert!(accepted.decision_created);
+
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute(
+                    "DELETE FROM track_identity_candidate_evidence
+                     WHERE track_identity_candidate_id = ?1",
+                    [candidate_id],
+                )?;
+                Ok(())
+            })
+            .expect("delete candidate evidence");
+
+        let rejected = fixture.reject_candidate(candidate_id);
+        let failure = TrackIdentityDecisionFixture::expect_failure(rejected);
+        assert_eq!(
+            failure,
+            TrackIdentityDecisionChangeFailure::NoSourceScopeForDecision
+        );
+
+        let superseded: Option<i64> = fixture
+            .store
+            .open_read_connection()
+            .expect("open read")
+            .query_row(
+                "SELECT superseded_by_decision_id
+                 FROM track_identity_decisions
+                 WHERE track_identity_decision_id = ?1",
+                [accepted.track_identity_decision_id],
+                |row| row.get(0),
+            )
+            .expect("read superseded_by");
+        assert_eq!(
+            superseded, None,
+            "prior decision must not be superseded by failed no-source-scope reject"
+        );
+        assert_eq!(
+            fixture.count_rows("track_identity_decision_evidence"),
+            1,
+            "prior decision evidence snapshot must be intact"
+        );
+        assert_eq!(
+            fixture.count_rows("track_identity_decisions"),
+            1,
+            "only the prior decision must exist"
         );
     }
 
@@ -2840,9 +2942,7 @@ mod tests {
         );
         assert_eq!(scope_rows[0].0, 1);
         assert_eq!(scope_rows[1].0, 2);
-        assert_eq!(
-            scope_rows[0].1, "current_decision_evidence_source_v0"
-        );
+        assert_eq!(scope_rows[0].1, "current_decision_evidence_source_v0");
 
         let decisions_a = fixture
             .store
@@ -2855,8 +2955,7 @@ mod tests {
         assert_eq!(decisions_a.len(), 1);
         assert_eq!(decisions_b.len(), 1);
         assert_eq!(
-            decisions_a[0].track_identity_decision_id,
-            decisions_b[0].track_identity_decision_id,
+            decisions_a[0].track_identity_decision_id, decisions_b[0].track_identity_decision_id,
             "both source-scoped reads must return the same decision"
         );
 
