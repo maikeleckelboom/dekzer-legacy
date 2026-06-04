@@ -238,8 +238,6 @@ mod tests {
             .unwrap_or(&fix.relative_path);
         let name_browse_sort_key =
             crate::browse_sort_key::compute_name_browse_sort_key(name);
-        let relative_path_browse_sort_key =
-            crate::browse_sort_key::compute_relative_path_browse_sort_key(&fix.relative_path);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -248,7 +246,6 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
-                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      has_child_directories,
@@ -260,14 +257,13 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0, 0, 0, ?9, ?10, 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0, 0, 0, ?8, ?9, 1, 1, 1)",
                 rusqlite::params![
                     fix.source_directory_id,
                     fix.source_id,
                     fix.parent_source_directory_id,
                     name,
                     name_browse_sort_key,
-                    relative_path_browse_sort_key,
                     fix.relative_path,
                     fix.presence_state,
                     fix.dir_scan_state,

@@ -1654,8 +1654,6 @@ mod tests {
     ) {
         let name_browse_sort_key =
             crate::browse_sort_key::compute_name_browse_sort_key(name);
-        let relative_path_browse_sort_key =
-            crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -1664,21 +1662,19 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
-                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_updated_at,
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'present', 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'present', 1, 1, 1)",
                 params![
                     source_directory_id,
                     source_id,
                     parent_source_directory_id,
                     name,
                     name_browse_sort_key,
-                    relative_path_browse_sort_key,
                     relative_path,
                 ],
             )

@@ -1118,17 +1118,21 @@ fn source_directory_writes_do_not_reseed_navigation_projection() {
         .expect("upsert source directory");
 
     let connection = open_mutation_connection(&db_path);
-    let source_directory_count: i64 = connection
-        .query_row("SELECT COUNT(*) FROM source_directories", [], |row| {
-            row.get(0)
-        })
-        .expect("count source directories");
+    let source_directory_row: (i64, String) = connection
+        .query_row(
+            "SELECT COUNT(*), MIN(name_browse_sort_key)
+             FROM source_directories",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read source directory row");
     let navigation_row_count_after: i64 = connection
         .query_row("SELECT COUNT(*) FROM navigation_rows", [], |row| row.get(0))
         .expect("count navigation rows after source directory write");
     let navigation_change_count_after = navigation_projection_change_count(&connection);
 
-    assert_eq!(source_directory_count, 1);
+    assert_eq!(source_directory_row.0, 1);
+    assert!(!source_directory_row.1.is_empty());
     assert_eq!(navigation_row_count_after, navigation_row_count_before);
     assert_eq!(
         navigation_change_count_after,
@@ -1621,6 +1625,18 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
             updated_at: 15,
         })
         .expect("record source file observation");
+    let connection = open_mutation_connection(&db_path);
+    let source_file_sort_keys: (String, String) = connection
+        .query_row(
+            "SELECT name_browse_sort_key, relative_path_browse_sort_key
+             FROM source_files
+             WHERE source_file_id = ?1",
+            [source_file_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read source file sort keys");
+    assert!(!source_file_sort_keys.0.is_empty());
+    assert!(!source_file_sort_keys.1.is_empty());
     let source_basis_fingerprint = super::sources::source_observation_basis_fingerprint(
         source_file_id,
         "album/track.wav",

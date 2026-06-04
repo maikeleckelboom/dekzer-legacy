@@ -2481,7 +2481,6 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
-                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_state,
@@ -2489,13 +2488,12 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, 'present', ?7, 1, 1, 1)",
+                 VALUES (?1, ?2, NULL, ?3, ?4, ?5, 'present', ?6, 1, 1, 1)",
                 params![
                     source_directory_id,
                     source_id,
                     name,
                     name_browse_sort_key,
-                    crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path),
                     relative_path,
                     dir_scan_state,
                 ],

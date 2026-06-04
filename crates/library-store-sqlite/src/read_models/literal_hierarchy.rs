@@ -976,8 +976,6 @@ fn insert_directory(
         dir_scan_issue_kind: Option<&str>,
     ) {
         let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
-        let relative_path_browse_sort_key =
-            crate::browse_sort_key::compute_relative_path_browse_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -986,7 +984,6 @@ fn insert_directory(
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
-                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      has_child_directories,
@@ -998,13 +995,12 @@ fn insert_directory(
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 7, ?2, ?3, ?4, ?5, ?3, 'present', ?6, ?7, ?8, ?9, ?10, 1, 1, 1)",
+                 VALUES (?1, 7, ?2, ?3, ?4, ?3, 'present', ?5, ?6, ?7, ?8, ?9, 1, 1, 1)",
                 params![
                     source_directory_id,
                     parent_source_directory_id,
                     name,
                     name_browse_sort_key,
-                    relative_path_browse_sort_key,
                     facts.has_child_directories,
                     facts.has_primary_media_descendant,
                     facts.has_image_media_descendant,

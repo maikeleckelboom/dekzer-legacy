@@ -2,7 +2,7 @@ use rusqlite::{OptionalExtension, params};
 
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
-use crate::browse_sort_key::{compute_name_browse_sort_key, compute_relative_path_browse_sort_key};
+use crate::browse_sort_key::compute_name_browse_sort_key;
 use library_domain::{SourceAccessIssueKind, SourcePresenceState};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -44,16 +44,15 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                      parent_source_directory_id = ?3,
                      name = ?4,
                      name_browse_sort_key = ?5,
-                     relative_path_browse_sort_key = ?6,
-                     relative_path = ?7,
-                     presence_state = ?8,
-                     dir_scan_state = COALESCE(?10, dir_scan_state),
-                     dir_scan_issue_kind = ?11,
-                     dir_scan_error_detail = ?12,
-                     dir_scan_updated_at = ?9,
-                     scanned_at = COALESCE(?13, scanned_at),
-                     mtime_ns = COALESCE(?14, mtime_ns),
-                     updated_at = ?9
+                     relative_path = ?6,
+                     presence_state = ?7,
+                     dir_scan_state = COALESCE(?9, dir_scan_state),
+                     dir_scan_issue_kind = ?10,
+                     dir_scan_error_detail = ?11,
+                     dir_scan_updated_at = ?8,
+                     scanned_at = COALESCE(?12, scanned_at),
+                     mtime_ns = COALESCE(?13, mtime_ns),
+                     updated_at = ?8
                  WHERE source_directory_id = ?1",
                 params![
                     source_directory_id,
@@ -61,7 +60,6 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                     input.parent_source_directory_id,
                     input.name,
                     compute_name_browse_sort_key(&input.name),
-                    compute_relative_path_browse_sort_key(&input.relative_path),
                     input.relative_path,
                     input.presence_state.as_str(),
                     input.changed_at,
@@ -87,7 +85,6 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          parent_source_directory_id,
                          name,
                          name_browse_sort_key,
-                         relative_path_browse_sort_key,
                          relative_path,
                          presence_state,
                          dir_scan_state,
@@ -99,14 +96,13 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
                     params![
                         source_directory_id,
                         input.source_id,
                         input.parent_source_directory_id,
                         input.name,
                         compute_name_browse_sort_key(&input.name),
-                        compute_relative_path_browse_sort_key(&input.relative_path),
                         input.relative_path,
                         input.presence_state.as_str(),
                         dir_scan_state,
@@ -129,7 +125,6 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          parent_source_directory_id,
                          name,
                          name_browse_sort_key,
-                         relative_path_browse_sort_key,
                          relative_path,
                          presence_state,
                          dir_scan_state,
@@ -141,13 +136,12 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          created_at,
                          updated_at
                      )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
                     params![
                         input.source_id,
                         input.parent_source_directory_id,
                         input.name,
                         compute_name_browse_sort_key(&input.name),
-                        compute_relative_path_browse_sort_key(&input.relative_path),
                         input.relative_path,
                         input.presence_state.as_str(),
                         dir_scan_state,

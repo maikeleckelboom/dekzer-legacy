@@ -237,7 +237,6 @@ CREATE TABLE source_directories
     parent_source_directory_id         INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                               TEXT    NOT NULL,
     name_browse_sort_key               TEXT    NOT NULL,
-    relative_path_browse_sort_key      TEXT    NOT NULL,
     relative_path                      TEXT    NOT NULL,
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),

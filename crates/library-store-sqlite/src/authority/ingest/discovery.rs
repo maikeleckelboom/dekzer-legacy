@@ -2715,7 +2715,6 @@ mod tests {
                  parent_source_directory_id,
 name,
                   name_browse_sort_key,
-                  relative_path_browse_sort_key,
                   relative_path,
                   presence_state,
                   dir_scan_state,
@@ -2723,7 +2722,7 @@ name,
                   created_at,
                   updated_at
               )
-              VALUES (60, ?1, NULL, 'Locked', 'v1|tltotctkteted', 'v1|tltotctkteted', 'Locked', 'present', 'blocked', 1, 1, 1)",
+              VALUES (60, ?1, NULL, 'Locked', 'v1|tltotctkteted', 'Locked', 'present', 'blocked', 1, 1, 1)",
             [source_id],
         );
 
@@ -2765,7 +2764,6 @@ name,
                  parent_source_directory_id,
 name,
                   name_browse_sort_key,
-                  relative_path_browse_sort_key,
                   relative_path,
                   presence_state,
                   dir_scan_state,
@@ -2773,7 +2771,7 @@ name,
                   created_at,
                   updated_at
               )
-              VALUES (61, ?1, NULL, 'Failed', 'v1|tftaitlteted', 'v1|tftaitlteted', 'Failed', 'present', 'failed', 1, 1, 1)",
+              VALUES (61, ?1, NULL, 'Failed', 'v1|tftaitlteted', 'Failed', 'present', 'failed', 1, 1, 1)",
             [source_id],
         );
 
