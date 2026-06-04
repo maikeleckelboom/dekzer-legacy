@@ -24,9 +24,10 @@ use crate::snapshot_read_protocol::{
     map_read_library_asset_waveform_overview_reply, map_read_library_tree_children_reply,
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
     map_read_source_attachment_summary_reply, map_read_source_file_attachment_reply,
-    map_read_source_lifecycle_reply, map_search_navigation_node_library_browser_window_reply,
-    store_contents_policy, store_contents_recursion, store_contents_scope,
-    store_library_tree_entry_point,
+    map_read_source_lifecycle_reply, map_read_track_identity_review_candidates_reply,
+    map_search_navigation_node_library_browser_window_reply, store_contents_policy,
+    store_contents_recursion, store_contents_scope, store_library_tree_entry_point,
+    store_track_identity_review_state_filter,
 };
 use crate::source_file_hash_protocol::{
     empty_hash_source_files_blake3_reply, map_hash_lifecycle_source_failure,
@@ -552,6 +553,45 @@ impl LibraryBoundaryService {
         Ok(map_read_source_attachment_summary_reply(summary))
     }
 
+    pub fn read_track_identity_review_candidates(
+        &self,
+        request: protocol::ReadTrackIdentityReviewCandidatesRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadTrackIdentityReviewCandidatesReply> {
+        if request.limit == 0 {
+            return Err(protocol::ProtocolError::InvalidRequest {
+                detail: "readTrackIdentityReviewCandidates limit must be greater than zero"
+                    .to_string(),
+            });
+        }
+        let source_id = request
+            .source_id
+            .map(|source_id| require_positive_i64(source_id, "sourceId"))
+            .transpose()?;
+
+        if let Some(source_id) = source_id {
+            let lifecycle = self
+                .durable_store
+                .read_source_lifecycle(source_id)
+                .map_err(map_store_error)?;
+            if lifecycle.is_none() {
+                return Ok(protocol::ReadTrackIdentityReviewCandidatesReply {
+                    status: protocol::TrackIdentityReviewCandidatesReadStatus::SourceNotFound,
+                    candidates: Vec::new(),
+                });
+            }
+        }
+
+        let candidates = self
+            .durable_store
+            .read_track_identity_review_candidates(
+                source_id,
+                store_track_identity_review_state_filter(request.review_state),
+                request.limit,
+            )
+            .map_err(map_store_error)?;
+        map_read_track_identity_review_candidates_reply(candidates).map_err(map_store_error)
+    }
+
     pub fn read_navigation_node_library_browser_window(
         &self,
         request: protocol::ReadNavigationNodeLibraryBrowserWindowRequest,
@@ -891,6 +931,9 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ReadSourceAttachmentSummary(request) => self
                 .read_source_attachment_summary(request)
                 .map(protocol::SnapshotReadReply::SourceAttachmentSummary),
+            protocol::SnapshotReadCommand::ReadTrackIdentityReviewCandidates(request) => self
+                .read_track_identity_review_candidates(request)
+                .map(protocol::SnapshotReadReply::TrackIdentityReviewCandidates),
             protocol::SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(request) => self
                 .read_navigation_node_library_browser_window(request)
                 .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserWindow),
@@ -1257,17 +1300,18 @@ mod tests {
         ReadLibraryTreeChildrenRequest, ReadSourceAttachmentSummaryReply,
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
         ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest, RegisterLocalRootReply,
-        RegisterLocalRootRequest, RejectTrackIdentityCandidateRequest, RenamePlaylistReply,
-        RenamePlaylistRequest, RunSourceMaintenanceReply, RunSourceMaintenanceRequest,
-        SnapshotReadCommand, SnapshotReadReply, SourceFileAttachmentLinkStatus,
-        SourceFileHashCommand, SourceFileHashReply, SourceMaintenanceCommand,
-        SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
-        TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
+        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
+        ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
+        RejectTrackIdentityCandidateRequest, RenamePlaylistReply, RenamePlaylistRequest,
+        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SnapshotReadCommand,
+        SnapshotReadReply, SourceFileAttachmentLinkStatus, SourceFileHashCommand,
+        SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
+        StartRootScanRequest, TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
         TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
-        TrackIdentityUserBlockingDecisionState, UnregisterLocalRootReply,
-        UnregisterLocalRootRequest,
+        TrackIdentityReviewCandidatesReadStatus, TrackIdentityReviewState,
+        TrackIdentityReviewStateFilter, TrackIdentityUserBlockingDecisionState,
+        UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use rusqlite::Connection;
     use serde_json::json;
@@ -2745,6 +2789,133 @@ mod tests {
                 DeferTrackIdentityCandidateRequest {
                     candidate_id: 0,
                     reason: None,
+                },
+            ),
+        ));
+        assert!(matches!(invalid, Err(ProtocolError::InvalidRequest { .. })));
+    }
+
+    #[test]
+    fn track_identity_review_candidates_snapshot_read_maps_store_decisions() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("track-identity-review-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let wav = tiny_wav_bytes(44_100, 2, 16, 4_410);
+        std::fs::write(source_root.join("track.wav"), &wav).expect("write wav");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(&service, registered.root_id, 100, "track.wav", wav.len());
+
+        let maintenance = run_source_maintenance_with_request(
+            &service,
+            RunSourceMaintenanceRequest {
+                source_id: registered.root_id,
+                hash_limit: Some(10),
+                attachment_limit: Some(10),
+                probe_limit: Some(10),
+                promotion_limit: Some(10),
+                identity_candidate_limit: Some(10),
+                identity_decision_limit: Some(10),
+            },
+        );
+        assert_eq!(maintenance.track_identity_candidates.candidates_created, 1);
+        assert_eq!(maintenance.track_identity_decisions.decisions_created, 1);
+
+        let candidate_id = service
+            .durable_store
+            .read_track_identity_candidates_for_source(registered.root_id, 10)
+            .expect("read track identity candidates")
+            .into_iter()
+            .next()
+            .expect("candidate exists")
+            .track_identity_candidate_id;
+
+        let _reject_reply = expect_track_identity_decisions_reply(expect_success(
+            service.handle_command(CommandRequest::TrackIdentityDecisions(
+                TrackIdentityDecisionCommand::RejectTrackIdentityCandidate(
+                    RejectTrackIdentityCandidateRequest {
+                        candidate_id,
+                        reason: None,
+                    },
+                ),
+            )),
+        ));
+
+        let review_reply = match expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadTrackIdentityReviewCandidates(
+                ReadTrackIdentityReviewCandidatesRequest {
+                    source_id: Some(registered.root_id),
+                    review_state: Some(TrackIdentityReviewStateFilter::UserRejected),
+                    limit: 10,
+                },
+            )),
+        )) {
+            CommandReply::SnapshotRead(SnapshotReadReply::TrackIdentityReviewCandidates(reply)) => {
+                reply
+            }
+            other => panic!("expected review candidates reply, got {other:?}"),
+        };
+
+        assert_eq!(
+            review_reply.status,
+            TrackIdentityReviewCandidatesReadStatus::Ok
+        );
+        assert_eq!(review_reply.candidates.len(), 1);
+        let candidate = &review_reply.candidates[0];
+        assert_eq!(candidate.candidate_id, candidate_id);
+        assert_eq!(
+            candidate.review_state,
+            TrackIdentityReviewState::UserRejected
+        );
+        assert_eq!(candidate.evidence_summary.member_count, 1);
+        assert_eq!(candidate.evidence_summary.evidence_count, 1);
+        assert_eq!(candidate.source_summary.source_count, 1);
+        let decision = candidate
+            .effective_decision
+            .as_ref()
+            .expect("effective decision");
+        assert_eq!(
+            decision.decision_state,
+            TrackIdentityDecisionState::Rejected
+        );
+        assert_eq!(decision.decision_source, "user_local_v0");
+        assert_eq!(
+            decision.current_status,
+            TrackIdentityEffectiveDecisionCurrentStatus::Current
+        );
+        assert_eq!(
+            decision.user_blocking_decision_state,
+            TrackIdentityUserBlockingDecisionState::Rejected
+        );
+        assert!(decision.masked_system_decision_id.is_some());
+
+        let missing_source = match expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadTrackIdentityReviewCandidates(
+                ReadTrackIdentityReviewCandidatesRequest {
+                    source_id: Some(99_999),
+                    review_state: None,
+                    limit: 10,
+                },
+            )),
+        )) {
+            CommandReply::SnapshotRead(SnapshotReadReply::TrackIdentityReviewCandidates(reply)) => {
+                reply
+            }
+            other => panic!("expected review candidates reply, got {other:?}"),
+        };
+        assert_eq!(
+            missing_source.status,
+            TrackIdentityReviewCandidatesReadStatus::SourceNotFound
+        );
+        assert!(missing_source.candidates.is_empty());
+
+        let invalid = service.try_handle_command(CommandRequest::SnapshotRead(
+            SnapshotReadCommand::ReadTrackIdentityReviewCandidates(
+                ReadTrackIdentityReviewCandidatesRequest {
+                    source_id: Some(registered.root_id),
+                    review_state: None,
+                    limit: 0,
                 },
             ),
         ));

@@ -40,6 +40,7 @@ No two active docs may define the same authority._
 | `docs/library/track-identity-candidate-contract.md`          | **Canonical library contract**                               | Backend/store-owned exact evidence track identity candidate foundation, grouping provenance, staleness, read model, and explicit non-canonical boundaries.                                                       |
 | `docs/library/track-identity-decision-contract.md`           | Provisional implementation contract                          | Backend/store-owned track identity decision foundation over candidates, exact-content v0 decision production, candidate-level effective decision semantics, copied-provenance snapshots, supersession, and non-canonical boundaries. |
 | `docs/library/track-identity-decision-authority-contract.md` | Provisional implementation contract                          | Backend-owned accept/reject/defer command family for candidate-scoped user decisions, controlled decision sources, user/system precedence, source-maintenance interaction, and canonical-track non-goals.        |
+| `docs/library/track-identity-review-candidates-contract.md`  | Provisional implementation contract                          | Backend/store-owned candidate-centered read model for review candidates, source/evidence summaries, effective-decision relationship, V0 review states, and limit-only behavior.                                 |
 
 ## Contents read boundary docs
 

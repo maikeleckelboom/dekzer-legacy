@@ -103,6 +103,14 @@ pub use read_models::track_identity_decisions::{
     read_effective_track_identity_decision_for_candidate,
     read_track_identity_decisions_for_candidate, read_track_identity_decisions_for_source,
 };
+pub use read_models::track_identity_review::{
+    ReviewCandidate as StoreTrackIdentityReviewCandidate,
+    ReviewDecision as StoreTrackIdentityReviewDecision,
+    ReviewEvidenceSummary as StoreTrackIdentityReviewEvidenceSummary,
+    ReviewSourceSample as StoreTrackIdentityReviewSourceSample,
+    ReviewSourceSummary as StoreTrackIdentityReviewSourceSummary,
+    ReviewState as StoreTrackIdentityReviewState, read_track_identity_review_candidates,
+};
 pub use store::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibility,
     DurableStoreSchemaCompatibilityState, HashSourceFileBlake3BatchInput,

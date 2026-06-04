@@ -107,6 +107,7 @@ export function createFakeClient(
     acceptTrackIdentityCandidate: rejectUnexpectedClientCall,
     rejectTrackIdentityCandidate: rejectUnexpectedClientCall,
     deferTrackIdentityCandidate: rejectUnexpectedClientCall,
+    readTrackIdentityReviewCandidates: rejectUnexpectedClientCall,
     readNavigationRows: rejectUnexpectedClientCall,
     loadNavigationRow: rejectUnexpectedClientCall,
     loadNavigationRowByStableKey: rejectUnexpectedClientCall,

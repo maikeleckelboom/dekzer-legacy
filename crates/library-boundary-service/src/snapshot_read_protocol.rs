@@ -182,6 +182,44 @@ pub(crate) fn map_read_source_attachment_summary_reply(
     }
 }
 
+pub(crate) fn store_track_identity_review_state_filter(
+    filter: Option<protocol::TrackIdentityReviewStateFilter>,
+) -> Option<store::StoreTrackIdentityReviewState> {
+    match filter {
+        None | Some(protocol::TrackIdentityReviewStateFilter::All) => None,
+        Some(protocol::TrackIdentityReviewStateFilter::NeedsUserDecision) => {
+            Some(store::StoreTrackIdentityReviewState::NeedsUserDecision)
+        }
+        Some(protocol::TrackIdentityReviewStateFilter::SystemAccepted) => {
+            Some(store::StoreTrackIdentityReviewState::SystemAccepted)
+        }
+        Some(protocol::TrackIdentityReviewStateFilter::UserAccepted) => {
+            Some(store::StoreTrackIdentityReviewState::UserAccepted)
+        }
+        Some(protocol::TrackIdentityReviewStateFilter::UserRejected) => {
+            Some(store::StoreTrackIdentityReviewState::UserRejected)
+        }
+        Some(protocol::TrackIdentityReviewStateFilter::UserDeferred) => {
+            Some(store::StoreTrackIdentityReviewState::UserDeferred)
+        }
+        Some(protocol::TrackIdentityReviewStateFilter::StaleDecision) => {
+            Some(store::StoreTrackIdentityReviewState::StaleDecision)
+        }
+    }
+}
+
+pub(crate) fn map_read_track_identity_review_candidates_reply(
+    candidates: Vec<store::StoreTrackIdentityReviewCandidate>,
+) -> store::LibrarySqliteResult<protocol::ReadTrackIdentityReviewCandidatesReply> {
+    Ok(protocol::ReadTrackIdentityReviewCandidatesReply {
+        status: protocol::TrackIdentityReviewCandidatesReadStatus::Ok,
+        candidates: candidates
+            .into_iter()
+            .map(map_track_identity_review_candidate)
+            .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
+    })
+}
+
 pub(crate) fn map_read_navigation_node_library_browser_window_reply(
     window: Option<store::StoreLibraryBrowserWindow>,
 ) -> store::LibrarySqliteResult<protocol::ReadNavigationNodeLibraryBrowserWindowReply> {
@@ -467,6 +505,154 @@ fn map_source_attachment_summary(
         source_files_missing_attachment_links_count: summary
             .source_files_missing_attachment_links_count,
         unmaterialized_blake3_facts_count: summary.source_files_missing_attachment_links_count,
+    }
+}
+
+fn map_track_identity_review_candidate(
+    candidate: store::StoreTrackIdentityReviewCandidate,
+) -> store::LibrarySqliteResult<protocol::TrackIdentityReviewCandidate> {
+    Ok(protocol::TrackIdentityReviewCandidate {
+        candidate_id: candidate.candidate_id,
+        candidate_kind: candidate.candidate_kind,
+        candidate_evidence_basis: candidate.candidate_evidence_basis,
+        candidate_status: map_track_identity_review_candidate_status(candidate.candidate_status),
+        evidence_key_algorithm: candidate.evidence_key_algorithm,
+        evidence_key_value: candidate.evidence_key_value,
+        evidence_summary: protocol::TrackIdentityReviewEvidenceSummary {
+            member_count: candidate.evidence_summary.member_count,
+            evidence_count: candidate.evidence_summary.evidence_count,
+            current_evidence_count: candidate.evidence_summary.current_evidence_count,
+        },
+        source_summary: protocol::TrackIdentityReviewSourceSummary {
+            source_count: candidate.source_summary.source_count,
+            source_samples: candidate
+                .source_summary
+                .source_samples
+                .into_iter()
+                .map(|sample| protocol::TrackIdentityReviewSourceSample {
+                    source_id: sample.source_id,
+                    display_name: sample.display_name,
+                })
+                .collect(),
+        },
+        review_state: map_track_identity_review_state(candidate.review_state),
+        effective_decision: candidate
+            .effective_decision
+            .map(map_track_identity_review_decision)
+            .transpose()?,
+        created_at_ms: candidate.created_at,
+        updated_at_ms: candidate.updated_at,
+    })
+}
+
+fn map_track_identity_review_decision(
+    decision: store::StoreTrackIdentityReviewDecision,
+) -> store::LibrarySqliteResult<protocol::TrackIdentityReviewDecision> {
+    Ok(protocol::TrackIdentityReviewDecision {
+        decision_id: decision.decision_id,
+        decision_state: map_track_identity_decision_state(decision.decision_state)?,
+        decision_source: decision.decision_source,
+        decision_basis: decision.decision_basis,
+        current_status: map_track_identity_review_decision_current_status(decision.current_status)?,
+        created_at_ms: decision.created_at,
+        user_blocking_decision_state: map_track_identity_user_blocking_decision_state(
+            decision.user_blocking_decision_state,
+        ),
+        masked_system_decision_id: decision.masked_system_decision_id,
+    })
+}
+
+const fn map_track_identity_review_candidate_status(
+    status: store::StoreTrackIdentityCandidateStatus,
+) -> protocol::TrackIdentityReviewCandidateStatus {
+    match status {
+        store::StoreTrackIdentityCandidateStatus::Active => {
+            protocol::TrackIdentityReviewCandidateStatus::Active
+        }
+        store::StoreTrackIdentityCandidateStatus::Stale => {
+            protocol::TrackIdentityReviewCandidateStatus::Stale
+        }
+        store::StoreTrackIdentityCandidateStatus::Superseded => {
+            protocol::TrackIdentityReviewCandidateStatus::Superseded
+        }
+    }
+}
+
+const fn map_track_identity_review_state(
+    state: store::StoreTrackIdentityReviewState,
+) -> protocol::TrackIdentityReviewState {
+    match state {
+        store::StoreTrackIdentityReviewState::NeedsUserDecision => {
+            protocol::TrackIdentityReviewState::NeedsUserDecision
+        }
+        store::StoreTrackIdentityReviewState::SystemAccepted => {
+            protocol::TrackIdentityReviewState::SystemAccepted
+        }
+        store::StoreTrackIdentityReviewState::UserAccepted => {
+            protocol::TrackIdentityReviewState::UserAccepted
+        }
+        store::StoreTrackIdentityReviewState::UserRejected => {
+            protocol::TrackIdentityReviewState::UserRejected
+        }
+        store::StoreTrackIdentityReviewState::UserDeferred => {
+            protocol::TrackIdentityReviewState::UserDeferred
+        }
+        store::StoreTrackIdentityReviewState::StaleDecision => {
+            protocol::TrackIdentityReviewState::StaleDecision
+        }
+    }
+}
+
+fn map_track_identity_decision_state(
+    state: store::StoreTrackIdentityDecisionState,
+) -> store::LibrarySqliteResult<protocol::TrackIdentityDecisionState> {
+    match state {
+        store::StoreTrackIdentityDecisionState::Accepted => {
+            Ok(protocol::TrackIdentityDecisionState::Accepted)
+        }
+        store::StoreTrackIdentityDecisionState::Rejected => {
+            Ok(protocol::TrackIdentityDecisionState::Rejected)
+        }
+        store::StoreTrackIdentityDecisionState::Deferred => {
+            Ok(protocol::TrackIdentityDecisionState::Deferred)
+        }
+        store::StoreTrackIdentityDecisionState::Superseded => Err(malformed_store_state(
+            "review candidate effective decision unexpectedly resolved to superseded",
+        )),
+    }
+}
+
+fn map_track_identity_review_decision_current_status(
+    status: store::StoreTrackIdentityEffectiveDecisionCurrentStatus,
+) -> store::LibrarySqliteResult<protocol::TrackIdentityEffectiveDecisionCurrentStatus> {
+    match status {
+        store::StoreTrackIdentityEffectiveDecisionCurrentStatus::Current => {
+            Ok(protocol::TrackIdentityEffectiveDecisionCurrentStatus::Current)
+        }
+        store::StoreTrackIdentityEffectiveDecisionCurrentStatus::Stale => {
+            Ok(protocol::TrackIdentityEffectiveDecisionCurrentStatus::Stale)
+        }
+        store::StoreTrackIdentityEffectiveDecisionCurrentStatus::NoCurrentDecision => {
+            Err(malformed_store_state(
+                "review candidate decision unexpectedly had no-current-decision status",
+            ))
+        }
+    }
+}
+
+const fn map_track_identity_user_blocking_decision_state(
+    state: store::StoreTrackIdentityUserBlockingDecisionState,
+) -> protocol::TrackIdentityUserBlockingDecisionState {
+    match state {
+        store::StoreTrackIdentityUserBlockingDecisionState::None => {
+            protocol::TrackIdentityUserBlockingDecisionState::None
+        }
+        store::StoreTrackIdentityUserBlockingDecisionState::Rejected => {
+            protocol::TrackIdentityUserBlockingDecisionState::Rejected
+        }
+        store::StoreTrackIdentityUserBlockingDecisionState::Deferred => {
+            protocol::TrackIdentityUserBlockingDecisionState::Deferred
+        }
     }
 }
 

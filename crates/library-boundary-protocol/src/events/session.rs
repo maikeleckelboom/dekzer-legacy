@@ -37,6 +37,7 @@ impl MaintainedSnapshotScope {
             SnapshotReadCommand::ReadLibraryTreeChildren(_)
             | SnapshotReadCommand::ReadSourceLifecycle(_)
             | SnapshotReadCommand::ReadSourceMaintenance(_)
+            | SnapshotReadCommand::ReadTrackIdentityReviewCandidates(_)
             | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(_)
             | SnapshotReadCommand::ContentsRead(_)

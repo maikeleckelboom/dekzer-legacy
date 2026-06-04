@@ -1,4 +1,7 @@
-use super::{ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest};
+use super::{
+    ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest, TrackIdentityDecisionState,
+    TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityUserBlockingDecisionState,
+};
 
 #[derive(
     Debug,
@@ -2079,6 +2082,252 @@ pub struct ReadSourceAttachmentSummaryReply {
     schemars::JsonSchema,
     ts_rs::TS,
 )]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadTrackIdentityReviewCandidatesRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    #[ts(optional)]
+    pub source_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub review_state: Option<TrackIdentityReviewStateFilter>,
+    pub limit: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum TrackIdentityReviewStateFilter {
+    All,
+    NeedsUserDecision,
+    SystemAccepted,
+    UserAccepted,
+    UserRejected,
+    UserDeferred,
+    StaleDecision,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadTrackIdentityReviewCandidatesReply {
+    pub status: TrackIdentityReviewCandidatesReadStatus,
+    pub candidates: Vec<TrackIdentityReviewCandidate>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum TrackIdentityReviewCandidatesReadStatus {
+    Ok,
+    SourceNotFound,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct TrackIdentityReviewCandidate {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub candidate_id: i64,
+    pub candidate_kind: String,
+    pub candidate_evidence_basis: String,
+    pub candidate_status: TrackIdentityReviewCandidateStatus,
+    pub evidence_key_algorithm: String,
+    pub evidence_key_value: String,
+    pub evidence_summary: TrackIdentityReviewEvidenceSummary,
+    pub source_summary: TrackIdentityReviewSourceSummary,
+    pub review_state: TrackIdentityReviewState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub effective_decision: Option<TrackIdentityReviewDecision>,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum TrackIdentityReviewCandidateStatus {
+    Active,
+    Stale,
+    Superseded,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct TrackIdentityReviewDecision {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub decision_id: i64,
+    pub decision_state: TrackIdentityDecisionState,
+    pub decision_source: String,
+    pub decision_basis: String,
+    pub current_status: TrackIdentityEffectiveDecisionCurrentStatus,
+    pub created_at_ms: i64,
+    pub user_blocking_decision_state: TrackIdentityUserBlockingDecisionState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub masked_system_decision_id: Option<i64>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct TrackIdentityReviewEvidenceSummary {
+    pub member_count: usize,
+    pub evidence_count: usize,
+    pub current_evidence_count: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct TrackIdentityReviewSourceSummary {
+    pub source_count: usize,
+    pub source_samples: Vec<TrackIdentityReviewSourceSample>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct TrackIdentityReviewSourceSample {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+    pub display_name: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum TrackIdentityReviewState {
+    NeedsUserDecision,
+    SystemAccepted,
+    UserAccepted,
+    UserRejected,
+    UserDeferred,
+    StaleDecision,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 #[ts(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum SnapshotReadCommand {
@@ -2091,6 +2340,7 @@ pub enum SnapshotReadCommand {
     ReadSourceFileAttachment(ReadSourceFileAttachmentRequest),
     ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest),
     ReadSourceAttachmentSummary(ReadSourceAttachmentSummaryRequest),
+    ReadTrackIdentityReviewCandidates(ReadTrackIdentityReviewCandidatesRequest),
     ReadNavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowRequest),
     SearchNavigationNodeLibraryBrowserWindow(SearchNavigationNodeLibraryBrowserWindowRequest),
     ContentsRead(ContentsReadRequest),
@@ -2113,6 +2363,7 @@ pub enum SnapshotReadReply {
     SourceFileAttachment(ReadSourceFileAttachmentReply),
     AttachmentSourceFiles(ReadAttachmentSourceFilesReply),
     SourceAttachmentSummary(ReadSourceAttachmentSummaryReply),
+    TrackIdentityReviewCandidates(ReadTrackIdentityReviewCandidatesReply),
     NavigationNodeLibraryBrowserWindow(ReadNavigationNodeLibraryBrowserWindowReply),
     NavigationNodeLibraryBrowserSearch(SearchNavigationNodeLibraryBrowserWindowReply),
     Contents(ContentsReadReply),
@@ -2145,11 +2396,18 @@ mod tests {
         ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
         ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
         ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply,
-        ReadSourceLifecycleRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
+        ReadTrackIdentityReviewCandidatesRequest, SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
         SourceAccessState, SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
         SourceFileAttachmentLinkStatus, SourceLifecycle, SourceLifecycleIssueKind,
-        SourceMountStatus, SourceScanPhase,
+        SourceMountStatus, SourceScanPhase, TrackIdentityDecisionState,
+        TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityReviewCandidate,
+        TrackIdentityReviewCandidateStatus, TrackIdentityReviewCandidatesReadStatus,
+        TrackIdentityReviewDecision, TrackIdentityReviewEvidenceSummary,
+        TrackIdentityReviewSourceSample, TrackIdentityReviewSourceSummary,
+        TrackIdentityReviewState, TrackIdentityReviewStateFilter,
+        TrackIdentityUserBlockingDecisionState,
     };
     use serde_json::json;
 
@@ -2661,6 +2919,104 @@ mod tests {
             )
             .expect("deserialize summary read"),
             summary_command
+        );
+    }
+
+    #[test]
+    fn track_identity_review_candidates_read_is_limit_only_and_candidate_scoped() {
+        let command = SnapshotReadCommand::ReadTrackIdentityReviewCandidates(
+            ReadTrackIdentityReviewCandidatesRequest {
+                source_id: Some(7),
+                review_state: Some(TrackIdentityReviewStateFilter::NeedsUserDecision),
+                limit: 25,
+            },
+        );
+
+        let json = serde_json::to_value(&command).expect("serialize review read");
+        assert_eq!(
+            json,
+            json!({
+                "type": "readTrackIdentityReviewCandidates",
+                "payload": {
+                    "sourceId": "7",
+                    "reviewState": "needsUserDecision",
+                    "limit": 25
+                }
+            })
+        );
+        for forbidden in [
+            "/payload/cursor",
+            "/payload/sourcePath",
+            "/payload/filePath",
+            "/payload/title",
+            "/payload/artist",
+            "/payload/album",
+            "/payload/metadata",
+        ] {
+            assert!(
+                json.pointer(forbidden).is_none(),
+                "{forbidden} must be absent"
+            );
+        }
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadCommand>(json).expect("deserialize review read"),
+            command
+        );
+
+        let reply = SnapshotReadReply::TrackIdentityReviewCandidates(
+            ReadTrackIdentityReviewCandidatesReply {
+                status: TrackIdentityReviewCandidatesReadStatus::Ok,
+                candidates: vec![TrackIdentityReviewCandidate {
+                    candidate_id: 11,
+                    candidate_kind: "exact_primary_media_content".to_string(),
+                    candidate_evidence_basis: "current_primary_media_exact_blake3".to_string(),
+                    candidate_status: TrackIdentityReviewCandidateStatus::Active,
+                    evidence_key_algorithm: "blake3".to_string(),
+                    evidence_key_value:
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                            .to_string(),
+                    evidence_summary: TrackIdentityReviewEvidenceSummary {
+                        member_count: 1,
+                        evidence_count: 2,
+                        current_evidence_count: 2,
+                    },
+                    source_summary: TrackIdentityReviewSourceSummary {
+                        source_count: 1,
+                        source_samples: vec![TrackIdentityReviewSourceSample {
+                            source_id: 7,
+                            display_name: "Local".to_string(),
+                        }],
+                    },
+                    review_state: TrackIdentityReviewState::UserRejected,
+                    effective_decision: Some(TrackIdentityReviewDecision {
+                        decision_id: 12,
+                        decision_state: TrackIdentityDecisionState::Rejected,
+                        decision_source: "user_local_v0".to_string(),
+                        decision_basis: "explicit_user_local_decision_v0".to_string(),
+                        current_status: TrackIdentityEffectiveDecisionCurrentStatus::Current,
+                        created_at_ms: 100,
+                        user_blocking_decision_state:
+                            TrackIdentityUserBlockingDecisionState::Rejected,
+                        masked_system_decision_id: Some(9),
+                    }),
+                    created_at_ms: 80,
+                    updated_at_ms: 90,
+                }],
+            },
+        );
+
+        let json = serde_json::to_value(&reply).expect("serialize review reply");
+        assert_eq!(json["type"], json!("trackIdentityReviewCandidates"));
+        assert_eq!(json["payload"]["candidates"][0]["candidateId"], json!("11"));
+        assert_eq!(
+            json["payload"]["candidates"][0]["reviewState"],
+            json!("userRejected")
+        );
+        assert!(json.pointer("/payload/cursor").is_none());
+        assert!(json.pointer("/payload/nextCursor").is_none());
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(json).expect("deserialize review reply"),
+            reply
         );
     }
 

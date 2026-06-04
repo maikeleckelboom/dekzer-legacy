@@ -21,6 +21,8 @@ import type {
   ReadLibraryBoundaryEventsAfterRequest,
   ReadLibraryTreeChildrenReply,
   ReadLibraryTreeChildrenRequest,
+  ReadTrackIdentityReviewCandidatesReply,
+  ReadTrackIdentityReviewCandidatesRequest,
   ReadSourceAttachmentSummaryReply,
   ReadSourceAttachmentSummaryRequest,
   ReadSourceFileAttachmentReply,
@@ -316,6 +318,22 @@ export class LibraryBoundaryClient {
       },
       'snapshotRead',
       'sourceAttachmentSummary'
+    )
+  }
+
+  readTrackIdentityReviewCandidates(
+    request: ReadTrackIdentityReviewCandidatesRequest
+  ): Promise<ReadTrackIdentityReviewCandidatesReply> {
+    return this.sendAndExpect(
+      {
+        type: 'snapshotRead',
+        payload: {
+          type: 'readTrackIdentityReviewCandidates',
+          payload: request
+        }
+      },
+      'snapshotRead',
+      'trackIdentityReviewCandidates'
     )
   }
 

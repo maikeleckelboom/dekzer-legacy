@@ -35,6 +35,7 @@ mod track_identity_candidate_reads;
 mod track_identity_candidates;
 mod track_identity_decision_reads;
 mod track_identity_decisions;
+mod track_identity_review_reads;
 mod work_items;
 
 pub use attachment_identity::MaterializeAttachmentsForSourceResult;

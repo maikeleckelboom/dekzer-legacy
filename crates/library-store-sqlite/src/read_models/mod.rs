@@ -10,4 +10,5 @@ pub mod source_lifecycle;
 pub(crate) mod source_location_coverage;
 pub mod track_identity_candidates;
 pub mod track_identity_decisions;
+pub mod track_identity_review;
 pub(crate) mod waveform_profile_selection;

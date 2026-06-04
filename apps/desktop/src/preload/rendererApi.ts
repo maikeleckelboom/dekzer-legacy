@@ -54,6 +54,11 @@ import {
   type TrackIdentityDecisionRequest,
   type TrackIdentityDecisionCommandResult
 } from '../shared/libraryTrackIdentityDecisions/decisionCommands'
+import {
+  trackIdentityReviewCandidateChannels,
+  type ReadTrackIdentityReviewCandidatesRequest,
+  type ReadTrackIdentityReviewCandidatesResult
+} from '../shared/libraryTrackIdentityReview/reviewCandidates'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
@@ -215,6 +220,16 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             trackIdentityDecisionChannels.deferTrackIdentityCandidate,
             request
           )) as TrackIdentityDecisionCommandResult
+        }
+      },
+      trackIdentityReview: {
+        async readTrackIdentityReviewCandidates(
+          request: ReadTrackIdentityReviewCandidatesRequest
+        ): Promise<ReadTrackIdentityReviewCandidatesResult> {
+          return (await ipcRenderer.invoke(
+            trackIdentityReviewCandidateChannels.readTrackIdentityReviewCandidates,
+            request
+          )) as ReadTrackIdentityReviewCandidatesResult
         }
       },
       contents: {

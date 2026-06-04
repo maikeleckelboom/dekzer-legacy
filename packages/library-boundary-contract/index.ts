@@ -61,7 +61,7 @@ export type RejectTrackIdentityCandidateRequest = { candidateId: string, reason?
 
 export type DeferTrackIdentityCandidateRequest = { candidateId: string, reason?: string, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -92,6 +92,10 @@ export type ReadSourceFileAttachmentRequest = { sourceFileId: string, };
 export type ReadAttachmentSourceFilesRequest = { attachmentId: string, limit?: number, };
 
 export type ReadSourceAttachmentSummaryRequest = { sourceId: string, };
+
+export type ReadTrackIdentityReviewCandidatesRequest = { sourceId?: string, reviewState?: TrackIdentityReviewStateFilter, limit: number, };
+
+export type TrackIdentityReviewStateFilter = "all" | "needsUserDecision" | "systemAccepted" | "userAccepted" | "userRejected" | "userDeferred" | "staleDecision";
 
 export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
 
@@ -188,7 +192,7 @@ export type TrackIdentityEffectiveDecisionPrecedence = "user" | "system" | "none
 
 export type TrackIdentityUserBlockingDecisionState = "none" | "rejected" | "deferred";
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -207,6 +211,24 @@ export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStat
 export type ReadAttachmentSourceFilesReply = { status: AttachmentIdentityReadStatus, attachment?: AttachmentIdentity, sourceFileLinks: Array<SourceFileAttachmentLink>, effectiveLimit: number, remainingSourceFileLinks: number, };
 
 export type ReadSourceAttachmentSummaryReply = { status: AttachmentIdentityReadStatus, summary?: SourceAttachmentSummary, };
+
+export type ReadTrackIdentityReviewCandidatesReply = { status: TrackIdentityReviewCandidatesReadStatus, candidates: Array<TrackIdentityReviewCandidate>, };
+
+export type TrackIdentityReviewCandidatesReadStatus = "ok" | "sourceNotFound";
+
+export type TrackIdentityReviewCandidate = { candidateId: string, candidateKind: string, candidateEvidenceBasis: string, candidateStatus: TrackIdentityReviewCandidateStatus, evidenceKeyAlgorithm: string, evidenceKeyValue: string, evidenceSummary: TrackIdentityReviewEvidenceSummary, sourceSummary: TrackIdentityReviewSourceSummary, reviewState: TrackIdentityReviewState, effectiveDecision?: TrackIdentityReviewDecision, createdAtMs: number, updatedAtMs: number, };
+
+export type TrackIdentityReviewCandidateStatus = "active" | "stale" | "superseded";
+
+export type TrackIdentityReviewDecision = { decisionId: string, decisionState: TrackIdentityDecisionState, decisionSource: string, decisionBasis: string, currentStatus: TrackIdentityEffectiveDecisionCurrentStatus, createdAtMs: number, userBlockingDecisionState: TrackIdentityUserBlockingDecisionState, maskedSystemDecisionId?: string | null, };
+
+export type TrackIdentityReviewEvidenceSummary = { memberCount: number, evidenceCount: number, currentEvidenceCount: number, };
+
+export type TrackIdentityReviewSourceSummary = { sourceCount: number, sourceSamples: Array<TrackIdentityReviewSourceSample>, };
+
+export type TrackIdentityReviewSourceSample = { sourceId: string, displayName: string, };
+
+export type TrackIdentityReviewState = "needsUserDecision" | "systemAccepted" | "userAccepted" | "userRejected" | "userDeferred" | "staleDecision";
 
 export type ReadNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
 

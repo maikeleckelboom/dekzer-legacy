@@ -9,6 +9,7 @@ import type {
   HashSourceFilesBlake3Reply,
   ReadSourceMaintenanceReply,
   ReadSourceFileAttachmentReply,
+  ReadTrackIdentityReviewCandidatesReply,
   RegisterLocalRootReply,
   RunSourceMaintenanceReply,
   TrackIdentityDecisionCommandResult
@@ -80,6 +81,13 @@ type ReadSourceFileAttachmentReturnIsGenerated = AssertType<
   >
 >
 
+type ReadTrackIdentityReviewCandidatesReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient['readTrackIdentityReviewCandidates']>>,
+    ReadTrackIdentityReviewCandidatesReply
+  >
+>
+
 const compileTimeAssertions: [
   RegisterLocalRootReturnIsGenerated,
   RegisterLocalRootIdStaysString,
@@ -87,8 +95,9 @@ const compileTimeAssertions: [
   RunSourceMaintenanceReturnIsGenerated,
   AcceptTrackIdentityCandidateReturnIsGenerated,
   ReadSourceMaintenanceReturnIsGenerated,
-  ReadSourceFileAttachmentReturnIsGenerated
-] = [true, true, true, true, true, true, true]
+  ReadSourceFileAttachmentReturnIsGenerated,
+  ReadTrackIdentityReviewCandidatesReturnIsGenerated
+] = [true, true, true, true, true, true, true, true]
 void compileTimeAssertions
 
 type Resolve<T> = (value: T | PromiseLike<T>) => void
@@ -665,6 +674,84 @@ async function validatesTrackIdentityDecisionRequestsAndReplies(): Promise<void>
   equal(deferReply.type, 'written', 'defer reply unwraps the result')
 }
 
+async function validatesTrackIdentityReviewCandidateReads(): Promise<void> {
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(
+    success({
+      type: 'snapshotRead',
+      payload: {
+        type: 'trackIdentityReviewCandidates',
+        payload: {
+          status: 'ok',
+          candidates: [
+            {
+              candidateId: '7',
+              candidateKind: 'exact_primary_media_content',
+              candidateEvidenceBasis: 'current_primary_media_exact_blake3',
+              candidateStatus: 'active',
+              evidenceKeyAlgorithm: 'blake3',
+              evidenceKeyValue:
+                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              evidenceSummary: {
+                memberCount: 1,
+                evidenceCount: 1,
+                currentEvidenceCount: 1
+              },
+              sourceSummary: {
+                sourceCount: 1,
+                sourceSamples: [{ sourceId: '3', displayName: 'Local' }]
+              },
+              reviewState: 'userRejected',
+              effectiveDecision: {
+                decisionId: '11',
+                decisionState: 'rejected',
+                decisionSource: 'user_local_v0',
+                decisionBasis: 'explicit_user_local_decision_v0',
+                currentStatus: 'current',
+                createdAtMs: 100,
+                userBlockingDecisionState: 'rejected',
+                maskedSystemDecisionId: '10'
+              },
+              createdAtMs: 80,
+              updatedAtMs: 90
+            }
+          ]
+        }
+      }
+    })
+  )
+  const client = new LibraryBoundaryClient(transport)
+
+  const reply = await client.readTrackIdentityReviewCandidates({
+    sourceId: '3',
+    reviewState: 'userRejected',
+    limit: 25
+  })
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: 'snapshotRead',
+      payload: {
+        type: 'readTrackIdentityReviewCandidates',
+        payload: {
+          sourceId: '3',
+          reviewState: 'userRejected',
+          limit: 25
+        }
+      }
+    } satisfies CommandRequest,
+    'readTrackIdentityReviewCandidates sends only sourceId, reviewState, and limit'
+  )
+  equal(reply.status, 'ok', 'review read unwraps status')
+  equal(reply.candidates[0]?.reviewState, 'userRejected', 'review state is backend supplied')
+  equal(
+    reply.candidates[0]?.effectiveDecision?.userBlockingDecisionState,
+    'rejected',
+    'effective decision summary is preserved'
+  )
+}
+
 async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueOutcome(
@@ -1132,6 +1219,7 @@ await validatesRegisterLocalRootRequestAndReply()
 await validatesHashSourceFilesBlake3RequestAndReply()
 await validatesSourceMaintenanceRequestsAndReplies()
 await validatesTrackIdentityDecisionRequestsAndReplies()
+await validatesTrackIdentityReviewCandidateReads()
 await validatesAttachmentIdentityReadRequestsAndReplies()
 await validatesProtocolErrorsArePreserved()
 await validatesReplyFamilyMismatch()

@@ -40,6 +40,10 @@ import type {
   TrackIdentityDecisionRequest,
   TrackIdentityDecisionCommandResult
 } from './libraryTrackIdentityDecisions/decisionCommands'
+import type {
+  ReadTrackIdentityReviewCandidatesRequest,
+  ReadTrackIdentityReviewCandidatesResult
+} from './libraryTrackIdentityReview/reviewCandidates'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
@@ -62,6 +66,7 @@ export type LibraryApi = {
   readonly hashing: LibraryHashingApi
   readonly sourceMaintenance: LibrarySourceMaintenanceApi
   readonly trackIdentityDecisions: LibraryTrackIdentityDecisionApi
+  readonly trackIdentityReview: TrackIdentityReviewApi
   readonly contents: LibraryContentsApi
   readonly roots: LibraryRootsApi
   readonly viewState: LibraryViewStateApi
@@ -126,6 +131,12 @@ export type LibraryTrackIdentityDecisionApi = {
   deferTrackIdentityCandidate(
     request: TrackIdentityDecisionRequest
   ): Promise<TrackIdentityDecisionCommandResult>
+}
+
+export type TrackIdentityReviewApi = {
+  readTrackIdentityReviewCandidates(
+    request: ReadTrackIdentityReviewCandidatesRequest
+  ): Promise<ReadTrackIdentityReviewCandidatesResult>
 }
 
 export type LibraryRootsApi = {

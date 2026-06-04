@@ -3780,6 +3780,53 @@
         "sourceId"
       ]
     },
+    "ReadTrackIdentityReviewCandidatesReply": {
+      "type": "object",
+      "properties": {
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TrackIdentityReviewCandidate"
+          }
+        },
+        "status": {
+          "$ref": "#/$defs/TrackIdentityReviewCandidatesReadStatus"
+        }
+      },
+      "required": [
+        "status",
+        "candidates"
+      ]
+    },
+    "ReadTrackIdentityReviewCandidatesRequest": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "reviewState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackIdentityReviewStateFilter"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "limit"
+      ]
+    },
     "RegisterLocalRootReply": {
       "type": "object",
       "properties": {
@@ -4238,6 +4285,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadTrackIdentityReviewCandidatesRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readTrackIdentityReviewCandidates"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadNavigationNodeLibraryBrowserWindowRequest"
             },
             "type": {
@@ -4455,6 +4518,22 @@
             "type": {
               "type": "string",
               "const": "sourceAttachmentSummary"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadTrackIdentityReviewCandidatesReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "trackIdentityReviewCandidates"
             }
           },
           "required": [
@@ -5912,6 +5991,209 @@
         "effectiveDecisionCurrentStatus",
         "effectiveDecisionPrecedence",
         "userBlockingDecisionState"
+      ]
+    },
+    "TrackIdentityReviewCandidate": {
+      "type": "object",
+      "properties": {
+        "candidateEvidenceBasis": {
+          "type": "string"
+        },
+        "candidateId": {
+          "type": "string"
+        },
+        "candidateKind": {
+          "type": "string"
+        },
+        "candidateStatus": {
+          "$ref": "#/$defs/TrackIdentityReviewCandidateStatus"
+        },
+        "createdAtMs": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "effectiveDecision": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TrackIdentityReviewDecision"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidenceKeyAlgorithm": {
+          "type": "string"
+        },
+        "evidenceKeyValue": {
+          "type": "string"
+        },
+        "evidenceSummary": {
+          "$ref": "#/$defs/TrackIdentityReviewEvidenceSummary"
+        },
+        "reviewState": {
+          "$ref": "#/$defs/TrackIdentityReviewState"
+        },
+        "sourceSummary": {
+          "$ref": "#/$defs/TrackIdentityReviewSourceSummary"
+        },
+        "updatedAtMs": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "candidateId",
+        "candidateKind",
+        "candidateEvidenceBasis",
+        "candidateStatus",
+        "evidenceKeyAlgorithm",
+        "evidenceKeyValue",
+        "evidenceSummary",
+        "sourceSummary",
+        "reviewState",
+        "createdAtMs",
+        "updatedAtMs"
+      ]
+    },
+    "TrackIdentityReviewCandidateStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "stale",
+        "superseded"
+      ]
+    },
+    "TrackIdentityReviewCandidatesReadStatus": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "sourceNotFound"
+      ]
+    },
+    "TrackIdentityReviewDecision": {
+      "type": "object",
+      "properties": {
+        "createdAtMs": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "currentStatus": {
+          "$ref": "#/$defs/TrackIdentityEffectiveDecisionCurrentStatus"
+        },
+        "decisionBasis": {
+          "type": "string"
+        },
+        "decisionId": {
+          "type": "string"
+        },
+        "decisionSource": {
+          "type": "string"
+        },
+        "decisionState": {
+          "$ref": "#/$defs/TrackIdentityDecisionState"
+        },
+        "maskedSystemDecisionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "userBlockingDecisionState": {
+          "$ref": "#/$defs/TrackIdentityUserBlockingDecisionState"
+        }
+      },
+      "required": [
+        "decisionId",
+        "decisionState",
+        "decisionSource",
+        "decisionBasis",
+        "currentStatus",
+        "createdAtMs",
+        "userBlockingDecisionState"
+      ]
+    },
+    "TrackIdentityReviewEvidenceSummary": {
+      "type": "object",
+      "properties": {
+        "currentEvidenceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "evidenceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "memberCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "memberCount",
+        "evidenceCount",
+        "currentEvidenceCount"
+      ]
+    },
+    "TrackIdentityReviewSourceSample": {
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "displayName"
+      ]
+    },
+    "TrackIdentityReviewSourceSummary": {
+      "type": "object",
+      "properties": {
+        "sourceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceSamples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TrackIdentityReviewSourceSample"
+          }
+        }
+      },
+      "required": [
+        "sourceCount",
+        "sourceSamples"
+      ]
+    },
+    "TrackIdentityReviewState": {
+      "type": "string",
+      "enum": [
+        "needsUserDecision",
+        "systemAccepted",
+        "userAccepted",
+        "userRejected",
+        "userDeferred",
+        "staleDecision"
+      ]
+    },
+    "TrackIdentityReviewStateFilter": {
+      "type": "string",
+      "enum": [
+        "all",
+        "needsUserDecision",
+        "systemAccepted",
+        "userAccepted",
+        "userRejected",
+        "userDeferred",
+        "staleDecision"
       ]
     },
     "TrackIdentityUserBlockingDecisionState": {

@@ -51,6 +51,10 @@ import {
   type TrackIdentityDecisionCommandResult
 } from '../../../src/shared/libraryTrackIdentityDecisions/decisionCommands'
 import {
+  trackIdentityReviewCandidateChannels,
+  type ReadTrackIdentityReviewCandidatesResult
+} from '../../../src/shared/libraryTrackIdentityReview/reviewCandidates'
+import {
   boundaryEventChannels,
   type BoundaryEventDeliveryPayload
 } from '../../../src/shared/libraryBoundary/events'
@@ -97,6 +101,11 @@ describe('preload renderer API', () => {
     const deferTrackIdentityCandidateRequest = {
       candidateId: '9',
       reason: 'decide later'
+    }
+    const readTrackIdentityReviewCandidatesRequest = {
+      sourceId: '7',
+      reviewState: 'userRejected' as const,
+      limit: 25
     }
     const scanRequest = { rootId: 'root-1' }
     const persistedViewState: PersistedLibraryViewState = {
@@ -337,6 +346,44 @@ describe('preload renderer API', () => {
         }
       }
     }
+    const readTrackIdentityReviewCandidatesResult: ReadTrackIdentityReviewCandidatesResult = {
+      state: 'ready',
+      result: {
+        status: 'ok',
+        candidates: [
+          {
+            candidateId: '11',
+            candidateKind: 'exact_primary_media_content',
+            candidateEvidenceBasis: 'current_primary_media_exact_blake3',
+            candidateStatus: 'active',
+            evidenceKeyAlgorithm: 'blake3',
+            evidenceKeyValue: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            evidenceSummary: {
+              memberCount: 1,
+              evidenceCount: 1,
+              currentEvidenceCount: 1
+            },
+            sourceSummary: {
+              sourceCount: 1,
+              sourceSamples: [{ sourceId: '7', displayName: 'Local' }]
+            },
+            reviewState: 'userRejected',
+            effectiveDecision: {
+              decisionId: '12',
+              decisionState: 'rejected',
+              decisionSource: 'user_local_v0',
+              decisionBasis: 'explicit_user_local_decision_v0',
+              currentStatus: 'current',
+              createdAtMs: 100,
+              userBlockingDecisionState: 'rejected',
+              maskedSystemDecisionId: '10'
+            },
+            createdAtMs: 80,
+            updatedAtMs: 90
+          }
+        ]
+      }
+    }
     const readSourceMaintenanceResult: ReadSourceMaintenanceResult = {
       state: 'ready',
       snapshot: {
@@ -403,6 +450,7 @@ describe('preload renderer API', () => {
     let receivedAcceptTrackIdentityCandidateRequest: unknown
     let receivedRejectTrackIdentityCandidateRequest: unknown
     let receivedDeferTrackIdentityCandidateRequest: unknown
+    let receivedReadTrackIdentityReviewCandidatesRequest: unknown
     let receivedViewStatePayload: unknown
     let subscribeCount = 0
     let unsubscribeCount = 0
@@ -477,6 +525,11 @@ describe('preload renderer API', () => {
         if (channel === trackIdentityDecisionChannels.deferTrackIdentityCandidate) {
           receivedDeferTrackIdentityCandidateRequest = args[0]
           return deferTrackIdentityCandidateResult
+        }
+
+        if (channel === trackIdentityReviewCandidateChannels.readTrackIdentityReviewCandidates) {
+          receivedReadTrackIdentityReviewCandidatesRequest = args[0]
+          return readTrackIdentityReviewCandidatesResult
         }
 
         if (channel === rootChannels.chooseAndRegisterLocal) {
@@ -621,6 +674,14 @@ describe('preload renderer API', () => {
       )
     ).resolves.toBe(deferTrackIdentityCandidateResult)
     expect(receivedDeferTrackIdentityCandidateRequest).toBe(deferTrackIdentityCandidateRequest)
+    await expect(
+      api.library.trackIdentityReview.readTrackIdentityReviewCandidates(
+        readTrackIdentityReviewCandidatesRequest
+      )
+    ).resolves.toBe(readTrackIdentityReviewCandidatesResult)
+    expect(receivedReadTrackIdentityReviewCandidatesRequest).toBe(
+      readTrackIdentityReviewCandidatesRequest
+    )
     await expect(api.library.viewState.readViewState()).resolves.toBe(viewStateReadResult)
     await expect(api.library.viewState.writeViewState(persistedViewState)).resolves.toBe(
       viewStateWriteResult
