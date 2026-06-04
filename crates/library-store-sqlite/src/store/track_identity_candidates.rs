@@ -653,6 +653,8 @@ mod tests {
             let media_class = crate::browse_media::media_class_str_from_path(relative_path);
             let name_browse_sort_key =
                 crate::browse_sort_key::compute_name_browse_sort_key(file_name);
+            let relative_path_browse_sort_key =
+                crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -661,6 +663,7 @@ mod tests {
                              source_id,
                              name,
                              name_browse_sort_key,
+                             relative_path_browse_sort_key,
                              relative_path,
                              size_bytes,
                              mtime_ns,
@@ -673,12 +676,13 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (?1, ?2, ?3, ?4, ?5, 10, 100, ?6, ?7, 'present', 1, 1, 1, 1, 1)",
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 10, 100, ?7, ?8, 'present', 1, 1, 1, 1, 1)",
                         params![
                             source_file_id,
                             self.source_id,
                             file_name,
                             name_browse_sort_key,
+                            relative_path_browse_sort_key,
                             relative_path,
                             file_kind,
                             media_class,

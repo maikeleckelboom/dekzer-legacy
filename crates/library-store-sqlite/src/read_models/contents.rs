@@ -6,7 +6,7 @@ use crate::read_models::source_location_coverage::{
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
-const CONTENTS_CURSOR_VERSION: u8 = 1;
+const CONTENTS_CURSOR_VERSION: u8 = 2;
 const CONTENTS_CURSOR_KIND_SOURCE_FILE: &str = "sf";
 const CONTENTS_CURSOR_KIND_PRIMARY_MEDIA: &str = "pm";
 const CONTENTS_CURSOR_MEDIA_CLASS_ORDER: [StoreContentsMediaClass; 4] = [
@@ -43,7 +43,8 @@ enum ContentsCursorScope {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum ContentsCursorPosition {
     SourceFile {
-        relative_path_key: String,
+        relative_path_browse_sort_key: String,
+        relative_path: String,
         source_file_id: i64,
     },
     PrimaryMedia {
@@ -208,7 +209,8 @@ fn compute_cursor_position(
 ) -> ContentsCursorPosition {
     match row_profile {
         StoreContentsRowProfile::SourceFile => ContentsCursorPosition::SourceFile {
-            relative_path_key: row.relative_path.to_lowercase(),
+            relative_path_browse_sort_key: compute_source_file_browse_sort_key(row),
+            relative_path: row.relative_path.clone(),
             source_file_id: row.source_file_id,
         },
         StoreContentsRowProfile::PrimaryMedia => ContentsCursorPosition::PrimaryMedia {
@@ -220,6 +222,10 @@ fn compute_cursor_position(
             source_file_id: row.source_file_id,
         },
     }
+}
+
+fn compute_source_file_browse_sort_key(row: &StoreContentsFileRow) -> String {
+    crate::browse_sort_key::compute_relative_path_browse_sort_key(&row.relative_path)
 }
 
 fn availability_priority(availability_state: &Option<String>) -> i64 {
@@ -522,8 +528,9 @@ const PRIMARY_MEDIA_CONTENTS_ORDER_SQL: &str = "CASE availability_state
     lower(COALESCE(relative_path, '')) ASC,
     source_file_id ASC";
 
-const SOURCE_FILE_CONTENTS_ORDER_SQL: &str = "lower(COALESCE(relative_path, '')) ASC,
-    source_file_id ASC";
+const SOURCE_FILE_CONTENTS_ORDER_SQL: &str = "sf.relative_path_browse_sort_key ASC,
+    sf.relative_path ASC,
+    sf.source_file_id ASC";
 
 pub(crate) fn read_contents(
     connection: &Connection,
@@ -1600,7 +1607,7 @@ fn read_rows_for_accepted_locations(
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
     let scope_param_count: usize = 1;
     let cursor_param_count: usize = match cursor_position {
-        Some(ContentsCursorPosition::SourceFile { .. }) => 2,
+        Some(ContentsCursorPosition::SourceFile { .. }) => 3,
         Some(ContentsCursorPosition::PrimaryMedia { .. }) => 6,
         None => 0,
     };
@@ -1657,7 +1664,7 @@ fn read_rows_with_source_predicate(
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
     let scope_param_count: usize = if input.relative_path.is_some() { 2 } else { 1 };
     let cursor_param_count: usize = match input.cursor_position {
-        Some(ContentsCursorPosition::SourceFile { .. }) => 2,
+        Some(ContentsCursorPosition::SourceFile { .. }) => 3,
         Some(ContentsCursorPosition::PrimaryMedia { .. }) => 6,
         None => 0,
     };
@@ -1769,10 +1776,11 @@ fn source_file_rows_sql(
         .unwrap_or_default();
     let cursor_clause = match cursor_start {
         Some(base) => {
-            let rp_idx = base;
-            let sid_idx = base + 1;
+            let bsk_idx = base;
+            let rp_idx = base + 1;
+            let sid_idx = base + 2;
             format!(
-                "\n  AND (\n      lower(COALESCE(sf.relative_path, '')) > ?{rp_idx}\n      OR (lower(COALESCE(sf.relative_path, '')) = ?{rp_idx} AND sf.source_file_id > ?{sid_idx})\n  )"
+                "\n  AND (\n      sf.relative_path_browse_sort_key > ?{bsk_idx}\n      OR (sf.relative_path_browse_sort_key = ?{bsk_idx} AND sf.relative_path > ?{rp_idx})\n      OR (sf.relative_path_browse_sort_key = ?{bsk_idx} AND sf.relative_path = ?{rp_idx} AND sf.source_file_id > ?{sid_idx})\n  )"
             )
         }
         None => String::new(),
@@ -2100,10 +2108,14 @@ fn primary_media_rows_sql(
 fn push_cursor_params(cursor: &ContentsCursorPosition, params: &mut Vec<rusqlite::types::Value>) {
     match cursor {
         ContentsCursorPosition::SourceFile {
-            relative_path_key,
+            relative_path_browse_sort_key,
+            relative_path,
             source_file_id,
         } => {
-            params.push(rusqlite::types::Value::Text(relative_path_key.clone()));
+            params.push(rusqlite::types::Value::Text(
+                relative_path_browse_sort_key.clone(),
+            ));
+            params.push(rusqlite::types::Value::Text(relative_path.clone()));
             params.push(rusqlite::types::Value::Integer(*source_file_id));
         }
         ContentsCursorPosition::PrimaryMedia {
@@ -2465,6 +2477,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_state,
@@ -2472,12 +2485,13 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, NULL, ?3, ?4, ?5, 'present', ?6, 1, 1, 1)",
+                 VALUES (?1, ?2, NULL, ?3, ?4, ?5, ?6, 'present', ?7, 1, 1, 1)",
                 params![
                     source_directory_id,
                     source_id,
                     name,
                     name_browse_sort_key,
+                    crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path),
                     relative_path,
                     dir_scan_state,
                 ],
@@ -3107,6 +3121,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      file_kind,
                      media_class,
@@ -3117,13 +3132,14 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'present', 1, 1, 1, 1, 1)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'present', 1, 1, 1, 1, 1)",
                 params![
                     source_file_id,
                     source_id,
                     parent_directory_id,
                     file_name,
                     name_browse_sort_key,
+                    crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path),
                     relative_path,
                     file_kind,
                     media_class,
@@ -5973,5 +5989,201 @@ mod tests {
             StoreContentsCoverageState::LocationMissing,
             "direct SourceLocation missing coverage must be LocationMissing"
         );
+    }
+
+    #[test]
+    fn source_file_contents_natural_order_track_numbers() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for (id, name) in [
+            (1000, "Music/Track 001.wav"),
+            (1001, "Music/Track 01.wav"),
+            (1002, "Music/Track 10.wav"),
+            (1003, "Music/Track 2.wav"),
+            (1004, "Music/Track 1.wav"),
+        ] {
+            insert_scanned_file(&connection, id, 1, 10, name, "audio");
+        }
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        let paths: Vec<&str> = result
+            .rows
+            .iter()
+            .map(|row| row.relative_path.as_str())
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "Music/Track 1.wav",
+                "Music/Track 01.wav",
+                "Music/Track 001.wav",
+                "Music/Track 2.wav",
+                "Music/Track 10.wav",
+            ],
+            "source-file contents must order: 1 < 01 < 001 < 2 < 10"
+        );
+    }
+
+    #[test]
+    fn source_file_contents_recursive_path_natural_order() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Folder [2]", "complete");
+        insert_directory(&connection, 12, 1, "Music/Folder [1]", "complete");
+        insert_directory(&connection, 13, 1, "Music/Folder [10]", "complete");
+        insert_scanned_file(&connection, 1000, 1, 12, "Music/Folder [1]/Track 10.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 12, "Music/Folder [1]/Track 2.wav", "audio");
+        insert_scanned_file(&connection, 1002, 1, 12, "Music/Folder [1]/Track 1.wav", "audio");
+        insert_scanned_file(&connection, 1003, 1, 11, "Music/Folder [2]/Track 1.wav", "audio");
+        insert_scanned_file(&connection, 1004, 1, 13, "Music/Folder [10]/Track 1.wav", "audio");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            20,
+            None,
+        )
+        .expect("read contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        let paths: Vec<&str> = result
+            .rows
+            .iter()
+            .map(|row| row.relative_path.as_str())
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "Music/Folder [1]/Track 1.wav",
+                "Music/Folder [1]/Track 2.wav",
+                "Music/Folder [1]/Track 10.wav",
+                "Music/Folder [2]/Track 1.wav",
+                "Music/Folder [10]/Track 1.wav",
+            ],
+            "recursive path must order by component natural order"
+        );
+    }
+
+    #[test]
+    fn source_file_contents_cursor_pagination_natural_order() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Music/Track 1.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Music/Track 2.wav", "audio");
+        insert_scanned_file(&connection, 1002, 1, 10, "Music/Track 10.wav", "audio");
+        insert_scanned_file(&connection, 1003, 1, 10, "Music/Track 11.wav", "audio");
+
+        let page1 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            2,
+            None,
+        )
+        .expect("read page 1");
+
+        assert_eq!(page1.rows.len(), 2);
+        assert_eq!(page1.rows[0].relative_path, "Music/Track 1.wav");
+        assert_eq!(page1.rows[1].relative_path, "Music/Track 2.wav");
+        assert!(
+            page1.next_cursor.is_some(),
+            "expected next_cursor when more rows exist"
+        );
+
+        let cursor = page1.next_cursor.unwrap();
+        let page2 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&cursor),
+        )
+        .expect("read page 2");
+
+        assert_eq!(page2.rows.len(), 2);
+        assert_eq!(page2.rows[0].relative_path, "Music/Track 10.wav");
+        assert_eq!(page2.rows[1].relative_path, "Music/Track 11.wav");
+        assert!(
+            page2.next_cursor.is_none(),
+            "last page should have no next_cursor"
+        );
+        assert_eq!(page2.state, StoreContentsState::Ready);
+    }
+
+    #[test]
+    fn source_file_contents_no_digit_before_two_digit_after_pagination() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        for (id, name) in [
+            (1000, "Music/[1].wav"),
+            (1001, "Music/[10].wav"),
+            (1002, "Music/[2].wav"),
+        ] {
+            insert_scanned_file(&connection, id, 1, 10, name, "audio");
+        }
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            2,
+            None,
+        )
+        .expect("read first page");
+
+        assert_eq!(result.rows[0].relative_path, "Music/[1].wav");
+        assert_eq!(result.rows[1].relative_path, "Music/[2].wav");
+        assert!(result.next_cursor.is_some());
+
+        let cursor = result.next_cursor.unwrap();
+        let page2 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&cursor),
+        )
+        .expect("read second page");
+
+        assert_eq!(page2.rows[0].relative_path, "Music/[10].wav");
+        assert!(page2.next_cursor.is_none());
     }
 }

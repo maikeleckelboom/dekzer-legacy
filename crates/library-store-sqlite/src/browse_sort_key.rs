@@ -1,8 +1,23 @@
 pub(crate) fn compute_name_browse_sort_key(name: &str) -> String {
-    let mut key = String::with_capacity(name.len() * 4 + 8);
+    encode_sort_key_component(name)
+}
+
+pub(crate) fn compute_relative_path_browse_sort_key(relative_path: &str) -> String {
+    if relative_path.is_empty() {
+        return "v1|".to_string();
+    }
+    relative_path
+        .split('/')
+        .map(encode_sort_key_component)
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn encode_sort_key_component(component: &str) -> String {
+    let mut key = String::with_capacity(component.len() * 4 + 8);
     key.push_str("v1|");
 
-    let mut chars = name.chars().peekable();
+    let mut chars = component.chars().peekable();
     while let Some(&ch) = chars.peek() {
         if ch.is_ascii_digit() {
             let mut digit_chars = String::new();
@@ -18,17 +33,15 @@ pub(crate) fn compute_name_browse_sort_key(name: &str) -> String {
             let significant = strip_leading_zeros(&digit_chars);
             write_digit_run(&mut key, &significant, &digit_chars);
         } else {
-            let mut text_chars = String::new();
+            let mut text_run = String::new();
             while let Some(&c) = chars.peek() {
                 if c.is_ascii_digit() {
                     break;
                 }
-                for lower_ch in c.to_lowercase() {
-                    text_chars.push(lower_ch);
-                }
+                text_run.push(c);
                 chars.next();
             }
-            write_text_chars(&mut key, &text_chars);
+            write_text_run(&mut key, &text_run);
         }
     }
 
@@ -44,10 +57,12 @@ fn strip_leading_zeros(s: &str) -> String {
     }
 }
 
-fn write_text_chars(key: &mut String, text: &str) {
+fn write_text_run(key: &mut String, text: &str) {
     for ch in text.chars() {
-        key.push('t');
-        key.push(ch);
+        for lower_ch in ch.to_lowercase() {
+            key.push('t');
+            key.push(lower_ch);
+        }
     }
 }
 
@@ -64,7 +79,7 @@ fn write_digit_run(key: &mut String, significant: &str, original: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::compute_name_browse_sort_key;
+    use super::{compute_name_browse_sort_key, compute_relative_path_browse_sort_key};
 
     fn assert_order(expected: &[&str]) {
         let keys: Vec<(String, &str)> = expected
@@ -235,9 +250,97 @@ mod tests {
     }
 
     #[test]
-    fn key_is_printable_ascii() {
+    fn key_is_printable_ascii_for_ascii_input() {
         let key = compute_name_browse_sort_key("Track 10.wav");
         assert!(key.chars().all(|c| c.is_ascii_graphic() || c == ' ' || c == ':'));
+        assert!(key.starts_with("v1|"));
+    }
+
+    #[test]
+    fn non_ascii_filename_produces_deterministic_non_empty_key() {
+        let names = ["café.wav", "über cool.mp3", "señor.flac", "café.wav"];
+        let keys: Vec<_> = names
+            .iter()
+            .map(|n| compute_name_browse_sort_key(n))
+            .collect();
+        for (i, key) in keys.iter().enumerate() {
+            assert!(
+                !key.is_empty(),
+                "sort key must not be empty for: {:?}",
+                names[i]
+            );
+            assert!(
+                key.starts_with("v1|"),
+                "sort key must start with v1| for: {:?}",
+                names[i]
+            );
+        }
+        assert_eq!(
+            keys[0], keys[3],
+            "identical non-ASCII names must produce identical keys"
+        );
+    }
+
+    #[test]
+    fn non_ascii_sort_key_does_not_panic_on_non_latin_scripts() {
+        let names = ["日本語.mp3", "中文.wav", "한국어.flac", "Русский.mp3"];
+        for name in &names {
+            let key = compute_name_browse_sort_key(name);
+            assert!(
+                !key.is_empty(),
+                "sort key must not be empty for name: {name:?}"
+            );
+            assert!(
+                key.starts_with("v1|"),
+                "sort key must start with v1| for name: {name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn relative_path_sort_key_orders_naturally() {
+        let paths = [
+            "Folder [1]/Track 1.wav",
+            "Folder [1]/Track 2.wav",
+            "Folder [1]/Track 10.wav",
+            "Folder [2]/Track 1.wav",
+            "Folder [10]/Track 1.wav",
+        ];
+        let keys: Vec<_> = paths
+            .iter()
+            .map(|p| (compute_relative_path_browse_sort_key(p), *p))
+            .collect();
+        let mut sorted = keys.clone();
+        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        let result: Vec<&&str> = sorted.iter().map(|(_, p)| p).collect();
+        assert_eq!(
+            result,
+            vec![
+                &"Folder [1]/Track 1.wav",
+                &"Folder [1]/Track 2.wav",
+                &"Folder [1]/Track 10.wav",
+                &"Folder [2]/Track 1.wav",
+                &"Folder [10]/Track 1.wav",
+            ],
+            "relative path sort keys must order by path component natural order"
+        );
+    }
+
+    #[test]
+    fn relative_path_sort_key_empty_path() {
+        let key = compute_relative_path_browse_sort_key("");
+        assert!(key.starts_with("v1|"));
+    }
+
+    #[test]
+    fn relative_path_sort_key_single_component() {
+        let key = compute_relative_path_browse_sort_key("Track 1.wav");
+        assert_eq!(key, compute_name_browse_sort_key("Track 1.wav"));
+    }
+
+    #[test]
+    fn relative_path_sort_key_prefixed() {
+        let key = compute_relative_path_browse_sort_key("v1|");
         assert!(key.starts_with("v1|"));
     }
 

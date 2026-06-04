@@ -388,6 +388,8 @@ mod tests {
             .expect("relative path has file name");
         let name_browse_sort_key =
             crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let relative_path_browse_sort_key =
+            crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -396,6 +398,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      size_bytes,
                      mtime_ns,
@@ -408,11 +411,12 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 1, NULL, ?2, ?3, ?4, ?5, ?6, 'audio', 'audio', 'present', 10, 10, 10, 10, 10)",
+                 VALUES (?1, 1, NULL, ?2, ?3, ?4, ?5, ?6, ?7, 'audio', 'audio', 'present', 10, 10, 10, 10, 10)",
                 params![
                     source_file_id,
                     name,
                     name_browse_sort_key,
+                    relative_path_browse_sort_key,
                     relative_path,
                     size_bytes,
                     mtime_ns,

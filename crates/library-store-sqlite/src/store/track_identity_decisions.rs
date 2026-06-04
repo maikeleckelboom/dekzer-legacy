@@ -1089,6 +1089,8 @@ mod tests {
             let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
             let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
             let media_class = crate::browse_media::media_class_str_from_path(relative_path);
+            let relative_path_browse_sort_key =
+                crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -1097,6 +1099,7 @@ mod tests {
                              source_id,
                              name,
                              name_browse_sort_key,
+                             relative_path_browse_sort_key,
                              relative_path,
                              size_bytes,
                              mtime_ns,
@@ -1109,11 +1112,12 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (?1, ?2, ?3, '', ?4, 10, 100, ?5, ?6, 'present', 1, 1, 1, 1, 1)",
+                         VALUES (?1, ?2, ?3, '', ?4, ?5, 10, 100, ?6, ?7, 'present', 1, 1, 1, 1, 1)",
                         params![
                             source_file_id,
                             self.source_id,
                             file_name,
+                            relative_path_browse_sort_key,
                             relative_path,
                             file_kind,
                             media_class
@@ -2800,18 +2804,22 @@ mod tests {
                      VALUES (2, 'complete', 1, 2, 2, 2)",
                     [],
                 )?;
+                let src_b_rpath = "Album/source-b.wav";
+                let src_b_rpath_key =
+                    crate::browse_sort_key::compute_relative_path_browse_sort_key(src_b_rpath);
                 write.execute(
                     "INSERT INTO source_files (
-                         source_file_id, source_id, name, name_browse_sort_key, relative_path,
+                         source_file_id, source_id, name, name_browse_sort_key,
+                         relative_path_browse_sort_key, relative_path,
                          size_bytes, mtime_ns, file_kind, media_class,
                          presence_state, first_discovered_at,
                          last_observed_at, last_presence_change_at,
                          created_at, updated_at
                      )
-                      VALUES (200, 2, 'source-b.wav', 'v1|tstotutrctet-tbt.twtatv', 'Album/source-b.wav',
+                      VALUES (?1, 2, 'source-b.wav', 'v1|tstotutrctet-tbt.twtatv', ?2, ?3,
                              10, 100, 'audio', 'audio', 'present', 1, 1, 1,
                              1, 1)",
-                    [],
+                    params![200, src_b_rpath_key, src_b_rpath],
                 )?;
                 write.execute(
                     "INSERT OR IGNORE INTO WorkItems (

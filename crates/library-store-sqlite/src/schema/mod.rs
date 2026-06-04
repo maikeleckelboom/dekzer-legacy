@@ -341,6 +341,7 @@ mod tests {
                 "parent_source_directory_id",
                 "name",
                 "name_browse_sort_key",
+                "relative_path_browse_sort_key",
                 "relative_path",
                 "presence_state",
                 "has_child_directories",
@@ -384,6 +385,7 @@ mod tests {
                 "parent_source_directory_id",
                 "name",
                 "name_browse_sort_key",
+                "relative_path_browse_sort_key",
                 "relative_path",
                 "size_bytes",
                 "mtime_ns",
@@ -651,6 +653,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      has_child_directories,
@@ -663,7 +666,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                  VALUES (10, 1, NULL, 'pending', 'v1|tptetntdtitntg', 'pending', 'present', 0, 0, 0, 'pending', 100, NULL, NULL, 100, 100)",
+                  VALUES (10, 1, NULL, 'pending', 'v1|tptetntdtitntg', 'v1|tptetntdtitntg', 'pending', 'present', 0, 0, 0, 'pending', 100, NULL, NULL, 100, 100)",
                 [],
             )
             .expect("pending directory coverage facts are accepted");
@@ -676,6 +679,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      has_primary_media_descendant,
@@ -684,7 +688,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                  VALUES (11, 1, NULL, 'scanning-media', 'v1|tstctatntntitntgt-tmtetdtita', 'scanning-media', 'present', 1, 'scanning', 101, 101, 101)",
+                  VALUES (11, 1, NULL, 'scanning-media', 'v1|tstctatntntitntgt-tmtetdtita', 'v1|tstctatntntitntgt-tmtetdtita', 'scanning-media', 'present', 1, 'scanning', 101, 101, 101)",
                 [],
             )
             .expect("positive media knowledge before coverage completion is accepted");
@@ -697,6 +701,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      has_primary_media_descendant,
@@ -707,7 +712,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                  VALUES (12, 1, NULL, 'complete-empty', 'v1|tctomtptletettet-tetmtpttty', 'complete-empty', 'present', 0, 0, 'complete', 102, 102, 102, 102)",
+                  VALUES (12, 1, NULL, 'complete-empty', 'v1|tctomtptletettet-tetmtpttty', 'v1|tctomtptletettet-tetmtpttty', 'complete-empty', 'present', 0, 0, 'complete', 102, 102, 102, 102)",
                 [],
             )
             .expect("confirmed no-media directory coverage facts are accepted");
@@ -729,13 +734,14 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_updated_at,
                      created_at,
                      updated_at
                  )
-                  VALUES (20, 1, NULL, 'parent', 'v1|tptatrtetntt', 'parent', 'present', 100, 100, 100)",
+                  VALUES (20, 1, NULL, 'parent', 'v1|tptatrtetntt', 'v1|tptatrtetntt', 'parent', 'present', 100, 100, 100)",
                 [],
             )
             .expect("insert parent directory");
@@ -747,13 +753,14 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_updated_at,
                      created_at,
                      updated_at
                  )
-                  VALUES (21, 1, 20, 'child', 'v1|tcthtitltd', 'parent/child', 'present', 101, 101, 101)",
+                  VALUES (21, 1, 20, 'child', 'v1|tcthtitltd', 'v1|tptatrtetntt/tcthtitltd', 'parent/child', 'present', 101, 101, 101)",
                 [],
             )
             .expect("insert child directory");
@@ -765,6 +772,7 @@ mod tests {
                      parent_source_directory_id,
                      name,
                      name_browse_sort_key,
+                     relative_path_browse_sort_key,
                      relative_path,
                      presence_state,
                      first_discovered_at,
@@ -773,7 +781,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                  VALUES (30, 1, 21, 'track.flac', 'v1|tttrtatctkt.tftlatc', 'parent/child/track.flac', 'present', 102, 102, 102, 102, 102)",
+                  VALUES (30, 1, 21, 'track.flac', 'v1|tttrtatctkt.tftlatc', 'v1|tptatrtetntt/tcthtitltd/v1|tttrtatctkt.tftlatc', 'parent/child/track.flac', 'present', 102, 102, 102, 102, 102)",
                 [],
             )
             .expect("insert child file");
