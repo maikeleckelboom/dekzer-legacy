@@ -21,6 +21,9 @@ The library tree is a navigation surface. It projects sources, source locations,
 
 Audio, video, image, CUE, metadata companion, unsupported, and unknown source files belong to contents or diagnostic inventory reads, not to the tree hierarchy.
 
+Image-only folders are not default navigation rows unless a later product policy explicitly admits them. Directory
+navigation exists to browse source structure and reach contents scopes, not to surface artwork-only inventory.
+
 ## Tree Rows
 
 Tree hierarchy rows may include:
@@ -44,3 +47,6 @@ Leaf directories do not show a disclosure affordance. A directory may show discl
 The contents pane owns file rows for the selected source or directory scope. The default main contents browse remains audio-only and recursive according to the contents browse policy.
 
 Explicit source-file inventory remains available through contents or diagnostic paths. Companion files such as CUE sheets and artwork remain source-file inventory rows; they are not tree children.
+
+Contents rows are not canonical tracks. They are scoped source-file browse rows until a richer read model explicitly
+defines otherwise.

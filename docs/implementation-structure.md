@@ -902,7 +902,7 @@ windows are visibility-specific cache. These must stay separate.
 
 ### `contents/`
 
-**Key law:** selected contents must be backend/query-owned, not
+**Key law:** contents rows must be backend/query-owned, not
 renderer-derived from loaded tree state. The `sourceFile` row profile and
 the `primaryMedia` row profile are distinct. `browsePolicy/` governs which
 profile is active for a given visibility mode.
@@ -911,7 +911,7 @@ profile is active for a given visibility mode.
 
 Owns the mapping from selected node to selected backend scope. Prevents every
 controller from running its own binding lookup ritual. Owns: selectedNodeId,
-selected hierarchy binding, selected contents scope, source vs sourceLocation
+selected hierarchy binding, contents scope, source vs sourceLocation
 vs directory scope resolution, selection unavailable state.
 
 ### `browsePolicy/`

@@ -15,7 +15,7 @@ scope:
   - source-visible-state
   - access-state-semantics
   - library-tree-children-reads
-  - selected-contents-reads
+  - contents-scope-reads
   - renderer-projection-stability
   - maintained-snapshot-invalidation-routing
   - startup-bootstrap
@@ -53,12 +53,12 @@ Some diagrams include current-direction architecture. Those sections must label 
 
 Current first-slice projections are:
 
-| Projection                   | Role                                                                                                                                               |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Navigation rows              | Source entry rows and top-level navigation state. Source visible state is carried by navigation rows until a dedicated boundary projection exists. |
-| Library tree windows         | Authoritative immediate-children reads for a source or directory entry point.                                                                      |
-| Selected contents read pages | Authoritative selected-scope read results, including access state, coverage state, rows, and window cursor.                                        |
-| App-safe library events      | Main-forwarded event summaries and invalidations. Events trigger rereads; they do not carry replacement rows.                                      |
+| Projection              | Role                                                                                                                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Navigation rows         | Source entry rows and top-level navigation state. Source visible state is carried by navigation rows until a dedicated boundary projection exists. |
+| Library tree windows    | Authoritative immediate-children reads for a source or directory entry point.                                                                      |
+| Contents read pages     | Authoritative contents-scope read results, including access state, coverage state, rows, and window cursor.                                        |
+| App-safe library events | Main-forwarded event summaries and invalidations. Events trigger rereads; they do not carry replacement rows.                                      |
 
 Do not invent a dedicated SourceLifecycle projection in code or docs unless the boundary schema defines it. Until then,
 source visible state belongs to navigation rows or another explicitly existing first-slice read.
@@ -66,11 +66,11 @@ source visible state belongs to navigation rows or another explicitly existing f
 Do not invent `boundaryScopeId` for contents unless the boundary schema defines it. Until then, keep contents identity
 split into two layers:
 
-- Selected contents scope identity: source identity, directory identity when applicable, recursion policy, and material
+- Contents scope identity: source identity, directory identity when applicable, recursion policy, and material
   filters or sort policy that affect the result.
-- Active contents window request: selected contents scope identity plus page or window cursor.
+- Active contents window request: contents scope identity plus page or window cursor.
 
-Invalidation refreshes active contents windows whose selected contents scope is affected. A page or window cursor is not
+Invalidation refreshes active contents windows whose contents scope is affected. A page or window cursor is not
 the semantic scope identity.
 
 ## Source visible-state vocabulary
@@ -110,11 +110,11 @@ library restoration.
 
 Staged startup budgets:
 
-| Stage                         | Contract                                                                                                      |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Shell-to-glass                | The app/workspace frame paints without waiting for full library substrate reads.                              |
-| First library substrate frame | Navigation/source rows and active selection shell state paint from bounded authoritative reads.               |
-| Progressive restoration       | Active tree windows and selected contents restore progressively and may degrade without blocking first paint. |
+| Stage                         | Contract                                                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Shell-to-glass                | The app/workspace frame paints without waiting for full library substrate reads.                             |
+| First library substrate frame | Navigation/source rows and active selection shell state paint from bounded authoritative reads.              |
+| Progressive restoration       | Active tree windows and current contents restore progressively and may degrade without blocking first paint. |
 
 Successful authoritative read means the service returned a classified result for the requested scope. It does not
 require rows to be available or the source to be mounted.
@@ -362,9 +362,9 @@ flowchart TD
   E --> F["Renderer requests authoritative recovery reads through Main"]
   F --> G["Event gap is handled before contents confidence is claimed"]
   G --> H["Renderer does not convert event gap into empty contents"]
-  C -->|" no "| I["Renderer requests selected contents through Main"]
+  C -->|" no "| I["Renderer requests current contents through Main"]
   I --> J["Main forwards app-safe request to Boundary Client"]
-  J --> K["Rust Library Service evaluates selected contents scope"]
+  J --> K["Rust Library Service evaluates contents scope"]
   K --> L{"Contents result state"}
   L -->|" accessible + coverage authoritative + no relevant rows "| M["Return empty contents result"]
   M --> N["Renderer shows empty state"]
@@ -413,9 +413,9 @@ contents.
 flowchart TD
   A["User selects tree row"] --> B["Renderer records selected tree identity"]
   B --> C["Renderer derives product selection intent"]
-  C --> D["Main forwards selected contents request through boundary path"]
+  C --> D["Main forwards contents request through boundary path"]
   D --> E["Service validates selected entry and resolves recursion policy"]
-  E --> F["Selected contents scope identity"]
+  E --> F["Contents scope identity"]
   F --> G["sourceId + optional directoryId + recursion policy + material filters or sort policy"]
   G --> H["Renderer derives active contents window request"]
   H --> I["scope identity + page/window cursor"]
@@ -561,11 +561,11 @@ as normal refresh input. `navigationRows` refreshes navigation rows. `libraryBro
 previously loaded browser windows and expanded source/directory windows through authoritative reads,
 keeping previous rows visible while those reads are pending.
 
-The finer scopes shown in the invalidation diagrams (source visible state, library tree children by parent directory, selected contents scope identity) are target scope expansion. They are not current wire values.
+The finer scopes shown in the invalidation diagrams (source visible state, library tree children by parent directory, contents scope identity) are target scope expansion. They are not current wire values.
 
 - If the schema does not define SourceLifecycle invalidation, do not name it as if it exists. Use the actual
   invalidation scope that causes source visible state to be reread.
-- If the schema does not define ContentsScope boundaryScopeId, use selected contents scope identity. Do not key
+- If the schema does not define ContentsScope boundaryScopeId, use contents scope identity. Do not key
   invalidation to a page or window cursor.
 - Broad invalidation must not become a whole-app blind reload.
 
@@ -575,7 +575,7 @@ A broad or unknown invalidation refreshes only the active first-slice projection
 surface:
 
 1. Navigation rows.
-2. Current selected contents window for the active selected scope.
+2. Current contents window for the active contents scope.
 3. Visible loaded tree windows in the current library viewport.
 
 Active tree windows means the visible, pinned, or explicitly restored windows required for the current library surface
@@ -604,7 +604,7 @@ flowchart TD
   D --> E["Renderer fans out required authoritative reads"]
   E --> F["Request navigation rows"]
   E --> G["Request active tree windows"]
-  E --> H["Request selected contents scope if selection exists"]
+  E --> H["Request contents scope if selection exists"]
   F --> I["Read result joins bootstrap barrier"]
   G --> I
   H --> I
@@ -692,7 +692,7 @@ flowchart TD
   G --> H["Renderer fans out authoritative startup reads"]
   H --> I["Read navigation rows"]
   H --> J["Read active tree windows"]
-  H --> K["Read selected contents scope if selection exists"]
+  H --> K["Read contents scope if selection exists"]
   I --> L["Rust Service reads persisted SQLite state"]
   J --> L
   K --> L
@@ -708,7 +708,7 @@ Reopen proof passes only when visible library state is restored from persisted R
 cache and session events are not durable library authority.
 
 Reopen proof is progressive. It proves first library substrate frame restoration within a fixture-controlled budget,
-then progressive restoration of active tree windows and selected contents. It must not require a full library traversal,
+then progressive restoration of active tree windows and current contents. It must not require a full library traversal,
 scan completion, or event replay before first paint.
 
 Reopen event law:
@@ -722,16 +722,16 @@ Minimum test shape:
 1. Create a source fixture with nested directories and media-relevant files.
 2. Register the local source root.
 3. Run the background root scan to completion.
-4. Assert persisted navigation, hierarchy, coverage, and rows needed to reconstruct selected contents reads before
+4. Assert persisted navigation, hierarchy, coverage, and rows needed to reconstruct contents reads before
    close.
 5. Close the service or app process.
 6. Reopen against the same SQLite store.
-7. Before any event replay is used as state, read navigation rows, at least one tree window, and a selected contents
+7. Before any event replay is used as state, read navigation rows, at least one tree window, and a contents
    page through the same startup law used by the renderer.
 8. Assert fixture-controlled time-to-glass for the first library substrate frame, measured from renderer library surface
    start to first painted source/navigation projection, using `LIBRARY_BOOTSTRAP_TIME_TO_GLASS_BUDGET_MS` or the
    repository's equivalent test budget.
-9. Assert the timing report separates shell paint, navigation/source rows, tree window read, selected contents read, and
+9. Assert the timing report separates shell paint, navigation/source rows, tree window read, contents read, and
    progressive restoration work.
 10. Assert stable source identity, stable directory identity where expected, restored hierarchy, and restored contents.
 11. Assert renderer cache is not required to pass.
@@ -789,7 +789,7 @@ flowchart LR
   Service -->|" durable reads and writes "| SQLite["SQLite Store"]
   Service -->|" source identity and visible state vocabulary "| SourceVisibleVocabulary["Source visible state carried by current first-slice projection"]
   Service -->|" library tree windows "| TreeProjection["Library Tree Projection"]
-  Service -->|" selected contents read results "| ContentsProjection["Selected contents read projection"]
+  Service -->|" contents read results "| ContentsProjection["Contents read projection"]
   Service -->|" SourceScanEvent and MaintainedSnapshotInvalidated "| EventStream["Boundary Event Stream"]
   EventStream -->|" Main-owned event pump and cursor "| MainEventPump["Main Event Pump"]
   MainEventPump -->|" app-safe events "| RendererConsumer["Renderer Event Consumer"]
@@ -819,7 +819,7 @@ Before this sketch becomes canonical, verify each item against code and boundary
 
 1. Source visible-state names match the implemented schema or are explicitly documented as product vocabulary.
 2. No diagram names a SourceLifecycle projection unless the schema defines one.
-3. Contents invalidation uses selected contents scope identity, while active page/window cursors remain request-window
+3. Contents invalidation uses contents scope identity, while active page/window cursors remain request-window
    identity only.
 4. Startup bootstrap matches the background scan event recovery law: event forwarding starts only after authoritative
    reads succeed.

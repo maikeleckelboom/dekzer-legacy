@@ -33,7 +33,7 @@ The only action that removes a source from the visible tree is an explicit user-
 ## Source lifecycle states
 
 | State                  | Meaning                                                                             |
-|------------------------|-------------------------------------------------------------------------------------|
+| ---------------------- | ----------------------------------------------------------------------------------- |
 | `mounted`              | Source is mounted and accessible. Reads and scans proceed normally.                 |
 | `unavailable`          | Source is known but currently not reachable (drive ejected, network offline, etc.). |
 | `relocating`           | Source path has changed; substrate is resolving the new location.                   |
@@ -50,7 +50,7 @@ the visible tree. They are distinct: `removed_by_user` may retain metadata;
 ## Tree behavior per state
 
 | State                  | Source root row behavior                                              | Child branch behavior                                                           |
-|------------------------|-----------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| ---------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `mounted`              | Render normally.                                                      | Render normally.                                                                |
 | `unavailable`          | Keep root row. Show `unavailable` presentation with last-known label. | Keep last-known child structure in degraded presentation.                       |
 | `relocating`           | Keep root row. Show resolving indicator. Preserve child structure.    | Keep last-known child structure until new resolution confirmed.                 |
@@ -101,7 +101,7 @@ Common cases:
 Required behavior during relocation:
 
 | Step                 | Behavior                                                       |
-|----------------------|----------------------------------------------------------------|
+| -------------------- | -------------------------------------------------------------- |
 | Relocation detected  | Keep source root row. Begin resolving new path.                |
 | Resolution confirmed | Update `pathDisplay` on source row and affected child rows.    |
 | Node IDs preserved   | Branch cache remains valid; no re-read required.               |
@@ -117,7 +117,7 @@ A source may be present but blocked by OS permissions, privacy gates, or securit
 policy. This is not the same as unavailable.
 
 | Condition                      | Presentation                                         |
-|--------------------------------|------------------------------------------------------|
+| ------------------------------ | ---------------------------------------------------- |
 | Full access denied             | Source root row shows `blocked` with reason.         |
 | Privacy permission not granted | Source root row shows `blocked: privacy_permission`. |
 | Partial subdirectory denial    | Affected subdirectory nodes show `inaccessible`.     |
@@ -136,7 +136,7 @@ that has not been downloaded.
 Required behavior:
 
 | Condition                              | Presentation                                                               |
-|----------------------------------------|----------------------------------------------------------------------------|
+| -------------------------------------- | -------------------------------------------------------------------------- |
 | File locally available                 | Render normally.                                                           |
 | File is a placeholder (not downloaded) | Show placeholder indicator. Mark `availability_state = cloud_placeholder`. |
 | File is downloading                    | Show downloading indicator.                                                |
@@ -149,7 +149,7 @@ deferred availability.
 ## Source removal vs forgetting
 
 | Action        | User intent                         | Substrate behavior                                  | Tree behavior     |
-|---------------|-------------------------------------|-----------------------------------------------------|-------------------|
+| ------------- | ----------------------------------- | --------------------------------------------------- | ----------------- |
 | Remove source | Stop monitoring this source.        | Source marked inactive; metadata retained.          | Root row removed. |
 | Forget source | Purge all knowledge of this source. | Source and all child records purged from substrate. | Root row removed. |
 | Eject/unmount | OS-level action; no library intent. | Source transitions to `unavailable`.                | Root row kept.    |
@@ -165,6 +165,17 @@ reset selection.
 
 When the source recovers, the contents panel re-validates its scope and refreshes
 if needed, following the same stale-response rules as normal reads.
+
+## Source add, scan, and remove browser updates
+
+Source registration and scan update navigation, tree, lifecycle, and contents presentation through authoritative reads
+and maintained snapshot invalidations. Renderer refresh planning may coalesce visible/current refresh work, but it does
+not own source truth or replacement rows.
+
+Source removal is explicit user intent. Once removal is accepted, the browser clears source selection, clears contents,
+and removes that source from expanded navigation state. Retained prior rows are valid only as transient perception
+continuity before an accepted removal or accepted replacement read; they must not prove removed source visibility after
+the browser accepts removal.
 
 ## Source state and preparation work
 

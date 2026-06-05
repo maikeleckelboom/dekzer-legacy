@@ -27,7 +27,7 @@ A tree expansion must never clear a valid visible branch before the replacement 
 A tree expansion read is a substrate projection read. It is never a filesystem traversal.
 
 This contract exists because local SQLite reads can be fast and still produce visible flicker when renderer state is
-cleared before the next projection arrives. The gremlin lives between renderer commits, not inside SQLite.
+cleared before the next projection arrives. The visible failure happens between renderer commits, not inside SQLite.
 
 Tree expansion must feel stable under fast reads, slow reads, scan updates, partial hierarchy discovery, source
 relocation, and stale responses.
@@ -43,7 +43,7 @@ empty merely because a projection read is pending.
 
 This document governs the renderer and substrate boundary for source hierarchy tree expansion.
 
-Future implementation stages are marked explicitly. Concepts such as row profiles, batch reads, child summaries,
+Future implementation stages are marked explicitly. Concepts such as batch reads, child summaries,
 visible-frontier reads, and targeted scan invalidation by parent IDs are future architecture.
 
 It covers:
@@ -70,19 +70,19 @@ inaccessible, or excluded, the tree renders that state. It does not scan the fil
 
 ## Required concepts
 
-| Concept          | Meaning                                                                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Hierarchy node   | Substrate-owned persisted node representing a source root, directory, candidate, companion, blocked entry, or projected tree row subject. |
-| Tree row         | Renderer projection of a hierarchy node for the current row profile and policy.                                                           |
-| Row key          | Stable renderer key derived from substrate-assigned node identity, never from path alone.                                                 |
-| Expansion state  | Renderer/session-owned affordance state: expanded or collapsed.                                                                           |
-| Child state      | Projection-owned state describing what is known about a row's children.                                                                   |
-| Coverage state   | Substrate-owned scan coverage for the hierarchy under a node.                                                                             |
-| Projection epoch | Version/revision representing the projection policy or materialized row view.                                                             |
-| Scan epoch       | Version/revision representing hierarchy discovery progress.                                                                               |
-| Read epoch       | Epoch values captured when a child read request is issued.                                                                                |
-| Visible frontier | Expanded and near-visible tree branches currently relevant to the viewport.                                                               |
-| Branch cache     | Renderer-side non-authoritative cache of child rows and summaries.                                                                        |
+| Concept          | Meaning                                                                                                                   |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Hierarchy node   | Substrate-owned persisted node representing a source root, source location, directory, or hierarchy state/action subject. |
+| Tree row         | Renderer projection of a navigation hierarchy node under the current product policy.                                      |
+| Row key          | Stable renderer key derived from substrate-assigned node identity, never from path alone.                                 |
+| Expansion state  | Renderer/session-owned affordance state: expanded or collapsed.                                                           |
+| Child state      | Projection-owned state describing what is known about a row's children.                                                   |
+| Coverage state   | Substrate-owned scan coverage for the hierarchy under a node.                                                             |
+| Projection epoch | Version/revision representing the projection policy or materialized row view.                                             |
+| Scan epoch       | Version/revision representing hierarchy discovery progress.                                                               |
+| Read epoch       | Epoch values captured when a child read request is issued.                                                                |
+| Visible frontier | Expanded and near-visible tree branches currently relevant to the viewport.                                               |
+| Branch cache     | Renderer-side non-authoritative cache of child rows and summaries.                                                        |
 
 ## Node identity law
 
@@ -135,7 +135,7 @@ A tree row projection must carry enough state for stable rendering.
 | parentNodeId    | Parent node identity, if any.                                                                  |
 | label           | Display label.                                                                                 |
 | pathDisplay     | Optional display path or current resolution claim.                                             |
-| kind            | source_root, directory, media_candidate, companion, blocked, excluded, etc.                    |
+| kind            | source_root, source_location, directory, read_state, action, etc.                              |
 | childState      | unknown, queued, loading, ready, empty, partial, blocked, inaccessible, excluded.              |
 | coverageState   | unscanned, queued, scanning, partial, complete, inaccessible, excluded.                        |
 | knownChildCount | Number of known child rows under current policy.                                               |
@@ -257,8 +257,9 @@ Request guard fields (future — not active in current implementation):
 
 Response acceptance rule:
 
-A response is accepted only when the current row profile, projection epoch, and relevant scan epoch still match the
-request guard, or when the response explicitly declares which affected parent IDs remain valid under the newer epoch.
+A response is accepted only when the current projection context, projection epoch, and relevant scan epoch still match
+the request guard, or when the response explicitly declares which affected parent IDs remain valid under the newer
+epoch.
 
 If a scan chunk lands between request issue and response arrival and affects the requested parent, the response is
 stale. The renderer must ignore it and re-request the branch.
@@ -444,8 +445,8 @@ Required behavior during active drag:
 | Sibling updates are allowed                   | Non-dragged siblings may update normally.                                                                    |
 | Drag resolves or cancels before branch clears | If the drag source row's branch must clear (policy change, root identity change), defer until drag resolves. |
 
-UX result: dragging a track to a deck remains stable even if a scan chunk arrives and refreshes the parent branch
-mid-gesture.
+UX result: any future draggable tree row must remain stable even if a scan chunk arrives and refreshes the parent branch
+mid-gesture. The current navigation-only tree does not expose audio rows as drag sources.
 
 ## Source unavailable behavior
 
@@ -578,7 +579,7 @@ This contract intentionally does not govern:
 
 - Row profile definitions (see `library-row-profile-contract`)
 - Tree selection → contents coupling (see `library-tree-selection-contents-contract`)
-- Track and segment row rendering rules (see `library-tree-track-segment-rows-contract`)
+- Contents row presentation (see `library-tree-selection-contents-contract` and `library-contents-browse-policy`)
 - Source lifecycle visible states (see `source-lifecycle-visible-state-contract`)
 
 It does require the first implementation to stop empty-frame flicker by preserving branch state, using stable substrate

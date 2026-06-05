@@ -39,7 +39,7 @@ from the topology's perspective.
 They exchange exactly two things:
 
 | Direction          | What is exchanged                                           |
-|--------------------|-------------------------------------------------------------|
+| ------------------ | ----------------------------------------------------------- |
 | Topology → Library | Surface bounds, viewport dimensions, visibility state.      |
 | Library → Topology | Preferred minimum dimensions, surface identity for routing. |
 
@@ -50,12 +50,12 @@ layout algorithm decided.
 
 ## Ownership partition
 
-| Owner              | Owns                                                                                                  | Must not own                                                 |
-|--------------------|-------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| Workspace topology | Surface existence, placement, sizing, visibility, tab/split/dock composition.                         | Scan state, row authority, source identity, selection.       |
-| Library Browser    | Tree state, contents state, selection, source visible projection/presentation state, branch cache.    | Surface placement, workspace slot identity, layout geometry, source lifecycle authority. |
-| Library substrate  | Hierarchy node IDs, source records, source lifecycle state, track identity, preparation evidence.    | DOM realization, renderer state.                             |
-| Renderer           | Frame-stable painting of tree and contents rows inside the surface bounds.                            | Source meaning, hierarchy authority, source lifecycle.       |
+| Owner              | Owns                                                                                               | Must not own                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Workspace topology | Surface existence, placement, sizing, visibility, tab/split/dock composition.                      | Scan state, row authority, source identity, selection.                                   |
+| Library Browser    | Tree state, contents state, selection, source visible projection/presentation state, branch cache. | Surface placement, workspace slot identity, layout geometry, source lifecycle authority. |
+| Library substrate  | Hierarchy node IDs, source records, source lifecycle state, track identity, preparation evidence.  | DOM realization, renderer state.                                                         |
+| Renderer           | Frame-stable painting of tree and contents rows inside the surface bounds.                         | Source meaning, hierarchy authority, source lifecycle.                                   |
 
 ## Surface identity
 
@@ -78,7 +78,7 @@ preserved. Slot changes are geometry changes, not identity changes.
 Topology provides the Library Browser with its rendered bounds:
 
 | Provided value  | Meaning                                                     |
-|-----------------|-------------------------------------------------------------|
+| --------------- | ----------------------------------------------------------- |
 | `surfaceBounds` | Available width and height for the surface.                 |
 | `isVisible`     | Whether the surface is currently visible in the workspace.  |
 | `viewportHint`  | Optional hint: compact, standard, or expanded presentation. |
@@ -91,7 +91,7 @@ negotiation, but they do not let the Library Browser choose its own slot, split,
 dock, or tab position.
 
 | Provided value               | Meaning                                                                     |
-|------------------------------|-----------------------------------------------------------------------------|
+| ---------------------------- | --------------------------------------------------------------------------- |
 | `surfaceKind`                | Stable workspace surface kind: `library_browser`.                           |
 | `preferredMinDimensions`     | Advisory minimum width/height for usable browser presentation.              |
 | `preferredDefaultDimensions` | Optional advisory default size for first placement. Topology may ignore it. |
@@ -115,7 +115,7 @@ The Library Browser manages its own internal layout. Topology provides bounds;
 the browser decides how to fill them.
 
 | Preset                         | When used                              | Regions visible                           |
-|--------------------------------|----------------------------------------|-------------------------------------------|
+| ------------------------------ | -------------------------------------- | ----------------------------------------- |
 | `navigator_only`               | Surface width below compact threshold. | Source tree only.                         |
 | `navigator_contents`           | Standard surface width.                | Source tree + contents browser.           |
 | `navigator_contents_inspector` | Expanded surface width or user pinned. | Source tree + contents + inspector panel. |
@@ -145,7 +145,7 @@ When `surfaceBounds` changes (resize, split drag), the Library Browser:
 ## What topology must not own
 
 | Forbidden topology ownership   | Why                                                                     |
-|--------------------------------|-------------------------------------------------------------------------|
+| ------------------------------ | ----------------------------------------------------------------------- |
 | Selected tree node             | Selection is library state. Layout changes must not reset it.           |
 | Expanded tree nodes            | Expansion is library state. Slot moves must not collapse the tree.      |
 | Row profile or sort policy     | Projection policy is library state. Topology changes must not reset it. |
@@ -168,6 +168,15 @@ When the Library Browser surface becomes visible after being hidden:
 
 The tree and contents panel must look the same after show as they did before
 hide, modulo any scan progress that arrived while hidden.
+
+## Panel containment
+
+The Library Browser must keep row browsing inside its own surface bounds. Contents rows must be reachable through the
+contents region inside the library panel and must not require app-level overflow or workspace scrolling to browse the
+table.
+
+This is an acceptance rule between workspace topology and the Library Browser surface. It does not require a specific
+CSS class, grid, or table implementation.
 
 ## Non-goals
 

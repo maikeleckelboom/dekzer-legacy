@@ -48,7 +48,7 @@ The following facts are established by the Phase 0 inventory:
 
 3. **Recursive source/directory/sourceLocation contents queries are feasible with the current schema.**
 
-   Current selected contents already uses binary-collation descendant predicates. No schema migration is required for
+   Current contents reads already use binary-collation descendant predicates. No schema migration is required for
    recursive sourceFile/profile media-class filtering.
 
 4. **Cursor pagination is implemented for contents reads.**
@@ -66,7 +66,7 @@ The following facts are established by the Phase 0 inventory:
 
    It provides immediate children admitted by the product/boundary surface. It does not own recursive selected
    contents, aggregated contents coverage, or primary-media summary joins.
-   
+
    **Historical note:** `sourceFileVisibility` was implementation debt that has been removed from renderer-facing
    contracts. Library tree row admission is now a product/boundary surface concern, not a renderer-facing parameter.
 

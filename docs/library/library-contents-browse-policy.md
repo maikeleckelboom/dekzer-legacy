@@ -27,3 +27,21 @@ default main contents browse.
 
 This decision does not parse CUE sheets, infer artwork or CUE associations, create canonical track identity, or change
 durable source inventory semantics.
+
+## Current Row Contract
+
+Default contents rows are source-file browse rows. They are suitable for an audio-first file browse table, but they are
+not canonical tracks and do not decide same-song identity, analysis readiness, deck load readiness, CUE association, or
+artwork role.
+
+The contents read and store own ordering, media-class admission, row profile admission, recursion, cursor identity, and
+coverage. Renderer projection may choose labels, icons, state rows, and table layout for returned rows only.
+
+## Perception Contract
+
+Retained contents rows are perception continuity, not data authority. Pending state may be delayed to avoid spinner
+flash on fast reads. Warm contents prefetch is a short-lived runtime optimization for matching requests; it does not
+authorize rows and must be cleared by relevant invalidation or generation changes.
+
+The contents table must remain browsable inside the library panel. This is an acceptance rule for the product surface,
+not a requirement for a particular CSS implementation.

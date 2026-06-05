@@ -178,7 +178,7 @@ flowchart TD
   E --> F{"Invalidation scope"}
   F -->|" navigationRows "| G["Refresh navigation rows for source"]
   F -->|" LibraryTreeChildren entryPoint parentSourceDirectoryId "| H["Refresh matching loaded tree windows only"]
-  F -->|" ContentsScope scopeId "| I["Refresh selected contents if scope matches"]
+  F -->|" ContentsScope scopeId "| I["Refresh current contents if scope matches"]
   F -->|" SourceLifecycle sourceId "| J["Refresh source status in navigation"]
   F -->|" BroadLibraryRefresh "| K["Refresh active first-slice projections only"]
   G --> L["Renderer requests boundary read through Main"]
@@ -224,7 +224,7 @@ flowchart TD
   I -->|" yes "| J["Main forwards gap/recovery signal to renderer"]
   J --> K["Renderer sets recoveryNeeded"]
   K --> L["Renderer schedules bounded recovery pass"]
-  L --> L2["Refresh active projections only: navigation rows, loaded tree windows, selected contents scope"]
+  L --> L2["Refresh active projections only: navigation rows, loaded tree windows, current contents scope"]
   L2 --> L3["Debounce repeated gaps during recovery"]
   L3 --> M["Renderer acknowledges gap after recovery pass completes"]
   M --> N["Main schedules next bounded read"]
@@ -237,7 +237,7 @@ flowchart TD
   R -->|" MaintainedSnapshotInvalidated "| T{"Invalidation scope"}
   T -->|" navigationRows "| U["Renderer refreshes navigation rows"]
   T -->|" LibraryTreeChildren entryPoint parentSourceDirectoryId "| V["Renderer refreshes matching loaded tree windows"]
-  T -->|" ContentsScope scopeId "| W["Renderer refreshes selected contents if scope matches"]
+  T -->|" ContentsScope scopeId "| W["Renderer refreshes current contents if scope matches"]
   T -->|" SourceLifecycle sourceId "| X["Renderer refreshes source status in navigation"]
   T -->|" BroadLibraryRefresh "| Y["Renderer refreshes active first-slice projections only"]
   R -->|" unknown or unsupported "| Z["Renderer ignores safely, logs diagnostic"]
@@ -276,7 +276,7 @@ flowchart TD
   E --> E2["Main returns bootstrapPrepared to renderer"]
   E2 --> F["Renderer requests authoritative navigation rows through Main"]
   F --> G["Renderer requests active library tree windows through Main"]
-  G --> H["Renderer requests selected contents scope through Main if selection exists"]
+  G --> H["Renderer requests contents scope through Main if selection exists"]
   H --> I{"Authoritative reads successful?"}
   I -->|" no "| J["Bootstrap failed: renderer stays in degraded state, Main does not start event pump"]
   I -->|" yes "| K["Renderer subscribes to app-safe library events from Main"]
@@ -522,7 +522,7 @@ flowchart LR
 > carries scope identity. Rows are fetched through authoritative reads and are never embedded in scan events.
 
 > **Gap recovery is bounded and debounced.** A gap triggers recovery of active projections only: navigation rows, loaded
-> tree windows, selected contents scope, and visible source lifecycle state. Repeated gaps coalesce into one recovery
+> tree windows, current contents scope, and visible source lifecycle state. Repeated gaps coalesce into one recovery
 > pass. Recovery work is lower priority than direct user interaction and live-performance-critical work.
 
 > **Discovery progress is indeterminate until a denominator is known.** `SourceScanProgressed` may report monotonic

@@ -1,165 +1,139 @@
 ---
 status: candidate
-doctrine-version: 0.1
-last-reviewed: 2026-05-28
+doctrine-version: 0.2
+last-reviewed: 2026-06-06
 owner: renderer-substrate-boundary
 canonical-context:
   - library-tree-frame-stability-contract
-  - library-row-profile-contract
+  - library-contents-browse-policy
   - library-contents-read-boundary
-  - recursive-selected-contents-rule
   - source-hierarchy-contract
 scope:
   - tree-selection-authority
   - contents-scope-derivation
   - contents-panel-read-model
+  - contents-refresh-continuity
   - selection-invalidation
 ---
 
-# Library Tree Selection → Contents Contract
+# Library Tree Selection Contents Contract
 
-## Core law
+## Core Law
 
-**Selecting a tree node creates a contents scope. It does not transfer tree authority to the contents panel.**
+Selecting a tree navigation row creates a contents scope. It does not transfer tree authority to the contents panel.
 
-The tree owns hierarchy. The contents panel owns track rows for a selected scope.
-They are different projections of different questions. The tree does not push its
-row data into the contents panel. The contents panel reads independently using
-the scope the selection produced.
+The tree owns navigation rows: sources, source locations, directories, and hierarchy state/action rows. The contents
+panel owns audio/file row presentation for the selected scope. The tree does not push row data into contents, and
+contents does not read from the tree cache.
 
-## Ownership boundaries
+## Ownership Boundaries
 
-| Owner           | Owns                                                            | Must not own                             |
-|-----------------|-----------------------------------------------------------------|------------------------------------------|
-| Tree controller | Expanded/collapsed state, selection state, hierarchy row cache. | Contents rows, contents read state.      |
-| Selection model | Selected node identity, derived contents scope.                 | Tree expansion, contents rendering.      |
-| Contents panel  | Contents rows, pagination, sort, filter, loading state.         | Tree structure, hierarchy node identity. |
-| Substrate       | Both hierarchy and contents projection reads.                   | Renderer state of either panel.          |
+| Owner                      | Owns                                                              | Must not own                                               |
+| -------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------- |
+| Tree controller            | Expanded/collapsed state, selection state, hierarchy row cache.   | Contents rows, contents read state.                        |
+| Selection model            | Selected navigation row identity and derived contents scope.      | Tree expansion, contents rendering.                        |
+| Contents panel             | Contents rows, pagination, loading and refresh presentation.      | Tree structure, hierarchy node identity, browse authority. |
+| Contents policy/read model | Row profile, media classes, recursion, ordering, cursor identity. | Renderer-local sort/filter authority.                      |
+| Substrate                  | Hierarchy and contents projection reads.                          | Renderer state of either panel.                            |
 
-## Selection produces a scope, not a row copy
+Renderer projection may display labels, icons, state rows, and actions for rows returned by the contents read. It must
+not sort, filter, fan out hierarchy children, or synthesize rows to invent browse authority.
 
-When a tree node is selected, the selection model derives a contents scope from
-the selected node's substrate identity.
+## Selection Produces Scope
 
-```
-selectedNodeId → contentsScope(kind, id, policy)
-```
+Current selectable navigation rows derive contents scopes as follows:
 
-Scope kinds:
+| Tree row            | Derived contents scope                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| Source row          | Media-relevant source-file inventory under that source, subject to contents policy.          |
+| Source-location row | Media-relevant source-file inventory under that source location, subject to contents policy. |
+| Directory row       | Media-relevant source-file inventory under that directory, subject to contents policy.       |
+| State/action row    | No contents scope unless its action explicitly loads a page or branch.                       |
 
-| Tree node kind  | Derived contents scope                                                           |
-|-----------------|----------------------------------------------------------------------------------|
-| `source_root`   | Media-relevant source-file inventory under this source, subject to contents policy. |
-| `directory`     | Media-relevant source-file inventory under this directory, subject to contents policy (recursive or not). |
-| `primary_media` | Single track. Contents panel shows track detail or adjacent context.             |
-| `segment`       | Single segment. Contents panel shows segment detail or parent disc context.      |
-| `blocked`       | Blocked scope. Contents panel shows blocked state, not empty.                    |
-| `excluded`      | Excluded scope. Contents panel shows excluded state, not empty.                  |
+The scope is an identity tuple, not a row copy and not a path string. It includes the selected source or directory
+identity plus the contents policy and recursion that shape the read.
 
-The scope is a substrate concept, not a path string. It survives source relocation
-if the node identity is stable.
+## Contents Read Contract
 
-## Contents read is independent
+The contents panel issues an independent read:
 
-The contents panel issues its own read using the derived scope. It does not
-receive its rows from the tree cache.
-
-```
-readContents(scope, rowProfile, sortPolicy, filterPolicy, limit, cursor)
+```text
+readContents(scope, policy, recursion, limit, cursor)
 ```
 
-The contents read carries its own epoch guards:
+The default main contents browse is audio-first:
 
-| Guard field            | Meaning                                     |
-|------------------------|---------------------------------------------|
-| requestId              | Renderer-generated unique request identity. |
-| scopeNodeId            | Selected node identity.                     |
-| rowProfile             | Row profile active for contents.            |
-| sortPolicy             | Sort order at time of issue.                |
-| filterPolicy           | Active filter at time of issue.             |
-| scanEpochAtIssue       | Scan epoch when request was issued.         |
-| projectionEpochAtIssue | Projection epoch when request was issued.   |
+| Field          | Default      |
+| -------------- | ------------ |
+| `rowProfile`   | `sourceFile` |
+| `mediaClasses` | audio        |
+| `recursion`    | recursive    |
 
-Stale response handling mirrors the tree: a response whose guard no longer
-matches current state is silently discarded without clearing existing rows.
+Contents rows are media-relevant source-file rows unless a future explicit policy says otherwise. They are not
+canonical tracks and do not decide track identity, duplicate resolution, CUE association, artwork role, or analysis
+readiness.
 
-## Contents panel states
+## Contents Panel States
 
-| State          | Meaning                                                             | UI behavior                                                           |
-|----------------|---------------------------------------------------------------------|-----------------------------------------------------------------------|
-| `no_selection` | No tree node is selected.                                           | Panel shows empty/prompt state.                                       |
-| `loading`      | Scope is set; first page read is in flight; no rows yet.            | Show stable loading state. Do not flash empty.                        |
-| `partial`      | Some rows are loaded; scan coverage for scope is incomplete.        | Show known rows with partial indicator. Never hide known rows.        |
-| `ready`        | Rows loaded; coverage is complete for the current policy and scope. | Render normally.                                                      |
-| `empty`        | Coverage is complete; no rows exist under current policy and scope. | Show stable empty state.                                              |
-| `blocked`      | The selected scope is blocked or inaccessible.                      | Show blocked/inaccessible state with reason. Do not show empty.       |
-| `excluded`     | The selected scope is excluded by scan policy.                      | Show excluded state. Do not show empty.                               |
-| `stale`        | A new read is in flight; prior rows are still valid.                | Keep prior rows visible; show refresh indicator if duration warrants. |
-| `unavailable`  | The source containing the selected scope is currently unavailable.  | Keep scope selection; show unavailable state for rows.                |
+| State          | Meaning                                                                                                 | Required behavior                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `no_selection` | No selectable navigation row is selected.                                                               | Clear contents intentionally.                                                        |
+| `loading`      | A scope is set, no prior accepted rows exist, and the first read is pending past the display threshold. | Show stable loading state. Do not flash empty.                                       |
+| `ready`        | Rows loaded for the current policy and scope.                                                           | Render returned rows normally.                                                       |
+| `partial`      | Some rows are known, but coverage is incomplete.                                                        | Show known rows with incomplete-coverage indication.                                 |
+| `empty`        | Coverage is complete and no rows exist under the current policy and scope.                              | Show stable empty state.                                                             |
+| `blocked`      | The selected scope is blocked or inaccessible.                                                          | Show blocked/inaccessible state, not empty.                                          |
+| `refreshing`   | A newer read is pending while prior accepted rows are retained.                                         | Keep prior rows visible and mark refresh only when the pending threshold is crossed. |
+| `unavailable`  | The source containing the selected scope is unavailable.                                                | Keep scope selection and show unavailable/degraded row state when rows are retained. |
 
-A contents panel must never briefly show empty because a read is in flight.
-The `loading` state applies only when no prior row data exists for this scope.
+Retained rows are perception continuity. They are not data authority. Replacement data must come from an accepted
+contents read, and stale responses must be rejected by request identity, scope, policy, recursion, cursor, and boundary
+validation.
 
-## Partial contents behavior
+## Refresh And Invalidation
 
-When a selected directory has incomplete scan coverage, the contents panel shows
-what is known and indicates partial state. It does not wait for complete coverage.
+Maintained snapshot invalidations and scan events do not carry replacement rows. Renderer refresh planning coalesces the
+affected visible/current work, then asks Main for authoritative reads.
 
-The partial indicator must be honest:
+Current scoped refresh behavior:
 
-| Coverage state | Contents panel behavior                                         |
-|----------------|-----------------------------------------------------------------|
-| `unscanned`    | Show `loading` or `unknown` state; do not show empty.           |
-| `scanning`     | Show known rows (may be zero) with scanning/partial indicator.  |
-| `partial`      | Show known rows with `partial` indicator and provisional count. |
-| `complete`     | Show all rows with final count.                                 |
-| `inaccessible` | Show inaccessible state with reason.                            |
-| `excluded`     | Show excluded state.                                            |
+| Input                         | Refresh planning                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `navigationRows` invalidation | Refresh navigation rows and visible source lifecycle state.                                                                            |
+| `libraryBrowser` invalidation | Refresh expanded browser windows, refresh current contents, clear contents warm snapshots, and refresh visible source lifecycle state. |
+| Event gap recovery            | Refresh active first-slice projections by bounded policy and clear contents warm snapshots.                                            |
+| Source scan events            | Refresh visible source lifecycle state; contents and tree rows update through maintained snapshot invalidations or explicit reads.     |
 
-## Scan update invalidation for selected scope
+Warm contents prefetch is runtime warmth only. A warm snapshot may satisfy a matching request before it expires, but it
+does not become durable truth, does not broaden policy, and is cleared by relevant invalidations or generation changes.
 
-When a scan event arrives, the contents panel must check whether the event
-affects the currently selected scope.
+Pending state is user-perception behavior. Fast reads that complete before the threshold do not need visible pending
+chrome; slow reads must not erase valid prior rows while pending.
 
-```
-if affectedParentNodeIds.includes(selectedNodeId) or affects scope subtree:
-  mark contents stale
-  re-read if panel is visible
-  keep existing rows until replacement arrives
-```
+## Source Add, Scan, And Remove
 
-The contents panel does not re-read on every scan chunk. Only chunks that affect
-the selected scope trigger a contents refresh.
+Source registration and scan update the browser through authoritative reads and maintained snapshot invalidations. The
+renderer may request refreshes, but source identity, scan coverage, contents rows, and hierarchy rows come from the
+boundary/store path.
 
-## Selection survival under source state changes
+Source removal is intentional clearing:
 
-| Source condition           | Contents panel behavior                                                          |
-|----------------------------|----------------------------------------------------------------------------------|
-| Source remains mounted     | Normal operation.                                                                |
-| Source becomes unavailable | Keep scope selection; show `unavailable` state for rows. Do not clear selection. |
-| Source relocates (same ID) | Scope remains valid; re-read may be needed if paths changed.                     |
-| Source removed by user     | Clear selection; show `no_selection` state.                                      |
+1. Clear the selected node.
+2. Clear contents.
+3. Clear expanded tree state for that source.
+4. Persist the empty view state.
 
-Selection is not cleared by source unavailability. The DJ's intent to view that
-scope is preserved even when the source is temporarily offline.
+Retained prior rows must not prove removed source visibility after an accepted refresh or explicit removal result.
 
-## First-page law
+## Panel Containment
 
-The contents panel reads the first page only on initial scope load. It does not
-pre-read subsequent pages. Pagination is user-initiated or scroll-triggered.
+Contents rows must be browsable inside the library panel. The contents table owns its internal scroll region and must
+not require app-level overflow to reach rows.
 
-This prevents a scope change from silently issuing hundreds of reads across a
-large directory.
+This is an acceptance rule, not a CSS implementation contract. Any implementation may choose different layout
+mechanics, but the resulting browser must keep tree and contents browsing contained within the library panel bounds.
 
-## Contents panel does not own browse hierarchy
+## Non-Goals
 
-The contents panel reads a flat or policy-shaped list of tracks for a scope.
-It does not re-implement hierarchy traversal. If a "show all tracks recursively"
-scope is selected, the recursion decision belongs to the browse policy passed to
-the read, not to the contents panel iterating subdirectories.
-
-## Non-goals
-
-This contract does not define track detail panels, now-playing context, drag
-targets inside the contents panel, or search-scoped contents reads. Those are
-governed by downstream contracts once this coupling is stable.
+This contract does not define track detail panels, deck loading, search-scoped contents reads, renderer-side
+filter/sort controls, or future audio row read-model implementation.
