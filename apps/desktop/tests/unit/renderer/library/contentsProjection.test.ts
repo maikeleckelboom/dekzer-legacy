@@ -305,6 +305,51 @@ describe('projectContents', () => {
     })
   })
 
+  it('does not project pending contents without an accepted response as authoritative empty', () => {
+    const pending = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'idle',
+      pending: {
+        requestKey: 'source:7',
+        sequence: 1,
+        detail: 'Loading contents.'
+      },
+      detail: 'Contents request is pending.'
+    })
+
+    expect(pending.kind).toBe('notLoaded')
+    expect(pending.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'notLoaded',
+      label: 'Contents pending'
+    })
+  })
+
+  it('projects zero rows as authoritative empty only when accepted coverage says so', () => {
+    const pendingCoverage = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({ rows: [], state: 'ready', emptyAuthoritative: false })
+    )
+
+    expect(pendingCoverage.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'loading',
+      label: 'No visible files found yet'
+    })
+
+    const authoritative = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({ rows: [], state: 'empty', emptyAuthoritative: true })
+    )
+
+    expect(authoritative.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No visible files found'
+    })
+  })
+
   it('projects empty selection, unsupported selection, and host state', () => {
     const state = browserState({})
     const projection = browserProjection(state)
@@ -540,6 +585,7 @@ function readyContents(options: {
   readonly state?: ContentsResult['state']
   readonly detail?: string
   readonly profile?: ContentsReadPolicy
+  readonly emptyAuthoritative?: boolean
 }): ContentsBoundaryState {
   return {
     kind: 'ready',
@@ -556,6 +602,7 @@ function contentsResult(options: {
   readonly state?: ContentsResult['state']
   readonly detail?: string
   readonly profile?: ContentsReadPolicy
+  readonly emptyAuthoritative?: boolean
 }): ContentsResult {
   const state = options.state ?? 'ready'
   const policy =
@@ -578,7 +625,7 @@ function contentsResult(options: {
             ? 'sourceUnavailable'
             : 'complete',
       recursiveScopeComplete: state !== 'partial',
-      emptyResultAuthoritative: state !== 'partial'
+      emptyResultAuthoritative: options.emptyAuthoritative ?? state !== 'partial'
     },
     ...(options.detail === undefined ? {} : { detail: options.detail })
   }

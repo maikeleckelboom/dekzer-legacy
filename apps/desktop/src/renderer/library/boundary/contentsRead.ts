@@ -13,6 +13,7 @@ import type { RowBinding } from '../state'
 export type ContentsBoundaryState =
   | {
       readonly kind: 'idle'
+      readonly pending?: ContentsPendingRead
       readonly detail?: string
     }
   | {
@@ -27,12 +28,21 @@ export type ContentsBoundaryState =
       readonly result: ContentsReadResult
       readonly nextCursor?: string
       readonly accumulatedRows?: readonly ContentsFileRow[]
+      readonly pending?: ContentsPendingRead
+      readonly refreshError?: string
     }
   | {
       readonly kind: 'failed'
       readonly requestKey: string
       readonly detail: string
     }
+
+export type ContentsPendingRead = {
+  readonly requestKey: string
+  readonly sequence: number
+  readonly detail: string
+  readonly cursor?: string
+}
 
 export type ContentsReadController = {
   readonly state: Ref<ContentsBoundaryState>
@@ -53,6 +63,7 @@ type ReadOptions = {
 type LibraryContentsApi = RendererApi['library']['contents']
 
 const readLimit = 100
+const loadingThresholdMs = 125
 const safeContentsRequestFailure = 'Unable to request library contents.'
 const defaultContentsPolicy: ContentsReadPolicy = {
   mediaClasses: ['audio'],
@@ -89,7 +100,7 @@ export function createContentsReadController(
   })
   let readSequence = 0
   let started = false
-  let accumulatedRows: readonly ContentsFileRow[] | undefined = undefined
+  let loadingTimer: ReturnType<typeof setTimeout> | undefined = undefined
 
   function start(): void {
     started = true
@@ -97,14 +108,15 @@ export function createContentsReadController(
 
   function stop(): void {
     started = false
+    clearLoadingTimer()
   }
 
   function clear(): void {
+    clearLoadingTimer()
     state.value = {
       kind: 'idle',
       detail: 'No contents scope is active.'
     }
-    accumulatedRows = undefined
   }
 
   async function readForBinding(
@@ -123,12 +135,7 @@ export function createContentsReadController(
     const currentState = state.value
     const cursor = options.cursor
 
-    if (
-      !options.force &&
-      !cursor &&
-      (currentState.kind === 'loading' || currentState.kind === 'ready') &&
-      currentState.requestKey === requestKey
-    ) {
+    if (!options.force && !cursor && currentRequestKey(currentState) === requestKey) {
       return false
     }
 
@@ -138,12 +145,13 @@ export function createContentsReadController(
       cursor !== undefined
 
     const sequence = ++readSequence
-    state.value = {
-      kind: 'loading',
+    const pending: ContentsPendingRead = {
       requestKey,
       sequence,
-      detail: options.cursor !== undefined ? 'Loading more contents.' : 'Loading contents.'
+      detail: options.cursor !== undefined ? 'Loading more contents.' : 'Loading contents.',
+      ...(cursor === undefined ? {} : { cursor })
     }
+    startPendingRead(pending)
 
     try {
       const result = await contentsApi.read({
@@ -158,23 +166,24 @@ export function createContentsReadController(
         return false
       }
 
+      clearLoadingTimer()
       let rows: readonly ContentsFileRow[]
       const readyResult = result.state === 'ready' ? result.result : undefined
-      if (isSameRequest && accumulatedRows !== undefined && readyResult !== undefined) {
-        rows = [...accumulatedRows, ...(readyResult.rows ?? [])]
+      const previousRows = currentAcceptedRows(requestKey)
+      if (isSameRequest && previousRows !== undefined && readyResult !== undefined) {
+        rows = [...previousRows, ...(readyResult.rows ?? [])]
       } else if (readyResult !== undefined) {
         rows = readyResult.rows ?? []
       } else {
         rows = []
       }
 
-      const nextCursor = readyResult?.nextCursor
-      if (result.state === 'ready') {
-        accumulatedRows = nextCursor !== undefined ? rows : undefined
-      } else {
-        accumulatedRows = undefined
+      if (result.state !== 'ready' && hasAcceptedSnapshot()) {
+        retainAcceptedSnapshot(safeContentsResultFailure(result))
+        return true
       }
 
+      const nextCursor = readyResult?.nextCursor
       const stateUpdate: ContentsBoundaryState = {
         kind: 'ready',
         requestKey,
@@ -193,23 +202,146 @@ export function createContentsReadController(
         return false
       }
 
+      clearLoadingTimer()
+      if (hasAcceptedSnapshot()) {
+        retainAcceptedSnapshot(safeContentsRequestFailure)
+        return true
+      }
+
       state.value = {
         kind: 'failed',
         requestKey,
         detail: safeContentsRequestFailure
       }
-      accumulatedRows = undefined
       return true
     }
   }
 
+  function startPendingRead(pending: ContentsPendingRead): void {
+    clearLoadingTimer()
+
+    const currentState = state.value
+    if (currentState.kind === 'ready') {
+      state.value = {
+        kind: 'ready',
+        requestKey: currentState.requestKey,
+        result: currentState.result,
+        ...(currentState.nextCursor === undefined ? {} : { nextCursor: currentState.nextCursor }),
+        ...(currentState.accumulatedRows === undefined
+          ? {}
+          : { accumulatedRows: currentState.accumulatedRows }),
+        pending
+      }
+      return
+    }
+
+    state.value = {
+      kind: 'idle',
+      pending,
+      detail: 'Contents request is pending.'
+    }
+
+    loadingTimer = setTimeout(() => {
+      if (!started || !isCurrentLoading(pending.requestKey, pending.sequence)) {
+        return
+      }
+
+      state.value = {
+        kind: 'loading',
+        requestKey: pending.requestKey,
+        sequence: pending.sequence,
+        detail: pending.detail
+      }
+      loadingTimer = undefined
+    }, loadingThresholdMs)
+  }
+
+  function clearLoadingTimer(): void {
+    if (loadingTimer === undefined) {
+      return
+    }
+
+    clearTimeout(loadingTimer)
+    loadingTimer = undefined
+  }
+
   function isCurrentLoading(requestKey: string, sequence: number): boolean {
     const currentState = state.value
-    return (
-      currentState.kind === 'loading' &&
-      currentState.requestKey === requestKey &&
-      currentState.sequence === sequence
-    )
+    const pending = pendingRead(currentState)
+    return pending?.requestKey === requestKey && pending.sequence === sequence
+  }
+
+  function pendingRead(currentState: ContentsBoundaryState): ContentsPendingRead | undefined {
+    if (currentState.kind === 'idle' || currentState.kind === 'ready') {
+      return currentState.pending
+    }
+
+    if (currentState.kind === 'loading') {
+      return {
+        requestKey: currentState.requestKey,
+        sequence: currentState.sequence,
+        detail: currentState.detail ?? 'Loading contents.'
+      }
+    }
+
+    return undefined
+  }
+
+  function currentRequestKey(currentState: ContentsBoundaryState): string | undefined {
+    return pendingRead(currentState)?.requestKey ?? acceptedRequestKey(currentState)
+  }
+
+  function acceptedRequestKey(currentState: ContentsBoundaryState): string | undefined {
+    if (currentState.kind === 'ready') {
+      return currentState.requestKey
+    }
+
+    if (currentState.kind === 'loading') {
+      return currentState.requestKey
+    }
+
+    return undefined
+  }
+
+  function hasAcceptedSnapshot(): boolean {
+    return state.value.kind === 'ready'
+  }
+
+  function currentAcceptedRows(requestKey: string): readonly ContentsFileRow[] | undefined {
+    const currentState = state.value
+
+    if (currentState.kind !== 'ready' || currentState.requestKey !== requestKey) {
+      return undefined
+    }
+
+    if (currentState.accumulatedRows !== undefined) {
+      return currentState.accumulatedRows
+    }
+
+    return currentState.result.state === 'ready' ? currentState.result.result.rows : undefined
+  }
+
+  function retainAcceptedSnapshot(detail: string): void {
+    const currentState = state.value
+
+    if (currentState.kind !== 'ready') {
+      return
+    }
+
+    state.value = {
+      kind: 'ready',
+      requestKey: currentState.requestKey,
+      result: currentState.result,
+      ...(currentState.nextCursor === undefined ? {} : { nextCursor: currentState.nextCursor }),
+      ...(currentState.accumulatedRows === undefined
+        ? {}
+        : { accumulatedRows: currentState.accumulatedRows }),
+      refreshError: detail
+    }
+  }
+
+  function safeContentsResultFailure(result: ContentsReadResult): string {
+    return result.state === 'ready' ? safeContentsRequestFailure : result.error.message
   }
 
   return {

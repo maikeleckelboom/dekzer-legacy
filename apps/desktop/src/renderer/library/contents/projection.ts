@@ -228,14 +228,36 @@ function projectContentsState(options: {
 }): ContentProjection {
   const state = options.contentsState
 
-  if (state === undefined || state.kind === 'idle') {
+  if (state === undefined) {
     return stateProjection({
       kind: 'loading',
       ownerId: options.ownerId,
       title: options.title,
       state: 'loading',
       label: 'Loading contents',
-      detail: state?.detail ?? 'Loading contents.'
+      detail: 'Loading contents.'
+    })
+  }
+
+  if (state.kind === 'idle') {
+    if (state.pending !== undefined) {
+      return stateProjection({
+        kind: 'notLoaded',
+        ownerId: options.ownerId,
+        title: options.title,
+        state: 'notLoaded',
+        label: 'Contents pending',
+        detail: state.detail ?? 'Contents request is pending.'
+      })
+    }
+
+    return stateProjection({
+      kind: 'loading',
+      ownerId: options.ownerId,
+      title: options.title,
+      state: 'loading',
+      label: 'Loading contents',
+      detail: state.detail ?? 'Loading contents.'
     })
   }
 
@@ -458,7 +480,7 @@ function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['stat
   switch (result.state) {
     case 'ready':
     case 'empty':
-      return 'empty'
+      return result.coverage.emptyResultAuthoritative ? 'empty' : 'loading'
     case 'partial':
       return 'loading'
     case 'blocked':
