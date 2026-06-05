@@ -57,9 +57,7 @@ export function classifyInvalidationScope(scope: string): InvalidationScope {
   }
 }
 
-export function buildInvalidationPlan(
-  input: InvalidationPlanInput
-): RefreshPlan {
+export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan {
   let refreshNavigationRows = false
   let refreshExpandedBrowserWindows = false
   let refreshCurrentContents = false

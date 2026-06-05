@@ -734,7 +734,9 @@ describe('createContentsReadController', () => {
 
     expect(controller.state.value.kind).toBe('ready')
 
-    await expect(controller.readForBinding(readStateBinding(), { force: true })).resolves.toBe(false)
+    await expect(controller.readForBinding(readStateBinding(), { force: true })).resolves.toBe(
+      false
+    )
     expect(controller.state.value.kind).toBe('idle')
   })
 

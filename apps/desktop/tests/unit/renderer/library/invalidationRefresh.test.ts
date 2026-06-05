@@ -114,6 +114,7 @@ describe('executeRefreshPlan', () => {
       clearContentsWarmSnapshots: vi.fn(),
       refreshContentsForCurrentSelection: vi.fn(async () => true)
     })
+    const sourceLifecycleSourceIds = deps.sourceLifecycleSourceIds
     const plan = buildInvalidationPlan({
       invalidations: [
         invalidation('navigationRows', '1'),
@@ -121,7 +122,7 @@ describe('executeRefreshPlan', () => {
         invalidation('libraryBrowser', '3'),
         invalidation('libraryBrowser', '4')
       ],
-      sourceLifecycleSourceIds: deps.sourceLifecycleSourceIds
+      ...(sourceLifecycleSourceIds === undefined ? {} : { sourceLifecycleSourceIds })
     })
 
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
@@ -149,9 +150,10 @@ describe('executeRefreshPlan', () => {
     vi.mocked(deps.hierarchyRead.refreshNavigationRows).mockRejectedValueOnce(
       new Error('navigation failed')
     )
+    const sourceLifecycleSourceIds = deps.sourceLifecycleSourceIds
     const plan = buildInvalidationPlan({
       invalidations: [invalidation('navigationRows', '1'), invalidation('libraryBrowser', '2')],
-      sourceLifecycleSourceIds: deps.sourceLifecycleSourceIds
+      ...(sourceLifecycleSourceIds === undefined ? {} : { sourceLifecycleSourceIds })
     })
 
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
@@ -197,9 +199,7 @@ describe('executeRefreshPlan', () => {
     expect(deps.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
     expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
     expect(deps.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
-    expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(
-      new Set(['7'])
-    )
+    expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(new Set(['7']))
   })
 
   it('refreshes current contents through the owner', async () => {
@@ -218,9 +218,7 @@ describe('executeRefreshPlan', () => {
   })
 })
 
-function testDeps(
-  overrides: Partial<RefreshPlanDeps> = {}
-): RefreshPlanDeps {
+function testDeps(overrides: Partial<RefreshPlanDeps> = {}): RefreshPlanDeps {
   const { hierarchyRead, ...rest } = overrides
 
   return {
