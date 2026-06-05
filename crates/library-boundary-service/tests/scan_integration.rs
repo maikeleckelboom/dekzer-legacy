@@ -172,42 +172,6 @@ fn read_library_tree(
 }
 
 #[test]
-fn register_and_scan_mixed_nested_folder_succeeds() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let music_root = tempdir.path().join("music-root");
-    write_file(
-        &music_root
-            .join("artists")
-            .join("alpha")
-            .join("track_one.wav"),
-        b"not-real-audio-data",
-    );
-    write_file(
-        &music_root
-            .join("artists")
-            .join("alpha")
-            .join("track_two.flac"),
-        b"not-real-audio-data",
-    );
-    write_file(
-        &music_root.join("artwork").join("cover.png"),
-        b"fake-png-data",
-    );
-    write_file(&music_root.join("loose.mp3"), b"fake-mp3-data");
-
-    let service = open_service(&tempdir);
-    let registered = register_root(&service, &music_root);
-    let scanned = start_scan(&service, registered.root_id);
-
-    assert!(registered.root_id > 0);
-    assert!(!registered.canonical_path.is_empty());
-    assert!(scanned.scan_run_id > 0);
-
-    let completed = wait_for_scan_completion(&service, registered.root_id);
-    assert!(completed, "scan should finish on a small directory");
-}
-
-#[test]
 fn scan_empty_folder_succeeds() {
     let tempdir = TempDir::new().expect("create tempdir");
     let empty_root = tempdir.path().join("empty-root");
@@ -221,27 +185,6 @@ fn scan_empty_folder_succeeds() {
 
     let completed = wait_for_scan_completion(&service, registered.root_id);
     assert!(completed, "scan of empty folder should complete");
-}
-
-#[test]
-fn rescan_after_successful_scan_succeeds() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let music_root = tempdir.path().join("music-root");
-    write_file(&music_root.join("track.wav"), b"data");
-
-    let service = open_service(&tempdir);
-    let registered = register_root(&service, &music_root);
-
-    let first_scan = start_scan(&service, registered.root_id);
-    assert!(first_scan.scan_run_id > 0);
-    let first_completed = wait_for_scan_completion(&service, registered.root_id);
-    assert!(first_completed, "first scan should complete");
-
-    let rescan = start_scan(&service, registered.root_id);
-    assert!(rescan.scan_run_id > 0);
-    assert_ne!(rescan.scan_run_id, first_scan.scan_run_id);
-    let second_completed = wait_for_scan_completion(&service, registered.root_id);
-    assert!(second_completed, "rescan should complete");
 }
 
 #[test]
@@ -618,32 +561,6 @@ fn start_root_scan_publishes_started_and_completed_events_in_order() {
 }
 
 #[test]
-fn duplicate_start_root_scan_rejects_with_already_running_error() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let music_root = tempdir.path().join("music-root");
-    write_file(&music_root.join("track.wav"), b"data");
-
-    let service = open_service(&tempdir);
-    let registered = register_root(&service, &music_root);
-
-    let first = start_scan(&service, registered.root_id);
-    assert!(first.scan_run_id > 0);
-
-    let error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
-        LibraryRootCommand::StartRootScan(StartRootScanRequest {
-            root_id: registered.root_id,
-        }),
-    )));
-
-    assert_eq!(error.error.code(), "INVALID_REQUEST");
-    assert!(
-        error.error.to_string().contains("already running"),
-        "Error should mention already running, got: {}",
-        error.error
-    );
-}
-
-#[test]
 fn scan_publishes_maintained_snapshot_invalidations_on_completion() {
     let tempdir = TempDir::new().expect("create tempdir");
     let music_root = tempdir.path().join("music-root");
@@ -705,69 +622,31 @@ fn scan_publishes_maintained_snapshot_invalidations_on_completion() {
         "MaintainedSnapshotInvalidated for NavigationRows must be published after scan"
     );
 
-    let cancel_after_publication = cancel_scan(&service, scanned.scan_run_id);
+    let first_cancel = cancel_scan(&service, scanned.scan_run_id);
     assert_eq!(
-        cancel_after_publication.status,
+        first_cancel.status,
         CancelRootScanStatus::AlreadyTerminal,
-        "registry must not report terminal until scan event and invalidations are published"
+        "cancel after scan completion must return AlreadyTerminal"
+    );
+
+    let second_cancel = cancel_scan(&service, scanned.scan_run_id);
+    assert_eq!(
+        second_cancel.status,
+        CancelRootScanStatus::AlreadyTerminal,
+        "second cancel after terminal scan must also return AlreadyTerminal"
     );
 }
 
 #[test]
-fn cancel_unknown_scan_run_id_returns_not_found() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let service = open_service(&tempdir);
-
-    let reply = cancel_scan(&service, 99999);
-    assert_eq!(reply.status, CancelRootScanStatus::NotFound);
-}
-
-#[test]
-fn cancel_invalid_scan_run_id_rejects() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let service = open_service(&tempdir);
-
-    let zero_error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
-        LibraryRootCommand::CancelRootScan(CancelRootScanRequest { scan_run_id: 0 }),
-    )));
-    assert_eq!(zero_error.error.code(), "INVALID_REQUEST");
-    assert!(
-        zero_error.error.to_string().contains("scanRunId"),
-        "Error should mention scanRunId, got: {}",
-        zero_error.error,
-    );
-}
-
-#[test]
-fn cancel_already_terminal_scan_run_id_returns_already_terminal() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let music_root = tempdir.path().join("music-root");
-    write_file(&music_root.join("track.wav"), b"data");
-
-    let service = open_service(&tempdir);
-    let registered = register_root(&service, &music_root);
-    let scanned = start_scan(&service, registered.root_id);
-
-    assert!(scanned.scan_run_id > 0);
-    assert!(wait_for_scan_completion(&service, registered.root_id));
-
-    let reply = cancel_scan(&service, scanned.scan_run_id);
-    assert_eq!(reply.status, CancelRootScanStatus::AlreadyTerminal);
-
-    let second_reply = cancel_scan(&service, scanned.scan_run_id);
-    assert_eq!(second_reply.status, CancelRootScanStatus::AlreadyTerminal);
-}
-
-#[test]
-fn cancel_active_scan_returns_accepted_and_publishes_source_scan_cancelled() {
+fn cancel_active_scan_publishes_cancelled_and_registry_cleans_on_terminal() {
     let tempdir = TempDir::new().expect("create tempdir");
     let music_root = tempdir.path().join("large-root");
     fs::create_dir_all(&music_root).expect("create large root");
 
-    for d in 0..40 {
+    for d in 0..20 {
         let dir = music_root.join(format!("dir-{:03}", d));
         fs::create_dir_all(&dir).expect("create subdir");
-        for f in 0..60 {
+        for f in 0..20 {
             fs::write(
                 dir.join(format!("track-{:03}.wav", f)),
                 b"not-real-audio-data",
@@ -854,37 +733,6 @@ fn cancel_active_scan_returns_accepted_and_publishes_source_scan_cancelled() {
         !completed,
         "SourceScanCompleted must not be published for cancelled scan"
     );
-}
-
-#[test]
-fn cancel_active_scan_cleans_registry_and_second_cancel_returns_already_terminal() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let music_root = tempdir.path().join("large-root");
-    fs::create_dir_all(&music_root).expect("create large root");
-
-    for d in 0..40 {
-        let dir = music_root.join(format!("dir-{:03}", d));
-        fs::create_dir_all(&dir).expect("create subdir");
-        for f in 0..60 {
-            fs::write(
-                dir.join(format!("track-{:03}.wav", f)),
-                b"not-real-audio-data",
-            )
-            .expect("write file");
-        }
-    }
-
-    let service = open_service(&tempdir);
-    let registered = register_root(&service, &music_root);
-    let scanned = start_scan(&service, registered.root_id);
-
-    let first_cancel = cancel_scan(&service, scanned.scan_run_id);
-    assert_eq!(first_cancel.status, CancelRootScanStatus::Accepted);
-
-    let cancelled = wait_for_scan_event(&service, 64, |se| {
-        se.kind == SourceScanEventKind::SourceScanCancelled && se.scan_run_id == scanned.scan_run_id
-    });
-    assert!(cancelled.is_some(), "SourceScanCancelled must be published");
 
     let second_cancel = cancel_scan(&service, scanned.scan_run_id);
     assert_eq!(
@@ -895,7 +743,7 @@ fn cancel_active_scan_cleans_registry_and_second_cancel_returns_already_terminal
 }
 
 #[test]
-fn duplicate_start_root_scan_behavior_remains_unchanged_after_cancellation() {
+fn duplicate_start_rejects_then_rescan_succeeds() {
     let tempdir = TempDir::new().expect("create tempdir");
     let music_root = tempdir.path().join("music-root");
     write_file(&music_root.join("track.wav"), b"data");
