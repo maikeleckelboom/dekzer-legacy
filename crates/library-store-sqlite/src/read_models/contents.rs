@@ -3489,6 +3489,47 @@ mod tests {
     }
 
     #[test]
+    fn source_file_profile_audio_policy_returns_only_audio_rows() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/clip.mp4", "video");
+        insert_scanned_file(&connection, 1002, 1, 10, "Media/cover.jpg", "image");
+        insert_scanned_file(&connection, 1003, 1, 10, "Media/album.cue", "unsupported");
+        insert_scanned_file(&connection, 1004, 1, 10, "Media/readme.txt", "unsupported");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read audio-only source-file contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_eq!(
+            result
+                .policy
+                .media_classes
+                .iter()
+                .map(|media_class| media_class.as_str())
+                .collect::<Vec<_>>(),
+            vec!["audio"]
+        );
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0].relative_path, "Media/track.wav");
+        assert_eq!(result.rows[0].media_class, "audio");
+        assert_eq!(result.rows[0].file_kind, "audio");
+        assert!(result.rows[0].primary_media.is_none());
+    }
+
+    #[test]
     fn source_file_profile_unsupported_policy_admits_only_cue_sheets() {
         let connection = open_connection();
         insert_source(&connection, 1);

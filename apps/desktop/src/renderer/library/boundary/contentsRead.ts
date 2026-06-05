@@ -55,7 +55,7 @@ type LibraryContentsApi = RendererApi['library']['contents']
 const readLimit = 100
 const safeContentsRequestFailure = 'Unable to request library contents.'
 const defaultContentsPolicy: ContentsReadPolicy = {
-  mediaClasses: ['audio', 'video', 'image', 'unsupported'],
+  mediaClasses: ['audio'],
   rowProfile: { kind: 'sourceFile' }
 }
 const contentsRecursion: ContentsRecursion = 'recursive'

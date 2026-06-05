@@ -44,12 +44,12 @@ identity, or artwork role.
 
 ## Default Contents Policy
 
-The renderer default for selected library contents is:
+The renderer default for selected library contents is audio-first and audio-only in V0:
 
 | Field          | Value                            |
 |----------------|----------------------------------|
 | `rowProfile`   | `sourceFile`                     |
-| `mediaClasses` | audio, video, image, unsupported |
+| `mediaClasses` | audio                            |
 | `recursion`    | recursive                        |
 
 The renderer derives the scope from selection and sends this policy to `readContents`. The backend owns the query and
@@ -71,22 +71,25 @@ Unavailable, blocked, failed, or incomplete sources must return typed state. The
 authoritative empty result. Stored rows may still be returned with non-complete coverage when the source is unavailable
 or indexing is incomplete.
 
-## Media Admission
+## Explicit Source-File Inventory Admission
 
-Default media-relevant source-file inventory includes:
+Explicit non-default source-file inventory reads may include:
 
-| Stored facts                                                                     | Default inventory admission           |
-|----------------------------------------------------------------------------------|---------------------------------------|
-| `media_class = audio`                                                            | Include.                              |
-| `media_class = video`                                                            | Include.                              |
-| `media_class = image`                                                            | Include as an image file.             |
-| `media_class = unsupported` and `file_kind = cue_sheet`                          | Include as a companion metadata file. |
-| `media_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from default inventory.       |
-| `media_class = none` or `file_kind = unknown`                                    | Exclude from default inventory.       |
+| Stored facts                                                                     | Explicit inventory admission                                |
+|----------------------------------------------------------------------------------|-------------------------------------------------------------|
+| `media_class = audio`                                                            | Include.                                                    |
+| `media_class = video`                                                            | Include when policy requests video.                         |
+| `media_class = image`                                                            | Include when policy requests image.                         |
+| `media_class = unsupported` and `file_kind = cue_sheet`                          | Include when policy requests unsupported companion metadata. |
+| `media_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from normal inventory.                              |
+| `media_class = none` or `file_kind = unknown`                                    | Exclude from normal inventory.                              |
 
 This contract intentionally does not admit every `unsupported` row. `unsupported` is too broad for product inventory
 because it can include notes, PDFs, archives, binary data, and other unrelated files. CUE sheets are admitted because
 they are media-adjacent companion metadata. They remain source-file rows and never become primary media rows.
+
+The V0 main contents browse default requests only `audio`. It does not include video, image, unsupported, CUE, text, or
+metadata companion files unless a future explicit product surface chooses a broader policy.
 
 ## CUE And Images
 
@@ -108,7 +111,7 @@ video only. A policy that asks `primaryMedia` for image or unsupported rows must
 ## Ordering And Cursor
 
 `sourceFile` inventory rows are ordered by lowercased relative path, then `source_file_id`. Cursor identity includes
-scope, row profile, recursion, the requested media classes including `unsupported`, and the last row ordering position.
+scope, row profile, recursion, the requested media classes, and the last row ordering position.
 The media-class identity is derived from the requested policy, not from the rows returned on the current page. Changing
 media classes across pages returns `cursorInvalid`.
 

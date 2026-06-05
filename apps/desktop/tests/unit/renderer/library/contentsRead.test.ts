@@ -9,7 +9,7 @@ import type {
 import type { LibraryContentsApi } from '../../../../src/shared/rendererApi'
 
 describe('createContentsReadController', () => {
-  it('requests recursive source-file media inventory for selected directories', async () => {
+  it('requests recursive audio-only source-file contents for selected directories', async () => {
     let capturedRequest: ContentsReadRequest | undefined
     const contentsApi: LibraryContentsApi = {
       async read(request): Promise<ContentsReadResult> {
@@ -43,12 +43,15 @@ describe('createContentsReadController', () => {
         sourceDirectoryId: '11'
       },
       policy: {
-        mediaClasses: ['audio', 'video', 'image', 'unsupported'],
+        mediaClasses: ['audio'],
         rowProfile: { kind: 'sourceFile' }
       },
       recursion: 'recursive',
       limit: 100
     })
+    expect(capturedRequest?.policy.mediaClasses).not.toContain('image')
+    expect(capturedRequest?.policy.mediaClasses).not.toContain('video')
+    expect(capturedRequest?.policy.mediaClasses).not.toContain('unsupported')
   })
 })
 
