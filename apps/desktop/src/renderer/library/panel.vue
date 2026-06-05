@@ -12,7 +12,13 @@ import {
 } from './boundary/sourceLifecycleRead'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
-import { refreshHierarchyForMaintainedSnapshotInvalidation } from './runtime/invalidationRefresh'
+import {
+  buildGapRecoveryRefreshPlan,
+  buildMaintainedSnapshotInvalidationRefreshPlan,
+  buildSourceScanRefreshPlan,
+  executeLibraryRefreshPlan,
+  type InvalidationRefreshDependencies
+} from './runtime/invalidationRefresh'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
@@ -260,9 +266,12 @@ watch(
       return
     }
 
-    await hierarchyRead.refresh()
-    contentsRead.clearWarmSnapshots()
-    boundaryEvents.acknowledgedGap()
+    const plan = buildGapRecoveryRefreshPlan()
+    await executeLibraryRefreshPlan(plan, refreshPlanExecutionDependencies())
+
+    if (plan.acknowledgeGapAfterExecution) {
+      boundaryEvents.acknowledgedGap()
+    }
   }
 )
 
@@ -270,35 +279,24 @@ watch(
   () => boundaryEvents.maintainedSnapshotInvalidationSignal.value,
   async () => {
     const invalidations = boundaryEvents.consumeMaintainedSnapshotInvalidations()
+    const plan = buildMaintainedSnapshotInvalidationRefreshPlan({
+      invalidations,
+      sourceLifecycleSourceIds: sourceLifecycleSourceIds.value
+    })
 
-    for (const event of invalidations) {
-      await refreshHierarchyForMaintainedSnapshotInvalidation(event, {
-        hierarchyRead,
-        sourceLifecycleRead,
-        sourceLifecycleSourceIds: sourceLifecycleSourceIds.value,
-        expandedNodeIds: expandedNodeIds.value,
-        refreshContentsForCurrentSelection: () => {
-          contentsRead.clearWarmSnapshots()
-          requestContentsForCurrentSelection({ force: true })
-        }
-      })
-    }
+    await executeLibraryRefreshPlan(plan, refreshPlanExecutionDependencies())
   }
 )
 
 watch(
   () => boundaryEvents.sourceScanSignal.value,
   () => {
-    const sourceIds = sourceLifecycleSourceIds.value
-    const refreshedSourceIds = new Set<string>()
+    const plan = buildSourceScanRefreshPlan({
+      events: boundaryEvents.consumeSourceScanEvents(),
+      sourceLifecycleSourceIds: sourceLifecycleSourceIds.value
+    })
 
-    for (const event of boundaryEvents.consumeSourceScanEvents()) {
-      if (sourceIds.has(event.rootId)) {
-        refreshedSourceIds.add(event.rootId)
-      }
-    }
-
-    void sourceLifecycleRead.refreshSourceLifecycles(refreshedSourceIds)
+    void executeLibraryRefreshPlan(plan, refreshPlanExecutionDependencies())
   }
 )
 
@@ -469,6 +467,43 @@ function prepareNodeContents(nodeId: BrowserTreeNodeId): void {
 
 function cancelPrepareNodeContents(nodeId: BrowserTreeNodeId): void {
   contentsRead.cancelPreloadForBinding(browserProjection.value?.bindingsById.get(nodeId))
+}
+
+function refreshPlanExecutionDependencies(): InvalidationRefreshDependencies {
+  return {
+    hierarchyRead,
+    sourceLifecycleRead,
+    expandedNodeIds: expandedNodeIds.value,
+    clearContentsWarmSnapshots: () => contentsRead.clearWarmSnapshots(),
+    refreshContentsForCurrentSelection
+  }
+}
+
+function refreshContentsForCurrentSelection(): Promise<boolean> {
+  const binding = currentSelectedBinding()
+
+  if (!isContentsReadableBinding(binding)) {
+    return Promise.resolve(true)
+  }
+
+  return contentsRead.readForBinding(binding, { force: true })
+}
+
+function currentSelectedBinding(): RowBinding | undefined {
+  const selectedId = selectedNodeId.value
+  const projection = browserProjection.value
+
+  if (selectedId === undefined || projection === undefined) {
+    return undefined
+  }
+
+  return projection.bindingsById.get(selectedId)
+}
+
+function isContentsReadableBinding(
+  binding: RowBinding | undefined
+): binding is Extract<RowBinding, { readonly kind: 'source' | 'directory' }> {
+  return binding?.kind === 'source' || binding?.kind === 'directory'
 }
 
 async function handleRemoveSource(): Promise<void> {

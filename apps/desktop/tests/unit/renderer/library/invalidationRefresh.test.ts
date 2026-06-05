@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  buildGapRecoveryRefreshPlan,
+  buildMaintainedSnapshotInvalidationRefreshPlan,
+  buildSourceScanRefreshPlan,
+  classifyInvalidationScope,
+  executeLibraryRefreshPlan,
   refreshHierarchyForMaintainedSnapshotInvalidation,
   type InvalidationRefreshDependencies
 } from '../../../../src/renderer/library/runtime/invalidationRefresh'
@@ -13,7 +18,10 @@ import {
   type LibraryHierarchyReadApi
 } from '../../../../src/renderer/library/boundary/hierarchyRead'
 import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
-import type { AppMaintainedSnapshotInvalidatedEvent } from '../../../../src/shared/libraryBoundary/eventParser'
+import type {
+  AppMaintainedSnapshotInvalidatedEvent,
+  AppSourceScanEvent
+} from '../../../../src/shared/libraryBoundary/eventParser'
 import type { BoundaryEventDeliveryPayload } from '../../../../src/shared/libraryBoundary/events'
 import type {
   ChildRow,
@@ -22,6 +30,186 @@ import type {
   ReadResult
 } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type { NavigationReadRowsResult } from '../../../../src/shared/libraryNavigation/readRows'
+
+describe('library invalidation refresh planning', () => {
+  it('classifies current renderer invalidation scopes without inventing future scopes', () => {
+    expect(classifyInvalidationScope('navigationRows')).toBe('navigationRows')
+    expect(classifyInvalidationScope('libraryBrowser')).toBe('libraryBrowser')
+    expect(classifyInvalidationScope('LibraryBrowser')).toBe('unknown')
+    expect(classifyInvalidationScope('contents')).toBe('unknown')
+    expect(classifyInvalidationScope('sourceLifecycle')).toBe('unknown')
+  })
+
+  it('builds deterministic coalesced plans for maintained invalidation batches', () => {
+    const input = {
+      invalidations: [
+        invalidation('navigationRows', '1'),
+        invalidation('libraryBrowser', '2'),
+        invalidation('libraryBrowser', '3'),
+        invalidation('unsupportedScope', '4')
+      ],
+      sourceLifecycleSourceIds: ['7', '7', '9']
+    }
+
+    const first = buildMaintainedSnapshotInvalidationRefreshPlan(input)
+    const second = buildMaintainedSnapshotInvalidationRefreshPlan(input)
+
+    expect(planSnapshot(first)).toEqual(planSnapshot(second))
+    expect(planSnapshot(first)).toEqual({
+      refreshRootHierarchy: false,
+      refreshNavigationRows: true,
+      refreshExpandedBrowserWindows: true,
+      refreshCurrentContents: true,
+      clearAllContentsWarmSnapshots: true,
+      refreshSourceLifecycleIds: ['7', '9'],
+      acknowledgeGapAfterExecution: false,
+      broadRecovery: false
+    })
+  })
+
+  it('keeps unknown maintained invalidation scopes as safe no-ops', () => {
+    const plan = buildMaintainedSnapshotInvalidationRefreshPlan({
+      invalidations: [invalidation('futureScope', '1')],
+      sourceLifecycleSourceIds: ['7']
+    })
+
+    expect(planSnapshot(plan)).toEqual({
+      refreshRootHierarchy: false,
+      refreshNavigationRows: false,
+      refreshExpandedBrowserWindows: false,
+      refreshCurrentContents: false,
+      clearAllContentsWarmSnapshots: false,
+      refreshSourceLifecycleIds: [],
+      acknowledgeGapAfterExecution: false,
+      broadRecovery: false
+    })
+  })
+
+  it('dedupes source scan lifecycle refresh ids for visible source ids only', () => {
+    const plan = buildSourceScanRefreshPlan({
+      events: [
+        sourceScanEvent('7', 1),
+        sourceScanEvent('7', 2),
+        sourceScanEvent('8', 3),
+        sourceScanEvent('9', 4)
+      ],
+      sourceLifecycleSourceIds: new Set(['7', '9'])
+    })
+
+    expect(planSnapshot(plan)).toMatchObject({
+      refreshSourceLifecycleIds: ['7', '9'],
+      refreshNavigationRows: false,
+      refreshExpandedBrowserWindows: false,
+      refreshCurrentContents: false
+    })
+  })
+
+  it('represents gap recovery as a broad plan with post-execution acknowledgement', () => {
+    expect(planSnapshot(buildGapRecoveryRefreshPlan())).toEqual({
+      refreshRootHierarchy: true,
+      refreshNavigationRows: false,
+      refreshExpandedBrowserWindows: false,
+      refreshCurrentContents: false,
+      clearAllContentsWarmSnapshots: true,
+      refreshSourceLifecycleIds: [],
+      acknowledgeGapAfterExecution: true,
+      broadRecovery: true
+    })
+  })
+})
+
+describe('executeLibraryRefreshPlan', () => {
+  it('executes each refresh ownership at most once for a coalesced maintained batch', async () => {
+    const dependencies = testDependencies({
+      sourceLifecycleSourceIds: new Set(['7', '7', '9']),
+      sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) },
+      clearContentsWarmSnapshots: vi.fn(),
+      refreshContentsForCurrentSelection: vi.fn(async () => true)
+    })
+    const plan = buildMaintainedSnapshotInvalidationRefreshPlan({
+      invalidations: [
+        invalidation('navigationRows', '1'),
+        invalidation('navigationRows', '2'),
+        invalidation('libraryBrowser', '3'),
+        invalidation('libraryBrowser', '4')
+      ],
+      sourceLifecycleSourceIds: dependencies.sourceLifecycleSourceIds
+    })
+
+    await expect(executeLibraryRefreshPlan(plan, dependencies)).resolves.toBe(true)
+
+    expect(dependencies.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(
+      new Set(['navigation-row:7', 'source-directory:12'])
+    )
+    expect(dependencies.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
+    expect(dependencies.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(
+      new Set(['7', '9'])
+    )
+    expect(dependencies.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
+    expect(dependencies.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
+  })
+
+  it('continues independent refreshes when one refresh fails', async () => {
+    const dependencies = testDependencies({
+      sourceLifecycleSourceIds: new Set(['7']),
+      sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) },
+      clearContentsWarmSnapshots: vi.fn(),
+      refreshContentsForCurrentSelection: vi.fn(async () => true)
+    })
+    vi.mocked(dependencies.hierarchyRead.refreshNavigationRows).mockRejectedValueOnce(
+      new Error('navigation failed')
+    )
+    const plan = buildMaintainedSnapshotInvalidationRefreshPlan({
+      invalidations: [invalidation('navigationRows', '1'), invalidation('libraryBrowser', '2')],
+      sourceLifecycleSourceIds: dependencies.sourceLifecycleSourceIds
+    })
+
+    await expect(executeLibraryRefreshPlan(plan, dependencies)).resolves.toBe(false)
+
+    expect(dependencies.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(dependencies.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
+    expect(dependencies.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
+    expect(dependencies.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
+  })
+
+  it('executes gap recovery through the same plan and keeps acknowledgement policy visible', async () => {
+    const dependencies = testDependencies({
+      refresh: vi.fn(async () => false),
+      clearContentsWarmSnapshots: vi.fn()
+    })
+    const plan = buildGapRecoveryRefreshPlan()
+
+    await expect(executeLibraryRefreshPlan(plan, dependencies)).resolves.toBe(false)
+
+    expect(dependencies.hierarchyRead.refresh).toHaveBeenCalledTimes(1)
+    expect(dependencies.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
+    expect(dependencies.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
+    expect(plan.acknowledgeGapAfterExecution).toBe(true)
+  })
+
+  it('executes source scan plans without refreshing hierarchy or contents surfaces', async () => {
+    const dependencies = testDependencies({
+      sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) }
+    })
+    const plan = buildSourceScanRefreshPlan({
+      events: [sourceScanEvent('7', 1), sourceScanEvent('8', 2)],
+      sourceLifecycleSourceIds: new Set(['7'])
+    })
+
+    await expect(executeLibraryRefreshPlan(plan, dependencies)).resolves.toBe(true)
+
+    expect(dependencies.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
+    expect(dependencies.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
+    expect(dependencies.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
+    expect(dependencies.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(
+      new Set(['7'])
+    )
+  })
+})
 
 describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
   it('refreshes navigation rows for navigationRows invalidation', async () => {
@@ -231,22 +419,29 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
     refreshRead.resolve(refreshedSourceReadResult())
     await expect(refresh).resolves.toEqual([true])
 
-    expect(loadedChildIds(hierarchyRead, 'navigation-row:7')).toEqual([
-      'source-directory:13'
-    ])
+    expect(loadedChildIds(hierarchyRead, 'navigation-row:7')).toEqual(['source-directory:13'])
     expect(refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
     boundaryEvents.stop()
   })
 })
 
-function testDependencies(): InvalidationRefreshDependencies {
+function testDependencies(
+  overrides: Partial<InvalidationRefreshDependencies> & {
+    readonly refresh?: () => Promise<boolean>
+  } = {}
+): InvalidationRefreshDependencies {
+  const { hierarchyRead, refresh, ...rest } = overrides
+
   return {
     hierarchyRead: {
+      ...(refresh === undefined ? {} : { refresh }),
       refreshNavigationRows: vi.fn(async () => true),
-      refreshBrowserWindows: vi.fn(async () => true)
+      refreshBrowserWindows: vi.fn(async () => true),
+      ...hierarchyRead
     },
     expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12']),
-    refreshContentsForCurrentSelection: vi.fn()
+    refreshContentsForCurrentSelection: vi.fn(),
+    ...rest
   }
 }
 
@@ -258,6 +453,45 @@ function invalidation(scope: string, revision: string): AppMaintainedSnapshotInv
       scope,
       revision
     }
+  }
+}
+
+function sourceScanEvent(rootId: string, eventSequence: number): AppSourceScanEvent {
+  return {
+    eventSequence,
+    occurredAtMs: 1000 + eventSequence,
+    kind: 'sourceScanCompleted',
+    rootId,
+    scanRunId: `scan-${eventSequence}`,
+    phase: 'scanning',
+    directoriesVisited: 1,
+    filesVisited: 2,
+    filesDiscovered: 3,
+    mediaCandidates: 4,
+    queuedWorkItems: 5,
+    detail: null
+  }
+}
+
+function planSnapshot(plan: ReturnType<typeof buildGapRecoveryRefreshPlan>): {
+  readonly refreshRootHierarchy: boolean
+  readonly refreshNavigationRows: boolean
+  readonly refreshExpandedBrowserWindows: boolean
+  readonly refreshCurrentContents: boolean
+  readonly clearAllContentsWarmSnapshots: boolean
+  readonly refreshSourceLifecycleIds: readonly string[]
+  readonly acknowledgeGapAfterExecution: boolean
+  readonly broadRecovery: boolean
+} {
+  return {
+    refreshRootHierarchy: plan.refreshRootHierarchy,
+    refreshNavigationRows: plan.refreshNavigationRows,
+    refreshExpandedBrowserWindows: plan.refreshExpandedBrowserWindows,
+    refreshCurrentContents: plan.refreshCurrentContents,
+    clearAllContentsWarmSnapshots: plan.clearAllContentsWarmSnapshots,
+    refreshSourceLifecycleIds: [...plan.refreshSourceLifecycleIds],
+    acknowledgeGapAfterExecution: plan.acknowledgeGapAfterExecution,
+    broadRecovery: plan.broadRecovery
   }
 }
 
