@@ -13,6 +13,8 @@ export type UseTreeControllerOptions = {
   readonly selectNode: (nodeId: BrowserTreeNodeId) => void
   readonly toggleNode: (nodeId: BrowserTreeNodeId) => void
   readonly activateAction: (nodeId: BrowserTreeNodeId) => void
+  readonly prepareNode?: (nodeId: BrowserTreeNodeId) => void
+  readonly cancelPrepareNode?: (nodeId: BrowserTreeNodeId) => void
 }
 
 export function useTreeController(options: UseTreeControllerOptions): TreeContext {
@@ -78,6 +80,16 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     void nextTick(() => {
       itemElements.get(nodeId)?.focus()
     })
+  }
+
+  function prepareNode(nodeId: BrowserTreeNodeId): void {
+    if (visibleItems.value.some((item) => item.id === nodeId)) {
+      options.prepareNode?.(nodeId)
+    }
+  }
+
+  function cancelPrepareNode(nodeId: BrowserTreeNodeId): void {
+    options.cancelPrepareNode?.(nodeId)
   }
 
   function resolveKeyboardIntent(item: BrowserTreeVisibleItem, key: string): TreeKeyboardIntent {
@@ -195,6 +207,8 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     registerItemElement,
     setActiveNode,
     focusNode,
+    prepareNode,
+    cancelPrepareNode,
     selectNode: options.selectNode,
     toggleNode,
     revealNode,

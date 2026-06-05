@@ -111,6 +111,39 @@ describe('useTreeController', () => {
     expect(harness.events.log).toEqual(['select:source-a'])
   })
 
+  it('preparing a visible row emits prefetch intent without mutating tree state', () => {
+    const harness = treeHarness()
+
+    harness.controller.prepareNode('branch-a')
+
+    expect(harness.selectedNodeId.value).toBeUndefined()
+    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(false)
+    expect(harness.events.prepare).toEqual(['branch-a'])
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.toggle).toEqual([])
+    expect(harness.events.activateAction).toEqual([])
+  })
+
+  it('cancelling a prepared row emits cancel intent without selecting or expanding', () => {
+    const harness = treeHarness()
+
+    harness.controller.cancelPrepareNode('branch-a')
+
+    expect(harness.selectedNodeId.value).toBeUndefined()
+    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(false)
+    expect(harness.events.cancelPrepare).toEqual(['branch-a'])
+    expect(harness.events.log).toEqual(['cancelPrepare:branch-a'])
+  })
+
+  it('does not prepare rows that are no longer visible', () => {
+    const harness = treeHarness()
+
+    harness.controller.prepareNode('missing-row')
+
+    expect(harness.events.prepare).toEqual([])
+    expect(harness.events.log).toEqual([])
+  })
+
   it('keeps expansion stable when selecting another row', () => {
     const harness = treeHarness({
       expandedNodeIds: new Set(['branch-a'])
@@ -208,6 +241,8 @@ function treeHarness(
     readonly select: BrowserTreeNodeId[]
     readonly toggle: BrowserTreeNodeId[]
     readonly activateAction: BrowserTreeNodeId[]
+    readonly prepare: BrowserTreeNodeId[]
+    readonly cancelPrepare: BrowserTreeNodeId[]
     readonly log: string[]
   }
   readonly controller: ReturnType<typeof useTreeController>
@@ -220,6 +255,8 @@ function treeHarness(
     select: [] as BrowserTreeNodeId[],
     toggle: [] as BrowserTreeNodeId[],
     activateAction: [] as BrowserTreeNodeId[],
+    prepare: [] as BrowserTreeNodeId[],
+    cancelPrepare: [] as BrowserTreeNodeId[],
     log: [] as string[]
   }
 
@@ -250,7 +287,15 @@ function treeHarness(
 
       expandedNodeIds.value = nextExpandedIds
     },
-    activateAction
+    activateAction,
+    prepareNode: (nodeId) => {
+      events.prepare.push(nodeId)
+      events.log.push(`prepare:${nodeId}`)
+    },
+    cancelPrepareNode: (nodeId) => {
+      events.cancelPrepare.push(nodeId)
+      events.log.push(`cancelPrepare:${nodeId}`)
+    }
   })
 
   return {

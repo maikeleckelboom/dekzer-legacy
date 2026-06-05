@@ -22,6 +22,8 @@ const emit = defineEmits<{
   select: [nodeId: BrowserTreeNodeId]
   toggle: [nodeId: BrowserTreeNodeId]
   activateAction: [nodeId: BrowserTreeNodeId]
+  prepare: [nodeId: BrowserTreeNodeId]
+  cancelPrepare: [nodeId: BrowserTreeNodeId]
 }>()
 
 const controller = useTreeController({
@@ -30,7 +32,9 @@ const controller = useTreeController({
   expandedNodeIds: computed(() => expandedNodeIds),
   selectNode: (id) => emit('select', id),
   toggleNode: (id) => emit('toggle', id),
-  activateAction: (id) => emit('activateAction', id)
+  activateAction: (id) => emit('activateAction', id),
+  prepareNode: (id) => emit('prepare', id),
+  cancelPrepareNode: (id) => emit('cancelPrepare', id)
 })
 
 // The DOM is intentionally flattened: hierarchy is declared through aria-level,

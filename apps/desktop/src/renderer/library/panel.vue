@@ -261,6 +261,7 @@ watch(
     }
 
     await hierarchyRead.refresh()
+    contentsRead.clearWarmSnapshots()
     boundaryEvents.acknowledgedGap()
   }
 )
@@ -276,8 +277,10 @@ watch(
         sourceLifecycleRead,
         sourceLifecycleSourceIds: sourceLifecycleSourceIds.value,
         expandedNodeIds: expandedNodeIds.value,
-        refreshContentsForCurrentSelection: () =>
+        refreshContentsForCurrentSelection: () => {
+          contentsRead.clearWarmSnapshots()
           requestContentsForCurrentSelection({ force: true })
+        }
       })
     }
   }
@@ -460,6 +463,14 @@ function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   void hierarchyRead.requestNodeChildren(nodeId)
 }
 
+function prepareNodeContents(nodeId: BrowserTreeNodeId): void {
+  contentsRead.preloadForBinding(browserProjection.value?.bindingsById.get(nodeId))
+}
+
+function cancelPrepareNodeContents(nodeId: BrowserTreeNodeId): void {
+  contentsRead.cancelPreloadForBinding(browserProjection.value?.bindingsById.get(nodeId))
+}
+
 async function handleRemoveSource(): Promise<void> {
   const rootId = removeSourceRootId.value
 
@@ -576,6 +587,8 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           @select="selectNode"
           @toggle="toggleNode"
           @activate-action="activateNodeAction"
+          @prepare="prepareNodeContents"
+          @cancel-prepare="cancelPrepareNodeContents"
         />
       </aside>
 

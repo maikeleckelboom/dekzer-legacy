@@ -55,6 +55,15 @@ function handleRevealNode(): void {
 
 function handleFocus(): void {
   tree.setActiveNode(props.item.id)
+  tree.prepareNode(props.item.id)
+}
+
+function handlePointerEnter(): void {
+  tree.prepareNode(props.item.id)
+}
+
+function handlePointerLeave(): void {
+  tree.cancelPrepareNode(props.item.id)
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -120,6 +129,8 @@ function isPrimaryActivationKey(key: string): boolean {
     @click="handleRowClick"
     @focus="handleFocus"
     @keydown="handleKeydown"
+    @pointerenter="handlePointerEnter"
+    @pointerleave="handlePointerLeave"
   >
     <TreeRow :item="item" @reveal-node="handleRevealNode" />
   </div>

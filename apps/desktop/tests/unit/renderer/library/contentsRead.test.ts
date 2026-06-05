@@ -62,6 +62,323 @@ describe('createContentsReadController', () => {
     expect(capturedRequest?.policy.mediaClasses).not.toContain('unsupported')
   })
 
+  it('preloadForBinding schedules no IPC before the rest threshold', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+
+    await vi.advanceTimersByTimeAsync(124)
+    expect(contentsApi.requests).toEqual([])
+    expect(controller.state.value).toMatchObject({
+      kind: 'idle',
+      detail: 'No contents scope has been requested.'
+    })
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(contentsApi.requests).toHaveLength(1)
+    expect(controller.state.value).toMatchObject({
+      kind: 'idle',
+      detail: 'No contents scope has been requested.'
+    })
+  })
+
+  it('cancelPreloadForBinding before threshold prevents IPC', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(60)
+    controller.cancelPreloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    expect(contentsApi.requests).toEqual([])
+  })
+
+  it('preloadForBinding does not mutate visible contents state before or after response', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    expect(controller.state.value).toMatchObject({
+      kind: 'idle',
+      detail: 'No contents scope has been requested.'
+    })
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await flushPromises()
+
+    expect(controller.state.value).toMatchObject({
+      kind: 'idle',
+      detail: 'No contents scope has been requested.'
+    })
+  })
+
+  it('caps speculative in-flight prefetch reads', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding('11'))
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    controller.preloadForBinding(directoryBinding('12'))
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    expect(contentsApi.requests).toHaveLength(1)
+    expect(contentsApi.requests[0]?.scope).toMatchObject({
+      kind: 'directory',
+      sourceDirectoryId: '11'
+    })
+  })
+
+  it('normal selected reads are not blocked by the speculative in-flight cap', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding('11'))
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    const read = controller.readForBinding(directoryBinding('12'))
+
+    expect(contentsApi.requests).toHaveLength(2)
+    expect(controller.state.value).toMatchObject({
+      kind: 'idle',
+      pending: {
+        requestKey: 'directory:7:12:sourceFile:audio:recursive',
+        sequence: 1
+      }
+    })
+
+    contentsApi.resolveAt(1, readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(read).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+  })
+
+  it('readForBinding consumes a fresh warmed snapshot without a new IPC call', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await flushPromises()
+
+    await expect(controller.readForBinding(directoryBinding())).resolves.toBe(true)
+
+    expect(contentsApi.requests).toHaveLength(1)
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+    expect(controller.state.value).not.toHaveProperty('pending')
+  })
+
+  it('readForBinding reuses a matching in-flight prefetch and creates normal pending identity', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    const read = controller.readForBinding(directoryBinding())
+
+    expect(contentsApi.requests).toHaveLength(1)
+    expect(controller.state.value).toMatchObject({
+      kind: 'idle',
+      pending: {
+        requestKey: 'directory:7:11:sourceFile:audio:recursive',
+        sequence: 1
+      }
+    })
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await expect(read).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+  })
+
+  it('stale in-flight prefetch cannot commit to the wrong selected scope', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding('11'))
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    const staleRead = controller.readForBinding(directoryBinding('11'))
+    const currentRead = controller.readForBinding(directoryBinding('12'))
+
+    contentsApi.resolveAt(1, readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(currentRead).resolves.toBe(true)
+
+    contentsApi.resolveAt(0, readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await expect(staleRead).resolves.toBe(false)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+  })
+
+  it('force reads bypass warmed snapshots and refresh the selected scope', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await flushPromises()
+
+    const read = controller.readForBinding(directoryBinding(), { force: true })
+
+    expect(contentsApi.requests).toHaveLength(2)
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(read).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+  })
+
+  it('late prefetch completion after force does not overwrite the refreshed warm snapshot', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding('11'))
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    const forceRead = controller.readForBinding(directoryBinding('11'), { force: true })
+    expect(contentsApi.requests).toHaveLength(2)
+
+    contentsApi.resolveAt(1, readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(forceRead).resolves.toBe(true)
+
+    contentsApi.resolveAt(0, readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await flushPromises()
+
+    const otherRead = controller.readForBinding(directoryBinding('12'))
+    contentsApi.resolveAt(2, readyContents(requestAt(contentsApi, 2), [contentsRow('c', 'C.wav')]))
+    await expect(otherRead).resolves.toBe(true)
+
+    await expect(controller.readForBinding(directoryBinding('11'))).resolves.toBe(true)
+    expect(contentsApi.requests).toHaveLength(3)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+  })
+
+  it('load-more reads do not consume base warm cache entries', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await flushPromises()
+
+    const read = controller.readForBinding(directoryBinding(), { cursor: 'cursor-a' })
+
+    expect(contentsApi.requests).toHaveLength(2)
+    expect(contentsApi.requests[1]).toMatchObject({ cursor: 'cursor-a' })
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('a2', 'A2.wav')]))
+    await expect(read).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['A2.wav'])
+  })
+
+  it('warm cache entries expire before selection consumes them', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding())
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(10_001)
+
+    const read = controller.readForBinding(directoryBinding())
+
+    expect(contentsApi.requests).toHaveLength(2)
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(read).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+  })
+
+  it('warm cache is bounded to the most recent entries', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+
+    for (let index = 0; index < 17; index++) {
+      controller.preloadForBinding(directoryBinding(`${index + 1}`))
+      await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+      contentsApi.resolveNext(
+        readyContents(requestAt(contentsApi, index), [contentsRow(`${index}`, `${index}.wav`)])
+      )
+      await flushPromises()
+    }
+
+    const evictedRead = controller.readForBinding(directoryBinding('1'))
+    expect(contentsApi.requests).toHaveLength(18)
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 17), [contentsRow('fresh', 'Fresh.wav')])
+    )
+    await expect(evictedRead).resolves.toBe(true)
+
+    await expect(controller.readForBinding(directoryBinding('17'))).resolves.toBe(true)
+    expect(contentsApi.requests).toHaveLength(18)
+    expect(visibleLabels(controller.state.value)).toEqual(['16.wav'])
+  })
+
+  it('clear removes warm entries and scheduled preload timers', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(directoryBinding('11'))
+    controller.clear()
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    expect(contentsApi.requests).toEqual([])
+
+    controller.preloadForBinding(directoryBinding('12'))
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('b', 'B.wav')]))
+    await flushPromises()
+    controller.clearWarmSnapshots()
+
+    const read = controller.readForBinding(directoryBinding('12'))
+    expect(contentsApi.requests).toHaveLength(2)
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('c', 'C.wav')]))
+    await expect(read).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['C.wav'])
+  })
+
+  it('unsupported bindings do not preload contents', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    controller.preloadForBinding(readStateBinding())
+    controller.preloadForBinding(undefined)
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+
+    expect(contentsApi.requests).toEqual([])
+  })
+
   it('threshold-gates initial loading when there is no accepted snapshot', async () => {
     vi.useFakeTimers()
     const contentsApi = deferredContentsApi()
@@ -404,8 +721,23 @@ function directoryBinding(directoryId = '11'): RowBinding {
   }
 }
 
+function readStateBinding(): RowBinding {
+  return {
+    kind: 'readState',
+    state: 'notLoaded',
+    ownerId: 'navigation-row:7',
+    detail: 'Contents not loaded yet.'
+  }
+}
+
 function loadingThresholdPlusMargin(): number {
   return 126
+}
+
+async function flushPromises(): Promise<void> {
+  for (let index = 0; index < 5; index++) {
+    await Promise.resolve()
+  }
 }
 
 type DeferredContentsApi = LibraryContentsApi & {

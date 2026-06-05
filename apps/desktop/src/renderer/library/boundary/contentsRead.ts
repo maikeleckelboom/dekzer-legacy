@@ -51,6 +51,9 @@ export type ContentsReadController = {
     binding: RowBinding | undefined,
     options?: ReadOptions
   ) => Promise<boolean>
+  readonly preloadForBinding: (binding: RowBinding | undefined) => void
+  readonly cancelPreloadForBinding: (binding: RowBinding | undefined) => void
+  readonly clearWarmSnapshots: () => void
   readonly clear: () => void
   readonly start: () => void
   readonly stop: () => void
@@ -65,12 +68,36 @@ type LibraryContentsApi = RendererApi['library']['contents']
 
 const readLimit = 100
 const loadingThresholdMs = 125
+const preloadThresholdMs = 125
+const warmSnapshotTtlMs = 10_000
+const maxWarmSnapshots = 16
+const maxSpeculativeReads = 1
 const safeContentsRequestFailure = 'Unable to request library contents.'
 const defaultContentsPolicy: ContentsReadPolicy = {
   mediaClasses: ['audio'],
   rowProfile: { kind: 'sourceFile' }
 }
 const contentsRecursion: ContentsRecursion = 'recursive'
+
+type ContentsReadTarget = {
+  readonly scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>
+  readonly policy: ContentsReadPolicy
+  readonly recursion: ContentsRecursion
+  readonly requestKey: string
+}
+
+type WarmSnapshot = {
+  readonly requestKey: string
+  readonly result: ContentsReadResult
+  readonly nextCursor?: string
+  readonly accumulatedRows?: readonly ContentsFileRow[]
+  readonly expiresAtMs: number
+}
+
+type SpeculativeRead = {
+  readonly requestKey: string
+  readonly promise: Promise<ContentsReadResult>
+}
 
 export function useContentsRead(
   contentsApi: LibraryContentsApi = getRendererApi().library.contents
@@ -102,6 +129,11 @@ export function createContentsReadController(
   let readSequence = 0
   let started = false
   let thresholdTimer: ReturnType<typeof setTimeout> | undefined = undefined
+  let preloadTimer: ReturnType<typeof setTimeout> | undefined = undefined
+  let scheduledPreloadKey: string | undefined = undefined
+  let warmGeneration = 0
+  const warmSnapshots = new Map<string, WarmSnapshot>()
+  const speculativeReads = new Map<string, SpeculativeRead>()
 
   function start(): void {
     started = true
@@ -110,10 +142,13 @@ export function createContentsReadController(
   function stop(): void {
     started = false
     clearThresholdTimer()
+    clearPreloadTimer()
   }
 
   function clear(): void {
     clearThresholdTimer()
+    clearPreloadTimer()
+    clearWarmSnapshots()
     state.value = {
       kind: 'idle',
       detail: 'No contents scope is active.'
@@ -124,20 +159,32 @@ export function createContentsReadController(
     binding: RowBinding | undefined,
     options: ReadOptions = {}
   ): Promise<boolean> {
-    const scope = contentsScopeForBinding(binding)
+    const target = contentsReadTargetForBinding(binding)
 
-    if (scope === undefined) {
+    if (target === undefined) {
       clear()
       return false
     }
 
-    const policy = defaultContentsPolicy
-    const requestKey = contentsRequestKey(scope, policy, contentsRecursion)
+    const requestKey = target.requestKey
     const currentState = state.value
     const cursor = options.cursor
 
+    if (options.force) {
+      deleteWarmSnapshot(requestKey)
+    }
+
     if (!options.force && !cursor && currentRequestKey(currentState) === requestKey) {
       return false
+    }
+
+    if (!options.force && cursor === undefined) {
+      const warmSnapshot = freshWarmSnapshot(requestKey)
+      if (warmSnapshot !== undefined) {
+        clearThresholdTimer()
+        state.value = stateFromWarmSnapshot(warmSnapshot)
+        return true
+      }
     }
 
     const isSameRequest =
@@ -156,13 +203,10 @@ export function createContentsReadController(
     startPendingRead(pending)
 
     try {
-      const result = await contentsApi.read({
-        scope,
-        policy,
-        recursion: contentsRecursion,
-        limit: readLimit,
-        ...(cursor === undefined ? {} : { cursor })
-      })
+      const result =
+        cursor === undefined && !options.force
+          ? await (speculativeReads.get(requestKey)?.promise ?? readContents(target))
+          : await readContents(target, cursor)
 
       if (!started || !isCurrentLoading(requestKey, sequence)) {
         return false
@@ -198,6 +242,7 @@ export function createContentsReadController(
         ;(stateUpdate as { accumulatedRows?: readonly ContentsFileRow[] }).accumulatedRows = rows
       }
       state.value = stateUpdate
+      storeWarmSnapshotFromState(stateUpdate)
       return true
     } catch {
       if (!started || !isCurrentLoading(requestKey, sequence)) {
@@ -217,6 +262,38 @@ export function createContentsReadController(
       }
       return true
     }
+  }
+
+  function preloadForBinding(binding: RowBinding | undefined): void {
+    const target = contentsReadTargetForBinding(binding)
+
+    clearPreloadTimer()
+
+    if (target === undefined || freshWarmSnapshot(target.requestKey) !== undefined) {
+      return
+    }
+
+    scheduledPreloadKey = target.requestKey
+    preloadTimer = setTimeout(() => {
+      preloadTimer = undefined
+
+      if (!started || scheduledPreloadKey !== target.requestKey) {
+        return
+      }
+
+      scheduledPreloadKey = undefined
+      void startSpeculativeRead(target)
+    }, preloadThresholdMs)
+  }
+
+  function cancelPreloadForBinding(binding: RowBinding | undefined): void {
+    const target = contentsReadTargetForBinding(binding)
+
+    if (target === undefined || scheduledPreloadKey !== target.requestKey) {
+      return
+    }
+
+    clearPreloadTimer()
   }
 
   function startPendingRead(pending: ContentsPendingRead): void {
@@ -304,6 +381,20 @@ export function createContentsReadController(
 
     clearTimeout(thresholdTimer)
     thresholdTimer = undefined
+  }
+
+  function clearPreloadTimer(): void {
+    if (preloadTimer !== undefined) {
+      clearTimeout(preloadTimer)
+      preloadTimer = undefined
+    }
+
+    scheduledPreloadKey = undefined
+  }
+
+  function clearWarmSnapshots(): void {
+    warmGeneration++
+    warmSnapshots.clear()
   }
 
   function pendingPresentation(
@@ -395,12 +486,153 @@ export function createContentsReadController(
     return result.state === 'ready' ? safeContentsRequestFailure : result.error.message
   }
 
+  function readContents(target: ContentsReadTarget, cursor?: string): Promise<ContentsReadResult> {
+    return contentsApi.read({
+      scope: target.scope,
+      policy: target.policy,
+      recursion: target.recursion,
+      limit: readLimit,
+      ...(cursor === undefined ? {} : { cursor })
+    })
+  }
+
+  function startSpeculativeRead(
+    target: ContentsReadTarget
+  ): Promise<ContentsReadResult> | undefined {
+    const existing = speculativeReads.get(target.requestKey)
+    if (existing !== undefined) {
+      return existing.promise
+    }
+
+    if (speculativeReads.size >= maxSpeculativeReads) {
+      return undefined
+    }
+
+    const promise = readContents(target)
+    const generation = warmGeneration
+    speculativeReads.set(target.requestKey, {
+      requestKey: target.requestKey,
+      promise
+    })
+
+    void promise
+      .then((result) => {
+        if (result.state === 'ready' && generation === warmGeneration) {
+          storeWarmSnapshot({
+            requestKey: target.requestKey,
+            result,
+            ...(result.result.nextCursor === undefined
+              ? {}
+              : { nextCursor: result.result.nextCursor }),
+            ...((result.result.rows ?? []).length === 0
+              ? {}
+              : { accumulatedRows: result.result.rows ?? [] })
+          })
+        }
+      })
+      .catch(() => {
+        // Failed speculative reads are intentionally invisible to the accepted contents state.
+      })
+      .finally(() => {
+        speculativeReads.delete(target.requestKey)
+      })
+
+    return promise
+  }
+
+  function freshWarmSnapshot(requestKey: string): WarmSnapshot | undefined {
+    const snapshot = warmSnapshots.get(requestKey)
+
+    if (snapshot === undefined) {
+      return undefined
+    }
+
+    if (Date.now() > snapshot.expiresAtMs) {
+      warmSnapshots.delete(requestKey)
+      return undefined
+    }
+
+    warmSnapshots.delete(requestKey)
+    warmSnapshots.set(requestKey, snapshot)
+    return snapshot
+  }
+
+  function deleteWarmSnapshot(requestKey: string): void {
+    warmGeneration++
+    warmSnapshots.delete(requestKey)
+  }
+
+  function storeWarmSnapshotFromState(stateUpdate: ContentsBoundaryState): void {
+    if (stateUpdate.kind !== 'ready' || stateUpdate.result.state !== 'ready') {
+      return
+    }
+
+    storeWarmSnapshot({
+      requestKey: stateUpdate.requestKey,
+      result: stateUpdate.result,
+      ...(stateUpdate.nextCursor === undefined ? {} : { nextCursor: stateUpdate.nextCursor }),
+      ...(stateUpdate.accumulatedRows === undefined
+        ? {}
+        : { accumulatedRows: stateUpdate.accumulatedRows })
+    })
+  }
+
+  function storeWarmSnapshot(snapshot: Omit<WarmSnapshot, 'expiresAtMs'>): void {
+    warmSnapshots.delete(snapshot.requestKey)
+    warmSnapshots.set(snapshot.requestKey, {
+      ...snapshot,
+      expiresAtMs: Date.now() + warmSnapshotTtlMs
+    })
+
+    while (warmSnapshots.size > maxWarmSnapshots) {
+      const oldestKey = warmSnapshots.keys().next().value
+      if (oldestKey === undefined) {
+        return
+      }
+
+      warmSnapshots.delete(oldestKey)
+    }
+  }
+
+  function stateFromWarmSnapshot(snapshot: WarmSnapshot): ContentsBoundaryState {
+    return {
+      kind: 'ready',
+      requestKey: snapshot.requestKey,
+      result: snapshot.result,
+      ...(snapshot.nextCursor === undefined ? {} : { nextCursor: snapshot.nextCursor }),
+      ...(snapshot.accumulatedRows === undefined
+        ? {}
+        : { accumulatedRows: snapshot.accumulatedRows })
+    }
+  }
+
   return {
     state,
     readForBinding,
+    preloadForBinding,
+    cancelPreloadForBinding,
+    clearWarmSnapshots,
     clear,
     start,
     stop
+  }
+}
+
+function contentsReadTargetForBinding(
+  binding: RowBinding | undefined
+): ContentsReadTarget | undefined {
+  const scope = contentsScopeForBinding(binding)
+
+  if (scope === undefined) {
+    return undefined
+  }
+
+  const policy = defaultContentsPolicy
+  return {
+    scope,
+    policy,
+    recursion: contentsRecursion,
+    requestKey: contentsRequestKey(scope, policy, contentsRecursion)
   }
 }
 
