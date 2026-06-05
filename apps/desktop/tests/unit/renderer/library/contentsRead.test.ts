@@ -234,6 +234,28 @@ describe('createContentsReadController', () => {
     expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
   })
 
+  it('retains accepted rows when loading more contents fails', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding('11'))
+    contentsApi.resolveNext(
+      readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')], 'ready', 'cursor-a')
+    )
+    await initial
+
+    const loadMore = controller.readForBinding(directoryBinding('11'), { cursor: 'cursor-a' })
+    contentsApi.rejectNext(new Error('read failed'))
+
+    await expect(loadMore).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      refreshError: 'Unable to request library contents.'
+    })
+  })
+
   it('retains accepted rows when a refresh fails', async () => {
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)

@@ -252,12 +252,12 @@ function projectContentsState(options: {
     }
 
     return stateProjection({
-      kind: 'loading',
+      kind: 'notLoaded',
       ownerId: options.ownerId,
       title: options.title,
-      state: 'loading',
-      label: 'Loading contents',
-      detail: state.detail ?? 'Loading contents.'
+      state: 'notLoaded',
+      label: 'Contents not loaded',
+      detail: state.detail ?? 'Contents have not been loaded.'
     })
   }
 
@@ -280,6 +280,17 @@ function projectContentsState(options: {
       state: 'failed',
       label: 'Contents unavailable',
       detail: state.detail
+    })
+  }
+
+  if (state.pending !== undefined && state.pending.requestKey !== state.requestKey) {
+    return stateProjection({
+      kind: 'notLoaded',
+      ownerId: options.ownerId,
+      title: options.title,
+      state: 'notLoaded',
+      label: 'Contents pending',
+      detail: 'Updating selected contents.'
     })
   }
 

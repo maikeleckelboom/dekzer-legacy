@@ -305,6 +305,21 @@ describe('projectContents', () => {
     })
   })
 
+  it('projects explicit idle contents without pending as not loaded', () => {
+    const idle = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'idle',
+      detail: 'No contents scope is active.'
+    })
+
+    expect(idle.kind).toBe('notLoaded')
+    expect(idle.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'notLoaded',
+      label: 'Contents not loaded',
+      detail: 'No contents scope is active.'
+    })
+  })
+
   it('does not project pending contents without an accepted response as authoritative empty', () => {
     const pending = projectForSelection(browserState({}), 'navigation-row:7', {
       kind: 'idle',
@@ -322,6 +337,102 @@ describe('projectContents', () => {
       state: 'notLoaded',
       label: 'Contents pending'
     })
+  })
+
+  it('does not project initial pending contents as loading before threshold promotion', () => {
+    const pending = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'idle',
+      pending: {
+        requestKey: 'source:7',
+        sequence: 1,
+        detail: 'Loading contents.'
+      },
+      detail: 'Contents request is pending.'
+    })
+
+    expect(pending.kind).toBe('notLoaded')
+    expect(pending.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'notLoaded',
+      label: 'Contents pending'
+    })
+  })
+
+  it('projects threshold-promoted initial loading as loading', () => {
+    const loading = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'loading',
+      requestKey: 'source:7',
+      sequence: 1,
+      detail: 'Loading contents.'
+    })
+
+    expect(loading.kind).toBe('loading')
+    expect(loading.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'loading',
+      label: 'Loading contents'
+    })
+  })
+
+  it('keeps accepted rows visible for same-scope pending reads', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        pendingRequestKey: 'source:7'
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Source Fixture')
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(contents.rows[0]).not.toMatchObject({ state: 'loading' })
+  })
+
+  it('does not project retained rows as current contents during cross-scope pending reads', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode('12', 'New Album')])
+      }
+    })
+    const contents = projectForSelection(
+      state,
+      'source-directory:12',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        requestKey: 'source:7',
+        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive'
+      })
+    )
+
+    expect(contents.kind).toBe('notLoaded')
+    expect(contents.title).toBe('New Album')
+    expect(contents.detail).toBe('Updating selected contents.')
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'notLoaded',
+      label: 'Contents pending',
+      detail: 'Updating selected contents.'
+    })
+    expect(contents.rows.map((row) => row.label)).not.toContain('old.wav')
+  })
+
+  it('retains accepted rows after a failed refresh without projecting blocking failure', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        refreshError: 'Unable to request library contents.'
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(contents.rows[0]).not.toMatchObject({ state: 'failed' })
   })
 
   it('projects zero rows as authoritative empty only when accepted coverage says so', () => {
@@ -586,14 +697,27 @@ function readyContents(options: {
   readonly detail?: string
   readonly profile?: ContentsReadPolicy
   readonly emptyAuthoritative?: boolean
+  readonly requestKey?: string
+  readonly pendingRequestKey?: string
+  readonly refreshError?: string
 }): ContentsBoundaryState {
   return {
     kind: 'ready',
-    requestKey: 'source:7',
+    requestKey: options.requestKey ?? 'source:7',
     result: {
       state: 'ready',
       result: contentsResult(options)
-    }
+    },
+    ...(options.pendingRequestKey === undefined
+      ? {}
+      : {
+          pending: {
+            requestKey: options.pendingRequestKey,
+            sequence: 2,
+            detail: 'Loading contents.'
+          }
+        }),
+    ...(options.refreshError === undefined ? {} : { refreshError: options.refreshError })
   }
 }
 
