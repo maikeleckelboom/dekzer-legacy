@@ -14,6 +14,10 @@ const props = defineProps<{
   item: BrowserTreeVisibleItem
 }>()
 
+const emit = defineEmits<{
+  toggleDisclosure: []
+}>()
+
 const rowClass = computed(() =>
   props.item.isSelected
     ? 'border-l-(--color-accent) bg-(--color-surface-strong) text-(--color-text)'
@@ -82,13 +86,18 @@ const labelClass = computed(() => {
     :style="rowStyle"
     :title="item.node.detail"
   >
-    <span class="grid size-6 shrink-0 place-items-center" aria-hidden="true">
-      <Icon
-        v-if="hasAffordance"
-        :icon="item.isExpanded ? DisclosureOpenIcon : DisclosureClosedIcon"
-        size="sm"
-      />
-    </span>
+    <button
+      v-if="hasAffordance"
+      class="grid size-6 shrink-0 place-items-center rounded-sm text-inherit hover:bg-white/10 focus:outline-none"
+      type="button"
+      tabindex="-1"
+      :aria-label="item.isExpanded ? 'Collapse' : 'Expand'"
+      @click.stop="emit('toggleDisclosure')"
+      @mousedown.prevent
+    >
+      <Icon :icon="item.isExpanded ? DisclosureOpenIcon : DisclosureClosedIcon" size="sm" />
+    </button>
+    <span v-else class="grid size-6 shrink-0 place-items-center" aria-hidden="true"> </span>
 
     <span class="grid size-6 shrink-0 place-items-center" aria-hidden="true">
       <Icon v-if="rowIcon" :icon="rowIcon" size="sm" :tone="iconTone" />

@@ -38,8 +38,20 @@ function activatePrimaryAction(): void {
   tree.activatePrimary(props.item.id)
 }
 
-function handleClick(): void {
-  activatePrimaryAction()
+function handleRowClick(): void {
+  focusItem()
+
+  if (props.item.isActionItem) {
+    tree.activateAction(props.item.id)
+    return
+  }
+
+  tree.selectNode(props.item.id)
+}
+
+function handleDisclosureToggle(): void {
+  focusItem()
+  tree.toggleNode(props.item.id)
 }
 
 function handleFocus(): void {
@@ -102,10 +114,10 @@ function isPrimaryActivationKey(key: string): boolean {
     :data-expanded="item.isBranch ? String(item.isExpanded) : undefined"
     :data-selected="item.isSelected ? 'true' : undefined"
     :tabindex="tree.getItemTabIndex(item.id)"
-    @click="handleClick"
+    @click="handleRowClick"
     @focus="handleFocus"
     @keydown="handleKeydown"
   >
-    <TreeRow :item="item" />
+    <TreeRow :item="item" @toggle-disclosure="handleDisclosureToggle" />
   </div>
 </template>
