@@ -11,6 +11,7 @@
     "install:workspace": "pnpm install",
     "desktop:dev": "pnpm --filter @dekzer/desktop run dev",
     "desktop:dev:fresh": "pnpm --filter @dekzer/desktop run dev:fresh",
+    "desktop:format": "pnpm --filter @dekzer/desktop exec prettier --write",
     "library:contract:export": "cargo run -p xtask -- export-boundary-contract",
     "library:contract:check": "cargo run -p xtask -- check-boundary-contract",
     "library:contract:build": "pnpm --filter @dekzer/library-boundary-contract run build",
