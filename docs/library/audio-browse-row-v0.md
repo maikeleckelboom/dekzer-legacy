@@ -1,151 +1,221 @@
 ---
-status: design-proposal
-doctrine-version: 0.1
+status: boundary-decision
+doctrine-version: 0.2
 last-reviewed: 2026-06-06
 owner: library-substrate-boundary
 canonical-context:
   - library-contents-browse-policy
+  - library-contents-read-boundary
   - library-tree-selection-contents-contract
   - media-relevant-file-inventory-contract
 scope:
-  - audio-browse-row-v0-design
-  - contents-read-model-proposal
+  - audio-browse-row-v0-boundary
+  - contents-read-model-decision
 ---
 
 # Audio Browse Row V0
 
 ## Status
 
-Design proposal. Not implemented.
+Boundary decision. Not implemented.
 
-This document defines the first intentional audio-row read-model/product-row contract. It does not introduce a runtime
-type, generated contract, store model, or renderer behavior.
+This document resolves the V0 authority and implementation boundary for the audio browse row read-model concept. It
+does not introduce runtime behavior, generated contracts, store code, renderer behavior, or a dedicated generated row
+type.
 
-## Owner
+## Decision
 
-Library substrate and boundary own the read model. Renderer owns presentation of returned rows only.
+Audio browse row V0 should be implemented as a new `ContentsRowProfile` kind under the existing `readContents`
+boundary.
 
-## Problem
+The future implementation should add a row profile such as `audioBrowse` to the existing contents read policy and keep
+the existing contents result envelope, scope model, recursion model, coverage model, and cursor pagination. V0 rows
+should use the current contents file-row payload shape with the V0 field subset below. The product/read-model concept is
+audio browse row; it is not a canonical track, not a tree row, and not a separate browse endpoint.
 
-The current default contents browse is smooth enough for source-file audio browsing, but the row still feels like raw
-file inventory. V0 needs a narrow product row that keeps current source-file truth, gives the contents table enough
-stable fields for professional browsing, and avoids premature track identity or analysis claims.
+The smallest correct V0 field set is the current source-file audio row authority that already crosses the contents
+boundary:
 
-## Current behavior this proposal builds on
+- row id;
+- source id;
+- source file id;
+- parent directory id;
+- display label;
+- file name;
+- source-relative path;
+- media class;
+- file kind;
+- presence;
+- optional availability state, preserving current absence for source-file-backed rows;
+- optional updated timestamp;
+- result state;
+- result scope;
+- result policy;
+- recursion;
+- coverage;
+- cursor.
 
-The tree is navigation-only. Selecting a source, source location, or directory derives a contents scope. The default
-contents read requests `rowProfile = sourceFile`, `mediaClasses = audio`, and `recursion = recursive`.
+Normalized extension, source display label, source-location provenance, source-file row version, and container/codec are
+not V0 fields.
 
-Current contents rows come from `ContentsFileRow` in the boundary contract and `StoreContentsFileRow` in the store read
-model. Renderer projection maps those rows into `ContentRow` for table display. Warm contents snapshots, retained rows,
-delayed pending state, and coalesced invalidation refresh are runtime/perception behavior, not row authority.
+## Current Row Authority Inventory
 
-## V0 field classification
+| Surface                   | Current authority                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Store read model          | `StoreContentsFileRow` owns `id`, `source_id`, `source_file_id`, `parent_directory_id`, `label`, `relative_path`, `file_name`, `media_class`, `file_kind`, `presence`, `availability_state`, `primary_media`, `updated_at`, and internal `relative_path_browse_sort_key`. Source-file profile SQL returns source-file facts and `NULL` primary-media fields. |
+| Rust boundary protocol    | `ContentsReadRequest` owns `scope`, `policy`, `recursion`, `limit`, and `cursor`. `ContentsResult` owns `state`, echoed `scope`, echoed `policy`, echoed `recursion`, `rows`, `coverage`, optional `nextCursor`, and optional `detail`. `ContentsFileRow` owns the current row fields listed above.                                                          |
+| Generated TS contract     | `packages/library-boundary-contract` mirrors the Rust protocol. `ContentsRowProfile` currently supports only `sourceFile` and `primaryMedia`; no audio browse profile exists yet.                                                                                                                                                                            |
+| TS boundary client        | `LibraryBoundaryClient.readContents` sends the existing `snapshotRead/contentsRead` command and expects the existing `contents` reply. It adds no row authority.                                                                                                                                                                                             |
+| Desktop main adapter      | `apps/desktop/src/main/libraryContents/read.ts` normalizes scope, policy, recursion, limit, and cursor, maps generated `ContentsFileRow` into shared `ContentsFileRow`, and rejects invalid image/unsupported primary-media combinations. It adds no browse-field authority.                                                                                 |
+| Renderer boundary adapter | `apps/desktop/src/renderer/library/boundary/contentsRead.ts` currently requests `rowProfile: sourceFile`, `mediaClasses: ['audio']`, and `recursion: recursive`; it owns warm snapshots, retained rows, delayed pending display, and pagination accumulation only.                                                                                           |
+| Renderer projection       | `contents/projection.ts` maps rows to `ContentRow` display rows with `id`, `label`, `presence`, `detail`, `icon`, `mediaClass`, and `availabilityState`. Its relative-path fallback and media labels are presentation, not durable field authority.                                                                                                          |
+| Table display             | `contents/table.vue` displays `Name` and `Details` columns. It does not display extension, source label, source-location provenance, row version, container, or codec.                                                                                                                                                                                       |
+| Cursor fields             | Source-file cursor identity is store-owned and binds version, row-profile kind, scope, media classes, recursion, and last source-file order position: `relative_path_browse_sort_key`, `relative_path`, and `source_file_id`.                                                                                                                                |
+| Coverage fields           | `ContentsCoverage` owns `state`, `recursiveScopeComplete`, `emptyResultAuthoritative`, and optional `detail`; incomplete, scanning, blocked, failed, unavailable, and missing-location cases must not become authoritative empty results.                                                                                                                    |
+| Scope fields              | Contents scope supports source, source location, and directory. Directory scope carries `sourceId` and `sourceDirectoryId`; source-location scope carries `sourceLocationId`. Rows do not carry per-row source-location provenance.                                                                                                                          |
+| Stable row identity       | Current source-file rows use `source-file:{source_file_id}`. Primary-media rows may use primary-media or library-asset identities, but those are not V0 audio browse row identities.                                                                                                                                                                         |
+| Display fields            | Current display authority is `label`, `fileName`, `relativePath`, `mediaClass`, `fileKind`, `presence`, and optional `availabilityState`.                                                                                                                                                                                                                    |
+| Provenance fields         | Current per-row provenance is `sourceId`, `sourceFileId`, `parentDirectoryId`, and `relativePath`. Scope-level provenance is in `ContentsResult.scope`; coverage-level provenance is in `ContentsCoverage`.                                                                                                                                                  |
+| State fields              | Row state is `presence`, optional `availabilityState`, and optional `updatedAtMs`. Result state is `ContentsResult.state`, coverage, detail, and cursor.                                                                                                                                                                                                     |
 
-| Field                                | Classification | Source of authority                                                                                                                                     |
-| ------------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stable row id                        | current        | `ContentsFileRow.id`; renderer uses it as the content row key.                                                                                          |
-| Source id                            | current        | `ContentsFileRow.sourceId` and `StoreContentsFileRow.source_id`.                                                                                        |
-| Source file id                       | current        | `ContentsFileRow.sourceFileId` and `StoreContentsFileRow.source_file_id`.                                                                               |
-| Parent directory id                  | current        | `ContentsFileRow.parentDirectoryId` and `StoreContentsFileRow.parent_directory_id`.                                                                     |
-| Display label                        | current        | `ContentsFileRow.label`; renderer currently displays this as row label.                                                                                 |
-| File name                            | current        | `ContentsFileRow.fileName` and `StoreContentsFileRow.file_name`.                                                                                        |
-| Source-relative path                 | current        | `ContentsFileRow.relativePath` and `StoreContentsFileRow.relative_path`; used as current location provenance.                                           |
-| Media class                          | current        | `ContentsFileRow.mediaClass`; default policy restricts this to audio.                                                                                   |
-| File kind                            | current        | `ContentsFileRow.fileKind`; current audio rows use path-derived `audio`.                                                                                |
-| Presence                             | current        | `ContentsFileRow.presence`; values are present, missing, or removed.                                                                                    |
-| Availability state                   | current        | Optional `ContentsFileRow.availabilityState`; currently available when the backing read model has it.                                                   |
-| Updated timestamp                    | current        | Optional `ContentsFileRow.updatedAtMs` mapped from `StoreContentsFileRow.updated_at`.                                                                   |
-| Coverage state                       | current        | `ContentsResult.coverage`; row pages must not claim completeness without it.                                                                            |
-| Pagination cursor                    | current        | `ContentsResult.nextCursor`; cursor identity is owned by the contents read.                                                                             |
-| Normalized extension                 | proposed       | Needed for a stable table column if extension/container should be displayed separately from file name. Not a current boundary field.                    |
-| Source display label                 | proposed       | Useful when a recursive source or source-location browse spans multiple visible source roots/locations. Not a current row field.                        |
-| Source-location id/label             | proposed       | Useful provenance for multi-location source browsing. Current scope may be a source location, but rows do not carry per-row source-location provenance. |
-| Row version                          | proposed       | Needed if future row identity needs versioned stale checks beyond `updatedAtMs` and cursor identity. Not a current source-file row field.               |
-| Container/codec format               | proposed       | Only if backed by current or newly contracted file evidence. V0 must not infer codec from unsupported analysis surfaces.                                |
-| Title, artist, album                 | rejected       | These appear only in optional primary-media summary today and are not reliable source-file browse-row fields for V0.                                    |
-| Duration                             | rejected       | Not part of V0 unless a future reliable audio-row contract makes it current.                                                                            |
-| BPM                                  | rejected       | Analysis fact, not V0 browse identity.                                                                                                                  |
-| Musical key                          | rejected       | Analysis fact, not V0 browse identity.                                                                                                                  |
-| Waveform                             | rejected       | Analysis artifact, not V0 browse identity.                                                                                                              |
-| Artwork                              | rejected       | Role decision, not V0 browse identity.                                                                                                                  |
-| CUE association                      | rejected       | Association/segmentation decision, not V0 browse identity.                                                                                              |
-| Canonical track id                   | rejected       | Track identity decision, not V0 browse identity.                                                                                                        |
-| Duplicate or same-song key           | rejected       | Identity resolution, not V0 browse identity.                                                                                                            |
-| Analysis readiness                   | rejected       | Preparation has grouped detail surfaces; V0 does not collapse it into one field.                                                                        |
-| Stems state                          | rejected       | Preparation/analysis domain, not V0 browse identity.                                                                                                    |
-| Tags, notes, crates, sleeves, routes | rejected       | Organization domains, not V0 browse identity.                                                                                                           |
-| Cloud or streaming availability      | rejected       | Not in the current row contract for V0.                                                                                                                 |
+## Field Authority Matrix
 
-## Non-goals
+| Field                           | Decision      | Authority                     | Reason                                                                                                                                                          | Implementation impact                                                                                                |
+| ------------------------------- | ------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Row id                          | current       | current contract              | `ContentsFileRow.id` is generated from the current store row identity.                                                                                          | Preserve `source-file:{source_file_id}` identity for source-file-backed audio browse rows.                           |
+| Source id                       | current       | current contract              | `ContentsFileRow.sourceId` and `StoreContentsFileRow.source_id` already cross the boundary.                                                                     | Preserve unchanged.                                                                                                  |
+| Source file id                  | current       | current contract              | `ContentsFileRow.sourceFileId` and `StoreContentsFileRow.source_file_id` already cross the boundary.                                                            | Preserve unchanged; do not treat it as a canonical track id.                                                         |
+| Parent directory id             | current       | current contract              | `ContentsFileRow.parentDirectoryId` maps from `source_files.parent_source_directory_id`.                                                                        | Preserve unchanged.                                                                                                  |
+| Display label                   | current       | current store/read model      | Store contents labels fall back from title to file name to relative path; source-file rows currently use file name unless empty.                                | Preserve store-owned label; renderer may display it only.                                                            |
+| File name                       | current       | current contract              | `ContentsFileRow.fileName` maps from `source_files.name`.                                                                                                       | Preserve unchanged.                                                                                                  |
+| Source-relative path            | current       | current contract              | `ContentsFileRow.relativePath` maps from `source_files.relative_path` and is current row location provenance.                                                   | Preserve unchanged.                                                                                                  |
+| Media class                     | current       | current contract              | `ContentsFileRow.mediaClass` maps from `source_files.media_class`; V0 policy/profile must return audio rows only.                                               | Enforce audio browse profile parity with current audio source-file reads.                                            |
+| File kind                       | current       | current contract              | `ContentsFileRow.fileKind` maps from `source_files.file_kind`.                                                                                                  | Preserve as file-kind authority, not container or codec.                                                             |
+| Presence                        | current       | current contract              | `ContentsFileRow.presence` maps from `source_files.presence_state`.                                                                                             | Preserve present/missing/removed behavior.                                                                           |
+| Availability state              | current       | current contract              | The field exists on `ContentsFileRow`; source-file profile currently returns it absent.                                                                         | Keep optional and absent unless store/read-model authority supplies it; do not synthesize in renderer.               |
+| Updated timestamp               | current       | current store/read model      | `ContentsFileRow.updatedAtMs` maps from `StoreContentsFileRow.updated_at`.                                                                                      | Preserve as timestamp, not a row version.                                                                            |
+| Result state                    | current       | current contract              | `ContentsResult.state` already carries ready, empty, partial, unavailable, missing, blocked, failed, policy-conflict, and cursor-invalid outcomes.              | Reuse unchanged.                                                                                                     |
+| Scope echo                      | current       | current contract              | `ContentsResult.scope` echoes source, source-location, or directory scope.                                                                                      | Reuse unchanged.                                                                                                     |
+| Policy echo                     | current       | current contract              | `ContentsResult.policy` echoes media classes and row profile.                                                                                                   | Add the future audio browse profile to cursor identity and echo behavior.                                            |
+| Recursion                       | current       | current contract              | `ContentsResult.recursion` echoes immediate or recursive.                                                                                                       | Reuse unchanged.                                                                                                     |
+| Coverage                        | current       | current contract              | `ContentsResult.coverage` owns completeness and authoritative-empty semantics.                                                                                  | Reuse unchanged.                                                                                                     |
+| Cursor                          | current       | current store/read model      | `nextCursor` is store-owned and binds scope, policy, recursion, and row ordering position.                                                                      | Add a distinct cursor kind/version path for the future audio browse profile or extend identity without mixing pages. |
+| Normalized extension            | promote later | proposed read-model authority | Useful as a convenience derived from persisted file name/path, but not currently a boundary field. It must be named extension, not format, container, or codec. | Exclude from V0. Add only in a later store/read-model-owned slice with tests.                                        |
+| Source display label            | defer         | none                          | Current row payload does not carry source display labels, and current selected-scope UI can display scope title outside the row.                                | Exclude from V0; add only if a later product column requires it.                                                     |
+| Source-location id              | defer         | none                          | Current rows do not carry per-row location membership, and overlapping accepted locations make naive inference ambiguous.                                       | Exclude from V0; add only with explicit location-membership authority and tie-break rules.                           |
+| Source-location label           | defer         | none                          | Depends on source-location provenance, which is not current per-row authority.                                                                                  | Exclude from V0.                                                                                                     |
+| Source-file row version         | defer         | none                          | `source_files` has `updated_at` but no row-version concept. Navigation and primary-media surfaces have row versions; source-file rows do not.                   | Exclude from V0; do not map `updatedAtMs` as a version.                                                              |
+| Container                       | reject        | none                          | Source-file rows have no explicit container evidence. File kind and extension are not container authority.                                                      | Do not add to V0.                                                                                                    |
+| Codec                           | reject        | none                          | Codec appears only on primary-media/evidence-backed summaries, not current source-file audio browse rows.                                                       | Do not add to V0.                                                                                                    |
+| Title                           | reject        | none                          | Optional primary-media summary fields are not reliable source-file browse-row fields.                                                                           | Do not add to V0.                                                                                                    |
+| Artist                          | reject        | none                          | Optional primary-media summary fields are not reliable source-file browse-row fields.                                                                           | Do not add to V0.                                                                                                    |
+| Album                           | reject        | none                          | Optional primary-media summary fields are not reliable source-file browse-row fields.                                                                           | Do not add to V0.                                                                                                    |
+| Duration                        | reject        | none                          | Duration is evidence/analysis-adjacent and not current source-file browse-row authority.                                                                        | Do not add to V0.                                                                                                    |
+| BPM                             | reject        | none                          | Analysis fact, not browse-row identity.                                                                                                                         | Do not add to V0.                                                                                                    |
+| Musical key                     | reject        | none                          | Analysis fact, not browse-row identity.                                                                                                                         | Do not add to V0.                                                                                                    |
+| Waveform                        | reject        | none                          | Analysis artifact, not browse-row identity.                                                                                                                     | Do not add to V0.                                                                                                    |
+| Artwork                         | reject        | none                          | Role decision, not browse-row identity.                                                                                                                         | Do not add to V0.                                                                                                    |
+| CUE association                 | reject        | none                          | Association/segmentation decision, not browse-row identity.                                                                                                     | Do not add to V0.                                                                                                    |
+| Canonical track id              | reject        | none                          | Track identity decision, not browse-row identity.                                                                                                               | Do not add to V0.                                                                                                    |
+| Duplicate or same-song key      | reject        | none                          | Identity resolution, not browse-row identity.                                                                                                                   | Do not add to V0.                                                                                                    |
+| Analysis readiness              | reject        | none                          | Preparation must remain grouped by fact, structure, artifact, work, outcome, and satisfaction concepts.                                                         | Do not add a flat readiness field to V0.                                                                             |
+| Stems state                     | reject        | none                          | Preparation/analysis domain, not browse-row identity.                                                                                                           | Do not add to V0.                                                                                                    |
+| Tags                            | reject        | none                          | Organization domain, not browse-row identity.                                                                                                                   | Do not add to V0.                                                                                                    |
+| Notes                           | reject        | none                          | Organization domain, not browse-row identity.                                                                                                                   | Do not add to V0.                                                                                                    |
+| Crates                          | reject        | none                          | Organization domain, not browse-row identity.                                                                                                                   | Do not add to V0.                                                                                                    |
+| Sleeves                         | reject        | none                          | Organization domain, not browse-row identity.                                                                                                                   | Do not add to V0.                                                                                                    |
+| Routes                          | reject        | none                          | Organization domain, not browse-row identity.                                                                                                                   | Do not add to V0.                                                                                                    |
+| Cloud or streaming availability | reject        | none                          | Not current local source-file browse authority.                                                                                                                 | Do not add to V0.                                                                                                    |
 
-V0 does not implement the read model, add generated contracts, add renderer filtering/sorting, or change contents
-policy. It does not define canonical tracks, deck loading, CUE parsing, artwork inference, duplicate resolution,
-analysis readiness, waveform display, stems, tags, notes, crates, sleeves, routes, or cloud/streaming availability.
+## Boundary Shape
 
-V0 does not describe preparation as one flat object or one status. If preparation appears later, it must preserve the
-separate fact, structure, artifact, work, outcome, and satisfaction concepts from the preparation detail surfaces.
+### Selected: new row profile under existing `readContents`
 
-## Authority boundaries
+The future implementation should extend `ContentsRowProfile` with an audio browse profile and keep the existing
+`ContentsReadRequest` and `ContentsResult` shape.
 
-| Owner                         | Owns                                                                                                     |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Store/read model              | Source-file identity, current row facts, ordering, cursor position, coverage.                            |
-| Boundary protocol             | Typed app-safe fields and absence/presence of optional fields.                                           |
-| Renderer                      | Table layout, icons, labels, contained scrolling, delayed pending presentation, retained-row perception. |
-| Invalidation refresh planning | Coalescing current visible refreshes and clearing warm runtime snapshots.                                |
+This is the smallest correct boundary because it preserves:
 
-Renderer must not infer authoritative browse fields from tree rows, filesystem paths outside the boundary, local sort
-state, or warm snapshots.
+- cursor compatibility by extending the existing cursor identity model with a distinct profile kind;
+- coverage compatibility by reusing `ContentsCoverage`;
+- source, source-location, and directory scope compatibility;
+- recursive default contents browse behavior;
+- source-file audio parity without making source-file rows canonical tracks;
+- generated contract locality: one enum/profile addition instead of a second command family;
+- renderer migration size: switch the default profile and keep the existing contents controller, pagination, and table
+  projection;
+- one browse path for contents-pane reads.
 
-## Migration path from current contents source-file rows
+### Rejected: new contents row kind under existing result shape
 
-1. Keep the current default contents policy as `sourceFile` + audio + recursive.
-2. Define the future audio-row read model as a boundary/store projection over current source-file rows.
-3. Start V0 with current fields that already cross the boundary.
-4. Add proposed provenance or extension fields only when their store authority is explicit.
-5. Preserve cursor identity and coverage semantics so old and new pages cannot be mixed silently.
-6. Switch renderer projection after the new read model exists and tests prove parity for current source-file audio rows.
+A row union or new row kind would force renderer and generated-contract branching before V0 has fields that require a
+separate payload. It also invites a type-level product concept before the read-model authority is meaningfully distinct.
 
-## Rejection cases
+### Rejected: new dedicated read endpoint
 
-A future implementation fails this proposal if it:
+A dedicated endpoint would duplicate scope, recursion, coverage, cursor, validation, IPC, and client surfaces already
+owned by `readContents`. There is no ownership reason for a new command.
 
-- adds audio rows back into tree navigation;
-- introduces renderer-side filtering or sorting as browse authority;
-- treats retained rows or warm snapshots as durable truth;
-- exposes optional primary-media summary fields as reliable V0 browse-row fields;
-- adds BPM, musical key, duration, artwork, waveform, CUE association, canonical track, analysis readiness, stems, tags,
-  notes, crates, sleeves, routes, or cloud/streaming availability to V0;
-- collapses preparation into one status;
-- changes contents policy or media classes to make the proposal pass.
+### Rejected: no new boundary yet
 
-## Test and acceptance plan for future implementation
+Keeping only source-file rows leaves the product/read-model boundary unresolved and keeps the default browse expressed
+as raw inventory policy. Source-file rows should remain available for explicit inventory/diagnostic use, but the main
+audio browse should have an explicit backend-owned profile.
 
-Future implementation should prove:
+## Future Implementation Acceptance Criteria
 
-- audio rows match current source-file audio results for the same source, source location, directory, recursion, limit,
-  and cursor;
-- row ids remain stable across refreshes when source-file identity is unchanged;
-- cursor paging produces no duplicates or gaps;
-- source removal clears accepted selection and contents after removal is accepted;
-- incomplete, blocked, unavailable, and missing-location states do not render as authoritative empty results;
-- warm prefetch never widens policy or authorizes stale data;
-- contents table rows remain browsable inside the library panel without app-level overflow.
+- `readContents` accepts the audio browse row profile and rejects incompatible media-class policies instead of silently
+  widening or narrowing them.
+- The default main contents browse can request audio browse rows with recursive source, source-location, and directory
+  scopes.
+- V0 audio browse rows match current `sourceFile` + `audio` results for the same scope, recursion, limit, and cursor,
+  including row order and absence/presence of optional fields.
+- Audio browse rows never carry primary-media summary fields, canonical track identity, preparation summaries, waveform,
+  stems, BPM, key, duration, artwork, CUE association, tags, notes, crates, sleeves, routes, or cloud/streaming state.
+- Cursor identity includes the audio browse profile and cannot mix source-file, primary-media, and audio-browse pages.
+- Coverage, `emptyResultAuthoritative`, blocked, failed, scanning, incomplete, source-unavailable, and location-missing
+  semantics remain unchanged.
+- Source-file rows are not added back to tree navigation.
+- Renderer does not filter, sort, or derive authoritative audio browse fields.
 
-## Suggested implementation order, no code
+## Required Tests For The Later Implementation Slice
 
-1. Ratify this proposal against current `ContentsFileRow` and store fields.
-2. Decide whether normalized extension, source display label, source-location provenance, row version, or container
-   format are required for V0 acceptance.
-3. Add store/read-model tests for any proposed fields before exposing them.
-4. Add boundary contract fields only after store authority exists.
-5. Add renderer projection for the new audio row surface.
-6. Keep current source-file audio browse as the fallback until parity tests pass.
+- Store read-model tests proving audio browse profile parity with current `sourceFile` + audio recursive and immediate
+  reads for source, source-location, and directory scopes.
+- Store cursor tests proving audio browse cursor page two, invalid cursor profile mismatch, policy mismatch, recursion
+  mismatch, scope mismatch, and no duplicate/gap behavior.
+- Store coverage tests proving incomplete, blocked, failed, unavailable, and missing-location cases keep current
+  coverage semantics.
+- Boundary protocol serialization tests for the new row-profile kind and cursor-invalid/policy-conflict behavior.
+- Boundary service mapping tests proving profile mapping and row parity.
+- Generated contract checks proving TS/schema include the new row-profile kind and no new dedicated row type.
+- Desktop main adapter tests proving request normalization, generated-contract mapping, error mapping, and no
+  renderer-side field derivation.
+- Renderer boundary tests proving the default request uses the new profile, preserves recursive audio browse, retains
+  cursor pagination, and keeps warm snapshots scoped to the request key.
+- Renderer projection tests proving current row display parity and no filtering/sorting authority.
 
-## Open gaps, if current fields are insufficient
+## Contract Generation Expectations
 
-Current rows do not expose a normalized extension field, source display label, source-location provenance per row, a
-source-file row version, or a reliable audio container/codec field. If the contents table needs those as product
-columns, the future implementation must add explicit read-model authority instead of deriving them as hidden renderer
-truth.
+The implementation slice should update Rust protocol first, then regenerate `packages/library-boundary-contract` from
+the Rust source of truth. Generated TS and JSON schema should change only to add the new `ContentsRowProfile` variant
+and any mechanical references required by that variant. No dedicated audio row type, dedicated endpoint, or source
+hierarchy contract change should appear.
+
+## Renderer Migration Expectations
+
+The renderer migration should be limited to the default contents policy and request-key handling for the new profile.
+Projection and table code should continue to render returned rows and should not derive extension, source label,
+source-location provenance, row version, container, or codec. Source-file rows should remain available for explicit
+non-default inventory/diagnostic modes.
+
+## Unresolved Gaps
+
+- Normalized extension is useful later, but it needs store/read-model authority and must remain an extension field, not
+  format, container, or codec.
+- Source display label is not a V0 row field. A later product column should decide whether scope title is sufficient or
+  whether row-level source labels are required.
+- Source-location provenance is not safe to infer per row because accepted locations can overlap. A later slice would
+  need explicit membership authority and deterministic tie-break rules.
+- Source-file row version does not exist. `updatedAtMs` is a timestamp and must not be described as a row version.
+- Container and codec are rejected for source-file audio browse rows until explicit media evidence authority is chosen.
