@@ -37,9 +37,8 @@ export type SourceScanRefreshPlanInput = {
 export type InvalidationRefreshDependencies = {
   readonly hierarchyRead: Pick<
     LibraryHierarchyReadController,
-    'refreshNavigationRows' | 'refreshBrowserWindows'
-  > &
-    Partial<Pick<LibraryHierarchyReadController, 'refresh'>>
+    'refreshNavigationRows' | 'refreshBrowserWindows' | 'refresh'
+  >
   readonly sourceLifecycleRead?: Pick<SourceLifecycleReadController, 'refreshSourceLifecycles'>
   readonly sourceLifecycleSourceIds?: ReadonlySet<string>
   readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>

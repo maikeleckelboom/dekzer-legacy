@@ -177,7 +177,11 @@ describe('executeLibraryRefreshPlan', () => {
 
   it('executes gap recovery through the same plan and keeps acknowledgement policy visible', async () => {
     const dependencies = testDependencies({
-      refresh: vi.fn(async () => false),
+      hierarchyRead: {
+        refresh: vi.fn(async () => false),
+        refreshNavigationRows: vi.fn(async () => true),
+        refreshBrowserWindows: vi.fn(async () => true)
+      },
       clearContentsWarmSnapshots: vi.fn()
     })
     const plan = buildGapRecoveryRefreshPlan()
@@ -208,6 +212,37 @@ describe('executeLibraryRefreshPlan', () => {
     expect(dependencies.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(
       new Set(['7'])
     )
+  })
+
+  it('delegates missing selected binding to contentsRead rather than silently retaining stale contents', async () => {
+    const refreshContentsForCurrentSelection = vi.fn(async () => false)
+    const dependencies = testDependencies({
+      refreshContentsForCurrentSelection
+    })
+    const plan = buildMaintainedSnapshotInvalidationRefreshPlan({
+      invalidations: [invalidation('libraryBrowser', '1')],
+      sourceLifecycleSourceIds: []
+    })
+
+    await expect(executeLibraryRefreshPlan(plan, dependencies)).resolves.toBe(false)
+
+    expect(refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports failure when hierarchy refresh fails for gap recovery', async () => {
+    const dependencies = testDependencies({
+      hierarchyRead: {
+        refresh: vi.fn(async () => false),
+        refreshNavigationRows: vi.fn(async () => true),
+        refreshBrowserWindows: vi.fn(async () => true)
+      },
+      clearContentsWarmSnapshots: vi.fn()
+    })
+    const plan = buildGapRecoveryRefreshPlan()
+
+    await expect(executeLibraryRefreshPlan(plan, dependencies)).resolves.toBe(false)
+
+    expect(dependencies.hierarchyRead.refresh).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -426,15 +461,13 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
 })
 
 function testDependencies(
-  overrides: Partial<InvalidationRefreshDependencies> & {
-    readonly refresh?: () => Promise<boolean>
-  } = {}
+  overrides: Partial<InvalidationRefreshDependencies> = {}
 ): InvalidationRefreshDependencies {
-  const { hierarchyRead, refresh, ...rest } = overrides
+  const { hierarchyRead, ...rest } = overrides
 
   return {
     hierarchyRead: {
-      ...(refresh === undefined ? {} : { refresh }),
+      refresh: vi.fn(async () => true),
       refreshNavigationRows: vi.fn(async () => true),
       refreshBrowserWindows: vi.fn(async () => true),
       ...hierarchyRead

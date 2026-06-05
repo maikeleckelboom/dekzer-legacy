@@ -706,6 +706,49 @@ describe('createContentsReadController', () => {
       refreshError: 'Unable to request library contents.'
     })
   })
+
+  it('clears stale contents when readForBinding receives undefined binding', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    expect(controller.state.value.kind).toBe('ready')
+
+    await expect(controller.readForBinding(undefined, { force: true })).resolves.toBe(false)
+    expect(controller.state.value.kind).toBe('idle')
+    expect(contentsApi.requests).toHaveLength(1)
+  })
+
+  it('clears stale contents when readForBinding receives a readState binding', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    expect(controller.state.value.kind).toBe('ready')
+
+    await expect(controller.readForBinding(readStateBinding(), { force: true })).resolves.toBe(false)
+    expect(controller.state.value.kind).toBe('idle')
+  })
+
+  it('clears contents and returns false for undefined binding without stale state', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    await expect(controller.readForBinding(undefined)).resolves.toBe(false)
+    expect(controller.state.value).toMatchObject({
+      kind: 'idle',
+      detail: 'No contents scope is active.'
+    })
+  })
 })
 
 function directoryBinding(directoryId = '11'): RowBinding {

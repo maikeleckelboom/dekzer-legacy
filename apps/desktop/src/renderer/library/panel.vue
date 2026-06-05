@@ -480,30 +480,15 @@ function refreshPlanExecutionDependencies(): InvalidationRefreshDependencies {
 }
 
 function refreshContentsForCurrentSelection(): Promise<boolean> {
-  const binding = currentSelectedBinding()
-
-  if (!isContentsReadableBinding(binding)) {
-    return Promise.resolve(true)
-  }
-
-  return contentsRead.readForBinding(binding, { force: true })
-}
-
-function currentSelectedBinding(): RowBinding | undefined {
   const selectedId = selectedNodeId.value
   const projection = browserProjection.value
 
   if (selectedId === undefined || projection === undefined) {
-    return undefined
+    contentsRead.clear()
+    return Promise.resolve(false)
   }
 
-  return projection.bindingsById.get(selectedId)
-}
-
-function isContentsReadableBinding(
-  binding: RowBinding | undefined
-): binding is Extract<RowBinding, { readonly kind: 'source' | 'directory' }> {
-  return binding?.kind === 'source' || binding?.kind === 'directory'
+  return contentsRead.readForBinding(projection.bindingsById.get(selectedId), { force: true })
 }
 
 async function handleRemoveSource(): Promise<void> {
