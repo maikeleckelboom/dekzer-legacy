@@ -10,6 +10,7 @@ export type LibraryBoundaryStdioLocalErrorCode =
   | "closedBeforeReady"
   | "duplicateRequestId"
   | "executeAfterClose"
+  | "closeTimeout"
   | "malformedStdout"
   | "processExit"
   | "spawnFailure"

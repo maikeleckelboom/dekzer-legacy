@@ -34,6 +34,7 @@ export type LibraryBoundaryStdioTransportOptions = {
   readonly userDataPath: string;
   readonly environment: LibraryBoundaryStdioEnvironment;
   readonly serverArgs?: readonly string[];
+  readonly closeTimeoutMs?: number;
   readonly cwd?: string;
   readonly diagnostics?: (diagnostic: LibraryBoundaryStdioDiagnostic) => void;
   readonly requestIdFactory?: () => string;
@@ -56,10 +57,13 @@ export class LibraryBoundaryStdioTransport
   readonly #diagnostics:
     | ((diagnostic: LibraryBoundaryStdioDiagnostic) => void)
     | undefined;
+  readonly #closeTimeoutMs: number | undefined;
   readonly #pending = new Map<string, PendingRequest>();
   readonly #requestIdFactory: () => string;
   readonly #stdout: Interface;
   readonly #stderr: Interface;
+  readonly #stdoutClosed: Promise<void>;
+  readonly #stderrClosed: Promise<void>;
   readonly #pendingEmptyResolvers = new Set<() => void>();
   #readyReject!: (reason: unknown) => void;
   #readyResolve!: () => void;
@@ -71,6 +75,7 @@ export class LibraryBoundaryStdioTransport
 
   constructor(options: LibraryBoundaryStdioTransportOptions) {
     this.#diagnostics = options.diagnostics;
+    this.#closeTimeoutMs = options.closeTimeoutMs;
     this.#requestIdFactory = options.requestIdFactory ?? randomUUID;
     this.#child = spawn(
       options.serverBinaryPath,
@@ -95,6 +100,8 @@ export class LibraryBoundaryStdioTransport
       input: this.#child.stderr,
       crlfDelay: Infinity
     });
+    this.#stdoutClosed = interfaceClosed(this.#stdout);
+    this.#stderrClosed = interfaceClosed(this.#stderr);
     this.ready = new Promise((resolve, reject) => {
       this.#readyResolve = resolve;
       this.#readyReject = reject;
@@ -175,20 +182,84 @@ export class LibraryBoundaryStdioTransport
         )
       );
     }
-    this.#closePromise = (async () => {
-      await this.#waitForPendingRequests();
-      if (!this.#child.stdin.destroyed) {
-        this.#child.stdin.end();
-      }
-      await this.#exitPromise;
-      this.#stdout.close();
-      this.#stderr.close();
-      if (this.#state !== "failed") {
-        this.#state = "closed";
-      }
-    })();
+    this.#closePromise = this.#closeTimeoutMs === undefined
+      ? this.#closeGracefully()
+      : this.#closeWithTimeout(this.#closeTimeoutMs);
 
     return this.#closePromise;
+  }
+
+  async #closeGracefully(): Promise<void> {
+    await this.#waitForPendingRequests();
+    if (!this.#child.stdin.destroyed) {
+      this.#child.stdin.end();
+    }
+    await this.#exitPromise;
+    this.#stdout.close();
+    this.#stderr.close();
+    await Promise.all([this.#stdoutClosed, this.#stderrClosed]);
+    if (this.#state !== "failed") {
+      this.#state = "closed";
+    }
+  }
+
+  async #closeWithTimeout(timeoutMs: number): Promise<void> {
+    const closeError = new LibraryBoundaryStdioTransportError(
+      "closeTimeout",
+      `library boundary stdio transport close timed out after ${timeoutMs}ms`
+    );
+    let timeoutId: NodeJS.Timeout | null = null;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = globalThis.setTimeout(() => {
+        this.#forceClose(closeError);
+        reject(closeError);
+      }, timeoutMs);
+    });
+
+    try {
+      await Promise.race([this.#closeGracefully(), timeout]);
+    } catch (error) {
+      if (error === closeError) {
+        await this.#waitForForcedExit(timeoutMs, closeError);
+      }
+      throw error;
+    } finally {
+      if (timeoutId !== null) {
+        globalThis.clearTimeout(timeoutId);
+      }
+    }
+  }
+
+  #forceClose(error: LibraryBoundaryStdioTransportError): void {
+    this.#state = "failed";
+    this.#rejectReady(error);
+    this.#rejectAllPending(error);
+    this.#child.stdin.destroy();
+    this.#child.stdout.destroy();
+    this.#child.stderr.destroy();
+    if (this.#child.exitCode === null && this.#child.signalCode === null) {
+      this.#child.kill();
+    }
+  }
+
+  #waitForForcedExit(
+    timeoutMs: number,
+    closeError: LibraryBoundaryStdioTransportError
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeoutId = globalThis.setTimeout(() => {
+        reject(new LibraryBoundaryStdioTransportError(
+          "closeTimeout",
+          `library boundary stdio process did not exit within ${timeoutMs}ms after close timeout`,
+          { cause: closeError }
+        ));
+      }, timeoutMs);
+
+      void this.#exitPromise.then(() => {
+        globalThis.clearTimeout(timeoutId);
+        resolve();
+      });
+    });
   }
 
   #createPendingRequest(requestId: string): PendingRequest {
@@ -483,6 +554,12 @@ function pendingPromise(pending: PendingRequest): Promise<CommandOutcome> {
   }
 
   return promise;
+}
+
+function interfaceClosed(readline: Interface): Promise<void> {
+  return new Promise((resolve) => {
+    readline.once("close", resolve);
+  });
 }
 
 export function createLibraryBoundaryStdioTransport(

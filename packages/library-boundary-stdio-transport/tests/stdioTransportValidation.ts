@@ -39,13 +39,15 @@ function createPlaylistRequest(displayName: string): CommandRequest {
 
 function createTransport(
   requestIdFactory = sequentialRequestIdFactory(),
-  startupMode = "ready"
+  startupMode = "ready",
+  closeTimeoutMs?: number
 ): LibraryBoundaryStdioTransport {
   return new LibraryBoundaryStdioTransport({
     serverBinaryPath: process.execPath,
     serverArgs: [fixtureServerPath, startupMode],
     userDataPath: process.cwd(),
     environment: "development",
+    closeTimeoutMs,
     requestIdFactory
   });
 }
@@ -534,6 +536,29 @@ async function validatesConcurrentWritesUseCompleteJsonLines(): Promise<void> {
   }
 }
 
+async function validatesCloseTimeoutRejectsPendingAndAwaitsChildExit(): Promise<void> {
+  const transport = createTransport(sequentialRequestIdFactory(), "ready", 50);
+  await transport.ready;
+
+  const pending = transport.execute(createPlaylistRequest("never-respond"));
+  void pending.catch(() => undefined);
+  await sleep(15);
+
+  const closeError = await rejects(
+    () => transport.close(),
+    LibraryBoundaryStdioTransportError,
+    "close timeout rejects instead of hanging on a pending request"
+  );
+  equal(closeError.code, "closeTimeout", "close timeout code is explicit");
+
+  const pendingError = await rejects(
+    () => pending,
+    LibraryBoundaryStdioTransportError,
+    "close timeout rejects the pending request"
+  );
+  equal(pendingError.code, "closeTimeout", "pending request sees close timeout");
+}
+
 function successPlaylistId(outcome: CommandOutcome): string {
   must(outcome.type === "success", "expected success outcome");
   const reply = outcome.payload.reply;
@@ -624,3 +649,4 @@ await validatesProcessExitRejectsPending();
 await validatesConcurrentResponsesRouteByRequestId();
 await validatesDuplicateGeneratedRequestIdRejectsBeforeWrite();
 await validatesConcurrentWritesUseCompleteJsonLines();
+await validatesCloseTimeoutRejectsPendingAndAwaitsChildExit();

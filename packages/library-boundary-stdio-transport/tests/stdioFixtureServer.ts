@@ -136,6 +136,10 @@ stdin.on("line", (line) => {
     return;
   }
 
+  if (displayName === "never-respond") {
+    return;
+  }
+
   if (displayName.startsWith("concurrent-")) {
     concurrentRequests.push(envelope);
     if (concurrentRequests.length === 2) {
