@@ -26,6 +26,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  tree.cancelPrepareNode(props.item.id)
   tree.registerItemElement(props.item.id)
 })
 

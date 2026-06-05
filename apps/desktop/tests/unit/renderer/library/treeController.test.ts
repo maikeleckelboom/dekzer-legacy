@@ -126,12 +126,17 @@ describe('useTreeController', () => {
 
   it('cancelling a prepared row emits cancel intent without selecting or expanding', () => {
     const harness = treeHarness()
+    const activeNodeId = harness.controller.activeNodeId.value
 
     harness.controller.cancelPrepareNode('branch-a')
 
+    expect(harness.controller.activeNodeId.value).toBe(activeNodeId)
     expect(harness.selectedNodeId.value).toBeUndefined()
     expect(harness.expandedNodeIds.value.has('branch-a')).toBe(false)
     expect(harness.events.cancelPrepare).toEqual(['branch-a'])
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.toggle).toEqual([])
+    expect(harness.events.activateAction).toEqual([])
     expect(harness.events.log).toEqual(['cancelPrepare:branch-a'])
   })
 
