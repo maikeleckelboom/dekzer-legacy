@@ -839,7 +839,9 @@ fn read_child_rows(
 
 fn directory_visibility_predicate_sql(row_admission: LibraryTreeRowAdmission) -> String {
     let revealable_descendant_predicate = match row_admission {
-        LibraryTreeRowAdmission::Performance => "has_primary_media_descendant = 1",
+        LibraryTreeRowAdmission::NavigationOnly | LibraryTreeRowAdmission::Performance => {
+            "has_primary_media_descendant = 1"
+        }
         LibraryTreeRowAdmission::PerformanceAndImages => {
             "(has_primary_media_descendant = 1 OR has_image_media_descendant = 1)"
         }
@@ -1292,6 +1294,66 @@ mod tests {
 
         assert_eq!(window.total_rows, 3);
         assert_eq!(window.rows.len(), 3);
+    }
+
+    #[test]
+    fn navigation_only_returns_directory_rows_and_counts_navigation_children_only() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Albums",
+            DirectoryFacts {
+                has_child_directories: true,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            21,
+            None,
+            "Singles",
+            DirectoryFacts {
+                has_child_directories: false,
+                has_primary_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file(&connection, 11, "track.flac", "audio");
+        insert_file(&connection, 12, "clip.mp4", "video");
+        insert_file(&connection, 13, "cover.jpg", "image");
+        insert_file(&connection, 14, "album.cue", "unsupported");
+        insert_file(&connection, 15, "mystery", "none");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            LibraryTreeRowAdmission::NavigationOnly,
+        )
+        .expect("read navigation-only hierarchy")
+        .expect("source window");
+
+        assert_eq!(window.total_rows, 2);
+        assert_eq!(
+            window
+                .rows
+                .iter()
+                .map(|row| (row.node_kind.as_str(), row.display_name.as_str()))
+                .collect::<Vec<_>>(),
+            vec![("directory", "Albums"), ("directory", "Singles")]
+        );
+        assert!(window.rows.iter().all(|row| row.source_file_id.is_none()));
+        assert!(window.rows.iter().all(|row| row.media_class.is_none()));
     }
 
     #[test]

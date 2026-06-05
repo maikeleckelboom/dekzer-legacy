@@ -371,19 +371,23 @@ function projectLiteralNodes(options: {
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
-  return options.nodes.map((node) =>
-    projectLiteralNode({
-      node,
-      entryPoint: options.entryPoint,
-      ...(options.label === undefined ? {} : { label: options.label }),
-      directoryReadStates: options.directoryReadStates,
-      bindingsById: options.bindingsById
-    })
+  return options.nodes.flatMap((node) =>
+    node.kind === 'directory'
+      ? [
+          projectLiteralDirectoryNode({
+            node,
+            entryPoint: options.entryPoint,
+            ...(options.label === undefined ? {} : { label: options.label }),
+            directoryReadStates: options.directoryReadStates,
+            bindingsById: options.bindingsById
+          })
+        ]
+      : []
   )
 }
 
-function projectLiteralNode(options: {
-  readonly node: ChildRow
+function projectLiteralDirectoryNode(options: {
+  readonly node: Extract<ChildRow, { readonly kind: 'directory' }>
   readonly entryPoint: EntryPoint
   readonly label?: string
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
@@ -391,61 +395,40 @@ function projectLiteralNode(options: {
 }): BrowserTreeNode {
   const node = options.node
 
-  if (node.kind === 'directory') {
-    options.bindingsById.set(node.id, {
-      kind: 'directory',
-      sourceId: node.sourceId,
-      directoryId: node.directoryId,
-      ...(node.parentDirectoryId === undefined
-        ? {}
-        : { parentDirectoryId: node.parentDirectoryId }),
-      entryPoint: copyEntryPoint(options.entryPoint),
-      ...(options.label === undefined ? {} : { label: options.label })
-    })
+  options.bindingsById.set(node.id, {
+    kind: 'directory',
+    sourceId: node.sourceId,
+    directoryId: node.directoryId,
+    ...(node.parentDirectoryId === undefined ? {} : { parentDirectoryId: node.parentDirectoryId }),
+    entryPoint: copyEntryPoint(options.entryPoint),
+    ...(options.label === undefined ? {} : { label: options.label })
+  })
 
-    const directoryState = options.directoryReadStates.get(node.directoryId)
+  const directoryState = options.directoryReadStates.get(node.directoryId)
 
-    if (isConfirmedDirectoryLeaf(node, directoryState)) {
-      return {
-        id: node.id,
-        role: 'literalDirectory',
-        label: node.label,
-        icon: 'folder',
-        detail: formatDirectoryDetail(node.presence),
-        children: { kind: 'none' }
-      }
-    }
-
+  if (isConfirmedDirectoryLeaf(node, directoryState)) {
     return {
       id: node.id,
       role: 'literalDirectory',
       label: node.label,
       icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
-      ...projectDirectoryChildren({
-        ownerId: node.id,
-        state: directoryState,
-        directoryReadStates: options.directoryReadStates,
-        bindingsById: options.bindingsById
-      })
+      children: { kind: 'none' }
     }
   }
 
-  options.bindingsById.set(node.id, {
-    kind: 'file',
-    sourceId: node.sourceId,
-    fileId: node.fileId,
-    ...(node.parentDirectoryId === undefined ? {} : { parentDirectoryId: node.parentDirectoryId }),
-    entryPoint: copyEntryPoint(options.entryPoint)
-  })
-
   return {
     id: node.id,
-    role: 'literalFile',
+    role: 'literalDirectory',
     label: node.label,
-    icon: browserTreeIconForMediaClass(node.mediaClass),
-    detail: formatFileDetail(node.presence, node.mediaClass),
-    children: { kind: 'none' }
+    icon: 'folder',
+    detail: formatDirectoryDetail(node.presence),
+    ...projectDirectoryChildren({
+      ownerId: node.id,
+      state: directoryState,
+      directoryReadStates: options.directoryReadStates,
+      bindingsById: options.bindingsById
+    })
   }
 }
 
@@ -497,22 +480,6 @@ function directoryFailedLabel(errorCode: string): string {
       return 'Directory read failed'
     default:
       return 'Read error'
-  }
-}
-
-function browserTreeIconForMediaClass(
-  mediaClass: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
-): BrowserTreeIcon {
-  switch (mediaClass) {
-    case 'audio':
-      return 'music'
-    case 'video':
-      return 'video'
-    case 'image':
-      return 'image'
-    case 'unsupported':
-    case 'none':
-      return 'file'
   }
 }
 
@@ -893,36 +860,6 @@ function formatRowFreshness(row: NavigationRow): string {
 
 function formatMoreDetail(offset: number, limit: number, totalRows: number): string {
   return `Items ${offset + 1}-${Math.min(offset + limit, totalRows)} of ${totalRows} are available.`
-}
-
-function formatFileDetail(
-  presence: ChildRow['presence'],
-  mediaClass: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
-): string {
-  switch (presence) {
-    case 'present':
-      return formatPresentFileDetail(mediaClass)
-    case 'missing':
-      return 'File missing'
-    case 'removed':
-      return 'File removed'
-  }
-}
-
-function formatPresentFileDetail(
-  mediaClass: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
-): string {
-  switch (mediaClass) {
-    case 'audio':
-      return 'Audio file'
-    case 'video':
-      return 'Video file'
-    case 'image':
-      return 'Image file'
-    case 'unsupported':
-    case 'none':
-      return 'File'
-  }
 }
 
 function formatDirectoryDetail(presence: ChildRow['presence']): string {

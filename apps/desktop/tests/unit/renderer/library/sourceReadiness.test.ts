@@ -89,8 +89,7 @@ describe('source readiness projection', () => {
     expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({ kind: 'source' })
     expect(visible.map((item) => item.id)).toEqual([
       'navigation-row:7',
-      'source-directory:12',
-      'source-file:11'
+      'source-directory:12'
     ])
   })
 
@@ -120,7 +119,7 @@ describe('source readiness projection', () => {
     const state = browserState({
       sourceState: {
         kind: 'refreshing',
-        children: loadedChildren([fileNode('11', 'track.wav')]),
+        children: loadedChildren([directoryNode('12', 'Album')]),
         requestKey: 'source:7',
         sequence: 2,
         detail: 'Refreshing hierarchy children.'

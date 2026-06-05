@@ -183,8 +183,8 @@ function leafNode(id: BrowserTreeNodeId): BrowserTreeNode {
   return {
     id,
     label: id,
-    role: 'literalFile',
-    icon: 'music',
+    role: 'literalDirectory',
+    icon: 'folder',
     children: { kind: 'none' }
   }
 }

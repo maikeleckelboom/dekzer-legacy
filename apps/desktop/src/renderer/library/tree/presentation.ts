@@ -1,18 +1,13 @@
 import type { IconComponent } from '../../icons/types'
 import {
-  FileIcon,
-  FileTextIcon,
   FolderIcon,
   FolderOpenIcon,
-  ImageIcon,
   ListMusicIcon,
   LoadingIcon,
   MoreIcon,
-  MusicIcon,
   NavigationIcon,
   SourceIcon,
   StateIcon,
-  VideoIcon,
   WarningIcon
 } from '../../icons/lucide'
 import type { BrowserTreeNode } from './types'
@@ -30,8 +25,6 @@ export function resolveBrowserTreeRowIcon(
       return isExpanded ? FolderOpenIcon : FolderIcon
     case 'literalDirectory':
       return isExpanded ? FolderOpenIcon : FolderIcon
-    case 'literalFile':
-      return resolveLiteralFileIcon(node.icon)
     case 'preparationSurface':
       return StateIcon
     case 'playlistSurface':
@@ -42,26 +35,6 @@ export function resolveBrowserTreeRowIcon(
       return resolveStateIcon(node.icon)
     case 'action':
       return resolveActionIcon(node.icon)
-  }
-}
-
-function resolveLiteralFileIcon(icon: BrowserTreeNode['icon']): IconComponent {
-  switch (icon) {
-    case 'music':
-      return MusicIcon
-    case 'video':
-      return VideoIcon
-    case 'image':
-      return ImageIcon
-    case 'cueSheet':
-      return FileTextIcon
-    case 'playlist':
-      return ListMusicIcon
-    case 'metadata':
-      return FileTextIcon
-    case 'file':
-    default:
-      return FileIcon
   }
 }
 

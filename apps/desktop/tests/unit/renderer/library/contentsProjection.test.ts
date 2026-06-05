@@ -305,13 +305,8 @@ describe('projectContents', () => {
     })
   })
 
-  it('projects empty selection, unsupported selection, host state, and literal files', () => {
-    const state = browserState({
-      sourceState: {
-        kind: 'loaded',
-        children: loadedChildren([fileNode('11', 'track.wav', 101)])
-      }
-    })
+  it('projects empty selection, unsupported selection, and host state', () => {
+    const state = browserState({})
     const projection = browserProjection(state)
 
     expect(projectContents({ state, bindingsById: projection.bindingsById })).toMatchObject({
@@ -325,19 +320,6 @@ describe('projectContents', () => {
         bindingsById: projection.bindingsById
       })
     ).toMatchObject({ kind: 'unsupported', title: 'Selection unavailable' })
-
-    const fileContents = projectContents({
-      state,
-      selectedNodeId: 'source-file:11',
-      bindingsById: projection.bindingsById
-    })
-    expect(fileContents).toMatchObject({ kind: 'ready', title: 'track.wav' })
-    expect(fileContents.rows[0]).toMatchObject({
-      kind: 'state',
-      label: 'File selected',
-      state: 'file',
-      detail: 'File'
-    })
 
     const failedHost = projectContents({
       state: {
@@ -355,6 +337,40 @@ describe('projectContents', () => {
     expect(failedHost.rows[0]).toMatchObject({
       state: 'failed',
       label: 'Library engine failed to start'
+    })
+  })
+
+  it('still projects explicit non-tree file bindings for inventory/detail paths', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([fileNode('11', 'track.wav', 101)])
+      }
+    })
+    const bindingsById: BrowserProjection['bindingsById'] = new Map([
+      [
+        'source-file:11',
+        {
+          kind: 'file',
+          sourceId: '7',
+          fileId: '11',
+          entryPoint: sourceEntryPoint()
+        }
+      ]
+    ])
+
+    const fileContents = projectContents({
+      state,
+      selectedNodeId: 'source-file:11',
+      bindingsById
+    })
+
+    expect(fileContents).toMatchObject({ kind: 'ready', title: 'track.wav' })
+    expect(fileContents.rows[0]).toMatchObject({
+      kind: 'state',
+      label: 'File selected',
+      state: 'file',
+      detail: 'File'
     })
   })
 })

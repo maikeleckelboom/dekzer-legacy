@@ -497,7 +497,7 @@ impl LibraryBoundaryService {
                 request.parent_source_directory_id,
                 request.offset,
                 request.limit,
-                library_store_sqlite::LibraryTreeRowAdmission::Performance,
+                library_store_sqlite::LibraryTreeRowAdmission::NavigationOnly,
             )
             .map_err(map_store_error)?;
         map_read_library_tree_children_reply(window).map_err(map_store_error)
@@ -2161,6 +2161,10 @@ mod tests {
             crate_row.directory_scan_state,
             Some(DirectoryScanState::Complete)
         );
+        assert_eq!(
+            crate_row.child_row_state,
+            Some(library_boundary_protocol::ChildRowState::NoChildRows)
+        );
         let crate_directory_id = crate_row
             .source_directory_id
             .expect("directory rows carry durable ids");
@@ -2175,16 +2179,11 @@ mod tests {
         let crate_window = crate_reply
             .window
             .expect("nested directory resolves to library tree window");
-        assert_eq!(crate_window.total_rows, 1);
-        let file_row = crate_window.rows.first().expect("scanned file row exists");
-        assert_eq!(file_row.node_kind, LibraryTreeNodeKind::File);
-        assert_eq!(file_row.display_name, "amen.wav");
-        assert_eq!(file_row.relative_path, "Crate/amen.wav");
-        assert!(file_row.source_file_id.is_some());
-        assert_eq!(file_row.has_child_directories, None);
-        assert_eq!(file_row.directory_primary_media_state, None);
-        assert_eq!(file_row.directory_image_media_state, None);
-        assert_eq!(file_row.directory_scan_state, None);
+        assert_eq!(crate_window.total_rows, 0);
+        assert!(
+            crate_window.rows.is_empty(),
+            "tree children are navigation-only; files stay in contents/inventory reads"
+        );
 
         drop(service);
         let reopened = LibraryBoundaryService::open(context).expect("reopen boundary service");

@@ -196,8 +196,7 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
     await expect(refresh).resolves.toEqual([true])
 
     expect(loadedChildIds(hierarchyRead, 'navigation-row:7')).toEqual([
-      'source-directory:13',
-      'source-file:99'
+      'source-directory:13'
     ])
     expect(refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
     boundaryEvents.stop()

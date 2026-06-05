@@ -25,6 +25,7 @@ impl BrowseMediaClass {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LibraryTreeRowAdmission {
+    NavigationOnly,
     Performance,
     PerformanceAndImages,
 }
@@ -41,6 +42,7 @@ pub(crate) fn library_tree_row_admission_predicate_sql(
     library_tree_row_admission: LibraryTreeRowAdmission,
 ) -> &'static str {
     match library_tree_row_admission {
+        LibraryTreeRowAdmission::NavigationOnly => "0 = 1",
         LibraryTreeRowAdmission::Performance => "media_class IN ('audio', 'video')",
         LibraryTreeRowAdmission::PerformanceAndImages => {
             "media_class IN ('audio', 'video', 'image')"
@@ -53,6 +55,7 @@ pub(crate) fn library_tree_row_admission_predicate_sql_for_column(
     column_sql: &str,
 ) -> String {
     match library_tree_row_admission {
+        LibraryTreeRowAdmission::NavigationOnly => "0 = 1".to_string(),
         LibraryTreeRowAdmission::Performance => {
             format!("{column_sql} IN ('audio', 'video')")
         }

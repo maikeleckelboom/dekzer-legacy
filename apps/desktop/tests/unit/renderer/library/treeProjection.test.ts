@@ -28,7 +28,7 @@ import type {
 } from '../../../../src/renderer/library/tree/types'
 
 describe('projectState', () => {
-  it('projects source hierarchy rows and load-more actions', () => {
+  it('projects source hierarchy directory rows and load-more actions', () => {
     const projection = projectTree(
       browserState({
         rows: [sourceNavigationRow('\\\\?\\C:\\Users\\Maikel\\Music')],
@@ -46,7 +46,6 @@ describe('projectState', () => {
     })
     expect(loadedChildIds(sourceNode)).toEqual([
       'source-directory:12',
-      'source-file:11',
       'more:navigation-row:7:2'
     ])
     expect(projection.bindingsById.get('source-directory:12')).toMatchObject({
@@ -93,9 +92,11 @@ describe('projectState', () => {
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
 
     expect(projection.nodes.map((node) => node.id)).toEqual(['navigation-row:7'])
-    expect(loadedChildIds(sourceNode)).toEqual(['source-file:11', 'source-file:99'])
+    expect(loadedChildIds(sourceNode)).toEqual([])
     expect(projection.bindingsById.has('navigation-row:100')).toBe(false)
     expect(projection.bindingsById.has('navigation-row:99')).toBe(false)
+    expect(projection.bindingsById.has('source-file:11')).toBe(false)
+    expect(projection.bindingsById.has('source-file:99')).toBe(false)
 
     const unsupportedOnly = projectTree(
       browserState({
@@ -106,42 +107,14 @@ describe('projectState', () => {
     expect(unsupportedOnly.nodes.some((node) => node.id === 'navigation-row:100')).toBe(false)
   })
 
-  it('projects literal file presentation from backend media class', () => {
+  it('excludes literal file rows from the tree projection', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
-          fileNode('11', 'cover.mp3', { mediaClass: 'image' }),
-          fileNode('13', 'clip.wav', { mediaClass: 'video' }),
-          fileNode('14', 'track.raw', { mediaClass: 'audio' })
-        ])
-      })
-    )
-
-    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
-    expect(loadedChildIds(sourceNode)).toEqual([
-      'source-file:11',
-      'source-file:13',
-      'source-file:14'
-    ])
-    expect(requiredNode(projection.nodes, 'source-file:11')).toMatchObject({
-      icon: 'image',
-      detail: 'Image file'
-    })
-    expect(requiredNode(projection.nodes, 'source-file:13')).toMatchObject({
-      icon: 'video',
-      detail: 'Video file'
-    })
-    expect(requiredNode(projection.nodes, 'source-file:14')).toMatchObject({
-      icon: 'music',
-      detail: 'Audio file'
-    })
-  })
-
-  it('projects unexpected backend-hidden media classes defensively', () => {
-    const projection = projectTree(
-      browserState({
-        sourceChildren: loadedChildren([
-          fileNode('12', 'desktop.ini', { mediaClass: 'unsupported' }),
+          fileNode('11', 'track.wav', { mediaClass: 'audio' }),
+          fileNode('12', 'clip.mp4', { mediaClass: 'video' }),
+          fileNode('13', 'cover.jpg', { mediaClass: 'image' }),
+          fileNode('14', 'album.cue', { mediaClass: 'unsupported' }),
           fileNode('15', 'mystery', { mediaClass: 'none' })
         ])
       })
@@ -149,17 +122,11 @@ describe('projectState', () => {
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
 
-    expect(loadedChildIds(sourceNode)).toEqual(['source-file:12', 'source-file:15'])
-    expect(requiredNode(projection.nodes, 'source-file:12')).toMatchObject({
-      icon: 'file',
-      detail: 'File'
-    })
-    expect(requiredNode(projection.nodes, 'source-file:15')).toMatchObject({
-      icon: 'file',
-      detail: 'File'
-    })
-    expect(projection.bindingsById.get('source-file:12')).toMatchObject({ kind: 'file' })
-    expect(projection.bindingsById.get('source-file:15')).toMatchObject({ kind: 'file' })
+    expect(loadedChildIds(sourceNode)).toEqual([])
+    for (const fileId of ['11', '12', '13', '14', '15']) {
+      expect(findNode(projection.nodes, `source-file:${fileId}`)).toBeUndefined()
+      expect(projection.bindingsById.has(`source-file:${fileId}`)).toBe(false)
+    }
   })
 
   it('projects host status instead of stale navigation rows', () => {
@@ -341,6 +308,44 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
   })
 
+  it('complete directory with only audio files is a selectable leaf folder', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Singles', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
+            directoryScanState: 'complete',
+            childRowState: 'noChildRows'
+          })
+        ]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loaded',
+              children: loadedChildren([fileNode('15', 'track.wav')], {
+                parentDirectoryId: '12'
+              })
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    expect(projection.bindingsById.get('source-directory:12')).toMatchObject({
+      kind: 'directory',
+      sourceId: '7',
+      directoryId: '12'
+    })
+    expect(projection.bindingsById.has('source-file:15')).toBe(false)
+  })
+
   it('state-only child rows do not accidentally decide branch identity', () => {
     const node: BrowserTreeNode = {
       id: 'state-only-owner',
@@ -395,7 +400,7 @@ describe('projectState', () => {
     })
   })
 
-  it('refreshing directory renders loaded children and remains a branch', () => {
+  it('refreshing directory ignores prior file children for branch identity', () => {
     const priorChildren = loadedChildren([fileNode('15', 'prior-track.wav')])
     const projection = projectTree(
       browserState({
@@ -416,15 +421,12 @@ describe('projectState', () => {
     )
     const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('loaded')
-    if (node.children.kind === 'loaded') {
-      expect(node.children.nodes.map((n) => n.id)).toEqual(['source-file:15'])
-    }
-    expect(isBrowserTreeBranch(node)).toBe(true)
-    expect(canRevealBrowserTreeChildren(node)).toBe(true)
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
   })
 
-  it('refreshing source renders loaded children', () => {
+  it('refreshing source ignores prior file children', () => {
     const projection = projectTree(
       browserState({
         sourceStates: new Map([
@@ -443,10 +445,7 @@ describe('projectState', () => {
     )
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
 
-    expect(sourceNode.children.kind).toBe('loaded')
-    if (sourceNode.children.kind === 'loaded') {
-      expect(sourceNode.children.nodes.map((n) => n.id)).toEqual(['source-file:11'])
-    }
+    expect(sourceNode.children.kind).toBe('none')
   })
 
   it('read failure does not project as source unavailable label', () => {
@@ -650,6 +649,7 @@ function readyNavigation(rows: readonly NavigationRow[]): NavigationReadRowsResu
 function loadedChildren(
   rows: readonly ChildRow[],
   options: {
+    readonly parentDirectoryId?: string
     readonly totalRows?: number
   } = {}
 ): LoadedChildren {
@@ -659,6 +659,9 @@ function loadedChildren(
   return {
     entryPoint: sourceEntryPoint(),
     label: 'Source Fixture',
+    ...(options.parentDirectoryId === undefined
+      ? {}
+      : { parentDirectoryId: options.parentDirectoryId }),
     rows,
     totalRows,
     coverage: {

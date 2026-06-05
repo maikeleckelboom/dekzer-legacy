@@ -788,21 +788,13 @@ fn map_library_tree_node(
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
     let media_class = map_library_tree_file_media_class(&node)?;
     let child_row_state = match node.node_kind.as_str() {
-        "directory" => {
-            match (
-                directory_primary_media_state.as_ref(),
-                directory_scan_state.as_ref(),
-            ) {
-                (Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants), _) => {
-                    Some(protocol::ChildRowState::HasChildRows)
-                }
-                (
-                    Some(protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants),
-                    Some(protocol::DirectoryScanState::Complete),
-                ) => Some(protocol::ChildRowState::NoChildRows),
-                _ => Some(protocol::ChildRowState::Unknown),
+        "directory" => match (has_child_directories, directory_scan_state.as_ref()) {
+            (Some(true), _) => Some(protocol::ChildRowState::HasChildRows),
+            (Some(false), Some(protocol::DirectoryScanState::Complete)) => {
+                Some(protocol::ChildRowState::NoChildRows)
             }
-        }
+            _ => Some(protocol::ChildRowState::Unknown),
+        },
         "file" => None,
         _ => None,
     };
@@ -1531,6 +1523,20 @@ mod tests {
         has_image_media_descendant: bool,
         dir_scan_state: &str,
     ) -> store::StoreLiteralHierarchyNode {
+        directory_node_with_child_directories(
+            true,
+            has_primary_media_descendant,
+            has_image_media_descendant,
+            dir_scan_state,
+        )
+    }
+
+    fn directory_node_with_child_directories(
+        has_child_directories: bool,
+        has_primary_media_descendant: bool,
+        has_image_media_descendant: bool,
+        dir_scan_state: &str,
+    ) -> store::StoreLiteralHierarchyNode {
         store::StoreLiteralHierarchyNode {
             node_kind: "directory".to_string(),
             source_id: 7,
@@ -1544,7 +1550,7 @@ mod tests {
             size_bytes: None,
             modified_at_ns: None,
             updated_at: 100,
-            has_child_directories: Some(true),
+            has_child_directories: Some(has_child_directories),
             has_primary_media_descendant: Some(has_primary_media_descendant),
             has_image_media_descendant: Some(has_image_media_descendant),
             dir_scan_state: Some(dir_scan_state.to_string()),
@@ -1651,8 +1657,10 @@ mod tests {
 
     #[test]
     fn directory_media_states_require_complete_coverage_for_negative_knowledge() {
-        let complete = map_library_tree_node(directory_node(false, false, "complete"))
-            .expect("map complete directory");
+        let complete = map_library_tree_node(directory_node_with_child_directories(
+            false, false, false, "complete",
+        ))
+        .expect("map complete directory");
         assert_eq!(
             complete.directory_primary_media_state,
             Some(protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants)
@@ -1667,8 +1675,10 @@ mod tests {
         );
 
         for scan_state in ["pending", "scanning", "blocked", "failed"] {
-            let mapped = map_library_tree_node(directory_node(false, false, scan_state))
-                .expect("map incomplete directory");
+            let mapped = map_library_tree_node(directory_node_with_child_directories(
+                false, false, false, scan_state,
+            ))
+            .expect("map incomplete directory");
             assert_eq!(
                 mapped.directory_primary_media_state,
                 Some(protocol::DirectoryPrimaryMediaState::Unknown),
@@ -1685,6 +1695,31 @@ mod tests {
                 "{scan_state} must not map to confirmed no-child-rows"
             );
         }
+    }
+
+    #[test]
+    fn directory_child_row_state_tracks_navigable_child_directories_not_files() {
+        let media_leaf = map_library_tree_node(directory_node_with_child_directories(
+            false, true, false, "complete",
+        ))
+        .expect("map media leaf directory");
+        assert_eq!(
+            media_leaf.directory_primary_media_state,
+            Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants)
+        );
+        assert_eq!(
+            media_leaf.child_row_state,
+            Some(protocol::ChildRowState::NoChildRows)
+        );
+
+        let branch = map_library_tree_node(directory_node_with_child_directories(
+            true, true, false, "complete",
+        ))
+        .expect("map branch directory");
+        assert_eq!(
+            branch.child_row_state,
+            Some(protocol::ChildRowState::HasChildRows)
+        );
     }
 
     #[test]

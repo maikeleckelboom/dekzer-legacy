@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 
 use library_boundary_protocol::{
-    CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandErrorEnvelope,
-    CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEvent,
+    CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, ChildRowState,
+    CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEvent,
     LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
     LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
     LibraryTreePresenceState, MaintainedSnapshotScope, NavigationRow, NavigationRowFamily,
@@ -349,8 +349,8 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .as_ref()
         .expect("source root resolves to hierarchy window");
     assert!(
-        root_window.total_rows >= 2,
-        "root window must contain at least artists/ and loose.mp3"
+        root_window.total_rows >= 1,
+        "root window must contain at least artists/"
     );
 
     let artists_dir = root_window
@@ -361,11 +361,13 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         })
         .expect("artists directory in root hierarchy");
 
-    root_window
-        .rows
-        .iter()
-        .find(|row| row.display_name == "loose.mp3" && row.node_kind == LibraryTreeNodeKind::File)
-        .expect("loose.mp3 file in root hierarchy");
+    assert!(
+        !root_window
+            .rows
+            .iter()
+            .any(|row| row.display_name == "loose.mp3"),
+        "loose.mp3 remains source-file inventory and must not appear in tree hierarchy"
+    );
 
     for row in &root_window.rows {
         assert_eq!(
@@ -376,14 +378,11 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     }
 
     for row in &root_window.rows {
-        assert!(
-            matches!(
-                row.node_kind,
-                LibraryTreeNodeKind::Directory | LibraryTreeNodeKind::File,
-            ),
-            "root row '{}' has unexpected node_kind {:?}",
-            row.display_name,
+        assert_eq!(
             row.node_kind,
+            LibraryTreeNodeKind::Directory,
+            "root tree row '{}' must be a navigation directory",
+            row.display_name,
         );
     }
 
@@ -398,42 +397,16 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
     }
 
     for row in &root_window.rows {
-        match row.node_kind {
-            LibraryTreeNodeKind::Directory => {
-                assert!(
-                    row.directory_scan_state.is_some(),
-                    "directory '{}' must have directory_scan_state",
-                    row.display_name,
-                );
-                assert!(
-                    row.has_child_directories.is_some(),
-                    "directory '{}' must have has_child_directories",
-                    row.display_name,
-                );
-            }
-            LibraryTreeNodeKind::File => {
-                assert!(
-                    row.directory_scan_state.is_none(),
-                    "file '{}' must not have directory_scan_state",
-                    row.display_name,
-                );
-                assert!(
-                    row.has_child_directories.is_none(),
-                    "file '{}' must not have has_child_directories",
-                    row.display_name,
-                );
-                assert!(
-                    row.directory_primary_media_state.is_none(),
-                    "file '{}' must not have directory_primary_media_state",
-                    row.display_name,
-                );
-                assert!(
-                    row.directory_image_media_state.is_none(),
-                    "file '{}' must not have directory_image_media_state",
-                    row.display_name,
-                );
-            }
-        }
+        assert!(
+            row.directory_scan_state.is_some(),
+            "directory '{}' must have directory_scan_state",
+            row.display_name,
+        );
+        assert!(
+            row.has_child_directories.is_some(),
+            "directory '{}' must have has_child_directories",
+            row.display_name,
+        );
     }
 
     let artists_dir_id = artists_dir
@@ -449,6 +422,11 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .iter()
         .find(|row| row.display_name == "alpha")
         .expect("alpha directory inside artists");
+    assert_eq!(
+        alpha_dir.child_row_state,
+        Some(ChildRowState::NoChildRows),
+        "alpha contains tracks but no navigable child directories"
+    );
 
     let alpha_dir_id = alpha_dir
         .source_directory_id
@@ -458,19 +436,10 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .window
         .as_ref()
         .expect("alpha directory resolves to hierarchy window");
+    assert_eq!(alpha_window.total_rows, 0);
     assert!(
-        alpha_window
-            .rows
-            .iter()
-            .any(|r| r.display_name == "track_one.flac"),
-        "track_one.flac in alpha directory"
-    );
-    assert!(
-        alpha_window
-            .rows
-            .iter()
-            .any(|r| r.display_name == "track_two.wav"),
-        "track_two.wav in alpha directory"
+        alpha_window.rows.is_empty(),
+        "track files in alpha remain contents/source-file inventory, not tree children"
     );
 
     let original_root_total = root_window.total_rows;
@@ -505,11 +474,13 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .iter()
         .find(|row| row.display_name == "artists")
         .expect("artists directory survives reopen");
-    reopened_root_window
-        .rows
-        .iter()
-        .find(|row| row.display_name == "loose.mp3")
-        .expect("loose.mp3 file survives reopen");
+    assert!(
+        !reopened_root_window
+            .rows
+            .iter()
+            .any(|row| row.display_name == "loose.mp3"),
+        "loose.mp3 must remain absent from reopened tree hierarchy"
+    );
 
     let reopened_artists_reply =
         read_library_tree(&reopened, registered.root_id, Some(artists_dir_id));

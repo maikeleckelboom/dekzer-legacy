@@ -50,7 +50,6 @@ export type BrowserTreeRowRole =
   | 'source'
   | 'sourceLocation'
   | 'literalDirectory'
-  | 'literalFile'
   | 'preparationSurface'
   | 'playlistSurface'
   | 'smartView'

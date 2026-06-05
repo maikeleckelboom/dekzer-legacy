@@ -123,13 +123,11 @@ describe('createLibraryHierarchyReadController', () => {
     expect(readRequests[1]).toMatchObject({ offset: 1 })
     expect(readRequests[1]).not.toHaveProperty('parentDirectoryId')
     expect(firstLoadedChildIds(treeNodes(controller), 'navigation-row:7')).toEqual([
-      'source-directory:12',
-      'source-file:99'
+      'source-directory:12'
     ])
 
     await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
     expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
-      'source-file:12-a',
       'more:source-directory:12:1'
     ])
 
@@ -142,10 +140,7 @@ describe('createLibraryHierarchyReadController', () => {
     })
 
     await expect(controller.requestNodeChildren('more:source-directory:12:1')).resolves.toBe(true)
-    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
-      'source-file:12-a',
-      'source-file:12-b'
-    ])
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([])
   })
 
   it('rejects unexpected continuation windows without replacing loaded rows', async () => {
@@ -272,7 +267,6 @@ describe('createLibraryHierarchyReadController', () => {
       'source-directory:14'
     ])
     expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
-      'source-file:12-track',
       'source-directory:99'
     ])
   })
@@ -433,21 +427,21 @@ describe('createLibraryHierarchyReadController', () => {
     await expect(controller.refresh()).resolves.toBe(true)
     await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
     const beforeChildren = firstLoadedChildIds(treeNodes(controller), 'source-directory:12')
-    expect(beforeChildren).toEqual(['source-file:12-track', 'source-directory:99'])
+    expect(beforeChildren).toEqual(['source-directory:99'])
 
     const refreshPromise = controller.requestDirectoryChildren('source-directory:12')
     await waitForMicrotasks()
 
     expect(controller.directoryReadStates.value.get('12')?.kind).toBe('refreshing')
     const duringChildren = firstLoadedChildIds(treeNodes(controller), 'source-directory:12')
-    expect(duringChildren).toEqual(['source-file:12-track', 'source-directory:99'])
+    expect(duringChildren).toEqual(['source-directory:99'])
 
     refreshDirRead.resolve(loadedDirectoryReadResult('12'))
     await expect(refreshPromise).resolves.toBe(true)
 
     expect(controller.directoryReadStates.value.get('12')?.kind).toBe('loaded')
     const afterChildren = firstLoadedChildIds(treeNodes(controller), 'source-directory:12')
-    expect(afterChildren).toEqual(['source-file:12-track', 'source-directory:99'])
+    expect(afterChildren).toEqual(['source-directory:99'])
   })
 
   it('retains loaded source children when a source refresh fails', async () => {
@@ -513,13 +507,13 @@ describe('createLibraryHierarchyReadController', () => {
     await expect(controller.refresh()).resolves.toBe(true)
     await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
     const beforeChildren = firstLoadedChildIds(treeNodes(controller), 'source-directory:12')
-    expect(beforeChildren).toEqual(['source-file:12-track', 'source-directory:99'])
+    expect(beforeChildren).toEqual(['source-directory:99'])
 
     await expect(controller.requestDirectoryChildren('source-directory:12')).resolves.toBe(true)
 
     expect(controller.directoryReadStates.value.get('12')?.kind).toBe('loaded')
     const afterChildren = firstLoadedChildIds(treeNodes(controller), 'source-directory:12')
-    expect(afterChildren).toEqual(['source-file:12-track', 'source-directory:99'])
+    expect(afterChildren).toEqual(['source-directory:99'])
   })
 
   it('uses loading when no prior children exist and refreshing when they do', async () => {
