@@ -32,6 +32,85 @@ describe('useTreeController', () => {
     expect(harness.events.activateAction).toEqual([])
   })
 
+  it('revealing a deferred branch expands before activating the load action', () => {
+    const harness = treeHarness({
+      nodes: [deferredBranchNode('source-a', 'Source A')]
+    })
+
+    harness.controller.revealNode('source-a')
+
+    expect(harness.selectedNodeId.value).toBeUndefined()
+    expect(harness.controller.activeNodeId.value).toBe('source-a')
+    expect(harness.expandedNodeIds.value.has('source-a')).toBe(true)
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.log).toEqual(['toggle:source-a', 'activateAction:source-a'])
+  })
+
+  it('revealing a loaded branch toggles expansion without activating a load action', () => {
+    const harness = treeHarness({
+      expandedNodeIds: new Set(['branch-a'])
+    })
+
+    harness.controller.revealNode('branch-a')
+    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(false)
+
+    harness.controller.revealNode('branch-a')
+    expect(harness.expandedNodeIds.value.has('branch-a')).toBe(true)
+
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.log).toEqual(['toggle:branch-a', 'toggle:branch-a'])
+  })
+
+  it('revealing a loading branch keeps it visible without duplicating a load action', () => {
+    const harness = treeHarness({
+      nodes: [loadingBranchNode('source-a', 'Source A')]
+    })
+
+    harness.controller.revealNode('source-a')
+    harness.controller.revealNode('source-a')
+
+    expect(harness.expandedNodeIds.value.has('source-a')).toBe(true)
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.log).toEqual(['toggle:source-a'])
+  })
+
+  it('revealing a failed retryable branch retries and keeps it revealed', () => {
+    const harness = treeHarness({
+      nodes: [failedBranchNode('source-a', 'Source A', { retryable: true })]
+    })
+
+    harness.controller.revealNode('source-a')
+
+    expect(harness.expandedNodeIds.value.has('source-a')).toBe(true)
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.log).toEqual(['toggle:source-a', 'activateAction:source-a'])
+  })
+
+  it('revealing a failed non-retryable branch preserves the error without a fake load', () => {
+    const harness = treeHarness({
+      nodes: [failedBranchNode('source-a', 'Source A', { retryable: false })],
+      expandedNodeIds: new Set(['source-a'])
+    })
+
+    harness.controller.revealNode('source-a')
+
+    expect(harness.expandedNodeIds.value.has('source-a')).toBe(true)
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.log).toEqual([])
+  })
+
+  it('row-body selection does not expand or load deferred children', () => {
+    const harness = treeHarness({
+      nodes: [deferredBranchNode('source-a', 'Source A')]
+    })
+
+    harness.controller.selectNode('source-a')
+
+    expect(harness.selectedNodeId.value).toBe('source-a')
+    expect(harness.expandedNodeIds.value.has('source-a')).toBe(false)
+    expect(harness.events.log).toEqual(['select:source-a'])
+  })
+
   it('keeps expansion stable when selecting another row', () => {
     const harness = treeHarness({
       expandedNodeIds: new Set(['branch-a'])
@@ -57,14 +136,14 @@ describe('useTreeController', () => {
     expect(harness.events.toggle).toEqual(['branch-a'])
   })
 
-  it('keeps ArrowRight and ArrowLeft expansion intents on the toggle path', () => {
+  it('keeps ArrowRight and ArrowLeft expansion intents on the reveal and toggle paths', () => {
     const harness = treeHarness()
     const collapsedBranch = visibleItem(harness, 'branch-a')
     const expandIntent = harness.controller.resolveKeyboardIntent(collapsedBranch, 'ArrowRight')
 
-    expect(expandIntent).toMatchObject({ kind: 'expand', nodeId: 'branch-a' })
-    if (expandIntent.kind === 'expand') {
-      harness.controller.toggleNode(expandIntent.nodeId)
+    expect(expandIntent).toMatchObject({ kind: 'revealNode', nodeId: 'branch-a' })
+    if (expandIntent.kind === 'revealNode') {
+      harness.controller.revealNode(expandIntent.nodeId)
     }
     expect(harness.expandedNodeIds.value.has('branch-a')).toBe(true)
 
@@ -79,10 +158,46 @@ describe('useTreeController', () => {
     expect(harness.events.select).toEqual([])
     expect(harness.events.toggle).toEqual(['branch-a', 'branch-a'])
   })
+
+  it('routes ArrowRight on a deferred branch through revealNode', () => {
+    const harness = treeHarness({
+      nodes: [deferredBranchNode('source-a', 'Source A')]
+    })
+    const deferredBranch = visibleItem(harness, 'source-a')
+    const intent = harness.controller.resolveKeyboardIntent(deferredBranch, 'ArrowRight')
+
+    expect(intent).toMatchObject({ kind: 'revealNode', nodeId: 'source-a' })
+    if (intent.kind === 'revealNode') {
+      harness.controller.revealNode(intent.nodeId)
+    }
+
+    expect(harness.expandedNodeIds.value.has('source-a')).toBe(true)
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.log).toEqual(['toggle:source-a', 'activateAction:source-a'])
+  })
+
+  it('collapses an expanded deferred branch with ArrowLeft', () => {
+    const harness = treeHarness({
+      nodes: [deferredBranchNode('source-a', 'Source A')],
+      expandedNodeIds: new Set(['source-a'])
+    })
+    const deferredBranch = visibleItem(harness, 'source-a')
+    const intent = harness.controller.resolveKeyboardIntent(deferredBranch, 'ArrowLeft')
+
+    expect(intent).toMatchObject({ kind: 'collapse', nodeId: 'source-a' })
+    if (intent.kind === 'collapse') {
+      harness.controller.toggleNode(intent.nodeId)
+    }
+
+    expect(harness.expandedNodeIds.value.has('source-a')).toBe(false)
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.log).toEqual(['toggle:source-a'])
+  })
 })
 
 function treeHarness(
   options: {
+    readonly nodes?: readonly BrowserTreeNode[]
     readonly selectedNodeId?: BrowserTreeNodeId
     readonly expandedNodeIds?: ReadonlySet<BrowserTreeNodeId>
   } = {}
@@ -93,6 +208,7 @@ function treeHarness(
     readonly select: BrowserTreeNodeId[]
     readonly toggle: BrowserTreeNodeId[]
     readonly activateAction: BrowserTreeNodeId[]
+    readonly log: string[]
   }
   readonly controller: ReturnType<typeof useTreeController>
 } {
@@ -103,23 +219,27 @@ function treeHarness(
   const events = {
     select: [] as BrowserTreeNodeId[],
     toggle: [] as BrowserTreeNodeId[],
-    activateAction: [] as BrowserTreeNodeId[]
+    activateAction: [] as BrowserTreeNodeId[],
+    log: [] as string[]
   }
 
   const activateAction = vi.fn((nodeId: BrowserTreeNodeId) => {
     events.activateAction.push(nodeId)
+    events.log.push(`activateAction:${nodeId}`)
   })
 
   const controller = useTreeController({
-    nodes: computed(() => treeNodes()),
+    nodes: computed(() => options.nodes ?? treeNodes()),
     selectedNodeId: computed(() => selectedNodeId.value),
     expandedNodeIds: computed(() => expandedNodeIds.value),
     selectNode: (nodeId) => {
       events.select.push(nodeId)
+      events.log.push(`select:${nodeId}`)
       selectedNodeId.value = nodeId
     },
     toggleNode: (nodeId) => {
       events.toggle.push(nodeId)
+      events.log.push(`toggle:${nodeId}`)
       const nextExpandedIds = new Set(expandedNodeIds.value)
 
       if (nextExpandedIds.has(nodeId)) {
@@ -185,6 +305,72 @@ function leafNode(id: BrowserTreeNodeId): BrowserTreeNode {
     label: id,
     role: 'literalDirectory',
     icon: 'folder',
+    children: { kind: 'none' }
+  }
+}
+
+function deferredBranchNode(id: BrowserTreeNodeId, label: string): BrowserTreeNode {
+  return {
+    id,
+    label,
+    role: 'source',
+    icon: 'source',
+    children: {
+      kind: 'deferred',
+      stateNode: stateNode(id, 'Source contents not loaded', 'state')
+    },
+    action: { kind: 'loadChildren', state: { kind: 'idle' } }
+  }
+}
+
+function loadingBranchNode(id: BrowserTreeNodeId, label: string): BrowserTreeNode {
+  return {
+    id,
+    label,
+    role: 'source',
+    icon: 'source',
+    children: {
+      kind: 'loading',
+      stateNode: stateNode(id, 'Loading source contents', 'loading')
+    }
+  }
+}
+
+function failedBranchNode(
+  id: BrowserTreeNodeId,
+  label: string,
+  options: { readonly retryable: boolean }
+): BrowserTreeNode {
+  return {
+    id,
+    label,
+    role: 'source',
+    icon: 'source',
+    children: {
+      kind: 'failed',
+      stateNode: stateNode(id, 'Hierarchy read failed', 'warning')
+    },
+    ...(options.retryable
+      ? {
+          action: {
+            kind: 'loadChildren' as const,
+            state: { kind: 'failed' as const, detail: 'Retry' }
+          }
+        }
+      : {})
+  }
+}
+
+function stateNode(
+  ownerId: BrowserTreeNodeId,
+  label: string,
+  icon: NonNullable<BrowserTreeNode['icon']>
+): BrowserTreeNode {
+  return {
+    id: `read-state:${ownerId}`,
+    label,
+    role: 'state',
+    icon,
     children: { kind: 'none' }
   }
 }

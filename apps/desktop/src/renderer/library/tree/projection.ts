@@ -239,7 +239,10 @@ function projectSourceChildren(options: {
           detail: state.detail
         },
         options.bindingsById
-      )
+      ),
+      ...(isRetryableChildrenReadError(state.errorCode)
+        ? { action: loadChildrenAction('failed', state.detail) }
+        : {})
     }
   }
 
@@ -483,6 +486,10 @@ function directoryFailedLabel(errorCode: string): string {
   }
 }
 
+function isRetryableChildrenReadError(errorCode: string): boolean {
+  return errorCode === 'readFailed' || errorCode === 'windowMismatch'
+}
+
 function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTreeChildren {
   return nodes.length === 0 ? { kind: 'none' } : { kind: 'loaded', nodes }
 }
@@ -593,7 +600,10 @@ function projectDirectoryChildren(options: {
           detail: state.detail
         },
         options.bindingsById
-      )
+      ),
+      ...(isRetryableChildrenReadError(state.errorCode)
+        ? { action: loadChildrenAction('failed', state.detail) }
+        : {})
     }
   }
 

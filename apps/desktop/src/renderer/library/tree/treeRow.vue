@@ -15,7 +15,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  toggleDisclosure: []
+  revealNode: []
 }>()
 
 const rowClass = computed(() =>
@@ -92,7 +92,7 @@ const labelClass = computed(() => {
       type="button"
       tabindex="-1"
       :aria-label="item.isExpanded ? 'Collapse' : 'Expand'"
-      @click.stop="emit('toggleDisclosure')"
+      @click.stop="emit('revealNode')"
       @mousedown.prevent
     >
       <Icon :icon="item.isExpanded ? DisclosureOpenIcon : DisclosureClosedIcon" size="sm" />

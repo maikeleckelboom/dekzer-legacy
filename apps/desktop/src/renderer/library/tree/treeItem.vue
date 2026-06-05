@@ -49,9 +49,8 @@ function handleRowClick(): void {
   tree.selectNode(props.item.id)
 }
 
-function handleDisclosureToggle(): void {
-  focusItem()
-  tree.toggleNode(props.item.id)
+function handleRevealNode(): void {
+  tree.revealNode(props.item.id)
 }
 
 function handleFocus(): void {
@@ -83,6 +82,10 @@ function applyKeyboardIntent(intent: ReturnType<typeof tree.resolveKeyboardInten
     case 'expand':
     case 'collapse':
       tree.toggleNode(intent.nodeId)
+      return
+
+    case 'revealNode':
+      tree.revealNode(intent.nodeId)
       return
 
     case 'activateAction':
@@ -118,6 +121,6 @@ function isPrimaryActivationKey(key: string): boolean {
     @focus="handleFocus"
     @keydown="handleKeydown"
   >
-    <TreeRow :item="item" @toggle-disclosure="handleDisclosureToggle" />
+    <TreeRow :item="item" @reveal-node="handleRevealNode" />
   </div>
 </template>

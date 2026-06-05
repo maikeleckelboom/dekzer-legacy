@@ -98,6 +98,49 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     options.toggleNode(nodeId)
   }
 
+  function expandNode(item: BrowserTreeVisibleItem): void {
+    if (!item.isExpanded) {
+      options.toggleNode(item.id)
+    }
+  }
+
+  function revealNode(nodeId: BrowserTreeNodeId): void {
+    focusNode(nodeId)
+
+    const item = visibleItems.value.find((visibleItem) => visibleItem.id === nodeId)
+
+    if (!item?.isBranch) {
+      return
+    }
+
+    switch (item.node.children.kind) {
+      case 'loaded':
+        options.toggleNode(nodeId)
+        return
+
+      case 'deferred':
+        expandNode(item)
+        if (item.canActivateAction) {
+          options.activateAction(nodeId)
+        }
+        return
+
+      case 'loading':
+        expandNode(item)
+        return
+
+      case 'failed':
+        if (item.canActivateAction) {
+          expandNode(item)
+          options.activateAction(nodeId)
+        }
+        return
+
+      case 'none':
+        return
+    }
+  }
+
   function activateAction(nodeId: BrowserTreeNodeId): void {
     const item = visibleItems.value.find((visibleItem) => visibleItem.id === nodeId)
 
@@ -154,6 +197,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     focusNode,
     selectNode: options.selectNode,
     toggleNode,
+    revealNode,
     activateAction,
     activatePrimary,
     resolveKeyboardIntent

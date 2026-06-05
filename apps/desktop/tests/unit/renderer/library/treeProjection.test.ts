@@ -44,10 +44,7 @@ describe('projectState', () => {
       id: 'navigation-row:7',
       label: 'Music'
     })
-    expect(loadedChildIds(sourceNode)).toEqual([
-      'source-directory:12',
-      'more:navigation-row:7:2'
-    ])
+    expect(loadedChildIds(sourceNode)).toEqual(['source-directory:12', 'more:navigation-row:7:2'])
     expect(projection.bindingsById.get('source-directory:12')).toMatchObject({
       kind: 'directory',
       sourceId: '7',
@@ -280,6 +277,10 @@ describe('projectState', () => {
     })
 
     expect(node.children.kind).toBe('failed')
+    expect(node.action).toMatchObject({
+      kind: 'loadChildren',
+      state: { kind: 'failed' }
+    })
     expect(isBrowserTreeBranch(node)).toBe(true)
     expect(childItemsFor(visibleItems, 'source-directory:12')[0]?.node).toMatchObject({
       role: 'state',
@@ -471,6 +472,10 @@ describe('projectState', () => {
     if (children.kind === 'failed') {
       expect(children.stateNode.label).toBe('Hierarchy read failed')
     }
+    expect(sourceNode.action).toMatchObject({
+      kind: 'loadChildren',
+      state: { kind: 'failed' }
+    })
     expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({
       kind: 'source'
     })
@@ -499,6 +504,7 @@ describe('projectState', () => {
     if (children.kind === 'failed') {
       expect(children.stateNode.label).toBe('Source unavailable')
     }
+    expect(sourceNode.action).toBeUndefined()
   })
 
   it('loaded source with sourceUnavailable coverage projects unavailable state', () => {

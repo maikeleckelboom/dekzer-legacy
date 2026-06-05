@@ -13,6 +13,7 @@ export type TreeContext = {
   readonly focusNode: (nodeId: BrowserTreeNodeId) => void
   readonly selectNode: (nodeId: BrowserTreeNodeId) => void
   readonly toggleNode: (nodeId: BrowserTreeNodeId) => void
+  readonly revealNode: (nodeId: BrowserTreeNodeId) => void
   readonly activateAction: (nodeId: BrowserTreeNodeId) => void
   readonly activatePrimary: (nodeId: BrowserTreeNodeId) => void
   readonly resolveKeyboardIntent: (item: BrowserTreeVisibleItem, key: string) => TreeKeyboardIntent

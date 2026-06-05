@@ -43,6 +43,11 @@ export type TreeKeyboardIntent =
       readonly shouldPreventDefault: true
     }
   | {
+      readonly kind: 'revealNode'
+      readonly nodeId: BrowserTreeNodeId
+      readonly shouldPreventDefault: true
+    }
+  | {
       readonly kind: 'activateAction'
       readonly nodeId: BrowserTreeNodeId
       readonly shouldPreventDefault: true
@@ -93,21 +98,13 @@ export function resolveTreeKeyboardIntent(
         return handledNoop()
       }
 
-      if (activeItem.canActivateAction) {
-        return {
-          kind: 'activateAction',
-          nodeId: activeItem.id,
-          shouldPreventDefault: true
-        }
-      }
-
       if (!activeItem.canRevealChildren) {
         return handledNoop()
       }
 
-      if (!activeItem.isExpanded) {
+      if (!activeItem.isExpanded || activeItem.canActivateAction || activeItem.isActionLoading) {
         return {
-          kind: 'expand',
+          kind: 'revealNode',
           nodeId: activeItem.id,
           shouldPreventDefault: true
         }
@@ -124,16 +121,16 @@ export function resolveTreeKeyboardIntent(
         return resolveFocusIntent(getParentVisibleNodeId(options.visibleItems, activeItem.id))
       }
 
-      if (activeItem.canActivateAction || activeItem.isActionLoading) {
-        return handledNoop()
-      }
-
       if (activeItem.canRevealChildren && activeItem.isExpanded) {
         return {
           kind: 'collapse',
           nodeId: activeItem.id,
           shouldPreventDefault: true
         }
+      }
+
+      if (activeItem.canActivateAction || activeItem.isActionLoading) {
+        return handledNoop()
       }
 
       return resolveFocusIntent(getParentVisibleNodeId(options.visibleItems, activeItem.id))
