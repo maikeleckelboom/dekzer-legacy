@@ -156,11 +156,11 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
 
 <template>
   <section
-    class="min-w-0 rounded-sm border border-(--color-border) bg-(--color-background)"
+    class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-sm border border-(--color-border) bg-(--color-background)"
     aria-labelledby="library-contents-title"
     aria-live="polite"
   >
-    <header class="border-b border-(--color-border) px-4 py-3">
+    <header class="shrink-0 border-b border-(--color-border) px-4 py-3">
       <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">Contents</p>
       <h3
         id="library-contents-title"
@@ -176,7 +176,9 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
       </p>
     </header>
 
-    <div class="overflow-x-auto">
+    <div
+      class="min-h-0 flex-1 overflow-auto scrollbar-gutter-stable scrollbar-track-transparent scrollbar-thumb-gray-200"
+    >
       <table class="min-w-full w-full table-fixed border-collapse text-left text-sm">
         <thead class="border-b border-(--color-border) text-xs uppercase text-(--color-text-muted)">
           <tr>
