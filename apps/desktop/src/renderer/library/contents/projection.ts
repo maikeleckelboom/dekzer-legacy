@@ -110,8 +110,10 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
   switch (binding.kind) {
     case 'source':
       return projectSourceContents({
+        state: options.state,
         selectedNodeId,
         binding,
+        bindingsById: options.bindingsById,
         contentsState: options.contentsState
       })
     case 'directory':
@@ -119,6 +121,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         state: options.state,
         selectedNodeId,
         binding,
+        bindingsById: options.bindingsById,
         contentsState: options.contentsState
       })
     case 'file':
@@ -194,14 +197,25 @@ function projectHostContents(
 }
 
 function projectSourceContents(options: {
+  readonly state: BrowserState
   readonly selectedNodeId: BrowserTreeNodeId
   readonly binding: Extract<RowBinding, { readonly kind: 'source' }>
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
   readonly contentsState: ContentsBoundaryState | undefined
 }): ContentProjection {
   const title = formatSourceDisplayName(options.binding.target.label)
+  const acceptedSnapshot = deferredAcceptedSnapshotProjection({
+    state: options.state,
+    bindingsById: options.bindingsById,
+    contentsState: options.contentsState
+  })
+  const useAcceptedFallback =
+    acceptedSnapshot === undefined && hasDeferredCrossScopePending(options.contentsState)
   return projectContentsState({
-    ownerId: options.selectedNodeId,
-    title,
+    ownerId:
+      acceptedSnapshot?.ownerId ??
+      (useAcceptedFallback ? 'accepted-contents' : options.selectedNodeId),
+    title: acceptedSnapshot?.title ?? (useAcceptedFallback ? 'Library contents' : title),
     contentsState: options.contentsState
   })
 }
@@ -210,15 +224,219 @@ function projectDirectoryContents(options: {
   readonly state: BrowserState
   readonly selectedNodeId: BrowserTreeNodeId
   readonly binding: Extract<RowBinding, { readonly kind: 'directory' }>
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
   readonly contentsState: ContentsBoundaryState | undefined
 }): ContentProjection {
   const directoryRow = findLoadedChildRow(options.state, options.selectedNodeId)
   const title = directoryRow?.label ?? 'Selected folder'
-  return projectContentsState({
-    ownerId: options.selectedNodeId,
-    title,
+  const acceptedSnapshot = deferredAcceptedSnapshotProjection({
+    state: options.state,
+    bindingsById: options.bindingsById,
     contentsState: options.contentsState
   })
+  const useAcceptedFallback =
+    acceptedSnapshot === undefined && hasDeferredCrossScopePending(options.contentsState)
+  return projectContentsState({
+    ownerId:
+      acceptedSnapshot?.ownerId ??
+      (useAcceptedFallback ? 'accepted-contents' : options.selectedNodeId),
+    title: acceptedSnapshot?.title ?? (useAcceptedFallback ? 'Library contents' : title),
+    contentsState: options.contentsState
+  })
+}
+
+type AcceptedSnapshotProjection = {
+  readonly ownerId: BrowserTreeNodeId
+  readonly title: string
+}
+
+type AcceptedContentsScope =
+  | {
+      readonly kind: 'source'
+      readonly sourceId: string
+    }
+  | {
+      readonly kind: 'sourceLocation'
+      readonly sourceLocationId: string
+    }
+  | {
+      readonly kind: 'directory'
+      readonly sourceId: string
+      readonly directoryId: string
+    }
+
+function deferredAcceptedSnapshotProjection(options: {
+  readonly state: BrowserState
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+  readonly contentsState: ContentsBoundaryState | undefined
+}): AcceptedSnapshotProjection | undefined {
+  const contentsState = options.contentsState
+
+  if (
+    contentsState?.kind !== 'ready' ||
+    contentsState.pending === undefined ||
+    contentsState.pending.requestKey === contentsState.requestKey ||
+    contentsState.pending.presentation !== 'deferred'
+  ) {
+    return undefined
+  }
+
+  return acceptedSnapshotProjectionForRequestKey({
+    state: options.state,
+    bindingsById: options.bindingsById,
+    requestKey: contentsState.requestKey
+  })
+}
+
+function hasDeferredCrossScopePending(contentsState: ContentsBoundaryState | undefined): boolean {
+  return (
+    contentsState?.kind === 'ready' &&
+    contentsState.pending !== undefined &&
+    contentsState.pending.requestKey !== contentsState.requestKey &&
+    contentsState.pending.presentation === 'deferred'
+  )
+}
+
+function acceptedSnapshotProjectionForRequestKey(options: {
+  readonly state: BrowserState
+  readonly bindingsById: BrowserProjection['bindingsById'] | undefined
+  readonly requestKey: string
+}): AcceptedSnapshotProjection | undefined {
+  const scope = parseAcceptedContentsScope(options.requestKey)
+
+  if (scope === undefined) {
+    return undefined
+  }
+
+  if (scope.kind === 'directory') {
+    const stateProjection = acceptedSnapshotProjectionFromState(scope, options.state)
+
+    if (stateProjection !== undefined) {
+      return stateProjection
+    }
+  }
+
+  const bindingProjection = acceptedSnapshotProjectionFromBindings(scope, options.bindingsById)
+
+  if (bindingProjection !== undefined) {
+    return bindingProjection
+  }
+
+  return acceptedSnapshotProjectionFromState(scope, options.state)
+}
+
+function acceptedSnapshotProjectionFromBindings(
+  scope: AcceptedContentsScope,
+  bindingsById: BrowserProjection['bindingsById'] | undefined
+): AcceptedSnapshotProjection | undefined {
+  if (bindingsById === undefined) {
+    return undefined
+  }
+
+  for (const [nodeId, binding] of bindingsById) {
+    if (scope.kind === 'source' && binding.kind === 'source') {
+      if (
+        binding.target.entryPoint.kind === 'source' &&
+        binding.target.entryPoint.sourceId === scope.sourceId
+      ) {
+        return {
+          ownerId: nodeId,
+          title: formatSourceDisplayName(binding.target.label)
+        }
+      }
+    }
+
+    if (scope.kind === 'sourceLocation' && binding.kind === 'source') {
+      if (
+        binding.target.entryPoint.kind === 'sourceLocation' &&
+        binding.target.entryPoint.sourceLocationId === scope.sourceLocationId
+      ) {
+        return {
+          ownerId: nodeId,
+          title: formatSourceDisplayName(binding.target.label)
+        }
+      }
+    }
+
+    if (
+      scope.kind === 'directory' &&
+      binding.kind === 'directory' &&
+      binding.sourceId === scope.sourceId &&
+      binding.directoryId === scope.directoryId
+    ) {
+      return {
+        ownerId: nodeId,
+        title: binding.label ?? 'Selected folder'
+      }
+    }
+  }
+
+  return undefined
+}
+
+function acceptedSnapshotProjectionFromState(
+  scope: AcceptedContentsScope,
+  state: BrowserState
+): AcceptedSnapshotProjection | undefined {
+  if (scope.kind === 'source' || scope.kind === 'sourceLocation') {
+    const row =
+      state.navigationReadResult?.state === 'ready'
+        ? state.navigationReadResult.rows.find((candidate) =>
+            scope.kind === 'source'
+              ? candidate.selectorKind === 'source' && candidate.selectorPayload === scope.sourceId
+              : candidate.selectorKind === 'sourceLocation' &&
+                candidate.selectorPayload === scope.sourceLocationId
+          )
+        : undefined
+
+    if (row !== undefined) {
+      return {
+        ownerId: `navigation-row:${row.navigationRowId}`,
+        title: formatSourceDisplayName(row.displayName)
+      }
+    }
+
+    return undefined
+  }
+
+  const row = findLoadedDirectoryRow(state, scope.sourceId, scope.directoryId)
+
+  if (row === undefined) {
+    return undefined
+  }
+
+  return {
+    ownerId: row.id,
+    title: row.label
+  }
+}
+
+function parseAcceptedContentsScope(requestKey: string): AcceptedContentsScope | undefined {
+  const parts = requestKey.split(':')
+
+  if (parts[0] === 'source' && parts[1] !== undefined) {
+    return {
+      kind: 'source',
+      sourceId: parts[1]
+    }
+  }
+
+  if (parts[0] === 'source-location' && parts[1] !== undefined) {
+    return {
+      kind: 'sourceLocation',
+      sourceLocationId: parts[1]
+    }
+  }
+
+  if (parts[0] === 'directory' && parts[1] !== undefined && parts[2] !== undefined) {
+    return {
+      kind: 'directory',
+      sourceId: parts[1],
+      directoryId: parts[2]
+    }
+  }
+
+  return undefined
 }
 
 function projectContentsState(options: {
@@ -283,7 +501,11 @@ function projectContentsState(options: {
     })
   }
 
-  if (state.pending !== undefined && state.pending.requestKey !== state.requestKey) {
+  if (
+    state.pending !== undefined &&
+    state.pending.requestKey !== state.requestKey &&
+    state.pending.presentation === 'visible'
+  ) {
     return stateProjection({
       kind: 'notLoaded',
       ownerId: options.ownerId,
@@ -698,6 +920,48 @@ function findLoadedChildRow(state: BrowserState, nodeId: BrowserTreeNodeId): Chi
     }
 
     const row = directoryState.children.rows.find((candidate) => candidate.id === nodeId)
+
+    if (row !== undefined) {
+      return row
+    }
+  }
+
+  return undefined
+}
+
+function findLoadedDirectoryRow(
+  state: BrowserState,
+  sourceId: string,
+  directoryId: string
+): Extract<ChildRow, { readonly kind: 'directory' }> | undefined {
+  for (const sourceState of state.sourceReadStates.values()) {
+    if (sourceState.kind !== 'loaded' && sourceState.kind !== 'refreshing') {
+      continue
+    }
+
+    const row = sourceState.children.rows.find(
+      (candidate): candidate is Extract<ChildRow, { readonly kind: 'directory' }> =>
+        candidate.kind === 'directory' &&
+        candidate.sourceId === sourceId &&
+        candidate.directoryId === directoryId
+    )
+
+    if (row !== undefined) {
+      return row
+    }
+  }
+
+  for (const directoryState of state.directoryReadStates.values()) {
+    if (directoryState.kind !== 'loaded' && directoryState.kind !== 'refreshing') {
+      continue
+    }
+
+    const row = directoryState.children.rows.find(
+      (candidate): candidate is Extract<ChildRow, { readonly kind: 'directory' }> =>
+        candidate.kind === 'directory' &&
+        candidate.sourceId === sourceId &&
+        candidate.directoryId === directoryId
+    )
 
     if (row !== undefined) {
       return row

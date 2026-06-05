@@ -326,7 +326,8 @@ describe('projectContents', () => {
       pending: {
         requestKey: 'source:7',
         sequence: 1,
-        detail: 'Loading contents.'
+        detail: 'Loading contents.',
+        presentation: 'visible'
       },
       detail: 'Contents request is pending.'
     })
@@ -345,7 +346,8 @@ describe('projectContents', () => {
       pending: {
         requestKey: 'source:7',
         sequence: 1,
-        detail: 'Loading contents.'
+        detail: 'Loading contents.',
+        presentation: 'visible'
       },
       detail: 'Contents request is pending.'
     })
@@ -390,7 +392,7 @@ describe('projectContents', () => {
     expect(contents.rows[0]).not.toMatchObject({ state: 'loading' })
   })
 
-  it('does not project retained rows as current contents during cross-scope pending reads', () => {
+  it('keeps the previous source projection during deferred cross-scope pending reads', () => {
     const state = browserState({
       sourceState: {
         kind: 'loaded',
@@ -403,7 +405,91 @@ describe('projectContents', () => {
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
         requestKey: 'source:7',
-        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive'
+        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        pendingPresentation: 'deferred'
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Source Fixture')
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(contents.rows.map((row) => row.label)).not.toContain('Contents pending')
+  })
+
+  it('keeps the previous directory projection during deferred folder-to-folder pending reads', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([
+          directoryNode('11', 'Old Album'),
+          directoryNode('12', 'New Album')
+        ])
+      }
+    })
+    const contents = projectForSelection(
+      state,
+      'source-directory:12',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        requestKey: 'directory:7:11:sourceFile:audio:recursive',
+        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        pendingPresentation: 'deferred'
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Old Album')
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(contents.title).not.toBe('New Album')
+  })
+
+  it('swaps directly to new accepted rows for fast cross-scope responses', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode('12', 'New Album')])
+      }
+    })
+    const deferred = projectForSelection(
+      state,
+      'source-directory:12',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        requestKey: 'source:7',
+        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        pendingPresentation: 'deferred'
+      })
+    )
+    const accepted = projectForSelection(
+      state,
+      'source-directory:12',
+      readyContents({
+        rows: [sourceFileRow('new', 'new.wav', 'audio')],
+        requestKey: 'directory:7:12:sourceFile:audio:recursive'
+      })
+    )
+
+    expect(deferred.title).toBe('Source Fixture')
+    expect(deferred.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(accepted.title).toBe('New Album')
+    expect(accepted.rows.map((row) => row.label)).toEqual(['new.wav'])
+  })
+
+  it('projects threshold-visible cross-scope pending reads without retained rows', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode('12', 'New Album')])
+      }
+    })
+    const contents = projectForSelection(
+      state,
+      'source-directory:12',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')],
+        requestKey: 'source:7',
+        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        pendingPresentation: 'visible'
       })
     )
 
@@ -699,6 +785,7 @@ function readyContents(options: {
   readonly emptyAuthoritative?: boolean
   readonly requestKey?: string
   readonly pendingRequestKey?: string
+  readonly pendingPresentation?: 'deferred' | 'visible'
   readonly refreshError?: string
 }): ContentsBoundaryState {
   return {
@@ -714,7 +801,8 @@ function readyContents(options: {
           pending: {
             requestKey: options.pendingRequestKey,
             sequence: 2,
-            detail: 'Loading contents.'
+            detail: 'Loading contents.',
+            presentation: options.pendingPresentation ?? 'visible'
           }
         }),
     ...(options.refreshError === undefined ? {} : { refreshError: options.refreshError })

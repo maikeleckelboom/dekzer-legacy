@@ -120,6 +120,120 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).not.toHaveProperty('pending')
   })
 
+  it('defers cross-scope pending presentation until the local read threshold', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding('11'))
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    const nextScope = controller.readForBinding(directoryBinding('12'))
+
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      pending: {
+        requestKey: 'directory:7:12:sourceFile:audio:recursive',
+        sequence: 2,
+        presentation: 'deferred'
+      }
+    })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+
+    await vi.advanceTimersByTimeAsync(124)
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      pending: {
+        presentation: 'deferred'
+      }
+    })
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      pending: {
+        requestKey: 'directory:7:12:sourceFile:audio:recursive',
+        sequence: 2,
+        presentation: 'visible'
+      }
+    })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(nextScope).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+    expect(controller.state.value).not.toHaveProperty('pending')
+  })
+
+  it('accepts fast cross-scope responses without promoting pending presentation', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding('11'))
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    const nextScope = controller.readForBinding(directoryBinding('12'))
+
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      pending: {
+        presentation: 'deferred'
+      }
+    })
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(nextScope).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+    expect(controller.state.value).not.toHaveProperty('pending')
+
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
+    expect(controller.state.value).not.toHaveProperty('pending')
+  })
+
+  it('cancels stale cross-scope threshold timers when selection changes again', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding('11'))
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    const staleScope = controller.readForBinding(directoryBinding('12'))
+    await vi.advanceTimersByTimeAsync(60)
+    const currentScope = controller.readForBinding(directoryBinding('13'))
+    await vi.advanceTimersByTimeAsync(65)
+
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      pending: {
+        requestKey: 'directory:7:13:sourceFile:audio:recursive',
+        sequence: 3,
+        presentation: 'deferred'
+      }
+    })
+
+    contentsApi.resolveAt(1, readyContents(requestAt(contentsApi, 2), [contentsRow('c', 'C.wav')]))
+    await expect(currentScope).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['C.wav'])
+    expect(controller.state.value).not.toHaveProperty('pending')
+
+    await vi.advanceTimersByTimeAsync(loadingThresholdPlusMargin())
+    expect(visibleLabels(controller.state.value)).toEqual(['C.wav'])
+    expect(controller.state.value).not.toHaveProperty('pending')
+
+    contentsApi.resolveAt(0, readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.wav')]))
+    await expect(staleScope).resolves.toBe(false)
+    expect(visibleLabels(controller.state.value)).toEqual(['C.wav'])
+  })
+
   it('does not let an older same-scope refresh overwrite a newer accepted response', async () => {
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)
@@ -288,6 +402,10 @@ function directoryBinding(directoryId = '11'): RowBinding {
     },
     label: 'Album'
   }
+}
+
+function loadingThresholdPlusMargin(): number {
+  return 126
 }
 
 type DeferredContentsApi = LibraryContentsApi & {

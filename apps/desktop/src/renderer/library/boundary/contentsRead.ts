@@ -41,6 +41,7 @@ export type ContentsPendingRead = {
   readonly requestKey: string
   readonly sequence: number
   readonly detail: string
+  readonly presentation: 'deferred' | 'visible'
   readonly cursor?: string
 }
 
@@ -100,7 +101,7 @@ export function createContentsReadController(
   })
   let readSequence = 0
   let started = false
-  let loadingTimer: ReturnType<typeof setTimeout> | undefined = undefined
+  let thresholdTimer: ReturnType<typeof setTimeout> | undefined = undefined
 
   function start(): void {
     started = true
@@ -108,11 +109,11 @@ export function createContentsReadController(
 
   function stop(): void {
     started = false
-    clearLoadingTimer()
+    clearThresholdTimer()
   }
 
   function clear(): void {
-    clearLoadingTimer()
+    clearThresholdTimer()
     state.value = {
       kind: 'idle',
       detail: 'No contents scope is active.'
@@ -149,6 +150,7 @@ export function createContentsReadController(
       requestKey,
       sequence,
       detail: options.cursor !== undefined ? 'Loading more contents.' : 'Loading contents.',
+      presentation: pendingPresentation(currentState, requestKey),
       ...(cursor === undefined ? {} : { cursor })
     }
     startPendingRead(pending)
@@ -166,7 +168,7 @@ export function createContentsReadController(
         return false
       }
 
-      clearLoadingTimer()
+      clearThresholdTimer()
       let rows: readonly ContentsFileRow[]
       const readyResult = result.state === 'ready' ? result.result : undefined
       const previousRows = currentAcceptedRows(requestKey)
@@ -202,7 +204,7 @@ export function createContentsReadController(
         return false
       }
 
-      clearLoadingTimer()
+      clearThresholdTimer()
       if (hasAcceptedSnapshot()) {
         retainAcceptedSnapshot(safeContentsRequestFailure)
         return true
@@ -218,7 +220,7 @@ export function createContentsReadController(
   }
 
   function startPendingRead(pending: ContentsPendingRead): void {
-    clearLoadingTimer()
+    clearThresholdTimer()
 
     const currentState = state.value
     if (currentState.kind === 'ready') {
@@ -232,6 +234,9 @@ export function createContentsReadController(
           : { accumulatedRows: currentState.accumulatedRows }),
         pending
       }
+      if (pending.presentation === 'deferred') {
+        scheduleDeferredPendingPromotion(pending)
+      }
       return
     }
 
@@ -241,7 +246,9 @@ export function createContentsReadController(
       detail: 'Contents request is pending.'
     }
 
-    loadingTimer = setTimeout(() => {
+    thresholdTimer = setTimeout(() => {
+      thresholdTimer = undefined
+
       if (!started || !isCurrentLoading(pending.requestKey, pending.sequence)) {
         return
       }
@@ -252,17 +259,60 @@ export function createContentsReadController(
         sequence: pending.sequence,
         detail: pending.detail
       }
-      loadingTimer = undefined
     }, loadingThresholdMs)
   }
 
-  function clearLoadingTimer(): void {
-    if (loadingTimer === undefined) {
+  function scheduleDeferredPendingPromotion(pending: ContentsPendingRead): void {
+    thresholdTimer = setTimeout(() => {
+      thresholdTimer = undefined
+
+      if (!started || !isCurrentLoading(pending.requestKey, pending.sequence)) {
+        return
+      }
+
+      const currentState = state.value
+      if (
+        currentState.kind !== 'ready' ||
+        currentState.pending === undefined ||
+        currentState.pending.requestKey !== pending.requestKey ||
+        currentState.pending.sequence !== pending.sequence ||
+        currentState.pending.presentation !== 'deferred'
+      ) {
+        return
+      }
+
+      state.value = {
+        kind: 'ready',
+        requestKey: currentState.requestKey,
+        result: currentState.result,
+        ...(currentState.nextCursor === undefined ? {} : { nextCursor: currentState.nextCursor }),
+        ...(currentState.accumulatedRows === undefined
+          ? {}
+          : { accumulatedRows: currentState.accumulatedRows }),
+        pending: {
+          ...currentState.pending,
+          presentation: 'visible'
+        }
+      }
+    }, loadingThresholdMs)
+  }
+
+  function clearThresholdTimer(): void {
+    if (thresholdTimer === undefined) {
       return
     }
 
-    clearTimeout(loadingTimer)
-    loadingTimer = undefined
+    clearTimeout(thresholdTimer)
+    thresholdTimer = undefined
+  }
+
+  function pendingPresentation(
+    currentState: ContentsBoundaryState,
+    requestKey: string
+  ): ContentsPendingRead['presentation'] {
+    return currentState.kind === 'ready' && currentState.requestKey !== requestKey
+      ? 'deferred'
+      : 'visible'
   }
 
   function isCurrentLoading(requestKey: string, sequence: number): boolean {
@@ -280,7 +330,8 @@ export function createContentsReadController(
       return {
         requestKey: currentState.requestKey,
         sequence: currentState.sequence,
-        detail: currentState.detail ?? 'Loading contents.'
+        detail: currentState.detail ?? 'Loading contents.',
+        presentation: 'visible'
       }
     }
 
