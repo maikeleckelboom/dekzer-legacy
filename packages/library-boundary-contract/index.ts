@@ -93,9 +93,7 @@ export type ReadAttachmentSourceFilesRequest = { attachmentId: string, limit?: n
 
 export type ReadSourceAttachmentSummaryRequest = { sourceId: string, };
 
-export type ReadTrackIdentityReviewCandidatesRequest = { sourceId?: string, reviewState?: TrackIdentityReviewStateFilter, limit: number, };
-
-export type TrackIdentityReviewStateFilter = "all" | "needsUserDecision" | "systemAccepted" | "userAccepted" | "userRejected" | "userDeferred" | "staleDecision";
+export type ReadTrackIdentityReviewCandidatesRequest = { sourceId?: string, reviewState?: TrackIdentityReviewState, limit: number, };
 
 export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
 
@@ -212,9 +210,9 @@ export type ReadAttachmentSourceFilesReply = { status: AttachmentIdentityReadSta
 
 export type ReadSourceAttachmentSummaryReply = { status: AttachmentIdentityReadStatus, summary?: SourceAttachmentSummary, };
 
-export type ReadTrackIdentityReviewCandidatesReply = { status: TrackIdentityReviewCandidatesReadStatus, candidates: Array<TrackIdentityReviewCandidate>, };
+export type ReadTrackIdentityReviewCandidatesReply = { status: TrackIdentityReviewReadStatus, candidates: Array<TrackIdentityReviewCandidate>, };
 
-export type TrackIdentityReviewCandidatesReadStatus = "ok" | "sourceNotFound";
+export type TrackIdentityReviewReadStatus = "ok" | "sourceNotFound";
 
 export type TrackIdentityReviewCandidate = { candidateId: string, candidateKind: string, candidateEvidenceBasis: string, candidateStatus: TrackIdentityReviewCandidateStatus, evidenceKeyAlgorithm: string, evidenceKeyValue: string, evidenceSummary: TrackIdentityReviewEvidenceSummary, sourceSummary: TrackIdentityReviewSourceSummary, reviewState: TrackIdentityReviewState, effectiveDecision?: TrackIdentityReviewDecision, createdAtMs: number, updatedAtMs: number, };
 

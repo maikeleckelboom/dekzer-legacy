@@ -3790,7 +3790,7 @@
           }
         },
         "status": {
-          "$ref": "#/$defs/TrackIdentityReviewCandidatesReadStatus"
+          "$ref": "#/$defs/TrackIdentityReviewReadStatus"
         }
       },
       "required": [
@@ -3809,7 +3809,7 @@
         "reviewState": {
           "anyOf": [
             {
-              "$ref": "#/$defs/TrackIdentityReviewStateFilter"
+              "$ref": "#/$defs/TrackIdentityReviewState"
             },
             {
               "type": "null"
@@ -6064,13 +6064,6 @@
         "superseded"
       ]
     },
-    "TrackIdentityReviewCandidatesReadStatus": {
-      "type": "string",
-      "enum": [
-        "ok",
-        "sourceNotFound"
-      ]
-    },
     "TrackIdentityReviewDecision": {
       "type": "object",
       "properties": {
@@ -6138,6 +6131,13 @@
         "currentEvidenceCount"
       ]
     },
+    "TrackIdentityReviewReadStatus": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "sourceNotFound"
+      ]
+    },
     "TrackIdentityReviewSourceSample": {
       "type": "object",
       "properties": {
@@ -6176,18 +6176,6 @@
     "TrackIdentityReviewState": {
       "type": "string",
       "enum": [
-        "needsUserDecision",
-        "systemAccepted",
-        "userAccepted",
-        "userRejected",
-        "userDeferred",
-        "staleDecision"
-      ]
-    },
-    "TrackIdentityReviewStateFilter": {
-      "type": "string",
-      "enum": [
-        "all",
         "needsUserDecision",
         "systemAccepted",
         "userAccepted",

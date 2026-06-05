@@ -2093,32 +2093,8 @@ pub struct ReadTrackIdentityReviewCandidatesRequest {
     pub source_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub review_state: Option<TrackIdentityReviewStateFilter>,
+    pub review_state: Option<TrackIdentityReviewState>,
     pub limit: usize,
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    ts_rs::TS,
-)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-pub enum TrackIdentityReviewStateFilter {
-    All,
-    NeedsUserDecision,
-    SystemAccepted,
-    UserAccepted,
-    UserRejected,
-    UserDeferred,
-    StaleDecision,
 }
 
 #[derive(
@@ -2134,7 +2110,7 @@ pub enum TrackIdentityReviewStateFilter {
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub struct ReadTrackIdentityReviewCandidatesReply {
-    pub status: TrackIdentityReviewCandidatesReadStatus,
+    pub status: TrackIdentityReviewReadStatus,
     pub candidates: Vec<TrackIdentityReviewCandidate>,
 }
 
@@ -2152,7 +2128,7 @@ pub struct ReadTrackIdentityReviewCandidatesReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum TrackIdentityReviewCandidatesReadStatus {
+pub enum TrackIdentityReviewReadStatus {
     Ok,
     SourceNotFound,
 }
@@ -2403,11 +2379,10 @@ mod tests {
         SourceFileAttachmentLinkStatus, SourceLifecycle, SourceLifecycleIssueKind,
         SourceMountStatus, SourceScanPhase, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityReviewCandidate,
-        TrackIdentityReviewCandidateStatus, TrackIdentityReviewCandidatesReadStatus,
-        TrackIdentityReviewDecision, TrackIdentityReviewEvidenceSummary,
+        TrackIdentityReviewCandidateStatus, TrackIdentityReviewDecision,
+        TrackIdentityReviewEvidenceSummary, TrackIdentityReviewReadStatus,
         TrackIdentityReviewSourceSample, TrackIdentityReviewSourceSummary,
-        TrackIdentityReviewState, TrackIdentityReviewStateFilter,
-        TrackIdentityUserBlockingDecisionState,
+        TrackIdentityReviewState, TrackIdentityUserBlockingDecisionState,
     };
     use serde_json::json;
 
@@ -2927,7 +2902,7 @@ mod tests {
         let command = SnapshotReadCommand::ReadTrackIdentityReviewCandidates(
             ReadTrackIdentityReviewCandidatesRequest {
                 source_id: Some(7),
-                review_state: Some(TrackIdentityReviewStateFilter::NeedsUserDecision),
+                review_state: Some(TrackIdentityReviewState::NeedsUserDecision),
                 limit: 25,
             },
         );
@@ -2965,7 +2940,7 @@ mod tests {
 
         let reply = SnapshotReadReply::TrackIdentityReviewCandidates(
             ReadTrackIdentityReviewCandidatesReply {
-                status: TrackIdentityReviewCandidatesReadStatus::Ok,
+                status: TrackIdentityReviewReadStatus::Ok,
                 candidates: vec![TrackIdentityReviewCandidate {
                     candidate_id: 11,
                     candidate_kind: "exact_primary_media_content".to_string(),

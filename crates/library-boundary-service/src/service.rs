@@ -557,12 +557,7 @@ impl LibraryBoundaryService {
         &self,
         request: protocol::ReadTrackIdentityReviewCandidatesRequest,
     ) -> protocol::ProtocolResult<protocol::ReadTrackIdentityReviewCandidatesReply> {
-        if request.limit == 0 {
-            return Err(protocol::ProtocolError::InvalidRequest {
-                detail: "readTrackIdentityReviewCandidates limit must be greater than zero"
-                    .to_string(),
-            });
-        }
+        validate_track_identity_review_candidates_limit(request.limit)?;
         let source_id = request
             .source_id
             .map(|source_id| require_positive_i64(source_id, "sourceId"))
@@ -575,7 +570,7 @@ impl LibraryBoundaryService {
                 .map_err(map_store_error)?;
             if lifecycle.is_none() {
                 return Ok(protocol::ReadTrackIdentityReviewCandidatesReply {
-                    status: protocol::TrackIdentityReviewCandidatesReadStatus::SourceNotFound,
+                    status: protocol::TrackIdentityReviewReadStatus::SourceNotFound,
                     candidates: Vec::new(),
                 });
             }
@@ -1261,6 +1256,16 @@ fn validate_attachment_source_files_limit(limit: usize) -> protocol::ProtocolRes
     }
 }
 
+fn validate_track_identity_review_candidates_limit(limit: usize) -> protocol::ProtocolResult<()> {
+    if (1..=200).contains(&limit) {
+        Ok(())
+    } else {
+        Err(protocol::ProtocolError::InvalidRequest {
+            detail: "readTrackIdentityReviewCandidates limit must be between 1 and 200".to_string(),
+        })
+    }
+}
+
 pub(crate) fn unix_time_ms() -> protocol::ProtocolResult<i64> {
     let duration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1309,9 +1314,9 @@ mod tests {
         StartRootScanRequest, TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
         TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
-        TrackIdentityReviewCandidatesReadStatus, TrackIdentityReviewState,
-        TrackIdentityReviewStateFilter, TrackIdentityUserBlockingDecisionState,
-        UnregisterLocalRootReply, UnregisterLocalRootRequest,
+        TrackIdentityReviewReadStatus, TrackIdentityReviewState,
+        TrackIdentityUserBlockingDecisionState, UnregisterLocalRootReply,
+        UnregisterLocalRootRequest,
     };
     use rusqlite::Connection;
     use serde_json::json;
@@ -2846,7 +2851,7 @@ mod tests {
             CommandRequest::SnapshotRead(SnapshotReadCommand::ReadTrackIdentityReviewCandidates(
                 ReadTrackIdentityReviewCandidatesRequest {
                     source_id: Some(registered.root_id),
-                    review_state: Some(TrackIdentityReviewStateFilter::UserRejected),
+                    review_state: Some(TrackIdentityReviewState::UserRejected),
                     limit: 10,
                 },
             )),
@@ -2857,10 +2862,7 @@ mod tests {
             other => panic!("expected review candidates reply, got {other:?}"),
         };
 
-        assert_eq!(
-            review_reply.status,
-            TrackIdentityReviewCandidatesReadStatus::Ok
-        );
+        assert_eq!(review_reply.status, TrackIdentityReviewReadStatus::Ok);
         assert_eq!(review_reply.candidates.len(), 1);
         let candidate = &review_reply.candidates[0];
         assert_eq!(candidate.candidate_id, candidate_id);
@@ -2906,7 +2908,7 @@ mod tests {
         };
         assert_eq!(
             missing_source.status,
-            TrackIdentityReviewCandidatesReadStatus::SourceNotFound
+            TrackIdentityReviewReadStatus::SourceNotFound
         );
         assert!(missing_source.candidates.is_empty());
 
@@ -2916,6 +2918,17 @@ mod tests {
                     source_id: Some(registered.root_id),
                     review_state: None,
                     limit: 0,
+                },
+            ),
+        ));
+        assert!(matches!(invalid, Err(ProtocolError::InvalidRequest { .. })));
+
+        let invalid = service.try_handle_command(CommandRequest::SnapshotRead(
+            SnapshotReadCommand::ReadTrackIdentityReviewCandidates(
+                ReadTrackIdentityReviewCandidatesRequest {
+                    source_id: Some(registered.root_id),
+                    review_state: None,
+                    limit: 201,
                 },
             ),
         ));

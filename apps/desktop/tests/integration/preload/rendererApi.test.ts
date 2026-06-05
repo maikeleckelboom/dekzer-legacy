@@ -51,9 +51,9 @@ import {
   type TrackIdentityDecisionCommandResult
 } from '../../../src/shared/libraryTrackIdentityDecisions/decisionCommands'
 import {
-  trackIdentityReviewCandidateChannels,
-  type ReadTrackIdentityReviewCandidatesResult
-} from '../../../src/shared/libraryTrackIdentityReview/reviewCandidates'
+  channels as trackIdentityReviewChannels,
+  type ReadCandidatesResult
+} from '../../../src/shared/libraryTrackIdentityReview/candidates'
 import {
   boundaryEventChannels,
   type BoundaryEventDeliveryPayload
@@ -346,7 +346,7 @@ describe('preload renderer API', () => {
         }
       }
     }
-    const readTrackIdentityReviewCandidatesResult: ReadTrackIdentityReviewCandidatesResult = {
+    const readTrackIdentityReviewCandidatesResult: ReadCandidatesResult = {
       state: 'ready',
       result: {
         status: 'ok',
@@ -527,7 +527,7 @@ describe('preload renderer API', () => {
           return deferTrackIdentityCandidateResult
         }
 
-        if (channel === trackIdentityReviewCandidateChannels.readTrackIdentityReviewCandidates) {
+        if (channel === trackIdentityReviewChannels.readCandidates) {
           receivedReadTrackIdentityReviewCandidatesRequest = args[0]
           return readTrackIdentityReviewCandidatesResult
         }

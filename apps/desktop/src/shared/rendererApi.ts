@@ -41,9 +41,9 @@ import type {
   TrackIdentityDecisionCommandResult
 } from './libraryTrackIdentityDecisions/decisionCommands'
 import type {
-  ReadTrackIdentityReviewCandidatesRequest,
-  ReadTrackIdentityReviewCandidatesResult
-} from './libraryTrackIdentityReview/reviewCandidates'
+  ReadCandidatesRequest,
+  ReadCandidatesResult
+} from './libraryTrackIdentityReview/candidates'
 import type { LocalRootChoiceResult } from './libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from './libraryRoots/readLocalRoots'
 import type { LocalRootScanRequest, LocalRootScanResult } from './libraryRoots/runScan'
@@ -134,9 +134,7 @@ export type LibraryTrackIdentityDecisionApi = {
 }
 
 export type TrackIdentityReviewApi = {
-  readTrackIdentityReviewCandidates(
-    request: ReadTrackIdentityReviewCandidatesRequest
-  ): Promise<ReadTrackIdentityReviewCandidatesResult>
+  readTrackIdentityReviewCandidates(request: ReadCandidatesRequest): Promise<ReadCandidatesResult>
 }
 
 export type LibraryRootsApi = {

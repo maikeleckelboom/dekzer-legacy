@@ -15,13 +15,13 @@ import {
 } from '../../../src/main/libraryBoundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
 import {
-  readTrackIdentityReviewCandidatesThroughHost,
+  readCandidatesThroughHost,
   registerTrackIdentityReviewCandidatesIpc
-} from '../../../src/main/libraryTrackIdentityReview/reviewCandidates'
+} from '../../../src/main/libraryTrackIdentityReview/candidates'
 import {
-  trackIdentityReviewCandidateChannels,
-  type ReadTrackIdentityReviewCandidatesResult
-} from '../../../src/shared/libraryTrackIdentityReview/reviewCandidates'
+  channels,
+  type ReadCandidatesResult
+} from '../../../src/shared/libraryTrackIdentityReview/candidates'
 import {
   createFakeClient,
   silentLogger,
@@ -43,7 +43,7 @@ describe('track identity review candidate reads through the host', () => {
     const idleHost = new LibraryBoundaryHost(config, silentLogger())
 
     await expect(
-      readTrackIdentityReviewCandidatesThroughHost(idleHost, { sourceId: '7', limit: 25 })
+      readCandidatesThroughHost(idleHost, { sourceId: '7', limit: 25 })
     ).resolves.toMatchObject({
       state: 'hostUnavailable',
       error: { code: 'hostNotStarted' }
@@ -61,7 +61,7 @@ describe('track identity review candidate reads through the host', () => {
     )
 
     await expect(
-      readTrackIdentityReviewCandidatesThroughHost(successHost, {
+      readCandidatesThroughHost(successHost, {
         sourceId: '7',
         reviewState: 'userRejected',
         limit: 25,
@@ -86,7 +86,7 @@ describe('track identity review candidate reads through the host', () => {
     })
 
     await expect(
-      readTrackIdentityReviewCandidatesThroughHost(successHost, {
+      readCandidatesThroughHost(successHost, {
         sourceId: '0',
         limit: 25
       })
@@ -95,7 +95,7 @@ describe('track identity review candidate reads through the host', () => {
       error: { code: 'invalidRequest' }
     })
     await expect(
-      readTrackIdentityReviewCandidatesThroughHost(successHost, {
+      readCandidatesThroughHost(successHost, {
         sourceId: '7',
         reviewState: 'blockedByUserDecision',
         limit: 25
@@ -105,9 +105,18 @@ describe('track identity review candidate reads through the host', () => {
       error: { code: 'invalidRequest' }
     })
     await expect(
-      readTrackIdentityReviewCandidatesThroughHost(successHost, {
+      readCandidatesThroughHost(successHost, {
         sourceId: '7',
         reviewState: 'all',
+        limit: 25
+      })
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    })
+    await expect(
+      readCandidatesThroughHost(successHost, {
+        sourceId: '7',
         limit: 0
       })
     ).resolves.toMatchObject({
@@ -119,10 +128,7 @@ describe('track identity review candidate reads through the host', () => {
   it('registers track identity review candidate read IPC channel', () => {
     const config = hostConfig()
     const idleHost = new LibraryBoundaryHost(config, silentLogger())
-    const registration = new Map<
-      string,
-      (request: unknown) => Promise<ReadTrackIdentityReviewCandidatesResult>
-    >()
+    const registration = new Map<string, (request: unknown) => Promise<ReadCandidatesResult>>()
 
     registerTrackIdentityReviewCandidatesIpc(
       {
@@ -133,9 +139,7 @@ describe('track identity review candidate reads through the host', () => {
       idleHost
     )
 
-    expect(
-      registration.has(trackIdentityReviewCandidateChannels.readTrackIdentityReviewCandidates)
-    ).toBe(true)
+    expect(registration.has(channels.readCandidates)).toBe(true)
   })
 })
 

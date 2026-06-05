@@ -68,7 +68,6 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadAttachmentSourceFilesRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceAttachmentSummaryRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadTrackIdentityReviewCandidatesRequest>(&cfg, &mut output);
-    push_ts_decl::<crate::TrackIdentityReviewStateFilter>(&cfg, &mut output);
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadRequest>(&cfg, &mut output);
@@ -118,7 +117,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadAttachmentSourceFilesReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceAttachmentSummaryReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadTrackIdentityReviewCandidatesReply>(&cfg, &mut output);
-    push_ts_decl::<crate::TrackIdentityReviewCandidatesReadStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::TrackIdentityReviewReadStatus>(&cfg, &mut output);
     push_ts_decl::<crate::TrackIdentityReviewCandidate>(&cfg, &mut output);
     push_ts_decl::<crate::TrackIdentityReviewCandidateStatus>(&cfg, &mut output);
     push_ts_decl::<crate::TrackIdentityReviewDecision>(&cfg, &mut output);

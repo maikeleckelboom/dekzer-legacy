@@ -11,7 +11,7 @@ import { registerAttachmentIdentityReadIpc } from './libraryAttachmentIdentity/r
 import { registerSourceFileHashingIpc } from './librarySourceFileHashing/hashSourceFilesBlake3'
 import { registerSourceMaintenanceIpc } from './librarySourceMaintenance/sourceMaintenance'
 import { registerTrackIdentityDecisionIpc } from './libraryTrackIdentityDecisions/decisionCommands'
-import { registerTrackIdentityReviewCandidatesIpc } from './libraryTrackIdentityReview/reviewCandidates'
+import { registerTrackIdentityReviewCandidatesIpc } from './libraryTrackIdentityReview/candidates'
 import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
 import { registerLocalRootScanIpc } from './libraryRoots/runScan'
 import { registerCancelRootScanIpc } from './libraryRoots/cancelScan'

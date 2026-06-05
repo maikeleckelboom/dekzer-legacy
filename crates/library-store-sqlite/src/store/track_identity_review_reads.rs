@@ -758,6 +758,49 @@ mod tests {
     }
 
     #[test]
+    fn zero_limit_returns_no_candidates() {
+        let fixture = Fixture::new();
+        fixture.insert_candidate_with_current_evidence(1, 1, 100, HASH_A);
+
+        let candidates = fixture.read(None, 0);
+
+        assert!(candidates.is_empty());
+    }
+
+    #[test]
+    fn unknown_candidate_status_returns_malformed_schema_state() {
+        let fixture = Fixture::new();
+        fixture.insert_candidate_with_current_evidence(1, 1, 100, HASH_A);
+        fixture
+            .store
+            .with_write(|write| {
+                write.execute("PRAGMA ignore_check_constraints = ON", [])?;
+                write.execute(
+                    "UPDATE track_identity_candidates
+                     SET status = 'unknown'
+                     WHERE track_identity_candidate_id = 1",
+                    [],
+                )?;
+                write.execute("PRAGMA ignore_check_constraints = OFF", [])?;
+                Ok(())
+            })
+            .expect("corrupt candidate status");
+
+        let error = fixture
+            .store
+            .read_track_identity_review_candidates(None, None, 10)
+            .expect_err("unknown status must fail");
+
+        match error {
+            crate::LibrarySqliteError::MalformedSchemaState(detail) => {
+                assert!(detail.contains("unsupported status"));
+                assert!(detail.contains("unknown"));
+            }
+            other => panic!("expected MalformedSchemaState, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn review_state_filter_is_respected() {
         let fixture = Fixture::new();
         fixture.insert_candidate_with_current_evidence(1, 1, 100, HASH_A);

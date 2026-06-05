@@ -96,6 +96,10 @@ pub fn read_track_identity_review_candidates(
     review_state_filter: Option<ReviewState>,
     limit: usize,
 ) -> LibrarySqliteResult<Vec<ReviewCandidate>> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+
     // TODO(track-identity-review-cursor): add a V1 cursor with version,
     // scope/filter identity, and the last candidate_id position.
     let mut candidates = read_factual_candidates(connection, source_id)?;
@@ -120,67 +124,69 @@ fn read_factual_candidates(
     source_id: Option<i64>,
 ) -> LibrarySqliteResult<Vec<FactualCandidate>> {
     let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
-    connection
-        .prepare(&format!(
-            "SELECT candidate.track_identity_candidate_id,
-                    candidate.candidate_kind,
-                    candidate.evidence_basis,
-                    candidate.status,
-                    candidate.evidence_key_algorithm,
-                    candidate.evidence_key_value,
-                    (
-                        SELECT COUNT(*)
-                        FROM track_identity_candidate_members member
-                        WHERE member.track_identity_candidate_id =
-                              candidate.track_identity_candidate_id
-                    ) AS member_count,
-                    (
-                        SELECT COUNT(*)
-                        FROM track_identity_candidate_evidence evidence
-                        WHERE evidence.track_identity_candidate_id =
-                              candidate.track_identity_candidate_id
-                    ) AS evidence_count,
-                    (
-                        SELECT COUNT(DISTINCT evidence.source_id)
-                        FROM track_identity_candidate_evidence evidence
-                        WHERE evidence.track_identity_candidate_id =
-                              candidate.track_identity_candidate_id
-                    ) AS source_count,
-                    (
-                        SELECT COUNT(*)
-                        FROM track_identity_candidate_evidence evidence
-                        JOIN source_files file
-                          ON file.source_file_id = evidence.source_file_id
-                        LEFT JOIN SourceFacts facts
-                          ON facts.source_file_id = evidence.source_file_id
-                        LEFT JOIN source_file_attachment_links link
-                          ON link.source_file_attachment_link_id =
-                             evidence.source_file_attachment_link_id
-                        LEFT JOIN content_attachments attachment
-                          ON attachment.attachment_id = evidence.attachment_id
-                        WHERE evidence.track_identity_candidate_id =
-                              candidate.track_identity_candidate_id
-                          AND {current_evidence_predicate}
-                    ) AS current_evidence_count,
-                    candidate.created_at,
-                    candidate.updated_at
-             FROM track_identity_candidates candidate
-             WHERE (?1 IS NULL
-                OR EXISTS (
-                    SELECT 1
-                    FROM track_identity_candidate_evidence source_filter
-                    WHERE source_filter.track_identity_candidate_id =
+    let mut statement = connection.prepare(&format!(
+        "SELECT candidate.track_identity_candidate_id,
+                candidate.candidate_kind,
+                candidate.evidence_basis,
+                candidate.status,
+                candidate.evidence_key_algorithm,
+                candidate.evidence_key_value,
+                (
+                    SELECT COUNT(*)
+                    FROM track_identity_candidate_members member
+                    WHERE member.track_identity_candidate_id =
                           candidate.track_identity_candidate_id
-                      AND source_filter.source_id = ?1
-                ))
-             ORDER BY candidate.track_identity_candidate_id ASC",
-            current_evidence_predicate = current_evidence_predicate,
-        ))?
-        .query_map(params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM], |row| {
-            map_factual_candidate_row(row)
-        })?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Into::into)
+                ) AS member_count,
+                (
+                    SELECT COUNT(*)
+                    FROM track_identity_candidate_evidence evidence
+                    WHERE evidence.track_identity_candidate_id =
+                          candidate.track_identity_candidate_id
+                ) AS evidence_count,
+                (
+                    SELECT COUNT(DISTINCT evidence.source_id)
+                    FROM track_identity_candidate_evidence evidence
+                    WHERE evidence.track_identity_candidate_id =
+                          candidate.track_identity_candidate_id
+                ) AS source_count,
+                (
+                    SELECT COUNT(*)
+                    FROM track_identity_candidate_evidence evidence
+                    JOIN source_files file
+                      ON file.source_file_id = evidence.source_file_id
+                    LEFT JOIN SourceFacts facts
+                      ON facts.source_file_id = evidence.source_file_id
+                    LEFT JOIN source_file_attachment_links link
+                      ON link.source_file_attachment_link_id =
+                         evidence.source_file_attachment_link_id
+                    LEFT JOIN content_attachments attachment
+                      ON attachment.attachment_id = evidence.attachment_id
+                    WHERE evidence.track_identity_candidate_id =
+                          candidate.track_identity_candidate_id
+                      AND {current_evidence_predicate}
+                ) AS current_evidence_count,
+                candidate.created_at,
+                candidate.updated_at
+         FROM track_identity_candidates candidate
+         WHERE (?1 IS NULL
+            OR EXISTS (
+                SELECT 1
+                FROM track_identity_candidate_evidence source_filter
+                WHERE source_filter.track_identity_candidate_id =
+                      candidate.track_identity_candidate_id
+                  AND source_filter.source_id = ?1
+            ))
+         ORDER BY candidate.track_identity_candidate_id ASC",
+        current_evidence_predicate = current_evidence_predicate,
+    ))?;
+    let mut rows = statement.query(params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM])?;
+    let mut candidates = Vec::new();
+
+    while let Some(row) = rows.next()? {
+        candidates.push(map_factual_candidate_row(row)?);
+    }
+
+    Ok(candidates)
 }
 
 fn hydrate_review_candidate(
@@ -335,12 +341,12 @@ fn read_source_samples(
         .map_err(Into::into)
 }
 
-fn map_factual_candidate_row(row: &Row<'_>) -> rusqlite::Result<FactualCandidate> {
+fn map_factual_candidate_row(row: &Row<'_>) -> LibrarySqliteResult<FactualCandidate> {
     Ok(FactualCandidate {
         candidate_id: row.get(0)?,
         candidate_kind: row.get(1)?,
         candidate_evidence_basis: row.get(2)?,
-        candidate_status: map_candidate_status(row.get::<_, String>(3)?.as_str()),
+        candidate_status: map_candidate_status(row.get::<_, String>(3)?.as_str())?,
         evidence_key_algorithm: row.get(4)?,
         evidence_key_value: row.get(5)?,
         evidence_summary: ReviewEvidenceSummary {
@@ -354,11 +360,14 @@ fn map_factual_candidate_row(row: &Row<'_>) -> rusqlite::Result<FactualCandidate
     })
 }
 
-fn map_candidate_status(raw: &str) -> StoreTrackIdentityCandidateStatus {
+fn map_candidate_status(raw: &str) -> LibrarySqliteResult<StoreTrackIdentityCandidateStatus> {
     match raw {
-        "active" => StoreTrackIdentityCandidateStatus::Active,
-        "superseded" => StoreTrackIdentityCandidateStatus::Superseded,
-        _ => StoreTrackIdentityCandidateStatus::Stale,
+        "active" => Ok(StoreTrackIdentityCandidateStatus::Active),
+        "stale" => Ok(StoreTrackIdentityCandidateStatus::Stale),
+        "superseded" => Ok(StoreTrackIdentityCandidateStatus::Superseded),
+        other => Err(malformed_review_state(format!(
+            "track identity candidate has unsupported status {other:?}"
+        ))),
     }
 }
 

@@ -183,26 +183,26 @@ pub(crate) fn map_read_source_attachment_summary_reply(
 }
 
 pub(crate) fn store_track_identity_review_state_filter(
-    filter: Option<protocol::TrackIdentityReviewStateFilter>,
+    filter: Option<protocol::TrackIdentityReviewState>,
 ) -> Option<store::StoreTrackIdentityReviewState> {
     match filter {
-        None | Some(protocol::TrackIdentityReviewStateFilter::All) => None,
-        Some(protocol::TrackIdentityReviewStateFilter::NeedsUserDecision) => {
+        None => None,
+        Some(protocol::TrackIdentityReviewState::NeedsUserDecision) => {
             Some(store::StoreTrackIdentityReviewState::NeedsUserDecision)
         }
-        Some(protocol::TrackIdentityReviewStateFilter::SystemAccepted) => {
+        Some(protocol::TrackIdentityReviewState::SystemAccepted) => {
             Some(store::StoreTrackIdentityReviewState::SystemAccepted)
         }
-        Some(protocol::TrackIdentityReviewStateFilter::UserAccepted) => {
+        Some(protocol::TrackIdentityReviewState::UserAccepted) => {
             Some(store::StoreTrackIdentityReviewState::UserAccepted)
         }
-        Some(protocol::TrackIdentityReviewStateFilter::UserRejected) => {
+        Some(protocol::TrackIdentityReviewState::UserRejected) => {
             Some(store::StoreTrackIdentityReviewState::UserRejected)
         }
-        Some(protocol::TrackIdentityReviewStateFilter::UserDeferred) => {
+        Some(protocol::TrackIdentityReviewState::UserDeferred) => {
             Some(store::StoreTrackIdentityReviewState::UserDeferred)
         }
-        Some(protocol::TrackIdentityReviewStateFilter::StaleDecision) => {
+        Some(protocol::TrackIdentityReviewState::StaleDecision) => {
             Some(store::StoreTrackIdentityReviewState::StaleDecision)
         }
     }
@@ -212,7 +212,7 @@ pub(crate) fn map_read_track_identity_review_candidates_reply(
     candidates: Vec<store::StoreTrackIdentityReviewCandidate>,
 ) -> store::LibrarySqliteResult<protocol::ReadTrackIdentityReviewCandidatesReply> {
     Ok(protocol::ReadTrackIdentityReviewCandidatesReply {
-        status: protocol::TrackIdentityReviewCandidatesReadStatus::Ok,
+        status: protocol::TrackIdentityReviewReadStatus::Ok,
         candidates: candidates
             .into_iter()
             .map(map_track_identity_review_candidate)

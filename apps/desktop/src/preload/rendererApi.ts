@@ -55,10 +55,10 @@ import {
   type TrackIdentityDecisionCommandResult
 } from '../shared/libraryTrackIdentityDecisions/decisionCommands'
 import {
-  trackIdentityReviewCandidateChannels,
-  type ReadTrackIdentityReviewCandidatesRequest,
-  type ReadTrackIdentityReviewCandidatesResult
-} from '../shared/libraryTrackIdentityReview/reviewCandidates'
+  channels as trackIdentityReviewChannels,
+  type ReadCandidatesRequest,
+  type ReadCandidatesResult
+} from '../shared/libraryTrackIdentityReview/candidates'
 import { rootChannels } from '../shared/libraryRoots/channels'
 import { boundaryEventChannels } from '../shared/libraryBoundary/events'
 import type {
@@ -224,12 +224,12 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       },
       trackIdentityReview: {
         async readTrackIdentityReviewCandidates(
-          request: ReadTrackIdentityReviewCandidatesRequest
-        ): Promise<ReadTrackIdentityReviewCandidatesResult> {
+          request: ReadCandidatesRequest
+        ): Promise<ReadCandidatesResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityReviewCandidateChannels.readTrackIdentityReviewCandidates,
+            trackIdentityReviewChannels.readCandidates,
             request
-          )) as ReadTrackIdentityReviewCandidatesResult
+          )) as ReadCandidatesResult
         }
       },
       contents: {

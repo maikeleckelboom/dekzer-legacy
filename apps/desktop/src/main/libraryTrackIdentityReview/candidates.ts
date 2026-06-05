@@ -9,23 +9,22 @@ import {
 import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
-  trackIdentityReviewCandidateChannels,
-  type ReadTrackIdentityReviewCandidatesRequest,
-  type ReadTrackIdentityReviewCandidatesResult,
-  type TrackIdentityReviewCandidatesReadErrorCode,
-  type TrackIdentityReviewCandidatesReadErrorState
-} from '../../shared/libraryTrackIdentityReview/reviewCandidates'
+  channels,
+  type ReadCandidatesRequest,
+  type ReadCandidatesResult,
+  type ReadErrorCode,
+  type ReadErrorState
+} from '../../shared/libraryTrackIdentityReview/candidates'
 
 export type TrackIdentityReviewCandidatesIpcMain = {
   handle(
     channel: string,
-    listener: (event: unknown, request: unknown) => Promise<ReadTrackIdentityReviewCandidatesResult>
+    listener: (event: unknown, request: unknown) => Promise<ReadCandidatesResult>
   ): void
 }
 
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 const reviewStateValues = new Set([
-  'all',
   'needsUserDecision',
   'systemAccepted',
   'userAccepted',
@@ -38,16 +37,15 @@ export function registerTrackIdentityReviewCandidatesIpc(
   ipcMain: TrackIdentityReviewCandidatesIpcMain,
   host: LibraryBoundaryHost
 ): void {
-  ipcMain.handle(
-    trackIdentityReviewCandidateChannels.readTrackIdentityReviewCandidates,
-    (_event, request) => readTrackIdentityReviewCandidatesThroughHost(host, request)
+  ipcMain.handle(channels.readCandidates, (_event, request) =>
+    readCandidatesThroughHost(host, request)
   )
 }
 
-export async function readTrackIdentityReviewCandidatesThroughHost(
+export async function readCandidatesThroughHost(
   host: LibraryBoundaryHost,
   request: unknown
-): Promise<ReadTrackIdentityReviewCandidatesResult> {
+): Promise<ReadCandidatesResult> {
   const normalizedRequest = normalizeRequest(request)
 
   if (isReadResult(normalizedRequest)) {
@@ -79,9 +77,7 @@ export async function readTrackIdentityReviewCandidatesThroughHost(
   }
 }
 
-function normalizeRequest(
-  request: unknown
-): ReadTrackIdentityReviewCandidatesRequest | ReadTrackIdentityReviewCandidatesResult {
+function normalizeRequest(request: unknown): ReadCandidatesRequest | ReadCandidatesResult {
   if (!isRecord(request)) {
     return createReadErrorResult(
       'invalidRequest',
@@ -113,7 +109,7 @@ function normalizeRequest(
   if (
     request.reviewState !== undefined &&
     request.reviewState !== null &&
-    !isReviewStateFilter(request.reviewState)
+    !isReviewState(request.reviewState)
   ) {
     return createReadErrorResult(
       'invalidRequest',
@@ -135,7 +131,7 @@ function normalizeRequest(
 
 function getStartedClient(
   host: LibraryBoundaryHost
-): LibraryBoundaryHostClient | ReadTrackIdentityReviewCandidatesResult {
+): LibraryBoundaryHostClient | ReadCandidatesResult {
   try {
     return host.client
   } catch (error: unknown) {
@@ -155,10 +151,7 @@ function getStartedClient(
   }
 }
 
-function hostErrorCode(
-  host: LibraryBoundaryHost,
-  error: LibraryBoundaryHostError
-): TrackIdentityReviewCandidatesReadErrorCode {
+function hostErrorCode(host: LibraryBoundaryHost, error: LibraryBoundaryHostError): ReadErrorCode {
   if (host.state === 'failed') {
     return 'hostFailed'
   }
@@ -194,7 +187,7 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
 }
 
 function classifyReadError(error: unknown): {
-  readonly code: TrackIdentityReviewCandidatesReadErrorCode
+  readonly code: ReadErrorCode
   readonly message: string
   readonly detail?: string
 } {
@@ -240,11 +233,11 @@ function classifyReadError(error: unknown): {
 }
 
 function createReadErrorResult(
-  state: TrackIdentityReviewCandidatesReadErrorState,
-  code: TrackIdentityReviewCandidatesReadErrorCode,
+  state: ReadErrorState,
+  code: ReadErrorCode,
   message: string,
   detail?: string
-): ReadTrackIdentityReviewCandidatesResult {
+): ReadCandidatesResult {
   return {
     state,
     error: {
@@ -255,9 +248,7 @@ function createReadErrorResult(
   }
 }
 
-function isReviewStateFilter(
-  value: unknown
-): value is ReadTrackIdentityReviewCandidatesRequest['reviewState'] {
+function isReviewState(value: unknown): value is ReadCandidatesRequest['reviewState'] {
   return typeof value === 'string' && reviewStateValues.has(value)
 }
 
@@ -269,7 +260,7 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0
 }
 
-function isReadResult(value: unknown): value is ReadTrackIdentityReviewCandidatesResult {
+function isReadResult(value: unknown): value is ReadCandidatesResult {
   return isRecord(value) && typeof value.state === 'string'
 }
 

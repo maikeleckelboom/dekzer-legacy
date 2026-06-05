@@ -31,11 +31,10 @@ V0 request fields:
 
 - `sourceId` optional source filter.
 - `reviewState` optional filter. Omitted means all states.
-- `limit` required positive limit.
+- `limit` required positive limit, capped at 200 in V0.
 
-Valid `reviewState` filter values:
+Valid `reviewState` filter values are:
 
-- `all`
 - `needsUserDecision`
 - `systemAccepted`
 - `userAccepted`
@@ -45,6 +44,8 @@ Valid `reviewState` filter values:
 
 Requests must not carry filesystem paths, source paths, file paths, metadata, title, artist, album, canonical ids, or
 track ids.
+
+Omit `reviewState` to read all review states. V0 does not include an `all` review-state value.
 
 ## Response Shape
 
@@ -130,7 +131,8 @@ metadata, or source participation.
 
 ## V0 Limit-Only Behavior
 
-V0 ordering is stable backend ordering by `candidateId` ascending. V0 does not implement cursoring.
+V0 ordering is stable backend ordering by `candidateId` ascending. `limit` must be between 1 and 200. V0 does not
+implement cursoring.
 
 TODO for future cursoring:
 
@@ -162,4 +164,3 @@ This read model does not prove or create:
 
 Canonical track shells remain future because a product track identity must represent a stronger authority than an
 exact-content candidate plus an effective decision.
-
