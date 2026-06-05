@@ -126,6 +126,34 @@ try {
       0,
       "nested directory child window is navigation-only"
     );
+
+    const crateContents = await withTimeout(
+      first.client.readContents({
+        scope: {
+          type: "directory",
+          payload: {
+            sourceId: registeredRootId,
+            sourceDirectoryId: crateSourceDirectoryId!
+          }
+        },
+        policy: {
+          mediaClasses: ["audio"],
+          rowProfile: { kind: "sourceFile" }
+        },
+        recursion: "immediate",
+        limit: 10
+      }),
+      "readContents Crate",
+      commandTimeoutMs
+    );
+    must(
+      crateContents.result.state === "ready",
+      "contents read for Crate directory is ready"
+    );
+    must(
+      crateContents.result.rows.some((row) => row.fileName === "amen.wav"),
+      "nested audio file appears through contents read"
+    );
   });
 
   await withClient("reopened stdio smoke process", async (reopened) => {
@@ -137,7 +165,35 @@ try {
     equal(
       reopenedWindow.window?.totalRows,
       0,
-      "persisted hierarchy survives a new stdio process"
+      "nested directory child window is navigation-only after reopen"
+    );
+
+    const reopenedContents = await withTimeout(
+      reopened.client.readContents({
+        scope: {
+          type: "directory",
+          payload: {
+            sourceId: registeredRootId,
+            sourceDirectoryId: crateSourceDirectoryId!
+          }
+        },
+        policy: {
+          mediaClasses: ["audio"],
+          rowProfile: { kind: "sourceFile" }
+        },
+        recursion: "immediate",
+        limit: 10
+      }),
+      "readContents reopened Crate",
+      commandTimeoutMs
+    );
+    must(
+      reopenedContents.result.state === "ready",
+      "contents read persists across a reopened stdio process: state is ready"
+    );
+    must(
+      reopenedContents.result.rows.some((row) => row.fileName === "amen.wav"),
+      "nested audio file appears through contents read after reopen"
     );
   });
 } finally {
