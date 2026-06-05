@@ -232,6 +232,140 @@ describe('createLibraryHierarchyReadController', () => {
     expect(treeNodes(controller).map((node) => node.id)).toEqual(['navigation-row:7'])
   })
 
+  it('keeps accepted navigation rows and current root visible while navigation refresh is pending', async () => {
+    const navigationRefresh = deferred<NavigationReadRowsResult>()
+    let navigationReadCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => {
+          navigationReadCount += 1
+          return navigationReadCount === 1
+            ? navigationSourceReadRowsResult()
+            : navigationRefresh.promise
+        },
+        readChildren: async () => directoryRootHierarchyReadResult()
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    expect(controller.currentRoot.value?.id).toBe('source:7')
+    expect(treeNodes(controller).map((node) => node.id)).toEqual(['navigation-row:7'])
+
+    const refresh = controller.refreshNavigationRows()
+    await waitForMicrotasks()
+
+    expect(controller.navigationReadIsLoading.value).toBe(true)
+    expect(controller.navigationReadResult.value?.state).toBe('ready')
+    expect(controller.currentRoot.value?.id).toBe('source:7')
+    expect(treeNodes(controller).map((node) => node.id)).toEqual(['navigation-row:7'])
+    expect(controller.browserProjection.value?.bindingsById.has('navigation-row:7')).toBe(true)
+
+    navigationRefresh.resolve(navigationTwoSourceReadRowsResult())
+    await expect(refresh).resolves.toBe(true)
+
+    expect(treeNodes(controller).map((node) => node.id)).toEqual([
+      'navigation-row:7',
+      'navigation-row:9'
+    ])
+  })
+
+  it('retains accepted navigation rows when a navigation refresh returns an error result', async () => {
+    let navigationReadCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => {
+          navigationReadCount += 1
+          return navigationReadCount === 1
+            ? navigationSourceReadRowsResult()
+            : {
+                state: 'readFailed',
+                error: {
+                  code: 'readFailed',
+                  message: 'Navigation refresh failed.'
+                }
+              }
+        },
+        readChildren: async () => directoryRootHierarchyReadResult()
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await expect(controller.refreshNavigationRows()).resolves.toBe(true)
+
+    expect(controller.navigationReadRequestError.value).toBe('Navigation refresh failed.')
+    expect(controller.navigationReadResult.value).toMatchObject({
+      state: 'ready',
+      rows: [{ navigationRowId: '7' }]
+    })
+    expect(treeNodes(controller).map((node) => node.id)).toEqual(['navigation-row:7'])
+    expect(controller.currentRoot.value?.id).toBe('source:7')
+  })
+
+  it('retains accepted navigation rows when a navigation refresh request fails', async () => {
+    let navigationReadCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => {
+          navigationReadCount += 1
+          if (navigationReadCount === 1) {
+            return navigationSourceReadRowsResult()
+          }
+          throw new Error('read failed')
+        },
+        readChildren: async () => directoryRootHierarchyReadResult()
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+    await expect(controller.refreshNavigationRows()).resolves.toBe(true)
+
+    expect(controller.navigationReadRequestError.value).toBe(
+      'Unable to request library navigation rows.'
+    )
+    expect(treeNodes(controller).map((node) => node.id)).toEqual(['navigation-row:7'])
+    expect(controller.browserProjection.value?.bindingsById.has('navigation-row:7')).toBe(true)
+  })
+
+  it('does not let an older navigation refresh overwrite newer accepted rows', async () => {
+    const staleNavigationRefresh = deferred<NavigationReadRowsResult>()
+    const currentNavigationRefresh = deferred<NavigationReadRowsResult>()
+    let navigationReadCount = 0
+    const controller = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => {
+          navigationReadCount += 1
+          if (navigationReadCount === 1) {
+            return navigationSourceReadRowsResult()
+          }
+          return navigationReadCount === 2
+            ? staleNavigationRefresh.promise
+            : currentNavigationRefresh.promise
+        },
+        readChildren: async () => directoryRootHierarchyReadResult()
+      })
+    )
+
+    await expect(controller.refresh()).resolves.toBe(true)
+
+    const staleRefresh = controller.refreshNavigationRows()
+    const currentRefresh = controller.refreshNavigationRows()
+
+    currentNavigationRefresh.resolve(navigationTwoSourceReadRowsResult())
+    await expect(currentRefresh).resolves.toBe(true)
+    expect(treeNodes(controller).map((node) => node.id)).toEqual([
+      'navigation-row:7',
+      'navigation-row:9'
+    ])
+
+    staleNavigationRefresh.resolve(navigationSourceReadRowsResult('Stale Source'))
+    await expect(staleRefresh).resolves.toBe(false)
+    expect(treeNodes(controller).map((node) => node.id)).toEqual([
+      'navigation-row:7',
+      'navigation-row:9'
+    ])
+    expect(treeNodes(controller)[0]?.label).toBe('First Source')
+  })
+
   it('refreshBrowserWindows unions loaded and expanded windows without duplicate reads', async () => {
     const readRequests: ReadRequest[] = []
     const controller = createLibraryHierarchyReadController(
@@ -657,7 +791,7 @@ function testLibraryApi(options: {
   }
 }
 
-function navigationSourceReadRowsResult(): NavigationReadRowsResult {
+function navigationSourceReadRowsResult(displayName = 'Source Fixture'): NavigationReadRowsResult {
   return {
     state: 'ready',
     rows: [
@@ -667,7 +801,7 @@ function navigationSourceReadRowsResult(): NavigationReadRowsResult {
         parentNavigationRowId: null,
         family: 'sources',
         rowKind: 'source',
-        displayName: 'Source Fixture',
+        displayName,
         siblingPosition: 0,
         selectable: true,
         selectorKind: 'source',

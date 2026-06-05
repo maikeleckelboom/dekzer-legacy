@@ -39,6 +39,42 @@ describe('refreshHierarchyForMaintainedSnapshotInvalidation', () => {
     expect(dependencies.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
   })
 
+  it('keeps navigation rows visible while navigationRows invalidation refresh is pending', async () => {
+    const navigationRefresh = deferred<NavigationReadRowsResult>()
+    let navigationReadCount = 0
+    const hierarchyRead = createLibraryHierarchyReadController(
+      testLibraryApi({
+        readRows: async () => {
+          navigationReadCount += 1
+          return navigationReadCount === 1
+            ? navigationSourceReadRowsResult()
+            : navigationRefresh.promise
+        },
+        readChildren: async () => initialSourceReadResult()
+      })
+    )
+
+    await expect(hierarchyRead.refresh()).resolves.toBe(true)
+    expect(topNodeIds(hierarchyRead)).toEqual(['navigation-row:7'])
+
+    const refresh = refreshHierarchyForMaintainedSnapshotInvalidation(
+      invalidation('navigationRows', '5'),
+      {
+        hierarchyRead,
+        expandedNodeIds: new Set(),
+        refreshContentsForCurrentSelection: vi.fn()
+      }
+    )
+    await waitForMicrotasks()
+
+    expect(topNodeIds(hierarchyRead)).toEqual(['navigation-row:7'])
+    expect(loadedChildIds(hierarchyRead, 'navigation-row:7')).toEqual(['source-directory:12'])
+
+    navigationRefresh.resolve(navigationSourceReadRowsResult())
+    await expect(refresh).resolves.toBe(true)
+    expect(topNodeIds(hierarchyRead)).toEqual(['navigation-row:7'])
+  })
+
   it('refreshes browser windows once with expanded ids for libraryBrowser invalidation', async () => {
     const dependencies = testDependencies()
 
@@ -364,6 +400,12 @@ function loadedChildIds(
   const node = findNode(controller.browserProjection.value?.nodes ?? [], nodeId)
 
   return node?.children.kind === 'loaded' ? node.children.nodes.map((child) => child.id) : []
+}
+
+function topNodeIds(
+  controller: ReturnType<typeof createLibraryHierarchyReadController>
+): readonly string[] {
+  return controller.browserProjection.value?.nodes.map((node) => node.id) ?? []
 }
 
 function findNode(nodes: readonly BrowserTreeNode[], nodeId: string): BrowserTreeNode | undefined {

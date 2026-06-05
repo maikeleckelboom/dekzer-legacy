@@ -84,8 +84,8 @@ export function createLibraryHierarchyReadController(
   libraryApi: LibraryHierarchyReadApi
 ): LibraryHierarchyReadController {
   const hostStatus = ref<LibraryBoundaryHostStatus>()
-  const navigationReadResult = ref<NavigationReadRowsResult>()
-  const hierarchyReadResult = ref<ReadResult>()
+  const navigationReadResult = shallowRef<NavigationReadRowsResult>()
+  const hierarchyReadResult = shallowRef<ReadResult>()
   const navigationReadRequestError = ref<string>()
   const hierarchyReadRequestError = ref<string>()
   const navigationReadIsLoading = ref(false)
@@ -162,6 +162,7 @@ export function createLibraryHierarchyReadController(
 
   async function refreshNavigationRows(): Promise<boolean> {
     const sequence = ++navigationReadSequence
+    const priorAcceptedNavigationResult = acceptedNavigationResult(navigationReadResult.value)
     navigationReadIsLoading.value = true
     navigationReadRequestError.value = undefined
     hierarchyReadRequestError.value = undefined
@@ -175,13 +176,24 @@ export function createLibraryHierarchyReadController(
         return false
       }
 
+      if (result.state !== 'ready' && priorAcceptedNavigationResult !== undefined) {
+        navigationReadRequestError.value = result.error.message
+        return true
+      }
+
       navigationReadResult.value = result
-      hierarchyReadResult.value = undefined
+
+      if (priorAcceptedNavigationResult === undefined) {
+        hierarchyReadResult.value = undefined
+      }
 
       return result.state === 'ready'
     } catch {
       if (sequence === navigationReadSequence) {
         navigationReadRequestError.value = safeNavigationReadRequestFailure
+        if (priorAcceptedNavigationResult !== undefined) {
+          return true
+        }
       }
 
       return false
@@ -863,6 +875,12 @@ export function createLibraryHierarchyReadController(
     start,
     stop
   }
+}
+
+function acceptedNavigationResult(
+  result: NavigationReadRowsResult | undefined
+): Extract<NavigationReadRowsResult, { readonly state: 'ready' }> | undefined {
+  return result?.state === 'ready' ? result : undefined
 }
 
 function sourceReadRequest(target: SourceTarget): ReadRequest {
