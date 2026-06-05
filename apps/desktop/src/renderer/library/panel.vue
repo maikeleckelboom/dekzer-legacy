@@ -13,11 +13,11 @@ import {
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import {
-  buildGapRecoveryRefreshPlan,
-  buildMaintainedSnapshotInvalidationRefreshPlan,
-  buildSourceScanRefreshPlan,
-  executeLibraryRefreshPlan,
-  type InvalidationRefreshDependencies
+  buildGapPlan,
+  buildInvalidationPlan,
+  buildScanPlan,
+  executeRefreshPlan,
+  type RefreshPlanDeps
 } from './runtime/invalidationRefresh'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
@@ -266,8 +266,8 @@ watch(
       return
     }
 
-    const plan = buildGapRecoveryRefreshPlan()
-    await executeLibraryRefreshPlan(plan, refreshPlanExecutionDependencies())
+    const plan = buildGapPlan()
+    await executeRefreshPlan(plan, refreshPlanExecutionDependencies())
 
     if (plan.acknowledgeGapAfterExecution) {
       boundaryEvents.acknowledgedGap()
@@ -279,24 +279,24 @@ watch(
   () => boundaryEvents.maintainedSnapshotInvalidationSignal.value,
   async () => {
     const invalidations = boundaryEvents.consumeMaintainedSnapshotInvalidations()
-    const plan = buildMaintainedSnapshotInvalidationRefreshPlan({
+    const plan = buildInvalidationPlan({
       invalidations,
       sourceLifecycleSourceIds: sourceLifecycleSourceIds.value
     })
 
-    await executeLibraryRefreshPlan(plan, refreshPlanExecutionDependencies())
+    await executeRefreshPlan(plan, refreshPlanExecutionDependencies())
   }
 )
 
 watch(
   () => boundaryEvents.sourceScanSignal.value,
   () => {
-    const plan = buildSourceScanRefreshPlan({
+    const plan = buildScanPlan({
       events: boundaryEvents.consumeSourceScanEvents(),
       sourceLifecycleSourceIds: sourceLifecycleSourceIds.value
     })
 
-    void executeLibraryRefreshPlan(plan, refreshPlanExecutionDependencies())
+    void executeRefreshPlan(plan, refreshPlanExecutionDependencies())
   }
 )
 
@@ -469,7 +469,7 @@ function cancelPrepareNodeContents(nodeId: BrowserTreeNodeId): void {
   contentsRead.cancelPreloadForBinding(browserProjection.value?.bindingsById.get(nodeId))
 }
 
-function refreshPlanExecutionDependencies(): InvalidationRefreshDependencies {
+function refreshPlanExecutionDependencies(): RefreshPlanDeps {
   return {
     hierarchyRead,
     sourceLifecycleRead,

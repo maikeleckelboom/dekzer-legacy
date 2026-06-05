@@ -29,8 +29,8 @@ import type {
 } from '../../../../src/shared/libraryNavigation/readRows'
 import type { SourceLifecycleRecord } from '../../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
 
-describe('source readiness projection', () => {
-  it('uses scan progress for source-level scanning without synthesizing children', () => {
+describe('source readiness', () => {
+  it('scan progress drives scanning without synthesizing children', () => {
     const state = browserState()
     const progress: ScanProgressState = {
       kind: 'scanning',
@@ -52,7 +52,7 @@ describe('source readiness projection', () => {
     expect(sourceNode.children.kind).toBe('deferred')
   })
 
-  it('completed scan alone keeps the source registered until an authoritative read is ready', () => {
+  it('completed scan alone is not ready', () => {
     const progress: ScanProgressState = {
       kind: 'completed',
       rootId: '7',
@@ -67,17 +67,17 @@ describe('source readiness projection', () => {
     const readyState = browserState({
       sourceState: {
         kind: 'loaded',
-        children: loadedChildren([fileNode('11', 'track.wav')])
+        children: loadedChildren([directoryNode('12', 'Album')])
       }
     })
     expect(readinessFor(readyState, { progress })?.kind).toBe('ready')
   })
 
-  it('keeps an unavailable known source and its prior child rows visible', () => {
+  it('unavailable source keeps prior directory rows visible', () => {
     const state = browserState({
       sourceState: {
         kind: 'loaded',
-        children: loadedChildren([directoryNode('12', 'Albums'), fileNode('11', 'track.wav')])
+        children: loadedChildren([directoryNode('12', 'Albums'), directoryNode('13', 'Singles')])
       }
     })
     const projection = projectTree(withReadiness(state, readyRoots('unavailable')))
@@ -89,11 +89,12 @@ describe('source readiness projection', () => {
     expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({ kind: 'source' })
     expect(visible.map((item) => item.id)).toEqual([
       'navigation-row:7',
-      'source-directory:12'
+      'source-directory:12',
+      'source-directory:13'
     ])
   })
 
-  it('represents blocked and failed terminal scan progress honestly', () => {
+  it('terminal scan progress states', () => {
     expect(
       readinessFor(browserState(), {
         progress: {
@@ -115,7 +116,7 @@ describe('source readiness projection', () => {
     ).toBe('failed')
   })
 
-  it('keeps branch refresh separate from source-level readiness', () => {
+  it('branch refresh keeps source ready', () => {
     const state = browserState({
       sourceState: {
         kind: 'refreshing',
@@ -133,14 +134,14 @@ describe('source readiness projection', () => {
     expect(sourceNode.children.kind).toBe('loaded')
   })
 
-  it('does not let operation-only terminal state become durable source readiness', () => {
+  it('operation state does not override readiness', () => {
     const readiness = deriveSourceReadiness({
       sourceNodeId: 'navigation-row:7',
       sourceLabel: 'Source Fixture',
       rootId: '7',
       sourceReadState: {
         kind: 'loaded',
-        children: loadedChildren([fileNode('11', 'track.wav')])
+        children: loadedChildren([directoryNode('12', 'Album')])
       },
       currentScanStatus: 'failed'
     })
@@ -148,80 +149,50 @@ describe('source readiness projection', () => {
     expect(readiness.kind).toBe('ready')
   })
 
-  it('does not let active scanning progress override backend blocked access', () => {
-    const blockedLifecycle = sourceLifecycle({
-      accessState: 'blocked',
-      accessIssueKind: 'permissionDenied',
-      scanPhase: 'complete'
+  it('backend barrier beats active scan', () => {
+    const blocked = readinessFor(browserState(), {
+      lifecycle: sourceLifecycle({
+        accessState: 'blocked',
+        accessIssueKind: 'permissionDenied',
+        scanPhase: 'complete'
+      })
     })
+    expect(blocked?.kind).toBe('blocked')
 
-    expect(readinessFor(browserState(), { lifecycle: blockedLifecycle })?.kind).toBe('blocked')
+    const scanning = scanningReadiness({
+      lifecycle: sourceLifecycle({
+        accessState: 'blocked',
+        accessIssueKind: 'permissionDenied',
+        scanPhase: 'complete'
+      })
+    })
+    expect(scanning?.kind).toBe('blocked')
 
-    expect(
-      readinessFor(browserState(), {
-        lifecycle: blockedLifecycle,
-        progress: {
-          kind: 'scanning',
-          rootId: '7',
-          scanRunId: 'scan-2',
-          directoriesVisited: 1,
-          filesVisited: 0,
-          filesDiscovered: 0,
-          mediaCandidates: 0,
-          queuedWorkItems: 0
-        }
-      })?.kind
-    ).toBe('blocked')
-  })
-
-  it('does not let active scanning progress override backend unavailable mount', () => {
-    const readiness = readinessFor(browserState(), {
+    const unmounted = scanningReadiness({
       lifecycle: sourceLifecycle({
         mountStatus: 'unmounted',
         accessState: 'blocked',
         accessIssueKind: 'unavailableMount',
         scanPhase: 'complete'
-      }),
-      progress: {
-        kind: 'scanning',
-        rootId: '7',
-        scanRunId: 'scan-2',
-        directoriesVisited: 1,
-        filesVisited: 0,
-        filesDiscovered: 0,
-        mediaCandidates: 0,
-        queuedWorkItems: 0
-      }
+      })
     })
-
-    expect(readiness?.kind).toBe('unavailable')
+    expect(unmounted?.kind).toBe('unavailable')
   })
 
-  it('uses active scanning progress over backend durable scan phase when access and mount are usable', () => {
-    const readiness = readinessFor(browserState(), {
+  it('active scan beats backend scan phase when usable', () => {
+    const readiness = scanningReadiness({
       lifecycle: sourceLifecycle({
         mountStatus: 'mounted',
         accessState: 'accessible',
         scanPhase: 'blocked',
         scanIssueKind: 'permissionDenied'
-      }),
-      progress: {
-        kind: 'scanning',
-        rootId: '7',
-        scanRunId: 'scan-2',
-        directoriesVisited: 1,
-        filesVisited: 0,
-        filesDiscovered: 0,
-        mediaCandidates: 0,
-        queuedWorkItems: 0
-      }
+      })
     })
-
     expect(readiness?.kind).toBe('scanning')
   })
 
-  it('allows active scanning progress when backend mount and access are unknown without a barrier', () => {
-    const readiness = readinessFor(browserState(), {
+  it('scans when lifecycle is unknown', () => {
+    const readiness = scanningReadiness({
       lifecycle: sourceLifecycle({
         mountStatus: 'unknown',
         accessState: 'unknown',
@@ -238,31 +209,10 @@ describe('source readiness projection', () => {
         queuedWorkItems: 0
       }
     })
-
     expect(readiness?.kind).toBe('scanning')
   })
 
-  it('does not let branch refresh override backend-owned mount and access facts', () => {
-    const state = browserState({
-      sourceState: {
-        kind: 'loaded',
-        children: loadedChildren([fileNode('11', 'track.wav')])
-      }
-    })
-
-    const readiness = readinessFor(state, {
-      lifecycle: sourceLifecycle({
-        mountStatus: 'unmounted',
-        accessState: 'blocked',
-        accessIssueKind: 'unavailableMount',
-        scanPhase: 'complete'
-      })
-    })
-
-    expect(readiness?.kind).toBe('unavailable')
-  })
-
-  it('uses backend durable scan facts over terminal scan event state', () => {
+  it('backend scan facts beat stale terminal events', () => {
     const readiness = readinessFor(browserState(), {
       lifecycle: sourceLifecycle({
         accessState: 'accessible',
@@ -278,11 +228,11 @@ describe('source readiness projection', () => {
     expect(readiness?.kind).toBe('registered')
   })
 
-  it('uses authoritative hierarchy coverage for ready and empty instead of scan completion', () => {
+  it('hierarchy coverage decides ready vs empty', () => {
     const readyState = browserState({
       sourceState: {
         kind: 'loaded',
-        children: loadedChildren([fileNode('11', 'track.wav')])
+        children: loadedChildren([directoryNode('12', 'Album')])
       }
     })
     const emptyState = browserState({
@@ -302,6 +252,19 @@ describe('source readiness projection', () => {
     expect(readinessFor(readyState, { progress })?.kind).toBe('ready')
     expect(readinessFor(emptyState, { progress })?.kind).toBe('empty')
     expect(readinessFor(browserState(), { progress })?.kind).toBe('registered')
+  })
+
+  it('keeps file rows out of tree visibility', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([fileNode('99', 'hidden.wav')])
+      }
+    })
+    const projection = projectTree(withReadiness(state))
+
+    expect(projection.bindingsById.has('source-file:99')).toBe(false)
+    expect(findNode(projection.nodes, 'source-file:99')).toBeUndefined()
   })
 })
 
@@ -326,6 +289,27 @@ function readinessFor(
   })
 
   return readiness.get('navigation-row:7')
+}
+
+function scanningReadiness(options: {
+  readonly lifecycle: SourceLifecycleRecord
+  readonly progress?: ScanProgressState
+}): SourceReadiness | undefined {
+  return readinessFor(browserState(), {
+    lifecycle: options.lifecycle,
+    progress:
+      options.progress ??
+      ({
+        kind: 'scanning',
+        rootId: '7',
+        scanRunId: 'scan-2',
+        directoriesVisited: 1,
+        filesVisited: 0,
+        filesDiscovered: 0,
+        mediaCandidates: 0,
+        queuedWorkItems: 0
+      } satisfies ScanProgressState)
+  })
 }
 
 function withReadiness(
@@ -518,4 +502,22 @@ function requiredNodeOrUndefined(
   nodeId: string
 ): BrowserTreeNode | undefined {
   return nodes.find((node) => node.id === nodeId)
+}
+
+function findNode(nodes: readonly BrowserTreeNode[], nodeId: string): BrowserTreeNode | undefined {
+  for (const node of nodes) {
+    if (node.id === nodeId) {
+      return node
+    }
+
+    if (node.children.kind === 'loaded') {
+      const child = findNode(node.children.nodes, nodeId)
+
+      if (child !== undefined) {
+        return child
+      }
+    }
+  }
+
+  return undefined
 }

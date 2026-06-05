@@ -6,14 +6,14 @@ import type { LibraryHierarchyReadController } from '../boundary/hierarchyRead'
 import type { SourceLifecycleReadController } from '../boundary/sourceLifecycleRead'
 import type { BrowserTreeNodeId } from '../tree/types'
 
-export type RendererInvalidationScope =
+export type InvalidationScope =
   | 'navigationRows'
   | 'libraryBrowser'
   | 'contents'
   | 'sourceLifecycle'
   | 'unknown'
 
-export type LibraryRefreshPlan = {
+export type RefreshPlan = {
   readonly refreshRootHierarchy: boolean
   readonly refreshNavigationRows: boolean
   readonly refreshExpandedBrowserWindows: boolean
@@ -24,17 +24,17 @@ export type LibraryRefreshPlan = {
   readonly broadRecovery: boolean
 }
 
-export type MaintainedSnapshotInvalidationRefreshPlanInput = {
+export type InvalidationPlanInput = {
   readonly invalidations: readonly AppMaintainedSnapshotInvalidatedEvent[]
   readonly sourceLifecycleSourceIds?: Iterable<string>
 }
 
-export type SourceScanRefreshPlanInput = {
+export type ScanPlanInput = {
   readonly events: readonly AppSourceScanEvent[]
   readonly sourceLifecycleSourceIds?: ReadonlySet<string>
 }
 
-export type InvalidationRefreshDependencies = {
+export type RefreshPlanDeps = {
   readonly hierarchyRead: Pick<
     LibraryHierarchyReadController,
     'refreshNavigationRows' | 'refreshBrowserWindows' | 'refresh'
@@ -46,7 +46,7 @@ export type InvalidationRefreshDependencies = {
   readonly refreshContentsForCurrentSelection?: () => Promise<boolean> | boolean | void
 }
 
-export function classifyInvalidationScope(scope: string): RendererInvalidationScope {
+export function classifyInvalidationScope(scope: string): InvalidationScope {
   switch (scope) {
     case 'navigationRows':
       return 'navigationRows'
@@ -57,9 +57,9 @@ export function classifyInvalidationScope(scope: string): RendererInvalidationSc
   }
 }
 
-export function buildMaintainedSnapshotInvalidationRefreshPlan(
-  input: MaintainedSnapshotInvalidationRefreshPlanInput
-): LibraryRefreshPlan {
+export function buildInvalidationPlan(
+  input: InvalidationPlanInput
+): RefreshPlan {
   let refreshNavigationRows = false
   let refreshExpandedBrowserWindows = false
   let refreshCurrentContents = false
@@ -94,7 +94,7 @@ export function buildMaintainedSnapshotInvalidationRefreshPlan(
   })
 }
 
-export function buildSourceScanRefreshPlan(input: SourceScanRefreshPlanInput): LibraryRefreshPlan {
+export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
   const refreshSourceLifecycleIds = new Set<string>()
   const visibleSourceIds = input.sourceLifecycleSourceIds
 
@@ -109,7 +109,7 @@ export function buildSourceScanRefreshPlan(input: SourceScanRefreshPlanInput): L
   return refreshPlan({ refreshSourceLifecycleIds })
 }
 
-export function buildGapRecoveryRefreshPlan(): LibraryRefreshPlan {
+export function buildGapPlan(): RefreshPlan {
   return refreshPlan({
     refreshRootHierarchy: true,
     clearAllContentsWarmSnapshots: true,
@@ -118,9 +118,9 @@ export function buildGapRecoveryRefreshPlan(): LibraryRefreshPlan {
   })
 }
 
-export async function executeLibraryRefreshPlan(
-  plan: LibraryRefreshPlan,
-  dependencies: InvalidationRefreshDependencies
+export async function executeRefreshPlan(
+  plan: RefreshPlan,
+  dependencies: RefreshPlanDeps
 ): Promise<boolean> {
   let succeeded = true
 
@@ -161,27 +161,13 @@ export async function executeLibraryRefreshPlan(
   return succeeded
 }
 
-export async function refreshHierarchyForMaintainedSnapshotInvalidation(
-  event: AppMaintainedSnapshotInvalidatedEvent,
-  dependencies: InvalidationRefreshDependencies
-): Promise<boolean> {
-  const plan = buildMaintainedSnapshotInvalidationRefreshPlan({
-    invalidations: [event],
-    ...(dependencies.sourceLifecycleSourceIds === undefined
-      ? {}
-      : { sourceLifecycleSourceIds: dependencies.sourceLifecycleSourceIds })
-  })
-
-  return executeLibraryRefreshPlan(plan, dependencies)
-}
-
 function refreshPlan(
   input: Partial<
-    Omit<LibraryRefreshPlan, 'refreshSourceLifecycleIds'> & {
+    Omit<RefreshPlan, 'refreshSourceLifecycleIds'> & {
       readonly refreshSourceLifecycleIds: Iterable<string>
     }
   >
-): LibraryRefreshPlan {
+): RefreshPlan {
   return {
     refreshRootHierarchy: input.refreshRootHierarchy ?? false,
     refreshNavigationRows: input.refreshNavigationRows ?? false,

@@ -128,7 +128,7 @@ describe('projectState', () => {
 
   it('projects host status instead of stale navigation rows', () => {
     const staleState = browserState({
-      sourceChildren: loadedChildren([fileNode('11', 'track.wav')])
+      sourceChildren: loadedChildren([directoryNode('12', 'Album')])
     })
     const failedProjection = projectTree({
       ...staleState,
@@ -146,7 +146,7 @@ describe('projectState', () => {
     expect(stoppedProjection.bindingsById.has('navigation-row:7')).toBe(false)
   })
 
-  it('projecting an unloaded loadable directory creates a branch with deferred child state', () => {
+  it('unloaded directory is a deferred branch', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -170,7 +170,7 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(true)
   })
 
-  it('expanding a deferred directory cannot flatten to zero visible child rows', () => {
+  it('deferred directory expansion preserves state node', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -193,7 +193,7 @@ describe('projectState', () => {
     ).toEqual(['state'])
   })
 
-  it('loading directory remains a branch and keeps disclosure', () => {
+  it('loading directory remains a branch', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -224,7 +224,7 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(true)
   })
 
-  it('loading directory materializes a stable loading child representation when expanded', () => {
+  it('loading directory exposes state node when expanded', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([directoryNode('12', 'Album')]),
@@ -254,7 +254,7 @@ describe('projectState', () => {
     })
   })
 
-  it('failed directory remains a branch and materializes explicit failure state when expanded', () => {
+  it('failed directory exposes error state node when expanded', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([directoryNode('12', 'Album')]),
@@ -288,7 +288,7 @@ describe('projectState', () => {
     })
   })
 
-  it('complete no-media/no-child directory can still project as leaf with no children', () => {
+  it('completed childless directory is a leaf', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -309,7 +309,7 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
   })
 
-  it('complete directory with only audio files is a selectable leaf folder', () => {
+  it('directory with only audio files is a leaf', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -374,7 +374,7 @@ describe('projectState', () => {
     expect(visibleItems).toHaveLength(1)
   })
 
-  it('expanded state alone does not create disclosure for a confirmed leaf', () => {
+  it('leaf expansion does not create disclosure', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
