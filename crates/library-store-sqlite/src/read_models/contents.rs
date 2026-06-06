@@ -29,7 +29,7 @@ struct ContentsCursor {
     version: u8,
     scope: ContentsCursorScope,
     policy: ContentsCursorPolicy,
-    recursion: String,
+    scope_depth: String,
     position: ContentsCursorPosition,
 }
 
@@ -163,7 +163,7 @@ fn validate_cursor_identity(
     cursor: &ContentsCursor,
     scope: &StoreContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsRecursion,
+    recursion: StoreContentsScopeDepth,
 ) -> bool {
     if cursor.version != CONTENTS_CURSOR_VERSION {
         return false;
@@ -200,10 +200,10 @@ fn validate_cursor_identity(
         return false;
     }
     let expected_recursion = match recursion {
-        StoreContentsRecursion::Immediate => "immediate",
-        StoreContentsRecursion::Recursive => "recursive",
+        StoreContentsScopeDepth::Immediate => "immediate",
+        StoreContentsScopeDepth::Recursive => "recursive",
     };
-    cursor.recursion == expected_recursion
+    cursor.scope_depth == expected_recursion
 }
 
 fn compute_cursor_position(
@@ -294,7 +294,7 @@ fn build_next_cursor(
     rows: &[StoreContentsFileRow],
     scope: &StoreContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsRecursion,
+    recursion: StoreContentsScopeDepth,
 ) -> Option<String> {
     let last_row = rows.last()?;
     let position = compute_cursor_position(last_row, policy);
@@ -316,14 +316,14 @@ fn build_next_cursor(
         },
     };
     let recursion_str = match recursion {
-        StoreContentsRecursion::Immediate => "immediate".to_string(),
-        StoreContentsRecursion::Recursive => "recursive".to_string(),
+        StoreContentsScopeDepth::Immediate => "immediate".to_string(),
+        StoreContentsScopeDepth::Recursive => "recursive".to_string(),
     };
     let cursor = ContentsCursor {
         version: CONTENTS_CURSOR_VERSION,
         scope: cursor_scope,
         policy: canonical_cursor_policy(policy),
-        recursion: recursion_str,
+        scope_depth: recursion_str,
         position,
     };
     encode_cursor(&cursor).ok()
@@ -357,7 +357,7 @@ pub enum StoreContentsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreContentsCoverageState {
+pub enum StoreContentsScopeCoverageState {
     Complete,
     Pending,
     Scanning,
@@ -369,8 +369,8 @@ pub enum StoreContentsCoverageState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoreContentsCoverage {
-    pub state: StoreContentsCoverageState,
+pub struct StoreContentsScopeCoverage {
+    pub state: StoreContentsScopeCoverageState,
     pub recursive_scope_complete: bool,
     pub empty_result_authoritative: bool,
     pub detail: Option<String>,
@@ -381,10 +381,10 @@ pub struct StoreContentsResult {
     pub state: StoreContentsState,
     pub scope: StoreContentsScope,
     pub policy: StoreContentsReadPolicy,
-    pub recursion: StoreContentsRecursion,
+    pub scope_depth: StoreContentsScopeDepth,
     pub rows: Vec<StoreContentsFileRow>,
-    pub coverage: StoreContentsCoverage,
-    pub has_rows_omitted_by_policy: bool,
+    pub scope_coverage: StoreContentsScopeCoverage,
+    pub has_policy_omitted_rows: bool,
     pub next_cursor: Option<String>,
     pub detail: Option<String>,
 }
@@ -424,7 +424,7 @@ impl StorePrimaryMediaKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum StoreContentsRecursion {
+pub enum StoreContentsScopeDepth {
     Immediate,
     Recursive,
 }
@@ -564,7 +564,7 @@ pub(crate) fn read_contents(
     connection: &Connection,
     scope: StoreContentsScope,
     policy: StoreContentsReadPolicy,
-    recursion: StoreContentsRecursion,
+    recursion: StoreContentsScopeDepth,
     limit: usize,
     cursor: Option<&str>,
 ) -> LibrarySqliteResult<StoreContentsResult> {
@@ -578,15 +578,15 @@ pub(crate) fn read_contents(
                     state: StoreContentsState::CursorInvalid,
                     scope,
                     policy,
-                    recursion,
+                    scope_depth: recursion,
                     rows: Vec::new(),
-                    coverage: StoreContentsCoverage {
-                        state: StoreContentsCoverageState::Failed,
+                    scope_coverage: StoreContentsScopeCoverage {
+                        state: StoreContentsScopeCoverageState::Failed,
                         recursive_scope_complete: false,
                         empty_result_authoritative: false,
                         detail: Some("The contents cursor could not be decoded.".to_string()),
                     },
-                    has_rows_omitted_by_policy: false,
+                    has_policy_omitted_rows: false,
                     next_cursor: None,
                     detail: Some("The contents cursor could not be decoded.".to_string()),
                 });
@@ -597,17 +597,17 @@ pub(crate) fn read_contents(
                 state: StoreContentsState::CursorInvalid,
                 scope,
                 policy,
-                recursion,
+                scope_depth: recursion,
                 rows: Vec::new(),
-                coverage: StoreContentsCoverage {
-                    state: StoreContentsCoverageState::Failed,
+                scope_coverage: StoreContentsScopeCoverage {
+                    state: StoreContentsScopeCoverageState::Failed,
                     recursive_scope_complete: false,
                     empty_result_authoritative: false,
                     detail: Some(
                         "The contents cursor does not match the current request.".to_string(),
                     ),
                 },
-                has_rows_omitted_by_policy: false,
+                has_policy_omitted_rows: false,
                 next_cursor: None,
                 detail: Some("The contents cursor does not match the current request.".to_string()),
             });
@@ -633,15 +633,15 @@ pub(crate) fn read_contents(
                 state: StoreContentsState::CursorInvalid,
                 scope,
                 policy,
-                recursion,
+                scope_depth: recursion,
                 rows: Vec::new(),
-                coverage: StoreContentsCoverage {
-                    state: StoreContentsCoverageState::Failed,
+                scope_coverage: StoreContentsScopeCoverage {
+                    state: StoreContentsScopeCoverageState::Failed,
                     recursive_scope_complete: false,
                     empty_result_authoritative: false,
                     detail: Some("The contents cursor does not match the policy.".to_string()),
                 },
-                has_rows_omitted_by_policy: false,
+                has_policy_omitted_rows: false,
                 next_cursor: None,
                 detail: Some("The contents cursor does not match the policy.".to_string()),
             });
@@ -656,15 +656,15 @@ pub(crate) fn read_contents(
             state: StoreContentsState::LocationMissing,
             scope,
             policy,
-            recursion,
+            scope_depth: recursion,
             rows: Vec::new(),
-            coverage: StoreContentsCoverage {
-                state: StoreContentsCoverageState::LocationMissing,
+            scope_coverage: StoreContentsScopeCoverage {
+                state: StoreContentsScopeCoverageState::LocationMissing,
                 recursive_scope_complete: false,
                 empty_result_authoritative: false,
                 detail: Some("The library contents target is not available.".to_string()),
             },
-            has_rows_omitted_by_policy: false,
+            has_policy_omitted_rows: false,
             next_cursor: None,
             detail: Some("The library contents target is not available.".to_string()),
         });
@@ -693,21 +693,21 @@ pub(crate) fn read_contents(
             state,
             scope,
             policy,
-            recursion,
+            scope_depth: recursion,
             rows,
-            coverage: StoreContentsCoverage {
+            scope_coverage: StoreContentsScopeCoverage {
                 state: coverage_state,
                 recursive_scope_complete: false,
                 empty_result_authoritative: false,
                 detail: Some(detail.to_string()),
             },
-            has_rows_omitted_by_policy: false,
+            has_policy_omitted_rows: false,
             next_cursor,
             detail: Some(detail.to_string()),
         });
     }
 
-    let coverage = read_coverage(connection, &source_readiness, &resolved_scope)?;
+    let scope_coverage = read_scope_coverage(connection, &source_readiness, &resolved_scope)?;
     let rows = read_rows(
         connection,
         &resolved_scope,
@@ -726,35 +726,35 @@ pub(crate) fn read_contents(
     } else {
         rows
     };
-    let has_rows_omitted_by_policy = if matches!(
-        coverage.state,
-        StoreContentsCoverageState::Blocked
-            | StoreContentsCoverageState::Failed
-            | StoreContentsCoverageState::SourceUnavailable
-            | StoreContentsCoverageState::LocationMissing
+    let has_policy_omitted_rows = if matches!(
+        scope_coverage.state,
+        StoreContentsScopeCoverageState::Blocked
+            | StoreContentsScopeCoverageState::Failed
+            | StoreContentsScopeCoverageState::SourceUnavailable
+            | StoreContentsScopeCoverageState::LocationMissing
     ) {
         false
     } else {
-        read_has_rows_omitted_by_policy(connection, &resolved_scope, &policy, recursion)?
+        read_has_policy_omitted_rows(connection, &resolved_scope, &policy, recursion)?
     };
-    let state = contents_state(&coverage, rows.is_empty());
-    let detail = contents_detail(state, coverage.state);
+    let state = contents_state(&scope_coverage, rows.is_empty());
+    let detail = contents_detail(state, scope_coverage.state);
 
     let empty_result_authoritative = state == StoreContentsState::Empty
-        && coverage.recursive_scope_complete
-        && !has_rows_omitted_by_policy;
+        && scope_coverage.recursive_scope_complete
+        && !has_policy_omitted_rows;
 
     Ok(StoreContentsResult {
         state,
         scope,
         policy,
-        recursion,
+        scope_depth: recursion,
         rows,
-        coverage: StoreContentsCoverage {
+        scope_coverage: StoreContentsScopeCoverage {
             empty_result_authoritative,
-            ..coverage
+            ..scope_coverage
         },
-        has_rows_omitted_by_policy,
+        has_policy_omitted_rows,
         next_cursor,
         detail: detail.map(str::to_string),
     })
@@ -1071,13 +1071,17 @@ fn load_present_directory_path(
 
 fn source_unavailable_state(
     source: &SourceReadiness,
-) -> Option<(StoreContentsState, StoreContentsCoverageState, &'static str)> {
+) -> Option<(
+    StoreContentsState,
+    StoreContentsScopeCoverageState,
+    &'static str,
+)> {
     if source.source_class != "internal"
         && !matches!(source.mount_status.as_deref(), Some("mounted"))
     {
         return Some((
             StoreContentsState::SourceUnavailable,
-            StoreContentsCoverageState::SourceUnavailable,
+            StoreContentsScopeCoverageState::SourceUnavailable,
             "The selected source is unavailable.",
         ));
     }
@@ -1086,19 +1090,19 @@ fn source_unavailable_state(
         Some("missing") => {
             return Some((
                 StoreContentsState::LocationMissing,
-                StoreContentsCoverageState::LocationMissing,
+                StoreContentsScopeCoverageState::LocationMissing,
                 "The selected source root is missing.",
             ));
         }
         Some("blocked") => {
             let coverage_state = if source.access_issue_kind.as_deref() == Some("unavailable_mount")
             {
-                StoreContentsCoverageState::SourceUnavailable
+                StoreContentsScopeCoverageState::SourceUnavailable
             } else {
-                StoreContentsCoverageState::Blocked
+                StoreContentsScopeCoverageState::Blocked
             };
             let state = match coverage_state {
-                StoreContentsCoverageState::SourceUnavailable => {
+                StoreContentsScopeCoverageState::SourceUnavailable => {
                     StoreContentsState::SourceUnavailable
                 }
                 _ => StoreContentsState::Blocked,
@@ -1120,15 +1124,15 @@ fn source_unavailable_state(
                 StoreContentsState::Blocked
             },
             if source.scan_issue_kind.as_deref() == Some("unavailable_mount") {
-                StoreContentsCoverageState::SourceUnavailable
+                StoreContentsScopeCoverageState::SourceUnavailable
             } else {
-                StoreContentsCoverageState::Blocked
+                StoreContentsScopeCoverageState::Blocked
             },
             "The selected source scan is blocked.",
         )),
         Some("failed") => Some((
             StoreContentsState::Failed,
-            StoreContentsCoverageState::Failed,
+            StoreContentsScopeCoverageState::Failed,
             "The selected source scan failed.",
         )),
         Some("partial") => None,
@@ -1136,11 +1140,11 @@ fn source_unavailable_state(
     }
 }
 
-fn read_coverage(
+fn read_scope_coverage(
     connection: &Connection,
     source: &SourceReadiness,
     scope: &ResolvedContentsScope,
-) -> LibrarySqliteResult<StoreContentsCoverage> {
+) -> LibrarySqliteResult<StoreContentsScopeCoverage> {
     let counts = match scope {
         ResolvedContentsScope::WholeSource { source_id } => {
             read_whole_source_coverage_counts(connection, *source_id)?
@@ -1148,8 +1152,8 @@ fn read_coverage(
         ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
             let paths = load_accepted_source_location_paths(connection, *source_id)?;
             if paths.is_empty() {
-                return Ok(coverage(
-                    StoreContentsCoverageState::LocationMissing,
+                return Ok(scope_coverage(
+                    StoreContentsScopeCoverageState::LocationMissing,
                     false,
                     "No accepted source locations found.",
                 ));
@@ -1167,42 +1171,42 @@ fn read_coverage(
             match aggregate {
                 AcceptedSourceLocationCoverage::AllPresent => {}
                 AcceptedSourceLocationCoverage::AllMissing => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::LocationMissing,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::LocationMissing,
                         false,
                         "All accepted source locations are missing.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::MixedMissing => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Incomplete,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Incomplete,
                         false,
                         "One or more accepted source locations are missing. Results may be incomplete.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::Blocked => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Blocked,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Blocked,
                         false,
                         "One or more accepted source locations is under a blocked subtree.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::Failed => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Failed,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Failed,
                         false,
                         "One or more accepted source locations is under a failed subtree.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::Scanning => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Scanning,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Scanning,
                         false,
                         "One or more accepted source locations is being scanned.",
                     ));
                 }
                 AcceptedSourceLocationCoverage::Pending => {
-                    return Ok(coverage(
+                    return Ok(scope_coverage(
                         pending_or_scanning_coverage_state(source),
                         false,
                         "One or more accepted source locations has incomplete coverage.",
@@ -1212,8 +1216,8 @@ fn read_coverage(
             read_accepted_source_locations_coverage_counts(connection, *source_id)?
         }
         ResolvedContentsScope::MissingLocation { .. } => {
-            return Ok(coverage(
-                StoreContentsCoverageState::LocationMissing,
+            return Ok(scope_coverage(
+                StoreContentsScopeCoverageState::LocationMissing,
                 false,
                 "The selected folder is missing.",
             ));
@@ -1231,42 +1235,42 @@ fn read_coverage(
             match location_coverage {
                 SourceLocationCoverage::Present => {}
                 SourceLocationCoverage::Missing => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::LocationMissing,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::LocationMissing,
                         false,
                         "The selected source location is missing.",
                     ));
                 }
                 SourceLocationCoverage::Blocked => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Blocked,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Blocked,
                         false,
                         "The selected source location is under a blocked subtree.",
                     ));
                 }
                 SourceLocationCoverage::Failed => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Failed,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Failed,
                         false,
                         "The selected source location is under a failed subtree.",
                     ));
                 }
                 SourceLocationCoverage::Scanning => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Scanning,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Scanning,
                         false,
                         "The selected source location is being scanned.",
                     ));
                 }
                 SourceLocationCoverage::Pending => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::Pending,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::Pending,
                         false,
                         "The selected source location has pending coverage.",
                     ));
                 }
                 SourceLocationCoverage::Unknown => {
-                    return Ok(coverage(
+                    return Ok(scope_coverage(
                         pending_or_scanning_coverage_state(source),
                         false,
                         "The selected source location has unproven coverage.",
@@ -1282,14 +1286,14 @@ fn read_coverage(
             match load_directory_presence(connection, *source_id, relative_path)? {
                 DirectoryPresence::Present => {}
                 DirectoryPresence::Missing => {
-                    return Ok(coverage(
-                        StoreContentsCoverageState::LocationMissing,
+                    return Ok(scope_coverage(
+                        StoreContentsScopeCoverageState::LocationMissing,
                         false,
                         "The selected folder is missing.",
                     ));
                 }
                 DirectoryPresence::Unknown => {
-                    return Ok(coverage(
+                    return Ok(scope_coverage(
                         pending_or_scanning_coverage_state(source),
                         false,
                         "The selected folder has not been proven present or missing yet.",
@@ -1300,7 +1304,7 @@ fn read_coverage(
         }
     };
 
-    Ok(coverage_from_counts(source, scope, counts))
+    Ok(scope_coverage_from_counts(source, scope, counts))
 }
 
 fn read_whole_source_coverage_counts(
@@ -1394,25 +1398,25 @@ fn coverage_counts_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Coverag
     })
 }
 
-fn coverage_from_counts(
+fn scope_coverage_from_counts(
     source: &SourceReadiness,
     scope: &ResolvedContentsScope,
     counts: CoverageCounts,
-) -> StoreContentsCoverage {
+) -> StoreContentsScopeCoverage {
     if counts.total_directories == 0 {
         if matches!(scope, ResolvedContentsScope::WholeSource { .. })
             && source.scan_phase.as_deref() == Some("complete")
         {
-            return coverage(
-                StoreContentsCoverageState::Complete,
+            return scope_coverage(
+                StoreContentsScopeCoverageState::Complete,
                 true,
                 "The selected source has complete scan coverage.",
             );
         }
 
         if matches!(scope, ResolvedContentsScope::WholeSource { .. }) {
-            return coverage(
-                StoreContentsCoverageState::Pending,
+            return scope_coverage(
+                StoreContentsScopeCoverageState::Pending,
                 false,
                 "The selected source has no completed directory coverage yet.",
             );
@@ -1423,47 +1427,47 @@ fn coverage_from_counts(
             ResolvedContentsScope::AcceptedSourceLocations { .. }
                 | ResolvedContentsScope::SourceLocationPrefix { .. }
         ) {
-            return coverage(
-                StoreContentsCoverageState::Complete,
+            return scope_coverage(
+                StoreContentsScopeCoverageState::Complete,
                 true,
                 "The contents scope has complete scan coverage.",
             );
         }
 
-        return coverage(
-            StoreContentsCoverageState::LocationMissing,
+        return scope_coverage(
+            StoreContentsScopeCoverageState::LocationMissing,
             false,
             "The contents scope has no present directory coverage.",
         );
     }
 
     if counts.blocked_directories > 0 {
-        return coverage(
-            StoreContentsCoverageState::Blocked,
+        return scope_coverage(
+            StoreContentsScopeCoverageState::Blocked,
             false,
             "Part of the contents scope is blocked.",
         );
     }
 
     if counts.failed_directories > 0 {
-        return coverage(
-            StoreContentsCoverageState::Failed,
+        return scope_coverage(
+            StoreContentsScopeCoverageState::Failed,
             false,
             "Part of the contents scope failed to scan.",
         );
     }
 
     if counts.scanning_directories > 0 {
-        return coverage(
-            StoreContentsCoverageState::Scanning,
+        return scope_coverage(
+            StoreContentsScopeCoverageState::Scanning,
             false,
             "The contents scope is still scanning.",
         );
     }
 
     if counts.pending_directories > 0 {
-        return coverage(
-            StoreContentsCoverageState::Pending,
+        return scope_coverage(
+            StoreContentsScopeCoverageState::Pending,
             false,
             "The contents scope has pending scan coverage.",
         );
@@ -1475,8 +1479,8 @@ fn coverage_from_counts(
             Some("complete") | Some("partial")
         )
     {
-        return coverage(
-            StoreContentsCoverageState::Pending,
+        return scope_coverage(
+            StoreContentsScopeCoverageState::Pending,
             false,
             "The selected source has not completed a full recursive scan.",
         );
@@ -1485,34 +1489,34 @@ fn coverage_from_counts(
     if matches!(scope, ResolvedContentsScope::WholeSource { .. })
         && source.scan_phase.as_deref() == Some("partial")
     {
-        return coverage(
-            StoreContentsCoverageState::Pending,
+        return scope_coverage(
+            StoreContentsScopeCoverageState::Pending,
             false,
             "The selected source scan has incomplete descendant coverage.",
         );
     }
 
-    coverage(
-        StoreContentsCoverageState::Complete,
+    scope_coverage(
+        StoreContentsScopeCoverageState::Complete,
         true,
         "The contents scope has complete scan coverage.",
     )
 }
 
-fn pending_or_scanning_coverage_state(source: &SourceReadiness) -> StoreContentsCoverageState {
+fn pending_or_scanning_coverage_state(source: &SourceReadiness) -> StoreContentsScopeCoverageState {
     if source.scan_phase.as_deref() == Some("scanning") {
-        StoreContentsCoverageState::Scanning
+        StoreContentsScopeCoverageState::Scanning
     } else {
-        StoreContentsCoverageState::Pending
+        StoreContentsScopeCoverageState::Pending
     }
 }
 
-fn coverage(
-    state: StoreContentsCoverageState,
+fn scope_coverage(
+    state: StoreContentsScopeCoverageState,
     recursive_scope_complete: bool,
     detail: &str,
-) -> StoreContentsCoverage {
-    StoreContentsCoverage {
+) -> StoreContentsScopeCoverage {
+    StoreContentsScopeCoverage {
         state,
         recursive_scope_complete,
         empty_result_authoritative: false,
@@ -1520,35 +1524,37 @@ fn coverage(
     }
 }
 
-fn contents_state(coverage: &StoreContentsCoverage, rows_empty: bool) -> StoreContentsState {
+fn contents_state(coverage: &StoreContentsScopeCoverage, rows_empty: bool) -> StoreContentsState {
     match coverage.state {
-        StoreContentsCoverageState::Complete => {
+        StoreContentsScopeCoverageState::Complete => {
             if rows_empty {
                 StoreContentsState::Empty
             } else {
                 StoreContentsState::Ready
             }
         }
-        StoreContentsCoverageState::Pending
-        | StoreContentsCoverageState::Scanning
-        | StoreContentsCoverageState::Incomplete => StoreContentsState::Partial,
-        StoreContentsCoverageState::Blocked => StoreContentsState::Blocked,
-        StoreContentsCoverageState::Failed => StoreContentsState::Failed,
-        StoreContentsCoverageState::SourceUnavailable => StoreContentsState::SourceUnavailable,
-        StoreContentsCoverageState::LocationMissing => StoreContentsState::LocationMissing,
+        StoreContentsScopeCoverageState::Pending
+        | StoreContentsScopeCoverageState::Scanning
+        | StoreContentsScopeCoverageState::Incomplete => StoreContentsState::Partial,
+        StoreContentsScopeCoverageState::Blocked => StoreContentsState::Blocked,
+        StoreContentsScopeCoverageState::Failed => StoreContentsState::Failed,
+        StoreContentsScopeCoverageState::SourceUnavailable => StoreContentsState::SourceUnavailable,
+        StoreContentsScopeCoverageState::LocationMissing => StoreContentsState::LocationMissing,
     }
 }
 
 fn contents_detail(
     state: StoreContentsState,
-    coverage_state: StoreContentsCoverageState,
+    coverage_state: StoreContentsScopeCoverageState,
 ) -> Option<&'static str> {
     match state {
         StoreContentsState::Ready => None,
         StoreContentsState::Empty => None,
         StoreContentsState::Partial => Some(match coverage_state {
-            StoreContentsCoverageState::Scanning => "Still indexing. Results may be incomplete.",
-            StoreContentsCoverageState::Incomplete => {
+            StoreContentsScopeCoverageState::Scanning => {
+                "Still indexing. Results may be incomplete."
+            }
+            StoreContentsScopeCoverageState::Incomplete => {
                 "One or more accepted source locations are missing. Results may be incomplete."
             }
             _ => "Indexing is incomplete. Results may be incomplete.",
@@ -1562,11 +1568,11 @@ fn contents_detail(
     }
 }
 
-fn read_has_rows_omitted_by_policy(
+fn read_has_policy_omitted_rows(
     connection: &Connection,
     scope: &ResolvedContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsRecursion,
+    recursion: StoreContentsScopeDepth,
 ) -> LibrarySqliteResult<bool> {
     let Some(omitted_file_classes) = policy_omitted_file_classes(policy) else {
         // primaryMedia omission metadata is not surfaced until its own row universe is queryable.
@@ -1648,7 +1654,7 @@ fn read_rows(
     connection: &Connection,
     scope: &ResolvedContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsRecursion,
+    recursion: StoreContentsScopeDepth,
     limit: usize,
     cursor_position: Option<&ContentsCursorPosition>,
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
@@ -1730,18 +1736,18 @@ fn read_rows(
     }
 }
 
-fn whole_source_file_predicate(recursion: StoreContentsRecursion) -> String {
+fn whole_source_file_predicate(recursion: StoreContentsScopeDepth) -> String {
     match recursion {
-        StoreContentsRecursion::Recursive => "sf.source_id = ?1".to_string(),
-        StoreContentsRecursion::Immediate => {
+        StoreContentsScopeDepth::Recursive => "sf.source_id = ?1".to_string(),
+        StoreContentsScopeDepth::Immediate => {
             "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL".to_string()
         }
     }
 }
 
-fn accepted_locations_source_file_predicate(recursion: StoreContentsRecursion) -> String {
+fn accepted_locations_source_file_predicate(recursion: StoreContentsScopeDepth) -> String {
     match recursion {
-        StoreContentsRecursion::Recursive => format!(
+        StoreContentsScopeDepth::Recursive => format!(
             "sf.source_id = ?1
              AND EXISTS (
                  SELECT 1
@@ -1750,7 +1756,7 @@ fn accepted_locations_source_file_predicate(recursion: StoreContentsRecursion) -
              )",
             relative_path_scope_predicate("sf", "al.relative_path")
         ),
-        StoreContentsRecursion::Immediate => "sf.source_id = ?1
+        StoreContentsScopeDepth::Immediate => "sf.source_id = ?1
              AND EXISTS (
                  SELECT 1
                  FROM accepted_locations al
@@ -1887,14 +1893,14 @@ fn read_rows_with_source_predicate(
     Ok(rows)
 }
 
-fn scoped_path_predicate(recursion: StoreContentsRecursion) -> String {
+fn scoped_path_predicate(recursion: StoreContentsScopeDepth) -> String {
     match recursion {
-        StoreContentsRecursion::Recursive => format!(
+        StoreContentsScopeDepth::Recursive => format!(
             "sf.source_id = ?1
              AND {}",
             source_file_descendant_predicate("sf", "?2")
         ),
-        StoreContentsRecursion::Immediate => "sf.source_id = ?1
+        StoreContentsScopeDepth::Immediate => "sf.source_id = ?1
              AND sf.parent_source_directory_id = (
                  SELECT sd.source_directory_id
                  FROM source_directories sd
@@ -2469,9 +2475,9 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        StoreContentsCoverageState, StoreContentsFileClass, StoreContentsReadPolicy,
-        StoreContentsRecursion, StoreContentsRowOrigin, StoreContentsScope, StoreContentsState,
-        StorePrimaryMediaKind, canonical_cursor_policy, read_contents,
+        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRowOrigin,
+        StoreContentsScope, StoreContentsScopeCoverageState, StoreContentsScopeDepth,
+        StoreContentsState, StorePrimaryMediaKind, canonical_cursor_policy, read_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -3007,7 +3013,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3025,7 +3031,10 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(StoreContentsRowOrigin::PrimaryMediaCandidate, true)]
         );
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete
+        );
     }
 
     #[test]
@@ -3052,7 +3061,7 @@ mod tests {
                 source_location_id: 100,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3108,7 +3117,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3146,15 +3155,18 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Partial);
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Pending);
-        assert!(!result.coverage.empty_result_authoritative);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Pending
+        );
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3167,16 +3179,19 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Blocked);
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked
+        );
         assert!(result.rows.is_empty());
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3189,7 +3204,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3197,11 +3212,11 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::LocationMissing);
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::LocationMissing
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing
         );
         assert!(result.rows.is_empty());
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3218,16 +3233,19 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Partial);
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Scanning);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Scanning
+        );
         assert!(result.rows.is_empty());
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3245,16 +3263,19 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Blocked);
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
-        assert!(!result.coverage.recursive_scope_complete);
-        assert!(!result.coverage.empty_result_authoritative);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked
+        );
+        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     fn insert_scanned_file(
@@ -3332,7 +3353,7 @@ mod tests {
     fn assert_audio_browse_matches_source_file_audio(
         connection: &Connection,
         scope: StoreContentsScope,
-        recursion: StoreContentsRecursion,
+        recursion: StoreContentsScopeDepth,
         limit: usize,
     ) -> (super::StoreContentsResult, super::StoreContentsResult) {
         let source_file = read_contents(
@@ -3355,9 +3376,9 @@ mod tests {
         .expect("read audio-browse contents");
 
         assert_eq!(audio_browse.state, source_file.state);
-        assert_eq!(audio_browse.coverage, source_file.coverage);
+        assert_eq!(audio_browse.scope_coverage, source_file.scope_coverage);
         assert_eq!(audio_browse.rows, source_file.rows);
-        assert_eq!(audio_browse.recursion, source_file.recursion);
+        assert_eq!(audio_browse.scope_depth, source_file.scope_depth);
         assert_eq!(audio_browse.policy, StoreContentsReadPolicy::AudioBrowse);
 
         (source_file, audio_browse)
@@ -3375,7 +3396,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3383,9 +3404,12 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
-        assert!(result.coverage.empty_result_authoritative);
-        assert!(!result.has_rows_omitted_by_policy);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete
+        );
+        assert!(result.scope_coverage.empty_result_authoritative);
+        assert!(!result.has_policy_omitted_rows);
     }
 
     #[test]
@@ -3409,7 +3433,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3448,7 +3472,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3456,8 +3480,11 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
-        assert!(result.coverage.empty_result_authoritative);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete
+        );
+        assert!(result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3475,7 +3502,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3483,8 +3510,11 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
-        assert!(result.coverage.empty_result_authoritative);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete
+        );
+        assert!(result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3508,7 +3538,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3516,7 +3546,7 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
-        assert!(result.coverage.empty_result_authoritative);
+        assert!(result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3533,7 +3563,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3541,7 +3571,7 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Empty);
         assert!(result.rows.is_empty());
-        assert!(result.coverage.empty_result_authoritative);
+        assert!(result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3558,7 +3588,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3566,8 +3596,11 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Partial);
         assert!(result.rows.is_empty());
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Pending);
-        assert!(!result.coverage.empty_result_authoritative);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Pending
+        );
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3592,7 +3625,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3633,7 +3666,7 @@ mod tests {
                 StoreContentsFileClass::Image,
                 StoreContentsFileClass::Unsupported,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3688,7 +3721,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3722,7 +3755,7 @@ mod tests {
         let (_source_file, source_recursive) = assert_audio_browse_matches_source_file_audio(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_relative_paths(
@@ -3733,7 +3766,7 @@ mod tests {
         assert_audio_browse_matches_source_file_audio(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             10,
         );
 
@@ -3743,7 +3776,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_relative_paths(
@@ -3757,7 +3790,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             10,
         );
         assert_relative_paths(&directory_immediate.rows, &["Music/01.wav"]);
@@ -3767,7 +3800,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_relative_paths(
@@ -3780,7 +3813,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             10,
         );
         assert_relative_paths(&location_immediate.rows, &["Music/01.wav"]);
@@ -3810,7 +3843,7 @@ mod tests {
                 StoreContentsFileClass::Audio,
                 StoreContentsFileClass::Video,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3825,7 +3858,7 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3833,7 +3866,7 @@ mod tests {
 
         assert_eq!(audio_browse.state, StoreContentsState::Ready);
         assert_relative_paths(&audio_browse.rows, &["Media/track.wav"]);
-        assert!(audio_browse.has_rows_omitted_by_policy);
+        assert!(audio_browse.has_policy_omitted_rows);
     }
 
     #[test]
@@ -3854,7 +3887,7 @@ mod tests {
                 source_directory_id: 10,
             },
             playable_media_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -3866,7 +3899,7 @@ mod tests {
         assert_eq!(result.rows[0].file_kind, "video");
         assert_eq!(result.rows[1].file_class, "audio");
         assert_eq!(result.rows[1].file_kind, "audio");
-        assert!(result.has_rows_omitted_by_policy);
+        assert!(result.has_policy_omitted_rows);
     }
 
     #[test]
@@ -3885,14 +3918,14 @@ mod tests {
                 source_directory_id: 10,
             },
             playable_media_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read video contents");
         assert_eq!(video.state, StoreContentsState::Ready);
         assert_relative_paths(&video.rows, &["Videos/clip.mp4"]);
-        assert!(!video.has_rows_omitted_by_policy);
+        assert!(!video.has_policy_omitted_rows);
 
         let image = read_contents(
             &connection,
@@ -3901,15 +3934,15 @@ mod tests {
                 source_directory_id: 20,
             },
             playable_media_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read image-only contents");
         assert_eq!(image.state, StoreContentsState::Empty);
         assert!(image.rows.is_empty());
-        assert!(image.has_rows_omitted_by_policy);
-        assert!(!image.coverage.empty_result_authoritative);
+        assert!(image.has_policy_omitted_rows);
+        assert!(!image.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -3944,15 +3977,15 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read video scope as audio");
         assert_eq!(video.state, StoreContentsState::Empty);
         assert!(video.rows.is_empty());
-        assert!(video.has_rows_omitted_by_policy);
-        assert!(!video.coverage.empty_result_authoritative);
+        assert!(video.has_policy_omitted_rows);
+        assert!(!video.scope_coverage.empty_result_authoritative);
 
         for source_directory_id in [20, 30] {
             let result = read_contents(
@@ -3962,14 +3995,14 @@ mod tests {
                     source_directory_id,
                 },
                 audio_browse_policy(),
-                StoreContentsRecursion::Recursive,
+                StoreContentsScopeDepth::Recursive,
                 10,
                 None,
             )
             .expect("read non-audio scope");
             assert_eq!(result.state, StoreContentsState::Empty);
-            assert!(!result.has_rows_omitted_by_policy);
-            assert!(result.coverage.empty_result_authoritative);
+            assert!(!result.has_policy_omitted_rows);
+            assert!(result.scope_coverage.empty_result_authoritative);
         }
     }
 
@@ -3990,13 +4023,13 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read audio inventory");
         assert_relative_paths(&audio_only.rows, &["Media/track.wav"]);
-        assert!(audio_only.has_rows_omitted_by_policy);
+        assert!(audio_only.has_policy_omitted_rows);
 
         let all_requestable = read_contents(
             &connection,
@@ -4005,12 +4038,12 @@ mod tests {
                 source_directory_id: 10,
             },
             default_source_file_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read all requestable inventory");
-        assert!(!all_requestable.has_rows_omitted_by_policy);
+        assert!(!all_requestable.has_policy_omitted_rows);
     }
 
     #[test]
@@ -4030,12 +4063,12 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             1,
             None,
         )
         .expect("read immediate audio");
-        assert!(!immediate.has_rows_omitted_by_policy);
+        assert!(!immediate.has_policy_omitted_rows);
 
         let recursive_page_one = read_contents(
             &connection,
@@ -4044,14 +4077,14 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             1,
             None,
         )
         .expect("read recursive audio page one");
         assert_eq!(recursive_page_one.rows.len(), 1);
         assert!(recursive_page_one.next_cursor.is_some());
-        assert!(recursive_page_one.has_rows_omitted_by_policy);
+        assert!(recursive_page_one.has_policy_omitted_rows);
 
         let recursive_page_two = read_contents(
             &connection,
@@ -4060,12 +4093,12 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             1,
             recursive_page_one.next_cursor.as_deref(),
         )
         .expect("read recursive audio page two");
-        assert!(recursive_page_two.has_rows_omitted_by_policy);
+        assert!(recursive_page_two.has_policy_omitted_rows);
     }
 
     #[test]
@@ -4084,14 +4117,14 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read primary media");
 
         assert!(result.rows.is_empty());
-        assert!(!result.has_rows_omitted_by_policy);
+        assert!(!result.has_policy_omitted_rows);
     }
 
     #[test]
@@ -4112,12 +4145,15 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_eq!(empty.state, StoreContentsState::Empty);
-        assert_eq!(empty.coverage.state, StoreContentsCoverageState::Complete);
-        assert!(empty.coverage.empty_result_authoritative);
+        assert_eq!(
+            empty.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete
+        );
+        assert!(empty.scope_coverage.empty_result_authoritative);
 
         let (_source_file, scanning) = assert_audio_browse_matches_source_file_audio(
             &connection,
@@ -4125,15 +4161,15 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 11,
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_eq!(scanning.state, StoreContentsState::Partial);
         assert_eq!(
-            scanning.coverage.state,
-            StoreContentsCoverageState::Scanning
+            scanning.scope_coverage.state,
+            StoreContentsScopeCoverageState::Scanning
         );
-        assert!(!scanning.coverage.empty_result_authoritative);
+        assert!(!scanning.scope_coverage.empty_result_authoritative);
 
         let (_source_file, blocked) = assert_audio_browse_matches_source_file_audio(
             &connection,
@@ -4141,12 +4177,15 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 12,
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_eq!(blocked.state, StoreContentsState::Blocked);
-        assert_eq!(blocked.coverage.state, StoreContentsCoverageState::Blocked);
-        assert!(!blocked.coverage.empty_result_authoritative);
+        assert_eq!(
+            blocked.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked
+        );
+        assert!(!blocked.scope_coverage.empty_result_authoritative);
 
         let (_source_file, failed) = assert_audio_browse_matches_source_file_audio(
             &connection,
@@ -4154,27 +4193,30 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 13,
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_eq!(failed.state, StoreContentsState::Failed);
-        assert_eq!(failed.coverage.state, StoreContentsCoverageState::Failed);
-        assert!(!failed.coverage.empty_result_authoritative);
+        assert_eq!(
+            failed.scope_coverage.state,
+            StoreContentsScopeCoverageState::Failed
+        );
+        assert!(!failed.scope_coverage.empty_result_authoritative);
 
         let (_source_file, missing_location) = assert_audio_browse_matches_source_file_audio(
             &connection,
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_eq!(missing_location.state, StoreContentsState::LocationMissing);
         assert_eq!(
-            missing_location.coverage.state,
-            StoreContentsCoverageState::LocationMissing
+            missing_location.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing
         );
-        assert!(!missing_location.coverage.empty_result_authoritative);
+        assert!(!missing_location.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -4195,7 +4237,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Unsupported]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4245,7 +4287,7 @@ mod tests {
                 StoreContentsFileClass::Audio,
                 StoreContentsFileClass::Unsupported,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4276,7 +4318,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4285,7 +4327,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             10,
             None,
         )
@@ -4297,7 +4339,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4326,7 +4368,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Image]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4356,7 +4398,7 @@ mod tests {
                 StoreContentsFileClass::Unsupported,
                 StoreContentsFileClass::Unsupported,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4376,7 +4418,7 @@ mod tests {
             StoreContentsReadPolicy::PrimaryMedia {
                 media_kinds: Vec::new(),
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4395,7 +4437,7 @@ mod tests {
             StoreContentsReadPolicy::SourceFileInventory {
                 file_classes: Vec::new(),
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -4413,7 +4455,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             Some("page-2"),
         )
@@ -4445,7 +4487,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4481,7 +4523,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4517,7 +4559,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4530,7 +4572,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4546,7 +4588,7 @@ mod tests {
             StoreContentsReadPolicy::PrimaryMedia {
                 media_kinds: vec![StorePrimaryMediaKind::Video],
             },
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4557,7 +4599,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4608,7 +4650,7 @@ mod tests {
                     StoreContentsFileClass::Audio,
                     StoreContentsFileClass::Unsupported,
                 ]),
-                StoreContentsRecursion::Recursive,
+                StoreContentsScopeDepth::Recursive,
                 2,
                 cursor.as_deref(),
             )
@@ -4672,7 +4714,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4685,7 +4727,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4726,7 +4768,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4741,7 +4783,7 @@ mod tests {
                 StoreContentsFileClass::Audio,
                 StoreContentsFileClass::Video,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4771,7 +4813,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             default_source_file_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4786,7 +4828,7 @@ mod tests {
                 StoreContentsFileClass::Video,
                 StoreContentsFileClass::Image,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4820,7 +4862,7 @@ mod tests {
                 StoreContentsFileClass::Video,
                 StoreContentsFileClass::Image,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4831,7 +4873,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             default_source_file_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4861,7 +4903,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             default_source_file_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             None,
         )
@@ -4881,7 +4923,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             default_source_file_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&cursor),
         )
@@ -4896,7 +4938,7 @@ mod tests {
                 StoreContentsFileClass::Video,
                 StoreContentsFileClass::Image,
             ]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&cursor),
         )
@@ -4926,7 +4968,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -4938,7 +4980,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -4971,7 +5013,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             None,
         )
@@ -4983,7 +5025,7 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             None,
         )
@@ -5008,7 +5050,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&source_file_cursor),
         )
@@ -5020,7 +5062,7 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&audio_browse_cursor),
         )
@@ -5040,7 +5082,7 @@ mod tests {
                 source_directory_id: 10,
             },
             audio_browse_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&source_file_cursor),
         )
@@ -5058,7 +5100,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&audio_browse_cursor),
         )
@@ -5076,7 +5118,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&audio_browse_cursor),
         )
@@ -5118,7 +5160,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -5130,7 +5172,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 2 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -5160,7 +5202,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -5174,7 +5216,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -5208,7 +5250,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -5221,7 +5263,7 @@ mod tests {
                 source_location_id: 100,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -5251,7 +5293,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -5263,7 +5305,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             3,
             Some(&cursor),
         )
@@ -5282,7 +5324,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             Some("!invalid-base64url!"),
         )
@@ -5314,7 +5356,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -5349,7 +5391,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -5387,7 +5429,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -5403,7 +5445,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -5449,7 +5491,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -5465,7 +5507,7 @@ mod tests {
                 source_directory_id: 10,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -5509,7 +5551,7 @@ mod tests {
                 source_location_id: 100,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
@@ -5524,7 +5566,7 @@ mod tests {
                 source_location_id: 100,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
@@ -5568,7 +5610,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             3,
             None,
         )
@@ -5584,7 +5626,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Immediate,
+            StoreContentsScopeDepth::Immediate,
             3,
             Some(&cursor),
         )
@@ -5918,14 +5960,14 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
-        assert!(!result.coverage.empty_result_authoritative);
-        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.recursive_scope_complete);
         assert_ne!(result.state, StoreContentsState::Empty);
     }
 
@@ -5957,7 +5999,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -5967,9 +6009,12 @@ mod tests {
             !result.rows.is_empty(),
             "partial scan must return visible rows"
         );
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Blocked);
-        assert!(!result.coverage.recursive_scope_complete);
-        assert!(!result.coverage.empty_result_authoritative);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked
+        );
+        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6004,18 +6049,18 @@ mod tests {
                 source_directory_id: 11,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents for Good");
 
         assert_eq!(
-            dir_result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            dir_result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "clean sibling directory under partial source must have complete coverage"
         );
-        assert!(dir_result.coverage.recursive_scope_complete);
+        assert!(dir_result.scope_coverage.recursive_scope_complete);
         assert_eq!(dir_result.state, StoreContentsState::Ready);
         assert!(!dir_result.rows.is_empty());
 
@@ -6023,18 +6068,18 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents for source");
 
         assert_ne!(
-            source_result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            source_result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "whole source must remain non-complete when partial"
         );
-        assert!(!source_result.coverage.empty_result_authoritative);
+        assert!(!source_result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6059,19 +6104,19 @@ mod tests {
                 source_directory_id: 11,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents for empty Good");
 
         assert_eq!(
-            dir_result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            dir_result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "clean empty sibling directory under partial source may be authoritative empty"
         );
-        assert!(dir_result.coverage.recursive_scope_complete);
-        assert!(dir_result.coverage.empty_result_authoritative);
+        assert!(dir_result.scope_coverage.recursive_scope_complete);
+        assert!(dir_result.scope_coverage.empty_result_authoritative);
         assert_eq!(dir_result.state, StoreContentsState::Empty);
     }
 
@@ -6096,19 +6141,19 @@ mod tests {
                 source_directory_id: 11,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents for Locked");
 
         assert_eq!(
-            dir_result.coverage.state,
-            StoreContentsCoverageState::Blocked,
+            dir_result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked,
             "blocked scope under partial source must remain blocked"
         );
-        assert!(!dir_result.coverage.recursive_scope_complete);
-        assert!(!dir_result.coverage.empty_result_authoritative);
+        assert!(!dir_result.scope_coverage.recursive_scope_complete);
+        assert!(!dir_result.scope_coverage.empty_result_authoritative);
         assert_eq!(dir_result.state, StoreContentsState::Blocked);
     }
 
@@ -6140,7 +6185,7 @@ mod tests {
                 source_location_id: 100,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6152,12 +6197,12 @@ mod tests {
             "Music/DeletedFolder must be classified missing, not unknown or pending"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::LocationMissing,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing,
             "coverage must be locationMissing for scope-proven absent path under partial scan"
         );
-        assert!(!result.coverage.recursive_scope_complete);
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6188,7 +6233,7 @@ mod tests {
                 source_location_id: 100,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6200,12 +6245,12 @@ mod tests {
             "blocked location must not produce authoritative empty"
         );
         assert_ne!(
-            result.coverage.state,
-            StoreContentsCoverageState::LocationMissing,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing,
             "blocked parent must not be classified as missing"
         );
-        assert!(!result.coverage.empty_result_authoritative);
-        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.recursive_scope_complete);
     }
 
     #[test]
@@ -6230,18 +6275,18 @@ mod tests {
                 source_location_id: 100,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::Failed,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Failed,
             "failed parent must produce failed coverage"
         );
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6265,19 +6310,19 @@ mod tests {
                 source_location_id: 100,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::Pending,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Pending,
             "pending parent must produce pending coverage"
         );
-        assert!(!result.coverage.empty_result_authoritative);
-        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.recursive_scope_complete);
     }
 
     #[test]
@@ -6318,7 +6363,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6329,12 +6374,12 @@ mod tests {
             "accepted location rows must be returned"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "all accepted locations complete must produce complete coverage even under partial source"
         );
-        assert!(result.coverage.recursive_scope_complete);
-        assert!(result.coverage.empty_result_authoritative || !result.rows.is_empty());
+        assert!(result.scope_coverage.recursive_scope_complete);
+        assert!(result.scope_coverage.empty_result_authoritative || !result.rows.is_empty());
     }
 
     #[test]
@@ -6373,23 +6418,23 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_ne!(
-            result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "source with a blocked accepted location must not be complete"
         );
-        assert!(!result.coverage.empty_result_authoritative);
-        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.recursive_scope_complete);
     }
 
     #[test]
-    fn source_location_scope_and_source_agree_on_coverage() {
+    fn source_location_scope_and_source_agree_on_scope_coverage() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
@@ -6418,7 +6463,7 @@ mod tests {
                 source_location_id: 100,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6428,20 +6473,20 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents for Source");
 
         assert_eq!(
-            location_result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            location_result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "SourceLocation scope for Music/Good must be complete"
         );
         assert_eq!(
-            source_result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            source_result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "Source with only Music/Good accepted location must be complete"
         );
 
@@ -6460,7 +6505,7 @@ mod tests {
                 source_location_id: 101,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6470,20 +6515,20 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents for Source with blocked location");
 
         assert_eq!(
-            location_result_blocked.coverage.state,
-            StoreContentsCoverageState::Blocked,
+            location_result_blocked.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked,
             "SourceLocation scope for Music/Locked must be blocked"
         );
         assert_eq!(
-            source_result_blocked.coverage.state,
-            StoreContentsCoverageState::Blocked,
+            source_result_blocked.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked,
             "Source with blocked accepted location must be blocked"
         );
     }
@@ -6525,7 +6570,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6541,22 +6586,22 @@ mod tests {
             "mixed present + missing must not be LocationMissing"
         );
         assert_ne!(
-            result.coverage.state,
-            StoreContentsCoverageState::LocationMissing,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing,
             "mixed present + missing coverage must not be LocationMissing"
         );
         assert_ne!(
-            result.coverage.state,
-            StoreContentsCoverageState::Complete,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete,
             "mixed present + missing coverage must not be Complete"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::Incomplete,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Incomplete,
             "mixed present + missing coverage must be Incomplete"
         );
-        assert!(!result.coverage.recursive_scope_complete);
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6587,7 +6632,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6604,11 +6649,11 @@ mod tests {
             "mixed present + missing must not be LocationMissing"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::Incomplete,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Incomplete,
             "mixed present + missing coverage must be Incomplete"
         );
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6638,7 +6683,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6650,17 +6695,17 @@ mod tests {
             "all missing accepted locations must be LocationMissing"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::LocationMissing,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing,
             "all missing coverage must be LocationMissing"
         );
         assert!(result.rows.is_empty());
-        assert!(!result.coverage.empty_result_authoritative);
-        assert!(!result.coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.recursive_scope_complete);
     }
 
     #[test]
-    fn accepted_locations_present_plus_blocked_returns_rows_and_blocked_coverage() {
+    fn accepted_locations_present_plus_blocked_returns_rows_and_blocked_scope_coverage() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
@@ -6699,7 +6744,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6715,15 +6760,15 @@ mod tests {
             "present + blocked must not be LocationMissing"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::Blocked,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Blocked,
             "present + blocked must be Blocked coverage"
         );
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
-    fn accepted_locations_present_plus_failed_returns_rows_and_failed_coverage() {
+    fn accepted_locations_present_plus_failed_returns_rows_and_failed_scope_coverage() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
@@ -6762,7 +6807,7 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6778,11 +6823,11 @@ mod tests {
             "present + failed must not be LocationMissing"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::Failed,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Failed,
             "present + failed must be Failed coverage"
         );
-        assert!(!result.coverage.empty_result_authoritative);
+        assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6804,16 +6849,19 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Empty);
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
-        assert!(result.coverage.recursive_scope_complete);
-        assert!(result.coverage.empty_result_authoritative);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete
+        );
+        assert!(result.scope_coverage.recursive_scope_complete);
+        assert!(result.scope_coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -6846,15 +6894,18 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
         .expect("read contents");
 
         assert_eq!(result.state, StoreContentsState::Ready);
-        assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
-        assert!(result.coverage.recursive_scope_complete);
+        assert_eq!(
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::Complete
+        );
+        assert!(result.scope_coverage.recursive_scope_complete);
     }
 
     #[test]
@@ -6877,7 +6928,7 @@ mod tests {
                 source_location_id: 100,
             },
             primary_media_policy(),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6889,8 +6940,8 @@ mod tests {
             "direct SourceLocation missing must remain LocationMissing"
         );
         assert_eq!(
-            result.coverage.state,
-            StoreContentsCoverageState::LocationMissing,
+            result.scope_coverage.state,
+            StoreContentsScopeCoverageState::LocationMissing,
             "direct SourceLocation missing coverage must be LocationMissing"
         );
     }
@@ -6919,7 +6970,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
@@ -6965,7 +7016,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             20,
             None,
         )
@@ -7007,7 +7058,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             1,
             None,
         )
@@ -7049,7 +7100,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             None,
         )
@@ -7066,7 +7117,7 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            StoreContentsRecursion::Recursive,
+            StoreContentsScopeDepth::Recursive,
             2,
             Some(&cursor),
         )

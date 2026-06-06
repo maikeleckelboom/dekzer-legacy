@@ -121,7 +121,7 @@ try {
         policy: {
           kind: 'audioBrowse'
         },
-        recursion: 'immediate',
+        scopeDepth: 'immediate',
         limit: 10
       }),
       'readContents audioBrowse Crate',
@@ -159,7 +159,7 @@ try {
           kind: 'sourceFileInventory',
           fileClasses: ['audio']
         },
-        recursion: 'immediate',
+        scopeDepth: 'immediate',
         limit: 10
       }),
       'readContents reopened Crate',

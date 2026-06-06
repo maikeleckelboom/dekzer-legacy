@@ -290,7 +290,7 @@ pub struct SearchNavigationNodeLibraryBrowserWindowReply {
 pub struct ContentsReadRequest {
     pub scope: ContentsScope,
     pub policy: ContentsReadPolicy,
-    pub recursion: ContentsRecursion,
+    pub scope_depth: ContentsScopeDepth,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub limit: Option<usize>,
@@ -392,7 +392,7 @@ pub enum PrimaryMediaKind {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum ContentsRecursion {
+pub enum ContentsScopeDepth {
     Immediate,
     Recursive,
 }
@@ -460,10 +460,10 @@ pub struct ContentsResult {
     pub state: ContentsState,
     pub scope: ContentsScope,
     pub policy: ContentsReadPolicy,
-    pub recursion: ContentsRecursion,
+    pub scope_depth: ContentsScopeDepth,
     pub rows: Vec<ContentsFileRow>,
-    pub coverage: ContentsCoverage,
-    pub has_rows_omitted_by_policy: bool,
+    pub scope_coverage: ContentsScopeCoverage,
+    pub has_policy_omitted_rows: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub next_cursor: Option<String>,
@@ -512,7 +512,7 @@ pub enum ContentsState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum ContentsCoverageState {
+pub enum ContentsScopeCoverageState {
     Complete,
     Pending,
     Scanning,
@@ -535,8 +535,8 @@ pub enum ContentsCoverageState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct ContentsCoverage {
-    pub state: ContentsCoverageState,
+pub struct ContentsScopeCoverage {
+    pub state: ContentsScopeCoverageState,
     pub recursive_scope_complete: bool,
     pub empty_result_authoritative: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2362,30 +2362,30 @@ pub enum SnapshotReadReply {
 mod tests {
     use super::{
         AttachmentIdentity, AttachmentIdentityReadStatus, ChildRowState, ContentsFileClass,
-        ContentsFileKind, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
-        ContentsScope, DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
-        LibraryAssetAvailabilityState, LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
-        LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
-        LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
-        LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
-        LibraryAssetPreparationOutcomeKind, LibraryAssetPreparationOutcomeState,
-        LibraryAssetPreparationRequirementClass, LibraryAssetPreparationSatisfactionState,
-        LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
-        LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
-        LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeFileClass,
-        LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState, LibraryTreeWindow,
-        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigationRow,
-        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PrimaryMediaKind,
-        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
-        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
-        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
-        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
-        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
-        SearchNavigationNodeLibraryBrowserWindowReply,
+        ContentsFileKind, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
+        ContentsScopeDepth, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
+        LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
+        LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
+        LibraryAssetPreparationDetailGroup, LibraryAssetPreparationDetailGroupKey,
+        LibraryAssetPreparationDetailRow, LibraryAssetPreparationOutcomeKind,
+        LibraryAssetPreparationOutcomeState, LibraryAssetPreparationRequirementClass,
+        LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
+        LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
+        LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
+        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage, LibraryTreeCoverageState,
+        LibraryTreeEntryPoint, LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind,
+        LibraryTreePresenceState, LibraryTreeWindow, LoadNavigationRowByStableKeyRequest,
+        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
+        NavigationRowSelectorKind, PrimaryMediaKind, ReadAttachmentSourceFilesReply,
+        ReadAttachmentSourceFilesRequest, ReadLibraryAssetPreparationDetailRequest,
+        ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenReply,
+        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
+        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
+        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply,
+        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
+        ReadTrackIdentityReviewCandidatesRequest, SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
         SourceAccessState, SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
         SourceFileAttachmentLinkStatus, SourceLifecycle, SourceLifecycleIssueKind,
@@ -2581,7 +2581,7 @@ mod tests {
                     source_directory_id: 11,
                 },
                 policy,
-                recursion: ContentsRecursion::Recursive,
+                scope_depth: ContentsScopeDepth::Recursive,
                 limit: Some(25),
                 cursor: Some("opaque-cursor".to_string()),
             };

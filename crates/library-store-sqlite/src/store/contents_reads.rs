@@ -1,5 +1,5 @@
 use crate::read_models::contents::{
-    StoreContentsReadPolicy, StoreContentsRecursion, StoreContentsResult, StoreContentsScope,
+    StoreContentsReadPolicy, StoreContentsResult, StoreContentsScope, StoreContentsScopeDepth,
     read_contents,
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
@@ -11,7 +11,7 @@ impl SqliteDurableStore {
         &self,
         scope: StoreContentsScope,
         policy: StoreContentsReadPolicy,
-        recursion: StoreContentsRecursion,
+        recursion: StoreContentsScopeDepth,
         limit: usize,
         cursor: Option<&str>,
     ) -> LibrarySqliteResult<StoreContentsResult> {

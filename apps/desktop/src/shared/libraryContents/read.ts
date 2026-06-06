@@ -46,7 +46,7 @@ export type ContentsScope =
       readonly sourceDirectoryId: string
     }
 
-export type ContentsRecursion = 'immediate' | 'recursive'
+export type ContentsScopeDepth = 'immediate' | 'recursive'
 
 export type ContentsFileClass = 'audio' | 'video' | 'image' | 'unsupported'
 export type PrimaryMediaKind = 'audio' | 'video'
@@ -80,7 +80,7 @@ export type ContentsReadPolicy =
 export type ContentsReadRequest = {
   readonly scope: ContentsScope
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsRecursion
+  readonly scopeDepth: ContentsScopeDepth
   readonly limit?: number
   readonly cursor?: string
 }
@@ -94,7 +94,7 @@ export type ContentsState =
   | 'blocked'
   | 'failed'
 
-export type ContentsCoverageState =
+export type ContentsScopeCoverageState =
   | 'complete'
   | 'pending'
   | 'scanning'
@@ -104,8 +104,8 @@ export type ContentsCoverageState =
   | 'locationMissing'
   | 'incomplete'
 
-export type ContentsCoverage = {
-  readonly state: ContentsCoverageState
+export type ContentsScopeCoverage = {
+  readonly state: ContentsScopeCoverageState
   readonly recursiveScopeComplete: boolean
   readonly emptyResultAuthoritative: boolean
   readonly detail?: string
@@ -178,10 +178,10 @@ export type ContentsResult = {
   readonly state: ContentsState
   readonly scope: ContentsScope
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsRecursion
+  readonly scopeDepth: ContentsScopeDepth
   readonly rows: readonly ContentsFileRow[]
-  readonly coverage: ContentsCoverage
-  readonly hasRowsOmittedByPolicy: boolean
+  readonly scopeCoverage: ContentsScopeCoverage
+  readonly hasPolicyOmittedRows: boolean
   readonly nextCursor?: string
   readonly detail?: string
 }

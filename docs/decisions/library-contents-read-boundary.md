@@ -136,7 +136,7 @@ The following terms are not used as shared or backend contract concepts:
 type ContentsReadRequest = {
   readonly scope: ContentsScope
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsRecursion
+  readonly recursion: ContentsScopeDepth
   readonly limit?: number
   readonly cursor?: string
 }
@@ -146,7 +146,7 @@ type ContentsScope =
   | { readonly kind: 'sourceLocation'; readonly sourceLocationId: string }
   | { readonly kind: 'directory'; readonly sourceId: string; readonly sourceDirectoryId: string }
 
-type ContentsRecursion = 'immediate' | 'recursive'
+type ContentsScopeDepth = 'immediate' | 'recursive'
 
 type ContentsFileClass = 'audio' | 'video' | 'image' | 'unsupported'
 type PrimaryMediaKind = 'audio' | 'video'
@@ -171,10 +171,10 @@ type ContentsResult = {
   readonly state: ContentsState
   readonly scope: ContentsScope
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsRecursion
+  readonly recursion: ContentsScopeDepth
   readonly rows: readonly ContentsFileRow[]
-  readonly coverage: ContentsCoverage
-  readonly hasRowsOmittedByPolicy: boolean
+  readonly coverage: ContentsScopeCoverage
+  readonly hasPolicyOmittedRows: boolean
   readonly nextCursor?: string
   readonly detail?: string
 }
@@ -188,7 +188,7 @@ type ContentsResult = {
 - Renderer mode names do not cross into backend, shared, protocol, or query code.
 - Renderer sends typed policy, never raw SQL.
 - Backend and query code own profile-specific filtering.
-- Store/service own required scope-level `hasRowsOmittedByPolicy`; renderer does not inspect raw inventory.
+- Store/service own required scope-level `hasPolicyOmittedRows`; renderer does not inspect raw inventory.
 - Renderer does not answer authoritative selected scope contents from loaded hierarchy cache.
 - `playableMediaBrowse` is the default and may include audio and video only.
 - `playableMediaBrowse` has no caller-supplied file class filter.
@@ -205,7 +205,7 @@ type ContentsResult = {
 - Unsupported docs, archives, binaries, unknown files, and `none` files are excluded from normal contents policy.
 - `.m4a` classifies as audio and `.mp4` classifies as video until stronger media-probe authority exists.
 - Incomplete zero-row coverage is not authoritative empty.
-- Complete zero-row results with `hasRowsOmittedByPolicy: true` are empty only for the active policy.
+- Complete zero-row results with `hasPolicyOmittedRows: true` are empty only for the active policy.
 - `primaryMedia` omission metadata is `false` in this slice and never uses raw `source_files` as a proxy.
 - See `docs/library/media-relevant-file-inventory-contract.md` for durable inventory classification.
 - Cursor pagination is implemented; `nextCursor` is produced when more rows exist.

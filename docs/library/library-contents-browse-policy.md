@@ -23,7 +23,7 @@ The renderer requests a policy and presents returned facts. It does not supply `
 
 ## Omission Metadata
 
-Every contents result carries required service-owned `hasRowsOmittedByPolicy: boolean`.
+Every contents result carries required service-owned `hasPolicyOmittedRows: boolean`.
 
 For resolved scopes, the store computes the value across the requested scope and recursion mode, independently of the
 current page:
@@ -46,7 +46,7 @@ Coverage and omission metadata jointly define zero-row presentation:
 - complete coverage without omissions: true empty copy for the active policy.
 
 A folder containing only MP4 files returns video rows under `playableMediaBrowse`. The same folder returns zero rows and
-`hasRowsOmittedByPolicy: true` under `audioBrowse`; it is not presented as truly empty.
+`hasPolicyOmittedRows: true` under `audioBrowse`; it is not presented as truly empty.
 
 ## Other Policies
 

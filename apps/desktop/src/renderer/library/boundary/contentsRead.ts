@@ -4,7 +4,7 @@ import type { Ref } from 'vue'
 import type {
   ContentsReadPolicy,
   ContentsReadResult,
-  ContentsRecursion,
+  ContentsScopeDepth,
   ContentsFileRow
 } from '../../../shared/libraryContents/read'
 import type { RendererApi } from '../../../shared/rendererApi'
@@ -76,12 +76,12 @@ const safeContentsRequestFailure = 'Unable to request library contents.'
 const defaultContentsPolicy: ContentsReadPolicy = {
   kind: 'playableMediaBrowse'
 }
-const contentsRecursion: ContentsRecursion = 'recursive'
+const contentsScopeDepth: ContentsScopeDepth = 'recursive'
 
 type ContentsReadTarget = {
   readonly scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsRecursion
+  readonly scopeDepth: ContentsScopeDepth
   readonly requestKey: string
 }
 
@@ -486,7 +486,7 @@ export function createContentsReadController(
     return contentsApi.read({
       scope: target.scope,
       policy: target.policy,
-      recursion: target.recursion,
+      scopeDepth: target.scopeDepth,
       limit: readLimit,
       ...(cursor === undefined ? {} : { cursor })
     })
@@ -627,8 +627,8 @@ function contentsReadTargetForBinding(
   return {
     scope,
     policy,
-    recursion: contentsRecursion,
-    requestKey: contentsRequestKey(scope, policy, contentsRecursion)
+    scopeDepth: contentsScopeDepth,
+    requestKey: contentsRequestKey(scope, policy, contentsScopeDepth)
   }
 }
 
@@ -669,9 +669,9 @@ function contentsScopeForBinding(
 export function contentsRequestKey(
   scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>,
   policy: ContentsReadPolicy,
-  recursion: ContentsRecursion
+  scopeDepth: ContentsScopeDepth
 ): string {
-  const policyKey = `${contentsPolicyKey(policy)}:${recursion}`
+  const policyKey = `${contentsPolicyKey(policy)}:${scopeDepth}`
 
   switch (scope.kind) {
     case 'source':

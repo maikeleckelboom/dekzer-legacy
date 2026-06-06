@@ -75,7 +75,7 @@ describe('preload renderer API', () => {
         kind: 'primaryMedia' as const,
         mediaKinds: ['audio', 'video'] as const
       },
-      recursion: 'recursive' as const,
+      scopeDepth: 'recursive' as const,
       limit: 100
     }
     const sourceLifecycleRequest = { sourceId: '7' }

@@ -29,14 +29,14 @@ describe('createContentsReadController', () => {
             state: 'empty',
             scope: request.scope,
             policy: request.policy,
-            recursion: request.recursion,
+            scopeDepth: request.scopeDepth,
             rows: [],
-            coverage: {
+            scopeCoverage: {
               state: 'complete',
               recursiveScopeComplete: true,
               emptyResultAuthoritative: true
             },
-            hasRowsOmittedByPolicy: false
+            hasPolicyOmittedRows: false
           }
         }
       }
@@ -55,7 +55,7 @@ describe('createContentsReadController', () => {
       policy: {
         kind: 'playableMediaBrowse'
       },
-      recursion: 'recursive',
+      scopeDepth: 'recursive',
       limit: 100
     })
     expect(capturedRequest?.policy).toEqual({ kind: 'playableMediaBrowse' })
@@ -933,14 +933,14 @@ function readyContents(
       state,
       scope: request.scope,
       policy: request.policy,
-      recursion: request.recursion,
+      scopeDepth: request.scopeDepth,
       rows,
-      coverage: {
+      scopeCoverage: {
         state: 'complete',
         recursiveScopeComplete: true,
         emptyResultAuthoritative: rows.length === 0
       },
-      hasRowsOmittedByPolicy: false,
+      hasPolicyOmittedRows: false,
       ...(nextCursor === undefined ? {} : { nextCursor })
     }
   }

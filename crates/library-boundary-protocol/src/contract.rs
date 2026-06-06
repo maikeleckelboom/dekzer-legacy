@@ -75,7 +75,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ContentsReadPolicy>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileClass>(&cfg, &mut output);
     push_ts_decl::<crate::PrimaryMediaKind>(&cfg, &mut output);
-    push_ts_decl::<crate::ContentsRecursion>(&cfg, &mut output);
+    push_ts_decl::<crate::ContentsScopeDepth>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetWaveformOverviewRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetPreparationDetailRequest>(&cfg, &mut output);
     push_ts_decl::<crate::CommandReply>(&cfg, &mut output);
@@ -154,8 +154,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SourceAttachmentSummary>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsResult>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsState>(&cfg, &mut output);
-    push_ts_decl::<crate::ContentsCoverage>(&cfg, &mut output);
-    push_ts_decl::<crate::ContentsCoverageState>(&cfg, &mut output);
+    push_ts_decl::<crate::ContentsScopeCoverage>(&cfg, &mut output);
+    push_ts_decl::<crate::ContentsScopeCoverageState>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileRow>(&cfg, &mut output);
     push_ts_decl::<crate::PrimaryMediaSummary>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsRowOrigin>(&cfg, &mut output);
@@ -276,7 +276,7 @@ mod tests {
         assert!(ts.contains("LibraryTreeFileClass"));
         assert!(ts.contains("fileClass: ContentsFileClass"));
         assert!(ts.contains("playableMediaBrowse"));
-        assert!(ts.contains("hasRowsOmittedByPolicy: boolean"));
+        assert!(ts.contains("hasPolicyOmittedRows: boolean"));
         assert!(!ts.contains(&["media", "Class"].concat()));
         assert!(!ts.contains(&["Contents", "Media", "Class"].concat()));
         assert!(ts.contains("DirectoryPrimaryMediaState"));
@@ -306,7 +306,7 @@ mod tests {
         assert!(schema.contains("\"readLibraryTreeChildren\""));
         assert!(schema.contains("\"fileClass\""));
         assert!(schema.contains("\"playableMediaBrowse\""));
-        assert!(schema.contains("\"hasRowsOmittedByPolicy\""));
+        assert!(schema.contains("\"hasPolicyOmittedRows\""));
         assert!(!schema.contains(&format!("\"{}\"", ["media", "Class"].concat())));
         assert!(!schema.contains(&format!("\"{}\"", ["Contents", "Media", "Class"].concat())));
         assert!(schema.contains("\"acceptTrackIdentityCandidate\""));

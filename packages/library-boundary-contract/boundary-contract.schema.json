@@ -439,44 +439,6 @@
         "reply"
       ]
     },
-    "ContentsCoverage": {
-      "type": "object",
-      "properties": {
-        "detail": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "emptyResultAuthoritative": {
-          "type": "boolean"
-        },
-        "recursiveScopeComplete": {
-          "type": "boolean"
-        },
-        "state": {
-          "$ref": "#/$defs/ContentsCoverageState"
-        }
-      },
-      "required": [
-        "state",
-        "recursiveScopeComplete",
-        "emptyResultAuthoritative"
-      ]
-    },
-    "ContentsCoverageState": {
-      "type": "string",
-      "enum": [
-        "complete",
-        "pending",
-        "scanning",
-        "blocked",
-        "failed",
-        "sourceUnavailable",
-        "locationMissing",
-        "incomplete"
-      ]
-    },
     "ContentsFileClass": {
       "type": "string",
       "enum": [
@@ -683,39 +645,29 @@
         "policy": {
           "$ref": "#/$defs/ContentsReadPolicy"
         },
-        "recursion": {
-          "$ref": "#/$defs/ContentsRecursion"
-        },
         "scope": {
           "$ref": "#/$defs/ContentsScope"
+        },
+        "scopeDepth": {
+          "$ref": "#/$defs/ContentsScopeDepth"
         }
       },
       "required": [
         "scope",
         "policy",
-        "recursion"
-      ]
-    },
-    "ContentsRecursion": {
-      "type": "string",
-      "enum": [
-        "immediate",
-        "recursive"
+        "scopeDepth"
       ]
     },
     "ContentsResult": {
       "type": "object",
       "properties": {
-        "coverage": {
-          "$ref": "#/$defs/ContentsCoverage"
-        },
         "detail": {
           "type": [
             "string",
             "null"
           ]
         },
-        "hasRowsOmittedByPolicy": {
+        "hasPolicyOmittedRows": {
           "type": "boolean"
         },
         "nextCursor": {
@@ -727,9 +679,6 @@
         "policy": {
           "$ref": "#/$defs/ContentsReadPolicy"
         },
-        "recursion": {
-          "$ref": "#/$defs/ContentsRecursion"
-        },
         "rows": {
           "type": "array",
           "items": {
@@ -739,6 +688,12 @@
         "scope": {
           "$ref": "#/$defs/ContentsScope"
         },
+        "scopeCoverage": {
+          "$ref": "#/$defs/ContentsScopeCoverage"
+        },
+        "scopeDepth": {
+          "$ref": "#/$defs/ContentsScopeDepth"
+        },
         "state": {
           "$ref": "#/$defs/ContentsState"
         }
@@ -747,10 +702,10 @@
         "state",
         "scope",
         "policy",
-        "recursion",
+        "scopeDepth",
         "rows",
-        "coverage",
-        "hasRowsOmittedByPolicy"
+        "scopeCoverage",
+        "hasPolicyOmittedRows"
       ]
     },
     "ContentsRowOrigin": {
@@ -839,6 +794,51 @@
             "payload"
           ]
         }
+      ]
+    },
+    "ContentsScopeCoverage": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emptyResultAuthoritative": {
+          "type": "boolean"
+        },
+        "recursiveScopeComplete": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/$defs/ContentsScopeCoverageState"
+        }
+      },
+      "required": [
+        "state",
+        "recursiveScopeComplete",
+        "emptyResultAuthoritative"
+      ]
+    },
+    "ContentsScopeCoverageState": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "pending",
+        "scanning",
+        "blocked",
+        "failed",
+        "sourceUnavailable",
+        "locationMissing",
+        "incomplete"
+      ]
+    },
+    "ContentsScopeDepth": {
+      "type": "string",
+      "enum": [
+        "immediate",
+        "recursive"
       ]
     },
     "ContentsState": {

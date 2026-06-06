@@ -719,7 +719,7 @@ function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['stat
   switch (result.state) {
     case 'ready':
     case 'empty':
-      return result.coverage.state === 'complete' ? 'empty' : 'loading'
+      return result.scopeCoverage.state === 'complete' ? 'empty' : 'loading'
     case 'partial':
       // Partial coverage can legitimately contain zero known rows while scanning is incomplete.
       return 'loading'
@@ -736,10 +736,10 @@ function contentsStateLabel(result: ContentsResult): string {
   switch (result.state) {
     case 'ready':
     case 'empty':
-      if (result.coverage.state !== 'complete') {
+      if (result.scopeCoverage.state !== 'complete') {
         return 'Still indexing'
       }
-      return result.hasRowsOmittedByPolicy
+      return result.hasPolicyOmittedRows
         ? policyEmptyLabel(result.policy)
         : trueEmptyLabel(result.policy)
     case 'partial':
@@ -843,11 +843,11 @@ function contentsCoveragePrefix(result: ContentsResult): string | undefined {
     return 'Still indexing. Results may be incomplete.'
   }
 
-  if (result.coverage.state === 'pending' || result.coverage.state === 'scanning') {
+  if (result.scopeCoverage.state === 'pending' || result.scopeCoverage.state === 'scanning') {
     return 'Indexing is incomplete.'
   }
 
-  if (result.coverage.state === 'incomplete') {
+  if (result.scopeCoverage.state === 'incomplete') {
     return 'One or more accepted source locations are missing. Results may be incomplete.'
   }
 

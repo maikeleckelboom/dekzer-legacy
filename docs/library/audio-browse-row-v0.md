@@ -53,7 +53,7 @@ boundary:
 - result policy;
 - recursion;
 - coverage;
-- required service-owned `hasRowsOmittedByPolicy`;
+- required service-owned `hasPolicyOmittedRows`;
 - cursor.
 
 Normalized extension, source display label, source-location provenance, source-file row version, and container/codec are
@@ -64,7 +64,7 @@ not V0 fields.
 | Surface                   | Current authority                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Store read model          | `StoreContentsFileRow` owns `id`, `source_id`, `source_file_id`, `parent_directory_id`, `label`, `relative_path`, `file_name`, `file_class`, `file_kind`, `presence`, `availability_state`, `primary_media`, `updated_at`, and internal `relative_path_browse_sort_key`. Source-file profile SQL returns source-file facts and `NULL` primary-media fields. |
-| Rust boundary protocol    | `ContentsReadRequest` owns `scope`, `policy`, `recursion`, `limit`, and `cursor`. `ContentsResult` owns `state`, echoed `scope`, echoed `policy`, echoed `recursion`, `rows`, `coverage`, required `hasRowsOmittedByPolicy`, optional `nextCursor`, and optional `detail`. `ContentsFileRow` owns the current row fields listed above.                      |
+| Rust boundary protocol    | `ContentsReadRequest` owns `scope`, `policy`, `recursion`, `limit`, and `cursor`. `ContentsResult` owns `state`, echoed `scope`, echoed `policy`, echoed `recursion`, `rows`, `coverage`, required `hasPolicyOmittedRows`, optional `nextCursor`, and optional `detail`. `ContentsFileRow` owns the current row fields listed above.                      |
 | Generated TS contract     | `packages/library-boundary-contract` mirrors the Rust protocol. `ContentsReadPolicy` is the `playableMediaBrowse`, `audioBrowse`, `sourceFileInventory`, or `primaryMedia` union. No dedicated generated `AudioBrowseRow` type exists.                                                                                                                      |
 | TS boundary client        | `LibraryBoundaryClient.readContents` sends the existing `snapshotRead/contentsRead` command and expects the existing `contents` reply. It adds no row authority.                                                                                                                                                                                            |
 | Desktop main adapter      | `apps/desktop/src/main/libraryContents/read.ts` normalizes scope, policy, recursion, limit, and cursor, maps generated `ContentsFileRow` into shared `ContentsFileRow`, and rejects invalid image/unsupported primary-media combinations. It adds no browse-field authority.                                                                                |
@@ -72,11 +72,11 @@ not V0 fields.
 | Renderer projection       | `contents/projection.ts` maps rows to `ContentRow` display rows with `id`, `label`, `presence`, `detail`, `icon`, `fileClass`, and `availabilityState`. Its relative-path fallback and file-class labels are presentation, not durable field authority.                                                                                                     |
 | Table display             | `contents/table.vue` displays `Name` and `Details` columns. It does not display extension, source label, source-location provenance, row version, container, or codec.                                                                                                                                                                                      |
 | Cursor fields             | Cursor identity is store-owned and binds version, scope, the full profile-specific policy, recursion, and row order position. `audioBrowse` has a distinct policy identity from `sourceFileInventory` and reuses the source-file order position: `relative_path_browse_sort_key`, `relative_path`, and `source_file_id`.                                    |
-| Coverage fields           | `ContentsCoverage` owns `state`, `recursiveScopeComplete`, `emptyResultAuthoritative`, and optional `detail`; incomplete, scanning, blocked, failed, unavailable, and missing-location cases must not become authoritative empty results.                                                                                                                   |
+| Coverage fields           | `ContentsScopeCoverage` owns `state`, `recursiveScopeComplete`, `emptyResultAuthoritative`, and optional `detail`; incomplete, scanning, blocked, failed, unavailable, and missing-location cases must not become authoritative empty results.                                                                                                                   |
 | Scope fields              | Contents scope supports source, source location, and directory. Directory scope carries `sourceId` and `sourceDirectoryId`; source-location scope carries `sourceLocationId`. Rows do not carry per-row source-location provenance.                                                                                                                         |
 | Stable row identity       | Current source-file rows use `source-file:{source_file_id}`. Primary-media rows may use primary-media or library-asset identities, but those are not V0 audio browse row identities.                                                                                                                                                                        |
 | Display fields            | Current display authority is `label`, `fileName`, `relativePath`, `fileClass`, `fileKind`, `presence`, and optional `availabilityState`.                                                                                                                                                                                                                    |
-| Provenance fields         | Current per-row provenance is `sourceId`, `sourceFileId`, `parentDirectoryId`, and `relativePath`. Scope-level provenance is in `ContentsResult.scope`; coverage-level provenance is in `ContentsCoverage`.                                                                                                                                                 |
+| Provenance fields         | Current per-row provenance is `sourceId`, `sourceFileId`, `parentDirectoryId`, and `relativePath`. Scope-level provenance is in `ContentsResult.scope`; coverage-level provenance is in `ContentsScopeCoverage`.                                                                                                                                                 |
 | State fields              | Row state is `presence`, optional `availabilityState`, and optional `updatedAtMs`. Result state is `ContentsResult.state`, coverage, detail, and cursor.                                                                                                                                                                                                    |
 
 ## Field Authority Matrix
@@ -138,7 +138,7 @@ The implementation uses the `ContentsReadPolicy` union and keeps the existing `C
 This is the smallest correct boundary because it preserves:
 
 - cursor compatibility by extending the existing cursor identity model with a distinct profile kind;
-- coverage compatibility by reusing `ContentsCoverage`;
+- coverage compatibility by reusing `ContentsScopeCoverage`;
 - source, source-location, and directory scope compatibility;
 - recursive contents browse behavior;
 - source-file audio parity without making source-file rows canonical tracks;
@@ -172,10 +172,10 @@ Keeping only source-file rows leaves the audio-only read-model concept expressed
 - Audio browse rows never carry primary-media summary fields, canonical track identity, preparation summaries, waveform,
   stems, BPM, key, duration, artwork, CUE association, tags, notes, crates, sleeves, routes, or cloud/streaming state.
 - Cursor identity includes the audio browse profile and cannot mix source-file, primary-media, and audio-browse pages.
-- Coverage, required `hasRowsOmittedByPolicy`, blocked, failed, scanning, incomplete, source-unavailable, and
+- Coverage, required `hasPolicyOmittedRows`, blocked, failed, scanning, incomplete, source-unavailable, and
   location-missing semantics remain service-owned.
 - MP4/video rows never enter `audioBrowse`; an MP4-only resolved scope returns zero rows with
-  `hasRowsOmittedByPolicy: true`.
+  `hasPolicyOmittedRows: true`.
 - Source-file rows are not added back to tree navigation.
 - Renderer does not filter, sort, or derive authoritative audio browse fields.
 

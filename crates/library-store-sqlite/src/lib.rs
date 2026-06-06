@@ -65,10 +65,10 @@ pub use read_models::attachment_identity::{
     get_source_files_for_attachment, get_source_files_for_attachment_limited,
 };
 pub use read_models::contents::{
-    StoreContentsCoverage, StoreContentsCoverageState, StoreContentsFileClass,
-    StoreContentsFileRow, StoreContentsReadPolicy, StoreContentsRecursion, StoreContentsResult,
-    StoreContentsRowOrigin, StoreContentsScope, StoreContentsState, StorePrimaryMediaKind,
-    StorePrimaryMediaSummary,
+    StoreContentsFileClass, StoreContentsFileRow, StoreContentsReadPolicy, StoreContentsResult,
+    StoreContentsRowOrigin, StoreContentsScope, StoreContentsScopeCoverage,
+    StoreContentsScopeCoverageState, StoreContentsScopeDepth, StoreContentsState,
+    StorePrimaryMediaKind, StorePrimaryMediaSummary,
 };
 pub use read_models::library_asset_preparation_detail::{
     StoreLibraryAssetPreparationDetail, StoreLibraryAssetPreparationDetailGroup,

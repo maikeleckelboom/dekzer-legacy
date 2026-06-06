@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import type {
-  ContentsCoverage,
+  ContentsScopeCoverage,
   ContentsReadReply,
   ContentsReadRequest
 } from '@dekzer/library-boundary-contract'
@@ -63,7 +63,7 @@ describe('contents reads through the host', () => {
               kind: 'sourceFileInventory',
               fileClasses: ['audio', 'image', 'unsupported']
             },
-            recursion: 'recursive',
+            scopeDepth: 'recursive',
             limit: 50
           } satisfies ContentsReadRequest)
 
@@ -82,7 +82,7 @@ describe('contents reads through the host', () => {
           kind: 'sourceFileInventory',
           fileClasses: ['audio', 'image', 'unsupported']
         },
-        recursion: 'recursive',
+        scopeDepth: 'recursive',
         rows: [
           {
             id: 'source-file:12',
@@ -103,10 +103,10 @@ describe('contents reads through the host', () => {
             state: 'policyConflict',
             scope: request.scope,
             policy: request.policy,
-            recursion: request.recursion,
+            scopeDepth: request.scopeDepth,
             rows: [],
-            coverage: completeCoverage(),
-            hasRowsOmittedByPolicy: false,
+            scopeCoverage: completeCoverage(),
+            hasPolicyOmittedRows: false,
             detail: 'primaryMedia rows do not support image media kinds.'
           }
         })
@@ -120,7 +120,7 @@ describe('contents reads through the host', () => {
           kind: 'primaryMedia',
           mediaKinds: ['audio']
         },
-        recursion: 'recursive'
+        scopeDepth: 'recursive'
       })
     ).resolves.toMatchObject({
       state: 'policyConflict',
@@ -137,7 +137,7 @@ describe('contents reads through the host', () => {
           kind: 'sourceFileInventory',
           fileClasses: []
         },
-        recursion: 'recursive'
+        scopeDepth: 'recursive'
       })
     ).resolves.toMatchObject({
       state: 'invalidRequest',
@@ -151,7 +151,7 @@ describe('contents reads through the host', () => {
           kind: 'sourceFileInventory',
           fileClasses: 'audio'
         },
-        recursion: 'recursive'
+        scopeDepth: 'recursive'
       })
     ).resolves.toMatchObject({
       state: 'invalidRequest',
@@ -165,7 +165,7 @@ describe('contents reads through the host', () => {
           kind: 'sourceFileInventory',
           fileClasses: ['none']
         },
-        recursion: 'recursive'
+        scopeDepth: 'recursive'
       })
     ).resolves.toMatchObject({
       state: 'invalidRequest',
@@ -207,14 +207,14 @@ describe('contents reads through the host', () => {
               state: 'empty',
               scope: request.scope,
               policy: request.policy,
-              recursion: request.recursion,
+              scopeDepth: request.scopeDepth,
               rows: [],
-              coverage: {
+              scopeCoverage: {
                 state: 'complete',
                 recursiveScopeComplete: true,
                 emptyResultAuthoritative: true
               },
-              hasRowsOmittedByPolicy: false
+              hasPolicyOmittedRows: false
             }
           }
         }
@@ -227,7 +227,7 @@ describe('contents reads through the host', () => {
         policy: {
           kind: 'audioBrowse'
         },
-        recursion: 'recursive',
+        scopeDepth: 'recursive',
         limit: 25
       })
     ).resolves.toMatchObject({
@@ -253,14 +253,14 @@ describe('contents reads through the host', () => {
               state: 'empty',
               scope: request.scope,
               policy: request.policy,
-              recursion: request.recursion,
+              scopeDepth: request.scopeDepth,
               rows: [],
-              coverage: {
+              scopeCoverage: {
                 state: 'complete',
                 recursiveScopeComplete: true,
                 emptyResultAuthoritative: false
               },
-              hasRowsOmittedByPolicy: true
+              hasPolicyOmittedRows: true
             }
           }
         }
@@ -271,13 +271,13 @@ describe('contents reads through the host', () => {
       readContentsThroughHost(successHost, {
         scope: { kind: 'source', sourceId: '7' },
         policy: { kind: 'playableMediaBrowse' },
-        recursion: 'recursive'
+        scopeDepth: 'recursive'
       })
     ).resolves.toMatchObject({
       state: 'ready',
       result: {
         policy: { kind: 'playableMediaBrowse' },
-        hasRowsOmittedByPolicy: true
+        hasPolicyOmittedRows: true
       }
     })
   })
@@ -293,7 +293,7 @@ function sourceLocationRequest(): Parameters<typeof readContentsThroughHost>[1] 
       kind: 'sourceFileInventory',
       fileClasses: ['unsupported', 'image', 'audio', 'image']
     },
-    recursion: 'recursive',
+    scopeDepth: 'recursive',
     limit: 50
   }
 }
@@ -304,7 +304,7 @@ function readyContentsReply(request: ContentsReadRequest): ContentsReadReply {
       state: 'ready',
       scope: request.scope,
       policy: request.policy,
-      recursion: request.recursion,
+      scopeDepth: request.scopeDepth,
       rows: [
         {
           id: 'source-file:12',
@@ -320,13 +320,13 @@ function readyContentsReply(request: ContentsReadRequest): ContentsReadReply {
           updatedAtMs: 100
         }
       ],
-      coverage: completeCoverage(),
-      hasRowsOmittedByPolicy: false
+      scopeCoverage: completeCoverage(),
+      hasPolicyOmittedRows: false
     }
   }
 }
 
-function completeCoverage(): ContentsCoverage {
+function completeCoverage(): ContentsScopeCoverage {
   return {
     state: 'complete',
     recursiveScopeComplete: true,

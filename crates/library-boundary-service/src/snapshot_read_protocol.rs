@@ -99,11 +99,11 @@ pub(crate) fn store_contents_policy(
 }
 
 pub(crate) const fn store_contents_recursion(
-    recursion: protocol::ContentsRecursion,
-) -> store::StoreContentsRecursion {
+    recursion: protocol::ContentsScopeDepth,
+) -> store::StoreContentsScopeDepth {
     match recursion {
-        protocol::ContentsRecursion::Immediate => store::StoreContentsRecursion::Immediate,
-        protocol::ContentsRecursion::Recursive => store::StoreContentsRecursion::Recursive,
+        protocol::ContentsScopeDepth::Immediate => store::StoreContentsScopeDepth::Immediate,
+        protocol::ContentsScopeDepth::Recursive => store::StoreContentsScopeDepth::Recursive,
     }
 }
 
@@ -1025,19 +1025,19 @@ fn map_contents_result(
         state: map_contents_state(result.state),
         scope: map_contents_scope(result.scope),
         policy: map_contents_policy(result.policy),
-        recursion: map_contents_recursion(result.recursion),
+        scope_depth: map_contents_recursion(result.scope_depth),
         rows: result
             .rows
             .into_iter()
             .map(map_contents_row)
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
-        coverage: protocol::ContentsCoverage {
-            state: map_contents_coverage_state(result.coverage.state),
-            recursive_scope_complete: result.coverage.recursive_scope_complete,
-            empty_result_authoritative: result.coverage.empty_result_authoritative,
-            detail: result.coverage.detail,
+        scope_coverage: protocol::ContentsScopeCoverage {
+            state: map_contents_coverage_state(result.scope_coverage.state),
+            recursive_scope_complete: result.scope_coverage.recursive_scope_complete,
+            empty_result_authoritative: result.scope_coverage.empty_result_authoritative,
+            detail: result.scope_coverage.detail,
         },
-        has_rows_omitted_by_policy: result.has_rows_omitted_by_policy,
+        has_policy_omitted_rows: result.has_policy_omitted_rows,
         next_cursor: result.next_cursor,
         detail: result.detail,
     })
@@ -1069,11 +1069,11 @@ fn map_contents_policy(policy: store::StoreContentsReadPolicy) -> protocol::Cont
 }
 
 const fn map_contents_recursion(
-    recursion: store::StoreContentsRecursion,
-) -> protocol::ContentsRecursion {
+    recursion: store::StoreContentsScopeDepth,
+) -> protocol::ContentsScopeDepth {
     match recursion {
-        store::StoreContentsRecursion::Immediate => protocol::ContentsRecursion::Immediate,
-        store::StoreContentsRecursion::Recursive => protocol::ContentsRecursion::Recursive,
+        store::StoreContentsScopeDepth::Immediate => protocol::ContentsScopeDepth::Immediate,
+        store::StoreContentsScopeDepth::Recursive => protocol::ContentsScopeDepth::Recursive,
     }
 }
 
@@ -1130,22 +1130,32 @@ const fn map_contents_state(state: store::StoreContentsState) -> protocol::Conte
 }
 
 const fn map_contents_coverage_state(
-    state: store::StoreContentsCoverageState,
-) -> protocol::ContentsCoverageState {
+    state: store::StoreContentsScopeCoverageState,
+) -> protocol::ContentsScopeCoverageState {
     match state {
-        store::StoreContentsCoverageState::Complete => protocol::ContentsCoverageState::Complete,
-        store::StoreContentsCoverageState::Pending => protocol::ContentsCoverageState::Pending,
-        store::StoreContentsCoverageState::Scanning => protocol::ContentsCoverageState::Scanning,
-        store::StoreContentsCoverageState::Blocked => protocol::ContentsCoverageState::Blocked,
-        store::StoreContentsCoverageState::Failed => protocol::ContentsCoverageState::Failed,
-        store::StoreContentsCoverageState::SourceUnavailable => {
-            protocol::ContentsCoverageState::SourceUnavailable
+        store::StoreContentsScopeCoverageState::Complete => {
+            protocol::ContentsScopeCoverageState::Complete
         }
-        store::StoreContentsCoverageState::LocationMissing => {
-            protocol::ContentsCoverageState::LocationMissing
+        store::StoreContentsScopeCoverageState::Pending => {
+            protocol::ContentsScopeCoverageState::Pending
         }
-        store::StoreContentsCoverageState::Incomplete => {
-            protocol::ContentsCoverageState::Incomplete
+        store::StoreContentsScopeCoverageState::Scanning => {
+            protocol::ContentsScopeCoverageState::Scanning
+        }
+        store::StoreContentsScopeCoverageState::Blocked => {
+            protocol::ContentsScopeCoverageState::Blocked
+        }
+        store::StoreContentsScopeCoverageState::Failed => {
+            protocol::ContentsScopeCoverageState::Failed
+        }
+        store::StoreContentsScopeCoverageState::SourceUnavailable => {
+            protocol::ContentsScopeCoverageState::SourceUnavailable
+        }
+        store::StoreContentsScopeCoverageState::LocationMissing => {
+            protocol::ContentsScopeCoverageState::LocationMissing
+        }
+        store::StoreContentsScopeCoverageState::Incomplete => {
+            protocol::ContentsScopeCoverageState::Incomplete
         }
     }
 }
@@ -1776,22 +1786,22 @@ mod tests {
                 state: store::StoreContentsState::Empty,
                 scope: store::StoreContentsScope::Source { source_id: 7 },
                 policy: store_policy,
-                recursion: store::StoreContentsRecursion::Recursive,
+                scope_depth: store::StoreContentsScopeDepth::Recursive,
                 rows: Vec::new(),
-                coverage: store::StoreContentsCoverage {
-                    state: store::StoreContentsCoverageState::Complete,
+                scope_coverage: store::StoreContentsScopeCoverage {
+                    state: store::StoreContentsScopeCoverageState::Complete,
                     recursive_scope_complete: true,
                     empty_result_authoritative: false,
                     detail: None,
                 },
-                has_rows_omitted_by_policy: true,
+                has_policy_omitted_rows: true,
                 next_cursor: None,
                 detail: None,
             })
             .expect("map contents reply");
 
             assert_eq!(reply.result.policy, protocol_policy);
-            assert!(reply.result.has_rows_omitted_by_policy);
+            assert!(reply.result.has_policy_omitted_rows);
         }
     }
 }

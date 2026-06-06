@@ -116,7 +116,7 @@ Two distinct read boundaries are active in the first slice:
 The hierarchy read returns `LibraryTreeWindow` rows with `totalRows`, `nextOffset`, and a
 `LibraryTreeCoverage` containing `emptyResultAuthoritative`. In shared TS, the post-mapping
 equivalents are `ChildWindow` for the window and `ChildRow` for individual child rows. The contents read returns `ContentsResult`
-rows with `nextCursor` and `ContentsCoverage` containing `emptyResultAuthoritative`.
+rows with `nextCursor` and `ContentsScopeCoverage` containing `emptyResultAuthoritative`.
 
 These two boundaries must not share pagination state, cursor/offset tokens, cache entries, or row accumulators.
 Hierarchy pagination (`loadChildren`/`loadMore`) and contents pagination (`loadContentsPage`) are distinct.

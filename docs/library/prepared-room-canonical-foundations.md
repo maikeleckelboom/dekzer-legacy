@@ -309,7 +309,7 @@ This is the substrate requirement behind the "search must not erase spatial cont
 
 ### Constraint 3 — Content policy is applied at scope boundaries, not universally
 
-`hasRowsOmittedByPolicy` and policy filtering (audioBrowse, future playableMediaBrowse) apply at Cold Archive and Nearby
+`hasPolicyOmittedRows` and policy filtering (audioBrowse, future playableMediaBrowse) apply at Cold Archive and Nearby
 Reserve browse boundaries. They do not apply when reading the contents of a CrateZone or a Prepared Room's internal
 structure.
 

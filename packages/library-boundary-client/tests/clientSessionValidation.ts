@@ -903,14 +903,14 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
             policy: {
               kind: 'audioBrowse'
             },
-            recursion: 'recursive',
+            scopeDepth: 'recursive',
             rows: [],
-            coverage: {
+            scopeCoverage: {
               state: 'complete',
               recursiveScopeComplete: true,
               emptyResultAuthoritative: true
             },
-            hasRowsOmittedByPolicy: false
+            hasPolicyOmittedRows: false
           }
         }
       }
@@ -926,7 +926,7 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
     policy: {
       kind: 'audioBrowse'
     },
-    recursion: 'recursive',
+    scopeDepth: 'recursive',
     limit: 25
   })
 
@@ -944,7 +944,7 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
           policy: {
             kind: 'audioBrowse'
           },
-          recursion: 'recursive',
+          scopeDepth: 'recursive',
           limit: 25
         }
       }

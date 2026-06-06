@@ -429,8 +429,8 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::read_models::contents::{
-        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRecursion,
-        StoreContentsRowOrigin, StoreContentsScope, StoreContentsState, StorePrimaryMediaKind,
+        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRowOrigin,
+        StoreContentsScope, StoreContentsScopeDepth, StoreContentsState, StorePrimaryMediaKind,
     };
     use crate::{PromotePrimaryMediaForSourceResult, SqliteDurableStore};
 
@@ -939,7 +939,7 @@ mod tests {
                     source_id: fixture.source_id,
                 },
                 primary_media_policy(),
-                StoreContentsRecursion::Recursive,
+                StoreContentsScopeDepth::Recursive,
                 10,
                 None,
             )
@@ -979,7 +979,7 @@ mod tests {
                         StoreContentsFileClass::Unsupported,
                     ],
                 },
-                StoreContentsRecursion::Recursive,
+                StoreContentsScopeDepth::Recursive,
                 10,
                 None,
             )

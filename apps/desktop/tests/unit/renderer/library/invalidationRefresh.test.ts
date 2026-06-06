@@ -272,7 +272,7 @@ describe('executeRefreshPlan', () => {
         result: {
           state: 'partial',
           rows: [],
-          coverage: {
+          scopeCoverage: {
             state: 'scanning',
             emptyResultAuthoritative: false
           }
@@ -299,13 +299,13 @@ describe('executeRefreshPlan', () => {
       {
         scope: { kind: 'source', sourceId: '7' },
         policy: { kind: 'playableMediaBrowse' },
-        recursion: 'recursive',
+        scopeDepth: 'recursive',
         limit: 100
       },
       {
         scope: { kind: 'source', sourceId: '7' },
         policy: { kind: 'playableMediaBrowse' },
-        recursion: 'recursive',
+        scopeDepth: 'recursive',
         limit: 100
       }
     ])
@@ -376,14 +376,14 @@ function readyContentsResult(
       state,
       scope: { kind: 'source', sourceId: '7' },
       policy: { kind: 'playableMediaBrowse' },
-      recursion: 'recursive',
+      scopeDepth: 'recursive',
       rows,
-      coverage: {
+      scopeCoverage: {
         state: state === 'partial' ? 'scanning' : 'complete',
         recursiveScopeComplete: state === 'ready',
         emptyResultAuthoritative: false
       },
-      hasRowsOmittedByPolicy: false
+      hasPolicyOmittedRows: false
     }
   }
 }

@@ -207,17 +207,17 @@ describe('projectContents', () => {
           state: 'ready',
           scope: { kind: 'source', sourceId: '7' },
           policy: { kind: 'primaryMedia', mediaKinds: ['audio', 'video'] },
-          recursion: 'recursive',
+          scopeDepth: 'recursive',
           rows: [
             primaryMediaRow('asset-1', 'track.wav', 'audio'),
             primaryMediaRow('asset-2', 'clip.mp4', 'audio')
           ],
-          coverage: {
+          scopeCoverage: {
             state: 'complete',
             recursiveScopeComplete: true,
             emptyResultAuthoritative: true
           },
-          hasRowsOmittedByPolicy: false,
+          hasPolicyOmittedRows: false,
           nextCursor: 'c2Y6...'
         }
       }
@@ -256,14 +256,14 @@ describe('projectContents', () => {
           state: 'ready',
           scope: { kind: 'source', sourceId: '7' },
           policy: { kind: 'primaryMedia', mediaKinds: ['audio', 'video'] },
-          recursion: 'recursive',
+          scopeDepth: 'recursive',
           rows: [primaryMediaRow('c', 'third.wav', 'audio')],
-          coverage: {
+          scopeCoverage: {
             state: 'complete',
             recursiveScopeComplete: true,
             emptyResultAuthoritative: true
           },
-          hasRowsOmittedByPolicy: false,
+          hasPolicyOmittedRows: false,
           nextCursor: 'c2Y6...'
         }
       }
@@ -320,14 +320,14 @@ describe('projectContents', () => {
           state: 'partial',
           scope: { kind: 'source', sourceId: '7' },
           policy: { kind: 'audioBrowse' },
-          recursion: 'recursive',
+          scopeDepth: 'recursive',
           rows: [],
-          coverage: {
+          scopeCoverage: {
             state: 'scanning',
             recursiveScopeComplete: false,
             emptyResultAuthoritative: false
           },
-          hasRowsOmittedByPolicy: false
+          hasPolicyOmittedRows: false
         }
       }
     })
@@ -965,9 +965,9 @@ function contentsResult(options: {
     state,
     scope: { kind: 'source', sourceId: '7' },
     policy,
-    recursion: 'recursive',
+    scopeDepth: 'recursive',
     rows: options.rows,
-    coverage: {
+    scopeCoverage: {
       state:
         state === 'failed'
           ? 'failed'
@@ -979,7 +979,7 @@ function contentsResult(options: {
       recursiveScopeComplete: state !== 'partial',
       emptyResultAuthoritative: options.emptyAuthoritative ?? state !== 'partial'
     },
-    hasRowsOmittedByPolicy: options.omittedRows ?? false,
+    hasPolicyOmittedRows: options.omittedRows ?? false,
     ...(options.detail === undefined ? {} : { detail: options.detail })
   }
 }

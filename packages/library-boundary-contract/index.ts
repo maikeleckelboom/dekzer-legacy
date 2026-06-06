@@ -99,7 +99,7 @@ export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: s
 
 export type SearchNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, query: string, offset: number, limit: number, };
 
-export type ContentsReadRequest = { scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, limit?: number, cursor?: string, };
+export type ContentsReadRequest = { scope: ContentsScope, policy: ContentsReadPolicy, scopeDepth: ContentsScopeDepth, limit?: number, cursor?: string, };
 
 export type ContentsScope = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
 
@@ -109,7 +109,7 @@ export type ContentsFileClass = "audio" | "video" | "image" | "unsupported";
 
 export type PrimaryMediaKind = "audio" | "video";
 
-export type ContentsRecursion = "immediate" | "recursive";
+export type ContentsScopeDepth = "immediate" | "recursive";
 
 export type ReadLibraryAssetWaveformOverviewRequest = { libraryAssetId: string, };
 
@@ -282,13 +282,13 @@ export type SourceFileAttachmentLinkStatus = "current" | "stale";
 
 export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
 
-export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, rows: Array<ContentsFileRow>, coverage: ContentsCoverage, hasRowsOmittedByPolicy: boolean, nextCursor?: string, detail?: string, };
+export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, scopeDepth: ContentsScopeDepth, rows: Array<ContentsFileRow>, scopeCoverage: ContentsScopeCoverage, hasPolicyOmittedRows: boolean, nextCursor?: string, detail?: string, };
 
 export type ContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed" | "policyConflict" | "cursorInvalid";
 
-export type ContentsCoverage = { state: ContentsCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
+export type ContentsScopeCoverage = { state: ContentsScopeCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
 
-export type ContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
+export type ContentsScopeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
 
 export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, availabilityState?: LibraryAssetAvailabilityState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
 

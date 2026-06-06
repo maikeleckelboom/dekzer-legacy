@@ -631,7 +631,7 @@ impl LibraryBoundaryService {
             .read_contents(
                 store_contents_scope(request.scope),
                 store_contents_policy(request.policy),
-                store_contents_recursion(request.recursion),
+                store_contents_recursion(request.scope_depth),
                 limit,
                 request.cursor.as_deref(),
             )
@@ -1298,8 +1298,8 @@ mod tests {
     use library_boundary_protocol::{
         AcceptTrackIdentityCandidateRequest, AttachmentIdentityReadStatus, CancelRootScanReply,
         CancelRootScanRequest, CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest,
-        ContentsFileClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
-        ContentsScope, CreatePlaylistReply, CreatePlaylistRequest,
+        ContentsFileClass, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
+        ContentsScopeDepth, CreatePlaylistReply, CreatePlaylistRequest,
         DeferTrackIdentityCandidateRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
         HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
@@ -1541,7 +1541,7 @@ mod tests {
                     source_id: registered.root_id,
                 },
                 policy: ContentsReadPolicy::PlayableMediaBrowse,
-                recursion: ContentsRecursion::Recursive,
+                scope_depth: ContentsScopeDepth::Recursive,
                 limit: Some(10),
                 cursor: None,
             })
@@ -1563,7 +1563,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![ContentsFileClass::Video, ContentsFileClass::Audio]
         );
-        assert!(playable.has_rows_omitted_by_policy);
+        assert!(playable.has_policy_omitted_rows);
 
         let audio = service
             .read_contents(ContentsReadRequest {
@@ -1571,7 +1571,7 @@ mod tests {
                     source_id: registered.root_id,
                 },
                 policy: ContentsReadPolicy::AudioBrowse,
-                recursion: ContentsRecursion::Recursive,
+                scope_depth: ContentsScopeDepth::Recursive,
                 limit: Some(10),
                 cursor: None,
             })
@@ -1580,7 +1580,7 @@ mod tests {
         assert_eq!(audio.rows.len(), 1);
         assert_eq!(audio.rows[0].file_name, "track.m4a");
         assert_eq!(audio.rows[0].file_class, ContentsFileClass::Audio);
-        assert!(audio.has_rows_omitted_by_policy);
+        assert!(audio.has_policy_omitted_rows);
     }
 
     fn expect_success(outcome: CommandOutcome) -> CommandReply {
@@ -2012,7 +2012,7 @@ mod tests {
                         ContentsFileClass::Unsupported,
                     ],
                 },
-                recursion: ContentsRecursion::Recursive,
+                scope_depth: ContentsScopeDepth::Recursive,
                 limit: Some(200),
                 cursor: None,
             })

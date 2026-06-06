@@ -112,7 +112,7 @@ future media-probe authority establishes a different product policy; it never wi
 
 ### Policy Omission Metadata
 
-`ContentsResult.hasRowsOmittedByPolicy` is required and service-owned. It is a scope-level boolean, not a page-local
+`ContentsResult.hasPolicyOmittedRows` is required and service-owned. It is a scope-level boolean, not a page-local
 count. The store applies the same scope, recursion, presence, and policy universe used by the read.
 
 - `playableMediaBrowse` omission candidates are browse-relevant images.

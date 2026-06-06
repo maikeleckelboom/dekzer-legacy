@@ -11,14 +11,14 @@ import { LibraryBoundaryHostError } from '../libraryBoundary/errors'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryBoundary/host'
 import {
   contentsReadChannels,
-  type ContentsCoverage,
+  type ContentsScopeCoverage,
   type ContentsFileClass,
   type ContentsFileRow,
   type ContentsReadErrorCode,
   type ContentsReadErrorState,
   type ContentsReadPolicy,
   type ContentsReadResult,
-  type ContentsRecursion,
+  type ContentsScopeDepth,
   type ContentsResult,
   type ContentsScope,
   type PrimaryMediaKind,
@@ -72,7 +72,7 @@ export async function readContentsThroughHost(
     const reply = await client.readContents({
       scope: mapScopeToContract(normalizedRequest.scope),
       policy: mapPolicyToContract(normalizedRequest.policy),
-      recursion: normalizedRequest.recursion,
+      scopeDepth: normalizedRequest.scopeDepth,
       limit: normalizedRequest.limit,
       ...(normalizedRequest.cursor === undefined ? {} : { cursor: normalizedRequest.cursor })
     } satisfies ContractContentsReadRequest)
@@ -105,7 +105,7 @@ export async function readContentsThroughHost(
 type NormalizedRequest = {
   readonly scope: ContentsScope
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsRecursion
+  readonly scopeDepth: ContentsScopeDepth
   readonly limit: number
   readonly cursor?: string
 }
@@ -131,7 +131,7 @@ function normalizeRequest(request: unknown): NormalizedRequest | ContentsReadRes
     return policy
   }
 
-  const recursion = normalizeRecursion(request.recursion)
+  const recursion = normalizeRecursion(request.scopeDepth)
 
   if (isContentsReadResult(recursion)) {
     return recursion
@@ -152,7 +152,7 @@ function normalizeRequest(request: unknown): NormalizedRequest | ContentsReadRes
   return {
     scope,
     policy,
-    recursion,
+    scopeDepth: recursion,
     limit,
     ...(cursor === undefined ? {} : { cursor })
   }
@@ -292,7 +292,7 @@ function normalizePrimaryMediaKinds(
   return canonicalPrimaryMediaKindOrder.filter((mediaKind) => mediaKinds.has(mediaKind))
 }
 
-function normalizeRecursion(value: unknown): ContentsRecursion | ContentsReadResult {
+function normalizeRecursion(value: unknown): ContentsScopeDepth | ContentsReadResult {
   if (value === 'immediate' || value === 'recursive') {
     return value
   }
@@ -444,7 +444,7 @@ function contentsStateError(result: ContractContentsResult): ContentsReadResult 
 function mapContentsResult(result: ContractContentsResult): ContentsResult | undefined {
   const state = mapReadyContentsState(result.state)
 
-  if (state === undefined || typeof result.hasRowsOmittedByPolicy !== 'boolean') {
+  if (state === undefined || typeof result.hasPolicyOmittedRows !== 'boolean') {
     return undefined
   }
 
@@ -464,10 +464,10 @@ function mapContentsResult(result: ContractContentsResult): ContentsResult | und
     state,
     scope: mapScopeFromContract(result.scope),
     policy: mapPolicyFromContract(result.policy),
-    recursion: result.recursion,
+    scopeDepth: result.scopeDepth,
     rows,
-    coverage: mapCoverage(result),
-    hasRowsOmittedByPolicy: result.hasRowsOmittedByPolicy,
+    scopeCoverage: mapCoverage(result),
+    hasPolicyOmittedRows: result.hasPolicyOmittedRows,
     ...(result.nextCursor === undefined ? {} : { nextCursor: result.nextCursor }),
     ...(result.detail === undefined ? {} : { detail: result.detail })
   }
@@ -491,12 +491,12 @@ function mapReadyContentsState(
   }
 }
 
-function mapCoverage(result: ContractContentsResult): ContentsCoverage {
+function mapCoverage(result: ContractContentsResult): ContentsScopeCoverage {
   return {
-    state: result.coverage.state,
-    recursiveScopeComplete: result.coverage.recursiveScopeComplete,
-    emptyResultAuthoritative: result.coverage.emptyResultAuthoritative,
-    ...(result.coverage.detail === undefined ? {} : { detail: result.coverage.detail })
+    state: result.scopeCoverage.state,
+    recursiveScopeComplete: result.scopeCoverage.recursiveScopeComplete,
+    emptyResultAuthoritative: result.scopeCoverage.emptyResultAuthoritative,
+    ...(result.scopeCoverage.detail === undefined ? {} : { detail: result.scopeCoverage.detail })
   }
 }
 

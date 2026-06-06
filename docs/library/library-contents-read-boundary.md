@@ -16,7 +16,7 @@ The canonical typed boundary is `docs/decisions/library-contents-read-boundary.m
 The active policy union contains `playableMediaBrowse`, `audioBrowse`, `sourceFileInventory { fileClasses }`, and
 `primaryMedia { mediaKinds }`. The default product request uses `playableMediaBrowse`; `audioBrowse` remains audio-only.
 
-Every result carries required `hasRowsOmittedByPolicy`. The store/service computes it for the requested scope and
+Every result carries required `hasPolicyOmittedRows`. The store/service computes it for the requested scope and
 recursion mode. The renderer presents the returned rows, coverage, and omission fact without inspecting raw inventory.
 Incomplete zero-row coverage is not authoritative empty.
 

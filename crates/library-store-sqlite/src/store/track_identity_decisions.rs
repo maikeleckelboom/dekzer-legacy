@@ -1002,8 +1002,8 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::read_models::contents::{
-        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRecursion,
-        StoreContentsScope, StoreContentsState,
+        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsScope,
+        StoreContentsScopeDepth, StoreContentsState,
     };
     use crate::read_models::track_identity_decisions::{
         StoreTrackIdentityDecisionCurrentStatus, StoreTrackIdentityDecisionState,
@@ -2069,7 +2069,7 @@ mod tests {
                         StoreContentsFileClass::Unsupported,
                     ],
                 },
-                StoreContentsRecursion::Recursive,
+                StoreContentsScopeDepth::Recursive,
                 10,
                 None,
             )

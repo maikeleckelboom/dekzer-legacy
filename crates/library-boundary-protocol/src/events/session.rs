@@ -266,7 +266,7 @@ mod tests {
         MaintainedSnapshotRevision, MaintainedSnapshotScope,
     };
     use crate::{
-        ContentsReadPolicy, ContentsReadRequest, ContentsRecursion, ContentsScope,
+        ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeDepth,
         LibraryTreeEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
         PrimaryMediaKind, ReadAttachmentSourceFilesRequest,
         ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
@@ -331,7 +331,7 @@ mod tests {
                 policy: ContentsReadPolicy::PrimaryMedia {
                     media_kinds: vec![PrimaryMediaKind::Audio, PrimaryMediaKind::Video],
                 },
-                recursion: ContentsRecursion::Recursive,
+                scope_depth: ContentsScopeDepth::Recursive,
                 limit: Some(100),
                 cursor: None,
             }),

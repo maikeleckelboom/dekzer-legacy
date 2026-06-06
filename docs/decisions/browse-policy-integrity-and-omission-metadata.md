@@ -62,12 +62,12 @@ The renderer must not inspect raw source inventory, file extensions, tree state,
 to it in order to infer omissions. The renderer's authority is limited to:
 
 - The returned rows.
-- The returned `hasRowsOmittedByPolicy` value.
+- The returned `hasPolicyOmittedRows` value.
 - The returned coverage/completeness state.
 
-### Rule 5 — `hasRowsOmittedByPolicy` is a boolean in V0
+### Rule 5 — `hasPolicyOmittedRows` is a boolean in V0
 
-The field is `hasRowsOmittedByPolicy: boolean`. It is not a count.
+The field is `hasPolicyOmittedRows: boolean`. It is not a count.
 
 A count would carry obligations that are not yet cleanly answerable: exact across recursive scopes, across pagination,
 across unavailable source rows, across ignored inventory, across source-file rows versus canonical track rows, and
@@ -75,9 +75,9 @@ stable under partial scan coverage. A boolean answers the only question V0 needs
 inventory because of the active policy? Upgrade to a count only when counting authority, scope semantics, and coverage
 guarantees are explicitly defined.
 
-### Rule 6 — Exact semantics of `hasRowsOmittedByPolicy`
+### Rule 6 — Exact semantics of `hasPolicyOmittedRows`
 
-`hasRowsOmittedByPolicy: true` means:
+`hasPolicyOmittedRows: true` means:
 
 > Within the requested contents scope, recursion mode, and authoritative read snapshot, at least one persisted
 > browse-relevant potential contents row exists but is excluded by the active contents policy.
@@ -88,7 +88,7 @@ The field is:
 - Scoped to the request's `recursion` mode — recursive reads consider descendants; immediate reads do not report beyond
   immediate children.
 - Evaluated at the service/protocol boundary, not derived by the renderer.
-- Independent of page size. A page that returns rows may still carry `hasRowsOmittedByPolicy: true` at the scope level.
+- Independent of page size. A page that returns rows may still carry `hasPolicyOmittedRows: true` at the scope level.
 - Not a claim that scan coverage is complete.
 - Not triggered by ignored filesystem objects.
 
@@ -103,11 +103,11 @@ request.
 **Included** — matches the active contents policy; returned as a contents row.
 
 **Omitted by policy** — is browse-relevant inventory that does not match the active contents policy. This tier sets
-`hasRowsOmittedByPolicy: true`. Examples under `audioBrowse` are video-class `.mp4` files and browse-relevant images.
+`hasPolicyOmittedRows: true`. Examples under `audioBrowse` are video-class `.mp4` files and browse-relevant images.
 
 **Ignored** — is not browse-relevant contents inventory for the product surface under any policy. Examples: OS noise,
 temporary files, arbitrary binary objects, files Dekzer does not model as contents rows. Ignored items do not set
-`hasRowsOmittedByPolicy`. The product must not say "files hidden by this view" for items in this tier.
+`hasPolicyOmittedRows`. The product must not say "files hidden by this view" for items in this tier.
 
 The boundary between omitted-by-policy and ignored is not inferred from filesystem presence. It requires an explicit
 product decision per inventory class, owned by the classification authority, not by the renderer and not by inference
@@ -121,10 +121,10 @@ through the explicit `sourceFileInventory` policy and do not trigger omission fo
 
 ### Rule 9 — Coverage completeness gates empty-state copy
 
-The renderer must consult both the returned coverage state and `hasRowsOmittedByPolicy` before rendering any empty-state
+The renderer must consult both the returned coverage state and `hasPolicyOmittedRows` before rendering any empty-state
 copy. Authoritative empty copy is only valid when coverage is complete.
 
-| Coverage   | Returned rows | hasRowsOmittedByPolicy | Correct renderer meaning                                                                         |
+| Coverage   | Returned rows | hasPolicyOmittedRows | Correct renderer meaning                                                                         |
 | ---------- | :-----------: | :--------------------: | ------------------------------------------------------------------------------------------------ |
 | complete   |       0       |         false          | The scope has no browse-relevant inventory. Render authoritative empty copy.                     |
 | complete   |       0       |          true          | Browse-relevant inventory exists but is excluded by the active policy.                           |
@@ -138,7 +138,7 @@ copy. Authoritative empty copy is only valid when coverage is complete.
 Empty-state copy must be driven by the active policy's content description, not by a hardcoded string table in the
 renderer.
 
-Under `audioBrowse`, when coverage is complete, rows are zero, and `hasRowsOmittedByPolicy` is true:
+Under `audioBrowse`, when coverage is complete, rows are zero, and `hasPolicyOmittedRows` is true:
 
 > "No audio tracks in this view."
 
@@ -152,7 +152,7 @@ to the policy kind supplies presentation text; it does not transfer filtering au
 Given a scope containing only `.mp4` files, under `audioBrowse`:
 
 - Returned rows: zero.
-- `hasRowsOmittedByPolicy: true`.
+- `hasPolicyOmittedRows: true`.
 - Correct copy: "No audio tracks in this view."
 
 Under `playableMediaBrowse`, the same scope returns video rows and does not report policy omission.
@@ -160,7 +160,7 @@ Under `playableMediaBrowse`, the same scope returns video rows and does not repo
 Under no active policy may this scope render "This folder is empty" as long as it contains any browse-relevant
 inventory.
 
-### Rule 12 — `hasRowsOmittedByPolicy` is not a filter escape hatch
+### Rule 12 — `hasPolicyOmittedRows` is not a filter escape hatch
 
 The field is presentation metadata. The renderer must not use it to:
 
@@ -187,11 +187,11 @@ or add row fields such as duration, BPM, key, codec, artwork, canonical track id
 
 **Service/protocol:**
 
-- Audio-only scope under `audioBrowse` → rows returned, `hasRowsOmittedByPolicy: false`
-- MP4-only scope under `audioBrowse` → zero rows, `hasRowsOmittedByPolicy: true`
-- Mixed audio + MP4 scope under `audioBrowse` → audio rows returned, `hasRowsOmittedByPolicy: true`
-- Ignored-only scope (OS noise, tmp files) → zero rows, `hasRowsOmittedByPolicy: false`
-- Recursive read with MP4 only in a descendant → `hasRowsOmittedByPolicy: true` at scope level
+- Audio-only scope under `audioBrowse` → rows returned, `hasPolicyOmittedRows: false`
+- MP4-only scope under `audioBrowse` → zero rows, `hasPolicyOmittedRows: true`
+- Mixed audio + MP4 scope under `audioBrowse` → audio rows returned, `hasPolicyOmittedRows: true`
+- Ignored-only scope (OS noise, tmp files) → zero rows, `hasPolicyOmittedRows: false`
+- Recursive read with MP4 only in a descendant → `hasPolicyOmittedRows: true` at scope level
 - Immediate read → descendants outside immediate scope do not contribute to the field
 - Paginated read → field is scope-level, not page-local; additional pages do not flip the value
 - Incomplete scan coverage + zero known rows → coverage state is incomplete; authoritative empty not claimed
@@ -199,10 +199,10 @@ or add row fields such as duration, BPM, key, codec, artwork, canonical track id
 **Renderer:**
 
 - Renderer does not inspect file extensions, raw inventory, or tree state to derive omission
-- Zero rows + complete coverage + `hasRowsOmittedByPolicy: false` → "This folder is empty."
-- Zero rows + complete coverage + `hasRowsOmittedByPolicy: true` → policy-specific copy
+- Zero rows + complete coverage + `hasPolicyOmittedRows: false` → "This folder is empty."
+- Zero rows + complete coverage + `hasPolicyOmittedRows: true` → policy-specific copy
 - Zero rows + incomplete coverage → no authoritative empty copy, regardless of omission flag
-- Rows present + `hasRowsOmittedByPolicy: true` → rows shown normally; no rows hidden
+- Rows present + `hasPolicyOmittedRows: true` → rows shown normally; no rows hidden
 - Empty-state copy string sourced from policy description, not hardcoded
 
 **Regression guard — the following must not be present:**
@@ -213,7 +213,7 @@ or add row fields such as duration, BPM, key, codec, artwork, canonical track id
 - Raw inventory inspection in renderer
 - Renderer-authored `sourceFileInventory { fileClasses: ['audio', 'video'] }` as the product default
 - Source admission or default discovery changes
-- Ignored filesystem objects triggering `hasRowsOmittedByPolicy`
+- Ignored filesystem objects triggering `hasPolicyOmittedRows`
 - Authoritative empty copy rendered under incomplete coverage or active omission
 
 ---
@@ -224,9 +224,9 @@ or add row fields such as duration, BPM, key, codec, artwork, canonical track id
 
 A folder containing only MP4 files is not empty.
 
-`hasRowsOmittedByPolicy` crosses the service boundary. The renderer does not derive it.
+`hasPolicyOmittedRows` crosses the service boundary. The renderer does not derive it.
 
-Ignored filesystem objects do not trigger `hasRowsOmittedByPolicy`.
+Ignored filesystem objects do not trigger `hasPolicyOmittedRows`.
 
 Incomplete scan coverage must not produce authoritative empty copy.
 
