@@ -944,7 +944,7 @@ This document extends, not replaces, the following:
   library mutation, and that source availability changes invalidate or degrade readiness
   answers according to target policy rather than always fully invalidating.
 
-- `recursive-selected-contents-rule.md`: defines how tree selection projects recursive
+- `selected-contents-scope-depth-rule.md`: defines how tree selection projects descendant-inclusive
   primary media. This document adds the rule that contents projection does not load decks
   and does not own performance session scope.
 

@@ -1,6 +1,6 @@
-# Recursive Selected Contents Rule
+# Selected Contents Scope Depth Rule
 
-**Status:** CURRENT WITH LEGACY VOCABULARY — This document contains architectural decisions that remain valid (recursive selection vs tree expansion, query contracts, coverage states, result shapes, forbidden patterns), but its schema-specific references (`LibraryBrowserRows`, `library_asset_id`, `LibraryAssets`) predate the v1 substrate. For current v1 schema authority and vocabulary (`track_browser_rows`, `track_id`, `tracks`), see `docs/decisions/library-preparation-substrate-v1.md`. Do not use the legacy table/column names in this document as current implementation targets.
+**Status:** CURRENT WITH LEGACY VOCABULARY — This document contains architectural decisions that remain valid (descendant-inclusive scope depth selection vs tree expansion, query contracts, coverage states, result shapes, forbidden patterns), but its schema-specific references (`LibraryBrowserRows`, `library_asset_id`, `LibraryAssets`) predate the v1 substrate. For current v1 schema authority and vocabulary (`track_browser_rows`, `track_id`, `tracks`), see `docs/decisions/library-preparation-substrate-v1.md`. Do not use the legacy table/column names in this document as current implementation targets.
 
 ## Decision
 

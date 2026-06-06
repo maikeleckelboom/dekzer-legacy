@@ -1497,9 +1497,9 @@ fn source_aggregate_scope_predicate(scope_id_parameter: &str) -> String {
     )
 }
 
-fn scoped_read_cte_prefix(recursive_scope: Option<&str>) -> String {
-    match recursive_scope {
-        Some(recursive_scope) => format!("WITH RECURSIVE {recursive_scope},"),
+fn scoped_read_cte_prefix(cte_definition: Option<&str>) -> String {
+    match cte_definition {
+        Some(cte_definition) => format!("WITH RECURSIVE {cte_definition},"),
         None => "WITH".to_string(),
     }
 }

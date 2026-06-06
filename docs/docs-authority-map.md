@@ -52,7 +52,7 @@ No two active docs may define the same authority._
 | ---------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/library/library-contents-read-boundary.md`     | Discovery pointer                | Points to the canonical decisions doc and related library browser contracts. Does not define duplicate authority.                                                                                                                   |
 | `docs/decisions/library-contents-read-boundary.md`   | Canonical contents read boundary | Defines the single parameterized contents read boundary. Stale `sourceFileVisibility`-aware claim removed (historical note preserved). Complements `library-tree-selection-contents-contract.md` (which governs renderer coupling). |
-| `docs/decisions/recursive-selected-contents-rule.md` | Valid architectural decision     | CURRENT WITH LEGACY VOCABULARY. Schema-specific references predate v1 substrate. Architectural rules remain valid. For current v1 vocabulary see `docs/decisions/library-preparation-substrate-v1.md`.                              |
+| `docs/decisions/selected-contents-scope-depth-rule.md` | Valid architectural decision     | CURRENT WITH LEGACY VOCABULARY. Schema-specific references predate v1 substrate. Architectural rules remain valid. For current v1 vocabulary see `docs/decisions/library-preparation-substrate-v1.md`.                              |
 
 ## Implementation discipline
 

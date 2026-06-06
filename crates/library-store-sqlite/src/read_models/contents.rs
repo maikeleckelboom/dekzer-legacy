@@ -1484,7 +1484,7 @@ fn scope_coverage_from_counts(
         return scope_coverage(
             StoreContentsScopeCoverageState::Pending,
             false,
-            "The selected source has not completed a full recursive scan.",
+            "The selected source has not completed a full subtree scan.",
         );
     }
 

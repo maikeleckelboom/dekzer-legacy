@@ -8,7 +8,7 @@ default user-facing concept is a named library folder under a source, such as `M
 A source location is not a separate source, not a fake renderer folder, and not every discovered directory.
 
 For the canonical rules regarding contents queries, tree selection, renderer boundaries, result shapes, and index
-requirements, see `recursive-selected-contents-rule.md`.
+requirements, see `selected-contents-scope-depth-rule.md`.
 
 ## Source-location lifecycle contract
 
@@ -229,7 +229,7 @@ Implementation is allowed only after:
 - `source_directories.mtime_ns` exists in the baseline schema
 - `source_directories.scanned_at` exists in the baseline schema
 - `source_scan_state.scan_phase` includes `complete` and follows the transition rule in
-  `recursive-selected-contents-rule.md`
+  `selected-contents-scope-depth-rule.md`
 - parent-directory foreign keys for `source_directories` and `source_files` cascade instead of setting children to
   `NULL`
 - hot-path prefix indexes exist with `BINARY` collation
