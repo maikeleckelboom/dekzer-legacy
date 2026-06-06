@@ -138,12 +138,12 @@ try {
         },
         policy: {
           mediaClasses: ["audio"],
-          rowProfile: { kind: "sourceFile" }
+          rowProfile: { kind: "audioBrowse" }
         },
         recursion: "immediate",
         limit: 10
       }),
-      "readContents Crate",
+      "readContents audioBrowse Crate",
       commandTimeoutMs
     );
     must(

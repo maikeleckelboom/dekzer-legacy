@@ -9,6 +9,7 @@ use crate::{LibrarySqliteError, LibrarySqliteResult};
 const CONTENTS_CURSOR_VERSION: u8 = 2;
 const CONTENTS_CURSOR_KIND_SOURCE_FILE: &str = "sf";
 const CONTENTS_CURSOR_KIND_PRIMARY_MEDIA: &str = "pm";
+const CONTENTS_CURSOR_KIND_AUDIO_BROWSE: &str = "ab";
 const CONTENTS_CURSOR_MEDIA_CLASS_ORDER: [StoreContentsMediaClass; 4] = [
     StoreContentsMediaClass::Audio,
     StoreContentsMediaClass::Video,
@@ -160,6 +161,9 @@ fn validate_cursor_identity(
         ) | (
             CONTENTS_CURSOR_KIND_PRIMARY_MEDIA,
             StoreContentsRowProfile::PrimaryMedia
+        ) | (
+            CONTENTS_CURSOR_KIND_AUDIO_BROWSE,
+            StoreContentsRowProfile::AudioBrowse
         )
     );
     if !kind_matches {
@@ -208,14 +212,16 @@ fn compute_cursor_position(
     row_profile: StoreContentsRowProfile,
 ) -> ContentsCursorPosition {
     match row_profile {
-        StoreContentsRowProfile::SourceFile => ContentsCursorPosition::SourceFile {
-            relative_path_browse_sort_key: row
-                .relative_path_browse_sort_key
-                .clone()
-                .expect("source-file contents rows select relative_path_browse_sort_key"),
-            relative_path: row.relative_path.clone(),
-            source_file_id: row.source_file_id,
-        },
+        StoreContentsRowProfile::SourceFile | StoreContentsRowProfile::AudioBrowse => {
+            ContentsCursorPosition::SourceFile {
+                relative_path_browse_sort_key: row
+                    .relative_path_browse_sort_key
+                    .clone()
+                    .expect("source-file contents rows select relative_path_browse_sort_key"),
+                relative_path: row.relative_path.clone(),
+                source_file_id: row.source_file_id,
+            }
+        }
         StoreContentsRowProfile::PrimaryMedia => ContentsCursorPosition::PrimaryMedia {
             availability_priority: availability_priority(&row.availability_state),
             title_key: compute_title_key(row),
@@ -284,6 +290,7 @@ fn build_next_cursor(
     let kind = match policy.row_profile {
         StoreContentsRowProfile::SourceFile => CONTENTS_CURSOR_KIND_SOURCE_FILE.to_string(),
         StoreContentsRowProfile::PrimaryMedia => CONTENTS_CURSOR_KIND_PRIMARY_MEDIA.to_string(),
+        StoreContentsRowProfile::AudioBrowse => CONTENTS_CURSOR_KIND_AUDIO_BROWSE.to_string(),
     };
     let cursor_scope = match scope {
         StoreContentsScope::Source { source_id } => ContentsCursorScope::Source {
@@ -399,6 +406,7 @@ impl StoreContentsMediaClass {
 pub enum StoreContentsRowProfile {
     SourceFile,
     PrimaryMedia,
+    AudioBrowse,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -560,6 +568,19 @@ pub(crate) fn read_contents(
         ));
     }
 
+    if policy.row_profile == StoreContentsRowProfile::AudioBrowse
+        && policy.media_classes != vec![StoreContentsMediaClass::Audio]
+    {
+        return Ok(non_ready_result(
+            scope,
+            policy,
+            recursion,
+            StoreContentsState::PolicyConflict,
+            StoreContentsCoverageState::Failed,
+            "Audio browse contents can include audio rows only.",
+        ));
+    }
+
     let cursor_position = if let Some(cursor_str) = cursor {
         let decoded = match decode_cursor(cursor_str) {
             Ok(cursor) => cursor,
@@ -605,6 +626,9 @@ pub(crate) fn read_contents(
             (
                 ContentsCursorPosition::SourceFile { .. },
                 StoreContentsRowProfile::SourceFile
+            ) | (
+                ContentsCursorPosition::SourceFile { .. },
+                StoreContentsRowProfile::AudioBrowse
             ) | (
                 ContentsCursorPosition::PrimaryMedia { .. },
                 StoreContentsRowProfile::PrimaryMedia,
@@ -1469,6 +1493,7 @@ fn contents_detail(
         StoreContentsState::Empty => Some(match row_profile {
             StoreContentsRowProfile::PrimaryMedia => "No primary media found in this scope.",
             StoreContentsRowProfile::SourceFile => "No visible files found in this scope.",
+            StoreContentsRowProfile::AudioBrowse => "No audio files found in this scope.",
         }),
         StoreContentsState::Partial => Some(match coverage_state {
             StoreContentsCoverageState::Scanning => "Still indexing. Results may be incomplete.",
@@ -1747,13 +1772,15 @@ fn contents_rows_sql(
     limit_param: usize,
 ) -> String {
     match row_profile {
-        StoreContentsRowProfile::SourceFile => source_file_rows_sql(
-            prefix_cte,
-            source_predicate,
-            media_predicate,
-            cursor_start,
-            limit_param,
-        ),
+        StoreContentsRowProfile::SourceFile | StoreContentsRowProfile::AudioBrowse => {
+            source_file_rows_sql(
+                prefix_cte,
+                source_predicate,
+                media_predicate,
+                cursor_start,
+                limit_param,
+            )
+        }
         StoreContentsRowProfile::PrimaryMedia => primary_media_rows_sql(
             prefix_cte,
             source_predicate,
@@ -2351,6 +2378,13 @@ mod tests {
         StoreContentsReadPolicy {
             media_classes,
             row_profile: StoreContentsRowProfile::SourceFile,
+        }
+    }
+
+    fn audio_browse_policy() -> StoreContentsReadPolicy {
+        StoreContentsReadPolicy {
+            media_classes: vec![StoreContentsMediaClass::Audio],
+            row_profile: StoreContentsRowProfile::AudioBrowse,
         }
     }
 
@@ -3174,6 +3208,47 @@ mod tests {
         );
     }
 
+    fn assert_audio_browse_matches_source_file_audio(
+        connection: &Connection,
+        scope: StoreContentsScope,
+        recursion: StoreContentsRecursion,
+        limit: usize,
+    ) -> (super::StoreContentsResult, super::StoreContentsResult) {
+        let source_file = read_contents(
+            connection,
+            scope.clone(),
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            recursion,
+            limit,
+            None,
+        )
+        .expect("read source-file audio contents");
+        let audio_browse = read_contents(
+            connection,
+            scope,
+            audio_browse_policy(),
+            recursion,
+            limit,
+            None,
+        )
+        .expect("read audio-browse contents");
+
+        assert_eq!(audio_browse.state, source_file.state);
+        assert_eq!(audio_browse.coverage, source_file.coverage);
+        assert_eq!(audio_browse.rows, source_file.rows);
+        assert_eq!(audio_browse.recursion, source_file.recursion);
+        assert_eq!(
+            audio_browse.policy.media_classes,
+            vec![StoreContentsMediaClass::Audio]
+        );
+        assert_eq!(
+            audio_browse.policy.row_profile,
+            StoreContentsRowProfile::AudioBrowse
+        );
+
+        (source_file, audio_browse)
+    }
+
     #[test]
     fn source_scope_returns_empty_primary_media_without_promotion() {
         let connection = open_connection();
@@ -3527,6 +3602,228 @@ mod tests {
         assert_eq!(result.rows[0].media_class, "audio");
         assert_eq!(result.rows[0].file_kind, "audio");
         assert!(result.rows[0].primary_media.is_none());
+    }
+
+    #[test]
+    fn audio_browse_profile_reuses_source_file_audio_rows_for_scopes_and_recursion() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_directory(&connection, 11, 1, "Music/Sub", "complete");
+        insert_directory(&connection, 20, 1, "Images", "complete");
+        insert_location(&connection, 100, 1, "Music", "user", "registered_subpath");
+        insert_scanned_file(&connection, 1000, 1, 10, "Music/01.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Music/clip.mp4", "video");
+        insert_scanned_file(&connection, 1002, 1, 11, "Music/Sub/02.wav", "audio");
+        insert_scanned_file(&connection, 1003, 1, 20, "Images/front.jpg", "image");
+
+        let (_source_file, source_recursive) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_relative_paths(
+            &source_recursive.rows,
+            &["Music/01.wav", "Music/Sub/02.wav"],
+        );
+
+        assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            StoreContentsRecursion::Immediate,
+            10,
+        );
+
+        let (_source_file, directory_recursive) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_relative_paths(
+            &directory_recursive.rows,
+            &["Music/01.wav", "Music/Sub/02.wav"],
+        );
+
+        let (_source_file, directory_immediate) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            StoreContentsRecursion::Immediate,
+            10,
+        );
+        assert_relative_paths(&directory_immediate.rows, &["Music/01.wav"]);
+
+        let (_source_file, location_recursive) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_relative_paths(
+            &location_recursive.rows,
+            &["Music/01.wav", "Music/Sub/02.wav"],
+        );
+
+        let (_source_file, location_immediate) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            StoreContentsRecursion::Immediate,
+            10,
+        );
+        assert_relative_paths(&location_immediate.rows, &["Music/01.wav"]);
+
+        for row in source_recursive.rows {
+            assert!(row.primary_media.is_none());
+            assert!(row.availability_state.is_none());
+            assert_eq!(row.media_class, "audio");
+        }
+    }
+
+    #[test]
+    fn audio_browse_profile_rejects_non_audio_policy_without_weakening_source_file() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/clip.mp4", "video");
+
+        let source_file = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![
+                StoreContentsMediaClass::Audio,
+                StoreContentsMediaClass::Video,
+            ]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read source-file contents");
+        assert_eq!(source_file.state, StoreContentsState::Ready);
+        assert_relative_paths(&source_file.rows, &["Media/clip.mp4", "Media/track.wav"]);
+
+        let conflict = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            StoreContentsReadPolicy {
+                media_classes: vec![
+                    StoreContentsMediaClass::Audio,
+                    StoreContentsMediaClass::Video,
+                ],
+                row_profile: StoreContentsRowProfile::AudioBrowse,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read audio-browse contents");
+
+        assert_eq!(conflict.state, StoreContentsState::PolicyConflict);
+        assert!(conflict.rows.is_empty());
+        assert_eq!(
+            conflict.detail.as_deref(),
+            Some("Audio browse contents can include audio rows only.")
+        );
+    }
+
+    #[test]
+    fn audio_browse_profile_preserves_source_file_audio_coverage_states() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Empty", "complete");
+        insert_directory(&connection, 11, 1, "Scanning", "scanning");
+        insert_directory(&connection, 12, 1, "Blocked", "complete");
+        insert_directory(&connection, 13, 1, "Failed", "complete");
+        set_directory_scan_issue(&connection, 12, "blocked", "permission_denied");
+        set_directory_scan_issue(&connection, 13, "failed", "unknown_io");
+        insert_location(&connection, 100, 1, "Missing", "user", "registered_subpath");
+
+        let (_source_file, empty) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_eq!(empty.state, StoreContentsState::Empty);
+        assert_eq!(empty.coverage.state, StoreContentsCoverageState::Complete);
+        assert!(empty.coverage.empty_result_authoritative);
+
+        let (_source_file, scanning) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 11,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_eq!(scanning.state, StoreContentsState::Partial);
+        assert_eq!(
+            scanning.coverage.state,
+            StoreContentsCoverageState::Scanning
+        );
+        assert!(!scanning.coverage.empty_result_authoritative);
+
+        let (_source_file, blocked) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 12,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_eq!(blocked.state, StoreContentsState::Blocked);
+        assert_eq!(blocked.coverage.state, StoreContentsCoverageState::Blocked);
+        assert!(!blocked.coverage.empty_result_authoritative);
+
+        let (_source_file, failed) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 13,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_eq!(failed.state, StoreContentsState::Failed);
+        assert_eq!(failed.coverage.state, StoreContentsCoverageState::Failed);
+        assert!(!failed.coverage.empty_result_authoritative);
+
+        let (_source_file, missing_location) = assert_audio_browse_matches_source_file_audio(
+            &connection,
+            StoreContentsScope::SourceLocation {
+                source_location_id: 100,
+            },
+            StoreContentsRecursion::Recursive,
+            10,
+        );
+        assert_eq!(missing_location.state, StoreContentsState::LocationMissing);
+        assert_eq!(
+            missing_location.coverage.state,
+            StoreContentsCoverageState::LocationMissing
+        );
+        assert!(!missing_location.coverage.empty_result_authoritative);
     }
 
     #[test]
@@ -4298,6 +4595,146 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::CursorInvalid);
         assert!(result.rows.is_empty());
+    }
+
+    #[test]
+    fn audio_browse_cursor_paginates_like_source_file_audio_with_distinct_profile_identity() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Music", "complete");
+        insert_audio_source_files(
+            &connection,
+            10,
+            &[
+                (1000, "Music/[1].wav"),
+                (1001, "Music/[10].wav"),
+                (1002, "Music/[2].wav"),
+                (1003, "Music/[3].wav"),
+            ],
+        );
+
+        let source_file_page1 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            2,
+            None,
+        )
+        .expect("read source-file page 1");
+        let audio_browse_page1 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            audio_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            2,
+            None,
+        )
+        .expect("read audio-browse page 1");
+
+        assert_eq!(audio_browse_page1.rows, source_file_page1.rows);
+        assert_relative_paths(
+            &audio_browse_page1.rows,
+            &["Music/[1].wav", "Music/[2].wav"],
+        );
+        let source_file_cursor = source_file_page1.next_cursor.expect("source-file cursor");
+        let audio_browse_cursor = audio_browse_page1.next_cursor.expect("audio-browse cursor");
+        assert_ne!(
+            audio_browse_cursor, source_file_cursor,
+            "cursor identity must include row profile"
+        );
+
+        let source_file_page2 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&source_file_cursor),
+        )
+        .expect("read source-file page 2");
+        let audio_browse_page2 = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            audio_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&audio_browse_cursor),
+        )
+        .expect("read audio-browse page 2");
+
+        assert_eq!(audio_browse_page2.rows, source_file_page2.rows);
+        assert_relative_paths(
+            &audio_browse_page2.rows,
+            &["Music/[3].wav", "Music/[10].wav"],
+        );
+        assert!(audio_browse_page2.next_cursor.is_none());
+
+        let audio_from_source_file_cursor = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            audio_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&source_file_cursor),
+        )
+        .expect("read audio-browse with source-file cursor");
+        assert_eq!(
+            audio_from_source_file_cursor.state,
+            StoreContentsState::CursorInvalid
+        );
+        assert!(audio_from_source_file_cursor.rows.is_empty());
+
+        let source_file_from_audio_cursor = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&audio_browse_cursor),
+        )
+        .expect("read source-file with audio-browse cursor");
+        assert_eq!(
+            source_file_from_audio_cursor.state,
+            StoreContentsState::CursorInvalid
+        );
+        assert!(source_file_from_audio_cursor.rows.is_empty());
+
+        let primary_media_from_audio_cursor = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            2,
+            Some(&audio_browse_cursor),
+        )
+        .expect("read primary-media with audio-browse cursor");
+        assert_eq!(
+            primary_media_from_audio_cursor.state,
+            StoreContentsState::CursorInvalid
+        );
+        assert!(primary_media_from_audio_cursor.rows.is_empty());
     }
 
     #[test]

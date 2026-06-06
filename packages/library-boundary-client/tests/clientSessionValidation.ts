@@ -2,6 +2,7 @@ import type {
   CommandOutcome,
   CommandReply,
   CommandRequest,
+  ContentsReadRequest,
   LibraryBoundaryEvent,
   MaintainedSnapshotEvent,
   MaintainedSnapshotInvalidation,
@@ -88,6 +89,13 @@ type ReadTrackIdentityReviewCandidatesReturnIsGenerated = AssertType<
   >
 >
 
+type ContentsReadAcceptsAudioBrowseProfile = AssertType<
+  EqualTypes<
+    Extract<ContentsReadRequest['policy']['rowProfile'], { kind: 'audioBrowse' }>,
+    { kind: 'audioBrowse' }
+  >
+>
+
 const compileTimeAssertions: [
   RegisterLocalRootReturnIsGenerated,
   RegisterLocalRootIdStaysString,
@@ -96,8 +104,9 @@ const compileTimeAssertions: [
   AcceptTrackIdentityCandidateReturnIsGenerated,
   ReadSourceMaintenanceReturnIsGenerated,
   ReadSourceFileAttachmentReturnIsGenerated,
-  ReadTrackIdentityReviewCandidatesReturnIsGenerated
-] = [true, true, true, true, true, true, true, true]
+  ReadTrackIdentityReviewCandidatesReturnIsGenerated,
+  ContentsReadAcceptsAudioBrowseProfile
+] = [true, true, true, true, true, true, true, true, true]
 void compileTimeAssertions
 
 type Resolve<T> = (value: T | PromiseLike<T>) => void
@@ -878,6 +887,80 @@ async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void
   )
 }
 
+async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> {
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(
+    success({
+      type: 'snapshotRead',
+      payload: {
+        type: 'contents',
+        payload: {
+          result: {
+            state: 'empty',
+            scope: {
+              type: 'source',
+              payload: { sourceId: '7' }
+            },
+            policy: {
+              mediaClasses: ['audio'],
+              rowProfile: { kind: 'audioBrowse' }
+            },
+            recursion: 'recursive',
+            rows: [],
+            coverage: {
+              state: 'complete',
+              recursiveScopeComplete: true,
+              emptyResultAuthoritative: true
+            }
+          }
+        }
+      }
+    })
+  )
+  const client = new LibraryBoundaryClient(transport)
+
+  const reply = await client.readContents({
+    scope: {
+      type: 'source',
+      payload: { sourceId: '7' }
+    },
+    policy: {
+      mediaClasses: ['audio'],
+      rowProfile: { kind: 'audioBrowse' }
+    },
+    recursion: 'recursive',
+    limit: 25
+  })
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: 'snapshotRead',
+      payload: {
+        type: 'contentsRead',
+        payload: {
+          scope: {
+            type: 'source',
+            payload: { sourceId: '7' }
+          },
+          policy: {
+            mediaClasses: ['audio'],
+            rowProfile: { kind: 'audioBrowse' }
+          },
+          recursion: 'recursive',
+          limit: 25
+        }
+      }
+    } satisfies CommandRequest,
+    'readContents sends audioBrowse through the existing snapshot command'
+  )
+  equal(
+    reply.result.policy.rowProfile.kind,
+    'audioBrowse',
+    'contents reply preserves audioBrowse profile'
+  )
+}
+
 async function validatesProtocolErrorsArePreserved(): Promise<void> {
   const protocolError: ProtocolError = {
     type: 'invalidRequest',
@@ -1221,6 +1304,7 @@ await validatesSourceMaintenanceRequestsAndReplies()
 await validatesTrackIdentityDecisionRequestsAndReplies()
 await validatesTrackIdentityReviewCandidateReads()
 await validatesAttachmentIdentityReadRequestsAndReplies()
+await validatesContentsReadAudioBrowseRequestAndReply()
 await validatesProtocolErrorsArePreserved()
 await validatesReplyFamilyMismatch()
 await validatesReplyVariantMismatch()

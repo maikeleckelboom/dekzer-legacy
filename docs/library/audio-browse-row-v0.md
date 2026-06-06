@@ -1,5 +1,5 @@
 ---
-status: boundary-decision
+status: implemented-v0
 doctrine-version: 0.2
 last-reviewed: 2026-06-06
 owner: library-substrate-boundary
@@ -17,21 +17,20 @@ scope:
 
 ## Status
 
-Boundary decision. Not implemented.
+Implemented V0.
 
-This document resolves the V0 authority and implementation boundary for the audio browse row read-model concept. It
-does not introduce runtime behavior, generated contracts, store code, renderer behavior, or a dedicated generated row
-type.
+This document resolves the V0 authority and implementation boundary for the audio browse row read-model concept. The
+implemented V0 adds `audioBrowse` as a `ContentsRowProfile` under the existing `readContents` boundary. It reuses the
+existing contents file-row payload shape and does not introduce a dedicated generated audio row type.
 
 ## Decision
 
-Audio browse row V0 should be implemented as a new `ContentsRowProfile` kind under the existing `readContents`
-boundary.
+Audio browse row V0 is implemented as a new `ContentsRowProfile` kind under the existing `readContents` boundary.
 
-The future implementation should add a row profile such as `audioBrowse` to the existing contents read policy and keep
-the existing contents result envelope, scope model, recursion model, coverage model, and cursor pagination. V0 rows
-should use the current contents file-row payload shape with the V0 field subset below. The product/read-model concept is
-audio browse row; it is not a canonical track, not a tree row, and not a separate browse endpoint.
+The implementation adds the `audioBrowse` row profile to the existing contents read policy and keeps the existing
+contents result envelope, scope model, recursion model, coverage model, and cursor pagination. V0 rows use the current
+contents file-row payload shape with the V0 field subset below. The product/read-model concept is audio browse row; it
+is not a canonical track, not a tree row, and not a separate browse endpoint.
 
 The smallest correct V0 field set is the current source-file audio row authority that already crosses the contents
 boundary:
@@ -64,13 +63,13 @@ not V0 fields.
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Store read model          | `StoreContentsFileRow` owns `id`, `source_id`, `source_file_id`, `parent_directory_id`, `label`, `relative_path`, `file_name`, `media_class`, `file_kind`, `presence`, `availability_state`, `primary_media`, `updated_at`, and internal `relative_path_browse_sort_key`. Source-file profile SQL returns source-file facts and `NULL` primary-media fields. |
 | Rust boundary protocol    | `ContentsReadRequest` owns `scope`, `policy`, `recursion`, `limit`, and `cursor`. `ContentsResult` owns `state`, echoed `scope`, echoed `policy`, echoed `recursion`, `rows`, `coverage`, optional `nextCursor`, and optional `detail`. `ContentsFileRow` owns the current row fields listed above.                                                          |
-| Generated TS contract     | `packages/library-boundary-contract` mirrors the Rust protocol. `ContentsRowProfile` currently supports only `sourceFile` and `primaryMedia`; no audio browse profile exists yet.                                                                                                                                                                            |
+| Generated TS contract     | `packages/library-boundary-contract` mirrors the Rust protocol. `ContentsRowProfile` supports `sourceFile`, `primaryMedia`, and `audioBrowse`. No dedicated generated `AudioBrowseRow` type exists.                                                                                                                                                          |
 | TS boundary client        | `LibraryBoundaryClient.readContents` sends the existing `snapshotRead/contentsRead` command and expects the existing `contents` reply. It adds no row authority.                                                                                                                                                                                             |
 | Desktop main adapter      | `apps/desktop/src/main/libraryContents/read.ts` normalizes scope, policy, recursion, limit, and cursor, maps generated `ContentsFileRow` into shared `ContentsFileRow`, and rejects invalid image/unsupported primary-media combinations. It adds no browse-field authority.                                                                                 |
-| Renderer boundary adapter | `apps/desktop/src/renderer/library/boundary/contentsRead.ts` currently requests `rowProfile: sourceFile`, `mediaClasses: ['audio']`, and `recursion: recursive`; it owns warm snapshots, retained rows, delayed pending display, and pagination accumulation only.                                                                                           |
+| Renderer boundary adapter | `apps/desktop/src/renderer/library/boundary/contentsRead.ts` requests `rowProfile: audioBrowse`, `mediaClasses: ['audio']`, and `recursion: recursive` for the default browse; it owns warm snapshots, retained rows, delayed pending display, and pagination accumulation only.                                                                             |
 | Renderer projection       | `contents/projection.ts` maps rows to `ContentRow` display rows with `id`, `label`, `presence`, `detail`, `icon`, `mediaClass`, and `availabilityState`. Its relative-path fallback and media labels are presentation, not durable field authority.                                                                                                          |
 | Table display             | `contents/table.vue` displays `Name` and `Details` columns. It does not display extension, source label, source-location provenance, row version, container, or codec.                                                                                                                                                                                       |
-| Cursor fields             | Source-file cursor identity is store-owned and binds version, row-profile kind, scope, media classes, recursion, and last source-file order position: `relative_path_browse_sort_key`, `relative_path`, and `source_file_id`.                                                                                                                                |
+| Cursor fields             | Cursor identity is store-owned and binds version, row-profile kind, scope, media classes, recursion, and row order position. `audioBrowse` has a distinct cursor kind from `sourceFile` and reuses the source-file order position: `relative_path_browse_sort_key`, `relative_path`, and `source_file_id`.                                                   |
 | Coverage fields           | `ContentsCoverage` owns `state`, `recursiveScopeComplete`, `emptyResultAuthoritative`, and optional `detail`; incomplete, scanning, blocked, failed, unavailable, and missing-location cases must not become authoritative empty results.                                                                                                                    |
 | Scope fields              | Contents scope supports source, source location, and directory. Directory scope carries `sourceId` and `sourceDirectoryId`; source-location scope carries `sourceLocationId`. Rows do not carry per-row source-location provenance.                                                                                                                          |
 | Stable row identity       | Current source-file rows use `source-file:{source_file_id}`. Primary-media rows may use primary-media or library-asset identities, but those are not V0 audio browse row identities.                                                                                                                                                                         |
@@ -131,8 +130,8 @@ not V0 fields.
 
 ### Selected: new row profile under existing `readContents`
 
-The future implementation should extend `ContentsRowProfile` with an audio browse profile and keep the existing
-`ContentsReadRequest` and `ContentsResult` shape.
+The implementation extends `ContentsRowProfile` with `audioBrowse` and keeps the existing `ContentsReadRequest` and
+`ContentsResult` shape.
 
 This is the smallest correct boundary because it preserves:
 
@@ -162,7 +161,7 @@ Keeping only source-file rows leaves the product/read-model boundary unresolved 
 as raw inventory policy. Source-file rows should remain available for explicit inventory/diagnostic use, but the main
 audio browse should have an explicit backend-owned profile.
 
-## Future Implementation Acceptance Criteria
+## V0 Acceptance Criteria
 
 - `readContents` accepts the audio browse row profile and rejects incompatible media-class policies instead of silently
   widening or narrowing them.
@@ -178,7 +177,7 @@ audio browse should have an explicit backend-owned profile.
 - Source-file rows are not added back to tree navigation.
 - Renderer does not filter, sort, or derive authoritative audio browse fields.
 
-## Required Tests For The Later Implementation Slice
+## Required Tests For V0
 
 - Store read-model tests proving audio browse profile parity with current `sourceFile` + audio recursive and immediate
   reads for source, source-location, and directory scopes.
@@ -195,16 +194,15 @@ audio browse should have an explicit backend-owned profile.
   cursor pagination, and keeps warm snapshots scoped to the request key.
 - Renderer projection tests proving current row display parity and no filtering/sorting authority.
 
-## Contract Generation Expectations
+## Contract Generation
 
-The implementation slice should update Rust protocol first, then regenerate `packages/library-boundary-contract` from
-the Rust source of truth. Generated TS and JSON schema should change only to add the new `ContentsRowProfile` variant
-and any mechanical references required by that variant. No dedicated audio row type, dedicated endpoint, or source
-hierarchy contract change should appear.
+The implementation updates Rust protocol first, then regenerates `packages/library-boundary-contract` from the Rust
+source of truth. Generated TS and JSON schema change only to add the `audioBrowse` `ContentsRowProfile` variant and
+mechanical manifest hashes. No dedicated audio row type, dedicated endpoint, or source hierarchy contract change exists.
 
-## Renderer Migration Expectations
+## Renderer Migration
 
-The renderer migration should be limited to the default contents policy and request-key handling for the new profile.
+The renderer migration is limited to the default contents policy and request-key handling for the new profile.
 Projection and table code should continue to render returned rows and should not derive extension, source label,
 source-location provenance, row version, container, or codec. Source-file rows should remain available for explicit
 non-default inventory/diagnostic modes.

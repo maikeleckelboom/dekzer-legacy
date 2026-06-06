@@ -165,6 +165,52 @@ describe('contents reads through the host', () => {
     expect(registration.channel).toBe(contentsReadChannels.read)
     expect(typeof registration.handler).toBe('function')
   })
+
+  it('passes audioBrowse row profile through to the boundary contract', async () => {
+    const config = hostConfig()
+    const successHost = await startedHostWithClient(
+      config,
+      createFakeClient({
+        readContents: async (request) => {
+          expect(request.policy.rowProfile).toEqual({ kind: 'audioBrowse' })
+          return {
+            result: {
+              state: 'empty',
+              scope: request.scope,
+              policy: request.policy,
+              recursion: request.recursion,
+              rows: [],
+              coverage: {
+                state: 'complete',
+                recursiveScopeComplete: true,
+                emptyResultAuthoritative: true
+              }
+            }
+          }
+        }
+      })
+    )
+
+    await expect(
+      readContentsThroughHost(successHost, {
+        scope: { kind: 'source', sourceId: '7' },
+        policy: {
+          mediaClasses: ['audio'],
+          rowProfile: { kind: 'audioBrowse' }
+        },
+        recursion: 'recursive',
+        limit: 25
+      })
+    ).resolves.toMatchObject({
+      state: 'ready',
+      result: {
+        policy: {
+          mediaClasses: ['audio'],
+          rowProfile: { kind: 'audioBrowse' }
+        }
+      }
+    })
+  })
 })
 
 function sourceLocationRequest(): Parameters<typeof readContentsThroughHost>[1] {

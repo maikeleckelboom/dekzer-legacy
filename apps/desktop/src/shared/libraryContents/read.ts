@@ -67,6 +67,9 @@ export type ContentsRowProfile =
   | {
       readonly kind: 'primaryMedia'
     }
+  | {
+      readonly kind: 'audioBrowse'
+    }
 
 export type ContentsReadPolicy = {
   readonly mediaClasses: readonly ContentsMediaClass[]

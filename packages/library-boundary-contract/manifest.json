@@ -1,13 +1,13 @@
 {
-  "artifactHash": "5ff34909c6c43a9ae761e9d17e6f91408a301d31f486c6596aa643bf28295db6",
+  "artifactHash": "26bb4e83592ee0d234f4456b071365a7a0217d0c3db041867560ac95b6b68bed",
   "artifacts": [
     {
       "path": "index.ts",
-      "sha256": "f86d914c9b617d8927ef571a2b782a010a5253160a0038aa96b11bb3ef33893a"
+      "sha256": "216d47c6f8ff09eefe5f1308b74a1cff1b48da426deaddd02c0c7e7c0393e40d"
     },
     {
       "path": "boundary-contract.schema.json",
-      "sha256": "10d1ea695b8295423fe6b776b823dff2cb32e5755f8726ba2a20ae0f951a6bce"
+      "sha256": "bf7d17b95e97be61d770bae0127c19b37ab522680a6adcb94c1e7aa4ff96abc9"
     },
     {
       "path": "package.json",

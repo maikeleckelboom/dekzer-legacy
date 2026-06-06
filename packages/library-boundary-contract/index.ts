@@ -105,7 +105,7 @@ export type ContentsScope = { "type": "source", "payload": { sourceId: string, }
 
 export type ContentsReadPolicy = { mediaClasses: Array<ContentsMediaClass>, rowProfile: ContentsRowProfile, };
 
-export type ContentsRowProfile = { "kind": "sourceFile" } | { "kind": "primaryMedia" };
+export type ContentsRowProfile = { "kind": "sourceFile" } | { "kind": "primaryMedia" } | { "kind": "audioBrowse" };
 
 export type ContentsRecursion = "immediate" | "recursive";
 

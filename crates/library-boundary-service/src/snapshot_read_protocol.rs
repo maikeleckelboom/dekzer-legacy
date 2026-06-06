@@ -110,6 +110,7 @@ const fn store_contents_row_profile(
     match row_profile {
         protocol::ContentsRowProfile::SourceFile => store::StoreContentsRowProfile::SourceFile,
         protocol::ContentsRowProfile::PrimaryMedia => store::StoreContentsRowProfile::PrimaryMedia,
+        protocol::ContentsRowProfile::AudioBrowse => store::StoreContentsRowProfile::AudioBrowse,
     }
 }
 
@@ -1056,6 +1057,7 @@ const fn map_contents_row_profile(
     match row_profile {
         store::StoreContentsRowProfile::SourceFile => protocol::ContentsRowProfile::SourceFile,
         store::StoreContentsRowProfile::PrimaryMedia => protocol::ContentsRowProfile::PrimaryMedia,
+        store::StoreContentsRowProfile::AudioBrowse => protocol::ContentsRowProfile::AudioBrowse,
     }
 }
 
@@ -1514,7 +1516,10 @@ fn malformed_store_state(detail: impl Into<String>) -> store::LibrarySqliteError
 
 #[cfg(test)]
 mod tests {
-    use super::{map_library_tree_node, map_read_library_tree_children_reply};
+    use super::{
+        map_library_tree_node, map_read_contents_reply, map_read_library_tree_children_reply,
+        store_contents_policy,
+    };
     use library_boundary_protocol as protocol;
     use library_store_sqlite as store;
 
@@ -1731,5 +1736,42 @@ mod tests {
             other => panic!("expected malformed store state, found {other:?}"),
         };
         assert!(detail.contains("unsupported dir_scan_state"));
+    }
+
+    #[test]
+    fn contents_profile_mapping_preserves_audio_browse_policy() {
+        let protocol_policy = protocol::ContentsReadPolicy {
+            media_classes: vec![protocol::ContentsMediaClass::Audio],
+            row_profile: protocol::ContentsRowProfile::AudioBrowse,
+        };
+        let store_policy = store_contents_policy(protocol_policy.clone());
+
+        assert_eq!(
+            store_policy.row_profile,
+            store::StoreContentsRowProfile::AudioBrowse
+        );
+        assert_eq!(
+            store_policy.media_classes,
+            vec![store::StoreContentsMediaClass::Audio]
+        );
+
+        let reply = map_read_contents_reply(store::StoreContentsResult {
+            state: store::StoreContentsState::Empty,
+            scope: store::StoreContentsScope::Source { source_id: 7 },
+            policy: store_policy,
+            recursion: store::StoreContentsRecursion::Recursive,
+            rows: Vec::new(),
+            coverage: store::StoreContentsCoverage {
+                state: store::StoreContentsCoverageState::Complete,
+                recursive_scope_complete: true,
+                empty_result_authoritative: true,
+                detail: None,
+            },
+            next_cursor: None,
+            detail: None,
+        })
+        .expect("map contents reply");
+
+        assert_eq!(reply.result.policy, protocol_policy);
     }
 }

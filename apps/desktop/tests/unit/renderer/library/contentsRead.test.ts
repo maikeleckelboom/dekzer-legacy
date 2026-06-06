@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  contentsRequestKey,
   createContentsReadController,
   type ContentsBoundaryState
 } from '../../../../src/renderer/library/boundary/contentsRead'
@@ -17,7 +18,7 @@ describe('createContentsReadController', () => {
     vi.useRealTimers()
   })
 
-  it('requests recursive audio-only source-file contents for selected directories', async () => {
+  it('requests recursive audio-only audio-browse contents for selected directories', async () => {
     let capturedRequest: ContentsReadRequest | undefined
     const contentsApi: LibraryContentsApi = {
       async read(request): Promise<ContentsReadResult> {
@@ -52,7 +53,7 @@ describe('createContentsReadController', () => {
       },
       policy: {
         mediaClasses: ['audio'],
-        rowProfile: { kind: 'sourceFile' }
+        rowProfile: { kind: 'audioBrowse' }
       },
       recursion: 'recursive',
       limit: 100
@@ -60,6 +61,35 @@ describe('createContentsReadController', () => {
     expect(capturedRequest?.policy.mediaClasses).not.toContain('image')
     expect(capturedRequest?.policy.mediaClasses).not.toContain('video')
     expect(capturedRequest?.policy.mediaClasses).not.toContain('unsupported')
+  })
+
+  it('includes row profile in request keys', () => {
+    const scope = {
+      kind: 'directory' as const,
+      sourceId: '7',
+      sourceDirectoryId: '11'
+    }
+
+    expect(
+      contentsRequestKey(
+        scope,
+        {
+          mediaClasses: ['audio'],
+          rowProfile: { kind: 'audioBrowse' }
+        },
+        'recursive'
+      )
+    ).toBe('directory:7:11:audioBrowse:audio:recursive')
+    expect(
+      contentsRequestKey(
+        scope,
+        {
+          mediaClasses: ['audio'],
+          rowProfile: { kind: 'sourceFile' }
+        },
+        'recursive'
+      )
+    ).toBe('directory:7:11:sourceFile:audio:recursive')
   })
 
   it('preloadForBinding schedules no IPC before the rest threshold', async () => {
@@ -154,7 +184,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:12:sourceFile:audio:recursive',
+        requestKey: 'directory:7:12:audioBrowse:audio:recursive',
         sequence: 1
       }
     })
@@ -197,7 +227,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:11:sourceFile:audio:recursive',
+        requestKey: 'directory:7:11:audioBrowse:audio:recursive',
         sequence: 1
       }
     })
@@ -287,7 +317,12 @@ describe('createContentsReadController', () => {
     const read = controller.readForBinding(directoryBinding(), { cursor: 'cursor-a' })
 
     expect(contentsApi.requests).toHaveLength(2)
-    expect(contentsApi.requests[1]).toMatchObject({ cursor: 'cursor-a' })
+    expect(contentsApi.requests[1]).toMatchObject({
+      cursor: 'cursor-a',
+      policy: {
+        rowProfile: { kind: 'audioBrowse' }
+      }
+    })
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('a2', 'A2.wav')]))
     await expect(read).resolves.toBe(true)
     expect(visibleLabels(controller.state.value)).toEqual(['A2.wav'])
@@ -390,7 +425,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:11:sourceFile:audio:recursive',
+        requestKey: 'directory:7:11:audioBrowse:audio:recursive',
         sequence: 1
       }
     })
@@ -401,7 +436,7 @@ describe('createContentsReadController', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(controller.state.value).toMatchObject({
       kind: 'loading',
-      requestKey: 'directory:7:11:sourceFile:audio:recursive',
+      requestKey: 'directory:7:11:audioBrowse:audio:recursive',
       sequence: 1
     })
 
@@ -424,7 +459,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:11:sourceFile:audio:recursive',
+        requestKey: 'directory:7:11:audioBrowse:audio:recursive',
         sequence: 2
       }
     })
@@ -452,7 +487,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:12:sourceFile:audio:recursive',
+        requestKey: 'directory:7:12:audioBrowse:audio:recursive',
         sequence: 2,
         presentation: 'deferred'
       }
@@ -471,7 +506,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:12:sourceFile:audio:recursive',
+        requestKey: 'directory:7:12:audioBrowse:audio:recursive',
         sequence: 2,
         presentation: 'visible'
       }
@@ -531,7 +566,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:13:sourceFile:audio:recursive',
+        requestKey: 'directory:7:13:audioBrowse:audio:recursive',
         sequence: 3,
         presentation: 'deferred'
       }
@@ -586,7 +621,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:12:sourceFile:audio:recursive',
+        requestKey: 'directory:7:12:audioBrowse:audio:recursive',
         sequence: 2
       }
     })

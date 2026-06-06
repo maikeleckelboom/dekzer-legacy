@@ -734,6 +734,18 @@
           "required": [
             "kind"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "audioBrowse"
+            }
+          },
+          "required": [
+            "kind"
+          ]
         }
       ]
     },

@@ -75,7 +75,7 @@ const maxSpeculativeReads = 1
 const safeContentsRequestFailure = 'Unable to request library contents.'
 const defaultContentsPolicy: ContentsReadPolicy = {
   mediaClasses: ['audio'],
-  rowProfile: { kind: 'sourceFile' }
+  rowProfile: { kind: 'audioBrowse' }
 }
 const contentsRecursion: ContentsRecursion = 'recursive'
 
@@ -670,7 +670,7 @@ function contentsScopeForBinding(
   }
 }
 
-function contentsRequestKey(
+export function contentsRequestKey(
   scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>,
   policy: ContentsReadPolicy,
   recursion: ContentsRecursion

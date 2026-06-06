@@ -4,13 +4,13 @@
 
 Default main library contents browse is audio-first and audio-only for V0.
 
-The default renderer contents request uses the existing literal source-file row profile with:
+The default renderer contents request uses the backend-owned audio browse row profile with:
 
-| Field          | V0 default   |
-| -------------- | ------------ |
-| `rowProfile`   | `sourceFile` |
-| `mediaClasses` | audio        |
-| `recursion`    | recursive    |
+| Field          | V0 default    |
+| -------------- | ------------- |
+| `rowProfile`   | `audioBrowse` |
+| `mediaClasses` | audio         |
+| `recursion`    | recursive     |
 
 The renderer may choose this policy, but the boundary and backend own what rows are returned. The projection and table
 render returned rows and must not hide disallowed rows with renderer-side filtering or sorting.
@@ -30,9 +30,9 @@ durable source inventory semantics.
 
 ## Current Row Contract
 
-Default contents rows are source-file browse rows. They are suitable for an audio-first file browse table, but they are
-not canonical tracks and do not decide same-song identity, analysis readiness, deck load readiness, CUE association, or
-artwork role.
+Default contents rows use the audio browse profile and reuse the existing contents file-row payload shape. They are
+suitable for an audio-first file browse table, but they are not canonical tracks and do not decide same-song identity,
+analysis readiness, deck load readiness, CUE association, or artwork role.
 
 The contents read and store own ordering, media-class admission, row profile admission, recursion, cursor identity, and
 coverage. Renderer projection may choose labels, icons, state rows, and table layout for returned rows only.

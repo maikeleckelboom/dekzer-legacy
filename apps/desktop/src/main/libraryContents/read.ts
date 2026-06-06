@@ -266,6 +266,10 @@ function normalizeRowProfile(value: unknown): ContentsRowProfile | ContentsReadR
     return { kind: 'primaryMedia' }
   }
 
+  if (isRecord(value) && value.kind === 'audioBrowse') {
+    return { kind: 'audioBrowse' }
+  }
+
   return createContentsErrorResult(
     'invalidRequest',
     'invalidRequest',

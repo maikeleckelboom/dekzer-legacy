@@ -136,4 +136,4 @@ mechanics, but the resulting browser must keep tree and contents browsing contai
 ## Non-Goals
 
 This contract does not define track detail panels, deck loading, search-scoped contents reads, renderer-side
-filter/sort controls, or future audio row read-model implementation.
+filter/sort controls, or future audio browse fields and surfaces beyond the implemented V0 contents profile.

@@ -75,7 +75,10 @@ The following facts are established by the Phase 0 inventory:
 ## Contract Vocabulary
 
 ```ts
-type ContentsRowProfile = { readonly kind: 'sourceFile' } | { readonly kind: 'primaryMedia' }
+type ContentsRowProfile =
+  | { readonly kind: 'sourceFile' }
+  | { readonly kind: 'primaryMedia' }
+  | { readonly kind: 'audioBrowse' }
 ```
 
 **sourceFile:**
@@ -92,6 +95,14 @@ type ContentsRowProfile = { readonly kind: 'sourceFile' } | { readonly kind: 'pr
 - may carry primary-media, library-asset, readiness, prep, waveform, and stems summary
 - rejects image with `policyConflict`
 - replaces the old selectedContentsRead behavior
+
+**audioBrowse:**
+
+- audio only
+- reuses the current contents file-row payload shape
+- returns V0 rows with source-file audio parity for equivalent scope, recursion, limit, and cursor
+- rejects non-audio media classes with `policyConflict`
+- cursor identity is distinct from `sourceFile` and `primaryMedia`
 
 The following terms are not used as shared or backend contract concepts:
 
@@ -153,6 +164,9 @@ type ContentsReadPolicy = {
 - sourceFile profile never carries primaryMedia summary.
 - primaryMedia profile may include audio and video only.
 - primaryMedia + image or unsupported returns `policyConflict`.
+- audioBrowse profile may include audio only.
+- audioBrowse + video, image, or unsupported returns `policyConflict`.
+- audioBrowse reuses the contents file-row payload shape and does not introduce a dedicated row type.
 - Image rows never carry primaryMedia summary.
 - `mediaClasses` are deterministic arrays, not Set.
 - `mediaClasses` are canonicalized in deterministic order: audio, video, image, unsupported.

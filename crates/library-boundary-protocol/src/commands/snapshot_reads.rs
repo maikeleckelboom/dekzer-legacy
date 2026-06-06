@@ -333,6 +333,7 @@ pub struct ContentsReadPolicy {
 pub enum ContentsRowProfile {
     SourceFile,
     PrimaryMedia,
+    AudioBrowse,
 }
 
 #[derive(
@@ -2351,7 +2352,8 @@ pub enum SnapshotReadReply {
 mod tests {
     use super::{
         AttachmentIdentity, AttachmentIdentityReadStatus, ChildRowState, ContentsFileKind,
-        ContentsMediaClass, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
+        ContentsRowProfile, ContentsScope, DirectoryImageMediaState, DirectoryPrimaryMediaState,
         DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
         LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
         LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
@@ -2516,6 +2518,56 @@ mod tests {
             ContentsFileKind::from_projection_value("unknown"),
             Some(ContentsFileKind::Unknown)
         );
+    }
+
+    #[test]
+    fn contents_row_profile_serializes_audio_browse_boundary_shape() {
+        let profile = ContentsRowProfile::AudioBrowse;
+        let json = serde_json::to_value(profile).expect("serialize profile");
+        assert_eq!(json, json!({ "kind": "audioBrowse" }));
+        assert_eq!(
+            serde_json::from_value::<ContentsRowProfile>(json).expect("deserialize profile"),
+            ContentsRowProfile::AudioBrowse
+        );
+    }
+
+    #[test]
+    fn contents_row_profile_variants_remain_distinct_in_read_requests() {
+        let profiles = [
+            (ContentsRowProfile::SourceFile, "sourceFile"),
+            (ContentsRowProfile::PrimaryMedia, "primaryMedia"),
+            (ContentsRowProfile::AudioBrowse, "audioBrowse"),
+        ];
+
+        for (profile, expected_kind) in profiles {
+            let request = ContentsReadRequest {
+                scope: ContentsScope::Directory {
+                    source_id: 7,
+                    source_directory_id: 11,
+                },
+                policy: ContentsReadPolicy {
+                    media_classes: vec![ContentsMediaClass::Audio],
+                    row_profile: profile,
+                },
+                recursion: ContentsRecursion::Recursive,
+                limit: Some(25),
+                cursor: Some("opaque-cursor".to_string()),
+            };
+
+            let command = SnapshotReadCommand::ContentsRead(request.clone());
+            let json = serde_json::to_value(&command).expect("serialize contents read");
+            assert_eq!(json["type"], json!("contentsRead"));
+            assert_eq!(
+                json["payload"]["policy"]["rowProfile"]["kind"],
+                json!(expected_kind)
+            );
+            assert_eq!(json["payload"]["cursor"], json!("opaque-cursor"));
+            assert_eq!(
+                serde_json::from_value::<SnapshotReadCommand>(json)
+                    .expect("deserialize contents read"),
+                command
+            );
+        }
     }
 
     #[test]

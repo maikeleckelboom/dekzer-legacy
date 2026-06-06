@@ -151,6 +151,21 @@ describe('projectContents', () => {
     })
   })
 
+  it('projects audio-browse file-row payloads without filtering or sorting', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        profile: { mediaClasses: ['audio'], rowProfile: { kind: 'audioBrowse' } },
+        rows: [sourceFileRow('b', 'B.wav', 'audio'), sourceFileRow('a', 'A.jpg', 'image')]
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.rows.map((row) => row.label)).toEqual(['B.wav', 'A.jpg'])
+    expect(contents.rows.every((row) => row.kind === 'file')).toBe(true)
+  })
+
   it('shows load-more row and continuation detail when nextCursor exists', () => {
     const contents = projectForSelection(browserState({}), 'navigation-row:7', {
       kind: 'ready',
@@ -405,7 +420,7 @@ describe('projectContents', () => {
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
         requestKey: 'source:7',
-        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
         pendingPresentation: 'deferred'
       })
     )
@@ -431,8 +446,8 @@ describe('projectContents', () => {
       'source-directory:12',
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
-        requestKey: 'directory:7:11:sourceFile:audio:recursive',
-        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        requestKey: 'directory:7:11:audioBrowse:audio:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
         pendingPresentation: 'deferred'
       })
     )
@@ -456,7 +471,7 @@ describe('projectContents', () => {
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
         requestKey: 'source:7',
-        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
         pendingPresentation: 'deferred'
       })
     )
@@ -465,7 +480,7 @@ describe('projectContents', () => {
       'source-directory:12',
       readyContents({
         rows: [sourceFileRow('new', 'new.wav', 'audio')],
-        requestKey: 'directory:7:12:sourceFile:audio:recursive'
+        requestKey: 'directory:7:12:audioBrowse:audio:recursive'
       })
     )
 
@@ -488,7 +503,7 @@ describe('projectContents', () => {
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
         requestKey: 'source:7',
-        pendingRequestKey: 'directory:7:12:sourceFile:audio:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
         pendingPresentation: 'visible'
       })
     )
