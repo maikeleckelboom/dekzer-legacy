@@ -719,7 +719,7 @@ function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['stat
   switch (result.state) {
     case 'ready':
     case 'empty':
-      return result.coverage.emptyResultAuthoritative ? 'empty' : 'loading'
+      return result.coverage.state === 'complete' ? 'empty' : 'loading'
     case 'partial':
       // Partial coverage can legitimately contain zero known rows while scanning is incomplete.
       return 'loading'
@@ -733,14 +733,15 @@ function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['stat
 }
 
 function contentsStateLabel(result: ContentsResult): string {
-  const rowSubject = contentsRowSubject(result)
-
   switch (result.state) {
     case 'ready':
     case 'empty':
-      return result.coverage.emptyResultAuthoritative
-        ? `No ${rowSubject} found`
-        : `No ${rowSubject} found yet`
+      if (result.coverage.state !== 'complete') {
+        return 'Still indexing'
+      }
+      return result.hasRowsOmittedByPolicy
+        ? policyEmptyLabel(result.policy)
+        : trueEmptyLabel(result.policy)
     case 'partial':
       return 'Still indexing'
     case 'sourceUnavailable':
@@ -798,16 +799,43 @@ function contentsDetailWithContinuation(
   return contentsDetail(result, accumulatedRows)
 }
 
-function contentsRowSubject(result: ContentsResult): 'primary media' | 'visible files' {
-  return result.policy.kind === 'primaryMedia' ? 'primary media' : 'visible files'
+function contentsCountSubject(result: ContentsResult, count: number): string {
+  switch (result.policy.kind) {
+    case 'playableMediaBrowse':
+      return count === 1 ? 'playable media item' : 'playable media items'
+    case 'audioBrowse':
+      return count === 1 ? 'audio track' : 'audio tracks'
+    case 'primaryMedia':
+      return count === 1 ? 'primary media item' : 'primary media items'
+    case 'sourceFileInventory':
+      return count === 1 ? 'requested file' : 'requested files'
+  }
 }
 
-function contentsCountSubject(result: ContentsResult, count: number): string {
-  if (result.policy.kind === 'primaryMedia') {
-    return count === 1 ? 'primary media item' : 'primary media items'
+function policyEmptyLabel(policy: ContentsResult['policy']): string {
+  switch (policy.kind) {
+    case 'playableMediaBrowse':
+      return 'No playable media in this view'
+    case 'audioBrowse':
+      return 'No audio tracks in this view'
+    case 'sourceFileInventory':
+      return 'No requested files in this view'
+    case 'primaryMedia':
+      return 'No primary media in this view'
   }
+}
 
-  return count === 1 ? 'visible file' : 'visible files'
+function trueEmptyLabel(policy: ContentsResult['policy']): string {
+  switch (policy.kind) {
+    case 'playableMediaBrowse':
+      return 'No playable media found'
+    case 'audioBrowse':
+      return 'No audio tracks found'
+    case 'sourceFileInventory':
+      return 'No requested files found'
+    case 'primaryMedia':
+      return 'No primary media found'
+  }
 }
 
 function contentsCoveragePrefix(result: ContentsResult): string | undefined {

@@ -103,7 +103,7 @@ export type ContentsReadRequest = { scope: ContentsScope, policy: ContentsReadPo
 
 export type ContentsScope = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
 
-export type ContentsReadPolicy = { "kind": "audioBrowse" } | { "kind": "sourceFileInventory", fileClasses: Array<ContentsFileClass>, } | { "kind": "primaryMedia", mediaKinds: Array<PrimaryMediaKind>, };
+export type ContentsReadPolicy = { "kind": "playableMediaBrowse" } | { "kind": "audioBrowse" } | { "kind": "sourceFileInventory", fileClasses: Array<ContentsFileClass>, } | { "kind": "primaryMedia", mediaKinds: Array<PrimaryMediaKind>, };
 
 export type ContentsFileClass = "audio" | "video" | "image" | "unsupported";
 
@@ -282,7 +282,7 @@ export type SourceFileAttachmentLinkStatus = "current" | "stale";
 
 export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
 
-export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, rows: Array<ContentsFileRow>, coverage: ContentsCoverage, nextCursor?: string, detail?: string, };
+export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, recursion: ContentsRecursion, rows: Array<ContentsFileRow>, coverage: ContentsCoverage, hasRowsOmittedByPolicy: boolean, nextCursor?: string, detail?: string, };
 
 export type ContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed" | "policyConflict" | "cursorInvalid";
 

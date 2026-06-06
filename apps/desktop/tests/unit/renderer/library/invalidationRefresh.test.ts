@@ -298,13 +298,13 @@ describe('executeRefreshPlan', () => {
     expect(requests).toEqual([
       {
         scope: { kind: 'source', sourceId: '7' },
-        policy: { kind: 'audioBrowse' },
+        policy: { kind: 'playableMediaBrowse' },
         recursion: 'recursive',
         limit: 100
       },
       {
         scope: { kind: 'source', sourceId: '7' },
-        policy: { kind: 'audioBrowse' },
+        policy: { kind: 'playableMediaBrowse' },
         recursion: 'recursive',
         limit: 100
       }
@@ -375,14 +375,15 @@ function readyContentsResult(
     result: {
       state,
       scope: { kind: 'source', sourceId: '7' },
-      policy: { kind: 'audioBrowse' },
+      policy: { kind: 'playableMediaBrowse' },
       recursion: 'recursive',
       rows,
       coverage: {
         state: state === 'partial' ? 'scanning' : 'complete',
         recursiveScopeComplete: state === 'ready',
         emptyResultAuthoritative: false
-      }
+      },
+      hasRowsOmittedByPolicy: false
     }
   }
 }

@@ -122,7 +122,10 @@ describe('projectContents', () => {
     const contents = projectForSelection(
       state,
       'source-directory:50',
-      readyContents({ rows: [sourceFileRow('cover-1', 'front.jpg', 'image')] })
+      readyContents({
+        profile: { kind: 'sourceFileInventory', fileClasses: ['image'] },
+        rows: [sourceFileRow('cover-1', 'front.jpg', 'image')]
+      })
     )
 
     expect(contents.kind).toBe('ready')
@@ -139,7 +142,10 @@ describe('projectContents', () => {
     const contents = projectForSelection(
       browserState({}),
       'navigation-row:7',
-      readyContents({ rows: [sourceFileRow('cue-1', 'album.cue', 'unsupported', 'cueSheet')] })
+      readyContents({
+        profile: { kind: 'sourceFileInventory', fileClasses: ['unsupported'] },
+        rows: [sourceFileRow('cue-1', 'album.cue', 'unsupported', 'cueSheet')]
+      })
     )
 
     expect(contents.kind).toBe('ready')
@@ -164,6 +170,26 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('ready')
     expect(contents.rows.map((row) => row.label)).toEqual(['B.wav', 'A.jpg'])
     expect(contents.rows.every((row) => row.kind === 'file')).toBe(true)
+  })
+
+  it('projects MP4 source rows as video under playable-media browse', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        profile: { kind: 'playableMediaBrowse' },
+        rows: [sourceFileRow('video-1', 'clip.mp4', 'video')]
+      })
+    )
+
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'file',
+      label: 'clip.mp4',
+      fileClass: 'video',
+      icon: 'video'
+    })
+    expect(contents.rows[0]).not.toHaveProperty('state', 'empty')
   })
 
   it('shows load-more row and continuation detail when nextCursor exists', () => {
@@ -191,6 +217,7 @@ describe('projectContents', () => {
             recursiveScopeComplete: true,
             emptyResultAuthoritative: true
           },
+          hasRowsOmittedByPolicy: false,
           nextCursor: 'c2Y6...'
         }
       }
@@ -236,6 +263,7 @@ describe('projectContents', () => {
             recursiveScopeComplete: true,
             emptyResultAuthoritative: true
           },
+          hasRowsOmittedByPolicy: false,
           nextCursor: 'c2Y6...'
         }
       }
@@ -260,7 +288,7 @@ describe('projectContents', () => {
     )
 
     expect(contents.kind).toBe('ready')
-    expect(contents.detail).toBe('3 visible files loaded.')
+    expect(contents.detail).toBe('3 playable media items loaded.')
     expect(contents.rows).toHaveLength(3)
   })
 
@@ -280,7 +308,7 @@ describe('projectContents', () => {
     expect(empty.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No visible files found'
+      label: 'No playable media found'
     })
 
     const partial = projectForSelection(browserState({}), 'navigation-row:7', {
@@ -298,7 +326,8 @@ describe('projectContents', () => {
             state: 'scanning',
             recursiveScopeComplete: false,
             emptyResultAuthoritative: false
-          }
+          },
+          hasRowsOmittedByPolicy: false
         }
       }
     })
@@ -525,7 +554,7 @@ describe('projectContents', () => {
 
     expect(contents.kind).toBe('ready')
     expect(contents.title).toBe('Source Fixture')
-    expect(contents.detail).toBe('Updating selected contents. 1 visible file loaded.')
+    expect(contents.detail).toBe('Updating selected contents. 1 playable media item loaded.')
     expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
   })
 
@@ -576,17 +605,17 @@ describe('projectContents', () => {
     expect(contents.rows[0]).not.toMatchObject({ state: 'failed' })
   })
 
-  it('projects zero rows as authoritative empty only when accepted coverage says so', () => {
+  it('distinguishes incomplete zero rows from complete authoritative empty', () => {
     const pendingCoverage = projectForSelection(
       browserState({}),
       'navigation-row:7',
-      readyContents({ rows: [], state: 'ready', emptyAuthoritative: false })
+      readyContents({ rows: [], state: 'partial', emptyAuthoritative: false })
     )
 
     expect(pendingCoverage.rows[0]).toMatchObject({
       kind: 'state',
       state: 'loading',
-      label: 'No visible files found yet'
+      label: 'Still indexing'
     })
 
     const authoritative = projectForSelection(
@@ -598,7 +627,64 @@ describe('projectContents', () => {
     expect(authoritative.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No visible files found'
+      label: 'No playable media found'
+    })
+  })
+
+  it('projects policy-empty copy from service-owned omission metadata', () => {
+    const audioBrowse = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        profile: { kind: 'audioBrowse' },
+        emptyAuthoritative: false,
+        omittedRows: true
+      })
+    )
+    expect(audioBrowse.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No audio tracks in this view',
+      detail: 'No audio tracks in this view'
+    })
+
+    const playableMediaBrowse = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        profile: { kind: 'playableMediaBrowse' },
+        emptyAuthoritative: false,
+        omittedRows: true
+      })
+    )
+    expect(playableMediaBrowse.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No playable media in this view'
+    })
+  })
+
+  it('keeps incomplete zero-row omission results in indexing presentation', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'partial',
+        profile: { kind: 'audioBrowse' },
+        emptyAuthoritative: false,
+        omittedRows: true
+      })
+    )
+
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'loading',
+      label: 'Still indexing'
     })
   })
 
@@ -838,6 +924,7 @@ function readyContents(options: {
   readonly detail?: string
   readonly profile?: ContentsReadPolicy
   readonly emptyAuthoritative?: boolean
+  readonly omittedRows?: boolean
   readonly requestKey?: string
   readonly pendingRequestKey?: string
   readonly pendingPresentation?: 'deferred' | 'visible'
@@ -870,14 +957,10 @@ function contentsResult(options: {
   readonly detail?: string
   readonly profile?: ContentsReadPolicy
   readonly emptyAuthoritative?: boolean
+  readonly omittedRows?: boolean
 }): ContentsResult {
   const state = options.state ?? 'ready'
-  const policy =
-    options.profile ??
-    ({
-      kind: 'sourceFileInventory',
-      fileClasses: ['audio', 'video', 'image', 'unsupported']
-    } satisfies ContentsReadPolicy)
+  const policy = options.profile ?? ({ kind: 'playableMediaBrowse' } satisfies ContentsReadPolicy)
   return {
     state,
     scope: { kind: 'source', sourceId: '7' },
@@ -890,10 +973,13 @@ function contentsResult(options: {
           ? 'failed'
           : state === 'sourceUnavailable'
             ? 'sourceUnavailable'
-            : 'complete',
+            : state === 'partial'
+              ? 'scanning'
+              : 'complete',
       recursiveScopeComplete: state !== 'partial',
       emptyResultAuthoritative: options.emptyAuthoritative ?? state !== 'partial'
     },
+    hasRowsOmittedByPolicy: options.omittedRows ?? false,
     ...(options.detail === undefined ? {} : { detail: options.detail })
   }
 }

@@ -77,6 +77,7 @@ The following facts are established by the Phase 0 inventory:
 
 ```ts
 type ContentsReadPolicy =
+  | { readonly kind: 'playableMediaBrowse' }
   | { readonly kind: 'audioBrowse' }
   | {
       readonly kind: 'sourceFileInventory'
@@ -94,7 +95,15 @@ type ContentsReadPolicy =
 - audio, video, image allowed
 - no primaryMedia summary
 - no prep, readiness, waveform, or stems joins
-- used by image-inclusive visible browsing
+- used by explicit inventory browsing
+
+**playableMediaBrowse:**
+
+- canonical default product browse
+- audio and video durable file classes
+- accepts no caller-supplied class filter
+- excludes images, unsupported raw files, diagnostics-only rows, metadata companions, and CUE sheets
+- cursor identity is distinct from every other policy
 
 **primaryMedia:**
 
@@ -153,9 +162,22 @@ type ContentsFileKind =
   | 'unknown'
 
 type ContentsReadPolicy =
+  | { readonly kind: 'playableMediaBrowse' }
   | { readonly kind: 'audioBrowse' }
   | { readonly kind: 'sourceFileInventory'; readonly fileClasses: readonly ContentsFileClass[] }
   | { readonly kind: 'primaryMedia'; readonly mediaKinds: readonly PrimaryMediaKind[] }
+
+type ContentsResult = {
+  readonly state: ContentsState
+  readonly scope: ContentsScope
+  readonly policy: ContentsReadPolicy
+  readonly recursion: ContentsRecursion
+  readonly rows: readonly ContentsFileRow[]
+  readonly coverage: ContentsCoverage
+  readonly hasRowsOmittedByPolicy: boolean
+  readonly nextCursor?: string
+  readonly detail?: string
+}
 ```
 
 ---
@@ -166,7 +188,10 @@ type ContentsReadPolicy =
 - Renderer mode names do not cross into backend, shared, protocol, or query code.
 - Renderer sends typed policy, never raw SQL.
 - Backend and query code own profile-specific filtering.
+- Store/service own required scope-level `hasRowsOmittedByPolicy`; renderer does not inspect raw inventory.
 - Renderer does not answer authoritative selected scope contents from loaded hierarchy cache.
+- `playableMediaBrowse` is the default and may include audio and video only.
+- `playableMediaBrowse` has no caller-supplied file class filter.
 - sourceFileInventory may include audio, video, image, and admitted unsupported companion rows.
 - sourceFileInventory never carries primaryMedia summary.
 - primaryMedia profile may include audio and video only.
@@ -178,7 +203,11 @@ type ContentsReadPolicy =
 - `fileClasses` canonicalize as audio, video, image, unsupported; `mediaKinds` canonicalize as audio, video.
 - Normal media-relevant source-file inventory admits unsupported rows only when `fileKind = cueSheet`.
 - Unsupported docs, archives, binaries, unknown files, and `none` files are excluded from normal contents policy.
-- See `docs/library/media-relevant-file-inventory-contract.md` for the default inventory policy.
+- `.m4a` classifies as audio and `.mp4` classifies as video until stronger media-probe authority exists.
+- Incomplete zero-row coverage is not authoritative empty.
+- Complete zero-row results with `hasRowsOmittedByPolicy: true` are empty only for the active policy.
+- `primaryMedia` omission metadata is `false` in this slice and never uses raw `source_files` as a proxy.
+- See `docs/library/media-relevant-file-inventory-contract.md` for durable inventory classification.
 - Cursor pagination is implemented; `nextCursor` is produced when more rows exist.
 - Provided cursor must not be silently ignored or treated as page one.
 - Invalid or mismatched cursor returns `cursorInvalid` with no `nextCursor`.

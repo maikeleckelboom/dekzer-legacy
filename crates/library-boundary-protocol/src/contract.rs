@@ -275,6 +275,8 @@ mod tests {
         assert!(ts.contains("LibraryTreeNode"));
         assert!(ts.contains("LibraryTreeFileClass"));
         assert!(ts.contains("fileClass: ContentsFileClass"));
+        assert!(ts.contains("playableMediaBrowse"));
+        assert!(ts.contains("hasRowsOmittedByPolicy: boolean"));
         assert!(!ts.contains(&["media", "Class"].concat()));
         assert!(!ts.contains(&["Contents", "Media", "Class"].concat()));
         assert!(ts.contains("DirectoryPrimaryMediaState"));
@@ -303,6 +305,8 @@ mod tests {
         assert!(schema.contains("\"readSourceLifecycle\""));
         assert!(schema.contains("\"readLibraryTreeChildren\""));
         assert!(schema.contains("\"fileClass\""));
+        assert!(schema.contains("\"playableMediaBrowse\""));
+        assert!(schema.contains("\"hasRowsOmittedByPolicy\""));
         assert!(!schema.contains(&format!("\"{}\"", ["media", "Class"].concat())));
         assert!(!schema.contains(&format!("\"{}\"", ["Contents", "Media", "Class"].concat())));
         assert!(schema.contains("\"acceptTrackIdentityCandidate\""));

@@ -2,59 +2,67 @@
 
 ## Decision
 
-Default main library contents browse is audio-first and audio-only for V0.
-
-The default renderer contents request uses the backend-owned policy:
+The default main library contents browse uses the backend-owned canonical policy:
 
 ```ts
 {
-  policy: { kind: 'audioBrowse' },
+  policy: { kind: 'playableMediaBrowse' },
   recursion: 'recursive'
 }
 ```
 
-`audioBrowse` implies audio and accepts no caller-supplied class filter.
+`playableMediaBrowse` includes durable `source_files.file_class` values `audio` and `video`. It excludes images,
+unsupported raw files, diagnostics-only files, generic metadata companions, and CUE sheets.
 
-The renderer may choose this policy, but the boundary and backend own what rows are returned. The projection and table
-render returned rows and must not hide disallowed rows with renderer-side filtering or sorting.
+`audioBrowse` remains a separate audio-only policy. It includes `audio` and excludes `video`, including extension-only
+`.mp4` files. Extension classification treats `.m4a` as audio and `.mp4` as video until media-probe authority establishes
+stronger facts for a specific file.
 
-The persisted source-file vocabulary is separate from the policy discriminant:
+The renderer requests a policy and presents returned facts. It does not supply `['audio', 'video']` as a default
+`sourceFileInventory` filter, inspect raw source inventory, filter rows, sort rows, or infer hidden content.
 
-- `file_kind` is the detailed detected taxonomy.
-- `file_class` is the coarse inventory classification with values `audio`, `video`, `image`, `unsupported`, and `none`.
-- Contents source-file rows expose the coarse fact as `fileClass`.
-- `none` is a persisted/internal classification and is not requestable through `sourceFileInventory.fileClasses`.
-- `unsupported` in `sourceFileInventory` admits only cue-sheet files, not all unsupported files.
+## Omission Metadata
 
-## Boundaries
+Every contents result carries required service-owned `hasRowsOmittedByPolicy: boolean`.
 
-Raw source-file inventory remains available through `sourceFileInventory.fileClasses`. Explicit non-default inventory
-reads may request `audio`, `video`, `image`, and `unsupported` as requestable browse classes. Inserting `none` as a
-`ContentsFileClass` requires a separate decision.
+For resolved scopes, the store computes the value across the requested scope and recursion mode, independently of the
+current page:
 
-`primaryMedia.mediaKinds` is separate primary-media vocabulary and is not an alias for source-file `fileClasses`.
+- `playableMediaBrowse` reports browse-relevant image rows as omitted.
+- `audioBrowse` reports browse-relevant video and image rows as omitted.
+- `sourceFileInventory` reports requestable browse classes omitted by its explicit class filter.
+- unsupported raw junk, diagnostics-only files, and unrequested internal classifications do not trigger the value.
+- `primaryMedia` returns `false` in this slice; it does not use raw `source_files` as a proxy for the primary-media row
+  universe.
 
-Video is not part of the V0 default browse policy. Artwork, CUE sheets, and metadata companion files are not default
-playable rows. They may exist in durable source inventory and future explicit surfaces, but they are not returned by the
-default main contents browse.
+Non-browsable and unavailable result states return `false` and let result state drive presentation.
 
-This decision does not parse CUE sheets, infer artwork or CUE associations, create canonical track identity, or change
-durable source inventory semantics.
+## Empty Presentation
 
-## Current Row Contract
+Coverage and omission metadata jointly define zero-row presentation:
 
-Default contents rows use the audio browse profile and reuse the existing contents file-row payload shape. They are
-suitable for an audio-first file browse table, but they are not canonical tracks and do not decide same-song identity,
-analysis readiness, deck load readiness, CUE association, or artwork role.
+- incomplete coverage: `Still indexing` or equivalent;
+- complete coverage plus omissions: policy-empty copy such as `No audio tracks in this view`;
+- complete coverage without omissions: true empty copy for the active policy.
 
-The contents read and store own ordering, profile-specific admission, recursion, cursor identity, and coverage.
-Renderer projection may choose labels, icons, state rows, and table layout for returned rows only.
+A folder containing only MP4 files returns video rows under `playableMediaBrowse`. The same folder returns zero rows and
+`hasRowsOmittedByPolicy: true` under `audioBrowse`; it is not presented as truly empty.
 
-## Perception Contract
+## Other Policies
 
-Retained contents rows are perception continuity, not data authority. Pending state may be delayed to avoid spinner
-flash on fast reads. Warm contents prefetch is a short-lived runtime optimization for matching requests; it does not
-authorize rows and must be cleared by relevant invalidation or generation changes.
+`sourceFileInventory.fileClasses` remains an explicit non-default inventory policy. It exposes requestable `audio`,
+`video`, `image`, and admitted `unsupported` companion rows; the admitted unsupported subset is currently CUE sheets.
+Persisted `none` and diagnostics-only unsupported kinds remain non-requestable.
 
-The contents table must remain browsable inside the library panel. This is an acceptance rule for the product surface,
-not a requirement for a particular CSS implementation.
+`primaryMedia.mediaKinds` remains separate primary-media vocabulary and authority.
+
+## Product Boundaries
+
+Contents rows reuse the existing file-row payload and do not synthesize duration, BPM, musical key, codec, container,
+artwork, source label, provenance, or canonical track identity.
+
+The tree remains navigation-only. Audio, video, and file rows stay in contents. Source registration may perform only its
+existing scoped first-source activation; scan events refresh data and never select browse scope.
+
+Pending contents remain retained and threshold-gated. Branch loading does not clear selected contents. Enter selects
+tree rows; Space remains reserved outside tree selection.

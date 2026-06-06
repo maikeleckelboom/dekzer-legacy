@@ -909,7 +909,8 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
               state: 'complete',
               recursiveScopeComplete: true,
               emptyResultAuthoritative: true
-            }
+            },
+            hasRowsOmittedByPolicy: false
           }
         }
       }

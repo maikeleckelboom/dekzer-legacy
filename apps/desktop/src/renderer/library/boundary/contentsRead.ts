@@ -74,7 +74,7 @@ const maxWarmSnapshots = 16
 const maxSpeculativeReads = 1
 const safeContentsRequestFailure = 'Unable to request library contents.'
 const defaultContentsPolicy: ContentsReadPolicy = {
-  kind: 'audioBrowse'
+  kind: 'playableMediaBrowse'
 }
 const contentsRecursion: ContentsRecursion = 'recursive'
 
@@ -685,6 +685,7 @@ export function contentsRequestKey(
 
 function contentsPolicyKey(policy: ContentsReadPolicy): string {
   switch (policy.kind) {
+    case 'playableMediaBrowse':
     case 'audioBrowse':
       return policy.kind
     case 'sourceFileInventory':

@@ -1,6 +1,6 @@
 ---
 status: pointer
-doctrine-version: 0.1
+doctrine-version: 0.2
 last-reviewed: 2026-06-06
 owner: renderer-substrate-boundary
 canonical-target:
@@ -11,13 +11,17 @@ scope:
 
 # Library Contents Read Boundary
 
-The canonical contents read boundary is `docs/decisions/library-contents-read-boundary.md`.
+The canonical typed boundary is `docs/decisions/library-contents-read-boundary.md`.
 
-Use that document for the typed contents request, policy, recursion, cursor, and pagination contract. Use
-`docs/library/contents-policy-shape.md` for the implemented profile-specific policy decision,
-`docs/library/library-contents-browse-policy.md` for the current default audio-first browse policy and
-`docs/library/library-tree-selection-contents-contract.md` for renderer coupling, retained-row behavior, refresh
-planning, and panel containment.
+The active policy union contains `playableMediaBrowse`, `audioBrowse`, `sourceFileInventory { fileClasses }`, and
+`primaryMedia { mediaKinds }`. The default product request uses `playableMediaBrowse`; `audioBrowse` remains audio-only.
 
-The source-file inventory vocabulary is `file_kind` for detailed taxonomy and `file_class` for coarse persisted
-classification. Boundary source-file rows expose `fileClass`; `sourceFileInventory` owns `fileClasses`.
+Every result carries required `hasRowsOmittedByPolicy`. The store/service computes it for the requested scope and
+recursion mode. The renderer presents the returned rows, coverage, and omission fact without inspecting raw inventory.
+Incomplete zero-row coverage is not authoritative empty.
+
+Source-file inventory uses `file_kind` for detailed taxonomy and durable `file_class` for coarse classification.
+Extension classification treats `.m4a` as audio and `.mp4` as video. Boundary source-file rows expose `fileClass`;
+`sourceFileInventory` alone owns caller-supplied `fileClasses`.
+
+Tree navigation remains directory/navigation-only. Audio, video, and file rows stay in contents.

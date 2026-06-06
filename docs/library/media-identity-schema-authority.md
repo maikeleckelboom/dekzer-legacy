@@ -78,7 +78,8 @@ Evidence:
 
 - Store read model support exists in `read_models/contents.rs` and reads `primary_media_candidates`.
 - Boundary protocol and generated TypeScript expose `ContentsReadPolicy.primaryMedia` and `PrimaryMediaSummary`.
-- Desktop Main validates and maps the policy, while the renderer default requests `audioBrowse`.
+- Desktop Main validates and maps the policy. The renderer default requests `playableMediaBrowse`; `audioBrowse`
+  remains an explicit audio-only policy.
 - `primaryMedia` rows are present-file scoped and expose only the supported primary-media `mediaKinds`.
 - Promoted rows depend on current `primary_media_candidates`, `source_file_attachment_links`, `content_attachments`, and
   current `SourceFacts`.

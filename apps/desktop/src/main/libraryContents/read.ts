@@ -213,6 +213,10 @@ function normalizePolicy(value: unknown): ContentsReadPolicy | ContentsReadResul
     return { kind: 'audioBrowse' }
   }
 
+  if (value.kind === 'playableMediaBrowse') {
+    return { kind: 'playableMediaBrowse' }
+  }
+
   if (value.kind === 'sourceFileInventory') {
     const fileClasses = normalizeFileClasses(value.fileClasses)
     return isContentsReadResult(fileClasses)
@@ -383,6 +387,7 @@ function mapScopeFromContract(scope: ContractContentsScope): ContentsScope {
 
 function mapPolicyToContract(policy: ContentsReadPolicy): ContractContentsReadPolicy {
   switch (policy.kind) {
+    case 'playableMediaBrowse':
     case 'audioBrowse':
       return policy
     case 'sourceFileInventory':
@@ -400,6 +405,7 @@ function mapPolicyToContract(policy: ContentsReadPolicy): ContractContentsReadPo
 
 function mapPolicyFromContract(policy: ContractContentsReadPolicy): ContentsReadPolicy {
   switch (policy.kind) {
+    case 'playableMediaBrowse':
     case 'audioBrowse':
       return policy
     case 'sourceFileInventory':
@@ -438,7 +444,7 @@ function contentsStateError(result: ContractContentsResult): ContentsReadResult 
 function mapContentsResult(result: ContractContentsResult): ContentsResult | undefined {
   const state = mapReadyContentsState(result.state)
 
-  if (state === undefined) {
+  if (state === undefined || typeof result.hasRowsOmittedByPolicy !== 'boolean') {
     return undefined
   }
 
@@ -461,6 +467,7 @@ function mapContentsResult(result: ContractContentsResult): ContentsResult | und
     recursion: result.recursion,
     rows,
     coverage: mapCoverage(result),
+    hasRowsOmittedByPolicy: result.hasRowsOmittedByPolicy,
     ...(result.nextCursor === undefined ? {} : { nextCursor: result.nextCursor }),
     ...(result.detail === undefined ? {} : { detail: result.detail })
   }

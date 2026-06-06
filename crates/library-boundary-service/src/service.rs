@@ -1228,7 +1228,8 @@ fn validate_contents_scope(scope: &protocol::ContentsScope) -> protocol::Protoco
 
 fn validate_contents_policy(policy: &protocol::ContentsReadPolicy) -> protocol::ProtocolResult<()> {
     let empty_filter = match policy {
-        protocol::ContentsReadPolicy::AudioBrowse => false,
+        protocol::ContentsReadPolicy::PlayableMediaBrowse
+        | protocol::ContentsReadPolicy::AudioBrowse => false,
         protocol::ContentsReadPolicy::SourceFileInventory { file_classes } => {
             file_classes.is_empty()
         }
@@ -1508,6 +1509,78 @@ mod tests {
 
         assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
         assert_eq!(error.code(), "INVALID_REQUEST");
+    }
+
+    #[test]
+    fn contents_service_preserves_playable_media_and_audio_browse_policy_semantics() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("contents-policy-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(&service, registered.root_id, 100, "track.m4a", 10);
+        record_present_source_file(&service, registered.root_id, 101, "clip.mp4", 10);
+        record_present_source_file(&service, registered.root_id, 102, "cover.jpg", 10);
+        service
+            .durable_store
+            .upsert_source_scan_state(UpsertSourceScanStateInput {
+                source_id: registered.root_id,
+                scan_phase: SourceScanPhase::Complete,
+                last_scan_started_at: Some(10),
+                last_scan_finished_at: Some(20),
+                last_successful_scan_at: Some(20),
+                scan_issue_kind: None,
+                error_detail: None,
+                updated_at: 20,
+            })
+            .expect("complete source scan");
+
+        let playable = service
+            .read_contents(ContentsReadRequest {
+                scope: ContentsScope::Source {
+                    source_id: registered.root_id,
+                },
+                policy: ContentsReadPolicy::PlayableMediaBrowse,
+                recursion: ContentsRecursion::Recursive,
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("read playable media")
+            .result;
+        assert_eq!(
+            playable
+                .rows
+                .iter()
+                .map(|row| row.file_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["clip.mp4", "track.m4a"]
+        );
+        assert_eq!(
+            playable
+                .rows
+                .iter()
+                .map(|row| row.file_class)
+                .collect::<Vec<_>>(),
+            vec![ContentsFileClass::Video, ContentsFileClass::Audio]
+        );
+        assert!(playable.has_rows_omitted_by_policy);
+
+        let audio = service
+            .read_contents(ContentsReadRequest {
+                scope: ContentsScope::Source {
+                    source_id: registered.root_id,
+                },
+                policy: ContentsReadPolicy::AudioBrowse,
+                recursion: ContentsRecursion::Recursive,
+                limit: Some(10),
+                cursor: None,
+            })
+            .expect("read audio browse")
+            .result;
+        assert_eq!(audio.rows.len(), 1);
+        assert_eq!(audio.rows[0].file_name, "track.m4a");
+        assert_eq!(audio.rows[0].file_class, ContentsFileClass::Audio);
+        assert!(audio.has_rows_omitted_by_policy);
     }
 
     fn expect_success(outcome: CommandOutcome) -> CommandReply {

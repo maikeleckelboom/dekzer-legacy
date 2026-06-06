@@ -26,7 +26,7 @@ defineProps<{
 }>()
 
 function formatContentDetail(row: ContentRow): string {
-  if (row.state === 'empty') return 'Empty folder'
+  if (row.state === 'empty') return row.detail ?? 'Empty'
   if (row.state === 'notLoaded') return 'Not loaded'
   if (row.state === 'loading') return 'Loading'
   if (row.state === 'failed') return 'Unavailable'

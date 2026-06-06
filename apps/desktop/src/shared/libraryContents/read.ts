@@ -63,6 +63,9 @@ export type ContentsFileKind =
 
 export type ContentsReadPolicy =
   | {
+      readonly kind: 'playableMediaBrowse'
+    }
+  | {
       readonly kind: 'audioBrowse'
     }
   | {
@@ -178,6 +181,7 @@ export type ContentsResult = {
   readonly recursion: ContentsRecursion
   readonly rows: readonly ContentsFileRow[]
   readonly coverage: ContentsCoverage
+  readonly hasRowsOmittedByPolicy: boolean
   readonly nextCursor?: string
   readonly detail?: string
 }

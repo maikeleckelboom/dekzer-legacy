@@ -75,6 +75,9 @@ pub(crate) fn store_contents_policy(
     policy: protocol::ContentsReadPolicy,
 ) -> store::StoreContentsReadPolicy {
     match policy {
+        protocol::ContentsReadPolicy::PlayableMediaBrowse => {
+            store::StoreContentsReadPolicy::PlayableMediaBrowse
+        }
         protocol::ContentsReadPolicy::AudioBrowse => store::StoreContentsReadPolicy::AudioBrowse,
         protocol::ContentsReadPolicy::SourceFileInventory { file_classes } => {
             store::StoreContentsReadPolicy::SourceFileInventory {
@@ -1034,6 +1037,7 @@ fn map_contents_result(
             empty_result_authoritative: result.coverage.empty_result_authoritative,
             detail: result.coverage.detail,
         },
+        has_rows_omitted_by_policy: result.has_rows_omitted_by_policy,
         next_cursor: result.next_cursor,
         detail: result.detail,
     })
@@ -1041,6 +1045,9 @@ fn map_contents_result(
 
 fn map_contents_policy(policy: store::StoreContentsReadPolicy) -> protocol::ContentsReadPolicy {
     match policy {
+        store::StoreContentsReadPolicy::PlayableMediaBrowse => {
+            protocol::ContentsReadPolicy::PlayableMediaBrowse
+        }
         store::StoreContentsReadPolicy::AudioBrowse => protocol::ContentsReadPolicy::AudioBrowse,
         store::StoreContentsReadPolicy::SourceFileInventory { file_classes } => {
             protocol::ContentsReadPolicy::SourceFileInventory {
@@ -1751,29 +1758,40 @@ mod tests {
     }
 
     #[test]
-    fn contents_profile_mapping_preserves_audio_browse_policy() {
-        let protocol_policy = protocol::ContentsReadPolicy::AudioBrowse;
-        let store_policy = store_contents_policy(protocol_policy.clone());
+    fn contents_profile_mapping_preserves_browse_policies_and_omission_metadata() {
+        for (protocol_policy, expected_store_policy) in [
+            (
+                protocol::ContentsReadPolicy::PlayableMediaBrowse,
+                store::StoreContentsReadPolicy::PlayableMediaBrowse,
+            ),
+            (
+                protocol::ContentsReadPolicy::AudioBrowse,
+                store::StoreContentsReadPolicy::AudioBrowse,
+            ),
+        ] {
+            let store_policy = store_contents_policy(protocol_policy.clone());
+            assert_eq!(store_policy, expected_store_policy);
 
-        assert_eq!(store_policy, store::StoreContentsReadPolicy::AudioBrowse);
-
-        let reply = map_read_contents_reply(store::StoreContentsResult {
-            state: store::StoreContentsState::Empty,
-            scope: store::StoreContentsScope::Source { source_id: 7 },
-            policy: store_policy,
-            recursion: store::StoreContentsRecursion::Recursive,
-            rows: Vec::new(),
-            coverage: store::StoreContentsCoverage {
-                state: store::StoreContentsCoverageState::Complete,
-                recursive_scope_complete: true,
-                empty_result_authoritative: true,
+            let reply = map_read_contents_reply(store::StoreContentsResult {
+                state: store::StoreContentsState::Empty,
+                scope: store::StoreContentsScope::Source { source_id: 7 },
+                policy: store_policy,
+                recursion: store::StoreContentsRecursion::Recursive,
+                rows: Vec::new(),
+                coverage: store::StoreContentsCoverage {
+                    state: store::StoreContentsCoverageState::Complete,
+                    recursive_scope_complete: true,
+                    empty_result_authoritative: false,
+                    detail: None,
+                },
+                has_rows_omitted_by_policy: true,
+                next_cursor: None,
                 detail: None,
-            },
-            next_cursor: None,
-            detail: None,
-        })
-        .expect("map contents reply");
+            })
+            .expect("map contents reply");
 
-        assert_eq!(reply.result.policy, protocol_policy);
+            assert_eq!(reply.result.policy, protocol_policy);
+            assert!(reply.result.has_rows_omitted_by_policy);
+        }
     }
 }

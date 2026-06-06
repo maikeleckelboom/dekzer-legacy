@@ -593,6 +593,18 @@
           "properties": {
             "kind": {
               "type": "string",
+              "const": "playableMediaBrowse"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
               "const": "audioBrowse"
             }
           },
@@ -703,6 +715,9 @@
             "null"
           ]
         },
+        "hasRowsOmittedByPolicy": {
+          "type": "boolean"
+        },
         "nextCursor": {
           "type": [
             "string",
@@ -734,7 +749,8 @@
         "policy",
         "recursion",
         "rows",
-        "coverage"
+        "coverage",
+        "hasRowsOmittedByPolicy"
       ]
     },
     "ContentsRowOrigin": {

@@ -13,6 +13,14 @@ const CONTENTS_CURSOR_FILE_CLASS_ORDER: [StoreContentsFileClass; 4] = [
     StoreContentsFileClass::Image,
     StoreContentsFileClass::Unsupported,
 ];
+const PLAYABLE_MEDIA_BROWSE_FILE_CLASSES: [StoreContentsFileClass; 2] =
+    [StoreContentsFileClass::Audio, StoreContentsFileClass::Video];
+const AUDIO_BROWSE_FILE_CLASSES: [StoreContentsFileClass; 1] = [StoreContentsFileClass::Audio];
+const BROWSE_RELEVANT_FILE_CLASSES: [StoreContentsFileClass; 3] = [
+    StoreContentsFileClass::Audio,
+    StoreContentsFileClass::Video,
+    StoreContentsFileClass::Image,
+];
 const CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER: [StorePrimaryMediaKind; 2] =
     [StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video];
 
@@ -28,6 +36,7 @@ struct ContentsCursor {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum ContentsCursorPolicy {
+    PlayableMediaBrowse,
     AudioBrowse,
     SourceFileInventory { file_classes: Vec<String> },
     PrimaryMedia { media_kinds: Vec<String> },
@@ -202,7 +211,8 @@ fn compute_cursor_position(
     policy: &StoreContentsReadPolicy,
 ) -> ContentsCursorPosition {
     match policy {
-        StoreContentsReadPolicy::SourceFileInventory { .. }
+        StoreContentsReadPolicy::PlayableMediaBrowse
+        | StoreContentsReadPolicy::SourceFileInventory { .. }
         | StoreContentsReadPolicy::AudioBrowse => ContentsCursorPosition::SourceFile {
             relative_path_browse_sort_key: row
                 .relative_path_browse_sort_key
@@ -257,6 +267,7 @@ fn compute_album_key(row: &StoreContentsFileRow) -> String {
 
 fn canonical_cursor_policy(policy: &StoreContentsReadPolicy) -> ContentsCursorPolicy {
     match policy {
+        StoreContentsReadPolicy::PlayableMediaBrowse => ContentsCursorPolicy::PlayableMediaBrowse,
         StoreContentsReadPolicy::AudioBrowse => ContentsCursorPolicy::AudioBrowse,
         StoreContentsReadPolicy::SourceFileInventory { file_classes } => {
             ContentsCursorPolicy::SourceFileInventory {
@@ -373,6 +384,7 @@ pub struct StoreContentsResult {
     pub recursion: StoreContentsRecursion,
     pub rows: Vec<StoreContentsFileRow>,
     pub coverage: StoreContentsCoverage,
+    pub has_rows_omitted_by_policy: bool,
     pub next_cursor: Option<String>,
     pub detail: Option<String>,
 }
@@ -419,6 +431,7 @@ pub enum StoreContentsRecursion {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoreContentsReadPolicy {
+    PlayableMediaBrowse,
     AudioBrowse,
     SourceFileInventory {
         file_classes: Vec<StoreContentsFileClass>,
@@ -573,6 +586,7 @@ pub(crate) fn read_contents(
                         empty_result_authoritative: false,
                         detail: Some("The contents cursor could not be decoded.".to_string()),
                     },
+                    has_rows_omitted_by_policy: false,
                     next_cursor: None,
                     detail: Some("The contents cursor could not be decoded.".to_string()),
                 });
@@ -593,6 +607,7 @@ pub(crate) fn read_contents(
                         "The contents cursor does not match the current request.".to_string(),
                     ),
                 },
+                has_rows_omitted_by_policy: false,
                 next_cursor: None,
                 detail: Some("The contents cursor does not match the current request.".to_string()),
             });
@@ -600,6 +615,9 @@ pub(crate) fn read_contents(
         let position_matches_policy = matches!(
             (&decoded.position, &policy),
             (
+                ContentsCursorPosition::SourceFile { .. },
+                StoreContentsReadPolicy::PlayableMediaBrowse
+            ) | (
                 ContentsCursorPosition::SourceFile { .. },
                 StoreContentsReadPolicy::SourceFileInventory { .. }
             ) | (
@@ -623,6 +641,7 @@ pub(crate) fn read_contents(
                     empty_result_authoritative: false,
                     detail: Some("The contents cursor does not match the policy.".to_string()),
                 },
+                has_rows_omitted_by_policy: false,
                 next_cursor: None,
                 detail: Some("The contents cursor does not match the policy.".to_string()),
             });
@@ -645,6 +664,7 @@ pub(crate) fn read_contents(
                 empty_result_authoritative: false,
                 detail: Some("The library contents target is not available.".to_string()),
             },
+            has_rows_omitted_by_policy: false,
             next_cursor: None,
             detail: Some("The library contents target is not available.".to_string()),
         });
@@ -681,6 +701,7 @@ pub(crate) fn read_contents(
                 empty_result_authoritative: false,
                 detail: Some(detail.to_string()),
             },
+            has_rows_omitted_by_policy: false,
             next_cursor,
             detail: Some(detail.to_string()),
         });
@@ -705,11 +726,23 @@ pub(crate) fn read_contents(
     } else {
         rows
     };
+    let has_rows_omitted_by_policy = if matches!(
+        coverage.state,
+        StoreContentsCoverageState::Blocked
+            | StoreContentsCoverageState::Failed
+            | StoreContentsCoverageState::SourceUnavailable
+            | StoreContentsCoverageState::LocationMissing
+    ) {
+        false
+    } else {
+        read_has_rows_omitted_by_policy(connection, &resolved_scope, &policy, recursion)?
+    };
     let state = contents_state(&coverage, rows.is_empty());
-    let detail = contents_detail(state, coverage.state, &policy);
+    let detail = contents_detail(state, coverage.state);
 
-    let empty_result_authoritative =
-        state == StoreContentsState::Empty && coverage.recursive_scope_complete;
+    let empty_result_authoritative = state == StoreContentsState::Empty
+        && coverage.recursive_scope_complete
+        && !has_rows_omitted_by_policy;
 
     Ok(StoreContentsResult {
         state,
@@ -721,6 +754,7 @@ pub(crate) fn read_contents(
             empty_result_authoritative,
             ..coverage
         },
+        has_rows_omitted_by_policy,
         next_cursor,
         detail: detail.map(str::to_string),
     })
@@ -730,6 +764,9 @@ pub(crate) fn canonicalize_policy(
     policy: StoreContentsReadPolicy,
 ) -> LibrarySqliteResult<StoreContentsReadPolicy> {
     match policy {
+        StoreContentsReadPolicy::PlayableMediaBrowse => {
+            Ok(StoreContentsReadPolicy::PlayableMediaBrowse)
+        }
         StoreContentsReadPolicy::AudioBrowse => Ok(StoreContentsReadPolicy::AudioBrowse),
         StoreContentsReadPolicy::SourceFileInventory { file_classes } => {
             let file_classes = canonicalize_file_classes(file_classes);
@@ -790,7 +827,8 @@ fn file_classes_predicate_sql(
 
 fn policy_file_classes(policy: &StoreContentsReadPolicy) -> Vec<StoreContentsFileClass> {
     match policy {
-        StoreContentsReadPolicy::AudioBrowse => vec![StoreContentsFileClass::Audio],
+        StoreContentsReadPolicy::PlayableMediaBrowse => PLAYABLE_MEDIA_BROWSE_FILE_CLASSES.to_vec(),
+        StoreContentsReadPolicy::AudioBrowse => AUDIO_BROWSE_FILE_CLASSES.to_vec(),
         StoreContentsReadPolicy::SourceFileInventory { file_classes } => file_classes.clone(),
         StoreContentsReadPolicy::PrimaryMedia { media_kinds } => media_kinds
             .iter()
@@ -800,6 +838,33 @@ fn policy_file_classes(policy: &StoreContentsReadPolicy) -> Vec<StoreContentsFil
             })
             .collect(),
     }
+}
+
+fn policy_omitted_file_classes(
+    policy: &StoreContentsReadPolicy,
+) -> Option<Vec<StoreContentsFileClass>> {
+    if matches!(policy, StoreContentsReadPolicy::PrimaryMedia { .. }) {
+        return None;
+    }
+
+    let included_file_classes = policy_file_classes(policy);
+    let browse_relevant_file_classes = match policy {
+        StoreContentsReadPolicy::SourceFileInventory { .. } => {
+            CONTENTS_CURSOR_FILE_CLASS_ORDER.as_slice()
+        }
+        StoreContentsReadPolicy::PlayableMediaBrowse | StoreContentsReadPolicy::AudioBrowse => {
+            BROWSE_RELEVANT_FILE_CLASSES.as_slice()
+        }
+        StoreContentsReadPolicy::PrimaryMedia { .. } => unreachable!(),
+    };
+
+    Some(
+        browse_relevant_file_classes
+            .iter()
+            .copied()
+            .filter(|file_class| !included_file_classes.contains(file_class))
+            .collect(),
+    )
 }
 
 fn resolve_scope(
@@ -1477,17 +1542,10 @@ fn contents_state(coverage: &StoreContentsCoverage, rows_empty: bool) -> StoreCo
 fn contents_detail(
     state: StoreContentsState,
     coverage_state: StoreContentsCoverageState,
-    policy: &StoreContentsReadPolicy,
 ) -> Option<&'static str> {
     match state {
         StoreContentsState::Ready => None,
-        StoreContentsState::Empty => Some(match policy {
-            StoreContentsReadPolicy::PrimaryMedia { .. } => "No primary media found in this scope.",
-            StoreContentsReadPolicy::SourceFileInventory { .. } => {
-                "No visible files found in this scope."
-            }
-            StoreContentsReadPolicy::AudioBrowse => "No audio files found in this scope.",
-        }),
+        StoreContentsState::Empty => None,
         StoreContentsState::Partial => Some(match coverage_state {
             StoreContentsCoverageState::Scanning => "Still indexing. Results may be incomplete.",
             StoreContentsCoverageState::Incomplete => {
@@ -1502,6 +1560,88 @@ fn contents_detail(
         StoreContentsState::PolicyConflict => Some("The contents policy cannot be read."),
         StoreContentsState::CursorInvalid => Some("The contents cursor is invalid."),
     }
+}
+
+fn read_has_rows_omitted_by_policy(
+    connection: &Connection,
+    scope: &ResolvedContentsScope,
+    policy: &StoreContentsReadPolicy,
+    recursion: StoreContentsRecursion,
+) -> LibrarySqliteResult<bool> {
+    let Some(omitted_file_classes) = policy_omitted_file_classes(policy) else {
+        // primaryMedia omission metadata is not surfaced until its own row universe is queryable.
+        return Ok(false);
+    };
+    if omitted_file_classes.is_empty() {
+        return Ok(false);
+    }
+
+    let omitted_file_class_predicate =
+        file_classes_predicate_sql("sf.file_class", "sf.file_kind", &omitted_file_classes);
+    match scope {
+        ResolvedContentsScope::WholeSource { source_id } => source_file_exists(
+            connection,
+            None,
+            &whole_source_file_predicate(recursion),
+            &omitted_file_class_predicate,
+            *source_id,
+            None,
+        ),
+        ResolvedContentsScope::AcceptedSourceLocations { source_id } => source_file_exists(
+            connection,
+            Some(accepted_locations_cte()),
+            &accepted_locations_source_file_predicate(recursion),
+            &omitted_file_class_predicate,
+            *source_id,
+            None,
+        ),
+        ResolvedContentsScope::Prefix {
+            source_id,
+            relative_path,
+        }
+        | ResolvedContentsScope::SourceLocationPrefix {
+            source_id,
+            relative_path,
+        } => source_file_exists(
+            connection,
+            None,
+            &scoped_path_predicate(recursion),
+            &omitted_file_class_predicate,
+            *source_id,
+            Some(relative_path),
+        ),
+        ResolvedContentsScope::MissingLocation { .. } => Ok(false),
+    }
+}
+
+fn source_file_exists(
+    connection: &Connection,
+    prefix_cte: Option<&str>,
+    source_predicate: &str,
+    file_class_predicate: &str,
+    source_id: i64,
+    relative_path: Option<&str>,
+) -> LibrarySqliteResult<bool> {
+    let cte_prefix = prefix_cte
+        .map(|cte| format!("WITH {cte} "))
+        .unwrap_or_default();
+    let sql = format!(
+        "{cte_prefix}SELECT EXISTS (
+             SELECT 1
+             FROM source_files sf
+             WHERE {file_class_predicate}
+               AND {source_predicate}
+             LIMIT 1
+         )"
+    );
+    let exists = if let Some(relative_path) = relative_path {
+        connection.query_row(&sql, params![source_id, relative_path], |row| {
+            row.get::<_, i64>(0)
+        })?
+    } else {
+        connection.query_row(&sql, [source_id], |row| row.get::<_, i64>(0))?
+    };
+    Ok(exists != 0)
 }
 
 fn read_rows(
@@ -1524,12 +1664,7 @@ fn read_rows(
 
     match scope {
         ResolvedContentsScope::WholeSource { source_id } => {
-            let source_predicate = match recursion {
-                StoreContentsRecursion::Recursive => "sf.source_id = ?1".to_string(),
-                StoreContentsRecursion::Immediate => {
-                    "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL".to_string()
-                }
-            };
+            let source_predicate = whole_source_file_predicate(recursion);
             read_rows_with_source_predicate(
                 connection,
                 SourcePredicateReadInput {
@@ -1544,28 +1679,7 @@ fn read_rows(
             )
         }
         ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
-            let predicate = match recursion {
-                StoreContentsRecursion::Recursive => format!(
-                    "sf.source_id = ?1
-                     AND EXISTS (
-                         SELECT 1
-                         FROM accepted_locations al
-                         WHERE {}
-                     )",
-                    relative_path_scope_predicate("sf", "al.relative_path")
-                ),
-                StoreContentsRecursion::Immediate => "sf.source_id = ?1
-                     AND EXISTS (
-                         SELECT 1
-                         FROM accepted_locations al
-                         JOIN source_directories sd
-                           ON sd.source_id = sf.source_id
-                          AND sd.relative_path COLLATE BINARY = al.relative_path COLLATE BINARY
-                           AND sd.presence_state = 'present'
-                         WHERE sf.parent_source_directory_id = sd.source_directory_id
-                     )"
-                .to_string(),
-            };
+            let predicate = accepted_locations_source_file_predicate(recursion);
             read_rows_for_accepted_locations(
                 connection,
                 &predicate,
@@ -1613,6 +1727,40 @@ fn read_rows(
             )
         }
         ResolvedContentsScope::MissingLocation { .. } => Ok(Vec::new()),
+    }
+}
+
+fn whole_source_file_predicate(recursion: StoreContentsRecursion) -> String {
+    match recursion {
+        StoreContentsRecursion::Recursive => "sf.source_id = ?1".to_string(),
+        StoreContentsRecursion::Immediate => {
+            "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL".to_string()
+        }
+    }
+}
+
+fn accepted_locations_source_file_predicate(recursion: StoreContentsRecursion) -> String {
+    match recursion {
+        StoreContentsRecursion::Recursive => format!(
+            "sf.source_id = ?1
+             AND EXISTS (
+                 SELECT 1
+                 FROM accepted_locations al
+                 WHERE {}
+             )",
+            relative_path_scope_predicate("sf", "al.relative_path")
+        ),
+        StoreContentsRecursion::Immediate => "sf.source_id = ?1
+             AND EXISTS (
+                 SELECT 1
+                 FROM accepted_locations al
+                 JOIN source_directories sd
+                   ON sd.source_id = sf.source_id
+                  AND sd.relative_path COLLATE BINARY = al.relative_path COLLATE BINARY
+                   AND sd.presence_state = 'present'
+                 WHERE sf.parent_source_directory_id = sd.source_directory_id
+             )"
+        .to_string(),
     }
 }
 
@@ -2347,6 +2495,10 @@ mod tests {
         StoreContentsReadPolicy::SourceFileInventory { file_classes }
     }
 
+    fn playable_media_browse_policy() -> StoreContentsReadPolicy {
+        StoreContentsReadPolicy::PlayableMediaBrowse
+    }
+
     fn audio_browse_policy() -> StoreContentsReadPolicy {
         StoreContentsReadPolicy::AudioBrowse
     }
@@ -2401,6 +2553,10 @@ mod tests {
                     "unsupported".to_string(),
                 ],
             }
+        );
+        assert_eq!(
+            canonical_cursor_policy(&playable_media_browse_policy()),
+            super::ContentsCursorPolicy::PlayableMediaBrowse
         );
     }
 
@@ -3229,6 +3385,7 @@ mod tests {
         assert!(result.rows.is_empty());
         assert_eq!(result.coverage.state, StoreContentsCoverageState::Complete);
         assert!(result.coverage.empty_result_authoritative);
+        assert!(!result.has_rows_omitted_by_policy);
     }
 
     #[test]
@@ -3676,6 +3833,265 @@ mod tests {
 
         assert_eq!(audio_browse.state, StoreContentsState::Ready);
         assert_relative_paths(&audio_browse.rows, &["Media/track.wav"]);
+        assert!(audio_browse.has_rows_omitted_by_policy);
+    }
+
+    #[test]
+    fn playable_media_browse_includes_audio_and_video_and_omits_browse_relevant_images() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.m4a", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/clip.mp4", "video");
+        insert_scanned_file(&connection, 1002, 1, 10, "Media/cover.jpg", "image");
+        insert_scanned_file(&connection, 1003, 1, 10, "Media/album.cue", "unsupported");
+        insert_scanned_file(&connection, 1004, 1, 10, "Media/readme.txt", "unsupported");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            playable_media_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read playable-media browse contents");
+
+        assert_eq!(result.state, StoreContentsState::Ready);
+        assert_relative_paths(&result.rows, &["Media/clip.mp4", "Media/track.m4a"]);
+        assert_eq!(result.rows[0].file_class, "video");
+        assert_eq!(result.rows[0].file_kind, "video");
+        assert_eq!(result.rows[1].file_class, "audio");
+        assert_eq!(result.rows[1].file_kind, "audio");
+        assert!(result.has_rows_omitted_by_policy);
+    }
+
+    #[test]
+    fn playable_media_browse_distinguishes_mp4_only_from_image_only_scope() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Videos", "complete");
+        insert_directory(&connection, 20, 1, "Covers", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Videos/clip.mp4", "video");
+        insert_scanned_file(&connection, 2000, 1, 20, "Covers/front.jpg", "image");
+
+        let video = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            playable_media_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read video contents");
+        assert_eq!(video.state, StoreContentsState::Ready);
+        assert_relative_paths(&video.rows, &["Videos/clip.mp4"]);
+        assert!(!video.has_rows_omitted_by_policy);
+
+        let image = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 20,
+            },
+            playable_media_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read image-only contents");
+        assert_eq!(image.state, StoreContentsState::Empty);
+        assert!(image.rows.is_empty());
+        assert!(image.has_rows_omitted_by_policy);
+        assert!(!image.coverage.empty_result_authoritative);
+    }
+
+    #[test]
+    fn audio_browse_reports_video_omission_but_ignores_cue_and_raw_unsupported_files() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Videos", "complete");
+        insert_directory(&connection, 20, 1, "Companions", "complete");
+        insert_directory(&connection, 30, 1, "Empty", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Videos/clip.mp4", "video");
+        insert_scanned_file(
+            &connection,
+            2000,
+            1,
+            20,
+            "Companions/album.cue",
+            "unsupported",
+        );
+        insert_scanned_file(
+            &connection,
+            2001,
+            1,
+            20,
+            "Companions/readme.txt",
+            "unsupported",
+        );
+
+        let video = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            audio_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read video scope as audio");
+        assert_eq!(video.state, StoreContentsState::Empty);
+        assert!(video.rows.is_empty());
+        assert!(video.has_rows_omitted_by_policy);
+        assert!(!video.coverage.empty_result_authoritative);
+
+        for source_directory_id in [20, 30] {
+            let result = read_contents(
+                &connection,
+                StoreContentsScope::Directory {
+                    source_id: 1,
+                    source_directory_id,
+                },
+                audio_browse_policy(),
+                StoreContentsRecursion::Recursive,
+                10,
+                None,
+            )
+            .expect("read non-audio scope");
+            assert_eq!(result.state, StoreContentsState::Empty);
+            assert!(!result.has_rows_omitted_by_policy);
+            assert!(result.coverage.empty_result_authoritative);
+        }
+    }
+
+    #[test]
+    fn source_file_inventory_omission_uses_requestable_classes_only() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/clip.mp4", "video");
+        insert_scanned_file(&connection, 1002, 1, 10, "Media/album.cue", "unsupported");
+        insert_scanned_file(&connection, 1003, 1, 10, "Media/readme.txt", "unsupported");
+
+        let audio_only = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read audio inventory");
+        assert_relative_paths(&audio_only.rows, &["Media/track.wav"]);
+        assert!(audio_only.has_rows_omitted_by_policy);
+
+        let all_requestable = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            default_source_file_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read all requestable inventory");
+        assert!(!all_requestable.has_rows_omitted_by_policy);
+    }
+
+    #[test]
+    fn omission_metadata_respects_recursion_and_is_not_page_local() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_directory(&connection, 11, 1, "Media/Sub", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/a.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/b.wav", "audio");
+        insert_scanned_file(&connection, 1002, 1, 11, "Media/Sub/clip.mp4", "video");
+
+        let immediate = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            audio_browse_policy(),
+            StoreContentsRecursion::Immediate,
+            1,
+            None,
+        )
+        .expect("read immediate audio");
+        assert!(!immediate.has_rows_omitted_by_policy);
+
+        let recursive_page_one = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            audio_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            1,
+            None,
+        )
+        .expect("read recursive audio page one");
+        assert_eq!(recursive_page_one.rows.len(), 1);
+        assert!(recursive_page_one.next_cursor.is_some());
+        assert!(recursive_page_one.has_rows_omitted_by_policy);
+
+        let recursive_page_two = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            audio_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            1,
+            recursive_page_one.next_cursor.as_deref(),
+        )
+        .expect("read recursive audio page two");
+        assert!(recursive_page_two.has_rows_omitted_by_policy);
+    }
+
+    #[test]
+    fn primary_media_omission_does_not_use_raw_source_files_as_a_proxy() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
+        insert_directory(&connection, 10, 1, "Media", "complete");
+        insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
+        insert_scanned_file(&connection, 1001, 1, 10, "Media/clip.mp4", "video");
+        insert_scanned_file(&connection, 1002, 1, 10, "Media/cover.jpg", "image");
+
+        let result = read_contents(
+            &connection,
+            StoreContentsScope::Directory {
+                source_id: 1,
+                source_directory_id: 10,
+            },
+            primary_media_policy(),
+            StoreContentsRecursion::Recursive,
+            10,
+            None,
+        )
+        .expect("read primary media");
+
+        assert!(result.rows.is_empty());
+        assert!(!result.has_rows_omitted_by_policy);
     }
 
     #[test]

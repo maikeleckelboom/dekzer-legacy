@@ -2,9 +2,9 @@
 
 **Status:** Locked
 **Applies to:** contents read service, contents read protocol, generated renderer contract, contents projection,
-renderer empty-state copy
+renderer empty-state copy, canonical playable-media policy
 **Does not apply to:** source registration activation, source-root admission, default music source discovery,
-playable-media policy implementation
+media probing or analysis
 
 ---
 
@@ -30,8 +30,8 @@ The service owns this distinction. The renderer presents it. The renderer has no
 include containers whose audio content has not been proven by a media probe authority. Extension alone is not sufficient
 proof.
 
-This is not a V0 constraint. It is the permanent meaning of the name. If Dekzer ever needs a policy that includes audio
-and video, that policy gets a new name. `audioBrowse` does not change meaning.
+This is the permanent meaning of the name. The audio-and-video policy is `playableMediaBrowse`; `audioBrowse` does not
+change meaning.
 
 ### Rule 2 — `.mp4` is video/container-class at the extension level
 
@@ -103,8 +103,7 @@ request.
 **Included** — matches the active contents policy; returned as a contents row.
 
 **Omitted by policy** — is browse-relevant inventory that does not match the active contents policy. This tier sets
-`hasRowsOmittedByPolicy: true`. Examples under `audioBrowse`: a video-class `.mp4` file, any future playable-media class
-not included by the active policy.
+`hasRowsOmittedByPolicy: true`. Examples under `audioBrowse` are video-class `.mp4` files and browse-relevant images.
 
 **Ignored** — is not browse-relevant contents inventory for the product surface under any policy. Examples: OS noise,
 temporary files, arbitrary binary objects, files Dekzer does not model as contents rows. Ignored items do not set
@@ -116,13 +115,9 @@ from extension alone.
 
 ### Rule 8 — Companion metadata requires explicit classification
 
-Metadata sidecars, artwork files, CUE sheets, and future analysis artifacts are not automatically ignored and are not
-automatically browse-relevant contents rows. Their tier must be decided explicitly per file class.
-
-A companion file triggers `hasRowsOmittedByPolicy` only if the active contents policy defines it as browse-relevant
-potential contents inventory and excludes it. Until explicitly classified, companion files do not default into either
-the omitted or the ignored tier — their tier is undefined and must be resolved before the service makes any claim about
-them.
+Artwork/image rows are browse-relevant inventory and trigger omission when excluded. CUE sheets are requestable only
+through the explicit `sourceFileInventory` policy and do not trigger omission for `playableMediaBrowse` or
+`audioBrowse`. Generic metadata companions, diagnostics-only rows, and unsupported raw junk are ignored.
 
 ### Rule 9 — Coverage completeness gates empty-state copy
 
@@ -130,7 +125,7 @@ The renderer must consult both the returned coverage state and `hasRowsOmittedBy
 copy. Authoritative empty copy is only valid when coverage is complete.
 
 | Coverage   | Returned rows | hasRowsOmittedByPolicy | Correct renderer meaning                                                                         |
-|------------|:-------------:|:----------------------:|--------------------------------------------------------------------------------------------------|
+| ---------- | :-----------: | :--------------------: | ------------------------------------------------------------------------------------------------ |
 | complete   |       0       |         false          | The scope has no browse-relevant inventory. Render authoritative empty copy.                     |
 | complete   |       0       |          true          | Browse-relevant inventory exists but is excluded by the active policy.                           |
 | incomplete |       0       |         false          | No rows known yet. Coverage incomplete. Do not render authoritative empty.                       |
@@ -149,9 +144,8 @@ Under `audioBrowse`, when coverage is complete, rows are zero, and `hasRowsOmitt
 
 Not: "This folder is empty."
 
-When a future playable-media policy is active, the same code path uses that policy's content description. The omission
-metadata slice may implement a minimal policy-description lookup keyed to the existing policy kind. It must not migrate
-the policy system into first-class configuration objects in the same slice.
+Under `playableMediaBrowse`, the same code path uses playable-media wording. A minimal policy-description lookup keyed
+to the policy kind supplies presentation text; it does not transfer filtering authority to the renderer.
 
 ### Rule 11 — MP4-only folder: canonical behavior
 
@@ -160,6 +154,8 @@ Given a scope containing only `.mp4` files, under `audioBrowse`:
 - Returned rows: zero.
 - `hasRowsOmittedByPolicy: true`.
 - Correct copy: "No audio tracks in this view."
+
+Under `playableMediaBrowse`, the same scope returns video rows and does not report policy omission.
 
 Under no active policy may this scope render "This folder is empty" as long as it contains any browse-relevant
 inventory.
@@ -177,52 +173,17 @@ The field is presentation metadata. The renderer must not use it to:
 
 ---
 
-## Future Product Direction
+## Current Product Direction
 
-For Dekzer as a professional DJ platform, the long-term default browse policy should be playable media: audio and video.
-Audio-only browse is a filtered view, not the universal product default. This conclusion follows from competitive
-research — rekordbox, Serato, and VirtualDJ all treat music video as first-class library content.
+The default browse policy is `playableMediaBrowse`: audio and video. Audio-only browse is a separate filtered view.
+The store owns included durable classes, omitted classes, cursor policy identity, recursion, and ordering.
 
-This future policy requires explicit naming, an explicit included-class contract, and an explicit empty-state
-description. It must not be implemented by widening `audioBrowse`. It is not part of the omission metadata slice.
-
----
-
-## Implementation Sequencing
-
-### Slice N — Source-add activation
-
-Merge independently. Source-add activation owns first-run browse activation behavior. The MP4-only folder issue is a
-discovered product honesty gap, not a regression from this commit.
-
-### Slice N+1 — Contents policy omission metadata
-
-In scope:
-
-- Store/service query support for `hasRowsOmittedByPolicy`
-- Protocol/result contract update
-- Generated contract update
-- Coverage completeness signal in result (if not already present)
-- Renderer empty-state copy using returned metadata and coverage state
-- Focused tests covering all cases in the Rule 9 truth table
-
-Out of scope:
-
-- Widening `audioBrowse`
-- Playable-media default policy
-- First-class policy object migration
-- Source-root admission or default music source discovery
-- Renderer-side filtering or sorting
-- Any new row-level fields (duration, BPM, key, codec, artwork, canonical track identity, analysis readiness)
-
-### Slice N+2 — Browse policy as first-class configuration objects
-
-Promote browse policy definitions into first-class objects carrying: policy key, included media/content classes, content
-description label, empty-state copy label, default status. Must not be combined with Slice N+1.
+The implementation does not widen `audioBrowse`, implement source admission/default discovery, add renderer filtering,
+or add row fields such as duration, BPM, key, codec, artwork, canonical track identity, or analysis readiness.
 
 ---
 
-## Required Tests for Slice N+1
+## Required Tests
 
 **Service/protocol:**
 
@@ -244,14 +205,13 @@ description label, empty-state copy label, default status. Must not be combined 
 - Rows present + `hasRowsOmittedByPolicy: true` → rows shown normally; no rows hidden
 - Empty-state copy string sourced from policy description, not hardcoded
 
-**Regression guard — the following must not be present in the Slice N+1 diff:**
+**Regression guard — the following must not be present:**
 
 - MP4 added to `audioBrowse`
 - Count field added to result
 - Renderer filtering or sorting added
 - Raw inventory inspection in renderer
-- Playable-media policy implementation
-- Policy object migration
+- Renderer-authored `sourceFileInventory { fileClasses: ['audio', 'video'] }` as the product default
 - Source admission or default discovery changes
 - Ignored filesystem objects triggering `hasRowsOmittedByPolicy`
 - Authoritative empty copy rendered under incomplete coverage or active omission
@@ -272,4 +232,4 @@ Incomplete scan coverage must not produce authoritative empty copy.
 
 Companion metadata class assignment must be explicit, not defaulted.
 
-Slice N+1 and Slice N+2 are separate commits with no shared scope.
+The renderer presents returned facts only.

@@ -312,6 +312,7 @@ pub struct ContentsReadRequest {
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(tag = "kind", rename_all = "camelCase")]
 pub enum ContentsReadPolicy {
+    PlayableMediaBrowse,
     AudioBrowse,
     SourceFileInventory {
         #[serde(rename = "fileClasses")]
@@ -462,6 +463,7 @@ pub struct ContentsResult {
     pub recursion: ContentsRecursion,
     pub rows: Vec<ContentsFileRow>,
     pub coverage: ContentsCoverage,
+    pub has_rows_omitted_by_policy: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub next_cursor: Option<String>,
@@ -2540,8 +2542,23 @@ mod tests {
     }
 
     #[test]
+    fn contents_policy_serializes_playable_media_browse_boundary_shape() {
+        let policy = ContentsReadPolicy::PlayableMediaBrowse;
+        let json = serde_json::to_value(&policy).expect("serialize policy");
+        assert_eq!(json, json!({ "kind": "playableMediaBrowse" }));
+        assert_eq!(
+            serde_json::from_value::<ContentsReadPolicy>(json).expect("deserialize policy"),
+            policy
+        );
+    }
+
+    #[test]
     fn contents_policy_variants_remain_distinct_in_read_requests() {
         let policies = [
+            (
+                ContentsReadPolicy::PlayableMediaBrowse,
+                "playableMediaBrowse",
+            ),
             (ContentsReadPolicy::AudioBrowse, "audioBrowse"),
             (
                 ContentsReadPolicy::SourceFileInventory {

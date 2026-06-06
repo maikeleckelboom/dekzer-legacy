@@ -106,6 +106,7 @@ describe('contents reads through the host', () => {
             recursion: request.recursion,
             rows: [],
             coverage: completeCoverage(),
+            hasRowsOmittedByPolicy: false,
             detail: 'primaryMedia rows do not support image media kinds.'
           }
         })
@@ -212,7 +213,8 @@ describe('contents reads through the host', () => {
                 state: 'complete',
                 recursiveScopeComplete: true,
                 emptyResultAuthoritative: true
-              }
+              },
+              hasRowsOmittedByPolicy: false
             }
           }
         }
@@ -234,6 +236,48 @@ describe('contents reads through the host', () => {
         policy: {
           kind: 'audioBrowse'
         }
+      }
+    })
+  })
+
+  it('passes playableMediaBrowse and required omission metadata without fileClasses', async () => {
+    const config = hostConfig()
+    const successHost = await startedHostWithClient(
+      config,
+      createFakeClient({
+        readContents: async (request) => {
+          expect(request.policy).toEqual({ kind: 'playableMediaBrowse' })
+          expect(request.policy).not.toHaveProperty('fileClasses')
+          return {
+            result: {
+              state: 'empty',
+              scope: request.scope,
+              policy: request.policy,
+              recursion: request.recursion,
+              rows: [],
+              coverage: {
+                state: 'complete',
+                recursiveScopeComplete: true,
+                emptyResultAuthoritative: false
+              },
+              hasRowsOmittedByPolicy: true
+            }
+          }
+        }
+      })
+    )
+
+    await expect(
+      readContentsThroughHost(successHost, {
+        scope: { kind: 'source', sourceId: '7' },
+        policy: { kind: 'playableMediaBrowse' },
+        recursion: 'recursive'
+      })
+    ).resolves.toMatchObject({
+      state: 'ready',
+      result: {
+        policy: { kind: 'playableMediaBrowse' },
+        hasRowsOmittedByPolicy: true
       }
     })
   })
@@ -276,7 +320,8 @@ function readyContentsReply(request: ContentsReadRequest): ContentsReadReply {
           updatedAtMs: 100
         }
       ],
-      coverage: completeCoverage()
+      coverage: completeCoverage(),
+      hasRowsOmittedByPolicy: false
     }
   }
 }
