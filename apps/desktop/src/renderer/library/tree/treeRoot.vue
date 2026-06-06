@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 
 import { provideTreeContext } from './context'
 import { useTreeController } from './controller'
@@ -10,9 +10,13 @@ defineOptions({
   name: 'TreeRoot'
 })
 
-const { nodes, expandedNodeIds, selectedNodeId } = defineProps<{
+const { nodes, expandedNodeIds, selectedNodeId, revealRequest } = defineProps<{
   nodes: readonly BrowserTreeNode[]
   selectedNodeId?: BrowserTreeNodeId
+  revealRequest?: {
+    readonly nodeId: BrowserTreeNodeId
+    readonly sequence: number
+  }
   expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   labelledBy: string
   emptyLabel?: string
@@ -41,6 +45,16 @@ const controller = useTreeController({
 // aria-posinset, and aria-setsize. Keyboard order, visual order, and projection
 // order remain identical; hierarchy belongs to the projection, not the nested DOM state.
 const visibleItems = controller.visibleItems
+
+watch(
+  () => revealRequest,
+  (request) => {
+    if (request !== undefined) {
+      controller.scrollNodeIntoView(request.nodeId)
+    }
+  },
+  { immediate: true }
+)
 
 provideTreeContext(controller)
 </script>

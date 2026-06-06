@@ -149,6 +149,21 @@ describe('useTreeController', () => {
     expect(harness.events.log).toEqual([])
   })
 
+  it('reveals a newly added row without focusing, selecting, or expanding it', async () => {
+    const harness = treeHarness()
+    const scrollIntoView = vi.fn()
+    const element = { scrollIntoView } as unknown as HTMLElement
+    harness.controller.registerItemElement('branch-b', element)
+
+    harness.controller.scrollNodeIntoView('branch-b')
+    await Promise.resolve()
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' })
+    expect(harness.selectedNodeId.value).toBeUndefined()
+    expect(harness.expandedNodeIds.value).toEqual(new Set())
+    expect(harness.events.log).toEqual([])
+  })
+
   it('keeps expansion stable when selecting another row', () => {
     const harness = treeHarness({
       expandedNodeIds: new Set(['branch-a'])

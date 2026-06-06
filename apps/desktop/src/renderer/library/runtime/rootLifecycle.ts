@@ -3,6 +3,7 @@ import type { ComputedRef, Ref } from 'vue'
 
 import type { LibraryHierarchyReadController } from '../boundary/hierarchyRead'
 import type { LocalRootActionsController } from '../boundary/localRootActions'
+import type { LocalRootRegistrationRoot } from '../../../shared/libraryRoots/registerLocalRoot'
 
 export type RootLifecycleRefreshStatus = 'idle' | 'refreshing' | 'refreshed' | 'failed'
 
@@ -23,6 +24,7 @@ export type RootLifecycleDependencies = {
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
   readonly confirmRemoveSource: () => boolean
   readonly isSourceRootVisible: (rootId: string) => boolean
+  readonly onSourceRegistered?: (root: LocalRootRegistrationRoot) => void
   readonly onSourceRemoved?: (rootId: string) => void
 }
 
@@ -65,6 +67,11 @@ export function createRootLifecycleController(
 
     if (!registered) {
       return false
+    }
+
+    const registeredRoot = dependencies.rootActions.registeredRoot.value
+    if (registeredRoot !== undefined) {
+      dependencies.onSourceRegistered?.(registeredRoot)
     }
 
     const localRootsHydrated = dependencies.rootActions.hydrateLocalRoots().catch(() => false)

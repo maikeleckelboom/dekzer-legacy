@@ -20,7 +20,13 @@ import {
   type RefreshPlanDeps
 } from './runtime/invalidationRefresh'
 import { useRootLifecycle } from './runtime/rootLifecycle'
-import { deriveSourceActionModel, hasVisibleSourceRootBinding } from './runtime/sourceActions'
+import {
+  deriveSourceActionModel,
+  hasVisibleSourceRootBinding,
+  resolveVisibleSourceRegistration,
+  sourceRegistrationIntent,
+  type SourceRegistrationIntent
+} from './runtime/sourceActions'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
 import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
@@ -61,6 +67,12 @@ const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(()
 const selectedNodeId = ref<BrowserTreeNodeId>()
 const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const pendingSourceRegistration = ref<SourceRegistrationIntent>()
+const sourceRevealRequest = ref<{
+  readonly nodeId: BrowserTreeNodeId
+  readonly sequence: number
+}>()
+let sourceRevealSequence = 0
 
 const restoreState = {
   readStarted: false,
@@ -113,33 +125,21 @@ const rootLifecycle = useRootLifecycle({
   },
   confirmRemoveSource: () => window.confirm(removeSourceMessage),
   isSourceRootVisible: (rootId) => hasVisibleSourceRootBinding(browserProjection.value, rootId),
+  onSourceRegistered: (root) => {
+    pendingSourceRegistration.value = sourceRegistrationIntent(root.rootId, selectedNodeId.value)
+  },
   onSourceRemoved: clearBrowserView
 })
 
 const liveTreeNodes = computed(() => browserProjection.value?.nodes ?? [])
-
-const preferredNodeId = computed(() => {
-  const projection = browserProjection.value
-
-  if (projection === undefined) {
-    return undefined
-  }
-
-  for (const [nodeId, binding] of projection.bindingsById) {
-    if (binding.kind === 'source') {
-      return nodeId
-    }
-  }
-
-  return projection.nodes[0]?.id
-})
 
 const treeRootProps = computed(() => ({
   expandedNodeIds: expandedNodeIds.value,
   emptyLabel: emptyTreeLabel,
   labelledBy: 'library-hierarchy-title',
   nodes: liveTreeNodes.value,
-  ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
+  ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
+  ...(sourceRevealRequest.value === undefined ? {} : { revealRequest: sourceRevealRequest.value })
 }))
 
 const contentsProjection = computed(() => {
@@ -165,22 +165,6 @@ const sourceActionModel = computed(() =>
 )
 
 const removeSourceRootId = computed(() => sourceActionModel.value.selectedRemovableSourceRootId)
-
-watch(preferredNodeId, (nodeId) => {
-  if (restoreState.userInteracted || restoreState.initialNodeApplied) {
-    return
-  }
-
-  if (nodeId === undefined) {
-    selectedNodeId.value = undefined
-    expandedNodeIds.value = new Set()
-    return
-  }
-
-  selectedNodeId.value = nodeId
-  expandedNodeIds.value = new Set([nodeId])
-  restoreState.initialNodeApplied = true
-})
 
 watch(scanProgressForRegisteredRoot, (progress) => {
   if (progress === undefined) {
@@ -221,6 +205,8 @@ watch(
 )
 
 watch(browserProjection, (projection) => {
+  applyPendingSourceRegistration(projection)
+
   const selectedId = selectedNodeId.value
 
   if (
@@ -447,6 +433,35 @@ function markUserInteraction(): void {
   pendingRestoreIds.value = new Set()
 }
 
+function applyPendingSourceRegistration(projection: ReturnType<typeof projectState>): void {
+  const pendingRegistration = pendingSourceRegistration.value
+
+  if (pendingRegistration === undefined) {
+    return
+  }
+
+  const visibleRegistration = resolveVisibleSourceRegistration(pendingRegistration, projection)
+
+  if (visibleRegistration === undefined) {
+    return
+  }
+
+  sourceRevealRequest.value = {
+    nodeId: visibleRegistration.nodeId,
+    sequence: ++sourceRevealSequence
+  }
+  pendingSourceRegistration.value = undefined
+
+  if (!visibleRegistration.activate) {
+    return
+  }
+
+  selectedNodeId.value = visibleRegistration.nodeId
+  restoreState.initialNodeApplied = true
+  requestContentsForCurrentSelection()
+  saveViewState()
+}
+
 function selectNode(nodeId: BrowserTreeNodeId): void {
   markUserInteraction()
   selectedNodeId.value = nodeId
@@ -523,6 +538,8 @@ function clearBrowserView(): void {
   contentsRead.clear()
   expandedNodeIds.value = new Set()
   pendingRestoreIds.value = new Set()
+  pendingSourceRegistration.value = undefined
+  sourceRevealRequest.value = undefined
 
   restoreState.userInteracted = false
   restoreState.initialNodeApplied = false

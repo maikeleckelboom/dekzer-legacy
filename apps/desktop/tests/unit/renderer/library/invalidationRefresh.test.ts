@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { createContentsReadController } from '../../../../src/renderer/library/boundary/contentsRead'
+import type { RowBinding } from '../../../../src/renderer/library/state'
 import {
   buildGapPlan,
   buildInvalidationPlan,
@@ -12,6 +14,11 @@ import type {
   AppMaintainedSnapshotInvalidatedEvent,
   AppSourceScanEvent
 } from '../../../../src/shared/libraryBoundary/eventParser'
+import type {
+  ContentsFileRow,
+  ContentsReadRequest,
+  ContentsReadResult
+} from '../../../../src/shared/libraryContents/read'
 
 describe('classify', () => {
   it('maps known scopes and rejects unknown scopes', () => {
@@ -216,6 +223,103 @@ describe('executeRefreshPlan', () => {
 
     expect(refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
   })
+
+  it('refreshes a selected mid-scan source from zero known rows when invalidation arrives', async () => {
+    const responses: ContentsReadResult[] = [
+      readyContentsResult([], 'partial'),
+      readyContentsResult([audioRow('source-file:1', 'track.wav')], 'ready')
+    ]
+    const requests: ContentsReadRequest[] = []
+    const contentsRead = createContentsReadController({
+      read: async (request) => {
+        requests.push(request)
+        const response = responses.shift()
+        if (response === undefined) {
+          throw new Error('Unexpected contents read.')
+        }
+        return response
+      }
+    })
+    const selectedSourceBinding: RowBinding = {
+      kind: 'source',
+      navigationRow: {
+        navigationRowId: '7',
+        stableKey: 'source:7',
+        parentNavigationRowId: null,
+        family: 'sources',
+        rowKind: 'source',
+        displayName: 'Source Fixture',
+        siblingPosition: 0,
+        selectable: true,
+        selectorKind: 'source',
+        selectorPayload: '7',
+        updatedAtMs: 100,
+        rowVersion: '1'
+      },
+      target: {
+        navigationRowId: '7',
+        entryPoint: { kind: 'source', sourceId: '7' },
+        label: 'Source Fixture'
+      }
+    }
+
+    contentsRead.start()
+    await expect(contentsRead.readForBinding(selectedSourceBinding)).resolves.toBe(true)
+    expect(contentsRead.state.value).toMatchObject({
+      kind: 'ready',
+      result: {
+        state: 'ready',
+        result: {
+          state: 'partial',
+          rows: [],
+          coverage: {
+            state: 'scanning',
+            emptyResultAuthoritative: false
+          }
+        }
+      }
+    })
+
+    const plan = buildInvalidationPlan({
+      invalidations: [invalidation('libraryBrowser', '1')],
+      sourceLifecycleSourceIds: ['7']
+    })
+    await expect(
+      executeRefreshPlan(
+        plan,
+        testDeps({
+          clearContentsWarmSnapshots: contentsRead.clearWarmSnapshots,
+          refreshContentsForCurrentSelection: () =>
+            contentsRead.readForBinding(selectedSourceBinding, { force: true })
+        })
+      )
+    ).resolves.toBe(true)
+
+    expect(requests).toEqual([
+      {
+        scope: { kind: 'source', sourceId: '7' },
+        policy: { kind: 'audioBrowse' },
+        recursion: 'recursive',
+        limit: 100
+      },
+      {
+        scope: { kind: 'source', sourceId: '7' },
+        policy: { kind: 'audioBrowse' },
+        recursion: 'recursive',
+        limit: 100
+      }
+    ])
+    expect(contentsRead.state.value).toMatchObject({
+      kind: 'ready',
+      result: {
+        state: 'ready',
+        result: {
+          state: 'ready',
+          rows: [{ id: 'source-file:1', label: 'track.wav' }]
+        }
+      }
+    })
+  })
 })
 
 function testDeps(overrides: Partial<RefreshPlanDeps> = {}): RefreshPlanDeps {
@@ -259,6 +363,42 @@ function sourceScanEvent(rootId: string, eventSequence: number): AppSourceScanEv
     mediaCandidates: 4,
     queuedWorkItems: 5,
     detail: null
+  }
+}
+
+function readyContentsResult(
+  rows: readonly ContentsFileRow[],
+  state: 'partial' | 'ready'
+): ContentsReadResult {
+  return {
+    state: 'ready',
+    result: {
+      state,
+      scope: { kind: 'source', sourceId: '7' },
+      policy: { kind: 'audioBrowse' },
+      recursion: 'recursive',
+      rows,
+      coverage: {
+        state: state === 'partial' ? 'scanning' : 'complete',
+        recursiveScopeComplete: state === 'ready',
+        emptyResultAuthoritative: false
+      }
+    }
+  }
+}
+
+function audioRow(id: string, label: string): ContentsFileRow {
+  return {
+    id,
+    sourceId: '7',
+    sourceFileId: id,
+    label,
+    relativePath: label,
+    fileName: label,
+    fileClass: 'audio',
+    fileKind: 'audio',
+    presence: 'present',
+    updatedAtMs: 100
   }
 }
 

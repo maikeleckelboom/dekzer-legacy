@@ -721,6 +721,7 @@ function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['stat
     case 'empty':
       return result.coverage.emptyResultAuthoritative ? 'empty' : 'loading'
     case 'partial':
+      // Partial coverage can legitimately contain zero known rows while scanning is incomplete.
       return 'loading'
     case 'blocked':
     case 'failed':

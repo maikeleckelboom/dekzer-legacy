@@ -11,6 +11,7 @@ export type TreeContext = {
   readonly registerItemElement: (nodeId: BrowserTreeNodeId, element?: HTMLElement) => void
   readonly setActiveNode: (nodeId: BrowserTreeNodeId) => void
   readonly focusNode: (nodeId: BrowserTreeNodeId) => void
+  readonly scrollNodeIntoView: (nodeId: BrowserTreeNodeId) => void
   readonly prepareNode: (nodeId: BrowserTreeNodeId) => void
   readonly cancelPrepareNode: (nodeId: BrowserTreeNodeId) => void
   readonly selectNode: (nodeId: BrowserTreeNodeId) => void

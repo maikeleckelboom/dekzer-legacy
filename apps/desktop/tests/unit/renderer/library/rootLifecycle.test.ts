@@ -9,6 +9,10 @@ import {
   createRootLifecycleController,
   type RootLifecycleController
 } from '../../../../src/renderer/library/runtime/rootLifecycle'
+import {
+  sourceRegistrationIntent,
+  type SourceRegistrationIntent
+} from '../../../../src/renderer/library/runtime/sourceActions'
 import type { LocalRootChoiceResult } from '../../../../src/shared/libraryRoots/chooseAndRegisterLocal'
 import type { ReadLocalRootsOutcome } from '../../../../src/shared/libraryRoots/readLocalRoots'
 import type { LocalRootScanResult } from '../../../../src/shared/libraryRoots/runScan'
@@ -74,6 +78,68 @@ describe('local root scan lifecycle', () => {
     expect(rootActions.scanStatus.value).toBe('scanning')
     expect(lifecycle.refreshStatus.value).toBe('idle')
     expect(rootActions.scanButtonLabel.value).toBe('Scanning folder')
+  })
+
+  it('reports registration success before navigation refresh and scan activity', async () => {
+    const events: string[] = []
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }),
+        runScan: async () => {
+          events.push('scan')
+          return startedRootResult()
+        }
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: {
+        refresh: async () => {
+          events.push('refresh')
+          return true
+        }
+      },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false,
+      onSourceRegistered: (root) => {
+        events.push(`registered:${root.rootId}`)
+      }
+    })
+
+    await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
+    expect(events).toEqual(['registered:root-2', 'refresh', 'scan'])
+  })
+
+  it('evaluates source activation when the registration response arrives, not at request start', async () => {
+    const choice = deferred<LocalRootChoiceResult>()
+    const selection = { nodeId: undefined as string | undefined }
+    let intent: SourceRegistrationIntent | undefined
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () => choice.promise,
+        runScan: async () => startedRootResult()
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: { refresh: async () => true },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false,
+      onSourceRegistered: (root) => {
+        intent = sourceRegistrationIntent(root.rootId, selection.nodeId)
+      }
+    })
+
+    const registration = lifecycle.addMusicFolder()
+    selection.nodeId = 'navigation-row:root-1'
+    choice.resolve(registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }))
+
+    await expect(registration).resolves.toBe(true)
+    expect(intent).toEqual({
+      rootId: 'root-2',
+      activateWhenVisible: false
+    })
   })
 
   it('does not let refresh failure overwrite scan success', async () => {

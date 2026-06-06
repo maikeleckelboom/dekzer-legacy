@@ -16,6 +16,16 @@ export type VisibleSourceRow = {
   readonly localRoot?: LocalRoot
 }
 
+export type SourceRegistrationIntent = {
+  readonly rootId: string
+  readonly activateWhenVisible: boolean
+}
+
+export type VisibleSourceRegistration = {
+  readonly nodeId: BrowserTreeNodeId
+  readonly activate: boolean
+}
+
 export type SourceActionModel = {
   readonly visibleSourceRows: readonly VisibleSourceRow[]
   readonly selectedRemovableSourceRootId?: string
@@ -73,7 +83,41 @@ export function hasVisibleSourceRootBinding(
   projection: BrowserProjection | undefined,
   rootId: string
 ): boolean {
-  return visibleLocalSourceRows(projection, { kind: 'unread' }).some((row) => row.rootId === rootId)
+  return visibleSourceNodeId(projection, rootId) !== undefined
+}
+
+export function sourceRegistrationIntent(
+  rootId: string,
+  selectedNodeId: BrowserTreeNodeId | undefined
+): SourceRegistrationIntent {
+  return {
+    rootId,
+    activateWhenVisible: selectedNodeId === undefined
+  }
+}
+
+export function visibleSourceNodeId(
+  projection: BrowserProjection | undefined,
+  rootId: string
+): BrowserTreeNodeId | undefined {
+  return visibleLocalSourceRows(projection, { kind: 'unread' }).find((row) => row.rootId === rootId)
+    ?.nodeId
+}
+
+export function resolveVisibleSourceRegistration(
+  intent: SourceRegistrationIntent,
+  projection: BrowserProjection | undefined
+): VisibleSourceRegistration | undefined {
+  const nodeId = visibleSourceNodeId(projection, intent.rootId)
+
+  if (nodeId === undefined) {
+    return undefined
+  }
+
+  return {
+    nodeId,
+    activate: intent.activateWhenVisible
+  }
 }
 
 function visibleLocalSourceRows(

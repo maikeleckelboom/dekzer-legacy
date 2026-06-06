@@ -82,6 +82,12 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     })
   }
 
+  function scrollNodeIntoView(nodeId: BrowserTreeNodeId): void {
+    void nextTick(() => {
+      itemElements.get(nodeId)?.scrollIntoView({ block: 'nearest' })
+    })
+  }
+
   function prepareNode(nodeId: BrowserTreeNodeId): void {
     if (visibleItems.value.some((item) => item.id === nodeId)) {
       options.prepareNode?.(nodeId)
@@ -207,6 +213,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
     registerItemElement,
     setActiveNode,
     focusNode,
+    scrollNodeIntoView,
     prepareNode,
     cancelPrepareNode,
     selectNode: options.selectNode,

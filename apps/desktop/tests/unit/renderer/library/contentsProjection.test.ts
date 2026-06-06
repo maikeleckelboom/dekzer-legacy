@@ -283,17 +283,32 @@ describe('projectContents', () => {
       label: 'No visible files found'
     })
 
-    const partial = projectForSelection(
-      browserState({}),
-      'navigation-row:7',
-      readyContents({ rows: [], state: 'partial' })
-    )
+    const partial = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'ready',
+      requestKey: 'source:7:audioBrowse:recursive',
+      result: {
+        state: 'ready',
+        result: {
+          state: 'partial',
+          scope: { kind: 'source', sourceId: '7' },
+          policy: { kind: 'audioBrowse' },
+          recursion: 'recursive',
+          rows: [],
+          coverage: {
+            state: 'scanning',
+            recursiveScopeComplete: false,
+            emptyResultAuthoritative: false
+          }
+        }
+      }
+    })
     expect(partial.kind).toBe('ready')
     expect(partial.rows[0]).toMatchObject({
       kind: 'state',
       state: 'loading',
       label: 'Still indexing'
     })
+    expect(partial.detail).toContain('Still indexing')
 
     const failed = projectForSelection(
       browserState({}),

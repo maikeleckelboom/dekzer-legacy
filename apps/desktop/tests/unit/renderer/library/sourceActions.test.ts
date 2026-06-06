@@ -5,7 +5,10 @@ import type { BrowserProjection } from '../../../../src/renderer/library/tree/pr
 import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
 import {
   deriveSourceActionModel,
-  hasVisibleSourceRootBinding
+  hasVisibleSourceRootBinding,
+  resolveVisibleSourceRegistration,
+  sourceRegistrationIntent,
+  visibleSourceNodeId
 } from '../../../../src/renderer/library/runtime/sourceActions'
 
 describe('deriveSourceActionModel', () => {
@@ -140,6 +143,44 @@ describe('deriveSourceActionModel', () => {
     expect(hasVisibleSourceRootBinding(projection, 'root-1')).toBe(true)
     expect(hasVisibleSourceRootBinding(projection, 'root-2')).toBe(false)
     expect(hasVisibleSourceRootBinding(undefined, 'root-1')).toBe(false)
+  })
+
+  it('authors activation only from selection state at registration response time', () => {
+    expect(sourceRegistrationIntent('root-2', undefined)).toEqual({
+      rootId: 'root-2',
+      activateWhenVisible: true
+    })
+    expect(sourceRegistrationIntent('root-2', 'navigation-row:root-1')).toEqual({
+      rootId: 'root-2',
+      activateWhenVisible: false
+    })
+  })
+
+  it('finds the newly registered source row without conflating reveal and selection', () => {
+    const projection = sourceProjection(['root-1', 'root-2'])
+
+    expect(visibleSourceNodeId(projection, 'root-2')).toBe('navigation-row:root-2')
+    expect(visibleSourceNodeId(projection, 'root-3')).toBeUndefined()
+  })
+
+  it('carries response-authored activation until the registered row is visible', () => {
+    const projection = sourceProjection(['root-1', 'root-2'])
+    const intent = sourceRegistrationIntent('root-2', undefined)
+
+    expect(resolveVisibleSourceRegistration(intent, projection)).toEqual({
+      nodeId: 'navigation-row:root-2',
+      activate: true
+    })
+  })
+
+  it('reveals but never activates when registration response observed an existing selection', () => {
+    const projection = sourceProjection(['root-1', 'root-2'])
+    const intent = sourceRegistrationIntent('root-2', 'navigation-row:root-1')
+
+    expect(resolveVisibleSourceRegistration(intent, projection)).toEqual({
+      nodeId: 'navigation-row:root-2',
+      activate: false
+    })
   })
 })
 
