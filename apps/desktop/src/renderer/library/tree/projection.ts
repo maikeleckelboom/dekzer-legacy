@@ -409,7 +409,7 @@ function projectLiteralDirectoryNode(options: {
 
   const directoryState = options.directoryReadStates.get(node.directoryId)
 
-  if (isConfirmedDirectoryLeaf(node)) {
+  if (!hasDisclosureAffordance(node)) {
     return {
       id: node.id,
       role: 'literalDirectory',
@@ -435,10 +435,16 @@ function projectLiteralDirectoryNode(options: {
   }
 }
 
-function isConfirmedDirectoryLeaf(
+export function isConfirmedDirectoryLeaf(
   node: Extract<ChildRow, { readonly kind: 'directory' }>
 ): boolean {
-  return node.navigableChildScopeState !== 'hasNavigableChildScopes'
+  return node.navigableChildScopeState === 'noNavigableChildScopes'
+}
+
+export function hasDisclosureAffordance(
+  node: Extract<ChildRow, { readonly kind: 'directory' }>
+): boolean {
+  return node.navigableChildScopeState === 'hasNavigableChildScopes'
 }
 
 const sourceUnavailableErrorCodes = new Set([

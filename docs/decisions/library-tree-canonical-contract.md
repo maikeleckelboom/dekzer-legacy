@@ -208,8 +208,10 @@ Every node in the left-side tree is one of three structural roles:
 selectable as a browse scope that aggregates its own content and all descendant content. Is expandable independently of
 selection. Unknown child scope existence must not be projected as a known expandable branch.
 
-**Leaf node** — has no navigable child scopes, or child scope existence is unknown. Has no disclosure affordance. Is selectable as a browse scope. Has no expansion
-state. Progressive scan may transition a row from unknown/no-disclosure to known-branch/disclosure through invalidation.
+**Leaf node** — has no navigable child scopes (confirmed leaf). Has no disclosure affordance. Is selectable as a browse scope. Has no expansion
+state. A confirmed leaf is semantically distinct from unknown child-scope existence; unknown is not a leaf.
+Progressive scan may transition an unknown/no-disclosure row to known-branch/disclosure through invalidation;
+that transition must preserve selection and contents.
 
 **Service root / virtual node** — a container node whose children are fetched from an external or deferred source.
 Behaves identically to container nodes except that first expansion triggers a deferred child fetch rather than revealing

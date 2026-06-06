@@ -19,6 +19,8 @@ import {
   isBrowserTreeBranch
 } from '../../../../src/renderer/library/tree/listProjection'
 import {
+  hasDisclosureAffordance,
+  isConfirmedDirectoryLeaf,
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
@@ -794,6 +796,183 @@ describe('projectState', () => {
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
     expect(sourceNode.children.kind).toBe('failed')
+  })
+
+  it('isConfirmedDirectoryLeaf returns true only for known no navigable child scopes', () => {
+    expect(
+      isConfirmedDirectoryLeaf(
+        directoryNode('1', 'Known Leaf', { navigableChildScopeState: 'noNavigableChildScopes' })
+      )
+    ).toBe(true)
+
+    expect(
+      isConfirmedDirectoryLeaf(
+        directoryNode('2', 'Unknown', { navigableChildScopeState: 'unknown' })
+      )
+    ).toBe(false)
+
+    expect(
+      isConfirmedDirectoryLeaf(
+        directoryNode('3', 'Branch', { navigableChildScopeState: 'hasNavigableChildScopes' })
+      )
+    ).toBe(false)
+  })
+
+  it('haveDisclosureAffordance returns true only for known navigable child scopes', () => {
+    expect(
+      hasDisclosureAffordance(
+        directoryNode('1', 'Branch', { navigableChildScopeState: 'hasNavigableChildScopes' })
+      )
+    ).toBe(true)
+
+    expect(
+      hasDisclosureAffordance(
+        directoryNode('2', 'Unknown', { navigableChildScopeState: 'unknown' })
+      )
+    ).toBe(false)
+
+    expect(
+      hasDisclosureAffordance(
+        directoryNode('3', 'Known Leaf', { navigableChildScopeState: 'noNavigableChildScopes' })
+      )
+    ).toBe(false)
+  })
+
+  it('unknown child scope and confirmed leaf are semantically distinct', () => {
+    const unknownDir = directoryNode('12', 'Unknown', { navigableChildScopeState: 'unknown' })
+    const leafDir = directoryNode('12', 'Leaf', {
+      navigableChildScopeState: 'noNavigableChildScopes'
+    })
+
+    expect(isConfirmedDirectoryLeaf(unknownDir)).toBe(false)
+    expect(isConfirmedDirectoryLeaf(leafDir)).toBe(true)
+    expect(hasDisclosureAffordance(unknownDir)).toBe(false)
+    expect(hasDisclosureAffordance(leafDir)).toBe(false)
+  })
+
+  it('media-only folder is a confirmed leaf', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Media Only', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'noNavigableChildScopes'
+          })
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    expect(isBrowserTreeBranch(node)).toBe(false)
+  })
+
+  it('video-only folder is a confirmed leaf', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Videos', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'noNavigableChildScopes'
+          })
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    expect(isBrowserTreeBranch(node)).toBe(false)
+  })
+
+  it('mixed media-only folder is a confirmed leaf', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Mixed', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'noNavigableChildScopes'
+          })
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    expect(isBrowserTreeBranch(node)).toBe(false)
+  })
+
+  it('unknown-to-branch transition shows disclosure without changing projection identity', () => {
+    const unknownProjection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Transition Folder', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryImageMediaState: { kind: 'unknown' },
+            directoryScanState: 'pending',
+            navigableChildScopeState: 'unknown'
+          })
+        ])
+      })
+    )
+    const unknownNode = requiredNode(unknownProjection.nodes, 'source-directory:12')
+    expect(unknownNode.children.kind).toBe('none')
+    expect(canRevealBrowserTreeChildren(unknownNode)).toBe(false)
+    expect(isBrowserTreeBranch(unknownNode)).toBe(false)
+
+    const branchProjection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Transition Folder', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryImageMediaState: { kind: 'unknown' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'hasNavigableChildScopes'
+          })
+        ])
+      })
+    )
+    const branchNode = requiredNode(branchProjection.nodes, 'source-directory:12')
+    expect(branchNode.children.kind).toBe('deferred')
+    expect(canRevealBrowserTreeChildren(branchNode)).toBe(true)
+    expect(isBrowserTreeBranch(branchNode)).toBe(true)
+
+    expect(unknownProjection.bindingsById.get('source-directory:12')).toMatchObject({
+      kind: 'directory'
+    })
+    expect(branchProjection.bindingsById.get('source-directory:12')).toMatchObject({
+      kind: 'directory'
+    })
+  })
+
+  it('folder with known child scopes shows disclosure', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Known Branch', {
+            navigableChildScopeState: 'hasNavigableChildScopes'
+          })
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('deferred')
+    expect(canRevealBrowserTreeChildren(node)).toBe(true)
+    expect(isBrowserTreeBranch(node)).toBe(true)
   })
 })
 
