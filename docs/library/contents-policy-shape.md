@@ -63,8 +63,8 @@ predicates, directory rollups, and fast contents queries:
 - `unsupported`
 - `none`
 
-The values and classification semantics are unchanged. `unsupported` and `none` are valid inventory classifications,
-which is why the durable concept is named `file_class`.
+The values and classification semantics are unchanged. `unsupported` and `none` are valid persisted inventory
+classifications, which is why the durable concept is named `file_class`.
 
 Boundary row facts use `fileClass`. Rust store and protocol types use `FileClass` vocabulary. The active implementation
 does not expose a source-file row fact named with media-class vocabulary.
@@ -72,11 +72,16 @@ does not expose a source-file row fact named with media-class vocabulary.
 ### Source-File Inventory Policy
 
 `sourceFileInventory.fileClasses` filters coarse source-file inventory facts. The active contents policy domain exposes
-`audio`, `video`, `image`, and admitted `unsupported` rows. The persisted `none` value remains part of the schema domain
-but is excluded from normal contents admission.
+`audio`, `video`, `image`, and `unsupported` as requestable browse classes.
 
-Unsupported rows remain admitted only where the existing policy permits them, including the current CUE-sheet
-behavior. The rename does not broaden unsupported-file admission.
+`none` is a persisted/internal classification for files that could not be assigned a more specific class. It is not a
+requestable `ContentsFileClass` value and is excluded from normal contents admission. A future diagnostic or raw inventory
+mode may choose to expose it, but that requires a separate decision.
+
+`unsupported` in the current `sourceFileInventory` browse path is not "all unsupported files." The store predicate
+narrows unsupported rows to those admitted as media-relevant: currently `cue_sheet` file-kind rows only. This
+cue-sheet-admitted behavior is the current product-admitted subset, not a statement that all unsupported files are
+product-visible. Changing this admission scope requires a separate decision.
 
 ### Audio Browse Policy
 

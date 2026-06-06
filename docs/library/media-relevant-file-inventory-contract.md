@@ -86,9 +86,16 @@ Explicit non-default source-file inventory reads may include:
 | `file_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from normal inventory.                               |
 | `file_class = none` or `file_kind = unknown`                                    | Exclude from normal inventory.                               |
 
+`none` is a persisted/internal classification for files that received no more specific class during scan. It is not a
+requestable `ContentsFileClass` value. A future diagnostic or raw inventory mode may choose to expose it, but that
+requires a separate decision.
+
 This contract intentionally does not admit every `unsupported` row. `unsupported` is too broad for product inventory
 because it can include notes, PDFs, archives, binary data, and other unrelated files. CUE sheets are admitted because
 they are media-adjacent companion metadata. They remain source-file rows and never become primary media rows.
+
+Changing the unsupported admission scope (for example, admitting `log_doc` or `text_doc` unsupported rows, or removing
+the cue-sheet filter) requires a separate decision. The current behavior is preserved.
 
 The V0 main contents browse default requests only `audio`. It does not include video, image, unsupported, CUE, text, or
 metadata companion files unless a future explicit product surface chooses a broader policy.

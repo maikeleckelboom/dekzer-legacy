@@ -1518,7 +1518,7 @@ fn read_rows(
         ))
     })?;
     let file_classes = policy_file_classes(policy);
-    let media_predicate =
+    let file_class_predicate =
         file_classes_predicate_sql("sf.file_class", "sf.file_kind", &file_classes);
     let primary_media_rows = matches!(policy, StoreContentsReadPolicy::PrimaryMedia { .. });
 
@@ -1534,7 +1534,7 @@ fn read_rows(
                 connection,
                 SourcePredicateReadInput {
                     source_predicate: &source_predicate,
-                    media_predicate: &media_predicate,
+                    file_class_predicate: &file_class_predicate,
                     primary_media_rows,
                     source_id: *source_id,
                     relative_path: None,
@@ -1569,7 +1569,7 @@ fn read_rows(
             read_rows_for_accepted_locations(
                 connection,
                 &predicate,
-                &media_predicate,
+                &file_class_predicate,
                 primary_media_rows,
                 *source_id,
                 limit_plus_one,
@@ -1585,7 +1585,7 @@ fn read_rows(
                 connection,
                 SourcePredicateReadInput {
                     source_predicate: &predicate,
-                    media_predicate: &media_predicate,
+                    file_class_predicate: &file_class_predicate,
                     primary_media_rows,
                     source_id: *source_id,
                     relative_path: Some(relative_path),
@@ -1603,7 +1603,7 @@ fn read_rows(
                 connection,
                 SourcePredicateReadInput {
                     source_predicate: &predicate,
-                    media_predicate: &media_predicate,
+                    file_class_predicate: &file_class_predicate,
                     primary_media_rows,
                     source_id: *source_id,
                     relative_path: Some(relative_path),
@@ -1619,7 +1619,7 @@ fn read_rows(
 fn read_rows_for_accepted_locations(
     connection: &Connection,
     source_predicate: &str,
-    media_predicate: &str,
+    file_class_predicate: &str,
     primary_media_rows: bool,
     source_id: i64,
     limit_plus_one: i64,
@@ -1641,7 +1641,7 @@ fn read_rows_for_accepted_locations(
     let sql = contents_rows_sql(
         Some(accepted_locations_cte()),
         source_predicate,
-        media_predicate,
+        file_class_predicate,
         primary_media_rows,
         cursor_start,
         limit_param,
@@ -1670,7 +1670,7 @@ fn read_rows_for_accepted_locations(
 
 struct SourcePredicateReadInput<'a> {
     source_predicate: &'a str,
-    media_predicate: &'a str,
+    file_class_predicate: &'a str,
     primary_media_rows: bool,
     source_id: i64,
     relative_path: Option<&'a str>,
@@ -1698,7 +1698,7 @@ fn read_rows_with_source_predicate(
     let sql = contents_rows_sql(
         None,
         input.source_predicate,
-        input.media_predicate,
+        input.file_class_predicate,
         input.primary_media_rows,
         cursor_start,
         limit_param,
@@ -1761,7 +1761,7 @@ fn scoped_path_predicate(recursion: StoreContentsRecursion) -> String {
 fn contents_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
-    media_predicate: &str,
+    file_class_predicate: &str,
     primary_media_rows: bool,
     cursor_start: Option<usize>,
     limit_param: usize,
@@ -1770,7 +1770,7 @@ fn contents_rows_sql(
         primary_media_rows_sql(
             prefix_cte,
             source_predicate,
-            media_predicate,
+            file_class_predicate,
             cursor_start,
             limit_param,
         )
@@ -1778,7 +1778,7 @@ fn contents_rows_sql(
         source_file_rows_sql(
             prefix_cte,
             source_predicate,
-            media_predicate,
+            file_class_predicate,
             cursor_start,
             limit_param,
         )
@@ -1788,7 +1788,7 @@ fn contents_rows_sql(
 fn source_file_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
-    media_predicate: &str,
+    file_class_predicate: &str,
     cursor_start: Option<usize>,
     limit_param: usize,
 ) -> String {
@@ -1844,8 +1844,8 @@ SELECT sf.source_file_id, \
        NULL AS codec, \
        sf.relative_path_browse_sort_key \
    FROM source_files sf \
- WHERE {media_predicate} \
-   AND {source_predicate}{cursor_clause} \
+WHERE {file_class_predicate} \
+  AND {source_predicate}{cursor_clause} \
  ORDER BY {SOURCE_FILE_CONTENTS_ORDER_SQL} \
  LIMIT ?{limit_param}"
     )
@@ -1854,7 +1854,7 @@ SELECT sf.source_file_id, \
 fn primary_media_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
-    media_predicate: &str,
+    file_class_predicate: &str,
     cursor_start: Option<usize>,
     limit_param: usize,
 ) -> String {
@@ -1945,7 +1945,7 @@ fn primary_media_rows_sql(
                       sf.updated_at \
                FROM source_files sf \
                WHERE sf.presence_state = 'present' \
-                 AND {media_predicate} \
+                 AND {file_class_predicate} \
                  AND {source_predicate} \
            ), \
            candidate_scope AS ( \
@@ -5205,13 +5205,18 @@ mod tests {
             );
         }
 
-        let media_predicate = super::file_classes_predicate_sql(
+        let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
         );
-        let sql =
-            super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
+        let sql = super::primary_media_rows_sql(
+            None,
+            "sf.source_id = ?1",
+            &file_class_predicate,
+            None,
+            2,
+        );
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -5246,12 +5251,13 @@ mod tests {
             );
         }
 
-        let media_predicate = super::file_classes_predicate_sql(
+        let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
             &[StoreContentsFileClass::Audio],
         );
-        let sql = super::source_file_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
+        let sql =
+            super::source_file_rows_sql(None, "sf.source_id = ?1", &file_class_predicate, None, 2);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -5290,12 +5296,13 @@ mod tests {
             "sf.source_id = ?1 AND {}",
             super::source_file_descendant_predicate("sf", "?2")
         );
-        let media_predicate = super::file_classes_predicate_sql(
+        let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
         );
-        let sql = super::primary_media_rows_sql(None, &source_predicate, &media_predicate, None, 3);
+        let sql =
+            super::primary_media_rows_sql(None, &source_predicate, &file_class_predicate, None, 3);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -5344,7 +5351,7 @@ mod tests {
              )",
             super::relative_path_scope_predicate("sf", "al.relative_path")
         );
-        let media_predicate = super::file_classes_predicate_sql(
+        let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
@@ -5352,7 +5359,7 @@ mod tests {
         let sql = super::primary_media_rows_sql(
             Some(super::accepted_locations_cte()),
             &predicate,
-            &media_predicate,
+            &file_class_predicate,
             None,
             2,
         );
@@ -5405,13 +5412,18 @@ mod tests {
             );
         }
 
-        let media_predicate = super::file_classes_predicate_sql(
+        let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
         );
-        let sql =
-            super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
+        let sql = super::primary_media_rows_sql(
+            None,
+            "sf.source_id = ?1",
+            &file_class_predicate,
+            None,
+            2,
+        );
         let plan = dump_query_plan(
             &connection,
             &sql,

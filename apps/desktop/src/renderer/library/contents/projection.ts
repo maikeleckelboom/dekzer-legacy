@@ -650,7 +650,7 @@ function sourceFileRowDetail(row: ContentsFileRow): string {
     return 'File removed'
   }
 
-  return row.relativePath ?? sourceFileMediaLabel(row.fileClass, row.fileKind)
+  return row.relativePath ?? sourceFileClassLabel(row.fileClass, row.fileKind)
 }
 
 function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsFileRow): string {
@@ -660,7 +660,7 @@ function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsF
   const base =
     parts.length > 0
       ? parts.join(' - ')
-      : (row.relativePath ?? sourceFileMediaLabel(row.fileClass, row.fileKind))
+      : (row.relativePath ?? sourceFileClassLabel(row.fileClass, row.fileKind))
 
   switch (row.availabilityState) {
     case 'available':
@@ -676,7 +676,7 @@ function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsF
   return base
 }
 
-function sourceFileMediaLabel(
+function sourceFileClassLabel(
   fileClass: ContentsFileRow['fileClass'],
   fileKind?: ContentsFileRow['fileKind']
 ): string {

@@ -23,11 +23,14 @@ The persisted source-file vocabulary is separate from the policy discriminant:
 - `file_kind` is the detailed detected taxonomy.
 - `file_class` is the coarse inventory classification with values `audio`, `video`, `image`, `unsupported`, and `none`.
 - Contents source-file rows expose the coarse fact as `fileClass`.
+- `none` is a persisted/internal classification and is not requestable through `sourceFileInventory.fileClasses`.
+- `unsupported` in `sourceFileInventory` admits only cue-sheet files, not all unsupported files.
 
 ## Boundaries
 
 Raw source-file inventory remains available through `sourceFileInventory.fileClasses`. Explicit non-default inventory
-reads may request audio, video, image, and admitted unsupported source-file rows.
+reads may request `audio`, `video`, `image`, and `unsupported` as requestable browse classes. Inserting `none` as a
+`ContentsFileClass` requires a separate decision.
 
 `primaryMedia.mediaKinds` is separate primary-media vocabulary and is not an alias for source-file `fileClasses`.
 

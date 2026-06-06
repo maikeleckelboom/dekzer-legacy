@@ -156,6 +156,20 @@ describe('contents reads through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
+
+    await expect(
+      readContentsThroughHost(successHost, {
+        scope: { kind: 'source', sourceId: '7' },
+        policy: {
+          kind: 'sourceFileInventory',
+          fileClasses: ['none']
+        },
+        recursion: 'recursive'
+      })
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    })
   })
 
   it('registers the contents read IPC channel', () => {
