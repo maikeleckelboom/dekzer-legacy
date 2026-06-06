@@ -215,7 +215,7 @@ Directory-level `dir_scan_state` values:
   unavailable when the selected source or scope itself is unavailable and the projection has known prior rows; shown in
   explicit issue/readiness views; never treated as empty.
 
-#### `source_files.media_class`
+#### `source_files.file_class`
 
 - `audio`: raw source-file class for audio files; included in primary media.
 - `video`: raw source-file class for video files; visible as a primary media candidate until future video inspection
@@ -225,7 +225,7 @@ Directory-level `dir_scan_state` values:
 - `unsupported`: strictly excluded from normal recursive selected contents.
 - `none`: strictly excluded from normal recursive selected contents.
 
-`source_files.media_class` is raw/provisional source-file classification. Normal recursive selected contents is
+`source_files.file_class` is raw/provisional source-file classification. Normal recursive selected contents is
 primary-media content. Primary media currently means audio/video. Image files are source companion/image media, not
 normal selected contents rows.
 

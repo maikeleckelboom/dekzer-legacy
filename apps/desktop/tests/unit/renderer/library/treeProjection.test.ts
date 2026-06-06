@@ -81,7 +81,7 @@ describe('projectState', () => {
         ],
         sourceChildren: loadedChildren([
           fileNode('11', 'track.wav'),
-          fileNode('99', 'clip.mp4', { mediaClass: 'video' })
+          fileNode('99', 'clip.mp4', { fileClass: 'video' })
         ])
       })
     )
@@ -108,11 +108,11 @@ describe('projectState', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
-          fileNode('11', 'track.wav', { mediaClass: 'audio' }),
-          fileNode('12', 'clip.mp4', { mediaClass: 'video' }),
-          fileNode('13', 'cover.jpg', { mediaClass: 'image' }),
-          fileNode('14', 'album.cue', { mediaClass: 'unsupported' }),
-          fileNode('15', 'mystery', { mediaClass: 'none' })
+          fileNode('11', 'track.wav', { fileClass: 'audio' }),
+          fileNode('12', 'clip.mp4', { fileClass: 'video' }),
+          fileNode('13', 'cover.jpg', { fileClass: 'image' }),
+          fileNode('14', 'album.cue', { fileClass: 'unsupported' }),
+          fileNode('15', 'mystery', { fileClass: 'none' })
         ])
       })
     )
@@ -435,7 +435,7 @@ describe('projectState', () => {
             'navigation-row:7',
             {
               kind: 'refreshing',
-              children: loadedChildren([fileNode('11', 'cover.mp3', { mediaClass: 'audio' })]),
+              children: loadedChildren([fileNode('11', 'cover.mp3', { fileClass: 'audio' })]),
               requestKey: 'source:7',
               sequence: 1,
               detail: 'Refreshing hierarchy children.'
@@ -786,7 +786,7 @@ function fileNode(
   fileId: string,
   label: string,
   options: {
-    readonly mediaClass?: Extract<ChildRow, { readonly kind: 'file' }>['mediaClass']
+    readonly fileClass?: Extract<ChildRow, { readonly kind: 'file' }>['fileClass']
   } = {}
 ): Extract<ChildRow, { readonly kind: 'file' }> {
   return {
@@ -795,7 +795,7 @@ function fileNode(
     label,
     sourceId: '7',
     fileId,
-    mediaClass: options.mediaClass ?? 'audio',
+    fileClass: options.fileClass ?? 'audio',
     presence: 'present',
     updatedAtMs: 100
   }

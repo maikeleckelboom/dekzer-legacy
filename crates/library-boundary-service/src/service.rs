@@ -1504,7 +1504,7 @@ mod tests {
         let error = validate_contents_policy(&ContentsReadPolicy::SourceFileInventory {
             file_classes: Vec::new(),
         })
-        .expect_err("empty contents media classes should be rejected");
+        .expect_err("empty contents file classes should be rejected");
 
         assert!(matches!(error, ProtocolError::InvalidRequest { .. }));
         assert_eq!(error.code(), "INVALID_REQUEST");

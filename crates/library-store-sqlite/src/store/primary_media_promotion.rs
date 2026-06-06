@@ -159,7 +159,7 @@ fn read_primary_media_promotion_skip_summary(
                 "SELECT
                     COALESCE(SUM(CASE
                         WHEN file.presence_state = 'present'
-                         AND NOT (file.media_class = 'audio' AND file.file_kind = 'audio')
+                         AND NOT (file.file_class = 'audio' AND file.file_kind = 'audio')
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE
                         WHEN {present_audio_predicate}
@@ -405,7 +405,7 @@ fn read_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> 
 }
 
 const PRESENT_AUDIO_PREDICATE: &str =
-    "file.presence_state = 'present' AND file.media_class = 'audio' AND file.file_kind = 'audio'";
+    "file.presence_state = 'present' AND file.file_class = 'audio' AND file.file_kind = 'audio'";
 
 const CURRENT_FACTS_PREDICATE: &str = "file.source_id = facts.basis_source_id
     AND file.relative_path = facts.basis_relative_path
@@ -429,7 +429,7 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::read_models::contents::{
-        StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion,
+        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRecursion,
         StoreContentsRowOrigin, StoreContentsScope, StoreContentsState, StorePrimaryMediaKind,
     };
     use crate::{PromotePrimaryMediaForSourceResult, SqliteDurableStore};
@@ -507,7 +507,7 @@ mod tests {
         fn insert_source_file(&self, source_file_id: i64, relative_path: &str) {
             let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
             let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
-            let media_class = crate::browse_media::media_class_str_from_path(relative_path);
+            let file_class = crate::browse_media::file_class_str_from_path(relative_path);
             let name_browse_sort_key =
                 crate::browse_sort_key::compute_name_browse_sort_key(file_name);
             let relative_path_browse_sort_key =
@@ -525,7 +525,7 @@ mod tests {
                              size_bytes,
                              mtime_ns,
                              file_kind,
-                             media_class,
+                             file_class,
                              presence_state,
                              first_discovered_at,
                              last_observed_at,
@@ -542,7 +542,7 @@ mod tests {
                             relative_path_browse_sort_key,
                             relative_path,
                             file_kind,
-                            media_class,
+                            file_class,
                         ],
                     )?;
                     Ok(())
@@ -973,10 +973,10 @@ mod tests {
                 },
                 StoreContentsReadPolicy::SourceFileInventory {
                     file_classes: vec![
-                        StoreContentsMediaClass::Audio,
-                        StoreContentsMediaClass::Video,
-                        StoreContentsMediaClass::Image,
-                        StoreContentsMediaClass::Unsupported,
+                        StoreContentsFileClass::Audio,
+                        StoreContentsFileClass::Video,
+                        StoreContentsFileClass::Image,
+                        StoreContentsFileClass::Unsupported,
                     ],
                 },
                 StoreContentsRecursion::Recursive,

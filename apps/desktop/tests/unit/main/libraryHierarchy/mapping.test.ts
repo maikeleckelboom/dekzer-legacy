@@ -34,7 +34,7 @@ function makeFileNode(overrides: Partial<LibraryTreeNode> = {}): LibraryTreeNode
     parentSourceDirectoryId: null,
     relativePath: 'track.wav',
     displayName: 'track.wav',
-    mediaClass: 'audio',
+    fileClass: 'audio',
     presenceState: 'present',
     sizeBytes: null,
     modifiedAtNs: null,
@@ -123,7 +123,7 @@ describe('mapLibraryTreeNode', () => {
       label: 'track.wav',
       sourceId: '7',
       fileId: '11',
-      mediaClass: 'audio',
+      fileClass: 'audio',
       presence: 'present',
       updatedAtMs: 101
     })
@@ -135,12 +135,12 @@ describe('mapLibraryTreeNode', () => {
     expect(result).toBeUndefined()
   })
 
-  it('defaults missing mediaClass to none for file nodes', () => {
-    const result = mapLibraryTreeNode(withoutProperty(makeFileNode(), 'mediaClass'))
+  it('defaults missing fileClass to none for file nodes', () => {
+    const result = mapLibraryTreeNode(withoutProperty(makeFileNode(), 'fileClass'))
 
     expect(result).not.toBeUndefined()
     if (result?.kind === 'file') {
-      expect(result.mediaClass).toBe('none')
+      expect(result.fileClass).toBe('none')
     }
   })
 })

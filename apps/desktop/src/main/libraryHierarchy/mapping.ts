@@ -72,7 +72,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
   }
 
   const sourceFileId = row.sourceFileId
-  const mediaClass = row.mediaClass ?? 'none'
+  const fileClass = row.fileClass ?? 'none'
 
   if (sourceFileId === null) {
     return undefined
@@ -84,7 +84,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
     label: row.displayName,
     sourceId: row.sourceId,
     fileId: sourceFileId,
-    mediaClass,
+    fileClass,
     ...(row.parentSourceDirectoryId === null
       ? {}
       : { parentDirectoryId: row.parentSourceDirectoryId }),

@@ -66,7 +66,7 @@ export type NodeKind = 'directory' | 'file'
 
 export type Presence = 'present' | 'missing' | 'removed'
 
-export type FileMediaClass = 'audio' | 'video' | 'image' | 'unsupported' | 'none'
+export type FileClass = 'audio' | 'video' | 'image' | 'unsupported' | 'none'
 
 export type DirectoryPrimaryMediaState =
   | {
@@ -131,7 +131,7 @@ export type ChildRow =
       readonly sourceId: string
       readonly fileId: string
       readonly parentDirectoryId?: string
-      readonly mediaClass: FileMediaClass
+      readonly fileClass: FileClass
       readonly presence: Presence
       readonly updatedAtMs: number
     }

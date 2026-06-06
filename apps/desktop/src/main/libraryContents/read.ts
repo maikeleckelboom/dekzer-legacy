@@ -496,7 +496,7 @@ function mapCoverage(result: ContractContentsResult): ContentsCoverage {
 function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefined {
   if (
     row.primaryMedia !== undefined &&
-    (row.mediaClass === 'image' || row.mediaClass === 'unsupported')
+    (row.fileClass === 'image' || row.fileClass === 'unsupported')
   ) {
     return undefined
   }
@@ -509,7 +509,7 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
     label: row.label,
     ...(row.relativePath === undefined ? {} : { relativePath: row.relativePath }),
     fileName: row.fileName,
-    mediaClass: row.mediaClass,
+    fileClass: row.fileClass,
     fileKind: row.fileKind,
     presence: row.presence,
     ...(row.availabilityState === undefined ? {} : { availabilityState: row.availabilityState }),

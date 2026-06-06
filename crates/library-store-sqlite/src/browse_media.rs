@@ -1,24 +1,24 @@
-// Source-file observation owns provisional path-based file/media classification.
-// Maintained read models should consume the stored source_files.file_kind and media_class.
+// Source-file observation owns provisional path-based file classification.
+// Maintained read models should consume the stored source_files.file_kind and file_class.
 #![allow(dead_code)]
 
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum BrowseMediaClass {
+pub(crate) enum SourceFileClass {
     Audio,
     Video,
     Image,
     Unsupported,
 }
 
-impl BrowseMediaClass {
+impl SourceFileClass {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
-            BrowseMediaClass::Audio => "audio",
-            BrowseMediaClass::Video => "video",
-            BrowseMediaClass::Image => "image",
-            BrowseMediaClass::Unsupported => "unsupported",
+            SourceFileClass::Audio => "audio",
+            SourceFileClass::Video => "video",
+            SourceFileClass::Image => "image",
+            SourceFileClass::Unsupported => "unsupported",
         }
     }
 }
@@ -30,12 +30,12 @@ pub enum SourceFileClassFilter {
     PrimaryMediaAndImages,
 }
 
-pub(crate) fn is_primary_media_class(media_class: &str) -> bool {
-    matches!(media_class, "audio" | "video")
+pub(crate) fn is_primary_file_class(file_class: &str) -> bool {
+    matches!(file_class, "audio" | "video")
 }
 
-pub(crate) fn is_image_media_class(media_class: &str) -> bool {
-    media_class == "image"
+pub(crate) fn is_image_file_class(file_class: &str) -> bool {
+    file_class == "image"
 }
 
 pub(crate) fn source_file_class_filter_predicate_sql(
@@ -43,10 +43,8 @@ pub(crate) fn source_file_class_filter_predicate_sql(
 ) -> &'static str {
     match source_file_class_filter {
         SourceFileClassFilter::NavigationOnly => "0 = 1",
-        SourceFileClassFilter::PrimaryMedia => "media_class IN ('audio', 'video')",
-        SourceFileClassFilter::PrimaryMediaAndImages => {
-            "media_class IN ('audio', 'video', 'image')"
-        }
+        SourceFileClassFilter::PrimaryMedia => "file_class IN ('audio', 'video')",
+        SourceFileClassFilter::PrimaryMediaAndImages => "file_class IN ('audio', 'video', 'image')",
     }
 }
 
@@ -65,39 +63,39 @@ pub(crate) fn source_file_class_filter_predicate_sql_for_column(
     }
 }
 
-pub(crate) fn canonical_media_class_from_file_kind(
+pub(crate) fn canonical_file_class_from_file_kind(
     file_kind: Option<&str>,
-) -> Option<BrowseMediaClass> {
+) -> Option<SourceFileClass> {
     match file_kind? {
-        "audio" => Some(BrowseMediaClass::Audio),
-        "video" => Some(BrowseMediaClass::Video),
-        "image" => Some(BrowseMediaClass::Image),
+        "audio" => Some(SourceFileClass::Audio),
+        "video" => Some(SourceFileClass::Video),
+        "image" => Some(SourceFileClass::Image),
         "cue_sheet" | "log_doc" | "text_doc" | "archive" | "other" => {
-            Some(BrowseMediaClass::Unsupported)
+            Some(SourceFileClass::Unsupported)
         }
         "unknown" => None,
         _ => None,
     }
 }
 
-pub(crate) fn canonical_media_class_from_media_kind(
+pub(crate) fn canonical_file_class_from_media_kind(
     media_kind: Option<&str>,
-) -> Option<BrowseMediaClass> {
+) -> Option<SourceFileClass> {
     match media_kind? {
-        "audio" => Some(BrowseMediaClass::Audio),
-        "video" => Some(BrowseMediaClass::Video),
-        "image" => Some(BrowseMediaClass::Image),
-        _ => Some(BrowseMediaClass::Unsupported),
+        "audio" => Some(SourceFileClass::Audio),
+        "video" => Some(SourceFileClass::Video),
+        "image" => Some(SourceFileClass::Image),
+        _ => Some(SourceFileClass::Unsupported),
     }
 }
 
-pub(crate) fn provisional_media_class_from_path(path: &str) -> Option<BrowseMediaClass> {
-    canonical_media_class_from_file_kind(Some(classify_relative_path_file_kind(path)))
+pub(crate) fn provisional_file_class_from_path(path: &str) -> Option<SourceFileClass> {
+    canonical_file_class_from_file_kind(Some(classify_relative_path_file_kind(path)))
 }
 
-pub(crate) fn media_class_str_from_path(relative_path: &str) -> &'static str {
-    match provisional_media_class_from_path(relative_path) {
-        Some(media_class) => media_class.as_str(),
+pub(crate) fn file_class_str_from_path(relative_path: &str) -> &'static str {
+    match provisional_file_class_from_path(relative_path) {
+        Some(file_class) => file_class.as_str(),
         None => "none",
     }
 }
@@ -137,79 +135,78 @@ pub(crate) fn classify_relative_path_file_kind(relative_path: &str) -> &'static 
 #[cfg(test)]
 mod tests {
     use super::{
-        BrowseMediaClass, canonical_media_class_from_file_kind,
-        canonical_media_class_from_media_kind, file_kind_str_from_path,
-        is_media_relevant_unsupported_file_kind, media_class_str_from_path,
-        provisional_media_class_from_path,
+        SourceFileClass, canonical_file_class_from_file_kind, canonical_file_class_from_media_kind,
+        file_class_str_from_path, file_kind_str_from_path, is_media_relevant_unsupported_file_kind,
+        provisional_file_class_from_path,
     };
 
     #[test]
     fn file_kind_mapping_classifies_audio_video_image_and_unsupported_classes() {
         assert_eq!(
-            canonical_media_class_from_file_kind(Some("audio")),
-            Some(BrowseMediaClass::Audio)
+            canonical_file_class_from_file_kind(Some("audio")),
+            Some(SourceFileClass::Audio)
         );
         assert_eq!(
-            canonical_media_class_from_file_kind(Some("video")),
-            Some(BrowseMediaClass::Video)
+            canonical_file_class_from_file_kind(Some("video")),
+            Some(SourceFileClass::Video)
         );
         assert_eq!(
-            canonical_media_class_from_file_kind(Some("image")),
-            Some(BrowseMediaClass::Image)
+            canonical_file_class_from_file_kind(Some("image")),
+            Some(SourceFileClass::Image)
         );
         assert_eq!(
-            canonical_media_class_from_file_kind(Some("cue_sheet")),
-            Some(BrowseMediaClass::Unsupported)
+            canonical_file_class_from_file_kind(Some("cue_sheet")),
+            Some(SourceFileClass::Unsupported)
         );
-        assert_eq!(canonical_media_class_from_file_kind(Some("unknown")), None);
-        assert_eq!(canonical_media_class_from_file_kind(None), None);
+        assert_eq!(canonical_file_class_from_file_kind(Some("unknown")), None);
+        assert_eq!(canonical_file_class_from_file_kind(None), None);
     }
 
     #[test]
     fn media_kind_mapping_preserves_video_and_image_and_downgrades_others_to_unsupported() {
         assert_eq!(
-            canonical_media_class_from_media_kind(Some("video")),
-            Some(BrowseMediaClass::Video)
+            canonical_file_class_from_media_kind(Some("video")),
+            Some(SourceFileClass::Video)
         );
         assert_eq!(
-            canonical_media_class_from_media_kind(Some("image")),
-            Some(BrowseMediaClass::Image)
+            canonical_file_class_from_media_kind(Some("image")),
+            Some(SourceFileClass::Image)
         );
         assert_eq!(
-            canonical_media_class_from_media_kind(Some("other")),
-            Some(BrowseMediaClass::Unsupported)
+            canonical_file_class_from_media_kind(Some("other")),
+            Some(SourceFileClass::Unsupported)
         );
     }
 
     #[test]
     fn provisional_path_classification_reuses_backend_extension_mapping() {
         assert_eq!(
-            provisional_media_class_from_path("crate/track.mp3"),
-            Some(BrowseMediaClass::Audio)
+            provisional_file_class_from_path("crate/track.mp3"),
+            Some(SourceFileClass::Audio)
         );
         assert_eq!(
-            provisional_media_class_from_path("crate/clip.mp4"),
-            Some(BrowseMediaClass::Video)
+            provisional_file_class_from_path("crate/clip.mp4"),
+            Some(SourceFileClass::Video)
         );
         assert_eq!(
-            provisional_media_class_from_path("crate/cover.png"),
-            Some(BrowseMediaClass::Image)
+            provisional_file_class_from_path("crate/cover.png"),
+            Some(SourceFileClass::Image)
         );
         assert_eq!(
-            provisional_media_class_from_path("crate/notes.txt"),
-            Some(BrowseMediaClass::Unsupported)
+            provisional_file_class_from_path("crate/notes.txt"),
+            Some(SourceFileClass::Unsupported)
         );
-        assert_eq!(provisional_media_class_from_path("crate/mystery"), None);
+        assert_eq!(provisional_file_class_from_path("crate/mystery"), None);
     }
 
     #[test]
-    fn media_class_str_from_path_classifies_wma_and_alac_as_audio() {
-        assert_eq!(media_class_str_from_path("lib/track.wma"), "audio");
-        assert_eq!(media_class_str_from_path("lib/track.alac"), "audio");
-        assert_eq!(media_class_str_from_path("lib/track.mp3"), "audio");
-        assert_eq!(media_class_str_from_path("lib/clip.mkv"), "video");
-        assert_eq!(media_class_str_from_path("lib/cover.png"), "image");
-        assert_eq!(media_class_str_from_path("lib/readme"), "none");
+    fn file_class_str_from_path_classifies_wma_and_alac_as_audio() {
+        assert_eq!(file_class_str_from_path("lib/track.wma"), "audio");
+        assert_eq!(file_class_str_from_path("lib/track.alac"), "audio");
+        assert_eq!(file_class_str_from_path("lib/track.mp3"), "audio");
+        assert_eq!(file_class_str_from_path("lib/clip.mkv"), "video");
+        assert_eq!(file_class_str_from_path("lib/cover.png"), "image");
+        assert_eq!(file_class_str_from_path("lib/readme"), "none");
     }
 
     #[test]
@@ -227,9 +224,9 @@ mod tests {
     }
 
     #[test]
-    fn browse_media_class_as_str_round_trips_through_database_domain() {
-        assert_eq!(BrowseMediaClass::Audio.as_str(), "audio");
-        assert_eq!(BrowseMediaClass::Video.as_str(), "video");
-        assert_eq!(BrowseMediaClass::Unsupported.as_str(), "unsupported");
+    fn browse_file_class_as_str_round_trips_through_database_domain() {
+        assert_eq!(SourceFileClass::Audio.as_str(), "audio");
+        assert_eq!(SourceFileClass::Video.as_str(), "video");
+        assert_eq!(SourceFileClass::Unsupported.as_str(), "unsupported");
     }
 }

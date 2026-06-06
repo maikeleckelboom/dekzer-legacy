@@ -346,6 +346,18 @@ pub enum ContentsFileClass {
     Unsupported,
 }
 
+impl ContentsFileClass {
+    pub fn from_projection_value(value: &str) -> Option<Self> {
+        match value.as_bytes() {
+            b"audio" => Some(Self::Audio),
+            b"video" => Some(Self::Video),
+            b"image" => Some(Self::Image),
+            b"unsupported" => Some(Self::Unsupported),
+            _ => None,
+        }
+    }
+}
+
 #[derive(
     Debug,
     Clone,
@@ -595,7 +607,7 @@ pub struct ContentsFileRow {
     #[ts(optional)]
     pub relative_path: Option<String>,
     pub file_name: String,
-    pub media_class: ContentsMediaClass,
+    pub file_class: ContentsFileClass,
     pub file_kind: ContentsFileKind,
     pub presence: ContentsPresenceState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -686,39 +698,6 @@ impl ContentsPresenceState {
             b"present" => Some(Self::Present),
             b"missing" => Some(Self::Missing),
             b"removed" => Some(Self::Removed),
-            _ => None,
-        }
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
-    ts_rs::TS,
-)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-pub enum ContentsMediaClass {
-    Audio,
-    Video,
-    Image,
-    Unsupported,
-}
-
-impl ContentsMediaClass {
-    pub fn from_projection_value(value: &str) -> Option<Self> {
-        match value.as_bytes() {
-            b"audio" => Some(Self::Audio),
-            b"video" => Some(Self::Video),
-            b"image" => Some(Self::Image),
-            b"unsupported" => Some(Self::Unsupported),
             _ => None,
         }
     }
@@ -1581,7 +1560,7 @@ pub enum DirectoryImageMediaState {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LibraryTreeFileMediaClass {
+pub enum LibraryTreeFileClass {
     Audio,
     Video,
     Image,
@@ -1589,7 +1568,7 @@ pub enum LibraryTreeFileMediaClass {
     None,
 }
 
-impl LibraryTreeFileMediaClass {
+impl LibraryTreeFileClass {
     pub fn from_projection_value(value: &str) -> Option<Self> {
         match value.as_bytes() {
             b"audio" => Some(Self::Audio),
@@ -1636,7 +1615,7 @@ pub struct LibraryTreeNode {
     pub display_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub media_class: Option<LibraryTreeFileMediaClass>,
+    pub file_class: Option<LibraryTreeFileClass>,
     pub presence_state: LibraryTreePresenceState,
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
@@ -2381,30 +2360,30 @@ pub enum SnapshotReadReply {
 mod tests {
     use super::{
         AttachmentIdentity, AttachmentIdentityReadStatus, ChildRowState, ContentsFileClass,
-        ContentsFileKind, ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest,
-        ContentsRecursion, ContentsScope, DirectoryImageMediaState, DirectoryPrimaryMediaState,
-        DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
-        LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
-        LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
-        LibraryAssetPreparationDetailGroup, LibraryAssetPreparationDetailGroupKey,
-        LibraryAssetPreparationDetailRow, LibraryAssetPreparationOutcomeKind,
-        LibraryAssetPreparationOutcomeState, LibraryAssetPreparationRequirementClass,
-        LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
-        LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
-        LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
-        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage, LibraryTreeCoverageState,
-        LibraryTreeEntryPoint, LibraryTreeFileMediaClass, LibraryTreeNode, LibraryTreeNodeKind,
-        LibraryTreePresenceState, LibraryTreeWindow, LoadNavigationRowByStableKeyRequest,
-        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
-        NavigationRowSelectorKind, PrimaryMediaKind, ReadAttachmentSourceFilesReply,
-        ReadAttachmentSourceFilesRequest, ReadLibraryAssetPreparationDetailRequest,
-        ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenReply,
-        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
-        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
-        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
-        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply,
-        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
-        ReadTrackIdentityReviewCandidatesRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        ContentsFileKind, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
+        ContentsScope, DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
+        LibraryAssetAvailabilityState, LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
+        LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
+        LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
+        LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
+        LibraryAssetPreparationOutcomeKind, LibraryAssetPreparationOutcomeState,
+        LibraryAssetPreparationRequirementClass, LibraryAssetPreparationSatisfactionState,
+        LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
+        LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
+        LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
+        LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeFileClass,
+        LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState, LibraryTreeWindow,
+        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigationRow,
+        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PrimaryMediaKind,
+        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
+        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
+        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
+        ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
+        SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
         SourceAccessState, SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
         SourceFileAttachmentLinkStatus, SourceLifecycle, SourceLifecycleIssueKind,
@@ -2510,22 +2489,22 @@ mod tests {
     }
 
     #[test]
-    fn contents_media_class_includes_inventory_class_values() {
+    fn contents_file_class_includes_inventory_class_values() {
         assert_eq!(
-            ContentsMediaClass::from_projection_value("audio"),
-            Some(ContentsMediaClass::Audio)
+            ContentsFileClass::from_projection_value("audio"),
+            Some(ContentsFileClass::Audio)
         );
         assert_eq!(
-            ContentsMediaClass::from_projection_value("video"),
-            Some(ContentsMediaClass::Video)
+            ContentsFileClass::from_projection_value("video"),
+            Some(ContentsFileClass::Video)
         );
         assert_eq!(
-            ContentsMediaClass::from_projection_value("image"),
-            Some(ContentsMediaClass::Image)
+            ContentsFileClass::from_projection_value("image"),
+            Some(ContentsFileClass::Image)
         );
         assert_eq!(
-            ContentsMediaClass::from_projection_value("unsupported"),
-            Some(ContentsMediaClass::Unsupported)
+            ContentsFileClass::from_projection_value("unsupported"),
+            Some(ContentsFileClass::Unsupported)
         );
     }
 
@@ -2757,7 +2736,7 @@ mod tests {
                     parent_source_directory_id: None,
                     relative_path: "Albums".to_string(),
                     display_name: "Albums".to_string(),
-                    media_class: None,
+                    file_class: None,
                     presence_state: LibraryTreePresenceState::Present,
                     size_bytes: None,
                     modified_at_ns: None,
@@ -2829,7 +2808,7 @@ mod tests {
     }
 
     #[test]
-    fn library_tree_file_media_class_serializes_as_media_class() {
+    fn library_tree_file_class_serializes_as_file_class() {
         let reply = SnapshotReadReply::LibraryTreeChildren(ReadLibraryTreeChildrenReply {
             window: Some(LibraryTreeWindow {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
@@ -2851,7 +2830,7 @@ mod tests {
                     parent_source_directory_id: None,
                     relative_path: "cover.mp3".to_string(),
                     display_name: "cover.mp3".to_string(),
-                    media_class: Some(LibraryTreeFileMediaClass::Image),
+                    file_class: Some(LibraryTreeFileClass::Image),
                     presence_state: LibraryTreePresenceState::Present,
                     size_bytes: Some(10),
                     modified_at_ns: Some(20),
@@ -2867,7 +2846,7 @@ mod tests {
 
         let json = serde_json::to_value(&reply).expect("serialize literal hierarchy reply");
         assert_eq!(
-            json["payload"]["window"]["rows"][0]["mediaClass"],
+            json["payload"]["window"]["rows"][0]["fileClass"],
             json!("image")
         );
         assert_eq!(

@@ -7,11 +7,11 @@ use crate::read_models::source_location_coverage::{
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
 const CONTENTS_CURSOR_VERSION: u8 = 3;
-const CONTENTS_CURSOR_FILE_CLASS_ORDER: [StoreContentsMediaClass; 4] = [
-    StoreContentsMediaClass::Audio,
-    StoreContentsMediaClass::Video,
-    StoreContentsMediaClass::Image,
-    StoreContentsMediaClass::Unsupported,
+const CONTENTS_CURSOR_FILE_CLASS_ORDER: [StoreContentsFileClass; 4] = [
+    StoreContentsFileClass::Audio,
+    StoreContentsFileClass::Video,
+    StoreContentsFileClass::Image,
+    StoreContentsFileClass::Unsupported,
 ];
 const CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER: [StorePrimaryMediaKind; 2] =
     [StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video];
@@ -378,14 +378,14 @@ pub struct StoreContentsResult {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum StoreContentsMediaClass {
+pub enum StoreContentsFileClass {
     Audio,
     Video,
     Image,
     Unsupported,
 }
 
-impl StoreContentsMediaClass {
+impl StoreContentsFileClass {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Audio => "audio",
@@ -421,7 +421,7 @@ pub enum StoreContentsRecursion {
 pub enum StoreContentsReadPolicy {
     AudioBrowse,
     SourceFileInventory {
-        file_classes: Vec<StoreContentsMediaClass>,
+        file_classes: Vec<StoreContentsFileClass>,
     },
     PrimaryMedia {
         media_kinds: Vec<StorePrimaryMediaKind>,
@@ -474,7 +474,7 @@ pub struct StoreContentsFileRow {
     pub label: String,
     pub relative_path: String,
     pub file_name: String,
-    pub media_class: String,
+    pub file_class: String,
     pub file_kind: String,
     pub presence: String,
     pub availability_state: Option<String>,
@@ -753,8 +753,8 @@ pub(crate) fn canonicalize_policy(
 }
 
 fn canonicalize_file_classes(
-    file_classes: Vec<StoreContentsMediaClass>,
-) -> Vec<StoreContentsMediaClass> {
+    file_classes: Vec<StoreContentsFileClass>,
+) -> Vec<StoreContentsFileClass> {
     CONTENTS_CURSOR_FILE_CLASS_ORDER
         .into_iter()
         .filter(|file_class| file_classes.contains(file_class))
@@ -771,32 +771,32 @@ fn canonicalize_primary_media_kinds(
 }
 
 fn file_classes_predicate_sql(
-    media_class_column_sql: &str,
+    file_class_column_sql: &str,
     file_kind_column_sql: &str,
-    file_classes: &[StoreContentsMediaClass],
+    file_classes: &[StoreContentsFileClass],
 ) -> String {
     let predicates = file_classes
         .iter()
         .map(|file_class| match file_class {
-            StoreContentsMediaClass::Unsupported => format!(
-                "({media_class_column_sql} = 'unsupported' AND {file_kind_column_sql} = 'cue_sheet')"
+            StoreContentsFileClass::Unsupported => format!(
+                "({file_class_column_sql} = 'unsupported' AND {file_kind_column_sql} = 'cue_sheet')"
             ),
-            _ => format!("{media_class_column_sql} = '{}'", file_class.as_str()),
+            _ => format!("{file_class_column_sql} = '{}'", file_class.as_str()),
         })
         .collect::<Vec<_>>()
         .join(" OR ");
     format!("({predicates})")
 }
 
-fn policy_file_classes(policy: &StoreContentsReadPolicy) -> Vec<StoreContentsMediaClass> {
+fn policy_file_classes(policy: &StoreContentsReadPolicy) -> Vec<StoreContentsFileClass> {
     match policy {
-        StoreContentsReadPolicy::AudioBrowse => vec![StoreContentsMediaClass::Audio],
+        StoreContentsReadPolicy::AudioBrowse => vec![StoreContentsFileClass::Audio],
         StoreContentsReadPolicy::SourceFileInventory { file_classes } => file_classes.clone(),
         StoreContentsReadPolicy::PrimaryMedia { media_kinds } => media_kinds
             .iter()
             .map(|media_kind| match media_kind {
-                StorePrimaryMediaKind::Audio => StoreContentsMediaClass::Audio,
-                StorePrimaryMediaKind::Video => StoreContentsMediaClass::Video,
+                StorePrimaryMediaKind::Audio => StoreContentsFileClass::Audio,
+                StorePrimaryMediaKind::Video => StoreContentsFileClass::Video,
             })
             .collect(),
     }
@@ -1519,7 +1519,7 @@ fn read_rows(
     })?;
     let file_classes = policy_file_classes(policy);
     let media_predicate =
-        file_classes_predicate_sql("sf.media_class", "sf.file_kind", &file_classes);
+        file_classes_predicate_sql("sf.file_class", "sf.file_kind", &file_classes);
     let primary_media_rows = matches!(policy, StoreContentsReadPolicy::PrimaryMedia { .. });
 
     match scope {
@@ -1813,7 +1813,7 @@ SELECT sf.source_file_id, \
        sf.parent_source_directory_id, \
        sf.relative_path, \
        sf.name AS file_name, \
-       sf.media_class, \
+       sf.file_class, \
        sf.file_kind, \
        sf.presence_state, \
        NULL AS library_asset_id, \
@@ -1939,7 +1939,7 @@ fn primary_media_rows_sql(
                       sf.name, \
                       sf.size_bytes, \
                       sf.mtime_ns, \
-                      sf.media_class, \
+                      sf.file_class, \
                       sf.file_kind, \
                      sf.presence_state, \
                       sf.updated_at \
@@ -1975,7 +1975,7 @@ fn primary_media_rows_sql(
                       sf.name, \
                       sf.size_bytes, \
                       sf.mtime_ns, \
-                      sf.media_class, \
+                      sf.file_class, \
                       sf.file_kind, \
                       sf.presence_state, \
                       ROW_NUMBER() OVER ( \
@@ -2020,7 +2020,7 @@ fn primary_media_rows_sql(
                       parent_source_directory_id, \
                      relative_path, \
                       name AS file_name, \
-                      media_class, \
+                      file_class, \
                       file_kind, \
                       presence_state, \
                       NULL AS library_asset_id, \
@@ -2055,7 +2055,7 @@ fn primary_media_rows_sql(
                           parent_source_directory_id, \
                           relative_path, \
                           name, \
-                          media_class, \
+                          file_class, \
                           file_kind, \
                           presence_state, \
                           NULL AS row_version, \
@@ -2092,7 +2092,7 @@ fn primary_media_rows_sql(
                  parent_source_directory_id, \
                  relative_path, \
                  file_name, \
-                 media_class, \
+                 file_class, \
                  file_kind, \
                  presence_state, \
                  library_asset_id, \
@@ -2191,7 +2191,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let parent_directory_id: Option<i64> = row.get(2)?;
     let relative_path: String = row.get(3)?;
     let file_name: String = row.get(4)?;
-    let media_class: String = row.get(5)?;
+    let file_class: String = row.get(5)?;
     let file_kind: String = row.get(6)?;
     let presence: String = row.get(7)?;
     let library_asset_id: Option<i64> = row.get(8)?;
@@ -2285,7 +2285,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
         label,
         relative_path,
         file_name,
-        media_class,
+        file_class,
         file_kind,
         presence,
         availability_state,
@@ -2321,7 +2321,7 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        StoreContentsCoverageState, StoreContentsMediaClass, StoreContentsReadPolicy,
+        StoreContentsCoverageState, StoreContentsFileClass, StoreContentsReadPolicy,
         StoreContentsRecursion, StoreContentsRowOrigin, StoreContentsScope, StoreContentsState,
         StorePrimaryMediaKind, canonical_cursor_policy, read_contents,
     };
@@ -2339,17 +2339,12 @@ mod tests {
         }
     }
 
-    fn primary_media_file_classes() -> Vec<StoreContentsMediaClass> {
-        vec![
-            StoreContentsMediaClass::Audio,
-            StoreContentsMediaClass::Video,
-        ]
+    fn primary_media_file_classes() -> Vec<StoreContentsFileClass> {
+        vec![StoreContentsFileClass::Audio, StoreContentsFileClass::Video]
     }
 
-    fn source_file_policy(media_classes: Vec<StoreContentsMediaClass>) -> StoreContentsReadPolicy {
-        StoreContentsReadPolicy::SourceFileInventory {
-            file_classes: media_classes,
-        }
+    fn source_file_policy(file_classes: Vec<StoreContentsFileClass>) -> StoreContentsReadPolicy {
+        StoreContentsReadPolicy::SourceFileInventory { file_classes }
     }
 
     fn audio_browse_policy() -> StoreContentsReadPolicy {
@@ -2358,34 +2353,34 @@ mod tests {
 
     fn default_source_file_policy() -> StoreContentsReadPolicy {
         source_file_policy(vec![
-            StoreContentsMediaClass::Audio,
-            StoreContentsMediaClass::Video,
-            StoreContentsMediaClass::Image,
-            StoreContentsMediaClass::Unsupported,
+            StoreContentsFileClass::Audio,
+            StoreContentsFileClass::Video,
+            StoreContentsFileClass::Image,
+            StoreContentsFileClass::Unsupported,
         ])
     }
 
     #[test]
     fn canonical_cursor_file_class_identity_uses_explicit_stable_order() {
-        for media_classes in [
+        for file_classes in [
             vec![
-                StoreContentsMediaClass::Unsupported,
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Image,
+                StoreContentsFileClass::Unsupported,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Image,
             ],
             vec![
-                StoreContentsMediaClass::Image,
-                StoreContentsMediaClass::Unsupported,
-                StoreContentsMediaClass::Audio,
+                StoreContentsFileClass::Image,
+                StoreContentsFileClass::Unsupported,
+                StoreContentsFileClass::Audio,
             ],
             vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Image,
-                StoreContentsMediaClass::Unsupported,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Image,
+                StoreContentsFileClass::Unsupported,
             ],
         ] {
             assert_eq!(
-                canonical_cursor_policy(&source_file_policy(media_classes)),
+                canonical_cursor_policy(&source_file_policy(file_classes)),
                 super::ContentsCursorPolicy::SourceFileInventory {
                     file_classes: vec![
                         "audio".to_string(),
@@ -2601,7 +2596,7 @@ mod tests {
         source_id: i64,
         parent_directory_id: i64,
         relative_path: &str,
-        media_class: &str,
+        file_class: &str,
         _title: &str,
     ) {
         let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
@@ -2611,10 +2606,10 @@ mod tests {
             source_id,
             parent_directory_id,
             relative_path,
-            media_class,
+            file_class,
         );
 
-        if media_class != "audio" || file_kind != "audio" {
+        if file_class != "audio" || file_kind != "audio" {
             return;
         }
 
@@ -2973,7 +2968,7 @@ mod tests {
                     (
                         summary.origin,
                         summary.attachment_id.is_some(),
-                        row.media_class.as_str(),
+                        row.file_class.as_str(),
                     )
                 })
                 .collect::<Vec<_>>(),
@@ -3112,7 +3107,7 @@ mod tests {
         source_id: i64,
         parent_directory_id: i64,
         relative_path: &str,
-        media_class: &str,
+        file_class: &str,
     ) {
         let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
         let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
@@ -3128,7 +3123,7 @@ mod tests {
                      relative_path_browse_sort_key,
                      relative_path,
                      file_kind,
-                     media_class,
+                     file_class,
                      presence_state,
                      first_discovered_at,
                      last_observed_at,
@@ -3146,7 +3141,7 @@ mod tests {
                     crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path),
                     relative_path,
                     file_kind,
-                    media_class,
+                    file_class,
                 ],
             )
             .expect("insert scanned source file");
@@ -3187,7 +3182,7 @@ mod tests {
         let source_file = read_contents(
             connection,
             scope.clone(),
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             recursion,
             limit,
             None,
@@ -3476,10 +3471,10 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-                StoreContentsMediaClass::Image,
-                StoreContentsMediaClass::Unsupported,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Video,
+                StoreContentsFileClass::Image,
+                StoreContentsFileClass::Unsupported,
             ]),
             StoreContentsRecursion::Recursive,
             10,
@@ -3495,7 +3490,7 @@ mod tests {
             .map(|row| {
                 (
                     row.relative_path.as_str(),
-                    row.media_class.as_str(),
+                    row.file_class.as_str(),
                     row.file_kind.as_str(),
                 )
             })
@@ -3535,7 +3530,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             10,
             None,
@@ -3545,11 +3540,11 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(
             result.policy,
-            source_file_policy(vec![StoreContentsMediaClass::Audio])
+            source_file_policy(vec![StoreContentsFileClass::Audio])
         );
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0].relative_path, "Media/track.wav");
-        assert_eq!(result.rows[0].media_class, "audio");
+        assert_eq!(result.rows[0].file_class, "audio");
         assert_eq!(result.rows[0].file_kind, "audio");
         assert!(result.rows[0].primary_media.is_none());
     }
@@ -3636,7 +3631,7 @@ mod tests {
         for row in source_recursive.rows {
             assert!(row.primary_media.is_none());
             assert!(row.availability_state.is_none());
-            assert_eq!(row.media_class, "audio");
+            assert_eq!(row.file_class, "audio");
         }
     }
 
@@ -3655,8 +3650,8 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Video,
             ]),
             StoreContentsRecursion::Recursive,
             10,
@@ -3783,7 +3778,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Unsupported]),
+            source_file_policy(vec![StoreContentsFileClass::Unsupported]),
             StoreContentsRecursion::Recursive,
             10,
             None,
@@ -3793,7 +3788,7 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0].relative_path, "Media/album.cue");
-        assert_eq!(result.rows[0].media_class, "unsupported");
+        assert_eq!(result.rows[0].file_class, "unsupported");
         assert_eq!(result.rows[0].file_kind, "cue_sheet");
         assert!(result.rows[0].primary_media.is_none());
     }
@@ -3831,8 +3826,8 @@ mod tests {
                 source_directory_id: 10,
             },
             source_file_policy(vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Unsupported,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Unsupported,
             ]),
             StoreContentsRecursion::Recursive,
             10,
@@ -3864,7 +3859,7 @@ mod tests {
         let recursive_source = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             10,
             None,
@@ -3873,7 +3868,7 @@ mod tests {
         let immediate_source = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Immediate,
             10,
             None,
@@ -3885,7 +3880,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             10,
             None,
@@ -3914,7 +3909,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Image]),
+            source_file_policy(vec![StoreContentsFileClass::Image]),
             StoreContentsRecursion::Recursive,
             10,
             None,
@@ -3923,12 +3918,12 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 2);
-        assert!(result.rows.iter().all(|row| row.media_class == "image"));
+        assert!(result.rows.iter().all(|row| row.file_class == "image"));
         assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
     }
 
     #[test]
-    fn duplicate_media_classes_are_canonicalized_deterministically() {
+    fn duplicate_file_classes_are_canonicalized_deterministically() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
@@ -3938,12 +3933,12 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![
-                StoreContentsMediaClass::Image,
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-                StoreContentsMediaClass::Unsupported,
-                StoreContentsMediaClass::Unsupported,
+                StoreContentsFileClass::Image,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Video,
+                StoreContentsFileClass::Unsupported,
+                StoreContentsFileClass::Unsupported,
             ]),
             StoreContentsRecursion::Recursive,
             10,
@@ -4033,7 +4028,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4105,7 +4100,7 @@ mod tests {
         let page1 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4145,7 +4140,7 @@ mod tests {
         let page2 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             Some(&cursor),
@@ -4194,8 +4189,8 @@ mod tests {
                     source_directory_id: 10,
                 },
                 source_file_policy(vec![
-                    StoreContentsMediaClass::Audio,
-                    StoreContentsMediaClass::Unsupported,
+                    StoreContentsFileClass::Audio,
+                    StoreContentsFileClass::Unsupported,
                 ]),
                 StoreContentsRecursion::Recursive,
                 2,
@@ -4225,7 +4220,7 @@ mod tests {
                 .map(|row| {
                     (
                         row.relative_path.as_str(),
-                        row.media_class.as_str(),
+                        row.file_class.as_str(),
                         row.file_kind.as_str(),
                     )
                 })
@@ -4314,7 +4309,7 @@ mod tests {
         let page1 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4327,8 +4322,8 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Video,
             ]),
             StoreContentsRecursion::Recursive,
             3,
@@ -4371,9 +4366,9 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-                StoreContentsMediaClass::Image,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Video,
+                StoreContentsFileClass::Image,
             ]),
             StoreContentsRecursion::Recursive,
             3,
@@ -4405,9 +4400,9 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-                StoreContentsMediaClass::Image,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Video,
+                StoreContentsFileClass::Image,
             ]),
             StoreContentsRecursion::Recursive,
             3,
@@ -4461,7 +4456,7 @@ mod tests {
             page1
                 .rows
                 .iter()
-                .all(|row| row.media_class.as_str() == "audio"),
+                .all(|row| row.file_class.as_str() == "audio"),
             "fixture page should return only audio rows"
         );
         let cursor = page1.next_cursor.expect("expected cursor");
@@ -4481,9 +4476,9 @@ mod tests {
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-                StoreContentsMediaClass::Image,
+                StoreContentsFileClass::Audio,
+                StoreContentsFileClass::Video,
+                StoreContentsFileClass::Image,
             ]),
             StoreContentsRecursion::Recursive,
             2,
@@ -4514,7 +4509,7 @@ mod tests {
         let page1 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4559,7 +4554,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             2,
             None,
@@ -4596,7 +4591,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             2,
             Some(&source_file_cursor),
@@ -4646,7 +4641,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             2,
             Some(&audio_browse_cursor),
@@ -4706,7 +4701,7 @@ mod tests {
         let page1 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4718,7 +4713,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 2 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             Some(&cursor),
@@ -4748,7 +4743,7 @@ mod tests {
         let page1 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4762,7 +4757,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             Some(&cursor),
@@ -4796,7 +4791,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4809,7 +4804,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             Some(&cursor),
@@ -4839,7 +4834,7 @@ mod tests {
         let page1 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4851,7 +4846,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Immediate,
             3,
             Some(&cursor),
@@ -4870,7 +4865,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             10,
             Some("!invalid-base64url!"),
@@ -4902,7 +4897,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             10,
             None,
@@ -4975,7 +4970,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -4991,7 +4986,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             Some(&cursor),
@@ -5097,7 +5092,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             None,
@@ -5112,7 +5107,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             3,
             Some(&cursor),
@@ -5156,7 +5151,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Immediate,
             3,
             None,
@@ -5172,7 +5167,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Immediate,
             3,
             Some(&cursor),
@@ -5211,7 +5206,7 @@ mod tests {
         }
 
         let media_predicate = super::file_classes_predicate_sql(
-            "sf.media_class",
+            "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
         );
@@ -5252,9 +5247,9 @@ mod tests {
         }
 
         let media_predicate = super::file_classes_predicate_sql(
-            "sf.media_class",
+            "sf.file_class",
             "sf.file_kind",
-            &[StoreContentsMediaClass::Audio],
+            &[StoreContentsFileClass::Audio],
         );
         let sql = super::source_file_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
         let plan = dump_query_plan(
@@ -5296,7 +5291,7 @@ mod tests {
             super::source_file_descendant_predicate("sf", "?2")
         );
         let media_predicate = super::file_classes_predicate_sql(
-            "sf.media_class",
+            "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
         );
@@ -5350,7 +5345,7 @@ mod tests {
             super::relative_path_scope_predicate("sf", "al.relative_path")
         );
         let media_predicate = super::file_classes_predicate_sql(
-            "sf.media_class",
+            "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
         );
@@ -5411,7 +5406,7 @@ mod tests {
         }
 
         let media_predicate = super::file_classes_predicate_sql(
-            "sf.media_class",
+            "sf.file_class",
             "sf.file_kind",
             &primary_media_file_classes(),
         );
@@ -6495,7 +6490,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             10,
             None,
@@ -6541,7 +6536,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             20,
             None,
@@ -6583,7 +6578,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             1,
             None,
@@ -6625,7 +6620,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             2,
             None,
@@ -6642,7 +6637,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            source_file_policy(vec![StoreContentsMediaClass::Audio]),
+            source_file_policy(vec![StoreContentsFileClass::Audio]),
             StoreContentsRecursion::Recursive,
             2,
             Some(&cursor),

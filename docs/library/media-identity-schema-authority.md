@@ -79,7 +79,7 @@ Evidence:
 - Store read model support exists in `read_models/contents.rs` and reads `primary_media_candidates`.
 - Boundary protocol and generated TypeScript expose `ContentsReadPolicy.primaryMedia` and `PrimaryMediaSummary`.
 - Desktop Main validates and maps the policy, while the renderer default requests `audioBrowse`.
-- `primaryMedia` rows are present-file scoped and reject image/unsupported media classes.
+- `primaryMedia` rows are present-file scoped and expose only the supported primary-media `mediaKinds`.
 - Promoted rows depend on current `primary_media_candidates`, `source_file_attachment_links`, `content_attachments`, and
   current `SourceFacts`.
 - Unpromoted source-file fallback rows are intentionally removed. Plain scanned source files do not surface as
@@ -139,7 +139,7 @@ detailed status, provenance, and supersession rules are owned by
 
 ## CUE Association Decision
 
-CUE files are current source-file inventory rows only: `fileKind = cueSheet`, `mediaClass = unsupported`.
+CUE files are current source-file inventory rows only: `fileKind = cueSheet`, `fileClass = unsupported`.
 
 Future CUE model:
 
@@ -236,7 +236,7 @@ CUE sheets remain source-file companion metadata rows and are not parsed by medi
 
 | Layer                     | Owns                                                                                                 | Does not own                                                                                |
 | ------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Source files              | Durable source-relative file inventory, path-derived file kind/media class, presence, size, mtime    | Playability, track identity, attachment identity, artwork role                              |
+| Source files              | Durable source-relative file inventory, path-derived file kind/file class, presence, size, mtime     | Playability, track identity, attachment identity, artwork role                              |
 | Observed file facts       | Future/partial evidence from reading bytes or probing containers                                     | Product row admission or user-facing track identity by itself                               |
 | Attachments               | Current durable bytes-identity relation from current BLAKE3 evidence to source-file occurrence links | Path proximity guesses, track identity, CUE pairing, prep readiness, browser rows           |
 | Primary media             | Evidence-backed playable-media candidate projection from current attachments and audio probe facts   | Canonical track identity, CUE pairing, browser-row authority                                |

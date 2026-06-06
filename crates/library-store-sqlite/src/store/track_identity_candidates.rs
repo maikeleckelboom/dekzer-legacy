@@ -521,7 +521,7 @@ fn read_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> 
 // Candidate production validates source rows before stored candidate evidence exists.
 // Stored evidence currentness is shared by read status and decision snapshot predicates.
 const CURRENT_PRIMARY_MEDIA_PREDICATE: &str = "file.presence_state = 'present'
-    AND file.media_class = 'audio'
+    AND file.file_class = 'audio'
     AND file.file_kind = 'audio'
     AND facts.source_file_id IS NOT NULL
     AND file.source_id = facts.basis_source_id
@@ -569,7 +569,7 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::read_models::contents::{
-        StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion,
+        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRecursion,
         StoreContentsScope, StoreContentsState,
     };
     use crate::read_models::track_identity_candidates::{
@@ -650,7 +650,7 @@ mod tests {
         fn insert_source_file(&self, source_file_id: i64, relative_path: &str) {
             let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
             let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
-            let media_class = crate::browse_media::media_class_str_from_path(relative_path);
+            let file_class = crate::browse_media::file_class_str_from_path(relative_path);
             let name_browse_sort_key =
                 crate::browse_sort_key::compute_name_browse_sort_key(file_name);
             let relative_path_browse_sort_key =
@@ -668,7 +668,7 @@ mod tests {
                              size_bytes,
                              mtime_ns,
                              file_kind,
-                             media_class,
+                             file_class,
                              presence_state,
                              first_discovered_at,
                              last_observed_at,
@@ -685,7 +685,7 @@ mod tests {
                             relative_path_browse_sort_key,
                             relative_path,
                             file_kind,
-                            media_class,
+                            file_class,
                         ],
                     )?;
                     Ok(())
@@ -1207,10 +1207,10 @@ mod tests {
                 },
                 StoreContentsReadPolicy::SourceFileInventory {
                     file_classes: vec![
-                        StoreContentsMediaClass::Audio,
-                        StoreContentsMediaClass::Video,
-                        StoreContentsMediaClass::Image,
-                        StoreContentsMediaClass::Unsupported,
+                        StoreContentsFileClass::Audio,
+                        StoreContentsFileClass::Video,
+                        StoreContentsFileClass::Image,
+                        StoreContentsFileClass::Unsupported,
                     ],
                 },
                 StoreContentsRecursion::Recursive,

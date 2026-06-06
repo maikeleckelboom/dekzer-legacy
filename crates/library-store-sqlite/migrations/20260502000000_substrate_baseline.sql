@@ -302,8 +302,8 @@ CREATE TABLE source_files
     mtime_ns                    INTEGER CHECK (mtime_ns IS NULL OR mtime_ns >= 0),
     file_kind                   TEXT    NOT NULL DEFAULT 'unknown'
         CHECK (file_kind IN ('audio', 'video', 'image', 'cue_sheet', 'log_doc', 'text_doc', 'archive', 'other', 'unknown')),
-    media_class                 TEXT    NOT NULL DEFAULT 'none'
-        CHECK (media_class IN ('audio', 'video', 'image', 'unsupported', 'none')),
+    file_class                 TEXT    NOT NULL DEFAULT 'none'
+        CHECK (file_class IN ('audio', 'video', 'image', 'unsupported', 'none')),
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
     first_discovered_at         INTEGER NOT NULL,
@@ -320,9 +320,9 @@ CREATE TABLE source_files
 CREATE INDEX source_files_source_presence
     ON source_files (source_id, presence_state);
 
-CREATE INDEX source_files_media_class_parent
-    ON source_files (source_id, presence_state, media_class, file_kind, parent_source_directory_id)
-    WHERE media_class IN ('audio', 'video', 'image', 'unsupported')
+CREATE INDEX source_files_file_class_parent
+    ON source_files (source_id, presence_state, file_class, file_kind, parent_source_directory_id)
+    WHERE file_class IN ('audio', 'video', 'image', 'unsupported')
       AND parent_source_directory_id IS NOT NULL;
 
 CREATE INDEX source_files_parent_source_directory
@@ -335,7 +335,7 @@ CREATE INDEX source_files_source_browse_order
     ON source_files (source_id, relative_path_browse_sort_key, relative_path, source_file_id);
 
 CREATE INDEX source_files_parent_browse
-    ON source_files (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name, media_class, file_kind);
+    ON source_files (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name, file_class, file_kind);
 
 -- TOMBSTONE: LibraryAssets is dormant for new content identity work. It is
 -- replaced by content_attachments plus future track/media layers, and the

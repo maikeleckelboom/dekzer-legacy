@@ -35,26 +35,28 @@ This preserves diagnostic and future migration room while making the contents pa
 | `relative_path`, `name`      | Source-relative location and display filename.                                                            |
 | `size_bytes`, `mtime_ns`     | Observed filesystem metadata when available.                                                              |
 | `file_kind`                  | Fine path-derived classifier: audio, video, image, cue_sheet, log_doc, text_doc, archive, other, unknown. |
-| `media_class`                | Coarse class: audio, video, image, unsupported, none.                                                     |
+| `file_class`                 | Coarse class: audio, video, image, unsupported, none.                                                     |
 | `presence_state`             | present, missing, or removed.                                                                             |
 | timestamps                   | First discovery, last observation, presence change, creation, update.                                     |
 
-`file_kind` and `media_class` are provisional path-derived facts. They are not proof of playability, readiness, track
+`file_kind` and `file_class` are provisional path-derived facts. They are not proof of playability, readiness, track
 identity, or artwork role.
 
 ## Default Contents Policy
 
 The renderer default for selected library contents is audio-first and audio-only in V0:
 
-| Field                | Value                 |
-| -------------------- | --------------------- |
-| `policy.kind`        | `sourceFileInventory` |
-| `policy.fileClasses` | audio                 |
-| `recursion`          | recursive             |
+| Field         | Value         |
+| ------------- | ------------- |
+| `policy.kind` | `audioBrowse` |
+| `recursion`   | recursive     |
 
 The renderer derives the scope from selection and sends this policy to `readContents`. The backend owns the query and
 admission. The renderer must not fan out tree children, synthesize directory contents, or answer the selected scope from
 the hierarchy cache.
+
+`audioBrowse` implies audio and has no caller-supplied class filter. Explicit inventory surfaces use
+`sourceFileInventory.fileClasses`.
 
 ## Scope Behavior
 
@@ -75,14 +77,14 @@ or indexing is incomplete.
 
 Explicit non-default source-file inventory reads may include:
 
-| Stored facts                                                                     | Explicit inventory admission                                 |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `media_class = audio`                                                            | Include.                                                     |
-| `media_class = video`                                                            | Include when policy requests video.                          |
-| `media_class = image`                                                            | Include when policy requests image.                          |
-| `media_class = unsupported` and `file_kind = cue_sheet`                          | Include when policy requests unsupported companion metadata. |
-| `media_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from normal inventory.                               |
-| `media_class = none` or `file_kind = unknown`                                    | Exclude from normal inventory.                               |
+| Stored facts                                                                    | Explicit inventory admission                                 |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `file_class = audio`                                                            | Include.                                                     |
+| `file_class = video`                                                            | Include when policy requests video.                          |
+| `file_class = image`                                                            | Include when policy requests image.                          |
+| `file_class = unsupported` and `file_kind = cue_sheet`                          | Include when policy requests unsupported companion metadata. |
+| `file_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from normal inventory.                               |
+| `file_class = none` or `file_kind = unknown`                                    | Exclude from normal inventory.                               |
 
 This contract intentionally does not admit every `unsupported` row. `unsupported` is too broad for product inventory
 because it can include notes, PDFs, archives, binary data, and other unrelated files. CUE sheets are admitted because
@@ -93,7 +95,7 @@ metadata companion files unless a future explicit product surface chooses a broa
 
 ## CUE And Images
 
-CUE sheets are represented only as `sourceFileInventory` rows with `mediaClass = unsupported` and
+CUE sheets are represented only as `sourceFileInventory` rows with `fileClass = unsupported` and
 `fileKind = cueSheet`.
 The inventory does not pair CUE sheets with FLAC files, does not parse track splits, and does not infer a playable
 primary-media item from a CUE file.
@@ -112,9 +114,9 @@ video only. A policy that asks `primaryMedia` for image or unsupported rows must
 ## Ordering And Cursor
 
 `sourceFileInventory` rows use the persisted source-file browse order. Cursor identity includes
-scope, row profile, recursion, the requested media classes, and the last row ordering position.
-The media-class identity is derived from the requested policy, not from the rows returned on the current page. Changing
-media classes across pages returns `cursorInvalid`.
+scope, the complete policy discriminant, recursion, the requested `fileClasses`, and the last row ordering position.
+The file-class identity is derived from the requested policy, not from the rows returned on the current page. Changing
+`fileClasses` across pages returns `cursorInvalid`.
 
 Cursor resumption must follow the same ordering contract and produce no duplicates and no gaps. Cursor mismatches return
 `cursorInvalid`.
@@ -123,7 +125,7 @@ The cursor must page the same backend query. It must not switch to renderer-loca
 
 ## Projection Boundary
 
-Rust and SQLite own durable facts and read-model admission. Boundary protocol exposes `mediaClass`, `fileKind`,
+Rust and SQLite own durable facts and read-model admission. Boundary protocol exposes `fileClass`, `fileKind`,
 `presence`, and stable source-file identifiers.
 
 The renderer may project icons and labels:

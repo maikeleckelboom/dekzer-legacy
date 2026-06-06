@@ -24,8 +24,8 @@ code does not branch on UI mode names.
 
 ## Motivation
 
-The existing selectedContentsRead path is primary-media-only. It cannot represent image rows because its media class is
-audio/video only and its rows carry primary-media/readiness/prep-shaped fields.
+The removed selected-contents path was primary-media-only. It could not represent image rows because its policy domain
+was audio/video only and its rows carried primary-media/readiness/prep-shaped fields.
 
 The temporary renderer visible-files proof demonstrated desired UI behavior, but renderer hierarchy cache is not the
 final owner of selected scope contents.
@@ -165,13 +165,13 @@ type ContentsReadPolicy =
 - One contents read boundary owns contents-pane reads.
 - Renderer mode names do not cross into backend, shared, protocol, or query code.
 - Renderer sends typed policy, never raw SQL.
-- Backend and query code own media filtering.
+- Backend and query code own profile-specific filtering.
 - Renderer does not answer authoritative selected scope contents from loaded hierarchy cache.
 - sourceFileInventory may include audio, video, image, and admitted unsupported companion rows.
 - sourceFileInventory never carries primaryMedia summary.
 - primaryMedia profile may include audio and video only.
 - audioBrowse profile may include audio only.
-- audioBrowse has no caller-supplied file/media class filter.
+- audioBrowse has no caller-supplied file class filter.
 - audioBrowse reuses the contents file-row payload shape and does not introduce a dedicated row type.
 - Image rows never carry primaryMedia summary.
 - `fileClasses` and `mediaKinds` are deterministic arrays, not Set.
@@ -195,8 +195,8 @@ One implementation migration was used:
 
 Do not reintroduce `selectedContentsRead` as a public API.
 Do not add aliases or compatibility wrappers.
-Do not widen `SelectedContentsMediaClass` to image.
-Define new `Contents*` contract names instead.
+Do not reintroduce or widen the removed selected-contents class type.
+Use the current `Contents*` contract names instead.
 
 ---
 

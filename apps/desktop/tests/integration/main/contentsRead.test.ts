@@ -89,7 +89,7 @@ describe('contents reads through the host', () => {
             sourceId: '7',
             sourceFileId: '12',
             label: 'Cover.jpg',
-            mediaClass: 'image'
+            fileClass: 'image'
           }
         ]
       }
@@ -106,7 +106,7 @@ describe('contents reads through the host', () => {
             recursion: request.recursion,
             rows: [],
             coverage: completeCoverage(),
-            detail: 'primaryMedia rows do not support image media classes.'
+            detail: 'primaryMedia rows do not support image media kinds.'
           }
         })
       })
@@ -125,7 +125,7 @@ describe('contents reads through the host', () => {
       state: 'policyConflict',
       error: {
         code: 'policyConflict',
-        message: 'primaryMedia rows do not support image media classes.'
+        message: 'primaryMedia rows do not support image media kinds.'
       }
     })
 
@@ -147,8 +147,8 @@ describe('contents reads through the host', () => {
       readContentsThroughHost(successHost, {
         scope: { kind: 'source', sourceId: '7' },
         policy: {
-          mediaClasses: ['audio'],
-          rowProfile: { kind: 'audioBrowse' }
+          kind: 'sourceFileInventory',
+          fileClasses: 'audio'
         },
         recursion: 'recursive'
       })
@@ -256,7 +256,7 @@ function readyContentsReply(request: ContentsReadRequest): ContentsReadReply {
           label: 'Cover.jpg',
           relativePath: 'Covers/Cover.jpg',
           fileName: 'Cover.jpg',
-          mediaClass: 'image',
+          fileClass: 'image',
           fileKind: 'image',
           presence: 'present',
           updatedAtMs: 100

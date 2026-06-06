@@ -1051,7 +1051,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
 
         let primary_media_predicate = source_file_class_filter_predicate_sql_for_column(
             SourceFileClassFilter::PrimaryMedia,
-            "f.media_class",
+            "f.file_class",
         );
         self.tx().execute(
             &format!(
@@ -1086,7 +1086,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  WHERE f.source_id = ?1
                    AND f.presence_state = 'present'
                    AND f.parent_source_directory_id IS NOT NULL
-                   AND f.media_class = 'image'
+                   AND f.file_class = 'image'
                  UNION
                  SELECT d.parent_source_directory_id
                  FROM source_directories d
@@ -1419,14 +1419,14 @@ mod tests {
         .expect("write file")
     }
 
-    fn read_media_class(connection: &rusqlite::Connection, relative_path: &str) -> String {
+    fn read_file_class(connection: &rusqlite::Connection, relative_path: &str) -> String {
         connection
             .query_row(
-                "SELECT media_class FROM source_files WHERE relative_path = ?1",
+                "SELECT file_class FROM source_files WHERE relative_path = ?1",
                 [relative_path],
                 |row| row.get::<_, String>(0),
             )
-            .expect("read media_class")
+            .expect("read file_class")
     }
 
     fn read_file_kind(connection: &rusqlite::Connection, relative_path: &str) -> String {
@@ -1625,7 +1625,7 @@ mod tests {
     }
 
     #[test]
-    fn wma_file_stores_audio_media_class() {
+    fn wma_file_stores_audio_file_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1637,11 +1637,11 @@ mod tests {
             "track.wma",
             "albums/track.wma",
         );
-        assert_eq!(read_media_class(&connection, "albums/track.wma"), "audio");
+        assert_eq!(read_file_class(&connection, "albums/track.wma"), "audio");
     }
 
     #[test]
-    fn alac_file_stores_audio_media_class() {
+    fn alac_file_stores_audio_file_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1653,11 +1653,11 @@ mod tests {
             "track.alac",
             "albums/track.alac",
         );
-        assert_eq!(read_media_class(&connection, "albums/track.alac"), "audio");
+        assert_eq!(read_file_class(&connection, "albums/track.alac"), "audio");
     }
 
     #[test]
-    fn mp4_file_stores_video_media_class() {
+    fn mp4_file_stores_video_file_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1669,11 +1669,11 @@ mod tests {
             "clip.mp4",
             "albums/clip.mp4",
         );
-        assert_eq!(read_media_class(&connection, "albums/clip.mp4"), "video");
+        assert_eq!(read_file_class(&connection, "albums/clip.mp4"), "video");
     }
 
     #[test]
-    fn png_file_stores_image_media_class() {
+    fn png_file_stores_image_file_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1685,11 +1685,11 @@ mod tests {
             "cover.png",
             "albums/cover.png",
         );
-        assert_eq!(read_media_class(&connection, "albums/cover.png"), "image");
+        assert_eq!(read_file_class(&connection, "albums/cover.png"), "image");
     }
 
     #[test]
-    fn unknown_extension_stores_none_media_class() {
+    fn unknown_extension_stores_none_file_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1701,11 +1701,11 @@ mod tests {
             "data.xyz",
             "albums/data.xyz",
         );
-        assert_eq!(read_media_class(&connection, "albums/data.xyz"), "none");
+        assert_eq!(read_file_class(&connection, "albums/data.xyz"), "none");
     }
 
     #[test]
-    fn cue_file_stores_fine_file_kind_and_unsupported_media_class() {
+    fn cue_file_stores_fine_file_kind_and_unsupported_file_class() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1718,7 +1718,7 @@ mod tests {
             "albums/album.cue",
         );
         assert_eq!(
-            read_media_class(&connection, "albums/album.cue"),
+            read_file_class(&connection, "albums/album.cue"),
             "unsupported"
         );
         assert_eq!(read_file_kind(&connection, "albums/album.cue"), "cue_sheet");
@@ -1768,11 +1768,11 @@ mod tests {
             "nested/track.alac",
         );
 
-        assert_eq!(read_media_class(&connection, "nested/track.wma"), "audio");
-        assert_eq!(read_media_class(&connection, "nested/track.alac"), "audio");
+        assert_eq!(read_file_class(&connection, "nested/track.wma"), "audio");
+        assert_eq!(read_file_class(&connection, "nested/track.alac"), "audio");
         assert!(
             read_directory_facts(&connection, "nested").has_primary_media_descendant,
-            ".wma and .alac media_class values must feed primary media descendant facts"
+            ".wma and .alac file_class values must feed primary media descendant facts"
         );
         assert!(!read_directory_facts(&connection, "nested").has_image_media_descendant);
 

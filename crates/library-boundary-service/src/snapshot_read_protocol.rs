@@ -106,12 +106,12 @@ pub(crate) const fn store_contents_recursion(
 
 const fn store_contents_file_class(
     file_class: protocol::ContentsFileClass,
-) -> store::StoreContentsMediaClass {
+) -> store::StoreContentsFileClass {
     match file_class {
-        protocol::ContentsFileClass::Audio => store::StoreContentsMediaClass::Audio,
-        protocol::ContentsFileClass::Video => store::StoreContentsMediaClass::Video,
-        protocol::ContentsFileClass::Image => store::StoreContentsMediaClass::Image,
-        protocol::ContentsFileClass::Unsupported => store::StoreContentsMediaClass::Unsupported,
+        protocol::ContentsFileClass::Audio => store::StoreContentsFileClass::Audio,
+        protocol::ContentsFileClass::Video => store::StoreContentsFileClass::Video,
+        protocol::ContentsFileClass::Image => store::StoreContentsFileClass::Image,
+        protocol::ContentsFileClass::Unsupported => store::StoreContentsFileClass::Unsupported,
     }
 }
 
@@ -797,7 +797,7 @@ fn map_library_tree_node(
     let directory_primary_media_state = map_directory_primary_media_state(&node)?;
     let directory_image_media_state = map_directory_image_media_state(&node)?;
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
-    let media_class = map_library_tree_file_media_class(&node)?;
+    let file_class = map_library_tree_file_class(&node)?;
     let child_row_state = match node.node_kind.as_str() {
         "directory" => match (has_child_directories, directory_scan_state.as_ref()) {
             (Some(true), _) => Some(protocol::ChildRowState::HasChildRows),
@@ -818,7 +818,7 @@ fn map_library_tree_node(
         parent_source_directory_id: node.parent_source_directory_id,
         relative_path: node.relative_path,
         display_name: node.display_name,
-        media_class,
+        file_class,
         presence_state: map_library_tree_presence_state(&node.presence_state)?,
         size_bytes: node.size_bytes,
         modified_at_ns: node.modified_at_ns,
@@ -843,13 +843,11 @@ fn map_library_tree_node_kind(
     }
 }
 
-fn map_library_tree_file_media_class(
+fn map_library_tree_file_class(
     node: &store::StoreLiteralHierarchyNode,
-) -> store::LibrarySqliteResult<Option<protocol::LibraryTreeFileMediaClass>> {
-    match (node.node_kind.as_str(), node.media_class.as_deref()) {
-        ("file", Some(value)) => Ok(protocol::LibraryTreeFileMediaClass::from_projection_value(
-            value,
-        )),
+) -> store::LibrarySqliteResult<Option<protocol::LibraryTreeFileClass>> {
+    match (node.node_kind.as_str(), node.file_class.as_deref()) {
+        ("file", Some(value)) => Ok(protocol::LibraryTreeFileClass::from_projection_value(value)),
         ("file", None) => Ok(None),
         ("directory", None) => Ok(None),
         ("directory", Some(_)) => Ok(None),
@@ -1073,13 +1071,13 @@ const fn map_contents_recursion(
 }
 
 const fn map_contents_file_class(
-    file_class: store::StoreContentsMediaClass,
+    file_class: store::StoreContentsFileClass,
 ) -> protocol::ContentsFileClass {
     match file_class {
-        store::StoreContentsMediaClass::Audio => protocol::ContentsFileClass::Audio,
-        store::StoreContentsMediaClass::Video => protocol::ContentsFileClass::Video,
-        store::StoreContentsMediaClass::Image => protocol::ContentsFileClass::Image,
-        store::StoreContentsMediaClass::Unsupported => protocol::ContentsFileClass::Unsupported,
+        store::StoreContentsFileClass::Audio => protocol::ContentsFileClass::Audio,
+        store::StoreContentsFileClass::Video => protocol::ContentsFileClass::Video,
+        store::StoreContentsFileClass::Image => protocol::ContentsFileClass::Image,
+        store::StoreContentsFileClass::Unsupported => protocol::ContentsFileClass::Unsupported,
     }
 }
 
@@ -1148,8 +1146,8 @@ const fn map_contents_coverage_state(
 fn map_contents_row(
     row: store::StoreContentsFileRow,
 ) -> store::LibrarySqliteResult<protocol::ContentsFileRow> {
-    let media_class = protocol::ContentsMediaClass::from_projection_value(&row.media_class)
-        .ok_or_else(|| invalid_contents_value("media_class", &row.media_class))?;
+    let file_class = protocol::ContentsFileClass::from_projection_value(&row.file_class)
+        .ok_or_else(|| invalid_contents_value("file_class", &row.file_class))?;
     let file_kind = protocol::ContentsFileKind::from_projection_value(&row.file_kind)
         .ok_or_else(|| invalid_contents_value("file_kind", &row.file_kind))?;
     let presence = protocol::ContentsPresenceState::from_projection_value(&row.presence)
@@ -1175,7 +1173,7 @@ fn map_contents_row(
         label: row.label,
         relative_path: Some(row.relative_path),
         file_name: row.file_name,
-        media_class,
+        file_class,
         file_kind,
         presence,
         availability_state,
@@ -1570,7 +1568,7 @@ mod tests {
             parent_source_directory_id: None,
             relative_path: "Albums".to_string(),
             display_name: "Albums".to_string(),
-            media_class: None,
+            file_class: None,
             presence_state: "present".to_string(),
             size_bytes: None,
             modified_at_ns: None,
@@ -1591,7 +1589,7 @@ mod tests {
             parent_source_directory_id: Some(11),
             relative_path: "Albums/track.flac".to_string(),
             display_name: "track.flac".to_string(),
-            media_class: Some("audio".to_string()),
+            file_class: Some("audio".to_string()),
             presence_state: "present".to_string(),
             size_bytes: Some(10),
             modified_at_ns: Some(20),
@@ -1647,10 +1645,7 @@ mod tests {
         );
 
         let file = &window.rows[1];
-        assert_eq!(
-            file.media_class,
-            Some(protocol::LibraryTreeFileMediaClass::Audio)
-        );
+        assert_eq!(file.file_class, Some(protocol::LibraryTreeFileClass::Audio));
         assert_eq!(file.has_child_directories, None);
         assert_eq!(file.directory_primary_media_state, None);
         assert_eq!(file.directory_image_media_state, None);
@@ -1659,24 +1654,21 @@ mod tests {
     }
 
     #[test]
-    fn library_tree_mapping_preserves_file_media_class_values() {
+    fn library_tree_mapping_preserves_file_class_values() {
         for (stored, expected) in [
-            ("audio", protocol::LibraryTreeFileMediaClass::Audio),
-            ("video", protocol::LibraryTreeFileMediaClass::Video),
-            ("image", protocol::LibraryTreeFileMediaClass::Image),
-            (
-                "unsupported",
-                protocol::LibraryTreeFileMediaClass::Unsupported,
-            ),
-            ("none", protocol::LibraryTreeFileMediaClass::None),
+            ("audio", protocol::LibraryTreeFileClass::Audio),
+            ("video", protocol::LibraryTreeFileClass::Video),
+            ("image", protocol::LibraryTreeFileClass::Image),
+            ("unsupported", protocol::LibraryTreeFileClass::Unsupported),
+            ("none", protocol::LibraryTreeFileClass::None),
         ] {
             let mut node = file_node();
             node.display_name = format!("fixture-{stored}");
-            node.media_class = Some(stored.to_string());
+            node.file_class = Some(stored.to_string());
 
             let mapped = map_library_tree_node(node).expect("map file node");
 
-            assert_eq!(mapped.media_class, Some(expected), "{stored}");
+            assert_eq!(mapped.file_class, Some(expected), "{stored}");
         }
     }
 

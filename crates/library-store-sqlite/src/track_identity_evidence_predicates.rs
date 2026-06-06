@@ -6,7 +6,7 @@ pub(crate) fn current_track_identity_candidate_evidence_predicate(
     format!(
         "file.source_id = facts.basis_source_id
     AND file.presence_state = 'present'
-    AND file.media_class = 'audio'
+    AND file.file_class = 'audio'
     AND file.file_kind = 'audio'
     AND facts.source_file_id IS NOT NULL
     AND file.relative_path = facts.basis_relative_path

@@ -45,7 +45,7 @@ Rules:
 A source-file occurrence is eligible only when all of these are true:
 
 - The source is usable for maintenance.
-- The source file is present, `media_class = audio`, and `file_kind = audio`.
+- The source file is present, `file_class = audio`, and `file_kind = audio`.
 - `SourceFacts` is current for the exact source-file basis: source id, relative path, size, mtime, and presence state.
 - The current facts contain `content_hash_algorithm = blake3` and a non-empty hash value.
 - `source_file_attachment_links` currently links the source file to a `content_attachments` row with the same hash.

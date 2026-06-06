@@ -463,7 +463,7 @@ function fileNode(fileId: string, label: string): Extract<ChildRow, { readonly k
     label,
     sourceId: '7',
     fileId,
-    mediaClass: 'audio',
+    fileClass: 'audio',
     presence: 'present',
     updatedAtMs: 100
   }

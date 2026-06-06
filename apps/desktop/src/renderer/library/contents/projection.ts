@@ -55,7 +55,7 @@ export type ContentRow = {
   readonly detail?: string
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
-  readonly mediaClass?: 'audio' | 'video' | 'image' | 'unsupported'
+  readonly fileClass?: 'audio' | 'video' | 'image' | 'unsupported'
   readonly availabilityState?: 'available' | 'unavailable' | 'degraded'
   readonly action?: ContentRowAction
 }
@@ -623,13 +623,13 @@ function contentsRow(row: ContentsFileRow): ContentRow {
     presence: row.presence,
     detail,
     icon,
-    mediaClass: row.mediaClass,
+    fileClass: row.fileClass,
     ...(row.availabilityState === undefined ? {} : { availabilityState: row.availabilityState })
   }
 }
 
 function contentsRowIcon(row: ContentsFileRow): ContentRowIcon {
-  switch (row.mediaClass) {
+  switch (row.fileClass) {
     case 'audio':
       return 'music'
     case 'video':
@@ -650,7 +650,7 @@ function sourceFileRowDetail(row: ContentsFileRow): string {
     return 'File removed'
   }
 
-  return row.relativePath ?? sourceFileMediaLabel(row.mediaClass, row.fileKind)
+  return row.relativePath ?? sourceFileMediaLabel(row.fileClass, row.fileKind)
 }
 
 function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsFileRow): string {
@@ -660,7 +660,7 @@ function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsF
   const base =
     parts.length > 0
       ? parts.join(' - ')
-      : (row.relativePath ?? sourceFileMediaLabel(row.mediaClass, row.fileKind))
+      : (row.relativePath ?? sourceFileMediaLabel(row.fileClass, row.fileKind))
 
   switch (row.availabilityState) {
     case 'available':
@@ -677,10 +677,10 @@ function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsF
 }
 
 function sourceFileMediaLabel(
-  mediaClass: ContentsFileRow['mediaClass'],
+  fileClass: ContentsFileRow['fileClass'],
   fileKind?: ContentsFileRow['fileKind']
 ): string {
-  switch (mediaClass) {
+  switch (fileClass) {
     case 'audio':
       return 'Audio file'
     case 'video':

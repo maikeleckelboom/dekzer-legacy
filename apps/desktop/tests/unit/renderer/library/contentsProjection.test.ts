@@ -53,7 +53,7 @@ describe('projectContents', () => {
         kind: 'file',
         label: 'track.wav',
         state: null,
-        mediaClass: 'audio',
+        fileClass: 'audio',
         availabilityState: 'available'
       },
       {
@@ -61,7 +61,7 @@ describe('projectContents', () => {
         kind: 'file',
         label: 'clip.mp4',
         state: null,
-        mediaClass: 'video',
+        fileClass: 'video',
         availabilityState: 'available'
       }
     ])
@@ -130,7 +130,7 @@ describe('projectContents', () => {
     expect(contents.rows).toHaveLength(1)
     expect(contents.rows[0]).toMatchObject({
       kind: 'file',
-      mediaClass: 'image',
+      fileClass: 'image',
       label: 'front.jpg'
     })
   })
@@ -145,7 +145,7 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('ready')
     expect(contents.rows[0]).toMatchObject({
       kind: 'file',
-      mediaClass: 'unsupported',
+      fileClass: 'unsupported',
       icon: 'cueSheet',
       label: 'album.cue'
     })
@@ -779,7 +779,7 @@ function fileNode(
     sourceId: '7',
     fileId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
-    mediaClass: 'audio',
+    fileClass: 'audio',
     presence: 'present',
     updatedAtMs
   }
@@ -861,7 +861,7 @@ function contentsResult(options: {
 function primaryMediaRow(
   stableId: string,
   label: string,
-  mediaClass: Exclude<ContentsFileRow['mediaClass'], 'image' | 'unsupported'>,
+  fileClass: Exclude<ContentsFileRow['fileClass'], 'image' | 'unsupported'>,
   origin: NonNullable<ContentsFileRow['primaryMedia']>['origin'] = 'libraryAsset'
 ): ContentsFileRow {
   return {
@@ -871,8 +871,8 @@ function primaryMediaRow(
     label,
     relativePath: label,
     fileName: label,
-    mediaClass,
-    fileKind: mediaClass,
+    fileClass,
+    fileKind: fileClass,
     presence: 'present',
     availabilityState: 'available',
     primaryMedia: {
@@ -891,8 +891,8 @@ function primaryMediaRow(
 function sourceFileRow(
   stableId: string,
   label: string,
-  mediaClass: ContentsFileRow['mediaClass'],
-  fileKind: ContentsFileRow['fileKind'] = mediaClass === 'unsupported' ? 'cueSheet' : mediaClass
+  fileClass: ContentsFileRow['fileClass'],
+  fileKind: ContentsFileRow['fileKind'] = fileClass === 'unsupported' ? 'cueSheet' : fileClass
 ): ContentsFileRow {
   return {
     id: `source-file:${stableId}`,
@@ -901,7 +901,7 @@ function sourceFileRow(
     label,
     relativePath: label,
     fileName: label,
-    mediaClass,
+    fileClass,
     fileKind,
     presence: 'present',
     updatedAtMs: 100
@@ -913,7 +913,7 @@ function rowSummary(row: ContentRow): {
   readonly kind: ContentRow['kind']
   readonly label: string
   readonly state: ContentRow['state'] | null
-  readonly mediaClass: ContentRow['mediaClass'] | null
+  readonly fileClass: ContentRow['fileClass'] | null
   readonly availabilityState: ContentRow['availabilityState'] | null
 } {
   return {
@@ -921,7 +921,7 @@ function rowSummary(row: ContentRow): {
     kind: row.kind,
     label: row.label,
     state: row.state ?? null,
-    mediaClass: row.mediaClass ?? null,
+    fileClass: row.fileClass ?? null,
     availabilityState: row.availabilityState ?? null
   }
 }

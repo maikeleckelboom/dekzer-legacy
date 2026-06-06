@@ -57,7 +57,7 @@ pub struct SourceFileMediaProbeCandidate {
     pub source_file_id: SourceFileId,
     pub source_id: i64,
     pub relative_path: String,
-    pub media_class: String,
+    pub file_class: String,
     pub file_kind: String,
     pub reason: SourceFileMediaProbeCandidateReason,
 }
@@ -516,7 +516,7 @@ fn read_source_file_media_probe_candidates_for_scope(
         "SELECT sf.source_file_id,
                 sf.source_id,
                 sf.relative_path,
-                sf.media_class,
+                sf.file_class,
                 sf.file_kind,
                 CASE
                     WHEN facts.source_file_id IS NULL THEN 'missing_facts'
@@ -534,7 +534,7 @@ fn read_source_file_media_probe_candidates_for_scope(
            ON facts.source_file_id = sf.source_file_id
          WHERE {scope_predicate}
            AND sf.presence_state = 'present'
-           AND sf.media_class = 'audio'
+           AND sf.file_class = 'audio'
            AND {}
           ORDER BY lower(sf.relative_path) ASC,
                   sf.source_file_id ASC
@@ -551,7 +551,7 @@ fn read_source_file_media_probe_candidates_for_scope(
                     .ok_or_else(|| rusqlite::Error::IntegralValueOutOfRange(0, source_file_id))?,
                 source_id: row.get(1)?,
                 relative_path: row.get(2)?,
-                media_class: row.get(3)?,
+                file_class: row.get(3)?,
                 file_kind: row.get(4)?,
                 reason: parse_media_probe_candidate_reason(&row.get::<_, String>(5)?).map_err(
                     |reason| {
@@ -580,7 +580,7 @@ fn count_source_file_media_probe_candidates_for_scope(
            ON facts.source_file_id = sf.source_file_id
                    WHERE {scope_predicate}
            AND sf.presence_state = 'present'
-           AND sf.media_class = 'audio'
+           AND sf.file_class = 'audio'
            AND {}",
         needs_media_probe_predicate_sql("sf", "facts")
     );
@@ -1135,7 +1135,7 @@ mod tests {
                              size_bytes,
                              mtime_ns,
                              file_kind,
-                             media_class,
+                             file_class,
                              presence_state,
                              first_discovered_at,
                              last_observed_at,
@@ -1153,7 +1153,7 @@ mod tests {
                             size_bytes,
                             mtime_ns,
                             file_kind_for_path(relative_path),
-                            media_class_for_path(relative_path)
+                            file_class_for_path(relative_path)
                         ],
                     )?;
                     Ok(())
@@ -1644,7 +1644,7 @@ mod tests {
                  LEFT JOIN SourceFacts facts ON facts.source_file_id = sf.source_file_id
                  WHERE sf.source_id = 1
                    AND sf.presence_state = 'present'
-                   AND sf.media_class = 'audio'
+                   AND sf.file_class = 'audio'
                    AND (facts.source_file_id IS NULL
                         OR NOT (
                             sf.source_id = facts.basis_source_id
@@ -1707,7 +1707,7 @@ mod tests {
         crate::browse_media::file_kind_str_from_path(path)
     }
 
-    fn media_class_for_path(path: &str) -> &'static str {
-        crate::browse_media::media_class_str_from_path(path)
+    fn file_class_for_path(path: &str) -> &'static str {
+        crate::browse_media::file_class_str_from_path(path)
     }
 }

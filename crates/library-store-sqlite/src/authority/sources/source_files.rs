@@ -3,8 +3,8 @@ use rusqlite::{OptionalExtension, params};
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
-    SourceFileClassFilter, file_kind_str_from_path, is_image_media_class, is_primary_media_class,
-    media_class_str_from_path, source_file_class_filter_predicate_sql_for_column,
+    SourceFileClassFilter, file_class_str_from_path, file_kind_str_from_path, is_image_file_class,
+    is_primary_file_class, source_file_class_filter_predicate_sql_for_column,
 };
 use crate::browse_sort_key::{compute_name_browse_sort_key, compute_relative_path_browse_sort_key};
 use library_domain::SourcePresenceState;
@@ -45,7 +45,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
         input: &RecordSourceFileObservationInput,
     ) -> LibrarySqliteResult<i64> {
         let file_kind = file_kind_str_from_path(&input.relative_path);
-        let media_class = media_class_str_from_path(&input.relative_path);
+        let file_class = file_class_str_from_path(&input.relative_path);
         let existing = self.load_existing_row(input)?;
         if let Some(existing) = existing {
             let observed_at = input.observed_at.or(Some(input.updated_at));
@@ -66,7 +66,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                      size_bytes = ?8,
                      mtime_ns = ?9,
                      presence_state = ?10,
-                     media_class = ?14,
+                     file_class = ?14,
                      file_kind = ?15,
                      last_observed_at = COALESCE(?11, last_observed_at),
                      last_presence_change_at = COALESCE(?12, last_presence_change_at),
@@ -86,7 +86,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                     observed_at,
                     last_presence_change_at,
                     input.updated_at,
-                    media_class,
+                    file_class,
                     file_kind,
                 ],
             )?;
@@ -111,7 +111,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          mtime_ns,
                          file_kind,
                          presence_state,
-                         media_class,
+                         file_class,
                          first_discovered_at,
                          last_observed_at,
                          last_presence_change_at,
@@ -131,7 +131,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.mtime_ns,
                         file_kind,
                         input.presence_state.as_str(),
-                        media_class,
+                        file_class,
                         first_discovered_at,
                         last_observed_at,
                         input.presence_changed_at,
@@ -153,7 +153,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                          mtime_ns,
                          file_kind,
                          presence_state,
-                         media_class,
+                         file_class,
                          first_discovered_at,
                          last_observed_at,
                          last_presence_change_at,
@@ -172,7 +172,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                         input.mtime_ns,
                         file_kind,
                         input.presence_state.as_str(),
-                        media_class,
+                        file_class,
                         first_discovered_at,
                         last_observed_at,
                         input.presence_changed_at,
@@ -233,14 +233,14 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
     ) -> LibrarySqliteResult<()> {
         let known_media_predicate = source_file_class_filter_predicate_sql_for_column(
             SourceFileClassFilter::PrimaryMediaAndImages,
-            "media_class",
+            "file_class",
         );
         let source_file = self
             .tx
             .query_row(
                 &format!(
                     "SELECT parent_source_directory_id,
-                        media_class
+                        file_class
                  FROM source_files
                  WHERE source_file_id = ?1
                    AND presence_state = 'present'
@@ -250,20 +250,20 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                 |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, String>(1)?)),
             )
             .optional()?
-            .and_then(|(parent_source_directory_id, media_class)| {
+            .and_then(|(parent_source_directory_id, file_class)| {
                 parent_source_directory_id
-                    .map(|parent_source_directory_id| (parent_source_directory_id, media_class))
+                    .map(|parent_source_directory_id| (parent_source_directory_id, file_class))
             });
 
-        let Some((parent_source_directory_id, media_class)) = source_file else {
+        let Some((parent_source_directory_id, file_class)) = source_file else {
             return Ok(());
         };
 
-        if is_primary_media_class(&media_class) {
+        if is_primary_file_class(&file_class) {
             self.propagate_primary_media_descendant_fact(parent_source_directory_id, updated_at)?;
         }
 
-        if is_image_media_class(&media_class) {
+        if is_image_file_class(&file_class) {
             self.propagate_image_media_descendant_fact(parent_source_directory_id, updated_at)?;
         }
 

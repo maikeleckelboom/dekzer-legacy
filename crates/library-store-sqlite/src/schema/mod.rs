@@ -393,7 +393,7 @@ mod tests {
                 "size_bytes",
                 "mtime_ns",
                 "file_kind",
-                "media_class",
+                "file_class",
                 "presence_state",
                 "first_discovered_at",
                 "last_observed_at",

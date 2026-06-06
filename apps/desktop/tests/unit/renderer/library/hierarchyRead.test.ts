@@ -1061,7 +1061,7 @@ function fileNode(
   fileId: string,
   label: string,
   parentDirectoryId?: string,
-  mediaClass: Extract<ChildRow, { kind: 'file' }>['mediaClass'] = 'audio',
+  fileClass: Extract<ChildRow, { kind: 'file' }>['fileClass'] = 'audio',
   sourceId = '7'
 ): Extract<ChildRow, { kind: 'file' }> {
   return {
@@ -1071,7 +1071,7 @@ function fileNode(
     sourceId,
     fileId,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
-    mediaClass,
+    fileClass,
     presence: 'present',
     updatedAtMs: 101
   }

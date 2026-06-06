@@ -28,13 +28,13 @@ contents does not read from the tree cache.
 
 ## Ownership Boundaries
 
-| Owner                      | Owns                                                              | Must not own                                               |
-| -------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------- |
-| Tree controller            | Expanded/collapsed state, selection state, hierarchy row cache.   | Contents rows, contents read state.                        |
-| Selection model            | Selected navigation row identity and derived contents scope.      | Tree expansion, contents rendering.                        |
-| Contents panel             | Contents rows, pagination, loading and refresh presentation.      | Tree structure, hierarchy node identity, browse authority. |
-| Contents policy/read model | Row profile, media classes, recursion, ordering, cursor identity. | Renderer-local sort/filter authority.                      |
-| Substrate                  | Hierarchy and contents projection reads.                          | Renderer state of either panel.                            |
+| Owner                      | Owns                                                                        | Must not own                                               |
+| -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Tree controller            | Expanded/collapsed state, selection state, hierarchy row cache.             | Contents rows, contents read state.                        |
+| Selection model            | Selected navigation row identity and derived contents scope.                | Tree expansion, contents rendering.                        |
+| Contents panel             | Contents rows, pagination, loading and refresh presentation.                | Tree structure, hierarchy node identity, browse authority. |
+| Contents policy/read model | Policy discriminant, variant filters, recursion, ordering, cursor identity. | Renderer-local sort/filter authority.                      |
+| Substrate                  | Hierarchy and contents projection reads.                                    | Renderer state of either panel.                            |
 
 Renderer projection may display labels, icons, state rows, and actions for rows returned by the contents read. It must
 not sort, filter, fan out hierarchy children, or synthesize rows to invent browse authority.

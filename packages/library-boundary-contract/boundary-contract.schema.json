@@ -513,6 +513,9 @@
             }
           ]
         },
+        "fileClass": {
+          "$ref": "#/$defs/ContentsFileClass"
+        },
         "fileKind": {
           "$ref": "#/$defs/ContentsFileKind"
         },
@@ -524,9 +527,6 @@
         },
         "label": {
           "type": "string"
-        },
-        "mediaClass": {
-          "$ref": "#/$defs/ContentsMediaClass"
         },
         "parentDirectoryId": {
           "type": [
@@ -573,18 +573,9 @@
         "sourceFileId",
         "label",
         "fileName",
-        "mediaClass",
+        "fileClass",
         "fileKind",
         "presence"
-      ]
-    },
-    "ContentsMediaClass": {
-      "type": "string",
-      "enum": [
-        "audio",
-        "video",
-        "image",
-        "unsupported"
       ]
     },
     "ContentsPresenceState": {
@@ -2422,7 +2413,7 @@
         }
       ]
     },
-    "LibraryTreeFileMediaClass": {
+    "LibraryTreeFileClass": {
       "type": "string",
       "enum": [
         "audio",
@@ -2478,20 +2469,20 @@
         "displayName": {
           "type": "string"
         },
-        "hasChildDirectories": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "mediaClass": {
+        "fileClass": {
           "anyOf": [
             {
-              "$ref": "#/$defs/LibraryTreeFileMediaClass"
+              "$ref": "#/$defs/LibraryTreeFileClass"
             },
             {
               "type": "null"
             }
+          ]
+        },
+        "hasChildDirectories": {
+          "type": [
+            "boolean",
+            "null"
           ]
         },
         "modifiedAtNs": {

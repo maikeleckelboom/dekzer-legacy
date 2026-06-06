@@ -51,7 +51,7 @@ pub struct StoreLiteralHierarchyNode {
     pub parent_source_directory_id: Option<i64>,
     pub relative_path: String,
     pub display_name: String,
-    pub media_class: Option<String>,
+    pub file_class: Option<String>,
     pub presence_state: String,
     pub size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
@@ -738,7 +738,7 @@ fn read_child_rows(
                 parent_source_directory_id,
                 relative_path,
                 display_name,
-                media_class,
+                file_class,
                 presence_state,
                 size_bytes,
                 modified_at_ns,
@@ -756,7 +756,7 @@ fn read_child_rows(
                     parent_source_directory_id,
                     relative_path,
                     name AS display_name,
-                    NULL AS media_class,
+                    NULL AS file_class,
                     presence_state,
                     NULL AS size_bytes,
                     NULL AS modified_at_ns,
@@ -783,7 +783,7 @@ fn read_child_rows(
                     parent_source_directory_id,
                     relative_path,
                     name AS display_name,
-                    media_class,
+                    file_class,
                     presence_state,
                     size_bytes,
                     mtime_ns AS modified_at_ns,
@@ -821,7 +821,7 @@ fn read_child_rows(
                     parent_source_directory_id: row.get(4)?,
                     relative_path: row.get(5)?,
                     display_name: row.get(6)?,
-                    media_class: row.get(7)?,
+                    file_class: row.get(7)?,
                     presence_state: row.get(8)?,
                     size_bytes: row.get(9)?,
                     modified_at_ns: row.get(10)?,
@@ -1013,8 +1013,8 @@ mod tests {
             .expect("insert source directory");
     }
 
-    fn insert_file(connection: &Connection, source_file_id: i64, name: &str, media_class: &str) {
-        insert_file_in_directory(connection, source_file_id, None, name, media_class);
+    fn insert_file(connection: &Connection, source_file_id: i64, name: &str, file_class: &str) {
+        insert_file_in_directory(connection, source_file_id, None, name, file_class);
     }
 
     fn insert_media_directories(connection: &Connection, directories: &[(i64, &str)]) {
@@ -1055,7 +1055,7 @@ mod tests {
         source_file_id: i64,
         parent_source_directory_id: Option<i64>,
         name: &str,
-        media_class: &str,
+        file_class: &str,
     ) {
         let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
         let relative_path_browse_sort_key =
@@ -1070,7 +1070,7 @@ mod tests {
                      name_browse_sort_key,
                      relative_path_browse_sort_key,
                      relative_path,
-                     media_class,
+                     file_class,
                      presence_state,
                      first_discovered_at,
                      last_observed_at,
@@ -1085,7 +1085,7 @@ mod tests {
                     name,
                     name_browse_sort_key,
                     relative_path_browse_sort_key,
-                    media_class
+                    file_class
                 ],
             )
             .expect("insert source file");
@@ -1173,14 +1173,14 @@ mod tests {
         let connection = test_connection();
         insert_source(&connection, 7);
 
-        for (source_file_id, name, media_class) in [
+        for (source_file_id, name, file_class) in [
             (11, "track.flac", "audio"),
             (12, "clip.mp4", "video"),
             (13, "cover.mp3", "image"),
             (14, "notes.txt", "unsupported"),
             (15, "mystery", "none"),
         ] {
-            insert_file(&connection, source_file_id, name, media_class);
+            insert_file(&connection, source_file_id, name, file_class);
         }
 
         let window = read_children(
@@ -1194,13 +1194,13 @@ mod tests {
         .expect("read literal hierarchy")
         .expect("source window");
 
-        let media_classes = window
+        let file_classes = window
             .rows
             .iter()
-            .map(|row| (row.display_name.as_str(), row.media_class.as_deref()))
+            .map(|row| (row.display_name.as_str(), row.file_class.as_deref()))
             .collect::<Vec<_>>();
         assert_eq!(
-            media_classes,
+            file_classes,
             vec![("clip.mp4", Some("video")), ("track.flac", Some("audio"))]
         );
     }
@@ -1210,14 +1210,14 @@ mod tests {
         let connection = test_connection();
         insert_source(&connection, 7);
 
-        for (source_file_id, name, media_class) in [
+        for (source_file_id, name, file_class) in [
             (11, "track.flac", "audio"),
             (12, "clip.mp4", "video"),
             (13, "cover.jpg", "image"),
             (14, "notes.txt", "unsupported"),
             (15, "mystery", "none"),
         ] {
-            insert_file(&connection, source_file_id, name, media_class);
+            insert_file(&connection, source_file_id, name, file_class);
         }
 
         let window = read_children(
@@ -1231,13 +1231,13 @@ mod tests {
         .expect("read literal hierarchy")
         .expect("source window");
 
-        let media_classes = window
+        let file_classes = window
             .rows
             .iter()
-            .map(|row| (row.display_name.as_str(), row.media_class.as_deref()))
+            .map(|row| (row.display_name.as_str(), row.file_class.as_deref()))
             .collect::<Vec<_>>();
         assert_eq!(
-            media_classes,
+            file_classes,
             vec![
                 ("clip.mp4", Some("video")),
                 ("cover.jpg", Some("image")),
@@ -1353,7 +1353,7 @@ mod tests {
             vec![("directory", "Albums"), ("directory", "Singles")]
         );
         assert!(window.rows.iter().all(|row| row.source_file_id.is_none()));
-        assert!(window.rows.iter().all(|row| row.media_class.is_none()));
+        assert!(window.rows.iter().all(|row| row.file_class.is_none()));
     }
 
     #[test]
@@ -1551,7 +1551,7 @@ mod tests {
         assert_eq!(root_window.rows[0].display_name, "Covers");
         assert_eq!(directory_window.total_rows, 1);
         assert_eq!(
-            directory_window.rows[0].media_class.as_deref(),
+            directory_window.rows[0].file_class.as_deref(),
             Some("image")
         );
     }

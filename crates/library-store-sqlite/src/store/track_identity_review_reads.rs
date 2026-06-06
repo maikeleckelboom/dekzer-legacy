@@ -149,7 +149,7 @@ mod tests {
                         "INSERT OR IGNORE INTO source_files (
                              source_file_id, source_id, parent_source_directory_id,
                              name, name_browse_sort_key, relative_path_browse_sort_key,
-                             relative_path, size_bytes, mtime_ns, file_kind, media_class,
+                             relative_path, size_bytes, mtime_ns, file_kind, file_class,
                              presence_state, first_discovered_at, last_observed_at,
                              last_presence_change_at, created_at, updated_at
                          )

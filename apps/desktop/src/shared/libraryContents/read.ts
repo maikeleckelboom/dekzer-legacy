@@ -48,8 +48,7 @@ export type ContentsScope =
 
 export type ContentsRecursion = 'immediate' | 'recursive'
 
-export type ContentsMediaClass = 'audio' | 'video' | 'image' | 'unsupported'
-export type ContentsFileClass = ContentsMediaClass
+export type ContentsFileClass = 'audio' | 'video' | 'image' | 'unsupported'
 export type PrimaryMediaKind = 'audio' | 'video'
 export type ContentsFileKind =
   | 'audio'
@@ -164,7 +163,7 @@ export type ContentsFileRow = {
   readonly label: string
   readonly relativePath?: string
   readonly fileName: string
-  readonly mediaClass: ContentsMediaClass
+  readonly fileClass: ContentsFileClass
   readonly fileKind: ContentsFileKind
   readonly presence: ContentsPresence
   readonly availabilityState?: ContentsAvailabilityState

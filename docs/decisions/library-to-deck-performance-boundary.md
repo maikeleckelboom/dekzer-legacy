@@ -131,7 +131,7 @@ Owns:
 - `source_scan_state` rows, scan phase
 - `presence_state`
 - Directory scan state, directory affordance facts
-- Source-file provisional `media_class` used only as inventory evidence and browse
+- Source-file provisional `file_class` used only as inventory evidence and browse
   visibility input
 - Discovery timestamps and observation facts
 
@@ -154,7 +154,7 @@ Rules:
 Rejection cases for this authority:
 
 - `source_files.availability_state` is treated as deck or runtime availability
-- `source_files.media_class` or `presence_state` is used as readiness proof or
+- `source_files.file_class` or `presence_state` is used as readiness proof or
   deck-load eligibility
 
 ### Library Item Authority
@@ -525,7 +525,7 @@ Does not own:
 
 Rules:
 
-- Does not infer readiness from `source_files.media_class`.
+- Does not infer readiness from `source_files.file_class`.
 - Does not mutate deck state directly.
 - Does not coordinate library-to-deck transition itself.
 - Does not construct fallback rows from raw filesystem inventory.
@@ -860,7 +860,7 @@ The following designs are invalid and must be rejected in code review:
 
 ```
 library_item carries playhead, deck slot, cue state, or loaded runtime status
-source_files.media_class is used as deck-load eligibility or readiness proof
+source_files.file_class is used as deck-load eligibility or readiness proof
 source_files.availability_state is treated as deck or runtime availability
 readiness writes deck state
 scheduler writes deck state

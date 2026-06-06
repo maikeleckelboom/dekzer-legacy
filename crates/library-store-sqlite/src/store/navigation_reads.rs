@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params, params_from_iter};
 
 use crate::browse_media::{
-    BrowseMediaClass, canonical_media_class_from_file_kind, canonical_media_class_from_media_kind,
+    SourceFileClass, canonical_file_class_from_file_kind, canonical_file_class_from_media_kind,
     classify_relative_path_file_kind,
 };
 use crate::read_models::navigation::{
@@ -28,7 +28,7 @@ pub(crate) enum FilesystemPathLibraryStatus {
 pub(crate) struct FilesystemPathLibraryAnnotation {
     pub requested_path: String,
     pub status: FilesystemPathLibraryStatus,
-    pub media_class: Option<BrowseMediaClass>,
+    pub file_class: Option<SourceFileClass>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -238,14 +238,14 @@ impl SqliteDurableStore {
             };
 
             if let Some(status) = status {
-                let media_class = canonical_media_class_from_file_kind(Some(
+                let file_class = canonical_file_class_from_file_kind(Some(
                     classify_relative_path_file_kind(&relative_path),
                 ))
-                .or_else(|| canonical_media_class_from_media_kind(media_kind.as_deref()));
+                .or_else(|| canonical_file_class_from_media_kind(media_kind.as_deref()));
                 annotations.push(FilesystemPathLibraryAnnotation {
                     requested_path,
                     status,
-                    media_class,
+                    file_class,
                 });
             }
         }

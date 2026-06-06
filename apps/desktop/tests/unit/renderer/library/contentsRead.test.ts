@@ -921,7 +921,7 @@ function contentsRow(id: string, label: string): ContentsFileRow {
     label,
     relativePath: label,
     fileName: label,
-    mediaClass: 'audio',
+    fileClass: 'audio',
     fileKind: 'audio',
     presence: 'present',
     updatedAtMs: 100

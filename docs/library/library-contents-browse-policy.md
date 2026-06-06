@@ -18,10 +18,18 @@ The default renderer contents request uses the backend-owned policy:
 The renderer may choose this policy, but the boundary and backend own what rows are returned. The projection and table
 render returned rows and must not hide disallowed rows with renderer-side filtering or sorting.
 
+The persisted source-file vocabulary is separate from the policy discriminant:
+
+- `file_kind` is the detailed detected taxonomy.
+- `file_class` is the coarse inventory classification with values `audio`, `video`, `image`, `unsupported`, and `none`.
+- Contents source-file rows expose the coarse fact as `fileClass`.
+
 ## Boundaries
 
 Raw source-file inventory remains available through `sourceFileInventory.fileClasses`. Explicit non-default inventory
 reads may request audio, video, image, and admitted unsupported source-file rows.
+
+`primaryMedia.mediaKinds` is separate primary-media vocabulary and is not an alias for source-file `fileClasses`.
 
 Video is not part of the V0 default browse policy. Artwork, CUE sheets, and metadata companion files are not default
 playable rows. They may exist in durable source inventory and future explicit surfaces, but they are not returned by the

@@ -65,8 +65,8 @@ pub use read_models::attachment_identity::{
     get_source_files_for_attachment, get_source_files_for_attachment_limited,
 };
 pub use read_models::contents::{
-    StoreContentsCoverage, StoreContentsCoverageState, StoreContentsFileRow,
-    StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion, StoreContentsResult,
+    StoreContentsCoverage, StoreContentsCoverageState, StoreContentsFileClass,
+    StoreContentsFileRow, StoreContentsReadPolicy, StoreContentsRecursion, StoreContentsResult,
     StoreContentsRowOrigin, StoreContentsScope, StoreContentsState, StorePrimaryMediaKind,
     StorePrimaryMediaSummary,
 };

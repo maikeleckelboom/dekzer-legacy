@@ -141,7 +141,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LibraryTreeCoverageState>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryTreeNode>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryTreeNodeKind>(&cfg, &mut output);
-    push_ts_decl::<crate::LibraryTreeFileMediaClass>(&cfg, &mut output);
+    push_ts_decl::<crate::LibraryTreeFileClass>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryTreePresenceState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryPrimaryMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryImageMediaState>(&cfg, &mut output);
@@ -159,7 +159,6 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ContentsFileRow>(&cfg, &mut output);
     push_ts_decl::<crate::PrimaryMediaSummary>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsRowOrigin>(&cfg, &mut output);
-    push_ts_decl::<crate::ContentsMediaClass>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileKind>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsPresenceState>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBrowserWindow>(&cfg, &mut output);
@@ -274,7 +273,10 @@ mod tests {
         assert!(ts.contains("SourceLifecycle"));
         assert!(ts.contains("readLibraryTreeChildren"));
         assert!(ts.contains("LibraryTreeNode"));
-        assert!(ts.contains("LibraryTreeFileMediaClass"));
+        assert!(ts.contains("LibraryTreeFileClass"));
+        assert!(ts.contains("fileClass: ContentsFileClass"));
+        assert!(!ts.contains(&["media", "Class"].concat()));
+        assert!(!ts.contains(&["Contents", "Media", "Class"].concat()));
         assert!(ts.contains("DirectoryPrimaryMediaState"));
         assert!(ts.contains("DirectoryImageMediaState"));
         assert!(ts.contains("DirectoryScanState"));
@@ -300,6 +302,9 @@ mod tests {
         assert!(schema.contains("\"registerLocalRoot\""));
         assert!(schema.contains("\"readSourceLifecycle\""));
         assert!(schema.contains("\"readLibraryTreeChildren\""));
+        assert!(schema.contains("\"fileClass\""));
+        assert!(!schema.contains(&format!("\"{}\"", ["media", "Class"].concat())));
+        assert!(!schema.contains(&format!("\"{}\"", ["Contents", "Media", "Class"].concat())));
         assert!(schema.contains("\"acceptTrackIdentityCandidate\""));
         assert!(schema.contains("\"protocolError\""));
         assert!(schema.contains("\"navigationRowId\""));

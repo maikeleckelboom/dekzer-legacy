@@ -67,7 +67,7 @@ pub struct SourceFileBlake3HashCandidate {
     pub source_file_id: SourceFileId,
     pub source_id: i64,
     pub relative_path: String,
-    pub media_class: String,
+    pub file_class: String,
     pub file_kind: String,
     pub reason: SourceFileBlake3HashCandidateReason,
 }
@@ -711,7 +711,7 @@ fn read_source_file_blake3_hash_candidates_for_scope(
         "SELECT sf.source_file_id,
                 sf.source_id,
                 sf.relative_path,
-                sf.media_class,
+                sf.file_class,
                 sf.file_kind,
                 CASE
                     WHEN facts.source_file_id IS NULL THEN 'missing_facts'
@@ -745,7 +745,7 @@ fn read_source_file_blake3_hash_candidates_for_scope(
                     .ok_or_else(|| rusqlite::Error::IntegralValueOutOfRange(0, source_file_id))?,
                 source_id: row.get(1)?,
                 relative_path: row.get(2)?,
-                media_class: row.get(3)?,
+                file_class: row.get(3)?,
                 file_kind: row.get(4)?,
                 reason: parse_hash_candidate_reason(&row.get::<_, String>(5)?).map_err(
                     |reason| {
@@ -823,8 +823,8 @@ fn hash_candidate_scope_predicate(
 
 fn media_relevant_source_file_predicate_sql(alias: &str) -> String {
     format!(
-        "({alias}.media_class IN ('audio', 'video', 'image')
-          OR ({alias}.media_class = 'unsupported' AND {alias}.file_kind = 'cue_sheet'))"
+        "({alias}.file_class IN ('audio', 'video', 'image')
+          OR ({alias}.file_class = 'unsupported' AND {alias}.file_kind = 'cue_sheet'))"
     )
 }
 
@@ -1340,7 +1340,7 @@ mod tests {
                              size_bytes,
                              mtime_ns,
                              file_kind,
-                             media_class,
+                             file_class,
                              presence_state,
                              first_discovered_at,
                              last_observed_at,
@@ -1358,7 +1358,7 @@ mod tests {
                             size_bytes,
                             mtime_ns,
                             file_kind_for_path(relative_path),
-                            media_class_for_path(relative_path)
+                            file_class_for_path(relative_path)
                         ],
                     )?;
                     Ok(())
@@ -2087,7 +2087,7 @@ mod tests {
         crate::browse_media::file_kind_str_from_path(path)
     }
 
-    fn media_class_for_path(path: &str) -> &'static str {
-        crate::browse_media::media_class_str_from_path(path)
+    fn file_class_for_path(path: &str) -> &'static str {
+        crate::browse_media::file_class_str_from_path(path)
     }
 }

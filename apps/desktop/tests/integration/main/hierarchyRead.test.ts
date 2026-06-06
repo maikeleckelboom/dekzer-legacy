@@ -120,7 +120,7 @@ describe('hierarchy and navigation reads through the host', () => {
                   parentSourceDirectoryId: null,
                   relativePath: 'track.wav',
                   displayName: 'track.wav',
-                  mediaClass: 'audio',
+                  fileClass: 'audio',
                   presenceState: 'present',
                   sizeBytes: null,
                   modifiedAtNs: null,

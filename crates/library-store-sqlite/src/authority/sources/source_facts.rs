@@ -402,7 +402,7 @@ mod tests {
                      size_bytes,
                      mtime_ns,
                      file_kind,
-                     media_class,
+                     file_class,
                      presence_state,
                      first_discovered_at,
                      last_observed_at,
@@ -648,7 +648,7 @@ mod tests {
             .execute(
                 "UPDATE source_files
                  SET file_kind = 'cue_sheet',
-                     media_class = 'unsupported'
+                     file_class = 'unsupported'
                  WHERE source_file_id = 101",
                 [],
             )

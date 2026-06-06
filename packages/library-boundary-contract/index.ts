@@ -256,11 +256,11 @@ export type LibraryTreeCoverage = { state: LibraryTreeCoverageState, recursiveSc
 
 export type LibraryTreeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
 
-export type LibraryTreeNode = { nodeKind: LibraryTreeNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, mediaClass?: LibraryTreeFileMediaClass, presenceState: LibraryTreePresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, childRowState?: ChildRowState, };
+export type LibraryTreeNode = { nodeKind: LibraryTreeNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, fileClass?: LibraryTreeFileClass, presenceState: LibraryTreePresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, childRowState?: ChildRowState, };
 
 export type LibraryTreeNodeKind = "directory" | "file";
 
-export type LibraryTreeFileMediaClass = "audio" | "video" | "image" | "unsupported" | "none";
+export type LibraryTreeFileClass = "audio" | "video" | "image" | "unsupported" | "none";
 
 export type LibraryTreePresenceState = "present" | "missing" | "removed";
 
@@ -290,13 +290,11 @@ export type ContentsCoverage = { state: ContentsCoverageState, recursiveScopeCom
 
 export type ContentsCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
 
-export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, mediaClass: ContentsMediaClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, availabilityState?: LibraryAssetAvailabilityState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
+export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, availabilityState?: LibraryAssetAvailabilityState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
 
 export type PrimaryMediaSummary = { origin: ContentsRowOrigin, primaryMediaCandidateId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, libraryAssetId: string | null, rowVersion: string | null, primarySourceFileId: string | null, title: string | null, artist: string | null, album: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary | null, };
 
 export type ContentsRowOrigin = "libraryAsset" | "sourceFile" | "primaryMediaCandidate";
-
-export type ContentsMediaClass = "audio" | "video" | "image" | "unsupported";
 
 export type ContentsFileKind = "audio" | "video" | "image" | "cueSheet" | "logDoc" | "textDoc" | "archive" | "other" | "unknown";
 
