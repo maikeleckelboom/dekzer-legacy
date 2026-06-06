@@ -28,7 +28,7 @@ This preserves diagnostic and future migration room while making the contents pa
 `source_files` owns durable file facts. The required inventory facts are:
 
 | Fact                         | Meaning                                                                                                   |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+|------------------------------|-----------------------------------------------------------------------------------------------------------|
 | `source_file_id`             | Stable durable file row identity inside the store.                                                        |
 | `source_id`                  | Owning source root.                                                                                       |
 | `parent_source_directory_id` | Immediate directory when known.                                                                           |
@@ -44,12 +44,12 @@ identity, or artwork role.
 
 ## Default Contents Policy
 
-The renderer default for selected library contents is audio-first and audio-only in V0:
+The renderer default for selected library contents is `playableMediaBrowse` (audio and video):
 
-| Field         | Value         |
-| ------------- | ------------- |
-| `policy.kind` | `audioBrowse` |
-| `scopeDepth`  | recursive     |
+| Field         | Value                 |
+|---------------|-----------------------|
+| `policy.kind` | `playableMediaBrowse` |
+| `scopeDepth`  | recursive             |
 
 The renderer derives the scope from selection and sends this policy to `readContents`. The backend owns the query and
 admission. The renderer must not fan out tree children, synthesize directory contents, or answer the selected scope from
@@ -61,12 +61,13 @@ the hierarchy cache.
 ## Scope Behavior
 
 | Scope          | Recursive behavior                                                                                              |
-| -------------- | --------------------------------------------------------------------------------------------------------------- |
+|----------------|-----------------------------------------------------------------------------------------------------------------|
 | source         | Reads rows under the whole source, or under accepted source locations when user-visible source locations exist. |
 | sourceLocation | Reads rows under that registered location prefix.                                                               |
 | directory      | Reads rows under that directory prefix.                                                                         |
 
-Immediate scope depth reads only immediate files for the selected scope. Recursive source and directory reads are backend
+Immediate scope depth reads only immediate files for the selected scope. Recursive source and directory reads are
+backend
 queries over durable source-file rows.
 
 Unavailable, blocked, failed, or incomplete sources must return typed state. They must not be collapsed into an
@@ -78,7 +79,7 @@ or indexing is incomplete.
 Explicit non-default source-file inventory reads may include:
 
 | Stored facts                                                                    | Explicit inventory admission                                 |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+|---------------------------------------------------------------------------------|--------------------------------------------------------------|
 | `file_class = audio`                                                            | Include.                                                     |
 | `file_class = video`                                                            | Include when policy requests video.                          |
 | `file_class = image`                                                            | Include when policy requests image.                          |
@@ -97,8 +98,9 @@ they are media-adjacent companion metadata. They remain source-file rows and nev
 Changing the unsupported admission scope (for example, admitting `log_doc` or `text_doc` unsupported rows, or removing
 the cue-sheet filter) requires a separate decision. The current behavior is preserved.
 
-The V0 main contents browse default requests only `audio`. It does not include video, image, unsupported, CUE, text, or
-metadata companion files unless a future explicit product surface chooses a broader policy.
+The V0 main contents browse default requests `playableMediaBrowse` (audio and video). It does not include image,
+unsupported, CUE, text, or metadata companion files unless a future explicit product surface chooses a broader policy.
+`audioBrowse` remains available as a separate audio-only explicit policy.
 
 ## CUE And Images
 
@@ -112,7 +114,8 @@ folder art, or unrelated imagery.
 
 ## Presence
 
-`sourceFileInventory` contents rows may include present, missing, and removed media-relevant files. The presence state must be
+`sourceFileInventory` contents rows may include present, missing, and removed media-relevant files. The presence state
+must be
 shown honestly. A missing or removed row is still a durable inventory fact.
 
 `primaryMedia` rows are playable/performance projection rows and remain present-file scoped. They may include audio and
@@ -138,7 +141,7 @@ Rust and SQLite own durable facts and read-model admission. Boundary protocol ex
 The renderer may project icons and labels:
 
 | Row facts              | Renderer projection |
-| ---------------------- | ------------------- |
+|------------------------|---------------------|
 | audio                  | music/file row      |
 | video                  | video/file row      |
 | image                  | image/file row      |

@@ -6,14 +6,14 @@ No two active docs may define the same authority._
 ## Product doctrine
 
 | Doc                                  | Role                           | Notes                                                                                                                                  |
-| ------------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+|--------------------------------------|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `docs/product-doctrine-shortened.md` | **Canonical product doctrine** | Active doctrine. Owns product position, identity stack, claims, readiness, conflict resolution, modeling laws, first slice boundaries. |
 | `docs/archive/product-doctrine.md`   | Superseded archive             | Long-form v2 draft. Superseded by `product-doctrine-shortened.md`. Historical source material only.                                    |
 
 ## Source and scan contracts
 
 | Doc                                                     | Role                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|---------------------------------------------------------|---------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `docs/source-root-scan-admission-contract.md`           | **Canonical scan admission contract** (with marked implementation status) | Owns root registration, root identity, scan preflight, traversal policy, candidate admission, magic reads, work budgets, observation persistence. Implementation status note distinguishes desired architecture from current incomplete implementation.                                                                                                                                                |
 | `docs/source-root-scan-reconnaissance-2026-05-27.md`    | Archived evidence report                                                  | Evidence only. Do not use as architecture authority. Canonical contract: `source-root-scan-admission-contract.md`.                                                                                                                                                                                                                                                                                     |
 | `docs/decisions/source-access-and-scan-coverage.md`     | Valid architectural decision                                              | Source access and scan coverage rules. Complements scan admission contract at lower detail level. Does not supersede the admission contract.                                                                                                                                                                                                                                                           |
@@ -25,7 +25,7 @@ No two active docs may define the same authority._
 ## Library browser contracts
 
 | Doc                                                          | Role                                                         | Owns                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|--------------------------------------------------------------|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `docs/library/source-hierarchy-contract.md`                  | **Canonical library contract**                               | Navigation-only tree rows: sources, source locations, directories, hierarchy state/action rows, and the exclusion of source-file/audio rows from tree navigation.                                                                    |
 | `docs/library/library-tree-frame-stability-contract.md`      | **Canonical library contract** (with marked future sections) | Branch rendering continuity, cache behavior, node identity, response guards, prefetch bounds, drag stability. Future sections marked for batch reads, child summaries, targeted scan invalidation.                                   |
 | `docs/library/library-tree-selection-contents-contract.md`   | **Canonical library contract**                               | Tree selection to contents scope, contents-owned audio/file rows, retained-row perception, delayed pending state, coalesced invalidation refresh, source removal clearing, panel containment.                                        |
@@ -48,28 +48,28 @@ No two active docs may define the same authority._
 
 ## Contents read boundary docs
 
-| Doc                                                  | Role                             | Notes                                                                                                                                                                                                                               |
-| ---------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/library/library-contents-read-boundary.md`     | Discovery pointer                | Points to the canonical decisions doc and related library browser contracts. Does not define duplicate authority.                                                                                                                   |
-| `docs/decisions/library-contents-read-boundary.md`   | Canonical contents read boundary | Defines the single parameterized contents read boundary. Stale `sourceFileVisibility`-aware claim removed (historical note preserved). Complements `library-tree-selection-contents-contract.md` (which governs renderer coupling). |
-| `docs/decisions/selected-contents-scope-depth-rule.md` | Valid architectural decision     | CURRENT WITH LEGACY VOCABULARY. Schema-specific references predate v1 substrate. Architectural rules remain valid. For current v1 vocabulary see `docs/decisions/library-preparation-substrate-v1.md`.                              |
+| Doc                                                    | Role                             | Notes                                                                                                                                                                                                                                                                            |
+|--------------------------------------------------------|----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `docs/library/library-contents-read-boundary.md`       | Discovery pointer                | Points to the canonical decisions doc and related library browser contracts. Does not define duplicate authority.                                                                                                                                                                |
+| `docs/decisions/library-contents-read-boundary.md`     | Canonical contents read boundary | Defines the single parameterized contents read boundary. Stale `sourceFileVisibility`-aware claim removed (historical note preserved). Complements `library-tree-selection-contents-contract.md` (which governs renderer coupling).                                              |
+| `docs/decisions/selected-contents-scope-depth-rule.md` | Valid architectural decision     | CURRENT. Architectural rules remain valid. Schema-specific references predate v1 substrate. For current v1 vocabulary see `docs/decisions/library-preparation-substrate-v1.md`; for current contents boundary vocabulary see `docs/decisions/library-contents-read-boundary.md`. |
 
 ## Implementation discipline
 
 | Doc                                           | Role                               | Notes                                                                                                                                                                           |
-| --------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|-----------------------------------------------|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `docs/substrate-implementation-discipline.md` | Reusable implementation discipline | Mined from superseded V1 Substrate Port brief. Preserves durable process laws only. Not architecture authority. Supersedes `code_change_brief_v_1_substrate_port.md` (deleted). |
 
 ## Evidence reports
 
 | Doc                                                  | Role                     | Notes                                                                        |
-| ---------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------- |
+|------------------------------------------------------|--------------------------|------------------------------------------------------------------------------|
 | `docs/source-root-scan-reconnaissance-2026-05-27.md` | Archived evidence report | Evidence only. Canonical contract: `source-root-scan-admission-contract.md`. |
 
 ## Superseded / archive material
 
 | Doc                                                        | Role               | Notes                                                                                                                                     |
-| ---------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+|------------------------------------------------------------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | `docs/archive/product-doctrine.md`                         | Superseded archive | Superseded by `product-doctrine-shortened.md`.                                                                                            |
 | `docs/archive/schema-rewrite-prompt.md`                    | Superseded archive | Implementation prompt, not canonical doc. Superseded by current schema baseline and `docs/decisions/library-preparation-substrate-v1.md`. |
 | `docs/source-hierarchy-contract.md`                        | Superseded pointer | Superseded by `docs/library/source-hierarchy-contract.md`.                                                                                |
@@ -79,7 +79,7 @@ No two active docs may define the same authority._
 ## Support maps
 
 | Doc                                            | Role                         | Notes                                                                                                   |
-| ---------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+|------------------------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------|
 | `docs/implementation-structure.md`             | Support map                  | Future implementation target shape. Not architecture authority. Guides crate/package/domain structure.  |
 | `docs/local-source-icon-doctrine.md`           | Icon doctrine                | Canonical for iconography rules. Depends on scan admission contract for root classification vocabulary. |
 | `docs/first-slice-substrate-map.md`            | First slice authority map    | Defines the first product slice. Not architecture authority.                                            |
@@ -88,7 +88,7 @@ No two active docs may define the same authority._
 ## Schema and substrate decisions
 
 | Doc                                                      | Role                                 | Notes                                                                                 |
-| -------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------- |
+|----------------------------------------------------------|--------------------------------------|---------------------------------------------------------------------------------------|
 | `docs/decisions/library-preparation-substrate-v1.md`     | Canonical schema decision (ACCEPTED) | v1 substrate schema authority. Replaces `LibraryAssets`-based schema.                 |
 | `docs/decisions/library-boundary-exposure.md`            | Valid architectural decision         | IPC boundary exposure rules for library operations.                                   |
 | `docs/decisions/library-to-deck-performance-boundary.md` | Future architecture boundary         | FUTURE ARCHITECTURE. Authority boundaries valid; table names predate v1 substrate.    |
@@ -103,5 +103,5 @@ Self-contained under `docs/workspace/`. See individual files. The primary entry 
 ## Known forward references (intentionally do not exist yet)
 
 | Referenced name             | Used by                                    | Reason                                                                                                   |
-| --------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+|-----------------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------|
 | `workspace-layout-contract` | Library browser workspace surface contract | TODO: Not yet written. Workspace topology contracts exist but specific layout contract not yet separate. |

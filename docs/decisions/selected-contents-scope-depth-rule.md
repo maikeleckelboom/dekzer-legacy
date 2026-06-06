@@ -1,6 +1,12 @@
 # Selected Contents Scope Depth Rule
 
-**Status:** CURRENT WITH LEGACY VOCABULARY — This document contains architectural decisions that remain valid (descendant-inclusive scope depth selection vs tree expansion, query contracts, coverage states, result shapes, forbidden patterns), but its schema-specific references (`LibraryBrowserRows`, `library_asset_id`, `LibraryAssets`) predate the v1 substrate. For current v1 schema authority and vocabulary (`track_browser_rows`, `track_id`, `tracks`), see `docs/decisions/library-preparation-substrate-v1.md`. Do not use the legacy table/column names in this document as current implementation targets.
+**Status:** CURRENT — The architectural decisions in this document remain valid (descendant-inclusive scope depth
+selection vs tree expansion, query contracts, coverage states, result shapes, forbidden patterns). Schema-specific
+references (`LibraryBrowserRows`, `library_asset_id`, `LibraryAssets`) are historical; for current v1 schema authority
+see `docs/decisions/library-preparation-substrate-v1.md`. For current contents read boundary vocabulary (`scopeDepth`,
+`scopeCoverage`, `hasPolicyOmittedRows`, `playableMediaBrowse`) see `docs/decisions/library-contents-read-boundary.md`
+and `docs/library/library-contents-browse-policy.md`. Do not use the legacy table/column names as current implementation
+targets.
 
 ## Decision
 
@@ -60,15 +66,26 @@ Canonical `selector_kind` values:
 Canonical payloads:
 
 ```json
-{ "kind": "source", "source_id": 3 }
+{
+  "kind": "source",
+  "source_id": 3
+}
 ```
 
 ```json
-{ "kind": "source_location", "source_id": 3, "source_location_id": 7 }
+{
+  "kind": "source_location",
+  "source_id": 3,
+  "source_location_id": 7
+}
 ```
 
 ```json
-{ "kind": "directory", "source_id": 3, "source_directory_id": 42 }
+{
+  "kind": "directory",
+  "source_id": 3,
+  "source_directory_id": 42
+}
 ```
 
 If `selector_kind` and `payload.kind` disagree, the renderer must reject the row as invalid projection data.
@@ -124,11 +141,13 @@ The baseline schema must also make literal hierarchy ownership structurally safe
 ```sql
 source_directories.parent_source_directory_id
   REFERENCES source_directories(source_directory_id)
-  ON DELETE CASCADE;
+  ON DELETE
+CASCADE;
 
 source_files.parent_source_directory_id
   REFERENCES source_directories(source_directory_id)
-  ON DELETE CASCADE;
+  ON DELETE
+CASCADE;
 ```
 
 Do not keep `ON DELETE SET NULL` for ordinary parent-directory relationships in the greenfield baseline. Deleting a
@@ -278,10 +297,10 @@ Required indexes:
 
 ```sql
 CREATE INDEX source_files_source_relative_path_binary
-ON source_files (source_id, relative_path COLLATE BINARY);
+  ON source_files (source_id, relative_path COLLATE BINARY);
 
 CREATE INDEX source_directories_source_relative_path_binary
-ON source_directories (source_id, relative_path COLLATE BINARY);
+  ON source_directories (source_id, relative_path COLLATE BINARY);
 ```
 
 Queries must compare using the same collation:
@@ -349,34 +368,28 @@ complete.
 Required conceptual query shape for aggregate source selection:
 
 ```sql
-WITH accepted_locations(relative_path) AS (
-  SELECT relative_path
-  FROM source_locations
-  WHERE source_id = :source_id
-    AND authority = 'user'
-    AND location_kind = 'registered_subpath'
-    AND is_user_visible = 1
-), covered_directories AS (
-  SELECT sd.dir_scan_state
-  FROM source_directories sd
-  WHERE sd.source_id = :source_id
-    AND EXISTS (
-      SELECT 1
-      FROM accepted_locations al
-      WHERE sd.relative_path COLLATE BINARY = al.relative_path COLLATE BINARY
-         OR (
-           sd.relative_path COLLATE BINARY >= al.relative_path || '/'
-           AND sd.relative_path COLLATE BINARY <  al.relative_path || char(48)
-         )
-    )
-)
-SELECT
-  CASE
-    WHEN SUM(CASE WHEN dir_scan_state = 'blocked' THEN 1 ELSE 0 END) > 0 THEN 'blocked'
-    WHEN SUM(CASE WHEN dir_scan_state = 'failed' THEN 1 ELSE 0 END) > 0 THEN 'failed'
-    WHEN SUM(CASE WHEN dir_scan_state IN ('pending', 'scanning') THEN 1 ELSE 0 END) > 0 THEN 'partial'
-    ELSE 'complete'
-  END AS aggregate_coverage_state
+WITH accepted_locations(relative_path) AS (SELECT relative_path
+                                           FROM source_locations
+                                           WHERE source_id = :source_id
+                                             AND authority = 'user'
+                                             AND location_kind = 'registered_subpath'
+                                             AND is_user_visible = 1),
+     covered_directories AS (SELECT sd.dir_scan_state
+                             FROM source_directories sd
+                             WHERE sd.source_id = :source_id
+                               AND EXISTS (SELECT 1
+                                           FROM accepted_locations al
+                                           WHERE sd.relative_path COLLATE BINARY = al.relative_path COLLATE BINARY
+                                              OR (
+                                             sd.relative_path COLLATE BINARY >= al.relative_path || '/'
+                                               AND sd.relative_path COLLATE BINARY < al.relative_path || char(48)
+                                             )))
+SELECT CASE
+         WHEN SUM(CASE WHEN dir_scan_state = 'blocked' THEN 1 ELSE 0 END) > 0 THEN 'blocked'
+         WHEN SUM(CASE WHEN dir_scan_state = 'failed' THEN 1 ELSE 0 END) > 0 THEN 'failed'
+         WHEN SUM(CASE WHEN dir_scan_state IN ('pending', 'scanning') THEN 1 ELSE 0 END) > 0 THEN 'partial'
+         ELSE 'complete'
+         END AS aggregate_coverage_state
 FROM covered_directories;
 ```
 
@@ -411,7 +424,7 @@ ORDER BY
     WHEN 'degraded' THEN 1
     WHEN 'unavailable' THEN 2
     ELSE 3
-  END ASC,
+END ASC,
   lower(COALESCE(title, relative_path, '')) ASC,
   lower(COALESCE(artist, '')) ASC,
   lower(COALESCE(album, '')) ASC,

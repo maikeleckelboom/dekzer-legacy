@@ -28,13 +28,13 @@ contents does not read from the tree cache.
 
 ## Ownership Boundaries
 
-| Owner                      | Owns                                                                        | Must not own                                               |
-| -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Tree controller            | Expanded/collapsed state, selection state, hierarchy row cache.             | Contents rows, contents read state.                        |
-| Selection model            | Selected navigation row identity and derived contents scope.                | Tree expansion, contents rendering.                        |
-| Contents panel             | Contents rows, pagination, loading and refresh presentation.                | Tree structure, hierarchy node identity, browse authority. |
+| Owner                      | Owns                                                                         | Must not own                                               |
+|----------------------------|------------------------------------------------------------------------------|------------------------------------------------------------|
+| Tree controller            | Expanded/collapsed state, selection state, hierarchy row cache.              | Contents rows, contents read state.                        |
+| Selection model            | Selected navigation row identity and derived contents scope.                 | Tree expansion, contents rendering.                        |
+| Contents panel             | Contents rows, pagination, loading and refresh presentation.                 | Tree structure, hierarchy node identity, browse authority. |
 | Contents policy/read model | Policy discriminant, variant filters, scopeDepth, ordering, cursor identity. | Renderer-local sort/filter authority.                      |
-| Substrate                  | Hierarchy and contents projection reads.                                    | Renderer state of either panel.                            |
+| Substrate                  | Hierarchy and contents projection reads.                                     | Renderer state of either panel.                            |
 
 Renderer projection may display labels, icons, state rows, and actions for rows returned by the contents read. It must
 not sort, filter, fan out hierarchy children, or synthesize rows to invent browse authority.
@@ -44,7 +44,7 @@ not sort, filter, fan out hierarchy children, or synthesize rows to invent brows
 Current selectable navigation rows derive contents scopes as follows:
 
 | Tree row            | Derived contents scope                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------- |
+|---------------------|----------------------------------------------------------------------------------------------|
 | Source row          | Media-relevant source-file inventory under that source, subject to contents policy.          |
 | Source-location row | Media-relevant source-file inventory under that source location, subject to contents policy. |
 | Directory row       | Media-relevant source-file inventory under that directory, subject to contents policy.       |
@@ -61,12 +61,12 @@ The contents panel issues an independent read:
 readContents(scope, policy, scopeDepth, limit, cursor)
 ```
 
-The default main contents browse is audio-first:
+The default main contents browse is `playableMediaBrowse` (audio and video):
 
-| Field         | Default       |
-| ------------- | ------------- |
-| `policy.kind` | `audioBrowse` |
-| `scopeDepth`  | recursive     |
+| Field         | Default               |
+|---------------|-----------------------|
+| `policy.kind` | `playableMediaBrowse` |
+| `scopeDepth`  | recursive             |
 
 Contents rows are media-relevant source-file rows unless a future explicit policy says otherwise. They are not
 canonical tracks and do not decide track identity, duplicate resolution, CUE association, artwork role, or analysis
@@ -75,7 +75,7 @@ readiness.
 ## Contents Panel States
 
 | State          | Meaning                                                                                                 | Required behavior                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+|----------------|---------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
 | `no_selection` | No selectable navigation row is selected.                                                               | Clear contents intentionally.                                                        |
 | `loading`      | A scope is set, no prior accepted rows exist, and the first read is pending past the display threshold. | Show stable loading state. Do not flash empty.                                       |
 | `ready`        | Rows loaded for the current policy and scope.                                                           | Render returned rows normally.                                                       |
@@ -97,7 +97,7 @@ affected visible/current work, then asks Main for authoritative reads.
 Current scoped refresh behavior:
 
 | Input                         | Refresh planning                                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `navigationRows` invalidation | Refresh navigation rows and visible source lifecycle state.                                                                            |
 | `libraryBrowser` invalidation | Refresh expanded browser windows, refresh current contents, clear contents warm snapshots, and refresh visible source lifecycle state. |
 | Event gap recovery            | Refresh active first-slice projections by bounded policy and clear contents warm snapshots.                                            |

@@ -1,370 +1,597 @@
-## Implementation sequence
+# Electron Boundary Spine
+
+**Status:** doctrine-candidate
+**Doctrine-version:** 0.1
+**Owner:** desktop-boundary-substrate
+**Scope:** renderer ↔ main ↔ Rust library service IPC discipline
+
+---
+
+## Architectural Law
+
+**Rust publishes. Main pumps. Renderer subscribes.**
+
+The Rust library service is the sole author of boundary events. The main process owns
+boundary event reception: it reads events from the Rust boundary stream and forwards
+publication events to the renderer. The renderer subscribes to main-forwarded publication
+only.
+
+The renderer does not invoke `ReadAfter` or `WaitForEventsAfter` directly. Event
+reception is subscription, not renderer-initiated polling. This law governs all event
+delivery design in this document.
+
+---
+
+## Implementation Sequence
 
 Do not mix this work with browse-policy omission metadata.
-
-Do not mix this work with source-root admission/default discovery.
+Do not mix this work with source-root admission or default discovery.
 
 Recommended sequence:
 
 1. Finish or merge source-add activation if already green.
-2. Finish browse-policy omission metadata inventory and implement that slice only if the inventory proves the boolean
-   can be computed honestly.
-3. Consolidate the Electron library command/event spine.
-4. Implement source-root admission and default music source discovery on top of the spine.
-5. Introduce resource-plane helpers only when a real resource payload requires them.
+2. Finish browse-policy omission metadata inventory and implement that slice only if the
+   inventory proves the boolean can be computed honestly.
+3. Verify this document is ratified and present in `docs/architecture/` before any spine
+   implementation begins.
+4. Consolidate the Electron library command/event spine.
+5. Verify that renderer-side event polling is structurally removed or guarded.
+6. Implement source-root admission and default music source discovery on top of the spine.
+7. Introduce ResourcePlane helpers only when a real resource payload requires them.
 
-The spine should happen before source-root admission/default discovery because source admission adds new command and
-event surface. Adding that surface before the spine increases IPC entropy.
+The spine must happen before source-root admission and default discovery because source
+admission adds new command and event surface. Adding that surface before the spine
+increases IPC entropy.
 
-The spine should not block small already-green product repairs, but it should block larger new boundary surfaces.
+The spine must not block small already-green product repairs, but it must block larger new
+boundary surfaces.
 
-## First spine implementation slice
+---
 
-The first implementation slice should be structural, not semantic.
+## First Spine Implementation Slice
 
-In scope:
+The first implementation slice is structural, not semantic.
 
-* central channel owner for library IPC;
-* plane-separated channel constants;
-* one explicit library command registry;
-* typed command handler wrapper;
-* product result versus host failure separation;
-* renderer boundary client normalization;
-* preload listener cleanup API;
-* event emit helpers;
-* generated contract type imports;
-* validation hooks;
-* tests and source guards.
+**In scope:**
 
-Out of scope:
+- central channel owner for library IPC
+- plane-separated channel constants
+- one explicit library command registry with service readiness gate
+- typed command handler wrapper
+- Boundary Event Pump as a named main-process lifecycle owner
+- product result versus host failure separation
+- service-not-ready as host failure
+- renderer boundary client with subscription and cleanup lifecycle
+- preload listener cleanup API
+- event emit helpers for main-to-renderer forwarding
+- generated contract type imports
+- validation hooks
+- tests and source guards
 
-* source-root admission;
-* default music source discovery;
-* browse-policy omission metadata;
-* playable-media policy;
-* source scan behavior changes;
-* tree behavior changes;
-* contents row fields;
-* waveform/resource payload implementation;
-* Exclave integration;
-* new schema generation system;
-* broad preload rewrite;
-* app shell redesign.
+**Out of scope:**
 
-The first slice may move existing handlers into the spine, but it must not change product behavior unless a behavior is
-already a boundary bug.
+- source-root admission
+- default music source discovery
+- browse-policy omission metadata
+- playable-media policy changes
+- source scan behavior changes
+- tree behavior changes
+- contents row fields
+- waveform or resource payload implementation
+- ResourcePlane implementation
+- Exclave integration
+- new schema generation system
+- broad preload rewrite
+- app shell redesign
 
-## File ownership target
+The first slice may move existing handlers into the spine, but it must not change product
+behavior unless a behavior is already a boundary bug.
+
+---
+
+## File Ownership Target
 
 Use existing files if they already own these roles. Do not create parallel paths.
 
-Target ownership shape:
+The spine has six owners.
 
-### Channel owner
+### 1. Channel Owner
 
-Owns:
+**File:** `apps/desktop/src/main/library/channels.ts`
 
-* ControlPlane constants;
-* PublicationPlane constants;
-* future ResourcePlane constants;
-* channel naming convention;
-* no duplicate channel strings.
+**Owns:**
 
-Does not own:
+- `ControlPlane` constants
+- `PublicationPlane` constants
+- future `ResourcePlane` constants
+- channel naming convention
+- no duplicate channel strings
 
-* handler logic;
-* emit logic;
-* product behavior.
+**Does not own:** handler logic, emit logic, pump lifecycle, product behavior.
 
-### Command registry
+```typescript
+export const ControlPlane = {
+  ContentsRead:        'library.contents.read',
+  HierarchyRead:       'library.hierarchy.read',
+  SourceAdd:           'library.source.add',
+  SourceRemove:        'library.source.remove',
+  ScanStart:           'library.scan.start',
+  ScanCancel:          'library.scan.cancel',
+  SourceLifecycleRead: 'library.source.lifecycle.read',
+} as const;
 
-Owns:
+export const PublicationPlane = {
+  BrowserInvalidated:     'library.invalidation.browser',
+  SourceLifecycleChanged: 'library.source.lifecycle.changed',
+  ScanEvent:              'library.scan.event',
+  BoundaryGapDetected:    'library.boundary.gap.detected',
+} as const;
 
-* registering all library control-plane commands;
-* explicit allowlist;
-* dependency injection through function signature;
-* request decode hook;
-* service call handoff;
-* product result normalization;
-* unexpected exception normalization;
-* host failure logging;
-* response validation hook.
+export const ResourcePlane = {
+  // Reserved. Future: WaveformReadRange, ArtworkOpen, AnalysisBlobReadRange.
+} as const;
 
-Does not own:
+// Type-level plane membership — used to enforce primitive selection in
+// the registry and emit helpers.
+export type ControlChannel     = typeof ControlPlane[keyof typeof ControlPlane];
+export type PublicationChannel = typeof PublicationPlane[keyof typeof PublicationPlane];
+export type ResourceChannel    = typeof ResourcePlane[keyof typeof ResourcePlane];
+```
 
-* source admission policy;
-* scan lifecycle;
-* selection behavior;
-* contents filtering;
-* renderer projection.
+No constant appears in more than one plane. If a channel moves between planes, the old
+constant is removed, not aliased.
 
-### Event emit helpers
+### 2. Command Registry
 
-Own:
+**File:** `apps/desktop/src/main/library/commands.ts`
 
-* publication event send calls;
-* publication channel constants;
-* event payload typing;
-* optional event validation;
-* delivery target policy.
+**Owns:**
 
-Do not own:
+- registering all library control-plane commands
+- explicit command allowlist
+- dependency injection through function signature — not ambient globals
+- `decodeCommandRequest` hook at main ingress
+- service readiness gate
+- service call handoff
+- product result normalisation
+- unexpected exception normalisation to `HostCommandFailure`
+- host failure logging
+- `validateCommandResponse` hook at main egress
 
-* event meaning;
-* refresh scheduling;
-* renderer invalidation policy;
-* scan state authority.
+**Does not own:** source admission policy, scan lifecycle, boundary event polling, cursor
+tracking for publication events, selection behavior, contents filtering, renderer
+projection.
 
-### Preload boundary
+**Operational law:** command handlers translate IPC requests to service method calls and
+normalise results. They must not contain conditional branching on product domain values.
+If product branching is needed, it lives in the service method, not the handler.
 
-Owns:
+Dependency injection shape:
 
-* safe command invocation wrappers;
-* safe listener registration;
-* cleanup-returning listener functions;
-* no raw ipcRenderer exposure.
+```typescript
+export function registerLibraryCommands(deps: {
+  ipcMain:        Electron.IpcMain;
+  libraryService: LibraryService;   // typed service, not ambient global or singleton
+  getWindows:     () => BrowserWindow[];
+}): void { /* ... */ }
+```
 
-Does not own:
+### 3. Boundary Event Pump
 
-* renderer feature policy;
-* library state;
-* selection;
-* contents projection.
+**File:** `apps/desktop/src/main/library/pump.ts`
+**Concrete implementation name:** `MainLibraryEventPump`, unless the existing codebase
+already has a clearer equivalent owner.
 
-### Renderer boundary client
+The Boundary Event Pump is a main-process lifecycle owner. It is not a command handler,
+not a renderer feature client, and not a generic event helper. It owns the transition from
+the Rust boundary event stream to renderer subscription delivery.
 
-Owns:
+**Owns:**
 
-* feature-facing typed command API;
-* transport failure normalization;
-* product result forwarding;
-* event payload ingress normalization.
+- main-process bootstrap of boundary event reception
+- the `ReadAfter` or `WaitForEventsAfter` call loop against the Rust boundary
+- event cursor tracking
+- gap detection and gap signal forwarding to the renderer
+- classification of boundary event read outcomes: ready, gap, failed
+- backoff after read failure
+- forwarding parsed publication events to main-to-renderer emit helpers
+- teardown when the owning window or app lifecycle ends
 
-Does not own:
+**Does not own:** event authorship, scan lifecycle policy, renderer refresh policy,
+renderer selection behavior, product state authority, command handler registration.
 
-* source facts;
-* contents filtering;
-* scan meaning;
-* authority decisions.
+The pump may call control-plane commands against the Rust boundary because event reads are
+command-shaped at the transport layer. That does not make the renderer a command consumer
+for events.
 
-## Result model
+The pump is the only owner allowed to schedule continued `ReadAfter` or
+`WaitForEventsAfter` calls. Renderer code must never schedule that loop.
 
-The spine must distinguish three operational outcomes.
+Interface shape:
 
-### Product success
+```typescript
+interface MainLibraryEventPump {
+  start(deps: PumpDeps): void;
+  stop(): void;
+}
 
-The service ran and returned a value.
+interface PumpDeps {
+  boundaryClient: RustBoundaryClient;
+  emitHelpers:    LibraryEmitHelpers;
+  onGap:          (gap: BoundaryGapEvent) => void;
+}
+// Must not: author events, own scan policy, touch renderer state,
+// register command handlers, or make product decisions.
+```
 
-Example:
+### 4. Event Emit Helpers
 
-* contents read succeeded;
-* source registered;
-* scan start accepted.
+**File:** `apps/desktop/src/main/library/events.ts`
 
-### Product failure
+**Owns:**
 
-The service ran and returned a domain failure.
+- main-to-renderer publication forwarding only
+- `webContents.send` calls for library publication channels
+- `PublicationPlane` channel constants
+- event payload typing
+- optional main-to-renderer payload validation
+- delivery target policy
 
-Example:
+**Does not own:** Rust-side event authorship, boundary event stream publication, event
+meaning, event polling, cursor tracking, refresh scheduling, renderer invalidation policy,
+scan state authority.
 
-* source already exists;
-* invalid cursor;
-* policy conflict;
-* source not found;
-* scan already running.
+Rust remains the source of boundary events. Emit helpers forward already-parsed events
+from main to renderer subscribers. They do not decide which events exist.
 
-Product failures are not thrown as transport errors. Renderer feature code handles them as normal product outcomes.
+No raw `webContents.send` call for library events appears anywhere outside this file.
 
-### Host or transport failure
+### 5. Preload Boundary
 
-The boundary failed.
+**File:** `apps/desktop/src/preload/libraryApi.ts`
 
-Example:
+**Owns:**
 
-* handler crashed;
-* channel missing;
-* preload API missing;
-* validation failed;
-* serialization failed;
-* invoke rejected before a product result existed.
+- safe command invocation wrappers
+- safe listener registration with cleanup-returning functions
+- no raw `ipcRenderer` exposure to renderer feature code
 
-Host and transport failures are not LibraryError values.
+**Does not own:** event polling, renderer feature policy, library state, selection,
+contents projection.
 
-Renderer feature code must not confuse these with product errors.
+Every exposed listener must return a cleanup callback. Callers must invoke it on unmount
+or when the subscription is no longer needed.
 
-## Runtime validation policy
+### 6. Renderer Boundary Client
 
-The generated boundary contract package is the source of compile-time types.
+**File:** `apps/desktop/src/renderer/library/boundary/client.ts`
 
-If generated runtime validators already exist, the spine uses them.
+**Owns:**
 
-If generated runtime validators do not exist, the spine still introduces named validation hooks and documents the gap.
+- feature-facing typed command API
+- transport failure normalisation
+- product result forwarding
+- subscription registration for pump-forwarded publication events
+- cleanup lifecycle for renderer subscriptions
+- `decodeCommandResponse` and `decodePublicationEvent` hooks at renderer ingress
+
+**Does not own:** `ReadAfter` or `WaitForEventsAfter` scheduling, source facts, contents
+filtering, scan meaning, authority decisions.
+
+The renderer boundary client actively subscribes through preload APIs and owns calling
+the returned cleanup function when the consuming surface unmounts.
+
+---
+
+## Result Model
+
+The spine must distinguish three operational outcomes. They must never be conflated.
+Feature code sees only `BoundaryResult<T>` and must not write `try`/`catch` for normal
+library failures.
+
+```typescript
+// ── Layer 1: Product result ──────────────────────────────────────────────────
+// The service ran and returned a domain outcome.
+// Examples: contentsReadOk, sourceAlreadyRegistered, invalidCursor,
+//           scanAlreadyRunning, policyConflict.
+type LibraryResult<T> =
+  | { kind: 'ok';  value: T }
+  | { kind: 'err'; error: LibraryError }
+
+// ── Layer 2: Host command failure ────────────────────────────────────────────
+// The handler ran, but the host infrastructure failed during handling.
+// Examples: handler threw unexpectedly, serialisation failed inside main,
+//           response failed validation, service not yet ready.
+type HostCommandFailure = {
+  kind:    'hostFailure'
+  reason:  'handlerCrashed' | 'serializationFailed' | 'validationFailed' | 'serviceNotReady'
+  detail?: string
+}
+
+// ── Layer 3: Transport / preload failure ─────────────────────────────────────
+// The invoke could not reach the handler at all.
+// Examples: channel missing, preload API absent, renderer destroyed,
+//           Electron invoke rejected before any command outcome was returned.
+// The command wrapper may never run in this case. The renderer boundary
+// client is responsible for catching invoke rejection and producing this shape.
+type TransportFailure = {
+  kind:   'transportFailure'
+  reason: 'channelMissing' | 'preloadMissing' | 'rendererDestroyed' | 'invokeRejected'
+}
+
+// ── Feature-facing outer type ─────────────────────────────────────────────────
+// This is what renderer feature code receives. Nothing rawer crosses this line.
+type BoundaryResult<T> = LibraryResult<T> | HostCommandFailure | TransportFailure
+```
+
+---
+
+## Service-Not-Ready Law
+
+If a command arrives before the Rust service or boundary dependency is initialised, the
+command registry returns a host failure.
+
+Service-not-ready is not a product failure. It must not be encoded as `LibraryError`. It
+must not be silently queued inside an individual command handler.
+
+The registry uses a shared service readiness gate. A missing or uninitialised service
+produces `{ kind: 'hostFailure', reason: 'serviceNotReady' }`.
+
+Feature code may render loading, retry, or unavailable state based on host failure
+signals, but product policy does not live in the IPC handler.
+
+Startup bootstrap code may wait for readiness before exposing a feature surface. Once a
+command reaches the registry without a ready service, the outcome is host failure.
+
+---
+
+## Runtime Validation Policy
+
+The generated boundary contract package is the source of compile-time types. The spine
+imports from `packages/library-boundary-contract`. It does not locally redeclare types.
+
+If generated runtime validators already exist in the contract package, the spine uses
+them. If they do not, the first slice still introduces named validation hooks and
+documents the gap explicitly.
+
+First-slice validation is structurally present but behaviourally inert when validators
+are not yet generated. The acceptance bar requires that hooks are wired and called.
+Validation behaviour tests are explicitly gated on contract package runtime-validator
+generation and are out of scope for this slice.
 
 Do not invent a parallel local schema system in the first spine slice.
 
-Required validation hook names should make direction clear:
+**The four named validation hooks:**
 
-* decode command request at main ingress;
-* validate command response at main egress;
-* decode command response at renderer boundary ingress;
-* decode publication event at renderer boundary ingress.
+| Hook                      | Direction       | Location                                   | Role                                               |
+|---------------------------|-----------------|--------------------------------------------|----------------------------------------------------|
+| `decodeCommandRequest`    | renderer → main | command registry, main ingress             | `unknown → Req` before service call                |
+| `validateCommandResponse` | main → renderer | command registry, main egress              | `LibraryResult<T>` before IPC send; often identity |
+| `decodeCommandResponse`   | main → renderer | renderer boundary client, renderer ingress | `unknown → BoundaryResult<T>`                      |
+| `decodePublicationEvent`  | main → renderer | renderer boundary client, event ingress    | `unknown → EventPayload`                           |
 
-Validation failure becomes host failure, not product failure.
+`satisfies` at emit/send call sites provides a static shape check at the emission point.
+It does not validate runtime JSON arriving from Rust or stdio. Both are needed. Neither
+replaces the other.
 
-## Plane enforcement
+Validation failure at any hook becomes host failure, not product failure.
 
-Plane membership decides the Electron primitive.
+---
 
-ControlPlane:
+## Plane Enforcement
 
-* may use invoke and handle;
-* must not use send and on as the primary command path.
+Plane membership decides the Electron primitive. This is not a naming convention — it is a
+different wire mechanism.
 
-PublicationPlane:
+**ControlPlane:**
 
-* may use send and on;
-* listener APIs must return cleanup;
-* must not use invoke and handle as the primary event path.
+- uses `ipcMain.handle` on main side
+- uses `ipcRenderer.invoke` on renderer side
+- one request, one typed result, promise-based
+- must not use `send`/`on` as the primary command path
+- must not carry large binary payloads
 
-ResourcePlane:
+**PublicationPlane:**
 
-* reserved for future handle-oriented payload access;
-* must not be prematurely modeled as a generic event stream;
-* must not dump large payloads into command replies.
+- uses `webContents.send` on main side
+- uses `ipcRenderer.on` on renderer side, always with a cleanup-returning wrapper
+- carries summaries, invalidations, lifecycle notifications, and handles only
+- must not use `invoke`/`handle` as the primary event path
+- must not carry large binary payloads
+
+**ResourcePlane:**
+
+- reserved for handle-oriented payload access
+- future owner for waveform data, artwork, and analysis blob access
+- transport chosen per payload class: MessagePort, transferable ArrayBuffer,
+  SharedArrayBuffer for hot surfaces, native handle
+- must not be prematurely modelled as a generic event stream
+- large binary payloads must not be routed through ControlPlane or PublicationPlane
+  pending ResourcePlane definition
 
 A channel constant must not belong to more than one plane.
 
-## Source guards
+---
 
-The implementation must include source guards or equivalent tests for these conditions:
+## Source Guards
 
-* no raw library ipcMain.handle outside the command registry;
-* no raw library webContents.send outside publication emit helpers;
-* no raw ipcRenderer.on exposed to renderer feature code;
-* no library channel string literals outside the channel owner and tests;
-* no PublicationPlane channel used with invoke or handle;
-* no ControlPlane channel used with send or on;
-* generated contract types are imported rather than redeclared locally;
-* command registry does not contain product policy;
-* event emit helpers do not contain renderer refresh policy.
+The implementation must include source guards or equivalent tests for all of these:
 
-These guards are allowed to be pragmatic source-search tests if TypeScript cannot enforce the rule cleanly yet.
+- no raw library `ipcMain.handle` outside the command registry
+- no raw library `webContents.send` outside publication emit helpers
+- no raw `ipcRenderer.on` exposed to renderer feature code
+- no renderer-side `ReadAfter` or `WaitForEventsAfter` scheduling
+- no renderer feature code directly invoking `ReadAfter` or `WaitForEventsAfter`
+- no library channel string literals outside the channel owner and tests
+- no `PublicationPlane` channel used with `invoke` or `handle`
+- no `ControlPlane` channel used with `send` or `on`
+- generated contract types are imported, not locally redeclared
+- command registry contains no product policy
+- event emit helpers contain no renderer refresh policy
+- event emit helpers do not author Rust-side event meaning
+- `MainLibraryEventPump` is the only owner of publication cursor tracking
 
-## Acceptance bar
+Source guards may be pragmatic search-based tests where TypeScript cannot enforce the
+rule cleanly.
+
+---
+
+## Acceptance Bar
 
 The first spine slice is accepted only if:
 
-* all existing library commands remain callable;
-* all existing library publication events still reach the renderer;
-* product errors are returned as product failures;
-* unexpected handler exceptions become host failures;
-* renderer invoke rejection becomes host failure;
-* listener cleanup removes exactly the registered listener;
-* raw library IPC strings are centralized;
-* command and publication channels are separated by plane;
-* no product behavior moved into the registry;
-* no generated boundary types are duplicated;
-* validation hooks exist even if runtime validators are not yet generated;
-* targeted tests pass;
-* full verification passes.
+- all existing library commands remain callable
+- all existing library publication events still reach the renderer
+- product errors are returned as `LibraryResult` failures, never thrown
+- unexpected handler exceptions become `HostCommandFailure`
+- service-not-ready becomes `HostCommandFailure` with reason `serviceNotReady`
+- renderer invoke rejection becomes `TransportFailure`
+- listener cleanup removes exactly the registered listener
+- raw library IPC strings are centralised in `channels.ts`
+- command and publication channels are separated by plane
+- `MainLibraryEventPump` owns event cursor tracking and read scheduling
+- renderer code does not schedule `ReadAfter` or `WaitForEventsAfter` calls directly
+- no product behavior moved into the command registry
+- no generated boundary types are locally reduplicated
+- all four named validation hooks exist and are called, even if validators are inert stubs
+- validation behaviour tests are explicitly deferred until generated validators exist
+- `ResourcePlane` is reserved and large payload routing through ControlPlane or
+  PublicationPlane is rejected
+- targeted tests pass
+- full verification passes
 
-Manual smoke must confirm:
+**Manual smoke must confirm:**
 
-* add source still works;
-* scan start still works;
-* scan events still update visible state;
-* tree expansion still works;
-* contents reads still work;
-* remove source still works;
-* no renderer listener leak is visible through repeated mount/unmount or app navigation;
-* no product error appears as an unhandled exception in renderer logs.
+- add source still works
+- scan start still works
+- scan events still update visible state through main-forwarded publication
+- tree expansion still works
+- contents reads still work
+- remove source still works
+- no renderer listener leak visible through repeated mount/unmount or app navigation
+- no product error appears as an unhandled exception in renderer logs
 
-## Rejection cases
+---
+
+## Rejection Cases
 
 Reject the implementation if any of these are true:
 
-* command registry becomes a product service;
-* source admission is implemented inside the spine slice;
-* scan lifecycle policy moves into command registration;
-* renderer selection behavior changes accidentally;
-* publication events are routed through invoke;
-* commands are routed through event listeners;
-* raw library IPC strings remain scattered;
-* feature code catches raw Electron invoke errors directly;
-* product errors are thrown instead of returned;
-* host failures are encoded as LibraryError;
-* listener APIs do not return cleanup;
-* runtime validation is spread into feature components;
-* local request/response types duplicate generated contract types;
-* ResourcePlane is implemented prematurely without a real resource payload.
+- command registry becomes a product service
+- source admission is implemented inside the spine slice
+- scan lifecycle policy moves into command registration
+- renderer selection behavior changes accidentally
+- renderer schedules boundary event polling
+- renderer directly invokes `ReadAfter` or `WaitForEventsAfter` for event reception
+- publication events are routed through `invoke`
+- commands are routed through event listeners
+- raw library IPC strings remain scattered
+- feature code catches raw Electron invoke errors directly
+- product errors are thrown instead of returned
+- service-not-ready is encoded as `LibraryError`
+- host failures are encoded as `LibraryError`
+- listener APIs do not return cleanup
+- runtime validation is spread into feature components
+- local request/response types duplicate generated contract types
+- `ResourcePlane` is implemented prematurely without a real resource payload
+- waveform, artwork, or analysis blobs are routed through ControlPlane or PublicationPlane
 
-## Naming guidance
+---
+
+## Naming Guidance
 
 Use product and plane names that describe ownership.
 
-Good names:
+**Good:**
 
-* ControlPlane
-* PublicationPlane
-* ResourcePlane
-* registerLibraryCommands
-* emitLibraryBrowserInvalidation
-* emitLibraryScanEvent
-* createLibraryCommandHandler
-* normalizeHostInvokeFailure
+```
+ControlPlane
+PublicationPlane
+ResourcePlane
+MainLibraryEventPump
+registerLibraryCommands
+createLibraryCommandHandler
+emitLibraryBrowserInvalidation
+emitLibraryScanEvent
+normaliseHostCommandFailure
+normaliseTransportFailure
+decodeCommandRequest
+decodeCommandResponse
+decodePublicationEvent
+```
 
-Avoid names that imply too much:
+**Avoid — these imply too much or too little:**
 
-* ipcRouter
-* messageBus
-* eventHub
-* commandFramework
-* libraryCore
-* boundaryMagic
-* universalHandler
+```
+ipcRouter
+messageBus
+eventHub
+commandFramework
+libraryCore
+boundaryMagic
+universalHandler
+libraryEvents        (too vague — publication or control?)
+handleLibraryEvent   (what kind of event? what layer?)
+```
 
-The spine is explicit infrastructure, not a framework.
+The spine is explicit infrastructure, not a framework. Names should communicate
+ownership, not cleverness.
 
-## Long-term direction
+---
 
-The Electron boundary spine is the bridge between today’s Dekzer desktop app and the future Exclave-compatible
-architecture.
+## Long-Term Direction
 
-It should make future work easier without forcing premature integration.
+The Electron boundary spine is the bridge between today's Dekzer desktop app and a future
+Exclave-compatible architecture. It should make future work easier without forcing
+premature integration.
+
+The plane vocabulary is designed to be Exclave-compatible now. When Exclave's typed
+projection and resource surfaces are integrated, `ControlPlane`, `PublicationPlane`, and
+`ResourcePlane` map directly to Exclave's control, publication, and resource planes
+without renaming.
 
 Future work should be able to add:
 
-* source-root admission commands;
-* default music source discovery commands;
-* waveform resource handles;
-* artwork resource handles;
-* analysis blob resource handles;
-* warm runtime publication events;
-* hot realtime bindings;
-* stricter generated runtime validators;
+- source-root admission commands
+- default music source discovery commands
+- waveform resource handles
+- artwork resource handles
+- analysis blob resource handles
+- warm runtime publication events
+- hot realtime bindings over SharedArrayBuffer
+- stricter generated runtime validators
 
 without inventing new IPC patterns.
 
-The long-term target is not fewer boundaries.
+The pump model — Rust publishes, Main pumps, Renderer subscribes — must remain the
+boundary shape as transport primitives evolve. A future `WaitForEventsAfter` long-poll or
+shared-memory event ring replaces the `ReadAfter` loop inside the pump. It does not
+change renderer authority.
 
-The target is boundaries that are explicit, typed, testable, and owned.
+The long-term target is not fewer boundaries. The target is boundaries that are explicit,
+typed, testable, and owned.
+
+---
 
 ## Summary
 
-Dekzer’s Electron boundary spine exists to prevent local-first desktop complexity from becoming hidden renderer
-authority.
+Dekzer's Electron boundary spine exists to prevent local-first desktop complexity from
+becoming hidden renderer authority.
 
 The spine must make these facts structurally true:
 
-* commands are commands;
-* publications are publications;
-* resources are resources;
-* product errors are not host failures;
-* host failures are not product errors;
-* generated contracts are the type source;
-* listener cleanup is mandatory;
-* channel ownership is centralized;
-* plane membership determines transport primitive;
-* product authority stays outside the IPC spine.
+- commands are commands
+- publications are publications
+- resources are resources
+- Rust publishes; Main pumps; Renderer subscribes
+- product errors are not host failures
+- host failures are not product errors
+- service-not-ready is a host failure, not a product failure
+- transport failures are not host failures
+- generated contracts are the type source
+- listener cleanup is mandatory
+- channel ownership is centralised
+- plane membership determines transport primitive
+- product authority stays outside the IPC spine
 
 This is core architecture.
