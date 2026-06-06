@@ -196,7 +196,7 @@ export function createContentsReadController(
       requestKey,
       sequence,
       detail: options.cursor !== undefined ? 'Loading more contents.' : 'Loading contents.',
-      presentation: pendingPresentation(currentState, requestKey),
+      presentation: pendingPresentation(currentState),
       ...(cursor === undefined ? {} : { cursor })
     }
     startPendingRead(pending)
@@ -397,12 +397,9 @@ export function createContentsReadController(
   }
 
   function pendingPresentation(
-    currentState: ContentsBoundaryState,
-    requestKey: string
+    currentState: ContentsBoundaryState
   ): ContentsPendingRead['presentation'] {
-    return currentState.kind === 'ready' && currentState.requestKey !== requestKey
-      ? 'deferred'
-      : 'visible'
+    return currentState.kind === 'ready' ? 'deferred' : 'visible'
   }
 
   function isCurrentLoading(requestKey: string, sequence: number): boolean {

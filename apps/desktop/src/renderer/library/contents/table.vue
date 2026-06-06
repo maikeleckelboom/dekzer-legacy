@@ -180,7 +180,9 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
       class="min-h-0 flex-1 overflow-auto scrollbar-gutter-stable scrollbar-track-transparent scrollbar-thumb-gray-200"
     >
       <table class="min-w-full w-full table-fixed border-collapse text-left text-sm">
-        <thead class="border-b border-(--color-border) text-xs uppercase text-(--color-text-muted)">
+        <thead
+          class="sticky top-0 z-10 border-b border-(--color-border) bg-(--color-background) text-xs uppercase text-(--color-text-muted)"
+        >
           <tr>
             <th class="w-[70%] px-4 py-2 font-bold">Name</th>
             <th class="w-[30%] px-4 py-2 font-bold">Details</th>
@@ -220,7 +222,9 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
               </div>
             </td>
             <td class="px-4 py-2 align-middle text-xs leading-5 text-(--color-text-muted)">
-              {{ formatContentDetail(row) }}
+              <span class="block truncate" :title="formatContentDetail(row)">
+                {{ formatContentDetail(row) }}
+              </span>
             </td>
           </tr>
         </tbody>

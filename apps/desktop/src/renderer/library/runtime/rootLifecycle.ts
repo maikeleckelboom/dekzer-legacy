@@ -23,6 +23,7 @@ export type RootLifecycleDependencies = {
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
   readonly confirmRemoveSource: () => boolean
   readonly isSourceRootVisible: (rootId: string) => boolean
+  readonly onSourceRemoved?: (rootId: string) => void
 }
 
 export function useRootLifecycle(dependencies: RootLifecycleDependencies): RootLifecycleController {
@@ -130,6 +131,7 @@ export function createRootLifecycleController(
       return false
     }
 
+    dependencies.onSourceRemoved?.(rootIdToRemove)
     dependencies.rootActions.completeRemoveSource(rootIdToRemove)
     return true
   }

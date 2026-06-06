@@ -112,7 +112,8 @@ const rootLifecycle = useRootLifecycle({
     refresh: hierarchyRead.refresh
   },
   confirmRemoveSource: () => window.confirm(removeSourceMessage),
-  isSourceRootVisible: (rootId) => hasVisibleSourceRootBinding(browserProjection.value, rootId)
+  isSourceRootVisible: (rootId) => hasVisibleSourceRootBinding(browserProjection.value, rootId),
+  onSourceRemoved: clearBrowserView
 })
 
 const liveTreeNodes = computed(() => browserProjection.value?.nodes ?? [])
@@ -218,6 +219,22 @@ watch(
   },
   { immediate: true }
 )
+
+watch(browserProjection, (projection) => {
+  const selectedId = selectedNodeId.value
+
+  if (
+    selectedId === undefined ||
+    projection === undefined ||
+    projection.bindingsById.has(selectedId)
+  ) {
+    return
+  }
+
+  selectedNodeId.value = undefined
+  contentsRead.clear()
+  saveViewState()
+})
 
 watch(liveTreeNodes, () => {
   if (!restoreState.readStarted) {
@@ -498,12 +515,10 @@ async function handleRemoveSource(): Promise<void> {
     return
   }
 
-  const removed = await rootLifecycle.removeSource(rootId)
+  await rootLifecycle.removeSource(rootId)
+}
 
-  if (!removed) {
-    return
-  }
-
+function clearBrowserView(): void {
   selectedNodeId.value = undefined
   contentsRead.clear()
   expandedNodeIds.value = new Set()
@@ -555,10 +570,10 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
 
 <template>
   <section
-    class="flex h-[80svh] flex-col border border-(--color-border) bg-(--color-surface)"
+    class="flex h-[80svh] min-h-0 flex-col overflow-hidden border border-(--color-border) bg-(--color-surface)"
     aria-labelledby="library-hierarchy-title"
   >
-    <header class="flex items-center justify-between gap-4">
+    <header class="flex shrink-0 items-center justify-between gap-4">
       <h2 id="library-hierarchy-title" class="text-xl font-bold leading-none text-(--color-text)">
         Library
       </h2>
@@ -598,7 +613,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       </div>
     </header>
 
-    <div class="grid min-h-0 flex-1 grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
+    <div class="grid min-h-0 flex-1 grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)] overflow-hidden">
       <aside
         class="min-h-0 min-w-0 overflow-y-auto border-r border-(--color-border) p-1 scrollbar-gutter-stable scrollbar-track-transparent scrollbar-thumb-gray-200"
       >

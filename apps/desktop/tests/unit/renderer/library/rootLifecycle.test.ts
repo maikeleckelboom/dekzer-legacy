@@ -540,6 +540,33 @@ describe('local root remove lifecycle', () => {
     expect(lifecycle.refreshStatus.value).toBe('refreshed')
   })
 
+  it('clears selected browser contents intentionally after removal is authoritative', async () => {
+    const onSourceRemoved = vi.fn()
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+        runScan: async () => startedRootResult(),
+        unregisterLocalRoot: async () => ({ state: 'unregistered', unregistered: true })
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: { refresh: async () => true },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false,
+      onSourceRemoved
+    })
+
+    await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
+    rootActions.scanStatus.value = 'scanned'
+
+    await expect(lifecycle.removeSource('root-1')).resolves.toBe(true)
+    expect(onSourceRemoved).toHaveBeenCalledOnce()
+    expect(onSourceRemoved).toHaveBeenCalledWith('root-1')
+    expect(rootActions.removeSourceStatus.value).toBe('removed')
+  })
+
   it('lets confirmation and refresh postconditions control removal', async () => {
     const unregisterLocalRoot = vi.fn(async () => ({
       state: 'unregistered' as const,

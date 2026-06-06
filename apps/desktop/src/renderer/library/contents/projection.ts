@@ -204,13 +204,13 @@ function projectSourceContents(options: {
   readonly contentsState: ContentsBoundaryState | undefined
 }): ContentProjection {
   const title = formatSourceDisplayName(options.binding.target.label)
-  const acceptedSnapshot = deferredAcceptedSnapshotProjection({
+  const acceptedSnapshot = retainedAcceptedSnapshotProjection({
     state: options.state,
     bindingsById: options.bindingsById,
     contentsState: options.contentsState
   })
   const useAcceptedFallback =
-    acceptedSnapshot === undefined && hasDeferredCrossScopePending(options.contentsState)
+    acceptedSnapshot === undefined && hasCrossScopePending(options.contentsState)
   return projectContentsState({
     ownerId:
       acceptedSnapshot?.ownerId ??
@@ -229,13 +229,13 @@ function projectDirectoryContents(options: {
 }): ContentProjection {
   const directoryRow = findLoadedChildRow(options.state, options.selectedNodeId)
   const title = directoryRow?.label ?? 'Selected folder'
-  const acceptedSnapshot = deferredAcceptedSnapshotProjection({
+  const acceptedSnapshot = retainedAcceptedSnapshotProjection({
     state: options.state,
     bindingsById: options.bindingsById,
     contentsState: options.contentsState
   })
   const useAcceptedFallback =
-    acceptedSnapshot === undefined && hasDeferredCrossScopePending(options.contentsState)
+    acceptedSnapshot === undefined && hasCrossScopePending(options.contentsState)
   return projectContentsState({
     ownerId:
       acceptedSnapshot?.ownerId ??
@@ -265,7 +265,7 @@ type AcceptedContentsScope =
       readonly directoryId: string
     }
 
-function deferredAcceptedSnapshotProjection(options: {
+function retainedAcceptedSnapshotProjection(options: {
   readonly state: BrowserState
   readonly bindingsById: BrowserProjection['bindingsById'] | undefined
   readonly contentsState: ContentsBoundaryState | undefined
@@ -275,8 +275,7 @@ function deferredAcceptedSnapshotProjection(options: {
   if (
     contentsState?.kind !== 'ready' ||
     contentsState.pending === undefined ||
-    contentsState.pending.requestKey === contentsState.requestKey ||
-    contentsState.pending.presentation !== 'deferred'
+    contentsState.pending.requestKey === contentsState.requestKey
   ) {
     return undefined
   }
@@ -288,12 +287,11 @@ function deferredAcceptedSnapshotProjection(options: {
   })
 }
 
-function hasDeferredCrossScopePending(contentsState: ContentsBoundaryState | undefined): boolean {
+function hasCrossScopePending(contentsState: ContentsBoundaryState | undefined): boolean {
   return (
     contentsState?.kind === 'ready' &&
     contentsState.pending !== undefined &&
-    contentsState.pending.requestKey !== contentsState.requestKey &&
-    contentsState.pending.presentation === 'deferred'
+    contentsState.pending.requestKey !== contentsState.requestKey
   )
 }
 
@@ -501,28 +499,36 @@ function projectContentsState(options: {
     })
   }
 
-  if (
-    state.pending !== undefined &&
-    state.pending.requestKey !== state.requestKey &&
-    state.pending.presentation === 'visible'
-  ) {
-    return stateProjection({
-      kind: 'notLoaded',
-      ownerId: options.ownerId,
-      title: options.title,
-      state: 'notLoaded',
-      label: 'Contents pending',
-      detail: 'Updating selected contents.'
-    })
-  }
-
-  return projectContentsReadResult({
+  const projection = projectContentsReadResult({
     ownerId: options.ownerId,
     title: options.title,
     result: state.result,
     ...(state.nextCursor !== undefined ? { nextCursor: state.nextCursor } : {}),
     ...(state.accumulatedRows !== undefined ? { accumulatedRows: state.accumulatedRows } : {})
   })
+
+  if (state.pending?.presentation === 'visible') {
+    return {
+      ...projection,
+      detail:
+        state.pending.requestKey === state.requestKey
+          ? refreshingDetail('Refreshing contents.', projection.detail)
+          : refreshingDetail('Updating selected contents.', projection.detail)
+    }
+  }
+
+  if (state.refreshError !== undefined) {
+    return {
+      ...projection,
+      detail: refreshingDetail('Showing previous contents.', state.refreshError)
+    }
+  }
+
+  return projection
+}
+
+function refreshingDetail(prefix: string, detail: string | undefined): string {
+  return detail === undefined ? prefix : `${prefix} ${detail}`
 }
 
 function projectContentsReadResult(options: {

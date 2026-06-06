@@ -451,7 +451,8 @@ describe('createContentsReadController', () => {
     expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
   })
 
-  it('retains accepted rows while a same-scope refresh is pending', async () => {
+  it('retains accepted rows and threshold-gates same-scope refresh presentation', async () => {
+    vi.useFakeTimers()
     const contentsApi = deferredContentsApi()
     const controller = createContentsReadController(contentsApi)
 
@@ -466,7 +467,19 @@ describe('createContentsReadController', () => {
       kind: 'ready',
       pending: {
         requestKey: 'directory:7:11:audioBrowse:recursive',
-        sequence: 2
+        sequence: 2,
+        presentation: 'deferred'
+      }
+    })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+
+    await vi.advanceTimersByTimeAsync(125)
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      pending: {
+        requestKey: 'directory:7:11:audioBrowse:recursive',
+        sequence: 2,
+        presentation: 'visible'
       }
     })
     expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
@@ -476,6 +489,23 @@ describe('createContentsReadController', () => {
 
     expect(visibleLabels(controller.state.value)).toEqual(['B.wav'])
     expect(controller.state.value).not.toHaveProperty('pending')
+  })
+
+  it('clears accepted rows when the selected binding disappears', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    await expect(controller.readForBinding(undefined)).resolves.toBe(false)
+
+    expect(controller.state.value).toEqual({
+      kind: 'idle',
+      detail: 'No contents scope is active.'
+    })
   })
 
   it('defers cross-scope pending presentation until the local read threshold', async () => {

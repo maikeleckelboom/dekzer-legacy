@@ -197,6 +197,22 @@ describe('useTreeController', () => {
     expect(harness.events.toggle).toEqual(['branch-a', 'branch-a'])
   })
 
+  it('does not introduce Space as tree selection or activation', () => {
+    const harness = treeHarness()
+    const branch = visibleItem(harness, 'branch-a')
+
+    for (const key of [' ', 'Space', 'Spacebar']) {
+      expect(harness.controller.resolveKeyboardIntent(branch, key)).toEqual({
+        kind: 'none',
+        shouldPreventDefault: false
+      })
+    }
+
+    expect(harness.selectedNodeId.value).toBeUndefined()
+    expect(harness.events.select).toEqual([])
+    expect(harness.events.activateAction).toEqual([])
+  })
+
   it('routes ArrowRight on a deferred branch through revealNode', () => {
     const harness = treeHarness({
       nodes: [deferredBranchNode('source-a', 'Source A')]

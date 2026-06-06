@@ -490,7 +490,7 @@ describe('projectContents', () => {
     expect(accepted.rows.map((row) => row.label)).toEqual(['new.wav'])
   })
 
-  it('projects threshold-visible cross-scope pending reads without retained rows', () => {
+  it('retains accepted rows for threshold-visible cross-scope pending reads', () => {
     const state = browserState({
       sourceState: {
         kind: 'loaded',
@@ -508,17 +508,42 @@ describe('projectContents', () => {
       })
     )
 
-    expect(contents.kind).toBe('notLoaded')
-    expect(contents.title).toBe('New Album')
-    expect(contents.detail).toBe('Updating selected contents.')
-    expect(contents.rows).toHaveLength(1)
-    expect(contents.rows[0]).toMatchObject({
-      kind: 'state',
-      state: 'notLoaded',
-      label: 'Contents pending',
-      detail: 'Updating selected contents.'
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Source Fixture')
+    expect(contents.detail).toBe('Updating selected contents. 1 visible file loaded.')
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+  })
+
+  it('does not let disclosure-only branch loading replace selected contents', () => {
+    const state = browserState({
+      sourceState: {
+        kind: 'loaded',
+        children: loadedChildren([directoryNode('12', 'New Album')])
+      },
+      directoryStates: new Map([
+        [
+          '12',
+          {
+            kind: 'loading',
+            requestKey: 'source:7/directory:12',
+            sequence: 1,
+            detail: 'Loading children.'
+          }
+        ]
+      ])
     })
-    expect(contents.rows.map((row) => row.label)).not.toContain('old.wav')
+    const contents = projectForSelection(
+      state,
+      'navigation-row:7',
+      readyContents({
+        rows: [sourceFileRow('old', 'old.wav', 'audio')]
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Source Fixture')
+    expect(contents.rows.map((row) => row.label)).toEqual(['old.wav'])
+    expect(contents.rows[0]).not.toMatchObject({ state: 'loading' })
   })
 
   it('retains accepted rows after a failed refresh without projecting blocking failure', () => {

@@ -68,7 +68,7 @@ function handlePointerLeave(): void {
 }
 
 function handleKeydown(event: KeyboardEvent): void {
-  if (isPrimaryActivationKey(event.key)) {
+  if (event.key === 'Enter') {
     event.preventDefault()
     activatePrimaryAction()
     return
@@ -106,10 +106,6 @@ function applyKeyboardIntent(intent: ReturnType<typeof tree.resolveKeyboardInten
     case 'none':
       return
   }
-}
-
-function isPrimaryActivationKey(key: string): boolean {
-  return key === 'Enter' || key === ' ' || key === 'Space' || key === 'Spacebar'
 }
 </script>
 

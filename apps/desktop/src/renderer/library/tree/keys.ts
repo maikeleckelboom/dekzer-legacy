@@ -136,9 +136,6 @@ export function resolveTreeKeyboardIntent(
       return resolveFocusIntent(getParentVisibleNodeId(options.visibleItems, activeItem.id))
 
     case treeKeyboardKeys.enter:
-    case treeKeyboardKeys.space:
-    case treeKeyboardKeys.spaceKey:
-    case treeKeyboardKeys.legacySpace:
       if (activeItem === undefined) {
         return handledNoop()
       }
@@ -156,6 +153,11 @@ export function resolveTreeKeyboardIntent(
         nodeId: activeItem.id,
         shouldPreventDefault: true
       }
+
+    case treeKeyboardKeys.space:
+    case treeKeyboardKeys.spaceKey:
+    case treeKeyboardKeys.legacySpace:
+      return unhandled()
 
     case treeKeyboardKeys.escape:
       return unhandled()
