@@ -211,7 +211,7 @@ describe('contents reads through the host', () => {
               rows: [],
               scopeCoverage: {
                 state: 'complete',
-                recursiveScopeComplete: true,
+                subtreeCoverageComplete: true,
                 emptyResultAuthoritative: true
               },
               hasPolicyOmittedRows: false
@@ -257,7 +257,7 @@ describe('contents reads through the host', () => {
               rows: [],
               scopeCoverage: {
                 state: 'complete',
-                recursiveScopeComplete: true,
+                subtreeCoverageComplete: true,
                 emptyResultAuthoritative: false
               },
               hasPolicyOmittedRows: true
@@ -329,7 +329,7 @@ function readyContentsReply(request: ContentsReadRequest): ContentsReadReply {
 function completeCoverage(): ContentsScopeCoverage {
   return {
     state: 'complete',
-    recursiveScopeComplete: true,
+    subtreeCoverageComplete: true,
     emptyResultAuthoritative: false,
     detail: 'Complete.'
   }

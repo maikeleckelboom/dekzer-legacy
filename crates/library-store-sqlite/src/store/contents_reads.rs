@@ -11,13 +11,13 @@ impl SqliteDurableStore {
         &self,
         scope: StoreContentsScope,
         policy: StoreContentsReadPolicy,
-        recursion: StoreContentsScopeDepth,
+        scope_depth: StoreContentsScopeDepth,
         limit: usize,
         cursor: Option<&str>,
     ) -> LibrarySqliteResult<StoreContentsResult> {
         let mut connection = self.open_read_connection()?;
         let transaction = connection.transaction()?;
-        let result = read_contents(&transaction, scope, policy, recursion, limit, cursor)?;
+        let result = read_contents(&transaction, scope, policy, scope_depth, limit, cursor)?;
         transaction.commit().map_err(LibrarySqliteError::from)?;
         Ok(result)
     }

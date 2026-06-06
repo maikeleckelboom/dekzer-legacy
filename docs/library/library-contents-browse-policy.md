@@ -7,7 +7,7 @@ The default main library contents browse uses the backend-owned canonical policy
 ```ts
 {
   policy: { kind: 'playableMediaBrowse' },
-  recursion: 'recursive'
+  scopeDepth: 'recursive'
 }
 ```
 
@@ -25,7 +25,7 @@ The renderer requests a policy and presents returned facts. It does not supply `
 
 Every contents result carries required service-owned `hasPolicyOmittedRows: boolean`.
 
-For resolved scopes, the store computes the value across the requested scope and recursion mode, independently of the
+For resolved scopes, the store computes the value across the requested scope and scopeDepth mode, independently of the
 current page:
 
 - `playableMediaBrowse` reports browse-relevant image rows as omitted.

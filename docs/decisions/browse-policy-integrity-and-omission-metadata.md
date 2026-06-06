@@ -79,13 +79,13 @@ guarantees are explicitly defined.
 
 `hasPolicyOmittedRows: true` means:
 
-> Within the requested contents scope, recursion mode, and authoritative read snapshot, at least one persisted
+> Within the requested contents scope, scope depth mode, and authoritative read snapshot, at least one persisted
 > browse-relevant potential contents row exists but is excluded by the active contents policy.
 
 The field is:
 
 - Scoped to the request's `scope` parameter, not the current page.
-- Scoped to the request's `recursion` mode — recursive reads consider descendants; immediate reads do not report beyond
+- Scoped to the request's `scopeDepth` mode — recursive reads consider descendants; immediate reads do not report beyond
   immediate children.
 - Evaluated at the service/protocol boundary, not derived by the renderer.
 - Independent of page size. A page that returns rows may still carry `hasPolicyOmittedRows: true` at the scope level.
@@ -176,7 +176,7 @@ The field is presentation metadata. The renderer must not use it to:
 ## Current Product Direction
 
 The default browse policy is `playableMediaBrowse`: audio and video. Audio-only browse is a separate filtered view.
-The store owns included durable classes, omitted classes, cursor policy identity, recursion, and ordering.
+The store owns included durable classes, omitted classes, cursor policy identity, scopeDepth, and ordering.
 
 The implementation does not widen `audioBrowse`, implement source admission/default discovery, add renderer filtering,
 or add row fields such as duration, BPM, key, codec, artwork, canonical track identity, or analysis readiness.

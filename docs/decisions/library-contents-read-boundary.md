@@ -13,7 +13,7 @@ A contents read is parameterized by:
 
 - scope
 - policy
-- recursion
+- scopeDepth
 - limit
 - cursor
 
@@ -54,7 +54,7 @@ The following facts are established by the Phase 0 inventory:
 4. **Cursor pagination is implemented for contents reads.**
 
    Cursor identity is encoded as base64url JSON and validated. Cursor binds to scope, the complete profile-specific
-   policy discriminant, recursion, and ordering; it carries a last-row position tuple specific to each policy
+   policy discriminant, scopeDepth, and ordering; it carries a last-row position tuple specific to each policy
    (`audioBrowse`/`sourceFileInventory`: persisted browse sort key + relative path + source-file id; `primaryMedia`:
    `availability_priority`,
    `title_key`, `artist_key`, `album_key`, `relative_path_key`, `source_file_id`). The store validates cursor
@@ -66,7 +66,7 @@ The following facts are established by the Phase 0 inventory:
 5. **Hierarchy read is not the final owner for selected scope contents.**
 
    It provides immediate children admitted by the product/boundary surface. It does not own recursive selected
-   contents, aggregated contents coverage, or primary-media summary joins.
+   contents, aggregated contents scopeCoverage, or primary-media summary joins.
 
    **Historical note:** `sourceFileVisibility` was implementation debt that has been removed from renderer-facing
    contracts. Library tree row admission is now a product/boundary surface concern, not a renderer-facing parameter.
@@ -116,7 +116,7 @@ type ContentsReadPolicy =
 - audio only
 - accepts no caller-supplied class filter
 - reuses the current contents file-row payload shape
-- returns V0 rows with source-file audio parity for equivalent scope, recursion, limit, and cursor
+- returns V0 rows with source-file audio parity for equivalent scope, scopeDepth, limit, and cursor
 - cursor identity is distinct from `sourceFileInventory` and `primaryMedia`
 
 The following terms are not used as shared or backend contract concepts:
@@ -136,7 +136,7 @@ The following terms are not used as shared or backend contract concepts:
 type ContentsReadRequest = {
   readonly scope: ContentsScope
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsScopeDepth
+  readonly scopeDepth: ContentsScopeDepth
   readonly limit?: number
   readonly cursor?: string
 }
@@ -171,9 +171,9 @@ type ContentsResult = {
   readonly state: ContentsState
   readonly scope: ContentsScope
   readonly policy: ContentsReadPolicy
-  readonly recursion: ContentsScopeDepth
+  readonly scopeDepth: ContentsScopeDepth
   readonly rows: readonly ContentsFileRow[]
-  readonly coverage: ContentsScopeCoverage
+  readonly scopeCoverage: ContentsScopeCoverage
   readonly hasPolicyOmittedRows: boolean
   readonly nextCursor?: string
   readonly detail?: string
@@ -204,7 +204,7 @@ type ContentsResult = {
 - Normal media-relevant source-file inventory admits unsupported rows only when `fileKind = cueSheet`.
 - Unsupported docs, archives, binaries, unknown files, and `none` files are excluded from normal contents policy.
 - `.m4a` classifies as audio and `.mp4` classifies as video until stronger media-probe authority exists.
-- Incomplete zero-row coverage is not authoritative empty.
+- Incomplete zero-row scopeCoverage is not authoritative empty.
 - Complete zero-row results with `hasPolicyOmittedRows: true` are empty only for the active policy.
 - `primaryMedia` omission metadata is `false` in this slice and never uses raw `source_files` as a proxy.
 - See `docs/library/media-relevant-file-inventory-contract.md` for durable inventory classification.
@@ -233,7 +233,7 @@ Use the current `Contents*` contract names instead.
 
 Cursor pagination is implemented for contents reads:
 
-- Cursor is encoded as base64url JSON with scope, the full policy discriminant and variant filter state, recursion,
+- Cursor is encoded as base64url JSON with scope, the full policy discriminant and variant filter state, scopeDepth,
   and last-row ordering position.
 - Cursor identity is validated against the current request; mismatches return `cursorInvalid`.
 - `nextCursor` is produced when more rows exist beyond the limit.

@@ -214,7 +214,7 @@ describe('projectContents', () => {
           ],
           scopeCoverage: {
             state: 'complete',
-            recursiveScopeComplete: true,
+            subtreeCoverageComplete: true,
             emptyResultAuthoritative: true
           },
           hasPolicyOmittedRows: false,
@@ -260,7 +260,7 @@ describe('projectContents', () => {
           rows: [primaryMediaRow('c', 'third.wav', 'audio')],
           scopeCoverage: {
             state: 'complete',
-            recursiveScopeComplete: true,
+            subtreeCoverageComplete: true,
             emptyResultAuthoritative: true
           },
           hasPolicyOmittedRows: false,
@@ -324,7 +324,7 @@ describe('projectContents', () => {
           rows: [],
           scopeCoverage: {
             state: 'scanning',
-            recursiveScopeComplete: false,
+            subtreeCoverageComplete: false,
             emptyResultAuthoritative: false
           },
           hasPolicyOmittedRows: false
@@ -825,7 +825,7 @@ function loadedChildren(
     totalRows,
     coverage: {
       state: 'complete',
-      recursiveScopeComplete: true,
+      subtreeCoverageComplete: true,
       emptyResultAuthoritative: rows.length === 0
     } satisfies HierarchyCoverage,
     ...(nextOffset === undefined ? {} : { nextOffset }),
@@ -976,7 +976,7 @@ function contentsResult(options: {
             : state === 'partial'
               ? 'scanning'
               : 'complete',
-      recursiveScopeComplete: state !== 'partial',
+      subtreeCoverageComplete: state !== 'partial',
       emptyResultAuthoritative: options.emptyAuthoritative ?? state !== 'partial'
     },
     hasPolicyOmittedRows: options.omittedRows ?? false,

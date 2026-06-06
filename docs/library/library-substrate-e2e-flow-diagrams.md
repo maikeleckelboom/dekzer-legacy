@@ -66,7 +66,7 @@ source visible state belongs to navigation rows or another explicitly existing f
 Do not invent `boundaryScopeId` for contents unless the boundary schema defines it. Until then, keep contents identity
 split into two layers:
 
-- Contents scope identity: source identity, directory identity when applicable, recursion policy, and material
+- Contents scope identity: source identity, directory identity when applicable, scope depth, and material
   filters or sort policy that affect the result.
 - Active contents window request: contents scope identity plus page or window cursor.
 
@@ -414,9 +414,9 @@ flowchart TD
   A["User selects tree row"] --> B["Renderer records selected tree identity"]
   B --> C["Renderer derives product selection intent"]
   C --> D["Main forwards contents request through boundary path"]
-  D --> E["Service validates selected entry and resolves recursion policy"]
+  D --> E["Service validates selected entry and resolves scope depth"]
   E --> F["Contents scope identity"]
-  F --> G["sourceId + optional directoryId + recursion policy + material filters or sort policy"]
+  F --> G["sourceId + optional directoryId + scopeDepth + material filters or sort policy"]
   G --> H["Renderer derives active contents window request"]
   H --> I["scope identity + page/window cursor"]
   I --> J["Renderer requests contents read through Main"]
@@ -453,7 +453,7 @@ synthesize contents rows from loaded tree branches.
 
 Recursion policy:
 
-The renderer may express product selection intent, but the service validates and resolves the effective recursion
+The renderer may express product selection intent, but the service validates and resolves the effective scope depth
 policy. First-slice default is recursive contents for selected source and directory scopes, because the contents pane
 answers “what playable material is inside this selected library scope,” not “which child nodes are currently expanded.”
 A future non-recursive folder mode must be an explicit policy value, not an accidental side effect of tree expansion.

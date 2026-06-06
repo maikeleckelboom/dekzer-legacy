@@ -98,10 +98,10 @@ pub(crate) fn store_contents_policy(
     }
 }
 
-pub(crate) const fn store_contents_recursion(
-    recursion: protocol::ContentsScopeDepth,
+pub(crate) const fn store_contents_scope_depth(
+    scope_depth: protocol::ContentsScopeDepth,
 ) -> store::StoreContentsScopeDepth {
-    match recursion {
+    match scope_depth {
         protocol::ContentsScopeDepth::Immediate => store::StoreContentsScopeDepth::Immediate,
         protocol::ContentsScopeDepth::Recursive => store::StoreContentsScopeDepth::Recursive,
     }
@@ -424,7 +424,7 @@ fn map_library_tree_window(
         total_rows: window.total_rows,
         coverage: protocol::LibraryTreeCoverage {
             state: map_library_tree_coverage_state(window.coverage.state),
-            recursive_scope_complete: window.coverage.recursive_scope_complete,
+            subtree_coverage_complete: window.coverage.subtree_coverage_complete,
             empty_result_authoritative: window.coverage.empty_result_authoritative,
             detail: window.coverage.detail,
         },
@@ -1025,7 +1025,7 @@ fn map_contents_result(
         state: map_contents_state(result.state),
         scope: map_contents_scope(result.scope),
         policy: map_contents_policy(result.policy),
-        scope_depth: map_contents_recursion(result.scope_depth),
+        scope_depth: map_contents_scope_depth(result.scope_depth),
         rows: result
             .rows
             .into_iter()
@@ -1033,7 +1033,7 @@ fn map_contents_result(
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
         scope_coverage: protocol::ContentsScopeCoverage {
             state: map_contents_coverage_state(result.scope_coverage.state),
-            recursive_scope_complete: result.scope_coverage.recursive_scope_complete,
+            subtree_coverage_complete: result.scope_coverage.subtree_coverage_complete,
             empty_result_authoritative: result.scope_coverage.empty_result_authoritative,
             detail: result.scope_coverage.detail,
         },
@@ -1068,10 +1068,10 @@ fn map_contents_policy(policy: store::StoreContentsReadPolicy) -> protocol::Cont
     }
 }
 
-const fn map_contents_recursion(
-    recursion: store::StoreContentsScopeDepth,
+const fn map_contents_scope_depth(
+    scope_depth: store::StoreContentsScopeDepth,
 ) -> protocol::ContentsScopeDepth {
-    match recursion {
+    match scope_depth {
         store::StoreContentsScopeDepth::Immediate => protocol::ContentsScopeDepth::Immediate,
         store::StoreContentsScopeDepth::Recursive => protocol::ContentsScopeDepth::Recursive,
     }
@@ -1629,7 +1629,7 @@ mod tests {
                 total_rows: 2,
                 coverage: store::StoreLiteralHierarchyCoverage {
                     state: store::StoreLiteralHierarchyCoverageState::Scanning,
-                    recursive_scope_complete: false,
+                    subtree_coverage_complete: false,
                     empty_result_authoritative: false,
                     detail: Some("Still indexing.".to_string()),
                 },
@@ -1790,7 +1790,7 @@ mod tests {
                 rows: Vec::new(),
                 scope_coverage: store::StoreContentsScopeCoverage {
                     state: store::StoreContentsScopeCoverageState::Complete,
-                    recursive_scope_complete: true,
+                    subtree_coverage_complete: true,
                     empty_result_authoritative: false,
                     detail: None,
                 },

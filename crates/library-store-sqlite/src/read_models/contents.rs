@@ -163,7 +163,7 @@ fn validate_cursor_identity(
     cursor: &ContentsCursor,
     scope: &StoreContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsScopeDepth,
+    scope_depth: StoreContentsScopeDepth,
 ) -> bool {
     if cursor.version != CONTENTS_CURSOR_VERSION {
         return false;
@@ -199,11 +199,11 @@ fn validate_cursor_identity(
     if cursor.policy != canonical_cursor_policy(policy) {
         return false;
     }
-    let expected_recursion = match recursion {
+    let expected_scope_depth = match scope_depth {
         StoreContentsScopeDepth::Immediate => "immediate",
         StoreContentsScopeDepth::Recursive => "recursive",
     };
-    cursor.scope_depth == expected_recursion
+    cursor.scope_depth == expected_scope_depth
 }
 
 fn compute_cursor_position(
@@ -294,7 +294,7 @@ fn build_next_cursor(
     rows: &[StoreContentsFileRow],
     scope: &StoreContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsScopeDepth,
+    scope_depth: StoreContentsScopeDepth,
 ) -> Option<String> {
     let last_row = rows.last()?;
     let position = compute_cursor_position(last_row, policy);
@@ -315,7 +315,7 @@ fn build_next_cursor(
             source_directory_id: *source_directory_id,
         },
     };
-    let recursion_str = match recursion {
+    let scope_depth_str = match scope_depth {
         StoreContentsScopeDepth::Immediate => "immediate".to_string(),
         StoreContentsScopeDepth::Recursive => "recursive".to_string(),
     };
@@ -323,7 +323,7 @@ fn build_next_cursor(
         version: CONTENTS_CURSOR_VERSION,
         scope: cursor_scope,
         policy: canonical_cursor_policy(policy),
-        scope_depth: recursion_str,
+        scope_depth: scope_depth_str,
         position,
     };
     encode_cursor(&cursor).ok()
@@ -371,7 +371,7 @@ pub enum StoreContentsScopeCoverageState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoreContentsScopeCoverage {
     pub state: StoreContentsScopeCoverageState,
-    pub recursive_scope_complete: bool,
+    pub subtree_coverage_complete: bool,
     pub empty_result_authoritative: bool,
     pub detail: Option<String>,
 }
@@ -528,7 +528,7 @@ struct SourceReadiness {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct CoverageCounts {
+struct ScopeCoverageCounts {
     total_directories: i64,
     pending_directories: i64,
     scanning_directories: i64,
@@ -564,7 +564,7 @@ pub(crate) fn read_contents(
     connection: &Connection,
     scope: StoreContentsScope,
     policy: StoreContentsReadPolicy,
-    recursion: StoreContentsScopeDepth,
+    scope_depth: StoreContentsScopeDepth,
     limit: usize,
     cursor: Option<&str>,
 ) -> LibrarySqliteResult<StoreContentsResult> {
@@ -578,11 +578,11 @@ pub(crate) fn read_contents(
                     state: StoreContentsState::CursorInvalid,
                     scope,
                     policy,
-                    scope_depth: recursion,
+                    scope_depth,
                     rows: Vec::new(),
                     scope_coverage: StoreContentsScopeCoverage {
                         state: StoreContentsScopeCoverageState::Failed,
-                        recursive_scope_complete: false,
+                        subtree_coverage_complete: false,
                         empty_result_authoritative: false,
                         detail: Some("The contents cursor could not be decoded.".to_string()),
                     },
@@ -592,16 +592,16 @@ pub(crate) fn read_contents(
                 });
             }
         };
-        if !validate_cursor_identity(&decoded, &scope, &policy, recursion) {
+        if !validate_cursor_identity(&decoded, &scope, &policy, scope_depth) {
             return Ok(StoreContentsResult {
                 state: StoreContentsState::CursorInvalid,
                 scope,
                 policy,
-                scope_depth: recursion,
+                scope_depth,
                 rows: Vec::new(),
                 scope_coverage: StoreContentsScopeCoverage {
                     state: StoreContentsScopeCoverageState::Failed,
-                    recursive_scope_complete: false,
+                    subtree_coverage_complete: false,
                     empty_result_authoritative: false,
                     detail: Some(
                         "The contents cursor does not match the current request.".to_string(),
@@ -633,11 +633,11 @@ pub(crate) fn read_contents(
                 state: StoreContentsState::CursorInvalid,
                 scope,
                 policy,
-                scope_depth: recursion,
+                scope_depth,
                 rows: Vec::new(),
                 scope_coverage: StoreContentsScopeCoverage {
                     state: StoreContentsScopeCoverageState::Failed,
-                    recursive_scope_complete: false,
+                    subtree_coverage_complete: false,
                     empty_result_authoritative: false,
                     detail: Some("The contents cursor does not match the policy.".to_string()),
                 },
@@ -656,11 +656,11 @@ pub(crate) fn read_contents(
             state: StoreContentsState::LocationMissing,
             scope,
             policy,
-            scope_depth: recursion,
+            scope_depth,
             rows: Vec::new(),
             scope_coverage: StoreContentsScopeCoverage {
                 state: StoreContentsScopeCoverageState::LocationMissing,
-                recursive_scope_complete: false,
+                subtree_coverage_complete: false,
                 empty_result_authoritative: false,
                 detail: Some("The library contents target is not available.".to_string()),
             },
@@ -675,12 +675,12 @@ pub(crate) fn read_contents(
             connection,
             &resolved_scope,
             &policy,
-            recursion,
+            scope_depth,
             limit,
             cursor_position.as_ref(),
         )?;
         let next_cursor = if rows.len() > limit {
-            build_next_cursor(&rows[..limit], &scope, &policy, recursion)
+            build_next_cursor(&rows[..limit], &scope, &policy, scope_depth)
         } else {
             None
         };
@@ -693,11 +693,11 @@ pub(crate) fn read_contents(
             state,
             scope,
             policy,
-            scope_depth: recursion,
+            scope_depth,
             rows,
             scope_coverage: StoreContentsScopeCoverage {
                 state: coverage_state,
-                recursive_scope_complete: false,
+                subtree_coverage_complete: false,
                 empty_result_authoritative: false,
                 detail: Some(detail.to_string()),
             },
@@ -712,12 +712,12 @@ pub(crate) fn read_contents(
         connection,
         &resolved_scope,
         &policy,
-        recursion,
+        scope_depth,
         limit,
         cursor_position.as_ref(),
     )?;
     let next_cursor = if rows.len() > limit {
-        build_next_cursor(&rows[..limit], &scope, &policy, recursion)
+        build_next_cursor(&rows[..limit], &scope, &policy, scope_depth)
     } else {
         None
     };
@@ -735,20 +735,20 @@ pub(crate) fn read_contents(
     ) {
         false
     } else {
-        read_has_policy_omitted_rows(connection, &resolved_scope, &policy, recursion)?
+        read_has_policy_omitted_rows(connection, &resolved_scope, &policy, scope_depth)?
     };
     let state = contents_state(&scope_coverage, rows.is_empty());
     let detail = contents_detail(state, scope_coverage.state);
 
     let empty_result_authoritative = state == StoreContentsState::Empty
-        && scope_coverage.recursive_scope_complete
+        && scope_coverage.subtree_coverage_complete
         && !has_policy_omitted_rows;
 
     Ok(StoreContentsResult {
         state,
         scope,
         policy,
-        scope_depth: recursion,
+        scope_depth,
         rows,
         scope_coverage: StoreContentsScopeCoverage {
             empty_result_authoritative,
@@ -1147,7 +1147,7 @@ fn read_scope_coverage(
 ) -> LibrarySqliteResult<StoreContentsScopeCoverage> {
     let counts = match scope {
         ResolvedContentsScope::WholeSource { source_id } => {
-            read_whole_source_coverage_counts(connection, *source_id)?
+            read_whole_source_scope_coverage_counts(connection, *source_id)?
         }
         ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
             let paths = load_accepted_source_location_paths(connection, *source_id)?;
@@ -1213,7 +1213,7 @@ fn read_scope_coverage(
                     ));
                 }
             }
-            read_accepted_source_locations_coverage_counts(connection, *source_id)?
+            read_accepted_source_locations_scope_coverage_counts(connection, *source_id)?
         }
         ResolvedContentsScope::MissingLocation { .. } => {
             return Ok(scope_coverage(
@@ -1277,7 +1277,7 @@ fn read_scope_coverage(
                     ));
                 }
             }
-            read_prefix_coverage_counts(connection, *source_id, relative_path)?
+            read_prefix_scope_coverage_counts(connection, *source_id, relative_path)?
         }
         ResolvedContentsScope::Prefix {
             source_id,
@@ -1300,17 +1300,17 @@ fn read_scope_coverage(
                     ));
                 }
             }
-            read_prefix_coverage_counts(connection, *source_id, relative_path)?
+            read_prefix_scope_coverage_counts(connection, *source_id, relative_path)?
         }
     };
 
     Ok(scope_coverage_from_counts(source, scope, counts))
 }
 
-fn read_whole_source_coverage_counts(
+fn read_whole_source_scope_coverage_counts(
     connection: &Connection,
     source_id: i64,
-) -> LibrarySqliteResult<CoverageCounts> {
+) -> LibrarySqliteResult<ScopeCoverageCounts> {
     connection
         .query_row(
             "SELECT COUNT(*),
@@ -1322,15 +1322,15 @@ fn read_whole_source_coverage_counts(
              WHERE source_id = ?1
                AND presence_state = 'present'",
             [source_id],
-            coverage_counts_from_row,
+            scope_coverage_counts_from_row,
         )
         .map_err(Into::into)
 }
 
-fn read_accepted_source_locations_coverage_counts(
+fn read_accepted_source_locations_scope_coverage_counts(
     connection: &Connection,
     source_id: i64,
-) -> LibrarySqliteResult<CoverageCounts> {
+) -> LibrarySqliteResult<ScopeCoverageCounts> {
     connection
         .query_row(
             &format!(
@@ -1358,16 +1358,16 @@ fn read_accepted_source_locations_coverage_counts(
                 relative_path_scope_predicate("sd", "al.relative_path")
             ),
             [source_id],
-            coverage_counts_from_row,
+            scope_coverage_counts_from_row,
         )
         .map_err(Into::into)
 }
 
-fn read_prefix_coverage_counts(
+fn read_prefix_scope_coverage_counts(
     connection: &Connection,
     source_id: i64,
     relative_path: &str,
-) -> LibrarySqliteResult<CoverageCounts> {
+) -> LibrarySqliteResult<ScopeCoverageCounts> {
     connection
         .query_row(
             &format!(
@@ -1383,13 +1383,15 @@ fn read_prefix_coverage_counts(
                 relative_path_scope_predicate("sd", "?2")
             ),
             params![source_id, relative_path],
-            coverage_counts_from_row,
+            scope_coverage_counts_from_row,
         )
         .map_err(Into::into)
 }
 
-fn coverage_counts_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CoverageCounts> {
-    Ok(CoverageCounts {
+fn scope_coverage_counts_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<ScopeCoverageCounts> {
+    Ok(ScopeCoverageCounts {
         total_directories: row.get(0)?,
         pending_directories: row.get::<_, Option<i64>>(1)?.unwrap_or(0),
         scanning_directories: row.get::<_, Option<i64>>(2)?.unwrap_or(0),
@@ -1401,7 +1403,7 @@ fn coverage_counts_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Coverag
 fn scope_coverage_from_counts(
     source: &SourceReadiness,
     scope: &ResolvedContentsScope,
-    counts: CoverageCounts,
+    counts: ScopeCoverageCounts,
 ) -> StoreContentsScopeCoverage {
     if counts.total_directories == 0 {
         if matches!(scope, ResolvedContentsScope::WholeSource { .. })
@@ -1513,12 +1515,12 @@ fn pending_or_scanning_coverage_state(source: &SourceReadiness) -> StoreContents
 
 fn scope_coverage(
     state: StoreContentsScopeCoverageState,
-    recursive_scope_complete: bool,
+    subtree_coverage_complete: bool,
     detail: &str,
 ) -> StoreContentsScopeCoverage {
     StoreContentsScopeCoverage {
         state,
-        recursive_scope_complete,
+        subtree_coverage_complete,
         empty_result_authoritative: false,
         detail: Some(detail.to_string()),
     }
@@ -1572,7 +1574,7 @@ fn read_has_policy_omitted_rows(
     connection: &Connection,
     scope: &ResolvedContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsScopeDepth,
+    scope_depth: StoreContentsScopeDepth,
 ) -> LibrarySqliteResult<bool> {
     let Some(omitted_file_classes) = policy_omitted_file_classes(policy) else {
         // primaryMedia omission metadata is not surfaced until its own row universe is queryable.
@@ -1588,7 +1590,7 @@ fn read_has_policy_omitted_rows(
         ResolvedContentsScope::WholeSource { source_id } => source_file_exists(
             connection,
             None,
-            &whole_source_file_predicate(recursion),
+            &whole_source_file_predicate(scope_depth),
             &omitted_file_class_predicate,
             *source_id,
             None,
@@ -1596,7 +1598,7 @@ fn read_has_policy_omitted_rows(
         ResolvedContentsScope::AcceptedSourceLocations { source_id } => source_file_exists(
             connection,
             Some(accepted_locations_cte()),
-            &accepted_locations_source_file_predicate(recursion),
+            &accepted_locations_source_file_predicate(scope_depth),
             &omitted_file_class_predicate,
             *source_id,
             None,
@@ -1611,7 +1613,7 @@ fn read_has_policy_omitted_rows(
         } => source_file_exists(
             connection,
             None,
-            &scoped_path_predicate(recursion),
+            &scoped_path_predicate(scope_depth),
             &omitted_file_class_predicate,
             *source_id,
             Some(relative_path),
@@ -1654,7 +1656,7 @@ fn read_rows(
     connection: &Connection,
     scope: &ResolvedContentsScope,
     policy: &StoreContentsReadPolicy,
-    recursion: StoreContentsScopeDepth,
+    scope_depth: StoreContentsScopeDepth,
     limit: usize,
     cursor_position: Option<&ContentsCursorPosition>,
 ) -> LibrarySqliteResult<Vec<StoreContentsFileRow>> {
@@ -1670,7 +1672,7 @@ fn read_rows(
 
     match scope {
         ResolvedContentsScope::WholeSource { source_id } => {
-            let source_predicate = whole_source_file_predicate(recursion);
+            let source_predicate = whole_source_file_predicate(scope_depth);
             read_rows_with_source_predicate(
                 connection,
                 SourcePredicateReadInput {
@@ -1685,7 +1687,7 @@ fn read_rows(
             )
         }
         ResolvedContentsScope::AcceptedSourceLocations { source_id } => {
-            let predicate = accepted_locations_source_file_predicate(recursion);
+            let predicate = accepted_locations_source_file_predicate(scope_depth);
             read_rows_for_accepted_locations(
                 connection,
                 &predicate,
@@ -1700,7 +1702,7 @@ fn read_rows(
             source_id,
             relative_path,
         } => {
-            let predicate = scoped_path_predicate(recursion);
+            let predicate = scoped_path_predicate(scope_depth);
             read_rows_with_source_predicate(
                 connection,
                 SourcePredicateReadInput {
@@ -1718,7 +1720,7 @@ fn read_rows(
             source_id,
             relative_path,
         } => {
-            let predicate = scoped_path_predicate(recursion);
+            let predicate = scoped_path_predicate(scope_depth);
             read_rows_with_source_predicate(
                 connection,
                 SourcePredicateReadInput {
@@ -1736,8 +1738,8 @@ fn read_rows(
     }
 }
 
-fn whole_source_file_predicate(recursion: StoreContentsScopeDepth) -> String {
-    match recursion {
+fn whole_source_file_predicate(scope_depth: StoreContentsScopeDepth) -> String {
+    match scope_depth {
         StoreContentsScopeDepth::Recursive => "sf.source_id = ?1".to_string(),
         StoreContentsScopeDepth::Immediate => {
             "sf.source_id = ?1 AND sf.parent_source_directory_id IS NULL".to_string()
@@ -1745,8 +1747,8 @@ fn whole_source_file_predicate(recursion: StoreContentsScopeDepth) -> String {
     }
 }
 
-fn accepted_locations_source_file_predicate(recursion: StoreContentsScopeDepth) -> String {
-    match recursion {
+fn accepted_locations_source_file_predicate(scope_depth: StoreContentsScopeDepth) -> String {
+    match scope_depth {
         StoreContentsScopeDepth::Recursive => format!(
             "sf.source_id = ?1
              AND EXISTS (
@@ -1893,8 +1895,8 @@ fn read_rows_with_source_predicate(
     Ok(rows)
 }
 
-fn scoped_path_predicate(recursion: StoreContentsScopeDepth) -> String {
-    match recursion {
+fn scoped_path_predicate(scope_depth: StoreContentsScopeDepth) -> String {
+    match scope_depth {
         StoreContentsScopeDepth::Recursive => format!(
             "sf.source_id = ?1
              AND {}",
@@ -3274,7 +3276,7 @@ mod tests {
             result.scope_coverage.state,
             StoreContentsScopeCoverageState::Blocked
         );
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
         assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
@@ -3353,14 +3355,14 @@ mod tests {
     fn assert_audio_browse_matches_source_file_audio(
         connection: &Connection,
         scope: StoreContentsScope,
-        recursion: StoreContentsScopeDepth,
+        scope_depth: StoreContentsScopeDepth,
         limit: usize,
     ) -> (super::StoreContentsResult, super::StoreContentsResult) {
         let source_file = read_contents(
             connection,
             scope.clone(),
             source_file_policy(vec![StoreContentsFileClass::Audio]),
-            recursion,
+            scope_depth,
             limit,
             None,
         )
@@ -3369,7 +3371,7 @@ mod tests {
             connection,
             scope,
             audio_browse_policy(),
-            recursion,
+            scope_depth,
             limit,
             None,
         )
@@ -5309,7 +5311,7 @@ mod tests {
             3,
             Some(&cursor),
         )
-        .expect("read with changed recursion");
+        .expect("read with changed scope depth");
 
         assert_eq!(result.state, StoreContentsState::CursorInvalid);
         assert!(result.rows.is_empty());
@@ -5967,7 +5969,7 @@ mod tests {
         .expect("read contents");
 
         assert!(!result.scope_coverage.empty_result_authoritative);
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
         assert_ne!(result.state, StoreContentsState::Empty);
     }
 
@@ -6013,7 +6015,7 @@ mod tests {
             result.scope_coverage.state,
             StoreContentsScopeCoverageState::Blocked
         );
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
         assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
@@ -6060,7 +6062,7 @@ mod tests {
             StoreContentsScopeCoverageState::Complete,
             "clean sibling directory under partial source must have complete coverage"
         );
-        assert!(dir_result.scope_coverage.recursive_scope_complete);
+        assert!(dir_result.scope_coverage.subtree_coverage_complete);
         assert_eq!(dir_result.state, StoreContentsState::Ready);
         assert!(!dir_result.rows.is_empty());
 
@@ -6115,7 +6117,7 @@ mod tests {
             StoreContentsScopeCoverageState::Complete,
             "clean empty sibling directory under partial source may be authoritative empty"
         );
-        assert!(dir_result.scope_coverage.recursive_scope_complete);
+        assert!(dir_result.scope_coverage.subtree_coverage_complete);
         assert!(dir_result.scope_coverage.empty_result_authoritative);
         assert_eq!(dir_result.state, StoreContentsState::Empty);
     }
@@ -6152,7 +6154,7 @@ mod tests {
             StoreContentsScopeCoverageState::Blocked,
             "blocked scope under partial source must remain blocked"
         );
-        assert!(!dir_result.scope_coverage.recursive_scope_complete);
+        assert!(!dir_result.scope_coverage.subtree_coverage_complete);
         assert!(!dir_result.scope_coverage.empty_result_authoritative);
         assert_eq!(dir_result.state, StoreContentsState::Blocked);
     }
@@ -6201,7 +6203,7 @@ mod tests {
             StoreContentsScopeCoverageState::LocationMissing,
             "coverage must be locationMissing for scope-proven absent path under partial scan"
         );
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
         assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
@@ -6250,7 +6252,7 @@ mod tests {
             "blocked parent must not be classified as missing"
         );
         assert!(!result.scope_coverage.empty_result_authoritative);
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
     }
 
     #[test]
@@ -6322,7 +6324,7 @@ mod tests {
             "pending parent must produce pending coverage"
         );
         assert!(!result.scope_coverage.empty_result_authoritative);
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
     }
 
     #[test]
@@ -6378,7 +6380,7 @@ mod tests {
             StoreContentsScopeCoverageState::Complete,
             "all accepted locations complete must produce complete coverage even under partial source"
         );
-        assert!(result.scope_coverage.recursive_scope_complete);
+        assert!(result.scope_coverage.subtree_coverage_complete);
         assert!(result.scope_coverage.empty_result_authoritative || !result.rows.is_empty());
     }
 
@@ -6430,7 +6432,7 @@ mod tests {
             "source with a blocked accepted location must not be complete"
         );
         assert!(!result.scope_coverage.empty_result_authoritative);
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
     }
 
     #[test]
@@ -6600,7 +6602,7 @@ mod tests {
             StoreContentsScopeCoverageState::Incomplete,
             "mixed present + missing coverage must be Incomplete"
         );
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
         assert!(!result.scope_coverage.empty_result_authoritative);
     }
 
@@ -6701,7 +6703,7 @@ mod tests {
         );
         assert!(result.rows.is_empty());
         assert!(!result.scope_coverage.empty_result_authoritative);
-        assert!(!result.scope_coverage.recursive_scope_complete);
+        assert!(!result.scope_coverage.subtree_coverage_complete);
     }
 
     #[test]
@@ -6860,7 +6862,7 @@ mod tests {
             result.scope_coverage.state,
             StoreContentsScopeCoverageState::Complete
         );
-        assert!(result.scope_coverage.recursive_scope_complete);
+        assert!(result.scope_coverage.subtree_coverage_complete);
         assert!(result.scope_coverage.empty_result_authoritative);
     }
 
@@ -6905,7 +6907,7 @@ mod tests {
             result.scope_coverage.state,
             StoreContentsScopeCoverageState::Complete
         );
-        assert!(result.scope_coverage.recursive_scope_complete);
+        assert!(result.scope_coverage.subtree_coverage_complete);
     }
 
     #[test]

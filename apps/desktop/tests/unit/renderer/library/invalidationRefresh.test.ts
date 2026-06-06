@@ -380,7 +380,7 @@ function readyContentsResult(
       rows,
       scopeCoverage: {
         state: state === 'partial' ? 'scanning' : 'complete',
-        recursiveScopeComplete: state === 'ready',
+        subtreeCoverageComplete: state === 'ready',
         emptyResultAuthoritative: false
       },
       hasPolicyOmittedRows: false

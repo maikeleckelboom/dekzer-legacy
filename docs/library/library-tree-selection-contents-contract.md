@@ -33,7 +33,7 @@ contents does not read from the tree cache.
 | Tree controller            | Expanded/collapsed state, selection state, hierarchy row cache.             | Contents rows, contents read state.                        |
 | Selection model            | Selected navigation row identity and derived contents scope.                | Tree expansion, contents rendering.                        |
 | Contents panel             | Contents rows, pagination, loading and refresh presentation.                | Tree structure, hierarchy node identity, browse authority. |
-| Contents policy/read model | Policy discriminant, variant filters, recursion, ordering, cursor identity. | Renderer-local sort/filter authority.                      |
+| Contents policy/read model | Policy discriminant, variant filters, scopeDepth, ordering, cursor identity. | Renderer-local sort/filter authority.                      |
 | Substrate                  | Hierarchy and contents projection reads.                                    | Renderer state of either panel.                            |
 
 Renderer projection may display labels, icons, state rows, and actions for rows returned by the contents read. It must
@@ -51,14 +51,14 @@ Current selectable navigation rows derive contents scopes as follows:
 | State/action row    | No contents scope unless its action explicitly loads a page or branch.                       |
 
 The scope is an identity tuple, not a row copy and not a path string. It includes the selected source or directory
-identity plus the contents policy and recursion that shape the read.
+identity plus the contents policy and scope depth that shape the read.
 
 ## Contents Read Contract
 
 The contents panel issues an independent read:
 
 ```text
-readContents(scope, policy, recursion, limit, cursor)
+readContents(scope, policy, scopeDepth, limit, cursor)
 ```
 
 The default main contents browse is audio-first:
@@ -66,7 +66,7 @@ The default main contents browse is audio-first:
 | Field         | Default       |
 | ------------- | ------------- |
 | `policy.kind` | `audioBrowse` |
-| `recursion`   | recursive     |
+| `scopeDepth`  | recursive     |
 
 Contents rows are media-relevant source-file rows unless a future explicit policy says otherwise. They are not
 canonical tracks and do not decide track identity, duplicate resolution, CUE association, artwork role, or analysis
@@ -86,7 +86,7 @@ readiness.
 | `unavailable`  | The source containing the selected scope is unavailable.                                                | Keep scope selection and show unavailable/degraded row state when rows are retained. |
 
 Retained rows are perception continuity. They are not data authority. Replacement data must come from an accepted
-contents read, and stale responses must be rejected by request identity, scope, policy, recursion, cursor, and boundary
+contents read, and stale responses must be rejected by request identity, scope, policy, scopeDepth, cursor, and boundary
 validation.
 
 ## Refresh And Invalidation

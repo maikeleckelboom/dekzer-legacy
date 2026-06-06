@@ -907,7 +907,7 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
             rows: [],
             scopeCoverage: {
               state: 'complete',
-              recursiveScopeComplete: true,
+              subtreeCoverageComplete: true,
               emptyResultAuthoritative: true
             },
             hasPolicyOmittedRows: false

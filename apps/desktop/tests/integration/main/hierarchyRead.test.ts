@@ -351,7 +351,7 @@ function sourceNavigationRow(): Awaited<
 function completeCoverage(): LibraryTreeCoverage {
   return {
     state: 'complete' as const,
-    recursiveScopeComplete: true,
+    subtreeCoverageComplete: true,
     emptyResultAuthoritative: false,
     detail: 'Complete.'
   }

@@ -537,7 +537,7 @@ pub enum ContentsScopeCoverageState {
 #[ts(rename_all = "camelCase")]
 pub struct ContentsScopeCoverage {
     pub state: ContentsScopeCoverageState,
-    pub recursive_scope_complete: bool,
+    pub subtree_coverage_complete: bool,
     pub empty_result_authoritative: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -1441,7 +1441,7 @@ pub enum LibraryTreeCoverageState {
 #[ts(rename_all = "camelCase")]
 pub struct LibraryTreeCoverage {
     pub state: LibraryTreeCoverageState,
-    pub recursive_scope_complete: bool,
+    pub subtree_coverage_complete: bool,
     pub empty_result_authoritative: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
@@ -2741,7 +2741,7 @@ mod tests {
                 total_rows: 1,
                 coverage: LibraryTreeCoverage {
                     state: LibraryTreeCoverageState::Scanning,
-                    recursive_scope_complete: false,
+                    subtree_coverage_complete: false,
                     empty_result_authoritative: false,
                     detail: Some("Still indexing.".to_string()),
                 },
@@ -2788,7 +2788,7 @@ mod tests {
                         "totalRows": 1,
                         "coverage": {
                             "state": "scanning",
-                            "recursiveScopeComplete": false,
+                            "subtreeCoverageComplete": false,
                             "emptyResultAuthoritative": false,
                             "detail": "Still indexing."
                         },
@@ -2835,7 +2835,7 @@ mod tests {
                 total_rows: 1,
                 coverage: LibraryTreeCoverage {
                     state: LibraryTreeCoverageState::Complete,
-                    recursive_scope_complete: true,
+                    subtree_coverage_complete: true,
                     empty_result_authoritative: false,
                     detail: Some("Complete.".to_string()),
                 },

@@ -808,16 +808,16 @@
         "emptyResultAuthoritative": {
           "type": "boolean"
         },
-        "recursiveScopeComplete": {
-          "type": "boolean"
-        },
         "state": {
           "$ref": "#/$defs/ContentsScopeCoverageState"
+        },
+        "subtreeCoverageComplete": {
+          "type": "boolean"
         }
       },
       "required": [
         "state",
-        "recursiveScopeComplete",
+        "subtreeCoverageComplete",
         "emptyResultAuthoritative"
       ]
     },
@@ -2352,16 +2352,16 @@
         "emptyResultAuthoritative": {
           "type": "boolean"
         },
-        "recursiveScopeComplete": {
-          "type": "boolean"
-        },
         "state": {
           "$ref": "#/$defs/LibraryTreeCoverageState"
+        },
+        "subtreeCoverageComplete": {
+          "type": "boolean"
         }
       },
       "required": [
         "state",
-        "recursiveScopeComplete",
+        "subtreeCoverageComplete",
         "emptyResultAuthoritative"
       ]
     },

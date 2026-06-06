@@ -422,7 +422,7 @@ function loadedChildren(rows: readonly ChildRow[]): LoadedChildren {
     totalRows: rows.length,
     coverage: {
       state: 'complete',
-      recursiveScopeComplete: true,
+      subtreeCoverageComplete: true,
       emptyResultAuthoritative: rows.length === 0
     } satisfies HierarchyCoverage,
     limit: 50

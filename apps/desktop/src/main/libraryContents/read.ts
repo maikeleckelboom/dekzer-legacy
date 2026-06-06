@@ -131,10 +131,10 @@ function normalizeRequest(request: unknown): NormalizedRequest | ContentsReadRes
     return policy
   }
 
-  const recursion = normalizeRecursion(request.scopeDepth)
+  const scopeDepth = normalizeScopeDepth(request.scopeDepth)
 
-  if (isContentsReadResult(recursion)) {
-    return recursion
+  if (isContentsReadResult(scopeDepth)) {
+    return scopeDepth
   }
 
   const limit = normalizeLimit(request.limit)
@@ -152,7 +152,7 @@ function normalizeRequest(request: unknown): NormalizedRequest | ContentsReadRes
   return {
     scope,
     policy,
-    scopeDepth: recursion,
+    scopeDepth,
     limit,
     ...(cursor === undefined ? {} : { cursor })
   }
@@ -292,7 +292,7 @@ function normalizePrimaryMediaKinds(
   return canonicalPrimaryMediaKindOrder.filter((mediaKind) => mediaKinds.has(mediaKind))
 }
 
-function normalizeRecursion(value: unknown): ContentsScopeDepth | ContentsReadResult {
+function normalizeScopeDepth(value: unknown): ContentsScopeDepth | ContentsReadResult {
   if (value === 'immediate' || value === 'recursive') {
     return value
   }
@@ -300,7 +300,7 @@ function normalizeRecursion(value: unknown): ContentsScopeDepth | ContentsReadRe
   return createContentsErrorResult(
     'invalidRequest',
     'invalidRequest',
-    'Contents recursion is invalid.'
+    'Contents scope depth is invalid.'
   )
 }
 
@@ -494,7 +494,7 @@ function mapReadyContentsState(
 function mapCoverage(result: ContractContentsResult): ContentsScopeCoverage {
   return {
     state: result.scopeCoverage.state,
-    recursiveScopeComplete: result.scopeCoverage.recursiveScopeComplete,
+    subtreeCoverageComplete: result.scopeCoverage.subtreeCoverageComplete,
     emptyResultAuthoritative: result.scopeCoverage.emptyResultAuthoritative,
     ...(result.scopeCoverage.detail === undefined ? {} : { detail: result.scopeCoverage.detail })
   }

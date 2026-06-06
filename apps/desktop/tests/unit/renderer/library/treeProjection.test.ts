@@ -672,7 +672,7 @@ function loadedChildren(
     totalRows,
     coverage: {
       state: 'complete',
-      recursiveScopeComplete: true,
+      subtreeCoverageComplete: true,
       emptyResultAuthoritative: rows.length === 0
     } satisfies HierarchyCoverage,
     ...(nextOffset === undefined ? {} : { nextOffset }),
@@ -857,7 +857,7 @@ function makeCoverageChildren(options: {
     totalRows: options.rows?.length ?? 0,
     coverage: {
       state: options.coverageState,
-      recursiveScopeComplete: options.coverageState === 'complete',
+      subtreeCoverageComplete: options.coverageState === 'complete',
       emptyResultAuthoritative: options.emptyResultAuthoritative,
       ...(options.detail === undefined ? {} : { detail: options.detail })
     },

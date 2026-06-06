@@ -90,7 +90,7 @@ product-visible. Changing this admission scope requires a separate decision.
 `audioBrowse` is audio by definition:
 
 - no caller-supplied class field;
-- source-file audio parity for equivalent scope, recursion, limit, and cursor behavior;
+- source-file audio parity for equivalent scope, scopeDepth, limit, and cursor behavior;
 - the existing contents file-row payload with `fileClass`;
 - no renderer-side filtering or sorting;
 - no new audio row type or endpoint.
@@ -113,7 +113,7 @@ future media-probe authority establishes a different product policy; it never wi
 ### Policy Omission Metadata
 
 `ContentsResult.hasPolicyOmittedRows` is required and service-owned. It is a scope-level boolean, not a page-local
-count. The store applies the same scope, recursion, presence, and policy universe used by the read.
+count. The store applies the same scope, scopeDepth, presence, and policy universe used by the read.
 
 - `playableMediaBrowse` omission candidates are browse-relevant images.
 - `audioBrowse` omission candidates are browse-relevant video and image rows.
@@ -155,7 +155,7 @@ Contents cursor identity binds:
 - scope;
 - the complete policy discriminant;
 - canonicalized `sourceFileInventory.fileClasses` or `primaryMedia.mediaKinds`;
-- recursion;
+- scopeDepth;
 - the policy-specific ordering position.
 
 Required invariants:

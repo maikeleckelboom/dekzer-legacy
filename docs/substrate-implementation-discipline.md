@@ -150,7 +150,7 @@ Cursor identity is bound to:
 | cursor version        | Prevents stale cursor interpretation.                            |
 | scope                 | Cursor is only valid for the same browse/read scope.             |
 | policy                | Visibility/filter policy changes invalidate cursor.              |
-| recursion             | Recursive and non-recursive reads are not the same result space. |
+| scopeDepth            | Recursive and non-recursive reads are not the same result space. |
 | row profile           | Row shape affects continuation meaning.                          |
 | media class set       | Media filters affect ordering and membership.                    |
 | query/order identity  | Cursor depends on the exact result order.                        |

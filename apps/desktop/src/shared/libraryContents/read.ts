@@ -106,7 +106,7 @@ export type ContentsScopeCoverageState =
 
 export type ContentsScopeCoverage = {
   readonly state: ContentsScopeCoverageState
-  readonly recursiveScopeComplete: boolean
+  readonly subtreeCoverageComplete: boolean
   readonly emptyResultAuthoritative: boolean
   readonly detail?: string
 }

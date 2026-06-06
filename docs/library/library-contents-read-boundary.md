@@ -17,7 +17,7 @@ The active policy union contains `playableMediaBrowse`, `audioBrowse`, `sourceFi
 `primaryMedia { mediaKinds }`. The default product request uses `playableMediaBrowse`; `audioBrowse` remains audio-only.
 
 Every result carries required `hasPolicyOmittedRows`. The store/service computes it for the requested scope and
-recursion mode. The renderer presents the returned rows, coverage, and omission fact without inspecting raw inventory.
+scopeDepth mode. The renderer presents the returned rows, scopeCoverage, and omission fact without inspecting raw inventory.
 Incomplete zero-row coverage is not authoritative empty.
 
 Source-file inventory uses `file_kind` for detailed taxonomy and durable `file_class` for coarse classification.

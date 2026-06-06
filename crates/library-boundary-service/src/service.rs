@@ -26,7 +26,7 @@ use crate::snapshot_read_protocol::{
     map_read_source_attachment_summary_reply, map_read_source_file_attachment_reply,
     map_read_source_lifecycle_reply, map_read_track_identity_review_candidates_reply,
     map_search_navigation_node_library_browser_window_reply, store_contents_policy,
-    store_contents_recursion, store_contents_scope, store_library_tree_entry_point,
+    store_contents_scope, store_contents_scope_depth, store_library_tree_entry_point,
     store_track_identity_review_state_filter,
 };
 use crate::source_file_hash_protocol::{
@@ -631,7 +631,7 @@ impl LibraryBoundaryService {
             .read_contents(
                 store_contents_scope(request.scope),
                 store_contents_policy(request.policy),
-                store_contents_recursion(request.scope_depth),
+                store_contents_scope_depth(request.scope_depth),
                 limit,
                 request.cursor.as_deref(),
             )

@@ -1080,7 +1080,7 @@ function fileNode(
 function completeCoverage(): HierarchyCoverage {
   return {
     state: 'complete',
-    recursiveScopeComplete: true,
+    subtreeCoverageComplete: true,
     emptyResultAuthoritative: false
   }
 }
@@ -1088,7 +1088,7 @@ function completeCoverage(): HierarchyCoverage {
 function completeEmptyCoverage(): HierarchyCoverage {
   return {
     state: 'complete',
-    recursiveScopeComplete: true,
+    subtreeCoverageComplete: true,
     emptyResultAuthoritative: true
   }
 }

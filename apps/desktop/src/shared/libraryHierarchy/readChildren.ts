@@ -103,7 +103,7 @@ export type HierarchyCoverageState =
 
 export type HierarchyCoverage = {
   readonly state: HierarchyCoverageState
-  readonly recursiveScopeComplete: boolean
+  readonly subtreeCoverageComplete: boolean
   readonly emptyResultAuthoritative: boolean
   readonly detail?: string
 }

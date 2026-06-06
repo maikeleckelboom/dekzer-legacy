@@ -99,13 +99,13 @@ export async function readThroughHost(
 
 function mapCoverage(coverage: {
   readonly state: HierarchyCoverage['state']
-  readonly recursiveScopeComplete: boolean
+  readonly subtreeCoverageComplete: boolean
   readonly emptyResultAuthoritative: boolean
   readonly detail?: string | null
 }): HierarchyCoverage {
   return {
     state: coverage.state,
-    recursiveScopeComplete: coverage.recursiveScopeComplete,
+    subtreeCoverageComplete: coverage.subtreeCoverageComplete,
     emptyResultAuthoritative: coverage.emptyResultAuthoritative,
     ...(coverage.detail == null ? {} : { detail: coverage.detail })
   }

@@ -252,7 +252,7 @@ export type LibraryTreeEntryPoint = { "type": "source", "payload": { sourceId: s
 
 export type LibraryTreeWindow = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, totalRows: number, rows: Array<LibraryTreeNode>, coverage: LibraryTreeCoverage, };
 
-export type LibraryTreeCoverage = { state: LibraryTreeCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail: string | null, };
+export type LibraryTreeCoverage = { state: LibraryTreeCoverageState, subtreeCoverageComplete: boolean, emptyResultAuthoritative: boolean, detail: string | null, };
 
 export type LibraryTreeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
 
@@ -286,7 +286,7 @@ export type ContentsResult = { state: ContentsState, scope: ContentsScope, polic
 
 export type ContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed" | "policyConflict" | "cursorInvalid";
 
-export type ContentsScopeCoverage = { state: ContentsScopeCoverageState, recursiveScopeComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
+export type ContentsScopeCoverage = { state: ContentsScopeCoverageState, subtreeCoverageComplete: boolean, emptyResultAuthoritative: boolean, detail?: string, };
 
 export type ContentsScopeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
 

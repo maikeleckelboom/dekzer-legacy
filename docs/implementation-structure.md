@@ -1036,7 +1036,7 @@ library: {
 
   contents: {
     read(request: ContentsReadRequest): Promise<ContentsReadResult>
-    // ContentsReadRequest: { scope, policy, recursion, limit, cursor }
+    // ContentsReadRequest: { scope, policy, scopeDepth, limit, cursor }
   }
 
   search: {

@@ -49,7 +49,7 @@ The renderer default for selected library contents is audio-first and audio-only
 | Field         | Value         |
 | ------------- | ------------- |
 | `policy.kind` | `audioBrowse` |
-| `recursion`   | recursive     |
+| `scopeDepth`  | recursive     |
 
 The renderer derives the scope from selection and sends this policy to `readContents`. The backend owns the query and
 admission. The renderer must not fan out tree children, synthesize directory contents, or answer the selected scope from
@@ -66,7 +66,7 @@ the hierarchy cache.
 | sourceLocation | Reads rows under that registered location prefix.                                                               |
 | directory      | Reads rows under that directory prefix.                                                                         |
 
-Immediate recursion reads only immediate files for the selected scope. Recursive source and directory reads are backend
+Immediate scope depth reads only immediate files for the selected scope. Recursive source and directory reads are backend
 queries over durable source-file rows.
 
 Unavailable, blocked, failed, or incomplete sources must return typed state. They must not be collapsed into an
@@ -121,7 +121,7 @@ video only. A policy that asks `primaryMedia` for image or unsupported rows must
 ## Ordering And Cursor
 
 `sourceFileInventory` rows use the persisted source-file browse order. Cursor identity includes
-scope, the complete policy discriminant, recursion, the requested `fileClasses`, and the last row ordering position.
+scope, the complete policy discriminant, scopeDepth, the requested `fileClasses`, and the last row ordering position.
 The file-class identity is derived from the requested policy, not from the rows returned on the current page. Changing
 `fileClasses` across pages returns `cursorInvalid`.
 

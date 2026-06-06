@@ -33,7 +33,7 @@ describe('createContentsReadController', () => {
             rows: [],
             scopeCoverage: {
               state: 'complete',
-              recursiveScopeComplete: true,
+              subtreeCoverageComplete: true,
               emptyResultAuthoritative: true
             },
             hasPolicyOmittedRows: false
@@ -937,7 +937,7 @@ function readyContents(
       rows,
       scopeCoverage: {
         state: 'complete',
-        recursiveScopeComplete: true,
+        subtreeCoverageComplete: true,
         emptyResultAuthoritative: rows.length === 0
       },
       hasPolicyOmittedRows: false,

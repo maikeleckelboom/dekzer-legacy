@@ -37,7 +37,7 @@ pub enum StoreLiteralHierarchyCoverageState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoreLiteralHierarchyCoverage {
     pub state: StoreLiteralHierarchyCoverageState,
-    pub recursive_scope_complete: bool,
+    pub subtree_coverage_complete: bool,
     pub empty_result_authoritative: bool,
     pub detail: Option<String>,
 }
@@ -661,12 +661,12 @@ fn pending_or_scanning_coverage_state(
 
 fn literal_coverage(
     state: StoreLiteralHierarchyCoverageState,
-    recursive_scope_complete: bool,
+    subtree_coverage_complete: bool,
     detail: &str,
 ) -> StoreLiteralHierarchyCoverage {
     StoreLiteralHierarchyCoverage {
         state,
-        recursive_scope_complete,
+        subtree_coverage_complete,
         empty_result_authoritative: false,
         detail: Some(detail.to_string()),
     }
@@ -1164,7 +1164,7 @@ mod tests {
             window.coverage.state,
             StoreLiteralHierarchyCoverageState::Blocked
         );
-        assert!(!window.coverage.recursive_scope_complete);
+        assert!(!window.coverage.subtree_coverage_complete);
         assert!(!window.coverage.empty_result_authoritative);
     }
 
@@ -1592,7 +1592,7 @@ mod tests {
         .expect("source window");
 
         assert!(!window.coverage.empty_result_authoritative);
-        assert!(!window.coverage.recursive_scope_complete);
+        assert!(!window.coverage.subtree_coverage_complete);
     }
 
     #[test]
@@ -1649,7 +1649,7 @@ mod tests {
             window.coverage.state,
             StoreLiteralHierarchyCoverageState::Blocked
         );
-        assert!(!window.coverage.recursive_scope_complete);
+        assert!(!window.coverage.subtree_coverage_complete);
         assert!(!window.coverage.empty_result_authoritative);
         assert!(
             !window.rows.is_empty(),
@@ -1725,8 +1725,8 @@ mod tests {
             "clean sibling directory under partial source must have complete coverage"
         );
         assert!(
-            good_window.coverage.recursive_scope_complete,
-            "clean sibling directory under partial source must have recursiveScopeComplete = true"
+            good_window.coverage.subtree_coverage_complete,
+            "clean sibling directory under partial source must have subtreeCoverageComplete = true"
         );
         assert!(
             good_window.coverage.empty_result_authoritative,
@@ -1749,7 +1749,7 @@ mod tests {
             StoreLiteralHierarchyCoverageState::Blocked,
             "blocked subtree must remain blocked"
         );
-        assert!(!locked_window.coverage.recursive_scope_complete);
+        assert!(!locked_window.coverage.subtree_coverage_complete);
         assert!(!locked_window.coverage.empty_result_authoritative);
 
         let source_window = read_children(
@@ -1839,7 +1839,7 @@ mod tests {
             StoreLiteralHierarchyCoverageState::Complete,
             "clean sibling directory with media must have complete coverage"
         );
-        assert!(good_window.coverage.recursive_scope_complete);
+        assert!(good_window.coverage.subtree_coverage_complete);
         assert!(
             !good_window.rows.is_empty(),
             "clean sibling directory must return media rows"
@@ -1960,7 +1960,7 @@ mod tests {
             StoreLiteralHierarchyCoverageState::LocationMissing,
             "Music/DeletedFolder must be locationMissing even under partial scan when parent is complete"
         );
-        assert!(!window.coverage.recursive_scope_complete);
+        assert!(!window.coverage.subtree_coverage_complete);
     }
 
     #[test]

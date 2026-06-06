@@ -456,7 +456,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
             "post-scan coverage state must be Complete",
         );
         assert!(
-            w.coverage.recursive_scope_complete,
+            w.coverage.subtree_coverage_complete,
             "post-scan recursive scope must be complete",
         );
     }
