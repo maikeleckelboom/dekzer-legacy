@@ -47,7 +47,10 @@ export type ReadTarget =
       readonly label?: string
     }
 
-export type ChildRowState = 'unknown' | 'hasChildRows' | 'noChildRows'
+export type NavigableChildScopeState =
+  | 'unknown'
+  | 'hasNavigableChildScopes'
+  | 'noNavigableChildScopes'
 
 export type ReadRequest = {
   readonly target?: ReadTarget
@@ -121,7 +124,7 @@ export type ChildRow =
       readonly directoryPrimaryMediaState: DirectoryPrimaryMediaState
       readonly directoryImageMediaState: DirectoryImageMediaState
       readonly directoryScanState: DirectoryScanState
-      readonly childRowState: ChildRowState
+      readonly navigableChildScopeState: NavigableChildScopeState
       readonly updatedAtMs: number
     }
   | {

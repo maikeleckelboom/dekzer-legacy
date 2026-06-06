@@ -20,7 +20,7 @@ function makeDirectoryNode(overrides: Partial<LibraryTreeNode> = {}): LibraryTre
     directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
     directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'scanning',
-    childRowState: 'hasChildRows',
+    navigableChildScopeState: 'hasNavigableChildScopes',
     ...overrides
   }
 }
@@ -65,7 +65,7 @@ describe('mapLibraryTreeNode', () => {
       directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
       directoryImageMediaState: { kind: 'noImageMediaDescendants' },
       directoryScanState: 'scanning',
-      childRowState: 'hasChildRows',
+      navigableChildScopeState: 'hasNavigableChildScopes',
       updatedAtMs: 100
     })
   })
@@ -76,8 +76,10 @@ describe('mapLibraryTreeNode', () => {
     expect(result).toBeUndefined()
   })
 
-  it('rejects a directory node without childRowState', () => {
-    const result = mapLibraryTreeNode(withoutProperty(makeDirectoryNode(), 'childRowState'))
+  it('rejects a directory node without navigableChildScopeState', () => {
+    const result = mapLibraryTreeNode(
+      withoutProperty(makeDirectoryNode(), 'navigableChildScopeState')
+    )
 
     expect(result).toBeUndefined()
   })

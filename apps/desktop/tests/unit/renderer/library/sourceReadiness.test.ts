@@ -451,7 +451,7 @@ function directoryNode(
     directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
     directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'complete',
-    childRowState: 'hasChildRows',
+    navigableChildScopeState: 'hasNavigableChildScopes',
     updatedAtMs: 100
   }
 }

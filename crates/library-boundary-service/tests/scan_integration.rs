@@ -2,16 +2,16 @@ use std::fs;
 use std::path::Path;
 
 use library_boundary_protocol::{
-    CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, ChildRowState,
-    CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEvent,
+    CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandErrorEnvelope,
+    CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEvent,
     LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
     LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
-    LibraryTreePresenceState, MaintainedSnapshotScope, NavigationRow, NavigationRowFamily,
-    NavigationRowKind, ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
-    ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest,
-    RegisterLocalRootReply, RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand,
-    SnapshotReadReply, SourceScanEvent, SourceScanEventKind, StartRootScanReply,
-    StartRootScanRequest,
+    LibraryTreePresenceState, MaintainedSnapshotScope, NavigableChildScopeState, NavigationRow,
+    NavigationRowFamily, NavigationRowKind, ReadLibraryBoundaryEventsAfterReply,
+    ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenReply,
+    ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
+    RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand, SnapshotReadReply,
+    SourceScanEvent, SourceScanEventKind, StartRootScanReply, StartRootScanRequest,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -366,8 +366,8 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         .find(|row| row.display_name == "alpha")
         .expect("alpha directory inside artists");
     assert_eq!(
-        alpha_dir.child_row_state,
-        Some(ChildRowState::NoChildRows),
+        alpha_dir.navigable_child_scope_state,
+        Some(NavigableChildScopeState::NoNavigableChildScopes),
         "alpha contains tracks but no navigable child directories"
     );
 

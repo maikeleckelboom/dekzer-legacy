@@ -141,14 +141,6 @@
         }
       ]
     },
-    "ChildRowState": {
-      "type": "string",
-      "enum": [
-        "unknown",
-        "hasChildRows",
-        "noChildRows"
-      ]
-    },
     "CommandErrorEnvelope": {
       "type": "object",
       "properties": {
@@ -2442,16 +2434,6 @@
     "LibraryTreeNode": {
       "type": "object",
       "properties": {
-        "childRowState": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ChildRowState"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "directoryImageMediaState": {
           "anyOf": [
             {
@@ -2507,6 +2489,16 @@
             "null"
           ],
           "format": "int64"
+        },
+        "navigableChildScopeState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NavigableChildScopeState"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "nodeKind": {
           "$ref": "#/$defs/LibraryTreeNodeKind"
@@ -2779,6 +2771,14 @@
         "playlistId",
         "playlistEntryId",
         "newPosition"
+      ]
+    },
+    "NavigableChildScopeState": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "hasNavigableChildScopes",
+        "noNavigableChildScopes"
       ]
     },
     "NavigationRow": {

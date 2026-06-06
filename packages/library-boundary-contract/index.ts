@@ -71,7 +71,7 @@ export type LoadNavigationRowByStableKeyRequest = { stableKey: string, };
 
 export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, };
 
-export type ChildRowState = "unknown" | "hasChildRows" | "noChildRows";
+export type NavigableChildScopeState = "unknown" | "hasNavigableChildScopes" | "noNavigableChildScopes";
 
 export type ReadSourceLifecycleRequest = { sourceId: string, };
 
@@ -256,7 +256,7 @@ export type LibraryTreeCoverage = { state: LibraryTreeCoverageState, subtreeCove
 
 export type LibraryTreeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
 
-export type LibraryTreeNode = { nodeKind: LibraryTreeNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, fileClass?: LibraryTreeFileClass, presenceState: LibraryTreePresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, childRowState?: ChildRowState, };
+export type LibraryTreeNode = { nodeKind: LibraryTreeNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, fileClass?: LibraryTreeFileClass, presenceState: LibraryTreePresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, navigableChildScopeState?: NavigableChildScopeState, };
 
 export type LibraryTreeNodeKind = "directory" | "file";
 

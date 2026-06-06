@@ -110,7 +110,7 @@ describe('hierarchy and navigation reads through the host', () => {
                   directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
                   directoryImageMediaState: { kind: 'noImageMediaDescendants' },
                   directoryScanState: 'scanning',
-                  childRowState: 'hasChildRows'
+                  navigableChildScopeState: 'hasNavigableChildScopes'
                 },
                 {
                   nodeKind: 'file',
@@ -197,7 +197,7 @@ describe('hierarchy and navigation reads through the host', () => {
       error: { code: 'readFailed' }
     })
 
-    const dirWithoutChildRowState = await readThroughHost(
+    const dirWithoutNavigableChildScopeState = await readThroughHost(
       await startedHostWithClient(
         config,
         createFakeClient({
@@ -236,7 +236,7 @@ describe('hierarchy and navigation reads through the host', () => {
       firstAvailableSourceReadRequest()
     )
 
-    expect(dirWithoutChildRowState).toMatchObject({
+    expect(dirWithoutNavigableChildScopeState).toMatchObject({
       state: 'readFailed',
       error: { code: 'readFailed' }
     })

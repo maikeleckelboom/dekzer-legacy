@@ -204,12 +204,12 @@ This is the normative specification. It supersedes any prior informal descriptio
 
 Every node in the left-side tree is one of three structural roles:
 
-**Container node** — has child scopes or may have them (unknown until loaded). Has a disclosure affordance. Is
+**Container node** — has known navigable child scopes. Has a disclosure affordance. Is
 selectable as a browse scope that aggregates its own content and all descendant content. Is expandable independently of
-selection.
+selection. Unknown child scope existence must not be projected as a known expandable branch.
 
-**Leaf node** — has no child scopes. Has no disclosure affordance. Is selectable as a browse scope. Has no expansion
-state.
+**Leaf node** — has no navigable child scopes, or child scope existence is unknown. Has no disclosure affordance. Is selectable as a browse scope. Has no expansion
+state. Progressive scan may transition a row from unknown/no-disclosure to known-branch/disclosure through invalidation.
 
 **Service root / virtual node** — a container node whose children are fetched from an external or deferred source.
 Behaves identically to container nodes except that first expansion triggers a deferred child fetch rather than revealing

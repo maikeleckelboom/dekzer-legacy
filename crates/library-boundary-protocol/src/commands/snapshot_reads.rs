@@ -1636,7 +1636,7 @@ pub struct LibraryTreeNode {
     pub directory_scan_state: Option<DirectoryScanState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub child_row_state: Option<ChildRowState>,
+    pub navigable_child_scope_state: Option<NavigableChildScopeState>,
 }
 
 #[derive(
@@ -1653,10 +1653,10 @@ pub struct LibraryTreeNode {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum ChildRowState {
+pub enum NavigableChildScopeState {
     Unknown,
-    HasChildRows,
-    NoChildRows,
+    HasNavigableChildScopes,
+    NoNavigableChildScopes,
 }
 
 #[derive(
@@ -2361,31 +2361,31 @@ pub enum SnapshotReadReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        AttachmentIdentity, AttachmentIdentityReadStatus, ChildRowState, ContentsFileClass,
-        ContentsFileKind, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
-        ContentsScopeDepth, DirectoryImageMediaState, DirectoryPrimaryMediaState,
-        DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
-        LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
-        LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
-        LibraryAssetPreparationDetailGroup, LibraryAssetPreparationDetailGroupKey,
-        LibraryAssetPreparationDetailRow, LibraryAssetPreparationOutcomeKind,
-        LibraryAssetPreparationOutcomeState, LibraryAssetPreparationRequirementClass,
-        LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
-        LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
-        LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
-        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage, LibraryTreeCoverageState,
-        LibraryTreeEntryPoint, LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind,
-        LibraryTreePresenceState, LibraryTreeWindow, LoadNavigationRowByStableKeyRequest,
-        LoadNavigationRowRequest, NavigationRow, NavigationRowFamily, NavigationRowKind,
-        NavigationRowSelectorKind, PrimaryMediaKind, ReadAttachmentSourceFilesReply,
-        ReadAttachmentSourceFilesRequest, ReadLibraryAssetPreparationDetailRequest,
-        ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenReply,
-        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowReply,
-        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
-        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
-        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply,
-        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
-        ReadTrackIdentityReviewCandidatesRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        AttachmentIdentity, AttachmentIdentityReadStatus, ContentsFileClass, ContentsFileKind,
+        ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeDepth,
+        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
+        LibraryAssetAvailabilityState, LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
+        LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
+        LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
+        LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
+        LibraryAssetPreparationOutcomeKind, LibraryAssetPreparationOutcomeState,
+        LibraryAssetPreparationRequirementClass, LibraryAssetPreparationSatisfactionState,
+        LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
+        LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
+        LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
+        LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeFileClass,
+        LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState, LibraryTreeWindow,
+        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigableChildScopeState,
+        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
+        PrimaryMediaKind, ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
+        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
+        ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
+        ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
+        SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
         SourceAccessState, SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
         SourceFileAttachmentLinkStatus, SourceLifecycle, SourceLifecycleIssueKind,
@@ -2764,7 +2764,7 @@ mod tests {
                     ),
                     directory_image_media_state: Some(DirectoryImageMediaState::Unknown),
                     directory_scan_state: Some(DirectoryScanState::Scanning),
-                    child_row_state: Some(ChildRowState::Unknown),
+                    navigable_child_scope_state: Some(NavigableChildScopeState::Unknown),
                 }],
             }),
         });
@@ -2812,7 +2812,7 @@ mod tests {
                                 "kind": "unknown"
                             },
                             "directoryScanState": "scanning",
-                            "childRowState": "unknown"
+                            "navigableChildScopeState": "unknown"
                         }]
                     }
                 }
@@ -2856,7 +2856,7 @@ mod tests {
                     directory_primary_media_state: None,
                     directory_image_media_state: None,
                     directory_scan_state: None,
-                    child_row_state: None,
+                    navigable_child_scope_state: None,
                 }],
             }),
         });

@@ -558,9 +558,14 @@ on tree scroll position or tree expansion state.
 
 ### Tree expandability affordance (current implementation)
 
-The renderer derives directory expandability from `childRowState` (`unknown`, `hasChildRows`, `noChildRows`).
-The product boundary contract (`source-hierarchy-contract.md`) owns this rule: the renderer must not derive
+The renderer derives directory expandability from `navigableChildScopeState` (`unknown`, `hasNavigableChildScopes`,
+`noNavigableChildScopes`).
+The product boundary contract owns this rule: the renderer must not derive
 expandability from `directoryPrimaryMediaState` or `directoryImageMediaState`.
+A directory with `navigableChildScopeState === 'unknown'` must not show a disclosure chevron;
+only `hasNavigableChildScopes` warrants a disclosure affordance.
+Unknown child scope existence must not be projected as a known expandable branch.
+Leaf folders (including media-only folders) are selectable and have no disclosure.
 
 ### Substrate descendant facts (store-level evidence)
 

@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { LibraryBoundaryHostStatus } from '../../../../src/shared/libraryBoundary/status'
 import type {
   ChildRow,
-  ChildRowState,
   EntryPoint,
-  HierarchyCoverage
+  HierarchyCoverage,
+  NavigableChildScopeState
 } from '../../../../src/shared/libraryHierarchy/readChildren'
 import type {
   NavigationReadRowsResult,
@@ -146,15 +146,16 @@ describe('projectState', () => {
     expect(stoppedProjection.bindingsById.has('navigation-row:7')).toBe(false)
   })
 
-  it('unloaded directory is a deferred branch', () => {
+  it('unloaded directory with known child scopes is a deferred branch', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
-            hasChildDirectories: false,
+            hasChildDirectories: true,
             directoryPrimaryMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
-            directoryScanState: 'pending'
+            directoryScanState: 'scanning',
+            navigableChildScopeState: 'hasNavigableChildScopes'
           })
         ])
       })
@@ -175,10 +176,11 @@ describe('projectState', () => {
       browserState({
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
-            hasChildDirectories: false,
+            hasChildDirectories: true,
             directoryPrimaryMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
-            directoryScanState: 'pending'
+            directoryScanState: 'scanning',
+            navigableChildScopeState: 'hasNavigableChildScopes'
           })
         ])
       })
@@ -193,15 +195,16 @@ describe('projectState', () => {
     ).toEqual(['state'])
   })
 
-  it('loading directory remains a branch', () => {
+  it('loading directory with known child scopes remains a branch', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
-            hasChildDirectories: false,
+            hasChildDirectories: true,
             directoryPrimaryMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
-            directoryScanState: 'pending'
+            directoryScanState: 'scanning',
+            navigableChildScopeState: 'hasNavigableChildScopes'
           })
         ]),
         directoryStates: new Map([
@@ -297,7 +300,7 @@ describe('projectState', () => {
             directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
-            childRowState: 'noChildRows'
+            navigableChildScopeState: 'noNavigableChildScopes'
           })
         ])
       })
@@ -318,7 +321,7 @@ describe('projectState', () => {
             directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
-            childRowState: 'noChildRows'
+            navigableChildScopeState: 'noNavigableChildScopes'
           })
         ]),
         directoryStates: new Map([
@@ -383,7 +386,7 @@ describe('projectState', () => {
             directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
-            childRowState: 'noChildRows'
+            navigableChildScopeState: 'noNavigableChildScopes'
           })
         ])
       })
@@ -560,6 +563,214 @@ describe('projectState', () => {
 
     expect(projection.bindingsById.get('navigation-row:7')).toMatchObject({
       kind: 'source'
+    })
+  })
+
+  it('video-only folder with no child folders has no disclosure', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Videos', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'noNavigableChildScopes'
+          })
+        ]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loaded',
+              children: loadedChildren([fileNode('15', 'clip.mp4', { fileClass: 'video' })], {
+                parentDirectoryId: '12'
+              })
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+  })
+
+  it('mixed audio/video folder with no child folders has no disclosure', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Mixed Media', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'noNavigableChildScopes'
+          })
+        ]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loaded',
+              children: loadedChildren(
+                [
+                  fileNode('15', 'track.flac', { fileClass: 'audio' }),
+                  fileNode('16', 'clip.mp4', { fileClass: 'video' })
+                ],
+                { parentDirectoryId: '12' }
+              )
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+  })
+
+  it('unknown navigable child scope state is not projected as expandable', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Pending Scan', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryImageMediaState: { kind: 'unknown' },
+            directoryScanState: 'pending',
+            navigableChildScopeState: 'unknown'
+          })
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+  })
+
+  it('folder with unknown scope state does not reveal disclosure after child read', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Music Folder', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryImageMediaState: { kind: 'unknown' },
+            directoryScanState: 'pending',
+            navigableChildScopeState: 'unknown'
+          })
+        ]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loaded',
+              children: loadedChildren([fileNode('15', 'track.flac', { fileClass: 'audio' })], {
+                parentDirectoryId: '12'
+              })
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    expect(projection.bindingsById.has('source-file:15')).toBe(false)
+  })
+
+  it('noNavigableChildScopes folder is a leaf regardless of loaded state', () => {
+    const priorChildren = loadedChildren([fileNode('15', 'track.wav')], {
+      parentDirectoryId: '12'
+    })
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Scanned Leaf', {
+            hasChildDirectories: false,
+            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'noNavigableChildScopes'
+          })
+        ]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'refreshing',
+              children: priorChildren,
+              requestKey: 'source:7/directory:12/v:audio',
+              sequence: 2,
+              detail: 'Refreshing children.'
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(node.children.kind).toBe('none')
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+  })
+
+  it('folder with child folders is both selectable and expandable', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([
+          directoryNode('12', 'Parent Album', {
+            hasChildDirectories: true,
+            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryImageMediaState: { kind: 'noImageMediaDescendants' },
+            directoryScanState: 'complete',
+            navigableChildScopeState: 'hasNavigableChildScopes'
+          })
+        ]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loaded',
+              children: loadedChildren(
+                [
+                  directoryNode('20', 'Sub-Album', {
+                    hasChildDirectories: false,
+                    directoryPrimaryMediaState: {
+                      kind: 'noPrimaryMediaDescendants'
+                    },
+                    directoryImageMediaState: {
+                      kind: 'noImageMediaDescendants'
+                    },
+                    directoryScanState: 'complete',
+                    navigableChildScopeState: 'noNavigableChildScopes'
+                  }),
+                  fileNode('15', 'track.flac', { fileClass: 'audio' })
+                ],
+                { parentDirectoryId: '12' }
+              )
+            }
+          ]
+        ])
+      })
+    )
+    const node = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(isBrowserTreeBranch(node)).toBe(true)
+    expect(canRevealBrowserTreeChildren(node)).toBe(true)
+    expect(projection.bindingsById.get('source-directory:12')).toMatchObject({
+      kind: 'directory',
+      sourceId: '7',
+      directoryId: '12'
     })
   })
 
@@ -759,7 +970,7 @@ function directoryNode(
       ChildRow,
       { readonly kind: 'directory' }
     >['directoryScanState']
-    readonly childRowState?: ChildRowState
+    readonly navigableChildScopeState?: NavigableChildScopeState
   } = {}
 ): Extract<ChildRow, { readonly kind: 'directory' }> {
   return {
@@ -777,7 +988,7 @@ function directoryNode(
       kind: 'noImageMediaDescendants'
     },
     directoryScanState: options.directoryScanState ?? 'scanning',
-    childRowState: options.childRowState ?? 'hasChildRows',
+    navigableChildScopeState: options.navigableChildScopeState ?? 'hasNavigableChildScopes',
     updatedAtMs: 100
   }
 }

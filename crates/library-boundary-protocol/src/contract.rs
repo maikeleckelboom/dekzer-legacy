@@ -56,7 +56,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LoadNavigationRowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowByStableKeyRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenRequest>(&cfg, &mut output);
-    push_ts_decl::<crate::ChildRowState>(&cfg, &mut output);
+    push_ts_decl::<crate::NavigableChildScopeState>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceMaintenanceRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SourceClass>(&cfg, &mut output);

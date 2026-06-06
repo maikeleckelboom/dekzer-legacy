@@ -409,7 +409,7 @@ function projectLiteralDirectoryNode(options: {
 
   const directoryState = options.directoryReadStates.get(node.directoryId)
 
-  if (isConfirmedDirectoryLeaf(node, directoryState)) {
+  if (isConfirmedDirectoryLeaf(node)) {
     return {
       id: node.id,
       role: 'literalDirectory',
@@ -436,13 +436,9 @@ function projectLiteralDirectoryNode(options: {
 }
 
 function isConfirmedDirectoryLeaf(
-  node: Extract<ChildRow, { readonly kind: 'directory' }>,
-  state: DirectoryState | undefined
+  node: Extract<ChildRow, { readonly kind: 'directory' }>
 ): boolean {
-  if (state !== undefined && state.kind !== 'unloaded') {
-    return false
-  }
-  return node.childRowState === 'noChildRows'
+  return node.navigableChildScopeState !== 'hasNavigableChildScopes'
 }
 
 const sourceUnavailableErrorCodes = new Set([

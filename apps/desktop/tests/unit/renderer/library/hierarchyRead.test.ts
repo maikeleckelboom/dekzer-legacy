@@ -1052,7 +1052,7 @@ function directoryNode(
     directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
     directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'scanning',
-    childRowState: 'hasChildRows',
+    navigableChildScopeState: 'hasNavigableChildScopes',
     updatedAtMs: 100
   }
 }

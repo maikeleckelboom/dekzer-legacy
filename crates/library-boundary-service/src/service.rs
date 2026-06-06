@@ -2240,8 +2240,8 @@ mod tests {
             Some(DirectoryScanState::Complete)
         );
         assert_eq!(
-            crate_row.child_row_state,
-            Some(library_boundary_protocol::ChildRowState::NoChildRows)
+            crate_row.navigable_child_scope_state,
+            Some(library_boundary_protocol::NavigableChildScopeState::NoNavigableChildScopes)
         );
         let crate_directory_id = crate_row
             .source_directory_id

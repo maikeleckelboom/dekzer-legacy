@@ -801,13 +801,13 @@ fn map_library_tree_node(
     let directory_image_media_state = map_directory_image_media_state(&node)?;
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
     let file_class = map_library_tree_file_class(&node)?;
-    let child_row_state = match node.node_kind.as_str() {
+    let navigable_child_scope_state = match node.node_kind.as_str() {
         "directory" => match (has_child_directories, directory_scan_state.as_ref()) {
-            (Some(true), _) => Some(protocol::ChildRowState::HasChildRows),
+            (Some(true), _) => Some(protocol::NavigableChildScopeState::HasNavigableChildScopes),
             (Some(false), Some(protocol::DirectoryScanState::Complete)) => {
-                Some(protocol::ChildRowState::NoChildRows)
+                Some(protocol::NavigableChildScopeState::NoNavigableChildScopes)
             }
-            _ => Some(protocol::ChildRowState::Unknown),
+            _ => Some(protocol::NavigableChildScopeState::Unknown),
         },
         "file" => None,
         _ => None,
@@ -830,7 +830,7 @@ fn map_library_tree_node(
         directory_primary_media_state,
         directory_image_media_state,
         directory_scan_state,
-        child_row_state,
+        navigable_child_scope_state,
     })
 }
 
@@ -1657,8 +1657,8 @@ mod tests {
             Some(protocol::DirectoryScanState::Scanning)
         );
         assert_eq!(
-            directory.child_row_state,
-            Some(protocol::ChildRowState::HasChildRows)
+            directory.navigable_child_scope_state,
+            Some(protocol::NavigableChildScopeState::HasNavigableChildScopes)
         );
 
         let file = &window.rows[1];
@@ -1667,7 +1667,7 @@ mod tests {
         assert_eq!(file.directory_primary_media_state, None);
         assert_eq!(file.directory_image_media_state, None);
         assert_eq!(file.directory_scan_state, None);
-        assert_eq!(file.child_row_state, None);
+        assert_eq!(file.navigable_child_scope_state, None);
     }
 
     #[test]
@@ -1704,8 +1704,8 @@ mod tests {
             Some(protocol::DirectoryImageMediaState::NoImageMediaDescendants)
         );
         assert_eq!(
-            complete.child_row_state,
-            Some(protocol::ChildRowState::NoChildRows)
+            complete.navigable_child_scope_state,
+            Some(protocol::NavigableChildScopeState::NoNavigableChildScopes)
         );
 
         for scan_state in ["pending", "scanning", "blocked", "failed"] {
@@ -1724,15 +1724,15 @@ mod tests {
                 "{scan_state} must not map to confirmed no-media"
             );
             assert_eq!(
-                mapped.child_row_state,
-                Some(protocol::ChildRowState::Unknown),
-                "{scan_state} must not map to confirmed no-child-rows"
+                mapped.navigable_child_scope_state,
+                Some(protocol::NavigableChildScopeState::Unknown),
+                "{scan_state} must not map to confirmed no-navigable-child-scopes"
             );
         }
     }
 
     #[test]
-    fn directory_child_row_state_tracks_navigable_child_directories_not_files() {
+    fn directory_navigable_child_scope_state_tracks_navigable_child_directories_not_files() {
         let media_leaf = map_library_tree_node(directory_node_with_child_directories(
             false, true, false, "complete",
         ))
@@ -1742,8 +1742,8 @@ mod tests {
             Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants)
         );
         assert_eq!(
-            media_leaf.child_row_state,
-            Some(protocol::ChildRowState::NoChildRows)
+            media_leaf.navigable_child_scope_state,
+            Some(protocol::NavigableChildScopeState::NoNavigableChildScopes)
         );
 
         let branch = map_library_tree_node(directory_node_with_child_directories(
@@ -1751,8 +1751,8 @@ mod tests {
         ))
         .expect("map branch directory");
         assert_eq!(
-            branch.child_row_state,
-            Some(protocol::ChildRowState::HasChildRows)
+            branch.navigable_child_scope_state,
+            Some(protocol::NavigableChildScopeState::HasNavigableChildScopes)
         );
     }
 

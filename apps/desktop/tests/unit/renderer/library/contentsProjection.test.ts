@@ -18,7 +18,7 @@ import {
 } from '../../../../src/renderer/library/contents/projection'
 import type {
   ChildRow,
-  ChildRowState,
+  NavigableChildScopeState,
   EntryPoint,
   HierarchyCoverage
 } from '../../../../src/shared/libraryHierarchy/readChildren'
@@ -114,7 +114,7 @@ describe('projectContents', () => {
             directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
             directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
             directoryScanState: 'complete',
-            childRowState: 'noChildRows'
+            navigableChildScopeState: 'noNavigableChildScopes'
           })
         ])
       }
@@ -868,7 +868,7 @@ function directoryNode(
       ChildRow,
       { readonly kind: 'directory' }
     >['directoryScanState']
-    readonly childRowState?: ChildRowState
+    readonly navigableChildScopeState?: NavigableChildScopeState
   } = {}
 ): Extract<ChildRow, { readonly kind: 'directory' }> {
   return {
@@ -887,7 +887,7 @@ function directoryNode(
       kind: 'noImageMediaDescendants'
     },
     directoryScanState: options.directoryScanState ?? 'scanning',
-    childRowState: options.childRowState ?? 'hasChildRows',
+    navigableChildScopeState: options.navigableChildScopeState ?? 'hasNavigableChildScopes',
     updatedAtMs: 100
   }
 }

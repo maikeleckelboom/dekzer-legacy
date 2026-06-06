@@ -47,7 +47,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
       row.directoryPrimaryMediaState === undefined ||
       row.directoryImageMediaState === undefined ||
       row.directoryScanState === undefined ||
-      row.childRowState === undefined
+      row.navigableChildScopeState === undefined
     ) {
       return undefined
     }
@@ -66,7 +66,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
       directoryPrimaryMediaState: row.directoryPrimaryMediaState,
       directoryImageMediaState: row.directoryImageMediaState,
       directoryScanState: row.directoryScanState,
-      childRowState: row.childRowState,
+      navigableChildScopeState: row.navigableChildScopeState,
       updatedAtMs: row.updatedAtMs
     }
   }
