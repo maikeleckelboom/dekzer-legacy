@@ -142,8 +142,8 @@ This is the smallest correct boundary because it preserves:
 - recursive default contents browse behavior;
 - source-file audio parity without making source-file rows canonical tracks;
 - generated contract locality: one enum/profile addition instead of a second command family;
-- renderer migration size: switch the default profile and keep the existing contents controller, pagination, and table
-  projection;
+- renderer surface impact: keep the existing contents controller, pagination, and table projection while the profile
+  changes at the boundary;
 - one browse path for contents-pane reads.
 
 ### Rejected: new contents row kind under existing result shape
@@ -177,7 +177,7 @@ audio browse should have an explicit backend-owned profile.
 - Source-file rows are not added back to tree navigation.
 - Renderer does not filter, sort, or derive authoritative audio browse fields.
 
-## Required Tests For V0
+## V0 Test Coverage
 
 - Store read-model tests proving audio browse parity with `sourceFileInventory` audio recursive and immediate
   reads for source, source-location, and directory scopes.
@@ -200,11 +200,11 @@ The implementation updates Rust protocol first, then regenerates `packages/libra
 source of truth. Generated TS and JSON schema expose the profile-specific `ContentsReadPolicy` union and mechanical
 manifest hashes. No dedicated audio row type, dedicated endpoint, or source hierarchy contract change exists.
 
-## Renderer Migration
+## Renderer Surface
 
-The renderer migration is limited to the default contents policy and request-key handling for the new profile.
-Projection and table code should continue to render returned rows and should not derive extension, source label,
-source-location provenance, row version, container, or codec. Source-file rows should remain available for explicit
+The renderer uses the default contents policy and handles request-key identity for the current profile.
+Projection and table code render returned rows and do not derive extension, source label,
+source-location provenance, row version, container, or codec. Source-file rows remain available for explicit
 non-default inventory/diagnostic modes.
 
 ## Unresolved Gaps

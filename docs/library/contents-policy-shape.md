@@ -150,9 +150,9 @@ The schema and row-field rename does not alter cursor policy identity.
 - Do not add renderer filtering, sorting, or authoritative field derivation.
 - Do not broaden the contents row or table design.
 
-## Validation Requirements
+## Contract Invariants
 
-The implementation must prove:
+The current implementation proves:
 
 - schema, SQL, store rows, boundary rows, generated contracts, desktop adapters, and renderer projection use
   `file_class`/`fileClass`/`FileClass` for the coarse source-file inventory concept;
