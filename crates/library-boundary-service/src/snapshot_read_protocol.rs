@@ -1032,7 +1032,7 @@ fn map_contents_result(
             .map(map_contents_row)
             .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
         scope_coverage: protocol::ContentsScopeCoverage {
-            state: map_contents_coverage_state(result.scope_coverage.state),
+            state: map_contents_scope_coverage_state(result.scope_coverage.state),
             subtree_coverage_complete: result.scope_coverage.subtree_coverage_complete,
             empty_result_authoritative: result.scope_coverage.empty_result_authoritative,
             detail: result.scope_coverage.detail,
@@ -1129,7 +1129,7 @@ const fn map_contents_state(state: store::StoreContentsState) -> protocol::Conte
     }
 }
 
-const fn map_contents_coverage_state(
+const fn map_contents_scope_coverage_state(
     state: store::StoreContentsScopeCoverageState,
 ) -> protocol::ContentsScopeCoverageState {
     match state {

@@ -406,7 +406,7 @@ Implementation notes:
 
 ## 4. Tree selection to contents scope flow
 
-Tree expansion and contents selection are separate reads. The renderer never crawls the tree cache to answer recursive
+Tree expansion and contents selection are separate reads. The renderer never crawls the tree cache to answer descendant-scope
 contents.
 
 ```mermaid
@@ -454,9 +454,9 @@ synthesize contents rows from loaded tree branches.
 Recursion policy:
 
 The renderer may express product selection intent, but the service validates and resolves the effective scope depth
-policy. First-slice default is recursive contents for selected source and directory scopes, because the contents pane
-answers “what playable material is inside this selected library scope,” not “which child nodes are currently expanded.”
-A future non-recursive folder mode must be an explicit policy value, not an accidental side effect of tree expansion.
+policy. First-slice default is descendant-scope contents for selected source and directory scopes, because the contents pane
+answers "what playable material is inside this selected library scope," not "which child nodes are currently expanded."
+A future immediate-scope folder mode must be an explicit policy value, not an accidental side effect of tree expansion.
 
 Pagination policy:
 

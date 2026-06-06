@@ -140,7 +140,7 @@ This is the smallest correct boundary because it preserves:
 - cursor compatibility by extending the existing cursor identity model with a distinct profile kind;
 - scopeCoverage compatibility by reusing `ContentsScopeCoverage`;
 - source, source-location, and directory scope compatibility;
-- recursive contents browse behavior;
+- descendant-scope contents browse behavior;
 - source-file audio parity without making source-file rows canonical tracks;
 - generated contract locality: one enum/profile addition instead of a second command family;
 - renderer surface impact: keep the existing contents controller, pagination, and table projection while the profile

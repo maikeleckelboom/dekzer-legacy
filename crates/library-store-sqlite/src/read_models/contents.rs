@@ -3074,7 +3074,7 @@ mod tests {
     }
 
     #[test]
-    fn directory_scope_reads_recursive_media_and_excludes_prefix_siblings() {
+    fn directory_scope_reads_descendants_media_and_excludes_prefix_siblings() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
@@ -3251,7 +3251,7 @@ mod tests {
     }
 
     #[test]
-    fn blocked_descendant_prevents_recursive_scope_from_being_complete() {
+    fn blocked_descendant_prevents_descendant_scope_from_being_complete() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -3742,7 +3742,7 @@ mod tests {
     }
 
     #[test]
-    fn audio_browse_profile_reuses_source_file_audio_rows_for_scopes_and_recursion() {
+    fn audio_browse_profile_reuses_source_file_audio_rows_for_scopes_and_scope_depth() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -3754,14 +3754,14 @@ mod tests {
         insert_scanned_file(&connection, 1002, 1, 11, "Music/Sub/02.wav", "audio");
         insert_scanned_file(&connection, 1003, 1, 20, "Images/front.jpg", "image");
 
-        let (_source_file, source_recursive) = assert_audio_browse_matches_source_file_audio(
+        let (_source_file, source_descendants) = assert_audio_browse_matches_source_file_audio(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             StoreContentsScopeDepth::Recursive,
             10,
         );
         assert_relative_paths(
-            &source_recursive.rows,
+            &source_descendants.rows,
             &["Music/01.wav", "Music/Sub/02.wav"],
         );
 
@@ -3772,7 +3772,7 @@ mod tests {
             10,
         );
 
-        let (_source_file, directory_recursive) = assert_audio_browse_matches_source_file_audio(
+        let (_source_file, directory_descendants) = assert_audio_browse_matches_source_file_audio(
             &connection,
             StoreContentsScope::Directory {
                 source_id: 1,
@@ -3782,7 +3782,7 @@ mod tests {
             10,
         );
         assert_relative_paths(
-            &directory_recursive.rows,
+            &directory_descendants.rows,
             &["Music/01.wav", "Music/Sub/02.wav"],
         );
 
@@ -3797,7 +3797,7 @@ mod tests {
         );
         assert_relative_paths(&directory_immediate.rows, &["Music/01.wav"]);
 
-        let (_source_file, location_recursive) = assert_audio_browse_matches_source_file_audio(
+        let (_source_file, location_descendants) = assert_audio_browse_matches_source_file_audio(
             &connection,
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
@@ -3806,7 +3806,7 @@ mod tests {
             10,
         );
         assert_relative_paths(
-            &location_recursive.rows,
+            &location_descendants.rows,
             &["Music/01.wav", "Music/Sub/02.wav"],
         );
 
@@ -3820,7 +3820,7 @@ mod tests {
         );
         assert_relative_paths(&location_immediate.rows, &["Music/01.wav"]);
 
-        for row in source_recursive.rows {
+        for row in source_descendants.rows {
             assert!(row.primary_media.is_none());
             assert!(row.availability_state.is_none());
             assert_eq!(row.file_class, "audio");
@@ -4049,7 +4049,7 @@ mod tests {
     }
 
     #[test]
-    fn omission_metadata_respects_recursion_and_is_not_page_local() {
+    fn omission_metadata_respects_scope_depth_and_is_not_page_local() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
@@ -4072,7 +4072,7 @@ mod tests {
         .expect("read immediate audio");
         assert!(!immediate.has_policy_omitted_rows);
 
-        let recursive_page_one = read_contents(
+        let descendants_page_one = read_contents(
             &connection,
             StoreContentsScope::Directory {
                 source_id: 1,
@@ -4083,12 +4083,12 @@ mod tests {
             1,
             None,
         )
-        .expect("read recursive audio page one");
-        assert_eq!(recursive_page_one.rows.len(), 1);
-        assert!(recursive_page_one.next_cursor.is_some());
-        assert!(recursive_page_one.has_policy_omitted_rows);
+        .expect("read descendants audio page one");
+        assert_eq!(descendants_page_one.rows.len(), 1);
+        assert!(descendants_page_one.next_cursor.is_some());
+        assert!(descendants_page_one.has_policy_omitted_rows);
 
-        let recursive_page_two = read_contents(
+        let descendants_page_two = read_contents(
             &connection,
             StoreContentsScope::Directory {
                 source_id: 1,
@@ -4097,10 +4097,10 @@ mod tests {
             audio_browse_policy(),
             StoreContentsScopeDepth::Recursive,
             1,
-            recursive_page_one.next_cursor.as_deref(),
+            descendants_page_one.next_cursor.as_deref(),
         )
-        .expect("read recursive audio page two");
-        assert!(recursive_page_two.has_policy_omitted_rows);
+        .expect("read descendants audio page two");
+        assert!(descendants_page_two.has_policy_omitted_rows);
     }
 
     #[test]
@@ -4310,13 +4310,13 @@ mod tests {
     }
 
     #[test]
-    fn source_and_directory_scopes_apply_backend_recursion_without_renderer_fanout() {
+    fn source_and_directory_scopes_apply_backend_scope_depth_without_renderer_fanout() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
         insert_scanned_file(&connection, 1000, 1, 10, "Media/track.wav", "audio");
 
-        let recursive_source = read_contents(
+        let descendants_source = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
             source_file_policy(vec![StoreContentsFileClass::Audio]),
@@ -4324,7 +4324,7 @@ mod tests {
             10,
             None,
         )
-        .expect("read recursive source");
+        .expect("read descendants source");
         let immediate_source = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
@@ -4334,7 +4334,7 @@ mod tests {
             None,
         )
         .expect("read immediate source");
-        let recursive_directory = read_contents(
+        let descendants_directory = read_contents(
             &connection,
             StoreContentsScope::Directory {
                 source_id: 1,
@@ -4345,14 +4345,17 @@ mod tests {
             10,
             None,
         )
-        .expect("read recursive directory");
+        .expect("read descendants directory");
 
-        assert_eq!(recursive_source.rows.len(), 1);
-        assert_eq!(recursive_source.rows[0].relative_path, "Media/track.wav");
+        assert_eq!(descendants_source.rows.len(), 1);
+        assert_eq!(descendants_source.rows[0].relative_path, "Media/track.wav");
         assert_eq!(immediate_source.state, StoreContentsState::Empty);
         assert!(immediate_source.rows.is_empty());
-        assert_eq!(recursive_directory.rows.len(), 1);
-        assert_eq!(recursive_directory.rows[0].relative_path, "Media/track.wav");
+        assert_eq!(descendants_directory.rows.len(), 1);
+        assert_eq!(
+            descendants_directory.rows[0].relative_path,
+            "Media/track.wav"
+        );
     }
 
     #[test]
@@ -5276,7 +5279,7 @@ mod tests {
     }
 
     #[test]
-    fn cursor_with_changed_recursion_returns_cursor_invalid() {
+    fn cursor_with_changed_scope_depth_returns_cursor_invalid() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -5590,7 +5593,7 @@ mod tests {
     }
 
     #[test]
-    fn non_recursive_directory_source_file_cursor_returns_correct_page_two() {
+    fn immediate_directory_source_file_cursor_returns_correct_page_two() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -5616,7 +5619,7 @@ mod tests {
             3,
             None,
         )
-        .expect("read page 1 (non-recursive directory scope)");
+        .expect("read page 1 (immediate directory scope)");
 
         assert_eq!(page1.rows.len(), 3);
         let cursor = page1.next_cursor.expect("expected cursor for page 2");
@@ -5632,7 +5635,7 @@ mod tests {
             3,
             Some(&cursor),
         )
-        .expect("read page 2 (non-recursive directory scope)");
+        .expect("read page 2 (immediate directory scope)");
 
         assert_eq!(page2.rows.len(), 2);
         assert!(
@@ -6992,7 +6995,7 @@ mod tests {
     }
 
     #[test]
-    fn source_file_contents_recursive_path_natural_order() {
+    fn source_file_contents_descendants_path_natural_order() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");

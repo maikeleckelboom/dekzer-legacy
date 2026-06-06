@@ -101,7 +101,7 @@ Each domain surface in the first slice has an owning layer:
 
 Renderers may cache projection/read state, but do not own substrate state. Rust/SQLite own durable substrate state.
 
-Hierarchy reads do not own recursive contents scopes. Contents reads do not own source scanning. Scan admission does
+Hierarchy reads do not own descendant-scope contents reads. Contents reads do not own source scanning. Scan admission does
 not equal media inventory. Empty rows do not automatically mean nothing exists.
 
 ## Active read boundaries

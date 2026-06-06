@@ -69,7 +69,7 @@ to it in order to infer omissions. The renderer's authority is limited to:
 
 The field is `hasPolicyOmittedRows: boolean`. It is not a count.
 
-A count would carry obligations that are not yet cleanly answerable: exact across recursive scopes, across pagination,
+A count would carry obligations that are not yet cleanly answerable: exact across descendant scopes, across pagination,
 across unavailable source rows, across ignored inventory, across source-file rows versus canonical track rows, and
 stable under partial scan coverage. A boolean answers the only question V0 needs: did this view exclude browse-relevant
 inventory because of the active policy? Upgrade to a count only when counting authority, scope semantics, and coverage
@@ -85,7 +85,7 @@ guarantees are explicitly defined.
 The field is:
 
 - Scoped to the request's `scope` parameter, not the current page.
-- Scoped to the request's `scopeDepth` mode — recursive reads consider descendants; immediate reads do not report beyond
+- Scoped to the request's `scopeDepth` mode — descendant-scope reads consider descendants; immediate reads do not report beyond
   immediate children.
 - Evaluated at the service/protocol boundary, not derived by the renderer.
 - Independent of page size. A page that returns rows may still carry `hasPolicyOmittedRows: true` at the scope level.

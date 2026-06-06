@@ -457,7 +457,7 @@ fn scanned_literal_hierarchy_survives_service_reopen() {
         );
         assert!(
             w.coverage.subtree_coverage_complete,
-            "post-scan recursive scope must be complete",
+            "post-scan scope coverage must be complete",
         );
     }
 }

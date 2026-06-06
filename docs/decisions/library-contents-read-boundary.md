@@ -49,7 +49,7 @@ The following facts are established by the Phase 0 inventory:
 3. **Recursive source/directory/sourceLocation contents queries are feasible with the current schema.**
 
    Current contents reads already use binary-collation descendant predicates. No schema migration is required for
-   recursive `sourceFileInventory.fileClasses` filtering.
+   descendant-scope `sourceFileInventory.fileClasses` filtering.
 
 4. **Cursor pagination is implemented for contents reads.**
 
@@ -65,7 +65,7 @@ The following facts are established by the Phase 0 inventory:
 
 5. **Hierarchy read is not the final owner for selected scope contents.**
 
-   It provides immediate children admitted by the product/boundary surface. It does not own recursive selected
+   It provides immediate children admitted by the product/boundary surface. It does not own descendant-scope selected
    contents, aggregated contents scopeCoverage, or primary-media summary joins.
 
    **Historical note:** `sourceFileVisibility` was implementation debt that has been removed from renderer-facing

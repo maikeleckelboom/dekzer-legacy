@@ -294,7 +294,7 @@ The implementation is correct only when all of the following hold:
 
 - permission failure never returns empty contents;
 - an unmounted source returns source unavailable or blocked state, not empty rows;
-- a blocked descendant makes recursive coverage blocked or partial, not complete;
+- a blocked descendant makes descendant scope coverage blocked or partial, not complete;
 - a readable, fully scanned empty scope is the only path to authoritative empty;
 - missing directories are represented as missing, not failed scan errors;
 - symlink escape is classified as product-policy blocked;
