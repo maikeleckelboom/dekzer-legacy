@@ -72,8 +72,8 @@ describe('preload renderer API', () => {
         sourceId: '7'
       },
       policy: {
-        mediaClasses: ['audio', 'video'] as const,
-        rowProfile: { kind: 'primaryMedia' as const }
+        kind: 'primaryMedia' as const,
+        mediaKinds: ['audio', 'video'] as const
       },
       recursion: 'recursive' as const,
       limit: 100

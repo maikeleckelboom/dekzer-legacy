@@ -156,7 +156,7 @@ describe('projectContents', () => {
       browserState({}),
       'navigation-row:7',
       readyContents({
-        profile: { mediaClasses: ['audio'], rowProfile: { kind: 'audioBrowse' } },
+        profile: { kind: 'audioBrowse' },
         rows: [sourceFileRow('b', 'B.wav', 'audio'), sourceFileRow('a', 'A.jpg', 'image')]
       })
     )
@@ -180,7 +180,7 @@ describe('projectContents', () => {
         result: {
           state: 'ready',
           scope: { kind: 'source', sourceId: '7' },
-          policy: { mediaClasses: ['audio', 'video'], rowProfile: { kind: 'primaryMedia' } },
+          policy: { kind: 'primaryMedia', mediaKinds: ['audio', 'video'] },
           recursion: 'recursive',
           rows: [
             primaryMediaRow('asset-1', 'track.wav', 'audio'),
@@ -228,7 +228,7 @@ describe('projectContents', () => {
         result: {
           state: 'ready',
           scope: { kind: 'source', sourceId: '7' },
-          policy: { mediaClasses: ['audio', 'video'], rowProfile: { kind: 'primaryMedia' } },
+          policy: { kind: 'primaryMedia', mediaKinds: ['audio', 'video'] },
           recursion: 'recursive',
           rows: [primaryMediaRow('c', 'third.wav', 'audio')],
           coverage: {
@@ -835,8 +835,8 @@ function contentsResult(options: {
   const policy =
     options.profile ??
     ({
-      mediaClasses: ['audio', 'video', 'image', 'unsupported'],
-      rowProfile: { kind: 'sourceFile' }
+      kind: 'sourceFileInventory',
+      fileClasses: ['audio', 'video', 'image', 'unsupported']
     } satisfies ContentsReadPolicy)
   return {
     state,

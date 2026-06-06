@@ -73,7 +73,8 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ContentsReadRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsScope>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadPolicy>(&cfg, &mut output);
-    push_ts_decl::<crate::ContentsRowProfile>(&cfg, &mut output);
+    push_ts_decl::<crate::ContentsFileClass>(&cfg, &mut output);
+    push_ts_decl::<crate::PrimaryMediaKind>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsRecursion>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetWaveformOverviewRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetPreparationDetailRequest>(&cfg, &mut output);

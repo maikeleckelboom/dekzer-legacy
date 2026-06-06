@@ -53,7 +53,7 @@ pub use authority::work::{
     ReplaceResolvedLibraryAssetPrepTargetsInput, ResolvedLibraryAssetPrepTargetInput,
     StaleCapabilityChange, StartWorkRunInput, StartedWorkRun, UpsertPrepPolicyInput,
 };
-pub use browse_media::LibraryTreeRowAdmission;
+pub use browse_media::SourceFileClassFilter;
 pub use error::{
     CanonicalError, CanonicalErrorCode, CanonicalErrorCodeParseError, DurableStoreOpenFailure,
     DurableStoreOpenFailureKind, LibrarySqliteError, LibrarySqliteResult,
@@ -67,7 +67,7 @@ pub use read_models::attachment_identity::{
 pub use read_models::contents::{
     StoreContentsCoverage, StoreContentsCoverageState, StoreContentsFileRow,
     StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion, StoreContentsResult,
-    StoreContentsRowOrigin, StoreContentsRowProfile, StoreContentsScope, StoreContentsState,
+    StoreContentsRowOrigin, StoreContentsScope, StoreContentsState, StorePrimaryMediaKind,
     StorePrimaryMediaSummary,
 };
 pub use read_models::library_asset_preparation_detail::{

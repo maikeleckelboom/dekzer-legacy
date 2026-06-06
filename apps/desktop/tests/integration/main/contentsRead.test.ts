@@ -60,8 +60,8 @@ describe('contents reads through the host', () => {
               payload: { sourceLocationId: '33' }
             },
             policy: {
-              mediaClasses: ['audio', 'image', 'unsupported'],
-              rowProfile: { kind: 'sourceFile' }
+              kind: 'sourceFileInventory',
+              fileClasses: ['audio', 'image', 'unsupported']
             },
             recursion: 'recursive',
             limit: 50
@@ -79,8 +79,8 @@ describe('contents reads through the host', () => {
       result: {
         scope: { kind: 'sourceLocation', sourceLocationId: '33' },
         policy: {
-          mediaClasses: ['audio', 'image', 'unsupported'],
-          rowProfile: { kind: 'sourceFile' }
+          kind: 'sourceFileInventory',
+          fileClasses: ['audio', 'image', 'unsupported']
         },
         recursion: 'recursive',
         rows: [
@@ -116,8 +116,8 @@ describe('contents reads through the host', () => {
       readContentsThroughHost(conflictHost, {
         scope: { kind: 'source', sourceId: '7' },
         policy: {
-          mediaClasses: ['audio', 'image'],
-          rowProfile: { kind: 'primaryMedia' }
+          kind: 'primaryMedia',
+          mediaKinds: ['audio']
         },
         recursion: 'recursive'
       })
@@ -133,8 +133,22 @@ describe('contents reads through the host', () => {
       readContentsThroughHost(successHost, {
         scope: { kind: 'source', sourceId: '7' },
         policy: {
-          mediaClasses: [],
-          rowProfile: { kind: 'sourceFile' }
+          kind: 'sourceFileInventory',
+          fileClasses: []
+        },
+        recursion: 'recursive'
+      })
+    ).resolves.toMatchObject({
+      state: 'invalidRequest',
+      error: { code: 'invalidRequest' }
+    })
+
+    await expect(
+      readContentsThroughHost(successHost, {
+        scope: { kind: 'source', sourceId: '7' },
+        policy: {
+          mediaClasses: ['audio'],
+          rowProfile: { kind: 'audioBrowse' }
         },
         recursion: 'recursive'
       })
@@ -166,13 +180,13 @@ describe('contents reads through the host', () => {
     expect(typeof registration.handler).toBe('function')
   })
 
-  it('passes audioBrowse row profile through to the boundary contract', async () => {
+  it('passes audioBrowse policy through with no caller filter', async () => {
     const config = hostConfig()
     const successHost = await startedHostWithClient(
       config,
       createFakeClient({
         readContents: async (request) => {
-          expect(request.policy.rowProfile).toEqual({ kind: 'audioBrowse' })
+          expect(request.policy).toEqual({ kind: 'audioBrowse' })
           return {
             result: {
               state: 'empty',
@@ -195,8 +209,7 @@ describe('contents reads through the host', () => {
       readContentsThroughHost(successHost, {
         scope: { kind: 'source', sourceId: '7' },
         policy: {
-          mediaClasses: ['audio'],
-          rowProfile: { kind: 'audioBrowse' }
+          kind: 'audioBrowse'
         },
         recursion: 'recursive',
         limit: 25
@@ -205,8 +218,7 @@ describe('contents reads through the host', () => {
       state: 'ready',
       result: {
         policy: {
-          mediaClasses: ['audio'],
-          rowProfile: { kind: 'audioBrowse' }
+          kind: 'audioBrowse'
         }
       }
     })
@@ -220,8 +232,8 @@ function sourceLocationRequest(): Parameters<typeof readContentsThroughHost>[1] 
       sourceLocationId: '33'
     },
     policy: {
-      mediaClasses: ['unsupported', 'image', 'audio', 'image'],
-      rowProfile: { kind: 'sourceFile' }
+      kind: 'sourceFileInventory',
+      fileClasses: ['unsupported', 'image', 'audio', 'image']
     },
     recursion: 'recursive',
     limit: 50

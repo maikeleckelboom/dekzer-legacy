@@ -477,6 +477,15 @@
         "incomplete"
       ]
     },
+    "ContentsFileClass": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video",
+        "image",
+        "unsupported"
+      ]
+    },
     "ContentsFileKind": {
       "type": "string",
       "enum": [
@@ -587,21 +596,57 @@
       ]
     },
     "ContentsReadPolicy": {
-      "type": "object",
-      "properties": {
-        "mediaClasses": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/ContentsMediaClass"
-          }
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "audioBrowse"
+            }
+          },
+          "required": [
+            "kind"
+          ]
         },
-        "rowProfile": {
-          "$ref": "#/$defs/ContentsRowProfile"
+        {
+          "type": "object",
+          "properties": {
+            "fileClasses": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentsFileClass"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "const": "sourceFileInventory"
+            }
+          },
+          "required": [
+            "kind",
+            "fileClasses"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "primaryMedia"
+            },
+            "mediaKinds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/PrimaryMediaKind"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "mediaKinds"
+          ]
         }
-      },
-      "required": [
-        "mediaClasses",
-        "rowProfile"
       ]
     },
     "ContentsReadReply": {
@@ -707,46 +752,6 @@
         "libraryAsset",
         "sourceFile",
         "primaryMediaCandidate"
-      ]
-    },
-    "ContentsRowProfile": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "const": "sourceFile"
-            }
-          },
-          "required": [
-            "kind"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "const": "primaryMedia"
-            }
-          },
-          "required": [
-            "kind"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "const": "audioBrowse"
-            }
-          },
-          "required": [
-            "kind"
-          ]
-        }
       ]
     },
     "ContentsScope": {
@@ -3077,6 +3082,13 @@
             "payload"
           ]
         }
+      ]
+    },
+    "PrimaryMediaKind": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video"
       ]
     },
     "PrimaryMediaSummary": {

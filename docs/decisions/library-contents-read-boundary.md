@@ -49,13 +49,14 @@ The following facts are established by the Phase 0 inventory:
 3. **Recursive source/directory/sourceLocation contents queries are feasible with the current schema.**
 
    Current contents reads already use binary-collation descendant predicates. No schema migration is required for
-   recursive sourceFile/profile media-class filtering.
+   recursive `sourceFileInventory.fileClasses` filtering.
 
 4. **Cursor pagination is implemented for contents reads.**
 
-   Cursor identity is encoded (base64url-encoded JSON, version 1) and validated. Cursor binds to scope, policy
-   (media classes and row profile), recursion, and ordering; it carries a last-row position tuple specific to each
-   row profile (sourceFile: `relative_path_key` + `source_file_id`; primaryMedia: `availability_priority`,
+   Cursor identity is encoded as base64url JSON and validated. Cursor binds to scope, the complete profile-specific
+   policy discriminant, recursion, and ordering; it carries a last-row position tuple specific to each policy
+   (`audioBrowse`/`sourceFileInventory`: persisted browse sort key + relative path + source-file id; `primaryMedia`:
+   `availability_priority`,
    `title_key`, `artist_key`, `album_key`, `relative_path_key`, `source_file_id`). The store validates cursor
    identity against the current request. Mismatched or un-decodable cursors return `CursorInvalid` with no
    `nextCursor`. Successful reads return `nextCursor` when more rows exist. The renderer sends cursors through the
@@ -75,13 +76,19 @@ The following facts are established by the Phase 0 inventory:
 ## Contract Vocabulary
 
 ```ts
-type ContentsRowProfile =
-  | { readonly kind: 'sourceFile' }
-  | { readonly kind: 'primaryMedia' }
+type ContentsReadPolicy =
   | { readonly kind: 'audioBrowse' }
+  | {
+      readonly kind: 'sourceFileInventory'
+      readonly fileClasses: readonly ContentsFileClass[]
+    }
+  | {
+      readonly kind: 'primaryMedia'
+      readonly mediaKinds: readonly PrimaryMediaKind[]
+    }
 ```
 
-**sourceFile:**
+**sourceFileInventory:**
 
 - literal source-file facts
 - audio, video, image allowed
@@ -93,16 +100,15 @@ type ContentsRowProfile =
 
 - audio and video only
 - may carry primary-media, library-asset, readiness, prep, waveform, and stems summary
-- rejects image with `policyConflict`
 - replaces the old selectedContentsRead behavior
 
 **audioBrowse:**
 
 - audio only
+- accepts no caller-supplied class filter
 - reuses the current contents file-row payload shape
 - returns V0 rows with source-file audio parity for equivalent scope, recursion, limit, and cursor
-- rejects non-audio media classes with `policyConflict`
-- cursor identity is distinct from `sourceFile` and `primaryMedia`
+- cursor identity is distinct from `sourceFileInventory` and `primaryMedia`
 
 The following terms are not used as shared or backend contract concepts:
 
@@ -133,7 +139,8 @@ type ContentsScope =
 
 type ContentsRecursion = 'immediate' | 'recursive'
 
-type ContentsMediaClass = 'audio' | 'video' | 'image' | 'unsupported'
+type ContentsFileClass = 'audio' | 'video' | 'image' | 'unsupported'
+type PrimaryMediaKind = 'audio' | 'video'
 type ContentsFileKind =
   | 'audio'
   | 'video'
@@ -145,10 +152,10 @@ type ContentsFileKind =
   | 'other'
   | 'unknown'
 
-type ContentsReadPolicy = {
-  readonly mediaClasses: readonly ContentsMediaClass[]
-  readonly rowProfile: ContentsRowProfile
-}
+type ContentsReadPolicy =
+  | { readonly kind: 'audioBrowse' }
+  | { readonly kind: 'sourceFileInventory'; readonly fileClasses: readonly ContentsFileClass[] }
+  | { readonly kind: 'primaryMedia'; readonly mediaKinds: readonly PrimaryMediaKind[] }
 ```
 
 ---
@@ -160,16 +167,15 @@ type ContentsReadPolicy = {
 - Renderer sends typed policy, never raw SQL.
 - Backend and query code own media filtering.
 - Renderer does not answer authoritative selected scope contents from loaded hierarchy cache.
-- sourceFile profile may include audio, video, image, and admitted unsupported companion rows.
-- sourceFile profile never carries primaryMedia summary.
+- sourceFileInventory may include audio, video, image, and admitted unsupported companion rows.
+- sourceFileInventory never carries primaryMedia summary.
 - primaryMedia profile may include audio and video only.
-- primaryMedia + image or unsupported returns `policyConflict`.
 - audioBrowse profile may include audio only.
-- audioBrowse + video, image, or unsupported returns `policyConflict`.
+- audioBrowse has no caller-supplied file/media class filter.
 - audioBrowse reuses the contents file-row payload shape and does not introduce a dedicated row type.
 - Image rows never carry primaryMedia summary.
-- `mediaClasses` are deterministic arrays, not Set.
-- `mediaClasses` are canonicalized in deterministic order: audio, video, image, unsupported.
+- `fileClasses` and `mediaKinds` are deterministic arrays, not Set.
+- `fileClasses` canonicalize as audio, video, image, unsupported; `mediaKinds` canonicalize as audio, video.
 - Normal media-relevant source-file inventory admits unsupported rows only when `fileKind = cueSheet`.
 - Unsupported docs, archives, binaries, unknown files, and `none` files are excluded from normal contents policy.
 - See `docs/library/media-relevant-file-inventory-contract.md` for the default inventory policy.
@@ -198,7 +204,7 @@ Define new `Contents*` contract names instead.
 
 Cursor pagination is implemented for contents reads:
 
-- Cursor is encoded (base64url-encoded JSON, version 1) with scope, policy, recursion, row profile, media classes,
+- Cursor is encoded as base64url JSON with scope, the full policy discriminant and variant filter state, recursion,
   and last-row ordering position.
 - Cursor identity is validated against the current request; mismatches return `cursorInvalid`.
 - `nextCursor` is produced when more rows exist beyond the limit.

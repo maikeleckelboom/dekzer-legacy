@@ -74,13 +74,24 @@ pub(crate) fn store_contents_scope(scope: protocol::ContentsScope) -> store::Sto
 pub(crate) fn store_contents_policy(
     policy: protocol::ContentsReadPolicy,
 ) -> store::StoreContentsReadPolicy {
-    store::StoreContentsReadPolicy {
-        media_classes: policy
-            .media_classes
-            .into_iter()
-            .map(store_contents_media_class)
-            .collect(),
-        row_profile: store_contents_row_profile(policy.row_profile),
+    match policy {
+        protocol::ContentsReadPolicy::AudioBrowse => store::StoreContentsReadPolicy::AudioBrowse,
+        protocol::ContentsReadPolicy::SourceFileInventory { file_classes } => {
+            store::StoreContentsReadPolicy::SourceFileInventory {
+                file_classes: file_classes
+                    .into_iter()
+                    .map(store_contents_file_class)
+                    .collect(),
+            }
+        }
+        protocol::ContentsReadPolicy::PrimaryMedia { media_kinds } => {
+            store::StoreContentsReadPolicy::PrimaryMedia {
+                media_kinds: media_kinds
+                    .into_iter()
+                    .map(store_primary_media_kind)
+                    .collect(),
+            }
+        }
     }
 }
 
@@ -93,24 +104,23 @@ pub(crate) const fn store_contents_recursion(
     }
 }
 
-const fn store_contents_media_class(
-    media_class: protocol::ContentsMediaClass,
+const fn store_contents_file_class(
+    file_class: protocol::ContentsFileClass,
 ) -> store::StoreContentsMediaClass {
-    match media_class {
-        protocol::ContentsMediaClass::Audio => store::StoreContentsMediaClass::Audio,
-        protocol::ContentsMediaClass::Video => store::StoreContentsMediaClass::Video,
-        protocol::ContentsMediaClass::Image => store::StoreContentsMediaClass::Image,
-        protocol::ContentsMediaClass::Unsupported => store::StoreContentsMediaClass::Unsupported,
+    match file_class {
+        protocol::ContentsFileClass::Audio => store::StoreContentsMediaClass::Audio,
+        protocol::ContentsFileClass::Video => store::StoreContentsMediaClass::Video,
+        protocol::ContentsFileClass::Image => store::StoreContentsMediaClass::Image,
+        protocol::ContentsFileClass::Unsupported => store::StoreContentsMediaClass::Unsupported,
     }
 }
 
-const fn store_contents_row_profile(
-    row_profile: protocol::ContentsRowProfile,
-) -> store::StoreContentsRowProfile {
-    match row_profile {
-        protocol::ContentsRowProfile::SourceFile => store::StoreContentsRowProfile::SourceFile,
-        protocol::ContentsRowProfile::PrimaryMedia => store::StoreContentsRowProfile::PrimaryMedia,
-        protocol::ContentsRowProfile::AudioBrowse => store::StoreContentsRowProfile::AudioBrowse,
+const fn store_primary_media_kind(
+    media_kind: protocol::PrimaryMediaKind,
+) -> store::StorePrimaryMediaKind {
+    match media_kind {
+        protocol::PrimaryMediaKind::Audio => store::StorePrimaryMediaKind::Audio,
+        protocol::PrimaryMediaKind::Video => store::StorePrimaryMediaKind::Video,
     }
 }
 
@@ -1032,13 +1042,24 @@ fn map_contents_result(
 }
 
 fn map_contents_policy(policy: store::StoreContentsReadPolicy) -> protocol::ContentsReadPolicy {
-    protocol::ContentsReadPolicy {
-        media_classes: policy
-            .media_classes
-            .into_iter()
-            .map(map_contents_media_class)
-            .collect(),
-        row_profile: map_contents_row_profile(policy.row_profile),
+    match policy {
+        store::StoreContentsReadPolicy::AudioBrowse => protocol::ContentsReadPolicy::AudioBrowse,
+        store::StoreContentsReadPolicy::SourceFileInventory { file_classes } => {
+            protocol::ContentsReadPolicy::SourceFileInventory {
+                file_classes: file_classes
+                    .into_iter()
+                    .map(map_contents_file_class)
+                    .collect(),
+            }
+        }
+        store::StoreContentsReadPolicy::PrimaryMedia { media_kinds } => {
+            protocol::ContentsReadPolicy::PrimaryMedia {
+                media_kinds: media_kinds
+                    .into_iter()
+                    .map(map_primary_media_kind)
+                    .collect(),
+            }
+        }
     }
 }
 
@@ -1051,24 +1072,23 @@ const fn map_contents_recursion(
     }
 }
 
-const fn map_contents_row_profile(
-    row_profile: store::StoreContentsRowProfile,
-) -> protocol::ContentsRowProfile {
-    match row_profile {
-        store::StoreContentsRowProfile::SourceFile => protocol::ContentsRowProfile::SourceFile,
-        store::StoreContentsRowProfile::PrimaryMedia => protocol::ContentsRowProfile::PrimaryMedia,
-        store::StoreContentsRowProfile::AudioBrowse => protocol::ContentsRowProfile::AudioBrowse,
+const fn map_contents_file_class(
+    file_class: store::StoreContentsMediaClass,
+) -> protocol::ContentsFileClass {
+    match file_class {
+        store::StoreContentsMediaClass::Audio => protocol::ContentsFileClass::Audio,
+        store::StoreContentsMediaClass::Video => protocol::ContentsFileClass::Video,
+        store::StoreContentsMediaClass::Image => protocol::ContentsFileClass::Image,
+        store::StoreContentsMediaClass::Unsupported => protocol::ContentsFileClass::Unsupported,
     }
 }
 
-const fn map_contents_media_class(
-    media_class: store::StoreContentsMediaClass,
-) -> protocol::ContentsMediaClass {
-    match media_class {
-        store::StoreContentsMediaClass::Audio => protocol::ContentsMediaClass::Audio,
-        store::StoreContentsMediaClass::Video => protocol::ContentsMediaClass::Video,
-        store::StoreContentsMediaClass::Image => protocol::ContentsMediaClass::Image,
-        store::StoreContentsMediaClass::Unsupported => protocol::ContentsMediaClass::Unsupported,
+const fn map_primary_media_kind(
+    media_kind: store::StorePrimaryMediaKind,
+) -> protocol::PrimaryMediaKind {
+    match media_kind {
+        store::StorePrimaryMediaKind::Audio => protocol::PrimaryMediaKind::Audio,
+        store::StorePrimaryMediaKind::Video => protocol::PrimaryMediaKind::Video,
     }
 }
 
@@ -1740,20 +1760,10 @@ mod tests {
 
     #[test]
     fn contents_profile_mapping_preserves_audio_browse_policy() {
-        let protocol_policy = protocol::ContentsReadPolicy {
-            media_classes: vec![protocol::ContentsMediaClass::Audio],
-            row_profile: protocol::ContentsRowProfile::AudioBrowse,
-        };
+        let protocol_policy = protocol::ContentsReadPolicy::AudioBrowse;
         let store_policy = store_contents_policy(protocol_policy.clone());
 
-        assert_eq!(
-            store_policy.row_profile,
-            store::StoreContentsRowProfile::AudioBrowse
-        );
-        assert_eq!(
-            store_policy.media_classes,
-            vec![store::StoreContentsMediaClass::Audio]
-        );
+        assert_eq!(store_policy, store::StoreContentsReadPolicy::AudioBrowse);
 
         let reply = map_read_contents_reply(store::StoreContentsResult {
             state: store::StoreContentsState::Empty,

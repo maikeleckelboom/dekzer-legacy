@@ -24,10 +24,10 @@ impl BrowseMediaClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum LibraryTreeRowAdmission {
+pub enum SourceFileClassFilter {
     NavigationOnly,
-    Performance,
-    PerformanceAndImages,
+    PrimaryMedia,
+    PrimaryMediaAndImages,
 }
 
 pub(crate) fn is_primary_media_class(media_class: &str) -> bool {
@@ -38,28 +38,28 @@ pub(crate) fn is_image_media_class(media_class: &str) -> bool {
     media_class == "image"
 }
 
-pub(crate) fn library_tree_row_admission_predicate_sql(
-    library_tree_row_admission: LibraryTreeRowAdmission,
+pub(crate) fn source_file_class_filter_predicate_sql(
+    source_file_class_filter: SourceFileClassFilter,
 ) -> &'static str {
-    match library_tree_row_admission {
-        LibraryTreeRowAdmission::NavigationOnly => "0 = 1",
-        LibraryTreeRowAdmission::Performance => "media_class IN ('audio', 'video')",
-        LibraryTreeRowAdmission::PerformanceAndImages => {
+    match source_file_class_filter {
+        SourceFileClassFilter::NavigationOnly => "0 = 1",
+        SourceFileClassFilter::PrimaryMedia => "media_class IN ('audio', 'video')",
+        SourceFileClassFilter::PrimaryMediaAndImages => {
             "media_class IN ('audio', 'video', 'image')"
         }
     }
 }
 
-pub(crate) fn library_tree_row_admission_predicate_sql_for_column(
-    library_tree_row_admission: LibraryTreeRowAdmission,
+pub(crate) fn source_file_class_filter_predicate_sql_for_column(
+    source_file_class_filter: SourceFileClassFilter,
     column_sql: &str,
 ) -> String {
-    match library_tree_row_admission {
-        LibraryTreeRowAdmission::NavigationOnly => "0 = 1".to_string(),
-        LibraryTreeRowAdmission::Performance => {
+    match source_file_class_filter {
+        SourceFileClassFilter::NavigationOnly => "0 = 1".to_string(),
+        SourceFileClassFilter::PrimaryMedia => {
             format!("{column_sql} IN ('audio', 'video')")
         }
-        LibraryTreeRowAdmission::PerformanceAndImages => {
+        SourceFileClassFilter::PrimaryMediaAndImages => {
             format!("{column_sql} IN ('audio', 'video', 'image')")
         }
     }

@@ -91,7 +91,7 @@ type ReadTrackIdentityReviewCandidatesReturnIsGenerated = AssertType<
 
 type ContentsReadAcceptsAudioBrowseProfile = AssertType<
   EqualTypes<
-    Extract<ContentsReadRequest['policy']['rowProfile'], { kind: 'audioBrowse' }>,
+    Extract<ContentsReadRequest['policy'], { kind: 'audioBrowse' }>,
     { kind: 'audioBrowse' }
   >
 >
@@ -699,8 +699,7 @@ async function validatesTrackIdentityReviewCandidateReads(): Promise<void> {
               candidateEvidenceBasis: 'current_primary_media_exact_blake3',
               candidateStatus: 'active',
               evidenceKeyAlgorithm: 'blake3',
-              evidenceKeyValue:
-                'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              evidenceKeyValue: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
               evidenceSummary: {
                 memberCount: 1,
                 evidenceCount: 1,
@@ -902,8 +901,7 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
               payload: { sourceId: '7' }
             },
             policy: {
-              mediaClasses: ['audio'],
-              rowProfile: { kind: 'audioBrowse' }
+              kind: 'audioBrowse'
             },
             recursion: 'recursive',
             rows: [],
@@ -925,8 +923,7 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
       payload: { sourceId: '7' }
     },
     policy: {
-      mediaClasses: ['audio'],
-      rowProfile: { kind: 'audioBrowse' }
+      kind: 'audioBrowse'
     },
     recursion: 'recursive',
     limit: 25
@@ -944,8 +941,7 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
             payload: { sourceId: '7' }
           },
           policy: {
-            mediaClasses: ['audio'],
-            rowProfile: { kind: 'audioBrowse' }
+            kind: 'audioBrowse'
           },
           recursion: 'recursive',
           limit: 25
@@ -954,11 +950,7 @@ async function validatesContentsReadAudioBrowseRequestAndReply(): Promise<void> 
     } satisfies CommandRequest,
     'readContents sends audioBrowse through the existing snapshot command'
   )
-  equal(
-    reply.result.policy.rowProfile.kind,
-    'audioBrowse',
-    'contents reply preserves audioBrowse profile'
-  )
+  equal(reply.result.policy.kind, 'audioBrowse', 'contents reply preserves audioBrowse profile')
 }
 
 async function validatesProtocolErrorsArePreserved(): Promise<void> {

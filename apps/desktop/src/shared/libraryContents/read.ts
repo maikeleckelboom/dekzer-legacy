@@ -49,6 +49,8 @@ export type ContentsScope =
 export type ContentsRecursion = 'immediate' | 'recursive'
 
 export type ContentsMediaClass = 'audio' | 'video' | 'image' | 'unsupported'
+export type ContentsFileClass = ContentsMediaClass
+export type PrimaryMediaKind = 'audio' | 'video'
 export type ContentsFileKind =
   | 'audio'
   | 'video'
@@ -60,21 +62,18 @@ export type ContentsFileKind =
   | 'other'
   | 'unknown'
 
-export type ContentsRowProfile =
-  | {
-      readonly kind: 'sourceFile'
-    }
-  | {
-      readonly kind: 'primaryMedia'
-    }
+export type ContentsReadPolicy =
   | {
       readonly kind: 'audioBrowse'
     }
-
-export type ContentsReadPolicy = {
-  readonly mediaClasses: readonly ContentsMediaClass[]
-  readonly rowProfile: ContentsRowProfile
-}
+  | {
+      readonly kind: 'sourceFileInventory'
+      readonly fileClasses: readonly ContentsFileClass[]
+    }
+  | {
+      readonly kind: 'primaryMedia'
+      readonly mediaKinds: readonly PrimaryMediaKind[]
+    }
 
 export type ContentsReadRequest = {
   readonly scope: ContentsScope

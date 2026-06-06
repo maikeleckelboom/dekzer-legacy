@@ -12,16 +12,16 @@ import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../libraryB
 import {
   contentsReadChannels,
   type ContentsCoverage,
+  type ContentsFileClass,
   type ContentsFileRow,
-  type ContentsMediaClass,
   type ContentsReadErrorCode,
   type ContentsReadErrorState,
   type ContentsReadPolicy,
   type ContentsReadResult,
   type ContentsRecursion,
   type ContentsResult,
-  type ContentsRowProfile,
   type ContentsScope,
+  type PrimaryMediaKind,
   type PrimaryMediaSummary
 } from '../../shared/libraryContents/read'
 
@@ -35,12 +35,13 @@ export type LibraryContentsReadIpcMain = {
 const defaultContentsLimit = 100
 const maxContentsLimit = 200
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
-const canonicalMediaClassOrder: readonly ContentsMediaClass[] = [
+const canonicalFileClassOrder: readonly ContentsFileClass[] = [
   'audio',
   'video',
   'image',
   'unsupported'
 ]
+const canonicalPrimaryMediaKindOrder: readonly PrimaryMediaKind[] = ['audio', 'video']
 
 export function registerContentsReadIpc(
   ipcMain: LibraryContentsReadIpcMain,
@@ -200,7 +201,7 @@ function normalizeScope(value: unknown): ContentsScope | ContentsReadResult {
 }
 
 function normalizePolicy(value: unknown): ContentsReadPolicy | ContentsReadResult {
-  if (!isRecord(value)) {
+  if (!isRecord(value) || typeof value.kind !== 'string') {
     return createContentsErrorResult(
       'invalidRequest',
       'invalidRequest',
@@ -208,73 +209,83 @@ function normalizePolicy(value: unknown): ContentsReadPolicy | ContentsReadResul
     )
   }
 
-  const mediaClasses = normalizeMediaClasses(value.mediaClasses)
-
-  if (isContentsReadResult(mediaClasses)) {
-    return mediaClasses
-  }
-
-  const rowProfile = normalizeRowProfile(value.rowProfile)
-
-  if (isContentsReadResult(rowProfile)) {
-    return rowProfile
-  }
-
-  return {
-    mediaClasses,
-    rowProfile
-  }
-}
-
-function normalizeMediaClasses(value: unknown): readonly ContentsMediaClass[] | ContentsReadResult {
-  if (!Array.isArray(value) || value.length === 0) {
-    return createContentsErrorResult(
-      'invalidRequest',
-      'invalidRequest',
-      'Contents mediaClasses must be a non-empty array.'
-    )
-  }
-
-  const mediaClasses = new Set<ContentsMediaClass>()
-
-  for (const mediaClass of value) {
-    if (
-      mediaClass !== 'audio' &&
-      mediaClass !== 'video' &&
-      mediaClass !== 'image' &&
-      mediaClass !== 'unsupported'
-    ) {
-      return createContentsErrorResult(
-        'invalidRequest',
-        'invalidRequest',
-        'Contents mediaClasses contains an unsupported value.'
-      )
-    }
-
-    mediaClasses.add(mediaClass)
-  }
-
-  return canonicalMediaClassOrder.filter((mediaClass) => mediaClasses.has(mediaClass))
-}
-
-function normalizeRowProfile(value: unknown): ContentsRowProfile | ContentsReadResult {
-  if (isRecord(value) && value.kind === 'sourceFile') {
-    return { kind: 'sourceFile' }
-  }
-
-  if (isRecord(value) && value.kind === 'primaryMedia') {
-    return { kind: 'primaryMedia' }
-  }
-
-  if (isRecord(value) && value.kind === 'audioBrowse') {
+  if (value.kind === 'audioBrowse') {
     return { kind: 'audioBrowse' }
+  }
+
+  if (value.kind === 'sourceFileInventory') {
+    const fileClasses = normalizeFileClasses(value.fileClasses)
+    return isContentsReadResult(fileClasses)
+      ? fileClasses
+      : { kind: 'sourceFileInventory', fileClasses }
+  }
+
+  if (value.kind === 'primaryMedia') {
+    const mediaKinds = normalizePrimaryMediaKinds(value.mediaKinds)
+    return isContentsReadResult(mediaKinds) ? mediaKinds : { kind: 'primaryMedia', mediaKinds }
   }
 
   return createContentsErrorResult(
     'invalidRequest',
     'invalidRequest',
-    'Contents rowProfile is invalid.'
+    'Contents policy kind is invalid.'
   )
+}
+
+function normalizeFileClasses(value: unknown): readonly ContentsFileClass[] | ContentsReadResult {
+  if (!Array.isArray(value) || value.length === 0) {
+    return createContentsErrorResult(
+      'invalidRequest',
+      'invalidRequest',
+      'Contents sourceFileInventory fileClasses must be a non-empty array.'
+    )
+  }
+
+  const fileClasses = new Set<ContentsFileClass>()
+
+  for (const fileClass of value) {
+    if (
+      fileClass !== 'audio' &&
+      fileClass !== 'video' &&
+      fileClass !== 'image' &&
+      fileClass !== 'unsupported'
+    ) {
+      return createContentsErrorResult(
+        'invalidRequest',
+        'invalidRequest',
+        'Contents fileClasses contains an unsupported value.'
+      )
+    }
+
+    fileClasses.add(fileClass)
+  }
+
+  return canonicalFileClassOrder.filter((fileClass) => fileClasses.has(fileClass))
+}
+
+function normalizePrimaryMediaKinds(
+  value: unknown
+): readonly PrimaryMediaKind[] | ContentsReadResult {
+  if (!Array.isArray(value) || value.length === 0) {
+    return createContentsErrorResult(
+      'invalidRequest',
+      'invalidRequest',
+      'Contents primaryMedia mediaKinds must be a non-empty array.'
+    )
+  }
+
+  const mediaKinds = new Set<PrimaryMediaKind>()
+  for (const mediaKind of value) {
+    if (mediaKind !== 'audio' && mediaKind !== 'video') {
+      return createContentsErrorResult(
+        'invalidRequest',
+        'invalidRequest',
+        'Contents mediaKinds contains an unsupported value.'
+      )
+    }
+    mediaKinds.add(mediaKind)
+  }
+  return canonicalPrimaryMediaKindOrder.filter((mediaKind) => mediaKinds.has(mediaKind))
 }
 
 function normalizeRecursion(value: unknown): ContentsRecursion | ContentsReadResult {
@@ -371,16 +382,36 @@ function mapScopeFromContract(scope: ContractContentsScope): ContentsScope {
 }
 
 function mapPolicyToContract(policy: ContentsReadPolicy): ContractContentsReadPolicy {
-  return {
-    mediaClasses: [...policy.mediaClasses],
-    rowProfile: policy.rowProfile
+  switch (policy.kind) {
+    case 'audioBrowse':
+      return policy
+    case 'sourceFileInventory':
+      return {
+        kind: policy.kind,
+        fileClasses: [...policy.fileClasses]
+      }
+    case 'primaryMedia':
+      return {
+        kind: policy.kind,
+        mediaKinds: [...policy.mediaKinds]
+      }
   }
 }
 
 function mapPolicyFromContract(policy: ContractContentsReadPolicy): ContentsReadPolicy {
-  return {
-    mediaClasses: policy.mediaClasses,
-    rowProfile: policy.rowProfile
+  switch (policy.kind) {
+    case 'audioBrowse':
+      return policy
+    case 'sourceFileInventory':
+      return {
+        kind: policy.kind,
+        fileClasses: policy.fileClasses
+      }
+    case 'primaryMedia':
+      return {
+        kind: policy.kind,
+        mediaKinds: policy.mediaKinds
+      }
   }
 }
 

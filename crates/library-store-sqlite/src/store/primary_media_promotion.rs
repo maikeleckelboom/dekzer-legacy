@@ -430,7 +430,7 @@ mod tests {
 
     use crate::read_models::contents::{
         StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion,
-        StoreContentsRowOrigin, StoreContentsRowProfile, StoreContentsScope, StoreContentsState,
+        StoreContentsRowOrigin, StoreContentsScope, StoreContentsState, StorePrimaryMediaKind,
     };
     use crate::{PromotePrimaryMediaForSourceResult, SqliteDurableStore};
 
@@ -971,14 +971,13 @@ mod tests {
                 StoreContentsScope::Source {
                     source_id: fixture.source_id,
                 },
-                StoreContentsReadPolicy {
-                    media_classes: vec![
+                StoreContentsReadPolicy::SourceFileInventory {
+                    file_classes: vec![
                         StoreContentsMediaClass::Audio,
                         StoreContentsMediaClass::Video,
                         StoreContentsMediaClass::Image,
                         StoreContentsMediaClass::Unsupported,
                     ],
-                    row_profile: StoreContentsRowProfile::SourceFile,
                 },
                 StoreContentsRecursion::Recursive,
                 10,
@@ -1075,12 +1074,8 @@ mod tests {
     }
 
     fn primary_media_policy() -> StoreContentsReadPolicy {
-        StoreContentsReadPolicy {
-            media_classes: vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-            ],
-            row_profile: StoreContentsRowProfile::PrimaryMedia,
+        StoreContentsReadPolicy::PrimaryMedia {
+            media_kinds: vec![StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video],
         }
     }
 }

@@ -14,6 +14,7 @@ scope:
 The canonical contents read boundary is `docs/decisions/library-contents-read-boundary.md`.
 
 Use that document for the typed contents request, policy, recursion, cursor, and pagination contract. Use
+`docs/library/contents-policy-shape.md` for the implemented profile-specific policy decision,
 `docs/library/library-contents-browse-policy.md` for the current default audio-first browse policy and
 `docs/library/library-tree-selection-contents-contract.md` for renderer coupling, retained-row behavior, refresh
 planning, and panel containment.

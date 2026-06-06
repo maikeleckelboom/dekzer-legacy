@@ -13,8 +13,8 @@ use crate::authority::work::{
 };
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
-    LibraryTreeRowAdmission, classify_relative_path_file_kind,
-    library_tree_row_admission_predicate_sql_for_column,
+    SourceFileClassFilter, classify_relative_path_file_kind,
+    source_file_class_filter_predicate_sql_for_column,
 };
 use crate::time::unix_time_ms;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
@@ -1049,8 +1049,8 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             [root_id],
         )?;
 
-        let primary_media_predicate = library_tree_row_admission_predicate_sql_for_column(
-            LibraryTreeRowAdmission::Performance,
+        let primary_media_predicate = source_file_class_filter_predicate_sql_for_column(
+            SourceFileClassFilter::PrimaryMedia,
             "f.media_class",
         );
         self.tx().execute(

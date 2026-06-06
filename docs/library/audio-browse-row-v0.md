@@ -20,14 +20,15 @@ scope:
 Implemented V0.
 
 This document resolves the V0 authority and implementation boundary for the audio browse row read-model concept. The
-implemented V0 adds `audioBrowse` as a `ContentsRowProfile` under the existing `readContents` boundary. It reuses the
-existing contents file-row payload shape and does not introduce a dedicated generated audio row type.
+implemented V0 uses `{ kind: 'audioBrowse' }` in the profile-specific `ContentsReadPolicy` union under the existing
+`readContents` boundary. It reuses the existing contents file-row payload shape and does not introduce a dedicated
+generated audio row type.
 
 ## Decision
 
-Audio browse row V0 is implemented as a new `ContentsRowProfile` kind under the existing `readContents` boundary.
+Audio browse row V0 is implemented as the filter-free `audioBrowse` policy variant under `readContents`.
 
-The implementation adds the `audioBrowse` row profile to the existing contents read policy and keeps the existing
+The implementation keeps the existing
 contents result envelope, scope model, recursion model, coverage model, and cursor pagination. V0 rows use the current
 contents file-row payload shape with the V0 field subset below. The product/read-model concept is audio browse row; it
 is not a canonical track, not a tree row, and not a separate browse endpoint.
@@ -63,13 +64,13 @@ not V0 fields.
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Store read model          | `StoreContentsFileRow` owns `id`, `source_id`, `source_file_id`, `parent_directory_id`, `label`, `relative_path`, `file_name`, `media_class`, `file_kind`, `presence`, `availability_state`, `primary_media`, `updated_at`, and internal `relative_path_browse_sort_key`. Source-file profile SQL returns source-file facts and `NULL` primary-media fields. |
 | Rust boundary protocol    | `ContentsReadRequest` owns `scope`, `policy`, `recursion`, `limit`, and `cursor`. `ContentsResult` owns `state`, echoed `scope`, echoed `policy`, echoed `recursion`, `rows`, `coverage`, optional `nextCursor`, and optional `detail`. `ContentsFileRow` owns the current row fields listed above.                                                          |
-| Generated TS contract     | `packages/library-boundary-contract` mirrors the Rust protocol. `ContentsRowProfile` supports `sourceFile`, `primaryMedia`, and `audioBrowse`. No dedicated generated `AudioBrowseRow` type exists.                                                                                                                                                          |
+| Generated TS contract     | `packages/library-boundary-contract` mirrors the Rust protocol. `ContentsReadPolicy` is the `audioBrowse`, `sourceFileInventory`, or `primaryMedia` union. No dedicated generated `AudioBrowseRow` type exists.                                                                                                                                              |
 | TS boundary client        | `LibraryBoundaryClient.readContents` sends the existing `snapshotRead/contentsRead` command and expects the existing `contents` reply. It adds no row authority.                                                                                                                                                                                             |
 | Desktop main adapter      | `apps/desktop/src/main/libraryContents/read.ts` normalizes scope, policy, recursion, limit, and cursor, maps generated `ContentsFileRow` into shared `ContentsFileRow`, and rejects invalid image/unsupported primary-media combinations. It adds no browse-field authority.                                                                                 |
-| Renderer boundary adapter | `apps/desktop/src/renderer/library/boundary/contentsRead.ts` requests `rowProfile: audioBrowse`, `mediaClasses: ['audio']`, and `recursion: recursive` for the default browse; it owns warm snapshots, retained rows, delayed pending display, and pagination accumulation only.                                                                             |
+| Renderer boundary adapter | `apps/desktop/src/renderer/library/boundary/contentsRead.ts` requests `{ kind: 'audioBrowse' }` and recursive contents for the default browse; it owns warm snapshots, retained rows, delayed pending display, and pagination accumulation only.                                                                                                             |
 | Renderer projection       | `contents/projection.ts` maps rows to `ContentRow` display rows with `id`, `label`, `presence`, `detail`, `icon`, `mediaClass`, and `availabilityState`. Its relative-path fallback and media labels are presentation, not durable field authority.                                                                                                          |
 | Table display             | `contents/table.vue` displays `Name` and `Details` columns. It does not display extension, source label, source-location provenance, row version, container, or codec.                                                                                                                                                                                       |
-| Cursor fields             | Cursor identity is store-owned and binds version, row-profile kind, scope, media classes, recursion, and row order position. `audioBrowse` has a distinct cursor kind from `sourceFile` and reuses the source-file order position: `relative_path_browse_sort_key`, `relative_path`, and `source_file_id`.                                                   |
+| Cursor fields             | Cursor identity is store-owned and binds version, scope, the full profile-specific policy, recursion, and row order position. `audioBrowse` has a distinct policy identity from `sourceFileInventory` and reuses the source-file order position: `relative_path_browse_sort_key`, `relative_path`, and `source_file_id`.                                     |
 | Coverage fields           | `ContentsCoverage` owns `state`, `recursiveScopeComplete`, `emptyResultAuthoritative`, and optional `detail`; incomplete, scanning, blocked, failed, unavailable, and missing-location cases must not become authoritative empty results.                                                                                                                    |
 | Scope fields              | Contents scope supports source, source location, and directory. Directory scope carries `sourceId` and `sourceDirectoryId`; source-location scope carries `sourceLocationId`. Rows do not carry per-row source-location provenance.                                                                                                                          |
 | Stable row identity       | Current source-file rows use `source-file:{source_file_id}`. Primary-media rows may use primary-media or library-asset identities, but those are not V0 audio browse row identities.                                                                                                                                                                         |
@@ -95,7 +96,7 @@ not V0 fields.
 | Updated timestamp               | current       | current store/read model      | `ContentsFileRow.updatedAtMs` maps from `StoreContentsFileRow.updated_at`.                                                                                      | Preserve as timestamp, not a row version.                                                                            |
 | Result state                    | current       | current contract              | `ContentsResult.state` already carries ready, empty, partial, unavailable, missing, blocked, failed, policy-conflict, and cursor-invalid outcomes.              | Reuse unchanged.                                                                                                     |
 | Scope echo                      | current       | current contract              | `ContentsResult.scope` echoes source, source-location, or directory scope.                                                                                      | Reuse unchanged.                                                                                                     |
-| Policy echo                     | current       | current contract              | `ContentsResult.policy` echoes media classes and row profile.                                                                                                   | Add the future audio browse profile to cursor identity and echo behavior.                                            |
+| Policy echo                     | current       | current contract              | `ContentsResult.policy` echoes the profile-specific policy union.                                                                                               | Preserve the `audioBrowse` discriminant in cursor identity and echo behavior.                                        |
 | Recursion                       | current       | current contract              | `ContentsResult.recursion` echoes immediate or recursive.                                                                                                       | Reuse unchanged.                                                                                                     |
 | Coverage                        | current       | current contract              | `ContentsResult.coverage` owns completeness and authoritative-empty semantics.                                                                                  | Reuse unchanged.                                                                                                     |
 | Cursor                          | current       | current store/read model      | `nextCursor` is store-owned and binds scope, policy, recursion, and row ordering position.                                                                      | Add a distinct cursor kind/version path for the future audio browse profile or extend identity without mixing pages. |
@@ -128,10 +129,10 @@ not V0 fields.
 
 ## Boundary Shape
 
-### Selected: new row profile under existing `readContents`
+### Selected: profile-specific policy under existing `readContents`
 
-The implementation extends `ContentsRowProfile` with `audioBrowse` and keeps the existing `ContentsReadRequest` and
-`ContentsResult` shape.
+The implementation uses the `ContentsReadPolicy` union and keeps the existing `ContentsReadRequest` and
+`ContentsResult` envelope and row payload.
 
 This is the smallest correct boundary because it preserves:
 
@@ -163,11 +164,10 @@ audio browse should have an explicit backend-owned profile.
 
 ## V0 Acceptance Criteria
 
-- `readContents` accepts the audio browse row profile and rejects incompatible media-class policies instead of silently
-  widening or narrowing them.
+- `readContents` accepts `{ kind: 'audioBrowse' }`; incompatible class combinations are unrepresentable.
 - The default main contents browse can request audio browse rows with recursive source, source-location, and directory
   scopes.
-- V0 audio browse rows match current `sourceFile` + `audio` results for the same scope, recursion, limit, and cursor,
+- V0 audio browse rows match `sourceFileInventory.fileClasses = ['audio']` results for the same scope, recursion, limit, and cursor,
   including row order and absence/presence of optional fields.
 - Audio browse rows never carry primary-media summary fields, canonical track identity, preparation summaries, waveform,
   stems, BPM, key, duration, artwork, CUE association, tags, notes, crates, sleeves, routes, or cloud/streaming state.
@@ -179,13 +179,13 @@ audio browse should have an explicit backend-owned profile.
 
 ## Required Tests For V0
 
-- Store read-model tests proving audio browse profile parity with current `sourceFile` + audio recursive and immediate
+- Store read-model tests proving audio browse parity with `sourceFileInventory` audio recursive and immediate
   reads for source, source-location, and directory scopes.
 - Store cursor tests proving audio browse cursor page two, invalid cursor profile mismatch, policy mismatch, recursion
   mismatch, scope mismatch, and no duplicate/gap behavior.
 - Store coverage tests proving incomplete, blocked, failed, unavailable, and missing-location cases keep current
   coverage semantics.
-- Boundary protocol serialization tests for the new row-profile kind and cursor-invalid/policy-conflict behavior.
+- Boundary protocol serialization tests for the policy discriminant and cursor-invalid behavior.
 - Boundary service mapping tests proving profile mapping and row parity.
 - Generated contract checks proving TS/schema include the new row-profile kind and no new dedicated row type.
 - Desktop main adapter tests proving request normalization, generated-contract mapping, error mapping, and no
@@ -197,8 +197,8 @@ audio browse should have an explicit backend-owned profile.
 ## Contract Generation
 
 The implementation updates Rust protocol first, then regenerates `packages/library-boundary-contract` from the Rust
-source of truth. Generated TS and JSON schema change only to add the `audioBrowse` `ContentsRowProfile` variant and
-mechanical manifest hashes. No dedicated audio row type, dedicated endpoint, or source hierarchy contract change exists.
+source of truth. Generated TS and JSON schema expose the profile-specific `ContentsReadPolicy` union and mechanical
+manifest hashes. No dedicated audio row type, dedicated endpoint, or source hierarchy contract change exists.
 
 ## Renderer Migration
 

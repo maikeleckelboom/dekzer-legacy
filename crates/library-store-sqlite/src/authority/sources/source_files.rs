@@ -3,8 +3,8 @@ use rusqlite::{OptionalExtension, params};
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
-    LibraryTreeRowAdmission, file_kind_str_from_path, is_image_media_class, is_primary_media_class,
-    library_tree_row_admission_predicate_sql_for_column, media_class_str_from_path,
+    SourceFileClassFilter, file_kind_str_from_path, is_image_media_class, is_primary_media_class,
+    media_class_str_from_path, source_file_class_filter_predicate_sql_for_column,
 };
 use crate::browse_sort_key::{compute_name_browse_sort_key, compute_relative_path_browse_sort_key};
 use library_domain::SourcePresenceState;
@@ -231,8 +231,8 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
         source_file_id: i64,
         updated_at: i64,
     ) -> LibrarySqliteResult<()> {
-        let known_media_predicate = library_tree_row_admission_predicate_sql_for_column(
-            LibraryTreeRowAdmission::PerformanceAndImages,
+        let known_media_predicate = source_file_class_filter_predicate_sql_for_column(
+            SourceFileClassFilter::PrimaryMediaAndImages,
             "media_class",
         );
         let source_file = self

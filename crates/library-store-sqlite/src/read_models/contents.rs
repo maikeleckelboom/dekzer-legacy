@@ -6,25 +6,31 @@ use crate::read_models::source_location_coverage::{
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
-const CONTENTS_CURSOR_VERSION: u8 = 2;
-const CONTENTS_CURSOR_KIND_SOURCE_FILE: &str = "sf";
-const CONTENTS_CURSOR_KIND_PRIMARY_MEDIA: &str = "pm";
-const CONTENTS_CURSOR_KIND_AUDIO_BROWSE: &str = "ab";
-const CONTENTS_CURSOR_MEDIA_CLASS_ORDER: [StoreContentsMediaClass; 4] = [
+const CONTENTS_CURSOR_VERSION: u8 = 3;
+const CONTENTS_CURSOR_FILE_CLASS_ORDER: [StoreContentsMediaClass; 4] = [
     StoreContentsMediaClass::Audio,
     StoreContentsMediaClass::Video,
     StoreContentsMediaClass::Image,
     StoreContentsMediaClass::Unsupported,
 ];
+const CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER: [StorePrimaryMediaKind; 2] =
+    [StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ContentsCursor {
     version: u8,
-    kind: String,
     scope: ContentsCursorScope,
-    media_classes: Vec<String>,
+    policy: ContentsCursorPolicy,
     recursion: String,
     position: ContentsCursorPosition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum ContentsCursorPolicy {
+    AudioBrowse,
+    SourceFileInventory { file_classes: Vec<String> },
+    PrimaryMedia { media_kinds: Vec<String> },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -153,22 +159,6 @@ fn validate_cursor_identity(
     if cursor.version != CONTENTS_CURSOR_VERSION {
         return false;
     }
-    let kind_matches = matches!(
-        (cursor.kind.as_str(), policy.row_profile),
-        (
-            CONTENTS_CURSOR_KIND_SOURCE_FILE,
-            StoreContentsRowProfile::SourceFile
-        ) | (
-            CONTENTS_CURSOR_KIND_PRIMARY_MEDIA,
-            StoreContentsRowProfile::PrimaryMedia
-        ) | (
-            CONTENTS_CURSOR_KIND_AUDIO_BROWSE,
-            StoreContentsRowProfile::AudioBrowse
-        )
-    );
-    if !kind_matches {
-        return false;
-    }
     let scope_matches = match (&cursor.scope, scope) {
         (
             ContentsCursorScope::Source { source_id: a },
@@ -197,7 +187,7 @@ fn validate_cursor_identity(
     if !scope_matches {
         return false;
     }
-    if cursor.media_classes != canonical_cursor_media_classes(policy) {
+    if cursor.policy != canonical_cursor_policy(policy) {
         return false;
     }
     let expected_recursion = match recursion {
@@ -209,20 +199,19 @@ fn validate_cursor_identity(
 
 fn compute_cursor_position(
     row: &StoreContentsFileRow,
-    row_profile: StoreContentsRowProfile,
+    policy: &StoreContentsReadPolicy,
 ) -> ContentsCursorPosition {
-    match row_profile {
-        StoreContentsRowProfile::SourceFile | StoreContentsRowProfile::AudioBrowse => {
-            ContentsCursorPosition::SourceFile {
-                relative_path_browse_sort_key: row
-                    .relative_path_browse_sort_key
-                    .clone()
-                    .expect("source-file contents rows select relative_path_browse_sort_key"),
-                relative_path: row.relative_path.clone(),
-                source_file_id: row.source_file_id,
-            }
-        }
-        StoreContentsRowProfile::PrimaryMedia => ContentsCursorPosition::PrimaryMedia {
+    match policy {
+        StoreContentsReadPolicy::SourceFileInventory { .. }
+        | StoreContentsReadPolicy::AudioBrowse => ContentsCursorPosition::SourceFile {
+            relative_path_browse_sort_key: row
+                .relative_path_browse_sort_key
+                .clone()
+                .expect("source-file contents rows select relative_path_browse_sort_key"),
+            relative_path: row.relative_path.clone(),
+            source_file_id: row.source_file_id,
+        },
+        StoreContentsReadPolicy::PrimaryMedia { .. } => ContentsCursorPosition::PrimaryMedia {
             availability_priority: availability_priority(&row.availability_state),
             title_key: compute_title_key(row),
             artist_key: compute_artist_key(row),
@@ -266,17 +255,28 @@ fn compute_album_key(row: &StoreContentsFileRow) -> String {
         .unwrap_or_default()
 }
 
-fn canonical_cursor_media_classes(policy: &StoreContentsReadPolicy) -> Vec<String> {
-    CONTENTS_CURSOR_MEDIA_CLASS_ORDER
-        .iter()
-        .filter(|media_class| {
-            policy
-                .media_classes
-                .iter()
-                .any(|requested| requested == *media_class)
-        })
-        .map(|media_class| media_class.as_str().to_string())
-        .collect()
+fn canonical_cursor_policy(policy: &StoreContentsReadPolicy) -> ContentsCursorPolicy {
+    match policy {
+        StoreContentsReadPolicy::AudioBrowse => ContentsCursorPolicy::AudioBrowse,
+        StoreContentsReadPolicy::SourceFileInventory { file_classes } => {
+            ContentsCursorPolicy::SourceFileInventory {
+                file_classes: CONTENTS_CURSOR_FILE_CLASS_ORDER
+                    .iter()
+                    .filter(|file_class| file_classes.contains(file_class))
+                    .map(|file_class| file_class.as_str().to_string())
+                    .collect(),
+            }
+        }
+        StoreContentsReadPolicy::PrimaryMedia { media_kinds } => {
+            ContentsCursorPolicy::PrimaryMedia {
+                media_kinds: CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER
+                    .iter()
+                    .filter(|media_kind| media_kinds.contains(media_kind))
+                    .map(|media_kind| media_kind.as_str().to_string())
+                    .collect(),
+            }
+        }
+    }
 }
 
 fn build_next_cursor(
@@ -286,12 +286,7 @@ fn build_next_cursor(
     recursion: StoreContentsRecursion,
 ) -> Option<String> {
     let last_row = rows.last()?;
-    let position = compute_cursor_position(last_row, policy.row_profile);
-    let kind = match policy.row_profile {
-        StoreContentsRowProfile::SourceFile => CONTENTS_CURSOR_KIND_SOURCE_FILE.to_string(),
-        StoreContentsRowProfile::PrimaryMedia => CONTENTS_CURSOR_KIND_PRIMARY_MEDIA.to_string(),
-        StoreContentsRowProfile::AudioBrowse => CONTENTS_CURSOR_KIND_AUDIO_BROWSE.to_string(),
-    };
+    let position = compute_cursor_position(last_row, policy);
     let cursor_scope = match scope {
         StoreContentsScope::Source { source_id } => ContentsCursorScope::Source {
             source_id: *source_id,
@@ -315,9 +310,8 @@ fn build_next_cursor(
     };
     let cursor = ContentsCursor {
         version: CONTENTS_CURSOR_VERSION,
-        kind,
         scope: cursor_scope,
-        media_classes: canonical_cursor_media_classes(policy),
+        policy: canonical_cursor_policy(policy),
         recursion: recursion_str,
         position,
     };
@@ -403,10 +397,18 @@ impl StoreContentsMediaClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum StoreContentsRowProfile {
-    SourceFile,
-    PrimaryMedia,
-    AudioBrowse,
+pub enum StorePrimaryMediaKind {
+    Audio,
+    Video,
+}
+
+impl StorePrimaryMediaKind {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Audio => "audio",
+            Self::Video => "video",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -416,9 +418,14 @@ pub enum StoreContentsRecursion {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoreContentsReadPolicy {
-    pub media_classes: Vec<StoreContentsMediaClass>,
-    pub row_profile: StoreContentsRowProfile,
+pub enum StoreContentsReadPolicy {
+    AudioBrowse,
+    SourceFileInventory {
+        file_classes: Vec<StoreContentsMediaClass>,
+    },
+    PrimaryMedia {
+        media_kinds: Vec<StorePrimaryMediaKind>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -550,37 +557,6 @@ pub(crate) fn read_contents(
 ) -> LibrarySqliteResult<StoreContentsResult> {
     let policy = canonicalize_policy(policy)?;
 
-    if policy.row_profile == StoreContentsRowProfile::PrimaryMedia
-        && policy.media_classes.iter().any(|media_class| {
-            matches!(
-                media_class,
-                StoreContentsMediaClass::Image | StoreContentsMediaClass::Unsupported
-            )
-        })
-    {
-        return Ok(non_ready_result(
-            scope,
-            policy,
-            recursion,
-            StoreContentsState::PolicyConflict,
-            StoreContentsCoverageState::Failed,
-            "Primary media contents can include audio and video rows only.",
-        ));
-    }
-
-    if policy.row_profile == StoreContentsRowProfile::AudioBrowse
-        && policy.media_classes != vec![StoreContentsMediaClass::Audio]
-    {
-        return Ok(non_ready_result(
-            scope,
-            policy,
-            recursion,
-            StoreContentsState::PolicyConflict,
-            StoreContentsCoverageState::Failed,
-            "Audio browse contents can include audio rows only.",
-        ));
-    }
-
     let cursor_position = if let Some(cursor_str) = cursor {
         let decoded = match decode_cursor(cursor_str) {
             Ok(cursor) => cursor,
@@ -621,20 +597,20 @@ pub(crate) fn read_contents(
                 detail: Some("The contents cursor does not match the current request.".to_string()),
             });
         }
-        let position_matches_profile = matches!(
-            (&decoded.position, policy.row_profile),
+        let position_matches_policy = matches!(
+            (&decoded.position, &policy),
             (
                 ContentsCursorPosition::SourceFile { .. },
-                StoreContentsRowProfile::SourceFile
+                StoreContentsReadPolicy::SourceFileInventory { .. }
             ) | (
                 ContentsCursorPosition::SourceFile { .. },
-                StoreContentsRowProfile::AudioBrowse
+                StoreContentsReadPolicy::AudioBrowse
             ) | (
                 ContentsCursorPosition::PrimaryMedia { .. },
-                StoreContentsRowProfile::PrimaryMedia,
+                StoreContentsReadPolicy::PrimaryMedia { .. },
             )
         );
-        if !position_matches_profile {
+        if !position_matches_policy {
             return Ok(StoreContentsResult {
                 state: StoreContentsState::CursorInvalid,
                 scope,
@@ -645,10 +621,10 @@ pub(crate) fn read_contents(
                     state: StoreContentsCoverageState::Failed,
                     recursive_scope_complete: false,
                     empty_result_authoritative: false,
-                    detail: Some("The contents cursor does not match the row profile.".to_string()),
+                    detail: Some("The contents cursor does not match the policy.".to_string()),
                 },
                 next_cursor: None,
-                detail: Some("The contents cursor does not match the row profile.".to_string()),
+                detail: Some("The contents cursor does not match the policy.".to_string()),
             });
         }
         Some(decoded.position)
@@ -730,7 +706,7 @@ pub(crate) fn read_contents(
         rows
     };
     let state = contents_state(&coverage, rows.is_empty());
-    let detail = contents_detail(state, coverage.state, policy.row_profile);
+    let detail = contents_detail(state, coverage.state, &policy);
 
     let empty_result_authoritative =
         state == StoreContentsState::Empty && coverage.recursive_scope_complete;
@@ -753,62 +729,77 @@ pub(crate) fn read_contents(
 pub(crate) fn canonicalize_policy(
     policy: StoreContentsReadPolicy,
 ) -> LibrarySqliteResult<StoreContentsReadPolicy> {
-    let mut has_audio = false;
-    let mut has_video = false;
-    let mut has_image = false;
-    let mut has_unsupported = false;
-
-    for media_class in policy.media_classes {
-        match media_class {
-            StoreContentsMediaClass::Audio => has_audio = true,
-            StoreContentsMediaClass::Video => has_video = true,
-            StoreContentsMediaClass::Image => has_image = true,
-            StoreContentsMediaClass::Unsupported => has_unsupported = true,
+    match policy {
+        StoreContentsReadPolicy::AudioBrowse => Ok(StoreContentsReadPolicy::AudioBrowse),
+        StoreContentsReadPolicy::SourceFileInventory { file_classes } => {
+            let file_classes = canonicalize_file_classes(file_classes);
+            if file_classes.is_empty() {
+                return Err(LibrarySqliteError::MalformedSchemaState(
+                    "contents sourceFileInventory fileClasses must not be empty".to_string(),
+                ));
+            }
+            Ok(StoreContentsReadPolicy::SourceFileInventory { file_classes })
+        }
+        StoreContentsReadPolicy::PrimaryMedia { media_kinds } => {
+            let media_kinds = canonicalize_primary_media_kinds(media_kinds);
+            if media_kinds.is_empty() {
+                return Err(LibrarySqliteError::MalformedSchemaState(
+                    "contents primaryMedia mediaKinds must not be empty".to_string(),
+                ));
+            }
+            Ok(StoreContentsReadPolicy::PrimaryMedia { media_kinds })
         }
     }
-
-    let mut media_classes = Vec::new();
-    if has_audio {
-        media_classes.push(StoreContentsMediaClass::Audio);
-    }
-    if has_video {
-        media_classes.push(StoreContentsMediaClass::Video);
-    }
-    if has_image {
-        media_classes.push(StoreContentsMediaClass::Image);
-    }
-    if has_unsupported {
-        media_classes.push(StoreContentsMediaClass::Unsupported);
-    }
-
-    if media_classes.is_empty() {
-        return Err(LibrarySqliteError::MalformedSchemaState(
-            "contents mediaClasses must not be empty".to_string(),
-        ));
-    }
-
-    Ok(StoreContentsReadPolicy {
-        media_classes,
-        row_profile: policy.row_profile,
-    })
 }
 
-fn media_classes_predicate_sql(
+fn canonicalize_file_classes(
+    file_classes: Vec<StoreContentsMediaClass>,
+) -> Vec<StoreContentsMediaClass> {
+    CONTENTS_CURSOR_FILE_CLASS_ORDER
+        .into_iter()
+        .filter(|file_class| file_classes.contains(file_class))
+        .collect()
+}
+
+fn canonicalize_primary_media_kinds(
+    media_kinds: Vec<StorePrimaryMediaKind>,
+) -> Vec<StorePrimaryMediaKind> {
+    CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER
+        .into_iter()
+        .filter(|media_kind| media_kinds.contains(media_kind))
+        .collect()
+}
+
+fn file_classes_predicate_sql(
     media_class_column_sql: &str,
     file_kind_column_sql: &str,
-    media_classes: &[StoreContentsMediaClass],
+    file_classes: &[StoreContentsMediaClass],
 ) -> String {
-    let predicates = media_classes
+    let predicates = file_classes
         .iter()
-        .map(|media_class| match media_class {
+        .map(|file_class| match file_class {
             StoreContentsMediaClass::Unsupported => format!(
                 "({media_class_column_sql} = 'unsupported' AND {file_kind_column_sql} = 'cue_sheet')"
             ),
-            _ => format!("{media_class_column_sql} = '{}'", media_class.as_str()),
+            _ => format!("{media_class_column_sql} = '{}'", file_class.as_str()),
         })
         .collect::<Vec<_>>()
         .join(" OR ");
     format!("({predicates})")
+}
+
+fn policy_file_classes(policy: &StoreContentsReadPolicy) -> Vec<StoreContentsMediaClass> {
+    match policy {
+        StoreContentsReadPolicy::AudioBrowse => vec![StoreContentsMediaClass::Audio],
+        StoreContentsReadPolicy::SourceFileInventory { file_classes } => file_classes.clone(),
+        StoreContentsReadPolicy::PrimaryMedia { media_kinds } => media_kinds
+            .iter()
+            .map(|media_kind| match media_kind {
+                StorePrimaryMediaKind::Audio => StoreContentsMediaClass::Audio,
+                StorePrimaryMediaKind::Video => StoreContentsMediaClass::Video,
+            })
+            .collect(),
+    }
 }
 
 fn resolve_scope(
@@ -1486,14 +1477,16 @@ fn contents_state(coverage: &StoreContentsCoverage, rows_empty: bool) -> StoreCo
 fn contents_detail(
     state: StoreContentsState,
     coverage_state: StoreContentsCoverageState,
-    row_profile: StoreContentsRowProfile,
+    policy: &StoreContentsReadPolicy,
 ) -> Option<&'static str> {
     match state {
         StoreContentsState::Ready => None,
-        StoreContentsState::Empty => Some(match row_profile {
-            StoreContentsRowProfile::PrimaryMedia => "No primary media found in this scope.",
-            StoreContentsRowProfile::SourceFile => "No visible files found in this scope.",
-            StoreContentsRowProfile::AudioBrowse => "No audio files found in this scope.",
+        StoreContentsState::Empty => Some(match policy {
+            StoreContentsReadPolicy::PrimaryMedia { .. } => "No primary media found in this scope.",
+            StoreContentsReadPolicy::SourceFileInventory { .. } => {
+                "No visible files found in this scope."
+            }
+            StoreContentsReadPolicy::AudioBrowse => "No audio files found in this scope.",
         }),
         StoreContentsState::Partial => Some(match coverage_state {
             StoreContentsCoverageState::Scanning => "Still indexing. Results may be incomplete.",
@@ -1524,8 +1517,10 @@ fn read_rows(
             "contents limit {limit} exceeds i64 range"
         ))
     })?;
+    let file_classes = policy_file_classes(policy);
     let media_predicate =
-        media_classes_predicate_sql("sf.media_class", "sf.file_kind", &policy.media_classes);
+        file_classes_predicate_sql("sf.media_class", "sf.file_kind", &file_classes);
+    let primary_media_rows = matches!(policy, StoreContentsReadPolicy::PrimaryMedia { .. });
 
     match scope {
         ResolvedContentsScope::WholeSource { source_id } => {
@@ -1540,7 +1535,7 @@ fn read_rows(
                 SourcePredicateReadInput {
                     source_predicate: &source_predicate,
                     media_predicate: &media_predicate,
-                    row_profile: policy.row_profile,
+                    primary_media_rows,
                     source_id: *source_id,
                     relative_path: None,
                     limit_plus_one,
@@ -1575,7 +1570,7 @@ fn read_rows(
                 connection,
                 &predicate,
                 &media_predicate,
-                policy.row_profile,
+                primary_media_rows,
                 *source_id,
                 limit_plus_one,
                 cursor_position,
@@ -1591,7 +1586,7 @@ fn read_rows(
                 SourcePredicateReadInput {
                     source_predicate: &predicate,
                     media_predicate: &media_predicate,
-                    row_profile: policy.row_profile,
+                    primary_media_rows,
                     source_id: *source_id,
                     relative_path: Some(relative_path),
                     limit_plus_one,
@@ -1609,7 +1604,7 @@ fn read_rows(
                 SourcePredicateReadInput {
                     source_predicate: &predicate,
                     media_predicate: &media_predicate,
-                    row_profile: policy.row_profile,
+                    primary_media_rows,
                     source_id: *source_id,
                     relative_path: Some(relative_path),
                     limit_plus_one,
@@ -1625,7 +1620,7 @@ fn read_rows_for_accepted_locations(
     connection: &Connection,
     source_predicate: &str,
     media_predicate: &str,
-    row_profile: StoreContentsRowProfile,
+    primary_media_rows: bool,
     source_id: i64,
     limit_plus_one: i64,
     cursor_position: Option<&ContentsCursorPosition>,
@@ -1647,7 +1642,7 @@ fn read_rows_for_accepted_locations(
         Some(accepted_locations_cte()),
         source_predicate,
         media_predicate,
-        row_profile,
+        primary_media_rows,
         cursor_start,
         limit_param,
     );
@@ -1676,7 +1671,7 @@ fn read_rows_for_accepted_locations(
 struct SourcePredicateReadInput<'a> {
     source_predicate: &'a str,
     media_predicate: &'a str,
-    row_profile: StoreContentsRowProfile,
+    primary_media_rows: bool,
     source_id: i64,
     relative_path: Option<&'a str>,
     limit_plus_one: i64,
@@ -1704,7 +1699,7 @@ fn read_rows_with_source_predicate(
         None,
         input.source_predicate,
         input.media_predicate,
-        input.row_profile,
+        input.primary_media_rows,
         cursor_start,
         limit_param,
     );
@@ -1767,27 +1762,26 @@ fn contents_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
     media_predicate: &str,
-    row_profile: StoreContentsRowProfile,
+    primary_media_rows: bool,
     cursor_start: Option<usize>,
     limit_param: usize,
 ) -> String {
-    match row_profile {
-        StoreContentsRowProfile::SourceFile | StoreContentsRowProfile::AudioBrowse => {
-            source_file_rows_sql(
-                prefix_cte,
-                source_predicate,
-                media_predicate,
-                cursor_start,
-                limit_param,
-            )
-        }
-        StoreContentsRowProfile::PrimaryMedia => primary_media_rows_sql(
+    if primary_media_rows {
+        primary_media_rows_sql(
             prefix_cte,
             source_predicate,
             media_predicate,
             cursor_start,
             limit_param,
-        ),
+        )
+    } else {
+        source_file_rows_sql(
+            prefix_cte,
+            source_predicate,
+            media_predicate,
+            cursor_start,
+            limit_param,
+        )
     }
 }
 
@@ -2322,39 +2316,14 @@ fn contents_label(title: Option<&str>, file_name: &str, relative_path: &str) -> 
         .to_string()
 }
 
-fn non_ready_result(
-    scope: StoreContentsScope,
-    policy: StoreContentsReadPolicy,
-    recursion: StoreContentsRecursion,
-    state: StoreContentsState,
-    coverage_state: StoreContentsCoverageState,
-    detail: &str,
-) -> StoreContentsResult {
-    StoreContentsResult {
-        state,
-        scope,
-        policy,
-        recursion,
-        rows: Vec::new(),
-        coverage: StoreContentsCoverage {
-            state: coverage_state,
-            recursive_scope_complete: false,
-            empty_result_authoritative: false,
-            detail: Some(detail.to_string()),
-        },
-        next_cursor: None,
-        detail: Some(detail.to_string()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
         StoreContentsCoverageState, StoreContentsMediaClass, StoreContentsReadPolicy,
-        StoreContentsRecursion, StoreContentsRowOrigin, StoreContentsRowProfile,
-        StoreContentsScope, StoreContentsState, canonical_cursor_media_classes, read_contents,
+        StoreContentsRecursion, StoreContentsRowOrigin, StoreContentsScope, StoreContentsState,
+        StorePrimaryMediaKind, canonical_cursor_policy, read_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -2365,27 +2334,26 @@ mod tests {
     }
 
     fn primary_media_policy() -> StoreContentsReadPolicy {
-        StoreContentsReadPolicy {
-            media_classes: vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-            ],
-            row_profile: StoreContentsRowProfile::PrimaryMedia,
+        StoreContentsReadPolicy::PrimaryMedia {
+            media_kinds: vec![StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video],
         }
     }
 
+    fn primary_media_file_classes() -> Vec<StoreContentsMediaClass> {
+        vec![
+            StoreContentsMediaClass::Audio,
+            StoreContentsMediaClass::Video,
+        ]
+    }
+
     fn source_file_policy(media_classes: Vec<StoreContentsMediaClass>) -> StoreContentsReadPolicy {
-        StoreContentsReadPolicy {
-            media_classes,
-            row_profile: StoreContentsRowProfile::SourceFile,
+        StoreContentsReadPolicy::SourceFileInventory {
+            file_classes: media_classes,
         }
     }
 
     fn audio_browse_policy() -> StoreContentsReadPolicy {
-        StoreContentsReadPolicy {
-            media_classes: vec![StoreContentsMediaClass::Audio],
-            row_profile: StoreContentsRowProfile::AudioBrowse,
-        }
+        StoreContentsReadPolicy::AudioBrowse
     }
 
     fn default_source_file_policy() -> StoreContentsReadPolicy {
@@ -2398,13 +2366,7 @@ mod tests {
     }
 
     #[test]
-    fn canonical_cursor_media_class_identity_uses_explicit_stable_order() {
-        let expected = vec![
-            "audio".to_string(),
-            "image".to_string(),
-            "unsupported".to_string(),
-        ];
-
+    fn canonical_cursor_file_class_identity_uses_explicit_stable_order() {
         for media_classes in [
             vec![
                 StoreContentsMediaClass::Unsupported,
@@ -2423,19 +2385,27 @@ mod tests {
             ],
         ] {
             assert_eq!(
-                canonical_cursor_media_classes(&source_file_policy(media_classes)),
-                expected
+                canonical_cursor_policy(&source_file_policy(media_classes)),
+                super::ContentsCursorPolicy::SourceFileInventory {
+                    file_classes: vec![
+                        "audio".to_string(),
+                        "image".to_string(),
+                        "unsupported".to_string(),
+                    ],
+                }
             );
         }
 
         assert_eq!(
-            canonical_cursor_media_classes(&default_source_file_policy()),
-            vec![
-                "audio".to_string(),
-                "video".to_string(),
-                "image".to_string(),
-                "unsupported".to_string(),
-            ]
+            canonical_cursor_policy(&default_source_file_policy()),
+            super::ContentsCursorPolicy::SourceFileInventory {
+                file_classes: vec![
+                    "audio".to_string(),
+                    "video".to_string(),
+                    "image".to_string(),
+                    "unsupported".to_string(),
+                ],
+            }
         );
     }
 
@@ -3237,14 +3207,7 @@ mod tests {
         assert_eq!(audio_browse.coverage, source_file.coverage);
         assert_eq!(audio_browse.rows, source_file.rows);
         assert_eq!(audio_browse.recursion, source_file.recursion);
-        assert_eq!(
-            audio_browse.policy.media_classes,
-            vec![StoreContentsMediaClass::Audio]
-        );
-        assert_eq!(
-            audio_browse.policy.row_profile,
-            StoreContentsRowProfile::AudioBrowse
-        );
+        assert_eq!(audio_browse.policy, StoreContentsReadPolicy::AudioBrowse);
 
         (source_file, audio_browse)
     }
@@ -3525,15 +3488,7 @@ mod tests {
         .expect("read source-file contents");
 
         assert_eq!(result.state, StoreContentsState::Ready);
-        assert_eq!(
-            result
-                .policy
-                .media_classes
-                .iter()
-                .map(|media_class| media_class.as_str())
-                .collect::<Vec<_>>(),
-            vec!["audio", "video", "image", "unsupported"]
-        );
+        assert_eq!(result.policy, default_source_file_policy());
         let rows = result
             .rows
             .iter()
@@ -3589,13 +3544,8 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(
-            result
-                .policy
-                .media_classes
-                .iter()
-                .map(|media_class| media_class.as_str())
-                .collect::<Vec<_>>(),
-            vec!["audio"]
+            result.policy,
+            source_file_policy(vec![StoreContentsMediaClass::Audio])
         );
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0].relative_path, "Media/track.wav");
@@ -3691,7 +3641,7 @@ mod tests {
     }
 
     #[test]
-    fn audio_browse_profile_rejects_non_audio_policy_without_weakening_source_file() {
+    fn audio_browse_policy_is_audio_only_without_weakening_source_file_inventory() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
@@ -3716,31 +3666,21 @@ mod tests {
         assert_eq!(source_file.state, StoreContentsState::Ready);
         assert_relative_paths(&source_file.rows, &["Media/clip.mp4", "Media/track.wav"]);
 
-        let conflict = read_contents(
+        let audio_browse = read_contents(
             &connection,
             StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            StoreContentsReadPolicy {
-                media_classes: vec![
-                    StoreContentsMediaClass::Audio,
-                    StoreContentsMediaClass::Video,
-                ],
-                row_profile: StoreContentsRowProfile::AudioBrowse,
-            },
+            audio_browse_policy(),
             StoreContentsRecursion::Recursive,
             10,
             None,
         )
         .expect("read audio-browse contents");
 
-        assert_eq!(conflict.state, StoreContentsState::PolicyConflict);
-        assert!(conflict.rows.is_empty());
-        assert_eq!(
-            conflict.detail.as_deref(),
-            Some("Audio browse contents can include audio rows only.")
-        );
+        assert_eq!(audio_browse.state, StoreContentsState::Ready);
+        assert_relative_paths(&audio_browse.rows, &["Media/track.wav"]);
     }
 
     #[test]
@@ -4011,73 +3951,46 @@ mod tests {
         )
         .expect("read source-file contents");
 
-        assert_eq!(
-            result.policy.media_classes,
-            vec![
-                StoreContentsMediaClass::Audio,
-                StoreContentsMediaClass::Video,
-                StoreContentsMediaClass::Image,
-                StoreContentsMediaClass::Unsupported,
-            ]
-        );
+        assert_eq!(result.policy, default_source_file_policy());
     }
 
     #[test]
-    fn primary_media_policy_with_non_primary_media_classes_returns_policy_conflict() {
+    fn empty_primary_media_policy_is_rejected() {
         let connection = open_connection();
         insert_source(&connection, 1);
 
-        let result = read_contents(
+        let error = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            source_file_policy(vec![StoreContentsMediaClass::Image]),
-            StoreContentsRecursion::Recursive,
-            10,
-            None,
-        )
-        .expect("read source-file contents");
-        assert_eq!(result.state, StoreContentsState::Empty);
-
-        let conflict = read_contents(
-            &connection,
-            StoreContentsScope::Source { source_id: 1 },
-            StoreContentsReadPolicy {
-                media_classes: vec![
-                    StoreContentsMediaClass::Audio,
-                    StoreContentsMediaClass::Image,
-                ],
-                row_profile: StoreContentsRowProfile::PrimaryMedia,
+            StoreContentsReadPolicy::PrimaryMedia {
+                media_kinds: Vec::new(),
             },
             StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read conflicted contents");
+        .expect_err("empty primary-media kinds must be rejected");
+        assert!(error.to_string().contains("mediaKinds must not be empty"));
+    }
 
-        assert_eq!(conflict.state, StoreContentsState::PolicyConflict);
-        assert!(conflict.rows.is_empty());
+    #[test]
+    fn empty_source_file_inventory_policy_is_rejected() {
+        let connection = open_connection();
+        insert_source(&connection, 1);
 
-        let unsupported_conflict = read_contents(
+        let error = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            StoreContentsReadPolicy {
-                media_classes: vec![
-                    StoreContentsMediaClass::Audio,
-                    StoreContentsMediaClass::Unsupported,
-                ],
-                row_profile: StoreContentsRowProfile::PrimaryMedia,
+            StoreContentsReadPolicy::SourceFileInventory {
+                file_classes: Vec::new(),
             },
             StoreContentsRecursion::Recursive,
             10,
             None,
         )
-        .expect("read unsupported conflicted contents");
+        .expect_err("empty source-file classes must be rejected");
 
-        assert_eq!(
-            unsupported_conflict.state,
-            StoreContentsState::PolicyConflict
-        );
-        assert!(unsupported_conflict.rows.is_empty());
+        assert!(error.to_string().contains("fileClasses must not be empty"));
     }
 
     #[test]
@@ -4201,6 +4114,33 @@ mod tests {
 
         assert_eq!(page1.rows.len(), 3);
         let cursor = page1.next_cursor.expect("expected cursor for page 2");
+
+        let audio_browse_mismatch = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            audio_browse_policy(),
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("reject primary-media cursor for audio browse");
+        assert_eq!(
+            audio_browse_mismatch.state,
+            StoreContentsState::CursorInvalid
+        );
+
+        let media_kind_mismatch = read_contents(
+            &connection,
+            StoreContentsScope::Source { source_id: 1 },
+            StoreContentsReadPolicy::PrimaryMedia {
+                media_kinds: vec![StorePrimaryMediaKind::Video],
+            },
+            StoreContentsRecursion::Recursive,
+            3,
+            Some(&cursor),
+        )
+        .expect("reject primary-media cursor with changed media kinds");
+        assert_eq!(media_kind_mismatch.state, StoreContentsState::CursorInvalid);
 
         let page2 = read_contents(
             &connection,
@@ -4356,7 +4296,7 @@ mod tests {
     }
 
     #[test]
-    fn cursor_with_changed_media_classes_returns_cursor_invalid() {
+    fn source_file_inventory_cursor_with_changed_file_classes_returns_cursor_invalid() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4394,7 +4334,7 @@ mod tests {
             3,
             Some(&cursor),
         )
-        .expect("read with changed media_classes");
+        .expect("read with changed file classes");
 
         assert_eq!(result.state, StoreContentsState::CursorInvalid);
         assert!(result.rows.is_empty());
@@ -4491,7 +4431,7 @@ mod tests {
     }
 
     #[test]
-    fn cursor_media_class_identity_uses_requested_policy_not_returned_rows() {
+    fn cursor_file_class_identity_uses_requested_policy_not_returned_rows() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4556,7 +4496,7 @@ mod tests {
     }
 
     #[test]
-    fn cursor_with_changed_row_profile_returns_cursor_invalid() {
+    fn source_file_inventory_cursor_rejects_primary_media_policy() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4591,14 +4531,14 @@ mod tests {
             3,
             Some(&cursor),
         )
-        .expect("read with changed row_profile");
+        .expect("read with changed policy");
 
         assert_eq!(result.state, StoreContentsState::CursorInvalid);
         assert!(result.rows.is_empty());
     }
 
     #[test]
-    fn audio_browse_cursor_paginates_like_source_file_audio_with_distinct_profile_identity() {
+    fn audio_browse_cursor_paginates_like_source_file_audio_with_distinct_policy_identity() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4647,7 +4587,7 @@ mod tests {
         let audio_browse_cursor = audio_browse_page1.next_cursor.expect("audio-browse cursor");
         assert_ne!(
             audio_browse_cursor, source_file_cursor,
-            "cursor identity must include row profile"
+            "cursor identity must include policy discriminant"
         );
 
         let source_file_page2 = read_contents(
@@ -5270,10 +5210,10 @@ mod tests {
             );
         }
 
-        let media_predicate = super::media_classes_predicate_sql(
+        let media_predicate = super::file_classes_predicate_sql(
             "sf.media_class",
             "sf.file_kind",
-            &primary_media_policy().media_classes,
+            &primary_media_file_classes(),
         );
         let sql =
             super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);
@@ -5311,7 +5251,7 @@ mod tests {
             );
         }
 
-        let media_predicate = super::media_classes_predicate_sql(
+        let media_predicate = super::file_classes_predicate_sql(
             "sf.media_class",
             "sf.file_kind",
             &[StoreContentsMediaClass::Audio],
@@ -5355,10 +5295,10 @@ mod tests {
             "sf.source_id = ?1 AND {}",
             super::source_file_descendant_predicate("sf", "?2")
         );
-        let media_predicate = super::media_classes_predicate_sql(
+        let media_predicate = super::file_classes_predicate_sql(
             "sf.media_class",
             "sf.file_kind",
-            &primary_media_policy().media_classes,
+            &primary_media_file_classes(),
         );
         let sql = super::primary_media_rows_sql(None, &source_predicate, &media_predicate, None, 3);
         let plan = dump_query_plan(
@@ -5409,10 +5349,10 @@ mod tests {
              )",
             super::relative_path_scope_predicate("sf", "al.relative_path")
         );
-        let media_predicate = super::media_classes_predicate_sql(
+        let media_predicate = super::file_classes_predicate_sql(
             "sf.media_class",
             "sf.file_kind",
-            &primary_media_policy().media_classes,
+            &primary_media_file_classes(),
         );
         let sql = super::primary_media_rows_sql(
             Some(super::accepted_locations_cte()),
@@ -5470,10 +5410,10 @@ mod tests {
             );
         }
 
-        let media_predicate = super::media_classes_predicate_sql(
+        let media_predicate = super::file_classes_predicate_sql(
             "sf.media_class",
             "sf.file_kind",
-            &primary_media_policy().media_classes,
+            &primary_media_file_classes(),
         );
         let sql =
             super::primary_media_rows_sql(None, "sf.source_id = ?1", &media_predicate, None, 2);

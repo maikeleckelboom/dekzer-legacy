@@ -792,11 +792,11 @@ function contentsDetailWithContinuation(
 }
 
 function contentsRowSubject(result: ContentsResult): 'primary media' | 'visible files' {
-  return result.policy.rowProfile.kind === 'primaryMedia' ? 'primary media' : 'visible files'
+  return result.policy.kind === 'primaryMedia' ? 'primary media' : 'visible files'
 }
 
 function contentsCountSubject(result: ContentsResult, count: number): string {
-  if (result.policy.rowProfile.kind === 'primaryMedia') {
+  if (result.policy.kind === 'primaryMedia') {
     return count === 1 ? 'primary media item' : 'primary media items'
   }
 

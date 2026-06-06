@@ -57,7 +57,8 @@ chooses a deterministic representative by lowercased relative path and source-fi
 
 ## Contents Read Behavior
 
-`readContents` with `rowProfile: primaryMedia` reads only promoted `primary_media_candidates` rows. At read time it
+`readContents` with `{ kind: 'primaryMedia', mediaKinds: [...] }` reads only promoted
+`primary_media_candidates` rows. At read time it
 revalidates the current scoped source-file row, attachment link, attachment hash, and source facts. Stale or out-of-scope
 candidate rows are omitted rather than returned as degraded product rows.
 

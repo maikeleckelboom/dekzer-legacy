@@ -63,11 +63,10 @@ readContents(scope, policy, recursion, limit, cursor)
 
 The default main contents browse is audio-first:
 
-| Field          | Default      |
-| -------------- | ------------ |
-| `rowProfile`   | `sourceFile` |
-| `mediaClasses` | audio        |
-| `recursion`    | recursive    |
+| Field         | Default       |
+| ------------- | ------------- |
+| `policy.kind` | `audioBrowse` |
+| `recursion`   | recursive     |
 
 Contents rows are media-relevant source-file rows unless a future explicit policy says otherwise. They are not
 canonical tracks and do not decide track identity, duplicate resolution, CUE association, artwork role, or analysis

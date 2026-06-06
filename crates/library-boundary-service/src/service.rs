@@ -497,7 +497,7 @@ impl LibraryBoundaryService {
                 request.parent_source_directory_id,
                 request.offset,
                 request.limit,
-                library_store_sqlite::LibraryTreeRowAdmission::NavigationOnly,
+                library_store_sqlite::SourceFileClassFilter::NavigationOnly,
             )
             .map_err(map_store_error)?;
         map_read_library_tree_children_reply(window).map_err(map_store_error)
@@ -1227,9 +1227,16 @@ fn validate_contents_scope(scope: &protocol::ContentsScope) -> protocol::Protoco
 }
 
 fn validate_contents_policy(policy: &protocol::ContentsReadPolicy) -> protocol::ProtocolResult<()> {
-    if policy.media_classes.is_empty() {
+    let empty_filter = match policy {
+        protocol::ContentsReadPolicy::AudioBrowse => false,
+        protocol::ContentsReadPolicy::SourceFileInventory { file_classes } => {
+            file_classes.is_empty()
+        }
+        protocol::ContentsReadPolicy::PrimaryMedia { media_kinds } => media_kinds.is_empty(),
+    };
+    if empty_filter {
         return Err(protocol::ProtocolError::InvalidRequest {
-            detail: "contents mediaClasses must not be empty".to_string(),
+            detail: "contents policy filter must not be empty".to_string(),
         });
     }
 
@@ -1290,8 +1297,8 @@ mod tests {
     use library_boundary_protocol::{
         AcceptTrackIdentityCandidateRequest, AttachmentIdentityReadStatus, CancelRootScanReply,
         CancelRootScanRequest, CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest,
-        ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
-        ContentsRowProfile, ContentsScope, CreatePlaylistReply, CreatePlaylistRequest,
+        ContentsFileClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
+        ContentsScope, CreatePlaylistReply, CreatePlaylistRequest,
         DeferTrackIdentityCandidateRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
         HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
@@ -1493,10 +1500,9 @@ mod tests {
     }
 
     #[test]
-    fn contents_policy_validation_rejects_empty_media_classes() {
-        let error = validate_contents_policy(&ContentsReadPolicy {
-            media_classes: Vec::new(),
-            row_profile: ContentsRowProfile::SourceFile,
+    fn contents_policy_validation_rejects_empty_profile_filter() {
+        let error = validate_contents_policy(&ContentsReadPolicy::SourceFileInventory {
+            file_classes: Vec::new(),
         })
         .expect_err("empty contents media classes should be rejected");
 
@@ -1925,14 +1931,13 @@ mod tests {
         service
             .read_contents(ContentsReadRequest {
                 scope: ContentsScope::Source { source_id },
-                policy: ContentsReadPolicy {
-                    media_classes: vec![
-                        ContentsMediaClass::Audio,
-                        ContentsMediaClass::Video,
-                        ContentsMediaClass::Image,
-                        ContentsMediaClass::Unsupported,
+                policy: ContentsReadPolicy::SourceFileInventory {
+                    file_classes: vec![
+                        ContentsFileClass::Audio,
+                        ContentsFileClass::Video,
+                        ContentsFileClass::Image,
+                        ContentsFileClass::Unsupported,
                     ],
-                    row_profile: ContentsRowProfile::SourceFile,
                 },
                 recursion: ContentsRecursion::Recursive,
                 limit: Some(200),

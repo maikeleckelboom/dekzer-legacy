@@ -1,6 +1,6 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::browse_media::{LibraryTreeRowAdmission, library_tree_row_admission_predicate_sql};
+use crate::browse_media::{SourceFileClassFilter, source_file_class_filter_predicate_sql};
 use crate::read_models::source_location_coverage::{
     SourceLocationCoverage, classify_source_location_coverage,
 };
@@ -103,7 +103,7 @@ pub(crate) fn read_children(
     parent_source_directory_id: Option<i64>,
     offset: usize,
     limit: usize,
-    row_admission: LibraryTreeRowAdmission,
+    row_admission: SourceFileClassFilter,
 ) -> LibrarySqliteResult<Option<StoreLiteralHierarchyWindow>> {
     let Some(anchor) = resolve_read_anchor(connection, entry_point, parent_source_directory_id)?
     else {
@@ -676,10 +676,10 @@ fn read_child_count(
     connection: &Connection,
     source_id: i64,
     parent_source_directory_id: Option<i64>,
-    row_admission: LibraryTreeRowAdmission,
+    row_admission: SourceFileClassFilter,
 ) -> LibrarySqliteResult<usize> {
     let directory_visibility_predicate = directory_visibility_predicate_sql(row_admission);
-    let file_visibility_predicate = library_tree_row_admission_predicate_sql(row_admission);
+    let file_visibility_predicate = source_file_class_filter_predicate_sql(row_admission);
     let count = connection.query_row(
         &format!(
             "SELECT (
@@ -720,7 +720,7 @@ fn read_child_rows(
     parent_source_directory_id: Option<i64>,
     offset: usize,
     limit: usize,
-    row_admission: LibraryTreeRowAdmission,
+    row_admission: SourceFileClassFilter,
 ) -> LibrarySqliteResult<Vec<StoreLiteralHierarchyNode>> {
     let offset = i64::try_from(offset).map_err(|_| {
         LibrarySqliteError::WriteInvariant("literal hierarchy offset does not fit i64".to_string())
@@ -729,7 +729,7 @@ fn read_child_rows(
         LibrarySqliteError::WriteInvariant("literal hierarchy limit does not fit i64".to_string())
     })?;
     let directory_visibility_predicate = directory_visibility_predicate_sql(row_admission);
-    let file_visibility_predicate = library_tree_row_admission_predicate_sql(row_admission);
+    let file_visibility_predicate = source_file_class_filter_predicate_sql(row_admission);
     let mut statement = connection.prepare(&format!(
         "SELECT node_kind,
                 source_id,
@@ -837,12 +837,12 @@ fn read_child_rows(
     Ok(rows)
 }
 
-fn directory_visibility_predicate_sql(row_admission: LibraryTreeRowAdmission) -> String {
+fn directory_visibility_predicate_sql(row_admission: SourceFileClassFilter) -> String {
     let revealable_descendant_predicate = match row_admission {
-        LibraryTreeRowAdmission::NavigationOnly | LibraryTreeRowAdmission::Performance => {
+        SourceFileClassFilter::NavigationOnly | SourceFileClassFilter::PrimaryMedia => {
             "has_primary_media_descendant = 1"
         }
-        LibraryTreeRowAdmission::PerformanceAndImages => {
+        SourceFileClassFilter::PrimaryMediaAndImages => {
             "(has_primary_media_descendant = 1 OR has_image_media_descendant = 1)"
         }
     };
@@ -867,7 +867,7 @@ mod tests {
     use super::{
         StoreLiteralHierarchyCoverageState, StoreLiteralHierarchyEntryPoint, read_children,
     };
-    use crate::LibraryTreeRowAdmission;
+    use crate::SourceFileClassFilter;
     use crate::schema::install_baseline_schema_for_test;
     use rusqlite::{Connection, params};
 
@@ -1103,7 +1103,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1155,7 +1155,7 @@ mod tests {
             Some(20),
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1189,7 +1189,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1226,7 +1226,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::PerformanceAndImages,
+            SourceFileClassFilter::PrimaryMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1262,7 +1262,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1287,7 +1287,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::PerformanceAndImages,
+            SourceFileClassFilter::PrimaryMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1338,7 +1338,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::NavigationOnly,
+            SourceFileClassFilter::NavigationOnly,
         )
         .expect("read navigation-only hierarchy")
         .expect("source window");
@@ -1379,7 +1379,7 @@ mod tests {
             None,
             0,
             1,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read first literal hierarchy page")
         .expect("source window");
@@ -1389,7 +1389,7 @@ mod tests {
             None,
             1,
             1,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read second literal hierarchy page")
         .expect("source window");
@@ -1445,7 +1445,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1455,7 +1455,7 @@ mod tests {
             Some(21),
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy directory")
         .expect("directory window");
@@ -1498,7 +1498,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1532,7 +1532,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::PerformanceAndImages,
+            SourceFileClassFilter::PrimaryMediaAndImages,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1542,7 +1542,7 @@ mod tests {
             Some(21),
             0,
             10,
-            LibraryTreeRowAdmission::PerformanceAndImages,
+            SourceFileClassFilter::PrimaryMediaAndImages,
         )
         .expect("read literal hierarchy directory")
         .expect("directory window");
@@ -1586,7 +1586,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1640,7 +1640,7 @@ mod tests {
             Some(20),
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1714,7 +1714,7 @@ mod tests {
             Some(21),
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read Music/Good hierarchy")
         .expect("Music/Good window");
@@ -1739,7 +1739,7 @@ mod tests {
             Some(22),
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read Music/Locked hierarchy")
         .expect("Music/Locked window");
@@ -1758,7 +1758,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read whole source hierarchy")
         .expect("whole source window");
@@ -1829,7 +1829,7 @@ mod tests {
             Some(21),
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read Music/Good hierarchy")
         .expect("Music/Good window");
@@ -1851,7 +1851,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read whole source hierarchy")
         .expect("whole source window");
@@ -1950,7 +1950,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source location window");
@@ -2017,7 +2017,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source location window");
@@ -2042,7 +2042,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::PerformanceAndImages,
+            SourceFileClassFilter::PrimaryMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2069,7 +2069,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2120,7 +2120,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::PerformanceAndImages,
+            SourceFileClassFilter::PrimaryMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2157,7 +2157,7 @@ mod tests {
             None,
             0,
             5,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read first page")
         .expect("source window");
@@ -2168,7 +2168,7 @@ mod tests {
             None,
             5,
             5,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read second page")
         .expect("source window");
@@ -2179,7 +2179,7 @@ mod tests {
             None,
             10,
             5,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read third page")
         .expect("source window");
@@ -2241,7 +2241,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2287,7 +2287,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::PerformanceAndImages,
+            SourceFileClassFilter::PrimaryMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2316,7 +2316,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2352,7 +2352,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2386,7 +2386,7 @@ mod tests {
             None,
             0,
             10,
-            LibraryTreeRowAdmission::Performance,
+            SourceFileClassFilter::PrimaryMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");

@@ -74,8 +74,7 @@ const maxWarmSnapshots = 16
 const maxSpeculativeReads = 1
 const safeContentsRequestFailure = 'Unable to request library contents.'
 const defaultContentsPolicy: ContentsReadPolicy = {
-  mediaClasses: ['audio'],
-  rowProfile: { kind: 'audioBrowse' }
+  kind: 'audioBrowse'
 }
 const contentsRecursion: ContentsRecursion = 'recursive'
 
@@ -675,7 +674,7 @@ export function contentsRequestKey(
   policy: ContentsReadPolicy,
   recursion: ContentsRecursion
 ): string {
-  const policyKey = `${policy.rowProfile.kind}:${policy.mediaClasses.join(',')}:${recursion}`
+  const policyKey = `${contentsPolicyKey(policy)}:${recursion}`
 
   switch (scope.kind) {
     case 'source':
@@ -684,5 +683,16 @@ export function contentsRequestKey(
       return `source-location:${scope.sourceLocationId}:${policyKey}`
     case 'directory':
       return `directory:${scope.sourceId}:${scope.sourceDirectoryId}:${policyKey}`
+  }
+}
+
+function contentsPolicyKey(policy: ContentsReadPolicy): string {
+  switch (policy.kind) {
+    case 'audioBrowse':
+      return policy.kind
+    case 'sourceFileInventory':
+      return `${policy.kind}:${policy.fileClasses.join(',')}`
+    case 'primaryMedia':
+      return `${policy.kind}:${policy.mediaKinds.join(',')}`
   }
 }

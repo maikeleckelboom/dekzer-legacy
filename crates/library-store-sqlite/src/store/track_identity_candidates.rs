@@ -570,7 +570,7 @@ mod tests {
 
     use crate::read_models::contents::{
         StoreContentsMediaClass, StoreContentsReadPolicy, StoreContentsRecursion,
-        StoreContentsRowProfile, StoreContentsScope, StoreContentsState,
+        StoreContentsScope, StoreContentsState,
     };
     use crate::read_models::track_identity_candidates::{
         StoreTrackIdentityCandidateEvidenceStatus, StoreTrackIdentityCandidateStatus,
@@ -1205,14 +1205,13 @@ mod tests {
                 StoreContentsScope::Source {
                     source_id: fixture.source_id,
                 },
-                StoreContentsReadPolicy {
-                    media_classes: vec![
+                StoreContentsReadPolicy::SourceFileInventory {
+                    file_classes: vec![
                         StoreContentsMediaClass::Audio,
                         StoreContentsMediaClass::Video,
                         StoreContentsMediaClass::Image,
                         StoreContentsMediaClass::Unsupported,
                     ],
-                    row_profile: StoreContentsRowProfile::SourceFile,
                 },
                 StoreContentsRecursion::Recursive,
                 10,

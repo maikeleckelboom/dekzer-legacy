@@ -28,7 +28,7 @@ This preserves diagnostic and future migration room while making the contents pa
 `source_files` owns durable file facts. The required inventory facts are:
 
 | Fact                         | Meaning                                                                                                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------|
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `source_file_id`             | Stable durable file row identity inside the store.                                                        |
 | `source_id`                  | Owning source root.                                                                                       |
 | `parent_source_directory_id` | Immediate directory when known.                                                                           |
@@ -46,11 +46,11 @@ identity, or artwork role.
 
 The renderer default for selected library contents is audio-first and audio-only in V0:
 
-| Field          | Value                            |
-|----------------|----------------------------------|
-| `rowProfile`   | `sourceFile`                     |
-| `mediaClasses` | audio                            |
-| `recursion`    | recursive                        |
+| Field                | Value                 |
+| -------------------- | --------------------- |
+| `policy.kind`        | `sourceFileInventory` |
+| `policy.fileClasses` | audio                 |
+| `recursion`          | recursive             |
 
 The renderer derives the scope from selection and sends this policy to `readContents`. The backend owns the query and
 admission. The renderer must not fan out tree children, synthesize directory contents, or answer the selected scope from
@@ -59,7 +59,7 @@ the hierarchy cache.
 ## Scope Behavior
 
 | Scope          | Recursive behavior                                                                                              |
-|----------------|-----------------------------------------------------------------------------------------------------------------|
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
 | source         | Reads rows under the whole source, or under accepted source locations when user-visible source locations exist. |
 | sourceLocation | Reads rows under that registered location prefix.                                                               |
 | directory      | Reads rows under that directory prefix.                                                                         |
@@ -75,14 +75,14 @@ or indexing is incomplete.
 
 Explicit non-default source-file inventory reads may include:
 
-| Stored facts                                                                     | Explicit inventory admission                                |
-|----------------------------------------------------------------------------------|-------------------------------------------------------------|
-| `media_class = audio`                                                            | Include.                                                    |
-| `media_class = video`                                                            | Include when policy requests video.                         |
-| `media_class = image`                                                            | Include when policy requests image.                         |
+| Stored facts                                                                     | Explicit inventory admission                                 |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `media_class = audio`                                                            | Include.                                                     |
+| `media_class = video`                                                            | Include when policy requests video.                          |
+| `media_class = image`                                                            | Include when policy requests image.                          |
 | `media_class = unsupported` and `file_kind = cue_sheet`                          | Include when policy requests unsupported companion metadata. |
-| `media_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from normal inventory.                              |
-| `media_class = none` or `file_kind = unknown`                                    | Exclude from normal inventory.                              |
+| `media_class = unsupported` and `file_kind` is log_doc, text_doc, archive, other | Exclude from normal inventory.                               |
+| `media_class = none` or `file_kind = unknown`                                    | Exclude from normal inventory.                               |
 
 This contract intentionally does not admit every `unsupported` row. `unsupported` is too broad for product inventory
 because it can include notes, PDFs, archives, binary data, and other unrelated files. CUE sheets are admitted because
@@ -93,7 +93,8 @@ metadata companion files unless a future explicit product surface chooses a broa
 
 ## CUE And Images
 
-CUE sheets are represented only as `sourceFile` rows with `mediaClass = unsupported` and `fileKind = cueSheet`.
+CUE sheets are represented only as `sourceFileInventory` rows with `mediaClass = unsupported` and
+`fileKind = cueSheet`.
 The inventory does not pair CUE sheets with FLAC files, does not parse track splits, and does not infer a playable
 primary-media item from a CUE file.
 
@@ -102,7 +103,7 @@ folder art, or unrelated imagery.
 
 ## Presence
 
-`sourceFile` contents rows may include present, missing, and removed media-relevant files. The presence state must be
+`sourceFileInventory` contents rows may include present, missing, and removed media-relevant files. The presence state must be
 shown honestly. A missing or removed row is still a durable inventory fact.
 
 `primaryMedia` rows are playable/performance projection rows and remain present-file scoped. They may include audio and
@@ -110,7 +111,7 @@ video only. A policy that asks `primaryMedia` for image or unsupported rows must
 
 ## Ordering And Cursor
 
-`sourceFile` inventory rows are ordered by lowercased relative path, then `source_file_id`. Cursor identity includes
+`sourceFileInventory` rows use the persisted source-file browse order. Cursor identity includes
 scope, row profile, recursion, the requested media classes, and the last row ordering position.
 The media-class identity is derived from the requested policy, not from the rows returned on the current page. Changing
 media classes across pages returns `cursorInvalid`.
@@ -128,7 +129,7 @@ Rust and SQLite own durable facts and read-model admission. Boundary protocol ex
 The renderer may project icons and labels:
 
 | Row facts              | Renderer projection |
-|------------------------|---------------------|
+| ---------------------- | ------------------- |
 | audio                  | music/file row      |
 | video                  | video/file row      |
 | image                  | image/file row      |

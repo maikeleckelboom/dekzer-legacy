@@ -266,15 +266,14 @@ mod tests {
         MaintainedSnapshotRevision, MaintainedSnapshotScope,
     };
     use crate::{
-        ContentsMediaClass, ContentsReadPolicy, ContentsReadRequest, ContentsRecursion,
-        ContentsRowProfile, ContentsScope, LibraryTreeEntryPoint,
-        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        ReadAttachmentSourceFilesRequest, ReadLibraryAssetPreparationDetailRequest,
-        ReadLibraryAssetWaveformOverviewRequest, ReadLibraryTreeChildrenRequest,
-        ReadNavigationNodeLibraryBrowserWindowRequest, ReadNavigationRowsRequest,
-        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentRequest,
-        ReadSourceLifecycleRequest, SearchNavigationNodeLibraryBrowserWindowRequest,
-        SnapshotReadCommand,
+        ContentsReadPolicy, ContentsReadRequest, ContentsRecursion, ContentsScope,
+        LibraryTreeEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
+        PrimaryMediaKind, ReadAttachmentSourceFilesRequest,
+        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
+        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
+        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentRequest, ReadSourceLifecycleRequest,
+        SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand,
     };
     use serde_json::json;
 
@@ -329,9 +328,8 @@ mod tests {
                     source_id: 8,
                     source_directory_id: 9,
                 },
-                policy: ContentsReadPolicy {
-                    media_classes: vec![ContentsMediaClass::Audio, ContentsMediaClass::Video],
-                    row_profile: ContentsRowProfile::PrimaryMedia,
+                policy: ContentsReadPolicy::PrimaryMedia {
+                    media_kinds: vec![PrimaryMediaKind::Audio, PrimaryMediaKind::Video],
                 },
                 recursion: ContentsRecursion::Recursive,
                 limit: Some(100),

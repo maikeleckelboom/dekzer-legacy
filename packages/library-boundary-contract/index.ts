@@ -103,9 +103,11 @@ export type ContentsReadRequest = { scope: ContentsScope, policy: ContentsReadPo
 
 export type ContentsScope = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
 
-export type ContentsReadPolicy = { mediaClasses: Array<ContentsMediaClass>, rowProfile: ContentsRowProfile, };
+export type ContentsReadPolicy = { "kind": "audioBrowse" } | { "kind": "sourceFileInventory", fileClasses: Array<ContentsFileClass>, } | { "kind": "primaryMedia", mediaKinds: Array<PrimaryMediaKind>, };
 
-export type ContentsRowProfile = { "kind": "sourceFile" } | { "kind": "primaryMedia" } | { "kind": "audioBrowse" };
+export type ContentsFileClass = "audio" | "video" | "image" | "unsupported";
+
+export type PrimaryMediaKind = "audio" | "video";
 
 export type ContentsRecursion = "immediate" | "recursive";
 
