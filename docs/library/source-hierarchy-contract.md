@@ -44,7 +44,10 @@ Leaf directories do not show a disclosure affordance. A directory may show discl
 
 ## Contents and Inventory
 
-The contents pane owns file rows for the selected source or directory scope. The default main contents browse remains audio-only and recursive according to the contents browse policy.
+The contents pane owns file rows for the selected source or directory scope. Selecting a tree row establishes browse
+scope only. The product's initial active workflow filter is **Audio**, which uses the audio contents policy over the
+selected scope with recursive coverage. The separate **Media** filter uses the playable-media policy. Scope selection,
+active filter, contents policy, and scope depth remain separate owners.
 
 Explicit source-file inventory remains available through contents or diagnostic paths. Companion files such as CUE sheets and artwork remain source-file inventory rows; they are not tree children.
 

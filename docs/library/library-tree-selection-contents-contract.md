@@ -6,7 +6,7 @@ owner: renderer-substrate-boundary
 canonical-context:
   - library-tree-frame-stability-contract
   - library-contents-browse-policy
-  - library-contents-read-boundary
+  - decisions/library-contents-read-boundary
   - source-hierarchy-contract
 scope:
   - tree-selection-authority
@@ -61,12 +61,15 @@ The contents panel issues an independent read:
 readContents(scope, policy, scopeDepth, limit, cursor)
 ```
 
-The default main contents browse is `playableMediaBrowse` (audio and video):
+Tree selection establishes scope only. The initial **Audio** workflow filter supplies `audioBrowse`:
 
-| Field         | Default               |
-|---------------|-----------------------|
-| `policy.kind` | `playableMediaBrowse` |
-| `scopeDepth`  | recursive             |
+| Field         | Initial Audio value |
+|---------------|---------------------|
+| `policy.kind` | `audioBrowse`       |
+| `scopeDepth`  | recursive           |
+
+Switching to **Media** supplies `playableMediaBrowse`. Switching to **All Files** supplies an explicit
+`sourceFileInventory` policy. None of these filter changes alter tree containment or selection.
 
 Contents rows are media-relevant source-file rows unless a future explicit policy says otherwise. They are not
 canonical tracks and do not decide track identity, duplicate resolution, CUE association, artwork role, or analysis

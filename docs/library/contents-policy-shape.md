@@ -100,7 +100,7 @@ future media-probe authority establishes a different product policy; it never wi
 
 ### Playable-Media Browse Policy
 
-`playableMediaBrowse` is the canonical product default:
+`playableMediaBrowse` is the canonical protocol policy for the product's **Media** filter:
 
 - no caller-supplied class field;
 - included durable classes are `audio` and `video`;
@@ -189,7 +189,8 @@ The current implementation proves:
 - schema, SQL, store rows, boundary rows, generated contracts, desktop adapters, and renderer projection use
   `file_class`/`fileClass`/`FileClass` for the coarse source-file inventory concept;
 - classification values remain `audio`, `video`, `image`, `unsupported`, and `none`;
-- `playableMediaBrowse` includes audio and video and is the default product browse;
+- `playableMediaBrowse` includes audio and video and backs the **Media** workflow filter;
+- `audioBrowse` backs the initial **Audio** workflow filter;
 - `audioBrowse` behavior remains equivalent to source-file audio reads;
 - `sourceFileInventory.fileClasses` filtering remains intact;
 - `primaryMedia.mediaKinds` behavior remains intact;

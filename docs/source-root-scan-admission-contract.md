@@ -6,7 +6,7 @@ last-reviewed: 2026-05-27
 amended: 2026-05-30
 owner: music-library-substrate
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - source-access-and-scan-coverage
   - source-locations-lifecycle-contract
   - library-preparation-substrate-v1
@@ -489,7 +489,7 @@ Windows indirection must be classified precisely. “Do not follow symlinks blin
 |---------------------------------|--------------------------------------------------------------|----------------------------------------------------------------------------------------|
 | Symbolic link, file             | File points to another file.                                 | Represent as indirection; inspect target only if admitted and not already inventoried. |
 | Symbolic link, directory        | Directory points to another directory.                       | Represent as indirection node; do not descend unless policy or user opts in.           |
-| Junction                        | Directory redirection, often same-volume compatibility path. | Follow only if target is allowed by policy and visited identity is new.                |
+| Junction                        | Directory redirection, often a same-volume filesystem link.  | Follow only if target is allowed by policy and visited identity is new.                |
 | Mount point                     | Separate volume mounted inside a path.                       | Surface as separate source-root candidate, not silent child traversal.                 |
 | Cloud placeholder reparse point | File exists logically but bytes may not be local.            | Record placeholder state; hydrate only under explicit policy.                          |
 | Unknown reparse point           | Provider-specific behavior.                                  | Do not descend by default; record unsupported indirection.                             |
@@ -831,4 +831,3 @@ Before accepting a scan-related change, ask:
 | Does it handle Windows indirection precisely?                | Yes or explicitly out of scope for this slice. |
 | Does it keep CUE as companion metadata, not a track?         | Yes.                                           |
 | Does it preserve room for later deep import?                 | Yes, without making it default behavior.       |
-

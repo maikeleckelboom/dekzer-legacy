@@ -1,7 +1,8 @@
 # Electron Boundary Spine
 
-**Status:** doctrine-candidate
+**Status:** accepted
 **Doctrine-version:** 0.1
+**Last-reviewed:** 2026-06-09
 **Owner:** desktop-boundary-substrate
 **Scope:** renderer ↔ main ↔ Rust library service IPC discipline
 
@@ -32,8 +33,7 @@ Recommended sequence:
 1. Finish or merge source-add activation if already green.
 2. Finish browse-policy omission metadata inventory and implement that slice only if the
    inventory proves the boolean can be computed honestly.
-3. Verify this document is ratified and present in `docs/architecture/` before any spine
-   implementation begins.
+3. Verify this accepted decision remains the active boundary owner before any spine implementation begins.
 4. Consolidate the Electron library command/event spine.
 5. Verify that renderer-side event polling is structurally removed or guarded.
 6. Implement source-root admission and default music source discovery on top of the spine.
@@ -175,6 +175,29 @@ export function registerLibraryCommands(deps: {
   getWindows:     () => BrowserWindow[];
 }): void { /* ... */ }
 ```
+
+#### Exposure Classes and Local-Root Trust
+
+Library operations have two exposure classes:
+
+- **renderer-callable** operations are available through preload and IPC. Their inputs must be renderer-safe.
+- **host-internal** operations are available only inside Desktop Main or the library service path. They may consume
+  host-owned values after the host has selected or validated them.
+
+The renderer may request `chooseAndRegisterLocal`, but Desktop Main owns the native folder picker and the resulting
+absolute path. `registerLocalRoot` is host-internal and must not be exposed through renderer IPC, preload, or renderer
+feature APIs.
+
+| Operation                | Exposure          | Boundary rule                                                               |
+|--------------------------|-------------------|-----------------------------------------------------------------------------|
+| `chooseAndRegisterLocal` | renderer-callable | Takes no absolute-path input; Desktop Main owns native selection.           |
+| `registerLocalRoot`      | host-internal     | May accept the host-selected absolute path inside the trusted host path.    |
+| `runScan`                | renderer-callable | Accepts source/root identity, not an absolute path.                         |
+| hierarchy/contents reads | renderer-callable | Read-only typed requests through the command registry.                      |
+| host status read/listen  | renderer-callable | Reports host availability without exposing host-internal registration APIs. |
+
+No alternate renderer path may expose a host-internal operation. If exposure metadata becomes generated, extend the
+existing boundary protocol and export pipeline rather than creating a second operation registry.
 
 ### 3. Boundary Event Pump
 
@@ -406,8 +429,8 @@ different wire mechanism.
 - transport chosen per payload class: MessagePort, transferable ArrayBuffer,
   SharedArrayBuffer for hot surfaces, native handle
 - must not be prematurely modelled as a generic event stream
-- large binary payloads must not be routed through ControlPlane or PublicationPlane
-  pending ResourcePlane definition
+- waveform data, artwork payloads, and analysis blobs must not be routed through ControlPlane or PublicationPlane
+- large binary payloads remain prohibited there pending ResourcePlane definition
 
 A channel constant must not belong to more than one plane.
 

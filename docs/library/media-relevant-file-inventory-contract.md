@@ -4,7 +4,7 @@ last-reviewed: 2026-05-31
 owner: library-substrate-boundary
 canonical-context:
   - source-root-scan-admission-contract
-  - library-contents-read-boundary
+  - decisions/library-contents-read-boundary
   - library-tree-selection-contents-contract
 scope:
   - source-file-inventory
@@ -42,18 +42,22 @@ This preserves diagnostic and future migration room while making the contents pa
 `file_kind` and `file_class` are provisional path-derived facts. They are not proof of playability, readiness, track
 identity, or artwork role.
 
-## Default Contents Policy
+## Workflow Filter Mapping
 
-The renderer default for selected library contents is `playableMediaBrowse` (audio and video):
+The product's initial active workflow filter is **Audio**:
 
-| Field         | Value                 |
-|---------------|-----------------------|
-| `policy.kind` | `playableMediaBrowse` |
-| `scopeDepth`  | recursive             |
+| Field         | Value         |
+|---------------|---------------|
+| `policy.kind` | `audioBrowse` |
+| `scopeDepth`  | recursive     |
 
-The renderer derives the scope from selection and sends this policy to `readContents`. The backend owns the query and
-admission. The renderer must not fan out tree children, synthesize directory contents, or answer the selected scope from
-the hierarchy cache.
+The separate **Media** filter uses `playableMediaBrowse` for audio and video. **All Files** uses explicit raw
+`sourceFileInventory` policy and does not imply interpreted media.
+
+The renderer derives scope from selection and must send the active workflow policy to `readContents`. Current renderer
+code still hard-codes `playableMediaBrowse` as a fallback until workflow-filter ownership is wired; that implementation
+fallback does not change the Audio-first product contract. The backend owns query and admission. The renderer must not
+fan out tree children, synthesize directory contents, or answer the selected scope from the hierarchy cache.
 
 `audioBrowse` implies audio and has no caller-supplied class filter. Explicit inventory surfaces use
 `sourceFileInventory.fileClasses`.
@@ -98,9 +102,8 @@ they are media-adjacent companion metadata. They remain source-file rows and nev
 Changing the unsupported admission scope (for example, admitting `log_doc` or `text_doc` unsupported rows, or removing
 the cue-sheet filter) requires a separate decision. The current behavior is preserved.
 
-The V0 main contents browse default requests `playableMediaBrowse` (audio and video). It does not include image,
-unsupported, CUE, text, or metadata companion files unless a future explicit product surface chooses a broader policy.
-`audioBrowse` remains available as a separate audio-only explicit policy.
+The initial **Audio** workflow requests `audioBrowse`. The **Media** workflow requests `playableMediaBrowse` and does not
+include image, unsupported, CUE, text, or metadata companion files. **All Files** is the explicit raw inventory surface.
 
 ## CUE And Images
 

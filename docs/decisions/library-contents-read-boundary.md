@@ -99,7 +99,7 @@ type ContentsReadPolicy =
 
 **playableMediaBrowse:**
 
-- canonical default product browse
+- protocol policy for the product's **Media** workflow filter
 - audio and video durable file classes
 - accepts no caller-supplied class filter
 - excludes images, unsupported raw files, diagnostics-only rows, metadata companions, and CUE sheets
@@ -190,7 +190,8 @@ type ContentsResult = {
 - Backend and query code own profile-specific filtering.
 - Store/service own required scope-level `hasPolicyOmittedRows`; renderer does not inspect raw inventory.
 - Renderer does not answer authoritative selected scope contents from loaded hierarchy cache.
-- `playableMediaBrowse` is the default and may include audio and video only.
+- The product's initial active workflow filter is **Audio** and maps to `audioBrowse`.
+- `playableMediaBrowse` backs the separate **Media** filter and may include audio and video only.
 - `playableMediaBrowse` has no caller-supplied file class filter.
 - sourceFileInventory may include audio, video, image, and admitted unsupported companion rows.
 - sourceFileInventory never carries primaryMedia summary.

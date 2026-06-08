@@ -1,14 +1,13 @@
 # Library Contents Browse Policy
 
-## Decision
+## Product Filter Mapping
 
-The default main library contents browse uses the backend-owned canonical policy:
+The product's initial active workflow filter is **Audio**. Product filters map to backend-owned policies:
 
 ```ts
-{
-  policy: { kind: 'playableMediaBrowse' },
-  scopeDepth: 'recursive'
-}
+Audio     -> { policy: { kind: 'audioBrowse' }, scopeDepth: 'recursive' }
+Media     -> { policy: { kind: 'playableMediaBrowse' }, scopeDepth: 'recursive' }
+All Files -> { policy: { kind: 'sourceFileInventory', fileClasses: [...] }, scopeDepth: 'recursive' }
 ```
 
 `playableMediaBrowse` includes durable `source_files.file_class` values `audio` and `video`. It excludes images,
@@ -17,6 +16,9 @@ unsupported raw files, diagnostics-only files, generic metadata companions, and 
 `audioBrowse` remains a separate audio-only policy. It includes `audio` and excludes `video`, including extension-only
 `.mp4` files. Extension classification treats `.m4a` as audio and `.mp4` as video until media-probe authority establishes
 stronger facts for a specific file.
+
+**All Files** is raw source inventory. It is not interpreted content and not a problems view. The exact admitted
+inventory classes remain owned by `sourceFileInventory`.
 
 The renderer requests a policy and presents returned facts. It does not supply `['audio', 'video']` as a default
 `sourceFileInventory` filter, inspect raw source inventory, filter rows, sort rows, or infer hidden content.

@@ -6,7 +6,7 @@ doctrine-version: 0.3
 last-reviewed: 2026-05-27
 owner: library-browser-architecture
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - source-root-scan-admission-contract
   - first-slice-substrate-map
 scope:

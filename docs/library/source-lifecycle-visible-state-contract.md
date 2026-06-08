@@ -4,7 +4,7 @@ doctrine-version: 0.1
 last-reviewed: 2026-05-28
 owner: renderer-substrate-boundary
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - library-tree-frame-stability-contract
   - source-root-scan-admission-contract
   - source-hierarchy-contract
@@ -185,6 +185,18 @@ present and accessible.
 
 Preparation facet states for tracks attached to an unavailable source remain
 in their last-known state. They are not reset to `unknown`.
+
+## Backend Lifecycle Read Boundary
+
+`readSourceLifecycle({ sourceId })` is the backend-owned per-source lifecycle read. It returns durable source identity
+and typed mount, access, scan, issue, and timestamp facts. Missing lifecycle side rows produce typed unknown/default
+facts for a known source; `notFound` is reserved for an absent source row.
+
+This read does not own presentation labels, hierarchy children, branch coverage, contents windows, or locator/path
+exposure. Renderer lifecycle state is a projection over this durable read plus transient scan progress.
+
+Whole-source empty/coverage summary is intentionally absent. It may be added only when its semantics can be proved
+without duplicating branch/window hierarchy coverage or converting incomplete coverage into authoritative empty state.
 
 ## Non-goals
 

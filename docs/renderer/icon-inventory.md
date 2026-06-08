@@ -6,7 +6,7 @@ doctrine-version: 0.1
 last-reviewed: 2026-06-06
 owner: renderer-icon-surface
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - local-source-icon-doctrine
 scope:
   - renderer-icon-adapter

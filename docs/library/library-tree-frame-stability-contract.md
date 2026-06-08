@@ -5,7 +5,7 @@ doctrine-version: 0.3
 last-reviewed: 2026-05-28
 owner: renderer-substrate-boundary
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - source-root-scan-admission-contract
   - source-hierarchy-contract
   - first-slice-substrate-map
@@ -577,7 +577,8 @@ affect frame behavior directly and are not optional polish.
 
 This contract intentionally does not govern:
 
-- Row profile definitions (see `library-row-profile-contract`)
+- Tree row admission and contents-row separation (see `source-hierarchy-contract`,
+  `library-tree-selection-contents-contract`, and `contents-policy-shape`)
 - Tree selection → contents coupling (see `library-tree-selection-contents-contract`)
 - Contents row presentation (see `library-tree-selection-contents-contract` and `library-contents-browse-policy`)
 - Source lifecycle visible states (see `source-lifecycle-visible-state-contract`)

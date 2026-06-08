@@ -1,6 +1,6 @@
 ---
-status: provisional
-last-reviewed: 2026-06-03
+status: accepted
+last-reviewed: 2026-06-09
 owner: library-boundary-service
 canonical-context:
   - track-identity-candidate-contract

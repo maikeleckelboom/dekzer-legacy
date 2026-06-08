@@ -175,7 +175,9 @@ The field is presentation metadata. The renderer must not use it to:
 
 ## Current Product Direction
 
-The default browse policy is `playableMediaBrowse`: audio and video. Audio-only browse is a separate filtered view.
+The product's initial active workflow filter is **Audio** and maps to `audioBrowse`. **Media** is a separate workflow
+filter backed by `playableMediaBrowse` for audio and video. **All Files** is raw source inventory backed by an explicit
+`sourceFileInventory` request; it is not interpreted content or a problems view.
 The store owns included durable classes, omitted classes, cursor policy identity, scopeDepth, and ordering.
 
 The implementation does not widen `audioBrowse`, implement source admission/default discovery, add renderer filtering,

@@ -1,107 +1,100 @@
 # Dekzer Documentation Authority Map
 
-_This is the canonical index of Dekzer documentation authority. Every doc in this repo must have one clear role.
-No two active docs may define the same authority._
+This map names the active authority role of the current documentation tree. One concept has one canonical owner.
+Implementation companions may describe narrower implemented shapes but do not override their canonical owner.
 
-## Product doctrine
+## Product And Roadmap
 
-| Doc                                  | Role                           | Notes                                                                                                                                  |
-|--------------------------------------|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| `docs/product-doctrine-shortened.md` | **Canonical product doctrine** | Active doctrine. Owns product position, identity stack, claims, readiness, conflict resolution, modeling laws, first slice boundaries. |
-| `docs/archive/product-doctrine.md`   | Superseded archive             | Long-form v2 draft. Superseded by `product-doctrine-shortened.md`. Historical source material only.                                    |
+| Doc                                                       | Role                     | Ownership                                                                                                                                                             |
+| --------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/product/product-doctrine.md`                        | canonical owner          | Product thesis, trust laws, identity/evidence separation, readiness doctrine, workflow-filter language, spatial performance memory, and substrate admission pressure. |
+| `docs/library/prepared-room-canonical-foundations.md`     | canonical owner          | Prepared Room domain objects, five-layer performance stack, room-specific laws, and substrate constraints required by that future domain.                             |
+| `docs/library/product-roadmap-and-substrate-authority.md` | implementation companion | Current implementation checkpoint, dependency order, vetoes, and long-term substrate sequence. Layer contracts remain authoritative for implementation detail.        |
+| `docs/first-slice-substrate-map.md`                       | implementation companion | First-slice ownership and implemented boundary map.                                                                                                                   |
+| `docs/substrate-implementation-discipline.md`             | implementation companion | Reusable delivery discipline for substrate changes.                                                                                                                   |
+| `docs/implementation-structure.md`                        | future architecture      | Target package/domain structure; not current behavior authority.                                                                                                      |
 
-## Source and scan contracts
+## Source, Scan, And Lifecycle
 
-| Doc                                                     | Role                                                                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                  |
-|---------------------------------------------------------|---------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `docs/source-root-scan-admission-contract.md`           | **Canonical scan admission contract** (with marked implementation status) | Owns root registration, root identity, scan preflight, traversal policy, candidate admission, magic reads, work budgets, observation persistence. Implementation status note distinguishes desired architecture from current incomplete implementation.                                                                                                                                                |
-| `docs/source-root-scan-reconnaissance-2026-05-27.md`    | Archived evidence report                                                  | Evidence only. Do not use as architecture authority. Canonical contract: `source-root-scan-admission-contract.md`.                                                                                                                                                                                                                                                                                     |
-| `docs/decisions/source-access-and-scan-coverage.md`     | Valid architectural decision                                              | Source access and scan coverage rules. Complements scan admission contract at lower detail level. Does not supersede the admission contract.                                                                                                                                                                                                                                                           |
-| `docs/decisions/source-locations-lifecycle-contract.md` | Valid architectural decision                                              | Source location lifecycle and aggregate scope. Complements scan admission contract for source-location specifics.                                                                                                                                                                                                                                                                                      |
-| `docs/library/source-lifecycle-backend-contract-gap.md` | Inventory / contract gap                                                  | Backend inventory of durable lifecycle facts, runtime events, and the explicit contract gap for a backend-owned source lifecycle read surface.                                                                                                                                                                                                                                                         |
-| `docs/library/source-root-admission-policy.md`          | Valid architectural decision                                              | Design/policy doc. Owns source root admission pipeline, path classification, access capability preflight, admission result model, reason codes, admission proof/confirmation integrity, traversal and scan policy assignment rules, permission failure behavior during scan, duplicate/overlap source behavior, broad/system/data/cloud/network/removable source decisions, policy evolution behavior. |
-| `docs/library/default-music-source-discovery.md`        | Valid architectural decision                                              | Design/policy doc. Owns first-run platform Music folder discovery, Windows Music folder resolution via platform API, discovery candidate lifecycle, candidate presentation states, session dismissal behavior, deduplication against admitted sources, admission handoff, no-silent-scan rule.                                                                                                         |
+| Doc                                                         | Role                     | Ownership                                                                                                                |
+| ----------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `docs/source-root-scan-admission-contract.md`               | canonical owner          | Root registration, scan preflight, traversal, candidate admission, work budgets, and observation persistence.            |
+| `docs/decisions/source-access-and-scan-coverage.md`         | canonical owner          | Access outcomes, coverage semantics, and the rule that access failure is not empty contents.                             |
+| `docs/decisions/source-locations-lifecycle-contract.md`     | canonical owner          | Source-location identity and lifecycle semantics.                                                                        |
+| `docs/library/source-root-admission-policy.md`              | canonical owner          | Product admission policy, confirmation integrity, overlap behavior, and source-class decisions.                          |
+| `docs/library/default-music-source-discovery.md`            | canonical owner          | First-run platform Music-folder discovery and admission handoff.                                                         |
+| `docs/library/source-lifecycle-visible-state-contract.md`   | canonical owner          | User-visible source lifecycle, durable lifecycle read usage, unavailability, relocation, removal, and recovery behavior. |
+| `docs/library/source-maintenance-orchestration-contract.md` | canonical owner          | Backend-owned bounded maintenance ordering and invalidation behavior.                                                    |
+| `docs/library/background-root-scan-lifecycle-diagrams.md`   | implementation companion | Scan and source-lifecycle flow diagrams.                                                                                 |
+| `docs/library/library-substrate-e2e-flow-diagrams.md`       | implementation companion | End-to-end substrate flow diagrams.                                                                                      |
 
-## Library browser contracts
+## Library Navigation And Contents
 
-| Doc                                                          | Role                                                         | Owns                                                                                                                                                                                                                                 |
-|--------------------------------------------------------------|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `docs/library/source-hierarchy-contract.md`                  | **Canonical library contract**                               | Navigation-only tree rows: sources, source locations, directories, hierarchy state/action rows, and the exclusion of source-file/audio rows from tree navigation.                                                                    |
-| `docs/library/library-tree-frame-stability-contract.md`      | **Canonical library contract** (with marked future sections) | Branch rendering continuity, cache behavior, node identity, response guards, prefetch bounds, drag stability. Future sections marked for batch reads, child summaries, targeted scan invalidation.                                   |
-| `docs/library/library-tree-selection-contents-contract.md`   | **Canonical library contract**                               | Tree selection to contents scope, contents-owned audio/file rows, retained-row perception, delayed pending state, coalesced invalidation refresh, source removal clearing, panel containment.                                        |
-| `docs/library/source-lifecycle-visible-state-contract.md`    | **Canonical library contract**                               | Source visible availability states, unavailability UX, relocation UX, cloud placeholder behavior, source removal vs forgetting, browser updates from add/scan/remove.                                                                |
-| `docs/library/library-browser-workspace-surface-contract.md` | **Canonical library contract**                               | Library Browser workspace surface identity, topology handoff, geometry/viewport hints, internal layout presets, authority partition, panel containment.                                                                              |
-| `docs/library/library-boundary-event-stream-contract.md`     | **Canonical library contract**                               | Cursor-only boundary event model, `ReadAfter` semantics, event ring, gap recovery, scan event family, maintained snapshot invalidation, event parser contract.                                                                       |
-| `docs/library/library-contents-browse-policy.md`             | **Canonical library contract**                               | Default `playableMediaBrowse` audio-and-video rows, separate audio-only `audioBrowse`, service-owned omission metadata, renderer non-authority, and retained-row perception limits.                                                  |
-| `docs/library/contents-policy-shape.md`                      | **Canonical library support/decision record**                | Implemented profile-specific policy union, canonical playable-media class ownership, omission semantics, cursor identity, and persisted `source_files.file_class` vocabulary.                                                        |
-| `docs/library/audio-browse-row-v0.md`                        | Audio browse row V0 implementation contract                  | Owns implemented V0 `audioBrowse` profile authority, file-row payload reuse, final field matrix, selected `readContents` row-profile boundary shape, and rejected fields/shapes.                                                     |
-| `docs/library/media-relevant-file-inventory-contract.md`     | **Canonical library contract**                               | Media-relevant source-file inventory policy, store/read-model ownership, explicit inventory admission, CUE/image boundaries, presence, ordering, and renderer projection limits.                                                     |
-| `docs/library/media-identity-schema-authority.md`            | **Canonical library contract**                               | Asset identity, `primaryMedia` authority, CUE association, content hashing placement, and intentionally dormant identity/prep surfaces. Depends on source lifecycle and media-relevant file inventory contracts.                     |
-| `docs/library/attachment-identity-foundation-contract.md`    | **Canonical library contract**                               | Rust/store-only attachment identity foundation from current BLAKE3 observed-file facts, source-file attachment links, computed staleness, and deferred boundary/track/prep work.                                                     |
-| `docs/library/observed-file-facts-contract.md`               | **Canonical library contract**                               | Observed source-file evidence, file-basis validity, algorithm-tagged content hash placement, CUE observation ownership, and current/future boundaries for probing and identity consumption.                                          |
-| `docs/library/source-maintenance-orchestration-contract.md`  | **Canonical library contract**                               | Backend-owned bounded source maintenance unit order, command/read boundary, runtime-vs-durable ownership, scan-triggered behavior, and invalidation behavior.                                                                        |
-| `docs/library/primary-media-promotion-contract.md`           | **Canonical library contract**                               | Evidence-backed primary-media v0 promotion target, eligibility, `readContents` behavior, source-maintenance integration, and non-goals.                                                                                              |
-| `docs/library/track-identity-candidate-contract.md`          | **Canonical library contract**                               | Backend/store-owned exact evidence track identity candidate foundation, grouping provenance, staleness, read model, and explicit non-canonical boundaries.                                                                           |
-| `docs/library/track-identity-decision-contract.md`           | Provisional implementation contract                          | Backend/store-owned track identity decision foundation over candidates, exact-content v0 decision production, candidate-level effective decision semantics, copied-provenance snapshots, supersession, and non-canonical boundaries. |
-| `docs/library/track-identity-decision-authority-contract.md` | Provisional implementation contract                          | Backend-owned accept/reject/defer command family for candidate-scoped user decisions, controlled decision sources, user/system precedence, source-maintenance interaction, and canonical-track non-goals.                            |
-| `docs/library/track-identity-review-candidates-contract.md`  | Provisional implementation contract                          | Backend/store-owned candidate-centered read model for review candidates, source/evidence summaries, effective-decision relationship, V0 review states, and limit-only behavior.                                                      |
+| Doc                                                               | Role                     | Ownership                                                                                                               |
+| ----------------------------------------------------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `docs/library/source-hierarchy-contract.md`                       | canonical owner          | Navigation-only tree containment, selectable folders, disclosure rules, and exclusion of file/track rows from the tree. |
+| `docs/decisions/library-tree-canonical-contract.md`               | canonical owner          | Canonical tree structure and ownership decisions.                                                                       |
+| `docs/library/library-tree-frame-stability-contract.md`           | canonical owner          | Branch continuity, cache behavior, stable node identity, guards, prefetch bounds, and drag stability.                   |
+| `docs/library/library-tree-selection-contents-contract.md`        | canonical owner          | Scope-only tree selection, separate reveal intent, contents coupling, retained rows, and refresh behavior.              |
+| `docs/library/library-browser-workspace-surface-contract.md`      | canonical owner          | Library Browser surface identity, internal panel containment, geometry hints, and workspace handoff.                    |
+| `docs/decisions/library-contents-read-boundary.md`                | canonical owner          | Parameterized contents read contract, scope, policy, depth, pagination, coverage, and omission metadata.                |
+| `docs/decisions/selected-contents-scope-depth-rule.md`            | canonical owner          | Selected-scope depth semantics.                                                                                         |
+| `docs/library/library-contents-browse-policy.md`                  | canonical owner          | Product workflow-filter to contents-policy mapping and empty-state semantics.                                           |
+| `docs/library/contents-policy-shape.md`                           | implementation companion | Implemented policy union, file-class vocabulary, cursor identity, and policy-specific omission behavior.                |
+| `docs/library/audio-browse-row-v0.md`                             | implementation companion | Implemented `audioBrowse` row shape and boundary behavior.                                                              |
+| `docs/decisions/browse-policy-integrity-and-omission-metadata.md` | implementation companion | Integrity rules for implemented policy variants and omission metadata.                                                  |
+| `docs/library/source-browse-order-contract.md`                    | canonical owner          | Backend-owned natural ordering for source, directory, and file browsing.                                                |
 
-## Contents read boundary docs
+## File Facts, Identity, And Classification
 
-| Doc                                                    | Role                             | Notes                                                                                                                                                                                                                                                                            |
-|--------------------------------------------------------|----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `docs/library/library-contents-read-boundary.md`       | Discovery pointer                | Points to the canonical decisions doc and related library browser contracts. Does not define duplicate authority.                                                                                                                                                                |
-| `docs/decisions/library-contents-read-boundary.md`     | Canonical contents read boundary | Defines the single parameterized contents read boundary. Stale `sourceFileVisibility`-aware claim removed (historical note preserved). Complements `library-tree-selection-contents-contract.md` (which governs renderer coupling).                                              |
-| `docs/decisions/selected-contents-scope-depth-rule.md` | Valid architectural decision     | CURRENT. Architectural rules remain valid. Schema-specific references predate v1 substrate. For current v1 vocabulary see `docs/decisions/library-preparation-substrate-v1.md`; for current contents boundary vocabulary see `docs/decisions/library-contents-read-boundary.md`. |
+| Doc                                                       | Role                     | Ownership                                                                                                              |
+| --------------------------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `docs/library/media-relevant-file-inventory-contract.md`  | canonical owner          | Raw media-relevant source inventory, admission, presence, ordering, and projection limits.                             |
+| `docs/library/observed-file-facts-contract.md`            | canonical owner          | Basis-bound source-file evidence and validity.                                                                         |
+| `docs/library/media-probe-observations-contract.md`       | canonical owner          | Accepted media probe observations and their evidence basis.                                                            |
+| `docs/library/attachment-identity-foundation-contract.md` | canonical owner          | Exact-byte attachment identity and source-file attachment links.                                                       |
+| `docs/library/primary-media-promotion-contract.md`        | canonical owner          | Evidence-backed primary-media v0 promotion.                                                                            |
+| `docs/library/media-identity-schema-authority.md`         | implementation companion | Current schema/read-path ownership across inventory, attachment, primary-media, and exact-content identity layers.     |
+| `docs/decisions/library-preparation-substrate-v1.md`      | canonical owner          | Accepted v1 preparation substrate schema.                                                                              |
+| `docs/decisions/media-role-classification.md`             | future architecture      | Long-term classification, role, readiness, and projection lessons. Historical schema examples are not current targets. |
+| `docs/decisions/work-scheduling.md`                       | future architecture      | Long-term scheduler, priority, checkpoint, lease, and cancellation model.                                              |
 
-## Implementation discipline
+## Track Identity Decisions
 
-| Doc                                           | Role                               | Notes                                                                                                                                                                           |
-|-----------------------------------------------|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `docs/substrate-implementation-discipline.md` | Reusable implementation discipline | Mined from superseded V1 Substrate Port brief. Preserves durable process laws only. Not architecture authority. Supersedes `code_change_brief_v_1_substrate_port.md` (deleted). |
+| Doc                                                          | Role            | Ownership                                                                                |
+| ------------------------------------------------------------ | --------------- | ---------------------------------------------------------------------------------------- |
+| `docs/library/track-identity-candidate-contract.md`          | canonical owner | Exact-current-evidence track identity candidate production and provenance.               |
+| `docs/library/track-identity-decision-contract.md`           | canonical owner | Durable candidate decisions, evidence snapshots, source scope, and effective precedence. |
+| `docs/library/track-identity-decision-authority-contract.md` | canonical owner | Explicit backend-owned accept/reject/defer commands and user/system authority.           |
+| `docs/library/track-identity-review-candidates-contract.md`  | canonical owner | Candidate-centered review read model and backend-derived review state.                   |
 
-## Evidence reports
+## Desktop Boundary
 
-| Doc                                                  | Role                     | Notes                                                                        |
-|------------------------------------------------------|--------------------------|------------------------------------------------------------------------------|
-| `docs/source-root-scan-reconnaissance-2026-05-27.md` | Archived evidence report | Evidence only. Canonical contract: `source-root-scan-admission-contract.md`. |
+| Doc                                                      | Role                | Ownership                                                                                                                           |
+| -------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/decisions/electron-boundary-spine.md`              | canonical owner     | Electron command/publication/resource planes, exposure classes, host failures, validation hooks, and Boundary Event Pump ownership. |
+| `docs/library/library-boundary-event-stream-contract.md` | canonical owner     | Rust event-ring payloads, ordering, cursor semantics, event families, gaps, and scan-event limitations.                             |
+| `docs/decisions/library-to-deck-performance-boundary.md` | future architecture | Library-to-deck authority boundary; historical table vocabulary is not current schema authority.                                    |
 
-## Superseded / archive material
+## Supporting Product Surfaces
 
-| Doc                                                        | Role               | Notes                                                                                                                                     |
-|------------------------------------------------------------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| `docs/archive/product-doctrine.md`                         | Superseded archive | Superseded by `product-doctrine-shortened.md`.                                                                                            |
-| `docs/archive/schema-rewrite-prompt.md`                    | Superseded archive | Implementation prompt, not canonical doc. Superseded by current schema baseline and `docs/decisions/library-preparation-substrate-v1.md`. |
-| `docs/source-hierarchy-contract.md`                        | Superseded pointer | Superseded by `docs/library/source-hierarchy-contract.md`.                                                                                |
-| `docs/library/library-row-profile-contract.md`             | Superseded pointer | Superseded tree row-profile framing. Do not use to add renderer-controlled tree profiles or audio/file rows in tree navigation.           |
-| `docs/library/library-tree-track-segment-rows-contract.md` | Superseded pointer | Superseded in-tree media row framing. Do not use to restore track, companion, segment, source-file, or audio rows to tree navigation.     |
+| Doc                                  | Role              | Ownership                              |
+| ------------------------------------ | ----------------- | -------------------------------------- |
+| `docs/local-source-icon-doctrine.md` | canonical owner   | Local-source and media icon semantics. |
+| `docs/renderer/icon-inventory.md`    | research/evidence | Current renderer icon usage inventory. |
 
-## Support maps
+## Workspace
 
-| Doc                                            | Role                         | Notes                                                                                                   |
-|------------------------------------------------|------------------------------|---------------------------------------------------------------------------------------------------------|
-| `docs/implementation-structure.md`             | Support map                  | Future implementation target shape. Not architecture authority. Guides crate/package/domain structure.  |
-| `docs/local-source-icon-doctrine.md`           | Icon doctrine                | Canonical for iconography rules. Depends on scan admission contract for root classification vocabulary. |
-| `docs/first-slice-substrate-map.md`            | First slice authority map    | Defines the first product slice. Not architecture authority.                                            |
-| `docs/library/source-browse-order-contract.md` | Source browse order contract | Defines backend-owned natural ordering for source/folder/file browsing, sort key ownership, non-goals.  |
+Workspace documentation is self-contained and unchanged by library authority cleanup.
 
-## Schema and substrate decisions
-
-| Doc                                                      | Role                                 | Notes                                                                                 |
-|----------------------------------------------------------|--------------------------------------|---------------------------------------------------------------------------------------|
-| `docs/decisions/library-preparation-substrate-v1.md`     | Canonical schema decision (ACCEPTED) | v1 substrate schema authority. Replaces `LibraryAssets`-based schema.                 |
-| `docs/decisions/library-boundary-exposure.md`            | Valid architectural decision         | IPC boundary exposure rules for library operations.                                   |
-| `docs/decisions/library-to-deck-performance-boundary.md` | Future architecture boundary         | FUTURE ARCHITECTURE. Authority boundaries valid; table names predate v1 substrate.    |
-| `docs/decisions/media-role-classification.md`            | Future architecture boundary         | FUTURE ARCHITECTURE. Classification pipeline valid; table names predate v1 substrate. |
-| `docs/decisions/work-scheduling.md`                      | Future architecture boundary         | FUTURE ARCHITECTURE. Scheduler design valid; table names predate v1 substrate.        |
-
-## Workspace docs
-
-Self-contained under `docs/workspace/`. See individual files. The primary entry is
-`docs/workspace/visual-workspace-doctrine.md`.
-
-## Known forward references (intentionally do not exist yet)
-
-| Referenced name             | Used by                                    | Reason                                                                                                   |
-|-----------------------------|--------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| `workspace-layout-contract` | Library browser workspace surface contract | TODO: Not yet written. Workspace topology contracts exist but specific layout contract not yet separate. |
+| Doc                                                              | Role                     |
+| ---------------------------------------------------------------- | ------------------------ |
+| `docs/workspace/visual-workspace-doctrine.md`                    | canonical owner          |
+| `docs/workspace/adr-workspace-floating-docking-law.md`           | canonical owner          |
+| `docs/workspace/canonical-topology-families.md`                  | canonical owner          |
+| `docs/workspace/responsive-topology-matrix.md`                   | implementation companion |
+| `docs/workspace/scale-and-settings-architecture.md`              | canonical owner          |
+| `docs/workspace/topology-modeling-law.md`                        | canonical owner          |
+| `docs/workspace/workspace-engine-foundation-spec.md`             | canonical owner          |
+| `docs/workspace/workspace-topology-negotiation-law.md`           | canonical owner          |
+| `docs/workspace/workspace-topology-negotiation-solver-sketch.md` | implementation companion |

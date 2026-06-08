@@ -4,7 +4,7 @@ doctrine-version: 0.1
 last-reviewed: 2026-05-29
 owner: product-architecture
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - source-root-scan-admission-contract
   - source-hierarchy-contract
   - library-tree-frame-stability-contract

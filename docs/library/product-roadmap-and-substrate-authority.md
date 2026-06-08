@@ -14,8 +14,12 @@ details. This document defines sequence, dependency, vetoes, and long-term owner
 
 The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
 
-1. `feat(library): add media probe observations v0`
-2. `feat(library): add collection health and source integrity read model`
+1. `feat(library): add collection health and source integrity read model`
+
+Media probe observations, primary-media promotion, exact-content track identity candidates, candidate decisions,
+explicit user decision commands, and the review-candidates read model are already implemented. Their accepted contracts
+are narrower than the later canonical media-candidate and canonical-track roadmap layers and do not satisfy those future
+gates by themselves.
 
 ---
 
@@ -31,6 +35,12 @@ The following layers are canonical.
    scan-triggered in one maintenance unit; scheduler/drain behavior remains future work.
 5. **Attachment identity v0** — The app can say: these source-file rows have the same bytes and map to the same durable
    content attachment.
+6. **Media probe observations v0** — The app records accepted basis-bound audio probe summary facts through backend
+   inspection work.
+7. **Primary-media promotion v0** — The app promotes current audio evidence into backend-owned primary-media candidates.
+8. **Exact-content track identity candidate and decision v0** — The app groups exact current evidence, records
+   backend/user candidate decisions, resolves effective decision precedence, and exposes review candidates without
+   claiming canonical track identity.
 
 ### Canonical schema
 
@@ -318,7 +328,7 @@ product-trust read model. No attachment-detail UI may be built before A-4 lands.
 
 ---
 
-**A-3 [CODE] Media probe observations v0** [Planned]
+**A-3 [CODE] Media probe observations v0** [Ratified]
 
 Basis-bound probe evidence stored alongside observed facts.
 

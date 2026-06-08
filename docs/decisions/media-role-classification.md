@@ -5,6 +5,10 @@
 _Canonical architecture note. Governs library substrate, classification pipeline, browser projection, and all
 file-to-product-object mapping in Dekzer._
 
+**Terminology note:** **Companion Files** / companion is the product language. Legacy schema examples such as
+`sidecar_rule` are historical future-architecture vocabulary, not product labels. Any future schema revision must align
+new names with companion terminology rather than introducing another taxonomy.
+
 ---
 
 Dekzer does not browse files directly.
@@ -69,12 +73,12 @@ A library item may hold multiple roles simultaneously.
 
 Valid roles:
 
-| Role                 | Meaning                                                                                                                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `performance_item`   | Candidate for deck or transport use. Actual loadability is target-specific readiness.                                                                                                                                                            |
-| `visual_asset`       | Candidate for visual output or visual workflows. Actual use is target-specific readiness.                                                                                                                                                        |
-| `artwork_candidate`  | Candidate for attachment as artwork to a track, album, folder, or crate.                                                                                                                                                                         |
-| `companion_metadata` | A recognized sidecar or structured companion to another item — CUE sheets, structured playlists, disc image companions. Not every adjacent text file. Random `.log` files, screenshots, and unrecognized adjacents are not `companion_metadata`. |
+| Role                 | Meaning                                                                                                                                                                                                                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `performance_item`   | Candidate for deck or transport use. Actual loadability is target-specific readiness.                                                                                                                                                                                                                |
+| `visual_asset`       | Candidate for visual output or visual workflows. Actual use is target-specific readiness.                                                                                                                                                                                                            |
+| `artwork_candidate`  | Candidate for attachment as artwork to a track, album, folder, or crate.                                                                                                                                                                                                                             |
+| `companion_metadata` | A recognized structured companion to another item — CUE sheets, structured playlists, disc image companions. Not every adjacent text file. Random `.log` files, screenshots, and unrecognized adjacent files are not `companion_metadata`. Product surfaces label this category **Companion Files**. |
 
 Do not add `primary_role`. A music video is simultaneously a `performance_item` and a `visual_asset`. A cover image is
 an `artwork_candidate`. A role conflict is a projection problem, not a reason to introduce a false hierarchy.
@@ -495,7 +499,7 @@ An image becomes an `artwork_candidate` only when at least one of the following 
 1. It is embedded artwork extracted from an audio or video file.
 2. It lives in the same directory as at least one `performance_item` candidate.
 3. Its filename matches a recognized convention: `cover`, `folder`, `front`, `back`, `artwork`, `albumart`.
-4. Its basename or structured sidecar name matches a track, album, artist, or folder identity in the library.
+4. Its basename or structured companion name matches a track, album, artist, or folder identity in the library.
 5. The user manually promotes it as artwork.
 
 **An image is not an artwork candidate merely because it shares an ancestor directory with music.** Proximity is
@@ -544,7 +548,7 @@ justifies it.
     and identity facts (hash when available).
 4.  Extension claims produce low-confidence provisional role assignments
     for files whose extension_claim matches known media types
-    (audio, video, image, sidecar).
+    (audio, video, image, companion).
     Assignment state: proposed. Confidence: low. Basis: extension_claim.
 5.  Files with known media extensions are queued for Stage 2 or Stage 3
     at elevated priority.
@@ -586,7 +590,7 @@ An expensive container and stream inspection. Scheduled only when media-relevanc
 
 ```
 10. Media-relevance evidence that justifies a full probe:
-      - known media extension (audio, video, image, sidecar)
+      - known media extension (audio, video, image, companion)
       - recognized file signature / magic bytes from Stage 2
       - same-directory artwork candidate rule
       - prior library identity (file seen before as media)
@@ -635,7 +639,7 @@ provisional items until probe completes produces empty-looking trees during acti
 **Normal DJ browse context hides by default:**
 
 - Loose image files
-- Cover/artwork sidecar files
+- Cover/artwork companion files
 - Video files with no accepted `performance_item` role
 - Unsupported or unrecognized files
 - Cache files, export artifacts, log files

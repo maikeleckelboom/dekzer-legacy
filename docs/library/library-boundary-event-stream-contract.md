@@ -1,13 +1,13 @@
 ---
-status: candidate
+status: accepted
 doctrine-version: 0.1
-last-reviewed: 2026-05-30
+last-reviewed: 2026-06-09
 owner: renderer-substrate-boundary
 canonical-context:
   - first-slice-substrate-map
   - source-hierarchy-contract
   - library-tree-frame-stability-contract
-  - library-boundary-exposure
+  - electron-boundary-spine
 scope:
   - boundary-event-model
   - cursor-only-event-reading
@@ -134,7 +134,8 @@ the renderer was not polling (or polling too slowly).
 
 ### Gap recovery behavior
 
-When `gapDetected` is true:
+When `gapDetected` is true, Desktop Main's Boundary Event Pump reports the gap and renderer consumers schedule the
+authoritative projection rereads:
 
 1. The renderer marks its cached hierarchy/contents/projection state as potentially stale.
 2. The renderer issues authoritative snapshot rereads for visible and selected scopes.
@@ -216,6 +217,9 @@ Desktop Main owns `BoundaryEventPump` v1
 (`apps/desktop/src/main/libraryBoundary/eventPump.ts`). The pump starts when the library boundary
 host is started and at least one renderer subscriber exists. It polls `ReadAfter`, owns
 `lastSeenEventSequence`, detects `gapDetected`, and forwards batches through typed IPC.
+
+The Boundary Event Pump is the only scheduling owner for `ReadAfter` or a future `WaitForEventsAfter` transport.
+Renderer code consumes forwarded publications and must not schedule either service event-read operation.
 
 The renderer consumes Main-delivered batches through the boundary events controller
 (`apps/desktop/src/renderer/library/boundary/boundaryEvents.ts`).

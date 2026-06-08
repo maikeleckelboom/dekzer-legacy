@@ -5,7 +5,7 @@ last-reviewed: 2026-06-06
 owner: library-substrate-boundary
 canonical-context:
   - library-contents-browse-policy
-  - library-contents-read-boundary
+  - decisions/library-contents-read-boundary
   - library-tree-selection-contents-contract
   - media-relevant-file-inventory-contract
 scope:
@@ -68,7 +68,7 @@ not V0 fields.
 | Generated TS contract     | `packages/library-boundary-contract` mirrors the Rust protocol. `ContentsReadPolicy` is the `playableMediaBrowse`, `audioBrowse`, `sourceFileInventory`, or `primaryMedia` union. No dedicated generated `AudioBrowseRow` type exists.                                                                                                                      |
 | TS boundary client        | `LibraryBoundaryClient.readContents` sends the existing `snapshotRead/contentsRead` command and expects the existing `contents` reply. It adds no row authority.                                                                                                                                                                                            |
 | Desktop main adapter      | `apps/desktop/src/main/libraryContents/read.ts` normalizes scope, policy, scopeDepth, limit, and cursor, maps generated `ContentsFileRow` into shared `ContentsFileRow`, and rejects invalid image/unsupported primary-media combinations. It adds no browse-field authority.                                                                                |
-| Renderer boundary adapter | `apps/desktop/src/renderer/library/boundary/contentsRead.ts` requests `{ kind: 'playableMediaBrowse' }` for the default browse. `audioBrowse` remains available as a separate audio-only policy. The controller owns warm snapshots, retained rows, delayed pending display, and pagination accumulation only.                                              |
+| Renderer boundary adapter | `apps/desktop/src/renderer/library/boundary/contentsRead.ts` currently uses `{ kind: 'playableMediaBrowse' }` as its hard-coded fallback request. The policy union also accepts `{ kind: 'audioBrowse' }`. Product filter wiring must replace the hard-coded fallback so initial **Audio** maps to `audioBrowse` and **Media** maps to `playableMediaBrowse`. The controller owns warm snapshots, retained rows, delayed pending display, and pagination accumulation only. |
 | Renderer projection       | `contents/projection.ts` maps rows to `ContentRow` display rows with `id`, `label`, `presence`, `detail`, `icon`, `fileClass`, and `availabilityState`. Its relative-path fallback and file-class labels are presentation, not durable field authority.                                                                                                     |
 | Table display             | `contents/table.vue` displays `Name` and `Details` columns. It does not display extension, source label, source-location provenance, row version, container, or codec.                                                                                                                                                                                      |
 | Cursor fields             | Cursor identity is store-owned and binds version, scope, the full profile-specific policy, scopeDepth, and row order position. `audioBrowse` has a distinct policy identity from `sourceFileInventory` and reuses the source-file order position: `relative_path_browse_sort_key`, `relative_path`, and `source_file_id`.                                    |
@@ -160,13 +160,14 @@ owned by `readContents`. There is no ownership reason for a new command.
 ### Rejected: no new boundary yet
 
 Keeping only source-file rows leaves the audio-only read-model concept expressed as raw inventory policy.
-`audioBrowse` provides the explicit backend-owned audio profile while `playableMediaBrowse` owns the product default.
+`audioBrowse` provides the backend-owned policy for the initial **Audio** workflow filter.
+`playableMediaBrowse` provides the backend-owned policy for the separate **Media** filter.
 
 ## V0 Acceptance Criteria
 
 - `readContents` accepts `{ kind: 'audioBrowse' }`; incompatible class combinations are unrepresentable.
-- Audio-only views can request audio browse rows with recursive source, source-location, and directory scopes. The
-  default product browse uses `playableMediaBrowse`.
+- The initial **Audio** workflow requests audio browse rows with recursive source, source-location, and directory scopes.
+- The separate **Media** workflow requests `playableMediaBrowse`.
 - V0 audio browse rows match `sourceFileInventory.fileClasses = ['audio']` results for the same scope, scopeDepth, limit, and cursor,
   including row order and absence/presence of optional fields.
 - Audio browse rows never carry primary-media summary fields, canonical track identity, preparation summaries, waveform,
@@ -192,8 +193,8 @@ Keeping only source-file rows leaves the audio-only read-model concept expressed
 - Generated contract checks proving TS/schema include the new row-profile kind and no new dedicated row type.
 - Desktop main adapter tests proving request normalization, generated-contract mapping, error mapping, and no
   renderer-side field derivation.
-- Renderer boundary tests proving the default request uses `playableMediaBrowse`, retains cursor pagination, and keeps
-  warm snapshots scoped to the request key.
+- Renderer boundary tests proving cursor pagination and request-key identity for every policy. Workflow-filter tests
+  remain required when the current hard-coded fallback is replaced by product filter wiring.
 - Renderer projection tests proving current row display parity and no filtering/sorting authority.
 
 ## Contract Generation
@@ -204,7 +205,9 @@ manifest hashes. No dedicated audio row type, dedicated endpoint, or source hier
 
 ## Renderer Surface
 
-The renderer uses `playableMediaBrowse` by default and handles request-key identity for every policy profile.
+The renderer currently handles request-key identity for every policy profile but still hard-codes
+`playableMediaBrowse` as its fallback request. That is implementation state, not product doctrine. Product filter wiring
+must map initial **Audio** to `audioBrowse` and **Media** to `playableMediaBrowse`.
 Projection and table code render returned rows and do not derive extension, source label,
 source-location provenance, row version, container, or codec. Source-file rows remain available for explicit
 non-default inventory/diagnostic modes.

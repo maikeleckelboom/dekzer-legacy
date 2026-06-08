@@ -4,9 +4,10 @@ doctrine-version: 0.1
 last-reviewed: 2026-05-28
 owner: workspace-library-boundary
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - library-tree-frame-stability-contract
-  - library-row-profile-contract
+  - source-hierarchy-contract
+  - library-tree-selection-contents-contract
   - library-tree-selection-contents-contract
   - source-lifecycle-visible-state-contract
   - workspace-topology-negotiation-law

@@ -2,7 +2,7 @@
 authority: support-map
 purpose: Target implementation structure map. Not architecture authority.
 canonical-context:
-  - product-doctrine-shortened
+  - product/product-doctrine
   - library-preparation-substrate-v1
   - source-root-scan-admission-contract
 ---
