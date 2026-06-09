@@ -1,6 +1,6 @@
 # Library Tree Row Action Surface and Drag Scope Contract
 
-**Revision:** 2026-06-08 r2
+**Revision:** 2026-06-08
 
 ## Purpose
 

@@ -36,6 +36,7 @@ Implementation companions may describe narrower implemented shapes but do not ov
 | `docs/decisions/library-tree-canonical-contract.md`               | canonical owner          | Canonical tree structure and ownership decisions.                                                                       |
 | `docs/library/library-tree-frame-stability-contract.md`           | canonical owner          | Branch continuity, cache behavior, stable node identity, guards, prefetch bounds, and drag stability.                   |
 | `docs/library/library-tree-selection-contents-contract.md`        | canonical owner          | Scope-only tree selection, separate reveal intent, contents coupling, retained rows, and refresh behavior.              |
+| `docs/library/library-tree-row-action-and-dnd-scope-contract.md`  | canonical owner          | Tree row action surface, full-width selection, forgiving reveal lane, double-click prohibition, and D&D scope separation. |
 | `docs/library/library-browser-workspace-surface-contract.md`      | canonical owner          | Library Browser surface identity, internal panel containment, geometry hints, and workspace handoff.                    |
 | `docs/decisions/library-contents-read-boundary.md`                | canonical owner          | Parameterized contents read contract, scope, policy, depth, pagination, coverage, and omission metadata.                |
 | `docs/decisions/selected-contents-scope-depth-rule.md`            | canonical owner          | Selected-scope depth semantics.                                                                                         |
@@ -44,6 +45,12 @@ Implementation companions may describe narrower implemented shapes but do not ov
 | `docs/library/audio-browse-row-v0.md`                             | implementation companion | Implemented `audioBrowse` row shape and boundary behavior.                                                              |
 | `docs/decisions/browse-policy-integrity-and-omission-metadata.md` | implementation companion | Integrity rules for implemented policy variants and omission metadata.                                                  |
 | `docs/library/source-browse-order-contract.md`                    | canonical owner          | Backend-owned natural ordering for source, directory, and file browsing.                                                |
+
+## Browse Policy, Classification, and Filter Registry
+
+| Doc                                                       | Role            | Ownership                                                                                                                                                                      |
+| --------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `docs/library/library-browse-policy-and-classification.md` | canonical owner | Eight-owner separation model (source structure, source-file facts, classification, identity/evidence, interpretation, content projection, browse policy, facet projection), built-in filter registry, complete vocabulary, CUE/sidecar rules, tree/facet behavior, row identity, and navigation readiness probe relationship. |
 
 ## File Facts, Identity, And Classification
 
@@ -74,7 +81,16 @@ Implementation companions may describe narrower implemented shapes but do not ov
 | -------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/decisions/electron-boundary-spine.md`              | canonical owner     | Electron command/publication/resource planes, exposure classes, host failures, validation hooks, and Boundary Event Pump ownership. |
 | `docs/library/library-boundary-event-stream-contract.md` | canonical owner     | Rust event-ring payloads, ordering, cursor semantics, event families, gaps, and scan-event limitations.                             |
+| `docs/decisions/library-folder-structure.md`             | canonical owner     | Canonical Electron library folder structure, boundary spine ownership, layer ownership laws, naming conventions, and channel ownership. |
 | `docs/decisions/library-to-deck-performance-boundary.md` | future architecture | Library-to-deck authority boundary; historical table vocabulary is not current schema authority.                                    |
+
+## Migrations
+
+Migration documents are temporary companions. They describe one-time mechanical moves and will be removed after migration lands.
+
+| Doc                                                | Role                | Ownership                                                                                             |
+| -------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `docs/migrations/library-folder-structure-migration.md` | migration companion | Temporary mechanical migration plan from legacy Electron library folder layout to canonical structure. This document will be removed after the migration lands and is not ongoing product authority. |
 
 ## Supporting Product Surfaces
 

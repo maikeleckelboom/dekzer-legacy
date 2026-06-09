@@ -4,7 +4,7 @@
 
 Status: implementation companion
 Owner: Electron library boundary and renderer architecture
-Companion architecture doc: `docs/architecture/library-folder-structure.md`
+Companion architecture doc: `docs/decisions/library-folder-structure.md`
 
 This document defines the mechanical migration from the current Electron library folder layout to the ratified
 `main/library/` and `shared/library/` structure.

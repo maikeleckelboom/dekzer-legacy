@@ -2,7 +2,7 @@
 
 **Status:** Canon — implementation-gate
 **Domain:** Library / Browse / Classification
-**Revision:** 2026-06-08 r4
+**Revision:** 2026-06-08
 **Depends on:** `background-root-scan-lifecycle-diagrams.md`, `electron-boundary-spine.md`,
 `cue-backed-disc-image-model.md`
 
