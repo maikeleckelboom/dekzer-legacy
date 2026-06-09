@@ -85,7 +85,7 @@ The browser must expose readiness honestly instead of pretending the filesystem 
 
 ## Relationship To Representation Contract
 
-The Library Browser Representation Contract owns the umbrella model for library representations.
+[The Library Browser Representation Contract](../library/browse/representation-contract.md) owns the umbrella model for library representations.
 
 This document owns readiness behavior for the Local Files/raw source representation.
 

@@ -29,7 +29,7 @@ scope:
 This document defines how Dekzer library representation roots may be realized, grouped, split, and placed in the
 workspace.
 
-The Library Browser Representation Contract defines what library representations mean.
+[The Library Browser Representation Contract](representation-contract.md) defines what library representations mean.
 
 This document defines how those representations may appear.
 
@@ -777,19 +777,19 @@ It must:
 
 ## Relationship To Existing Docs
 
-The Library Browser Representation Contract owns representation semantics.
+[The Library Browser Representation Contract](representation-contract.md) owns representation semantics.
 
 This document owns realization and composition rules for representation roots.
 
-Source Activation and Navigation Readiness owns Local Files readiness behavior before recursive scan completion.
+[Source Activation and Navigation Readiness](../../product/source-activation-and-navigation-readiness.md) owns Local Files readiness behavior before recursive scan completion.
 
-First Slice Substrate Map owns current first-slice scope and active read-boundary ownership.
+[First Slice Substrate Map](../../product/first-slice-substrate-map.md) owns current first-slice scope and active read-boundary ownership.
 
-Prepared Room docs own Prepared Room and workflow semantics.
+[Prepared Room docs](../prepared-room/model.md) own Prepared Room and workflow semantics.
 
 Workspace topology docs own host topology, size negotiation, placement, and layout realization.
 
-Row action and drag-and-drop contracts own pointer surfaces, action legality, and drag/drop behavior.
+[Row action and drag-and-drop contracts](../tree/row-action-and-dnd-scope-contract.md) own pointer surfaces, action legality, and drag/drop behavior.
 
 This document sits between library representation semantics and workspace topology realization.
 

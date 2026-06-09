@@ -308,7 +308,7 @@ Future values (not yet registered): `stems`, `karaoke`, `spatial`, `multichannel
 concept.
 
 `ContentRowKind` and representation kind are separate axes. `ContentRowKind` describes the rendered row form inside a
-browse surface. Representation kind, as defined by `representation-contract.md`, describes ownership, provenance, legal
+browse surface. Representation kind, as defined by [`representation-contract.md`](representation-contract.md), describes ownership, provenance, legal
 actions, and the row's relationship to musical material. Content rows must carry both axes when they cross the read
 boundary. They are not competing taxonomies.
 
@@ -746,7 +746,7 @@ established before any implementation that renders a scrollable content list.
 
 ## 11. Relation to the navigation readiness probe
 
-The navigation readiness probe (defined in `background-root-scan-lifecycle-diagrams.md`) is the priority-lane operation
+The navigation readiness probe (defined in [`background-root-scan-lifecycle-diagrams.md`](../source/background-root-scan-lifecycle-diagrams.md)) is the priority-lane operation
 that discovers immediate child scopes after source admission. Its relationship to this document's model is strict.
 
 **The probe answers only structural questions:**

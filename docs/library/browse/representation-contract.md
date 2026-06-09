@@ -639,7 +639,7 @@ Source hierarchy contracts still own:
 - disclosure rules;
 - exclusion of file rows from the tree.
 
-Browse policy and classification still own:
+[Browse policy and classification](policy-and-classification.md) still own:
 
 - file classification;
 - row universes;
@@ -647,7 +647,7 @@ Browse policy and classification still own:
 - facets;
 - filter-aware content projection.
 
-Tree row action contracts still own:
+[Tree row action contracts](../tree/row-action-and-dnd-scope-contract.md) still own:
 
 - HTML row surface;
 - pointer hit zones;
@@ -655,14 +655,14 @@ Tree row action contracts still own:
 - selection/reveal separation;
 - local hierarchy versus future authored drag scope.
 
-Prepared Room docs still own:
+[Prepared Room docs](../prepared-room/model.md) still own:
 
 - Prepared Room domain model;
 - workflow stack;
 - performance memory;
 - room-specific laws.
 
-Library Representation Composition owns:
+[Library Representation Composition](representation-composition.md) owns:
 
 - realization forms;
 - panel instances;
@@ -749,7 +749,7 @@ For current Library V0:
 - Local Files/source hierarchy is the primary implemented representation.
 - Contents table applies media relevance and browse policy.
 - Source rows and directory rows are raw source browse scopes.
-- Contents rows use `ContentRowKind` from `browse-policy-and-classification.md` for their rendered row form
+- Contents rows use `ContentRowKind` from [`browse-policy-and-classification.md`](policy-and-classification.md) for their rendered row form
   (`playableAudioAsset`, `playableVideoAsset`, `cueBackedDisc`, `companionFile`, or `rawSourceFile` as applicable),
   while
   carrying representation kind separately. V0 Local Files content rows are raw source representations unless a narrower
