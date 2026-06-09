@@ -101,7 +101,7 @@ Migration documents are temporary companions. They describe one-time mechanical 
 
 ## Workspace
 
-Workspace documentation is self-contained and unchanged by library authority cleanup.
+Workspace documentation is self-contained. Filename normalization does not change workspace authority.
 
 | Doc                                                    | Role                     |
 | ------------------------------------------------------ | ------------------------ |

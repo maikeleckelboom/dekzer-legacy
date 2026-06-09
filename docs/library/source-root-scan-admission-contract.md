@@ -1,8 +1,8 @@
 ---
-status: candidate
+status: canon — target architecture
 ratification-target: source-scan-contract-v1
 doctrine-version: 0.3
-last-reviewed: 2026-05-27
+last-reviewed: 2026-06-09
 amended: 2026-05-30
 owner: music-library-substrate
 canonical-context:
