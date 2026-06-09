@@ -2,7 +2,7 @@
 
 status: accepted
 doctrine-version: 0.1
-last-reviewed: 2026-06-10
+last-reviewed: 2026-06-09
 owner: library-browser-architecture
 canonical-context:
 
@@ -184,6 +184,13 @@ User usually cannot:
 - treat generated grouping as authored hierarchy.
 
 A collection projection is not a playlist. It is a view over admitted musical material.
+
+**Deferred Collection authority note:** This contract names Collection as a representation class, but it does not fully
+own the Collection substrate contract. A future Collection authority contract must define canonical material identity,
+metadata ownership, attachment ownership, admitted-material lifecycle, preparation projection ownership, and the
+boundary
+between canonical material and source occurrences. Until that contract exists, do not use Collection as a vague bucket
+for unrelated material, metadata, source-file, or preparation concerns.
 
 ### 3. Authored Organization Representations
 
@@ -412,19 +419,19 @@ playlist.
 
 ## Ordering Ownership Matrix
 
-| Representation                | Ordering owner                               | User CRUD                             | Manual reorder          | D&D reparent             |
-| ----------------------------- | -------------------------------------------- | ------------------------------------- | ----------------------- | ------------------------ |
-| Local Files                   | filesystem and Dekzer browse policy          | source admission only                 | no                      | no                       |
-| Source table contents         | sort/filter policy                           | no membership CRUD                    | no durable manual order | no                       |
-| Collection projections        | Dekzer projection/sort policy                | metadata/prep actions where supported | usually no              | no                       |
-| Crates                        | user-authored order                          | yes                                   | yes                     | yes, when hierarchical   |
-| Playlists                     | user-authored order                          | yes                                   | yes                     | yes, when folders exist  |
-| Playlist/crate folders        | user-authored hierarchy                      | yes                                   | yes                     | yes                      |
-| Smart lists                   | user-authored definition, generated contents | definition CRUD                       | not by default          | not by default           |
-| Search results                | query                                        | no                                    | no                      | no                       |
-| External app crates/playlists | external/provenance owner                    | browse/import/mirror only             | not until Dekzer-owned  | not until Dekzer-owned   |
-| History/performed sets        | performance record                           | annotate/fork/copy                    | not as source record    | different rules          |
-| Prepared Room/sleeves         | user-authored workflow object                | yes                                   | yes                     | yes, but domain-specific |
+| Representation                | Ordering owner                                   | User CRUD                             | Manual reorder          | D&D reparent             |
+| ----------------------------- | ------------------------------------------------ | ------------------------------------- | ----------------------- | ------------------------ |
+| Local Files (tree)            | filesystem and Dekzer browse policy              | source admission only                 | no                      | no                       |
+| Local Files (contents)        | browse/content projection sort and filter policy | no membership CRUD                    | no durable manual order | no                       |
+| Collection projections        | Dekzer projection/sort policy                    | metadata/prep actions where supported | usually no              | no                       |
+| Crates                        | user-authored order                              | yes                                   | yes                     | yes, when hierarchical   |
+| Playlists                     | user-authored order                              | yes                                   | yes                     | yes, when folders exist  |
+| Playlist/crate folders        | user-authored hierarchy                          | yes                                   | yes                     | yes                      |
+| Smart lists                   | user-authored definition, generated contents     | definition CRUD                       | not by default          | not by default           |
+| Search results                | query                                            | no                                    | no                      | no                       |
+| External app crates/playlists | external/provenance owner                        | browse/import/mirror only             | not until Dekzer-owned  | not until Dekzer-owned   |
+| History/performed sets        | performance record                               | annotate/fork/copy                    | not as source record    | different rules          |
+| Prepared Room/sleeves         | user-authored workflow object                    | yes                                   | yes                     | yes, but domain-specific |
 
 ## Capability Model
 
@@ -452,6 +459,16 @@ Example capabilities:
 - isAuthoredObject;
 - isHistoryRecord;
 - isWorkflowObject.
+
+The capability profile contains two kinds of fields:
+
+- action capabilities, such as `canRename`, `canReorder`, `canImport`, and `canSnapshot`;
+- derived representation flags, such as `isRawSource`, `isGeneratedResult`, `isAuthoredObject`, `isHistoryRecord`, and
+  `isWorkflowObject`.
+
+Derived representation flags must be derived from `representationKind`. They are not independently settable. A row must
+not claim `representationKind = rawSource` while also setting `isAuthoredObject = true`. Context may narrow action
+capabilities, but it must not contradict the representation kind.
 
 The UI must not infer allowed actions from visual style alone.
 
@@ -648,7 +665,16 @@ Prepared Room docs still own:
 - performance memory;
 - room-specific laws.
 
-This document sits above those contracts and tells them what kind of representation they are part of.
+Library Representation Composition owns:
+
+- realization forms;
+- panel instances;
+- composition shells;
+- workspace placement boundaries;
+- the rule that implementations must not hard-code sidebar-only composition.
+
+This document sits above narrower contracts and tells them what kind of representation they are part of. Composition
+contracts decide how those representations may appear without changing their meaning.
 
 ## UI Requirements
 
@@ -704,7 +730,9 @@ Allowed actions must come from representation kind and capabilities.
 ### Vague Collection authority
 
 Do not use Collection as a bucket that hides ownership. Collection projections must say whether they project canonical
-material, source occurrence, metadata, preparation state, identity review, or another defined model.
+material, source occurrence, metadata, preparation state, identity review, or another defined model. Until the future
+Collection authority contract exists, this document only permits Collection as a named representation class and forbids
+using it as an unowned catch-all.
 
 ### Reducing workflow objects to playlists
 
@@ -724,7 +752,11 @@ For current Library V0:
 - Local Files/source hierarchy is the primary implemented representation.
 - Contents table applies media relevance and browse policy.
 - Source rows and directory rows are raw source browse scopes.
-- Contents rows are scoped source-file browse rows until a richer read model explicitly defines otherwise.
+- Contents rows use `ContentRowKind` from `browse-policy-and-classification.md` for their rendered row form
+  (`playableAudioAsset`, `playableVideoAsset`, `cueBackedDisc`, `companionFile`, or `rawSourceFile` as applicable),
+  while
+  carrying representation kind separately. V0 Local Files content rows are raw source representations unless a narrower
+  read model explicitly defines another representation.
 - Crates, playlists, smart lists, external adapters, and Prepared Room rows may remain future scope.
 - Row and projection naming should leave room for typed representation kinds.
 - Capability metadata should be shaped so authored representations can be added without rewriting the local source
@@ -739,12 +771,14 @@ Do not let the V0 implementation hard-code â€œlibrary equals local filesystem.â€
 A library representation model is acceptable when:
 
 - every tree/list row concept has an explicit representation kind;
+- content rows distinguish rendered `ContentRowKind` from ownership/provenance `representationKind`;
 - Local Files is modeled as raw source representation, not the whole library;
 - authored representations can own order and membership;
 - generated representations can own definitions without pretending live result rows are manually ordered;
 - external representations preserve provenance and editability state;
 - repeated appearances of material are explainable;
 - allowed actions are derived from representation kind and capabilities;
+- derived capability flags cannot contradict representation kind;
 - local source rows do not expose reorder or reparent behavior;
 - crates, playlists, sleeves, and Prepared Room rows can later expose authored drag-and-drop without changing Local
   Files semantics;

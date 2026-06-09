@@ -2,8 +2,9 @@
 
 **Status:** Canon — implementation-gate
 **Domain:** Library / Browse / Classification
-**Revision:** 2026-06-08
-**Depends on:** `background-root-scan-lifecycle-diagrams.md`, `electron-boundary-spine.md`
+**Revision:** 2026-06-09
+**Depends on:** `background-root-scan-lifecycle-diagrams.md`, `electron-boundary-spine.md`,
+`representation-contract.md`, `representation-composition.md`
 
 ---
 
@@ -16,7 +17,8 @@ classification, interpretation, and facet systems bleed into each other and prod
 god object.
 
 This document establishes the canonical separation of concerns, the complete vocabulary, the built-in filter registry,
-the CUE and companion-file rules, the facet behaviour contract, and the relationship to the navigation readiness probe. No code
+the CUE and companion-file rules, the facet behaviour contract, and the relationship to the navigation readiness probe.
+No code
 may be written against the filter registry, content read policy, or facet projection without this document reaching
 canon status.
 
@@ -252,6 +254,16 @@ does not change when the active browse policy changes.
 content, not of raw files. A raw `cueSheet` has no `MediaKind` by itself; only the resolved `cueBackedDisc` asset it may
 produce carries `MediaKind.audio`.
 
+Direct playable source files still receive a `MediaKind` when that playable experience is directly inferable from the
+file alone. A `.flac`, `.wav`, or `.mp3` file that is later identified as the target of a CUE sheet still has
+`fileClass = audioFile` and may contribute `MediaKind.audio` as a direct playable asset. Classification does not hide
+that file.
+
+The content projection hides a CUE target audio file under `preferInterpreted` only after a resolved or stale CUE
+interpretation emits a `cueBackedDisc` row. If the CUE link is `unresolved`, `ambiguous`, or `broken`, no interpreted
+playable row is emitted in workflow filters, and the direct audio file may remain visible as a normal
+`playableAudioAsset` unless a later problem or repair surface explicitly chooses a different presentation.
+
 Each `MediaKind` value carries registry metadata:
 
 | Metadata field                   | Description                                                  |
@@ -279,6 +291,16 @@ Future values (not yet registered): `stems`, `karaoke`, `spatial`, `multichannel
 
 `ContentRowKind` describes the type of row the content pane renders. It is a projection concept, not a classification
 concept.
+
+`ContentRowKind` and representation kind are separate axes. `ContentRowKind` describes the rendered row form inside a
+browse surface. Representation kind, as defined by `representation-contract.md`, describes ownership, provenance, legal
+actions, and the row's relationship to musical material. Content rows must carry both axes when they cross the read
+boundary. They are not competing taxonomies.
+
+Example: a `playableAudioAsset` emitted from Local Files is a playable row form inside the raw source representation. A
+future Collection projection may emit a row with a similar playable form, but it is a Collection representation and must
+not inherit Local Files semantics. A `cueBackedDisc` emitted from a Local Files audio workflow remains source-derived
+unless a later Collection authority explicitly admits and re-projects it as canonical material.
 
 | Value                | Meaning                                                                                            |
 | -------------------- | -------------------------------------------------------------------------------------------------- |
@@ -312,10 +334,10 @@ and related interpretation state fields, but it remains a companion or raw inven
 `InterpretationPolicy` describes how the content projection handles cases where both an interpreted asset and its
 constituent source files could appear.
 
-| Value               | Meaning                                                                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `preferInterpreted` | Show the canonical interpreted row. Hide constituent raw files that are fully accounted for by the interpretation. Example: show `cueBackedDisc`, hide the raw `.cue` and its audio target. |
-| `rawOnly`           | Show raw source files. Do not insert interpreted asset rows. Constituent files appear as raw rows regardless of whether an interpretation exists.                                           |
+| Value               | Meaning                                                                                                                                                                                                                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `preferInterpreted` | Show the canonical interpreted row. Hide constituent raw files that are fully accounted for by a resolved or stale interpretation. Example: show `cueBackedDisc`, hide the raw `.cue` and its audio target only after that interpreted row exists. |
+| `rawOnly`           | Show raw source files. Do not insert interpreted asset rows. Constituent files appear as raw rows regardless of whether an interpretation exists.                                                                                                  |
 
 ### 4.6 Browse policy
 
@@ -371,6 +393,11 @@ Derivation from `InterpretationReadiness` for interpreted playable rows:
 | `stale`                 | `warning`       |
 | `broken`                | `blocked`       |
 
+This derivation table applies only to emitted interpreted playable rows. `unresolved` and `ambiguous` links do not
+produce interpreted playable rows in workflow filters, so no playable-row `LoadEligibility` is derived for them. A
+`broken` interpretation maps to `blocked` only in a surface that explicitly emits a broken interpreted playable/problem
+row; this table does not permit broken interpreted rows to appear in normal workflow filters.
+
 `LoadEligibility` is a projection field. It must be supplied explicitly to the renderer. The renderer must not derive it
 from visual state.
 
@@ -385,13 +412,13 @@ equivalent to `allowed`.
 
 Five filters ship as built-ins. They are the complete default set.
 
-| User label      | Internal ID      | Row universe                | Predicate                                                                                   | Interpretation policy | Persistence        |
-| --------------- | ---------------- | --------------------------- | ------------------------------------------------------------------------------------------- | --------------------- | ------------------ |
-| Audio           | `audio`          | `interpretedPlayableAssets` | `mediaKind = audio`                                                                         | `preferInterpreted`   | `workflowFilter`   |
-| Video           | `video`          | `interpretedPlayableAssets` | `mediaKind = video`                                                                         | `preferInterpreted`   | `workflowFilter`   |
-| Media           | `media`          | `interpretedPlayableAssets` | `mediaKind ∈ {audio, video} and any future kind with includedInMediaFilterByDefault = true` | `preferInterpreted`   | `workflowFilter`   |
-| Companion Files | `companionFiles` | `rawSourceFiles`            | `fileClass ∈ {cueSheet, playlistFile}`                                                      | `rawOnly`             | `inspectionFilter` |
-| All Files       | `allSourceFiles` | `rawSourceFiles`            | all file classes pass                                                                       | `rawOnly`             | `inspectionFilter` |
+| User label      | Internal ID      | Row universe                | Predicate                                                                   | Interpretation policy | Persistence        |
+| --------------- | ---------------- | --------------------------- | --------------------------------------------------------------------------- | --------------------- | ------------------ |
+| Audio           | `audio`          | `interpretedPlayableAssets` | `mediaKind = audio`                                                         | `preferInterpreted`   | `workflowFilter`   |
+| Video           | `video`          | `interpretedPlayableAssets` | `mediaKind = video`                                                         | `preferInterpreted`   | `workflowFilter`   |
+| Media           | `media`          | `interpretedPlayableAssets` | `mediaKind ∈ {kinds registered with includedInMediaFilterByDefault = true}` | `preferInterpreted`   | `workflowFilter`   |
+| Companion Files | `companionFiles` | `rawSourceFiles`            | `fileClass ∈ {cueSheet, playlistFile}`                                      | `rawOnly`             | `inspectionFilter` |
+| All Files       | `allSourceFiles` | `rawSourceFiles`            | all file classes pass                                                       | `rawOnly`             | `inspectionFilter` |
 
 **Default active filter:** `audio`. Dekzer's V0 slice is audio-first. Showing video, companion, and raw files by default
 makes the application feel like a file manager rather than a DJ library.
@@ -438,18 +465,22 @@ inventory mode.
 
 ### 6.2 Per-filter CUE behaviour
 
-| Active filter   | CUE file                       | Associated audio file          | Interpreted disc asset                                     |
-| --------------- | ------------------------------ | ------------------------------ | ---------------------------------------------------------- |
-| Audio           | Not visible                    | Not visible as raw file        | Visible as `cueBackedDisc` (`MediaKind.audio`)             |
-| Video           | Not visible                    | Not visible                    | Not visible (disc is audio kind)                           |
-| Media           | Not visible                    | Not visible as raw file        | Visible as `cueBackedDisc` (`MediaKind.audio`)             |
-| Companion Files | Visible as `companionFile` row | Not visible                    | Not visible                                                |
-| All Files       | Visible as `rawSourceFile` row | Visible as `rawSourceFile` row | Not visible (raw inventory does not insert derived assets) |
+| Active filter   | CUE file                       | Associated audio file                                                                    | Interpreted disc asset                                      |
+| --------------- | ------------------------------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Audio           | Not visible                    | Hidden only after a resolved or stale `cueBackedDisc` exists; otherwise visible as audio | Visible as `cueBackedDisc` (`MediaKind.audio`) when emitted |
+| Video           | Not visible                    | Not visible                                                                              | Not visible (disc is audio kind)                            |
+| Media           | Not visible                    | Hidden only after a resolved or stale `cueBackedDisc` exists; otherwise visible as audio | Visible as `cueBackedDisc` (`MediaKind.audio`) when emitted |
+| Companion Files | Visible as `companionFile` row | Not visible                                                                              | Not visible                                                 |
+| All Files       | Visible as `rawSourceFile` row | Visible as `rawSourceFile` row                                                           | Not visible (raw inventory does not insert derived assets)  |
 
 ### 6.3 Broken, stale, and unresolved CUE
 
 A CUE sheet whose interpretation link is `broken`, `unresolved`, or `ambiguous` produces no `cueBackedDisc` asset and is
 not visible in workflow filters.
+
+The associated direct audio file remains governed by its own classification while interpretation is unresolved,
+ambiguous, or broken. `preferInterpreted` hides that audio file only when a resolved or stale interpretation actually
+emits a `cueBackedDisc`. This prevents music from disappearing while relationship interpretation catches up or fails.
 
 A CUE sheet whose interpretation link is `stale` produces a `cueBackedDisc` row with `interpretationReadiness = stale`
 and `loadEligibility = warning`. The disc remains visible in the `audio` and `media` filters to preserve continuity. It
@@ -472,7 +503,8 @@ scope for this document.
 
 ### 6.4 Playlist companion-file rules
 
-Playlist companion-file interpretation is reserved for V0. Under `companionFiles`, raw playlist files (`.m3u`, `.m3u8`, `.pls`,
+Playlist companion-file interpretation is deferred beyond V0. Under `companionFiles`, raw playlist files (`.m3u`,
+`.m3u8`, `.pls`,
 `.xspf`) are visible as `companionFile` rows. Under `allSourceFiles`, they appear as `rawSourceFile` rows.
 
 Whether resolved playlist files produce browse scopes, content rows, or imported library objects is owned by a separate
@@ -543,7 +575,9 @@ The following must hold on every filter switch:
 - No tree node is removed or added.
 - A content read is scheduled immediately using the new policy.
 - The renderer retains the last accepted content snapshot until the new read completes (see §12.1, criterion 5).
-- Facet visual prominence re-weights immediately for the new active filter.
+- Facet visual prominence re-weights synchronously from the last accepted facet snapshot when enough facet data already
+  exists. If new facet data is required, the prior accepted facet presentation is retained and marked pending without
+  implying that the scope is empty, failed, or complete.
 - The empty state message in the content pane is filter-specific (see §9.4).
 
 ---
@@ -604,7 +638,8 @@ Facet visual prominence is active-filter-aware. **ScopeFacet data is filter-agno
 prominence of facet indicators are filter-aware.** The rule is:
 
 > **Always emphasise content matching the active workflow filter. Show non-active content indicators only when they are
-> meaningful enough to explain the scope or guide the user. Meaningfulness is a projection threshold, not a classification
+> meaningful enough to explain the scope or guide the user. Meaningfulness is a projection threshold, not a
+> classification
 > rule.**
 
 **Prominence weights by scenario:**
@@ -633,6 +668,11 @@ content pane is empty.
 prominence weighting reverts to neutral — all known content kinds at equal weight. These filters are diagnostic
 surfaces; the active-filter-weighted emphasis model does not apply to them.
 
+**Immediate re-weighting:** Immediate means a synchronous renderer/projection pass over already accepted facet data. It
+must not trigger a scan, classifier pass, or blocking facet query. If a filter switch needs facet data that is not yet
+accepted, the renderer keeps the previous accepted facet presentation and marks it pending. Pending facet presentation
+must not look empty, failed, or complete.
+
 ### 9.4 Empty state
 
 When the content pane has zero rows for the selected scope under the active filter, it must display a filter-specific
@@ -659,11 +699,11 @@ established before any implementation that renders a scrollable content list.
 1. **Raw source file rows** are identified by `(sourceFileId, rowUniverse)`. A `sourceFileId` in the
    `interpretedPlayableAssets` universe does not produce a raw row, and vice versa.
 
-2. **Direct playable asset rows** (`playableAudioAsset`, `playableVideoAsset`) projected from a plain source file are
-   identified by a stable projected asset identity derived from `sourceFileId` plus row kind and media kind, or by a
-   materialized playable asset id if one exists. They must not reuse the `rawSourceFile` row id from the
-   `rawSourceFiles` universe. This prevents Audio-filter row identity and All Files row identity from aliasing on the
-   same physical file.
+2. **Direct playable asset rows** (`playableAudioAsset`, `playableVideoAsset`) projected from a plain source file use
+   this priority order: if a materialized playable asset id exists, that id is the row identity; otherwise the row id is
+   derived from `sourceFileId` plus `ContentRowKind` plus `MediaKind`. They must not reuse the `rawSourceFile` row id
+   from the `rawSourceFiles` universe. They must never reuse one row id across different `ContentRowKind` values. This
+   prevents Audio-filter row identity and All Files row identity from aliasing on the same physical file.
 
 3. **Interpreted asset rows** are identified by interpretation asset id or interpretation link id — not by any
    constituent source file id.
@@ -739,10 +779,11 @@ These criteria must be satisfied before any implementation against this document
 4. Switching the active browse policy must not add, remove, or reorder nodes in the tree.
 
 5. On filter switch, a content read must be scheduled immediately. The renderer must retain the last accepted content
-   snapshot and mark it pending until a new accepted snapshot arrives. It must not clear the pane to empty or show an
-   unqualified loading screen before the new read completes. If the selected scope has no previously loaded snapshot (
-   first view of this scope under this filter), the pane may show a scoped loading state — not a blank pane or a
-   misleading empty-state message.
+   snapshot and mark it pending until a new accepted snapshot arrives. Pending state must not look empty, failed, or
+   complete. It must not clear the pane to empty or show an unqualified loading screen before the new read completes. If
+   the selected scope has no previously loaded snapshot (first view of this scope under this filter), the pane may show
+   a
+   scoped loading state — not a blank pane or a misleading empty-state message.
 
 ### 12.2 CUE and companion-file behaviour
 
@@ -754,8 +795,10 @@ These criteria must be satisfied before any implementation against this document
    disc row with a visible stale indicator. `loadEligibility` must be `warning`. The row must remain visible while
    background re-resolution is running and must not be removed until re-resolution completes.
 
-8. Under the `audio` filter: a scope containing an unresolved or broken `.cue` file must produce an empty or
-   zero-matching content pane for CUE-derived content. The broken `.cue` must not appear.
+8. Under the `audio` filter: a scope containing an unresolved, ambiguous, or broken `.cue` file must produce no
+   `cueBackedDisc` row. The raw `.cue` must not appear. A directly playable associated audio file may remain visible as
+   a
+   `playableAudioAsset` unless it is hidden by a resolved or stale `cueBackedDisc` projection.
 
 9. Under the `companionFiles` filter: a raw `.cue` file must appear as a `companionFile` row, regardless of whether an
    interpretation link exists.
@@ -868,14 +911,23 @@ These criteria must be satisfied before any implementation against this document
 Questions are divided by whether they block a specific implementation surface. Decisions already taken are reflected in
 the document body and are not listed here.
 
-### 13.1 Open — not blocking classification, filter, or content read
+### 13.1 Deferred companion contracts
 
-| #   | Question                                                                                                                                                                                                                                                                                                                                                                                       | Relevant section |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| Q2  | Should broken interpretation links surface in a dedicated "Library Problems" view, and if so, what authority owns that view?                                                                                                                                                                                                                                                                   | §6.3             |
-| Q7  | A dedicated cue-backed disc image model document (`cue-backed-disc-image-model.md`) is deferred until implementation of `cueBackedDisc` content rows, internal track structure, timing, and track identity for interpreted disc images. The `cueBackedDisc` content row kind definition, interpretation policy, and CUE behaviour are already specified in this document (§3.5, §4.3, §5, §6). | §3.5, §4.3, §6   |
+The following contracts are deliberately deferred. They are not open decisions for this document, and implementations
+must not infer their final behavior from placeholders here.
 
-### 13.2 Must resolve before implementing the related surface
+| Contract                                                      | Deferred scope                                                                                                                                                                                                  |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cue-backed-disc-image-model.md`                              | Internal track structure, timing, track identity, index/gap handling, waveform segment projection, and independently loadable cue-track rows.                                                                   |
+| Bulk reclassification / classifier-version migration contract | How thousands of classification records are invalidated, retained, refreshed, and visually represented during classifier-version upgrades without lying to the renderer or dropping accepted state prematurely. |
+
+### 13.2 Open — not blocking classification, filter, or content read
+
+| #   | Question                                                                                                                     | Relevant section |
+| --- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| Q2  | Should broken interpretation links surface in a dedicated "Library Problems" view, and if so, what authority owns that view? | §6.3             |
+
+### 13.3 Must resolve before implementing the related surface
 
 | #   | Question                                                                                                                                                                                                                                                                       | Relevant section | Blocks                          |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- | ------------------------------- |
