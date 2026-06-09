@@ -1,26 +1,23 @@
 ---
-
 status: draft
 doctrine-version: 0.1
-last-reviewed: 2026-06-10
+last-reviewed: 2026-06-09
 owner: library-browser-architecture
 canonical-context:
-
-* product-doctrine
-* first-slice-substrate-map
-* source-hierarchy-contract
-* browse-policy-and-classification
-* tree-contract
-* library-browser-representation-contract
-* row-action-and-dnd-scope-contract
-  scope:
-* source-activation
-* navigation-readiness
-* child-readiness
-* contents-coverage
-* retained-browser-state
-* no-false-empty-states
-
+  - product-doctrine
+  - first-slice-substrate-map
+  - source-hierarchy-contract
+  - browse-policy-and-classification
+  - tree-contract
+  - library-browser-representation-contract
+  - row-action-and-dnd-scope-contract
+scope:
+  - source-activation
+  - navigation-readiness
+  - child-readiness
+  - contents-coverage
+  - retained-browser-state
+  - no-false-empty-states
 ---
 
 # Source Activation and Navigation Readiness

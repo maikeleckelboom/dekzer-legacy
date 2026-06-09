@@ -1,28 +1,25 @@
 ---
-
-status: draft
+status: accepted
 doctrine-version: 0.1
-last-reviewed: 2026-06-10
+last-reviewed: 2026-06-09
 owner: library-browser-architecture
 canonical-context:
-
-* product-doctrine
-* library-browser-representation-contract
-* source-activation-and-navigation-readiness
-* first-slice-substrate-map
-* prepared-room-model
-* workspace-topology-model
-* row-action-and-dnd-scope-contract
-  scope:
-* library-representation-composition
-* representation-root-realization
-* unified-library-sidebar
-* independent-library-panels
-* grouped-library-panels
-* topology-hosted-library-surfaces
-* panel-instance-state
-* composition-ownership
-
+  - product-doctrine
+  - library-browser-representation-contract
+  - source-activation-and-navigation-readiness
+  - first-slice-substrate-map
+  - prepared-room-model
+  - workspace-topology-model
+  - row-action-and-dnd-scope-contract
+scope:
+  - library-representation-composition
+  - representation-root-realization
+  - unified-library-sidebar
+  - independent-library-panels
+  - grouped-library-panels
+  - topology-hosted-library-surfaces
+  - panel-instance-state
+  - composition-ownership
 ---
 
 # Library Representation Composition Contract
@@ -158,6 +155,26 @@ One History panel may show a performed set list while another shows a performanc
 
 Those panel instances must not accidentally share scroll, selection, expansion, pagination, or focused row unless an
 explicit linked-panel model is designed.
+
+#### Browse Session Context
+
+A panel instance owns or references a browse session context. This session context carries the operational parameters
+that define what the panel renders and what local interaction state is active.
+
+In V0 there may be one effective library browse session. Future multiple panels need independent:
+
+- selected scope;
+- active browse policy;
+- expansion state;
+- pagination state;
+- scroll position;
+- focused row;
+- local filter, sort, and column state;
+- pending, retained, and error projection state.
+
+These must be per-panel unless an explicit linked-panel model is designed. Linked panels that intentionally share browse
+session state must be explicit in both code and product behavior. Do not accidentally share session state because two
+panels render the same representation root.
 
 ### Composition Shell Owns Grouping
 
@@ -328,9 +345,9 @@ It gives a panel or group spatial authority.
 
 It does not define the panel’s musical meaning.
 
-## Required Realization Forms
+## Supported Realization Forms Over Time
 
-The architecture must allow the following realization forms over time.
+These forms are architecture-supported over time. Not every form is a V0 implementation requirement.
 
 ### Unified Library Sidebar
 
@@ -744,6 +761,20 @@ A saved workspace layout may remember that a Crates panel and Local Files panel 
 
 That does not change crate membership, file paths, source registration, or history records.
 
+### Degraded Layout and Hydration Rule
+
+If a saved workspace references a representation root, panel realization, panel instance, or topology-hosted library
+surface that cannot hydrate, the composition shell must degrade gracefully.
+
+It must:
+
+- preserve the rest of the layout when possible;
+- show an unavailable, unsupported, or missing panel state where appropriate;
+- avoid deleting durable library data;
+- avoid deleting authored representation data;
+- avoid corrupting the saved workspace state during failed hydration;
+- never treat failed panel hydration as proof that the underlying musical material or representation no longer exists.
+
 ## Relationship To Existing Docs
 
 The Library Browser Representation Contract owns representation semantics.
@@ -797,9 +828,31 @@ Bad conceptual names:
 - playlist panel as a separate snowflake architecture;
 - crates sidebar as a unique subsystem unrelated to representation panels.
 
-First implementation may expose Local Files in a unified sidebar.
+### V0 Realization Boundary
 
-That sidebar must be treated as one realization, not the library’s permanent architecture.
+V0 required and current:
+
+- a unified Library sidebar and current Local Files realization is allowed and sufficient for the first implementation
+  slice;
+- one effective Library browse session is acceptable in V0 when the implementation has not introduced multiple
+  independent library panels.
+
+Architecture must allow later:
+
+- independent workspace panels;
+- grouped workspace panels;
+- focused preparation surfaces;
+- split and compare surfaces;
+- compact surfaces;
+- topology-hosted library surfaces.
+
+V0 must not:
+
+- implement fake Crates, Playlists, Smart Lists, External Libraries, History, Prepared Rooms, Sleeves, or Routes just to
+  satisfy the composition model;
+- hard-code sidebar-only architecture;
+- make Local Files the definition of Library;
+- make panel placement determine representation semantics.
 
 ## Suggested Future Substrate Shape
 

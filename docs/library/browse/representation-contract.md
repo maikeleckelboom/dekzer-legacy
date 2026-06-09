@@ -1,25 +1,22 @@
 ---
-
 status: accepted
 doctrine-version: 0.1
 last-reviewed: 2026-06-09
 owner: library-browser-architecture
 canonical-context:
-
-* product-doctrine
-* prepared-room-model
-* source-hierarchy-contract
-* browse-policy-and-classification
-* tree-contract
-* row-action-and-dnd-scope-contract
-  scope:
-* library-browser-representation-model
-* representation-ownership
-* repeated-material-semantics
-* row-capability-model
-* authored-organization-boundaries
-* external-library-provenance
-
+  - product-doctrine
+  - prepared-room-model
+  - source-hierarchy-contract
+  - browse-policy-and-classification
+  - tree-contract
+  - row-action-and-dnd-scope-contract
+scope:
+  - library-browser-representation-model
+  - representation-ownership
+  - repeated-material-semantics
+  - row-capability-model
+  - authored-organization-boundaries
+  - external-library-provenance
 ---
 
 # Library Browser Representation Contract

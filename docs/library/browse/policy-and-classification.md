@@ -1,10 +1,25 @@
-# Browse Policy and Classification
+---
+status: accepted
+doctrine-version: 0.1
+last-reviewed: 2026-06-09
+owner: library-browser-architecture
+canonical-context:
+  - background-root-scan-lifecycle-diagrams
+  - electron-boundary-spine
+  - library-browser-representation-contract
+  - library-browser-representation-composition
+scope:
+  - browse-policy-and-classification
+  - filter-registry
+  - content-row-projection
+  - interpretation-links
+  - cue-and-companion-file-rules
+  - facet-projection
+  - row-identity
+  - navigation-readiness-probe-independence
+---
 
-**Status:** Canon — implementation-gate
-**Domain:** Library / Browse / Classification
-**Revision:** 2026-06-09
-**Depends on:** `background-root-scan-lifecycle-diagrams.md`, `electron-boundary-spine.md`,
-`representation-contract.md`, `representation-composition.md`
+# Browse Policy and Classification
 
 ---
 
