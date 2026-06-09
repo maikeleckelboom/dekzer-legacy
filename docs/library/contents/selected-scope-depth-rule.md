@@ -4,8 +4,8 @@
 selection vs tree expansion, query contracts, coverage states, result shapes, forbidden patterns). Schema-specific
 references (`LibraryBrowserRows`, `library_asset_id`, `LibraryAssets`) are historical; for current v1 schema authority
 see `docs/decisions/library-preparation-substrate.md`. For current contents read boundary vocabulary (`scopeDepth`,
-`scopeCoverage`, `hasPolicyOmittedRows`, `playableMediaBrowse`) see `docs/decisions/library-contents-read-boundary.md`
-and `docs/library/contents-browse-policy.md`. Do not use the legacy table/column names as current implementation
+`scopeCoverage`, `hasPolicyOmittedRows`, `playableMediaBrowse`) see `docs/library/contents/read-boundary-contract.md`
+and `docs/library/contents/browse-policy.md`. Do not use the legacy table/column names as current implementation
 targets.
 
 ## Decision

@@ -217,7 +217,7 @@ receive missing attachment links. The cycle then runs one bounded audio-only med
 
 Source maintenance emits existing maintained snapshot invalidations when phase commits advance maintained revisions.
 There is no public source-maintenance event family yet. The public command/read contract is defined in
-`docs/library/source-maintenance-orchestration-contract.md`. Future event variants should distinguish maintenance
+`docs/library/source/maintenance-orchestration-contract.md`. Future event variants should distinguish maintenance
 activity from durable observed-facts truth and must not expose filesystem paths.
 
 ## CUE Ownership

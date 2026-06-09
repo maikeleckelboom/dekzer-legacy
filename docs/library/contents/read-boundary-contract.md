@@ -208,7 +208,7 @@ type ContentsResult = {
 - Incomplete zero-row scopeCoverage is not authoritative empty.
 - Complete zero-row results with `hasPolicyOmittedRows: true` are empty only for the active policy.
 - `primaryMedia` omission metadata is `false` in this slice and never uses raw `source_files` as a proxy.
-- See `docs/library/media-relevant-file-inventory-contract.md` for durable inventory classification.
+- See `docs/library/evidence/media-relevant-file-inventory-contract.md` for durable inventory classification.
 - Cursor pagination is implemented; `nextCursor` is produced when more rows exist.
 - Provided cursor must not be silently ignored or treated as page one.
 - Invalid or mismatched cursor returns `cursorInvalid` with no `nextCursor`.

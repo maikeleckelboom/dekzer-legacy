@@ -5,8 +5,8 @@ last-reviewed: 2026-05-30
 owner: library-boundary / local-library-substrate
 canonical-context:
   - background-root-scan-lifecycle-diagrams
-  - source-lifecycle-visible-state-contract
-  - source-root-scan-admission-contract
+  - lifecycle-visible-state-contract
+  - root-scan-admission-contract
   - source-hierarchy-contract
   - tree-frame-stability-contract
   - first-slice-substrate-map

@@ -4,9 +4,9 @@ doctrine-version: 0.2
 last-reviewed: 2026-06-06
 owner: renderer-substrate-boundary
 canonical-context:
-  - tree-frame-stability-contract
-  - contents-browse-policy
-  - decisions/library-contents-read-boundary
+  - frame-stability-contract
+  - browse-policy
+  - read-boundary-contract
   - source-hierarchy-contract
 scope:
   - tree-selection-authority

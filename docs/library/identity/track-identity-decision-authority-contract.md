@@ -5,7 +5,7 @@ owner: library-boundary-service
 canonical-context:
   - track-identity-candidate-contract
   - track-identity-decision-contract
-  - source-maintenance-orchestration-contract
+  - maintenance-orchestration-contract
 scope:
   - track-identity-decision-authority
   - explicit-user-decision-authority

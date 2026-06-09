@@ -2,7 +2,7 @@
 
 **Role:** Implementation companion — current product-filter to implemented backend contents policy mapping, current renderer/backend fallback state, omission metadata mapping, and empty-state semantics for implemented policies.
 
-The canonical product/domain browse policy, filter registry, classification vocabulary, row universes, and facets are owned by `docs/library/browse-policy-and-classification.md`. This document does not override that canon.
+The canonical product/domain browse policy, filter registry, classification vocabulary, row universes, and facets are owned by `docs/library/browse/policy-and-classification.md`. This document does not override that canon.
 
 ## Product Filter Mapping
 

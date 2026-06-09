@@ -4,9 +4,9 @@ doctrine-version: 0.2
 last-reviewed: 2026-06-06
 owner: library-substrate-boundary
 canonical-context:
-  - contents-browse-policy
-  - decisions/library-contents-read-boundary
-  - tree-selection-contents-contract
+  - browse-policy
+  - read-boundary-contract
+  - selection-contents-contract
   - media-relevant-file-inventory-contract
 scope:
   - audio-browse-row-v0-boundary

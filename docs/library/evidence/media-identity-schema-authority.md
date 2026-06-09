@@ -5,7 +5,7 @@ owner: library-substrate-boundary
 canonical-context:
   - source-lifecycle-backend-contract-gap
   - media-relevant-file-inventory-contract
-  - decisions/library-contents-read-boundary
+  - read-boundary-contract
   - primary-media-promotion-contract
   - track-identity-candidate-contract
   - track-identity-decision-contract
@@ -30,7 +30,7 @@ remove before observed file facts are broadened.
 Reading order:
 
 1. `docs/library/source-lifecycle-backend-contract-gap.md` owns source lifecycle and source readiness surfaces.
-2. `docs/library/media-relevant-file-inventory-contract.md` owns source-file inventory, contents browse policy, CUE
+2. `docs/library/evidence/media-relevant-file-inventory-contract.md` owns source-file inventory, contents browse policy, CUE
    inventory admission, image-file inventory behavior, and explicit inventory admission.
 3. This document owns asset identity, `primaryMedia`, CUE association, hashing placement, and deferred preparation
    surfaces.
@@ -90,7 +90,7 @@ Evidence:
 
 Therefore `primaryMedia` must not be treated as current track identity. It is now a narrow playable-media candidate
 projection backed by current attachment identity and audio probe evidence. The detailed eligibility and non-goals are
-owned by `docs/library/primary-media-promotion-contract.md`.
+owned by `docs/library/evidence/primary-media-promotion-contract.md`.
 
 ## Track Identity Candidate Decision
 
@@ -110,7 +110,7 @@ Therefore track identity candidates may say only that current evidence-backed pr
 by exact content evidence. They must not create canonical tracks, user decisions, CUE associations, metadata
 reconciliation, prep surfaces, playlist/crate/sleeve rows, waveform/stem authority, or renderer-owned grouping. The
 detailed status, grouping, and stale/current rules are owned by
-`docs/library/track-identity-candidate-contract.md`.
+`docs/library/identity/track-identity-candidate-contract.md`.
 
 ## Track Identity Decision Foundation
 
@@ -139,7 +139,7 @@ candidate;
 it must not be read as canonical track identity, same-song semantic identity, metadata reconciliation, CUE association,
 prep readiness, playlist membership, waveform/stem authority, artwork intelligence, or renderer-owned grouping. The
 detailed status, provenance, and supersession rules are owned by
-`docs/library/track-identity-decision-contract.md`.
+`docs/library/identity/track-identity-decision-contract.md`.
 
 ## CUE Association Decision
 

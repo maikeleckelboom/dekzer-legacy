@@ -6,7 +6,7 @@ owner: renderer-substrate-boundary
 canonical-context:
   - first-slice-substrate-map
   - source-hierarchy-contract
-  - tree-frame-stability-contract
+  - frame-stability-contract
   - electron-boundary-spine
 scope:
   - boundary-event-model

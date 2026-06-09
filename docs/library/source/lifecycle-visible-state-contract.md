@@ -5,8 +5,8 @@ last-reviewed: 2026-05-28
 owner: renderer-substrate-boundary
 canonical-context:
   - product/product-doctrine
-  - tree-frame-stability-contract
-  - source-root-scan-admission-contract
+  - frame-stability-contract
+  - root-scan-admission-contract
   - source-hierarchy-contract
   - first-slice-substrate-map
 scope:

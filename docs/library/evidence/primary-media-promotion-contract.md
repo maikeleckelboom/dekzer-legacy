@@ -6,7 +6,7 @@ canonical-context:
   - observed-file-facts-contract
   - attachment-identity-contract
   - media-probe-observations-contract
-  - source-maintenance-orchestration-contract
+  - maintenance-orchestration-contract
   - track-identity-candidate-contract
   - track-identity-decision-contract
 scope:

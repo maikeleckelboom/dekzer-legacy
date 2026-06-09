@@ -3,9 +3,9 @@ status: accepted
 last-reviewed: 2026-05-31
 owner: library-substrate-boundary
 canonical-context:
-  - source-root-scan-admission-contract
-  - decisions/library-contents-read-boundary
-  - tree-selection-contents-contract
+  - root-scan-admission-contract
+  - read-boundary-contract
+  - selection-contents-contract
 scope:
   - source-file-inventory
   - contents-read-policy

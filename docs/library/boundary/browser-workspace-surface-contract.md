@@ -5,9 +5,9 @@ last-reviewed: 2026-05-28
 owner: workspace-library-boundary
 canonical-context:
   - product/product-doctrine
-  - tree-frame-stability-contract
+  - frame-stability-contract
   - source-hierarchy-contract
-  - tree-selection-contents-contract
+  - selection-contents-contract
   - tree-selection-contents-contract
   - source-lifecycle-visible-state-contract
   - topology-negotiation-law

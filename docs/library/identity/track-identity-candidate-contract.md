@@ -7,7 +7,7 @@ canonical-context:
   - attachment-identity-contract
   - media-probe-observations-contract
   - primary-media-promotion-contract
-  - source-maintenance-orchestration-contract
+  - maintenance-orchestration-contract
   - track-identity-decision-contract
 scope:
   - track-identity-candidates
