@@ -1,4 +1,4 @@
-# Dekzer Library Tree — Architectural Synthesis and Canonical Contract
+# Library Tree Contract
 
 **Document type:** Architectural decision record
 **Source corpus:** Seven-product pro-DJ competitive research (Serato DJ Pro, rekordbox, Traktor Pro, VirtualDJ, djay
@@ -173,7 +173,7 @@ never discover a settings page to get this behavior.
 None of the products does this cleanly enough. The requirement is:
 
 | State                  | Visual                                                   |
-|------------------------|----------------------------------------------------------|
+| ---------------------- | -------------------------------------------------------- |
 | Unselected + collapsed | Neutral row background, ▶ disclosure                     |
 | Unselected + expanded  | Neutral row background, ▼ disclosure                     |
 | Selected + collapsed   | Highlighted row background, ▶ disclosure                 |
@@ -375,6 +375,6 @@ The research identifies the following elements that need explicit refinement:
 
 ---
 
-*Synthesis based on seven-product competitive corpus: Serato DJ Pro 4.x, rekordbox 7.x, Traktor Pro 4.x, VirtualDJ
+_Synthesis based on seven-product competitive corpus: Serato DJ Pro 4.x, rekordbox 7.x, Traktor Pro 4.x, VirtualDJ
 2025/2026, djay Pro 5.x, Engine DJ / Engine Desktop v5, Mixxx 2.5.x. Screenshot evidence and official manual citations
-as documented in the source research PDFs.*
+as documented in the source research PDFs._

@@ -173,16 +173,16 @@ It uses grouped names and literal typing:
 ```ts
 export const libraryControlChannels = {
   attachmentIdentity: {
-    read: '<existing channel string>',
+    read: '<existing channel string>'
   },
   contents: {
-    read: '<existing channel string>',
+    read: '<existing channel string>'
   },
   hierarchy: {
-    read: '<existing channel string>',
+    read: '<existing channel string>'
   },
   navigation: {
-    read: '<existing channel string>',
+    read: '<existing channel string>'
   },
   roots: {
     cancel: '<existing channel string>',
@@ -190,21 +190,21 @@ export const libraryControlChannels = {
     read: '<existing channel string>',
     register: '<existing channel string>',
     scan: '<existing channel string>',
-    unregister: '<existing channel string>',
+    unregister: '<existing channel string>'
   },
   source: {
     fileHashing: '<existing channel string>',
     lifecycle: '<existing channel string>',
-    maintenance: '<existing channel string>',
+    maintenance: '<existing channel string>'
   },
   trackIdentity: {
     candidates: '<existing channel string>',
-    decisions: '<existing channel string>',
+    decisions: '<existing channel string>'
   },
   viewState: {
     read: '<existing channel string>',
-    write: '<existing channel string>',
-  },
+    write: '<existing channel string>'
+  }
 } as const
 ```
 
@@ -245,7 +245,7 @@ code must not schedule boundary-service `ReadAfter` or `WaitForEventsAfter` acti
 `shared/rendererApi.ts` stays at shared root and composes the whole app API surface.
 
 ```ts
-import type {LibraryApi} from './library/boundary/rendererApi'
+import type { LibraryApi } from './library/boundary/rendererApi'
 
 export interface RendererApi {
   readonly library: LibraryApi

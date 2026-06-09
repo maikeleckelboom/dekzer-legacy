@@ -8,7 +8,7 @@ canonical-context:
   - source-lifecycle-visible-state-contract
   - source-root-scan-admission-contract
   - source-hierarchy-contract
-  - library-tree-frame-stability-contract
+  - tree-frame-stability-contract
   - first-slice-substrate-map
 scope:
   - source-registration-exposure
@@ -54,7 +54,7 @@ Some diagrams include current-direction architecture. Those sections must label 
 Current first-slice projections are:
 
 | Projection              | Role                                                                                                                                               |
-|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Navigation rows         | Source entry rows and top-level navigation state. Source visible state is carried by navigation rows until a dedicated boundary projection exists. |
 | Library tree windows    | Authoritative immediate-children reads for a source or directory entry point.                                                                      |
 | Contents read pages     | Authoritative contents-scope read results, including access state, coverage state, rows, and window cursor.                                        |
@@ -78,7 +78,7 @@ the semantic scope identity.
 This document uses the visible state vocabulary from the source lifecycle visible-state contract:
 
 | State                  | Meaning in this document                                                          |
-|------------------------|-----------------------------------------------------------------------------------|
+| ---------------------- | --------------------------------------------------------------------------------- |
 | `mounted`              | Source is known, resolved, and accessible enough for reads and scans.             |
 | `unavailable`          | Source is known but not currently reachable.                                      |
 | `relocating`           | Source identity is preserved while a new locator is being resolved.               |
@@ -111,7 +111,7 @@ library restoration.
 Staged startup budgets:
 
 | Stage                         | Contract                                                                                                     |
-|-------------------------------|--------------------------------------------------------------------------------------------------------------|
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Shell-to-glass                | The app/workspace frame paints without waiting for full library substrate reads.                             |
 | First library substrate frame | Navigation/source rows and active selection shell state paint from bounded authoritative reads.              |
 | Progressive restoration       | Active tree windows and current contents restore progressively and may degrade without blocking first paint. |
@@ -315,7 +315,7 @@ flowchart TD
 Recovery action policy:
 
 | Source state              | Primary action                                            | Notes                                                                                    |
-|---------------------------|-----------------------------------------------------------|------------------------------------------------------------------------------------------|
+| ------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `unavailable`             | Retry connection                                          | For reseated drives, remounted volumes, or transient locator failures.                   |
 | `unavailable` after retry | Locate source                                             | Uses a host-owned native picker; renderer never provides arbitrary path authority.       |
 | `blocked`                 | Open permission guidance or retry after permission change | Deterministic permission denial is not micro-retried in a loop.                          |
@@ -508,7 +508,7 @@ exactly three wire values: `unknown`, `hasNavigableChildScopes`, `noNavigableChi
 states below are target scope expansion, not current wire values.
 
 | State                   | Meaning                                                                                                        | Schema status                    |
-|-------------------------|----------------------------------------------------------------------------------------------------------------|----------------------------------|
+| ----------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------- |
 | `has_children_unloaded` | The row can expand, but the child window is not loaded in the renderer cache.                                  | projection concept only          |
 | `has_children_loaded`   | The row can expand and a current child window is loaded.                                                       | projection concept only          |
 | `no_children`           | The authoritative read says the row has no navigable child scopes in this tree projection.                     | maps to `noNavigableChildScopes` |

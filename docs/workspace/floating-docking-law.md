@@ -1,4 +1,4 @@
-# ADR: Performance Workspace Mutation and Docking Law
+# Floating Docking Law
 
 **Status:** Accepted
 **Domain:** Workspace / Layout Runtime

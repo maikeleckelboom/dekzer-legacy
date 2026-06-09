@@ -1,7 +1,7 @@
-# Library Preparation Substrate v1
+# Library Preparation Substrate
 
 **Status:** ACCEPTED FOR V1 SCHEMA IMPLEMENTATION
-**Location:** `docs/decisions/library-preparation-substrate-v1.md`
+**Location:** `docs/decisions/library-preparation-substrate.md`
 
 ---
 

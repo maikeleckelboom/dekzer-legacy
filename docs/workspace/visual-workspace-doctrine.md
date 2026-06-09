@@ -2,7 +2,7 @@
 
 **Governs:** visual product law — shell language, field language, optical rules, review standard.
 **Does not govern:** topology substitution, slot representation, or responsive mapping.
-**See also:** `canonical-topology-families.md`, `topology-modeling-law.md`.
+**See also:** `topology-families.md`, `topology-modeling-law.md`.
 
 ---
 
@@ -216,6 +216,6 @@ If any answer is vague, the screen is not final.
 
 ## See also
 
-- `canonical-topology-families.md` — legal topology families and their conditions
+- `topology-families.md` — legal topology families and their conditions
 - `responsive-topology-matrix.md` — size classes and substitution rules
 - `topology-modeling-law.md` — slot representation and continuity law

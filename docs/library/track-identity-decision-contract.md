@@ -4,7 +4,7 @@ last-reviewed: 2026-06-09
 owner: library-store-sqlite
 canonical-context:
   - observed-file-facts-contract
-  - attachment-identity-foundation-contract
+  - attachment-identity-contract
   - media-probe-observations-contract
   - primary-media-promotion-contract
   - track-identity-candidate-contract

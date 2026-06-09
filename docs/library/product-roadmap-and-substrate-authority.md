@@ -65,7 +65,7 @@ Outcome fields: `attachments_created`, `attachments_refreshed`, `links_created`,
 These tables exist but must not be used for new functionality.
 
 | Table                     | Status  | Replaced by                                       | Exit criterion                                                                                                                                                                                                        | Current prohibition                                                                          |
-|---------------------------|---------|---------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|
+| ------------------------- | ------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `LibraryAssets`           | Dormant | `content_attachments` + future track/media layers | Deleted or renamed when media candidate and track identity replace all asset-prep and browser read paths. Named as mandatory deletion task in the media candidate slice — not optional cleanup.                       | No new content identity code may read or write it for any purpose.                           |
 | `LibraryAssetAttachments` | Dormant | `source_file_attachment_links`                    | Deleted when source segment / segment set story is fully replaced by CUE association + media candidate / subtrack model. Named as mandatory deletion task in that slice.                                              | No new attachment identity code may use it for any purpose.                                  |
 | `primaryMedia`            | Dormant | Media candidate / track identity projection       | Either activated as a projection over media candidates, or deleted when media candidate read surfaces replace it. The decision must be made explicitly in the media candidate slice — neither outcome is the default. | Not a default content surface. Not track identity. No new reads or writes under any framing. |
@@ -88,7 +88,7 @@ Seven layers. Each answers a distinct question.
 
 ### Layer 1 — Source
 
-*Where music may live.*
+_Where music may live._
 
 Sources, source lifecycle, source locations, source directories, source files, source scan events, access state.
 
@@ -96,7 +96,7 @@ Sources, source lifecycle, source locations, source directories, source files, s
 
 ### Layer 2 — Observed Facts
 
-*Evidence about a source file.*
+_Evidence about a source file._
 
 File basis, BLAKE3 hash, media/container observations, tag observations, CUE parse observations, probe status,
 stale/current evidence status.
@@ -105,7 +105,7 @@ stale/current evidence status.
 
 ### Layer 3 — Attachment Identity
 
-*Stable content evidence.*
+_Stable content evidence._
 
 Content attachment (BLAKE3 keyed), source-file attachment link, attachment occurrence model (exact duplicate /
 relocation / offline / backup-copy views), source-file occurrence preference.
@@ -114,7 +114,7 @@ relocation / offline / backup-copy views), source-file occurrence preference.
 
 ### Layer 4 — Media Candidate
 
-*Playable or interpretable units derived from attachment evidence.*
+_Playable or interpretable units derived from attachment evidence._
 
 Audio/video file candidates, CUE document candidates, CUE-to-audio association evidence, split-track candidates from
 CUE, multi-file association candidates.
@@ -126,7 +126,7 @@ part of initial media candidate creation. See Layer 5 and C-2.
 
 ### Layer 5 — Track Identity
 
-*User and product musical identity — not a file.*
+_User and product musical identity — not a file._
 
 Track candidates, canonical tracks, duplicate track evidence, user-confirmed decisions, provenance, conflict state,
 merge/split decisions.
@@ -135,7 +135,7 @@ merge/split decisions.
 
 ### Layer 6 — Preparation
 
-*Independent readiness facets — not one status.*
+_Independent readiness facets — not one status._
 
 Beatgrid, BPM, key, waveform, cues, loops, phrases, loudness, energy, stems, notes, tags. Each facet: owner, basis,
 artifact/evidence, current/stale status, user-approved vs. machine-generated, readiness, conflict handling, provenance.
@@ -144,7 +144,7 @@ artifact/evidence, current/stale status, user-approved vs. machine-generated, re
 
 ### Layer 7 — Workflow / Product
 
-*The record room.*
+_The record room._
 
 Cold archive → nearby reserve → prepared room → prepared crates → hot table → live path → shadow paths. Sleeves, routes,
 performance history, RT Flight Deck.
@@ -161,7 +161,7 @@ lands. Do not re-open without a written rationale and architectural review.
 ### Identity channels are separate and must not contaminate each other
 
 | Channel           | Table                                          | Status             | Means                                           |
-|-------------------|------------------------------------------------|--------------------|-------------------------------------------------|
+| ----------------- | ---------------------------------------------- | ------------------ | ----------------------------------------------- |
 | Byte identity     | `content_attachments`                          | Current            | Same BLAKE3 hash = identical bytes              |
 | Acoustic identity | future `acoustic_fingerprint_evidence`         | Planned (C-2)      | Same audio content, possibly different encoding |
 | Track identity    | future `track_candidates` / `canonical_tracks` | Planned (D-1, D-2) | Same musical item                               |
@@ -752,7 +752,7 @@ Only after library substrate is trustworthy.
 These substitutions are non-negotiable in product-facing surfaces, docs, and code comments.
 
 | Do not use                                   | Use instead                                                                              |
-|----------------------------------------------|------------------------------------------------------------------------------------------|
+| -------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | "same track"                                 | "same content", "same bytes", "same attachment"                                          |
 | "duplicate song"                             | "same content evidence in multiple locations"                                            |
 | "safe to delete"                             | Never recommend deletion                                                                 |
@@ -765,7 +765,7 @@ These substitutions are non-negotiable in product-facing surfaces, docs, and cod
 ## Big Vetoes
 
 | Do not do                               | Until                                                                    |
-|-----------------------------------------|--------------------------------------------------------------------------|
+| --------------------------------------- | ------------------------------------------------------------------------ |
 | Product-facing duplicate/relocation UI  | Probe observations (A-3) + collection health (A-4) exist                 |
 | Track tables                            | Media candidate layer (C-1) is ratified                                  |
 | `primaryMedia` activation               | Media candidate / track identity layer is real                           |
@@ -806,4 +806,4 @@ kept.
 > contract before browser surfaces. Import interoperability contract before track identity and prep facet hardening.
 > Prepared Room formal model before preparation and workflow implementation. RT Flight Deck and performance session
 > doctrine before runtime event design. No automatic cleanup, removal, or merge without an explicit user decision record.
-**
+> **

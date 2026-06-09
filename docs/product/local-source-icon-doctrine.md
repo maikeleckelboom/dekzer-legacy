@@ -60,7 +60,7 @@ The browser must not feel like Windows Explorer, Finder, or a generic file picke
 ## Recognition boundary
 
 | Context                                                            | Icon authority                                                 |
-|--------------------------------------------------------------------|----------------------------------------------------------------|
+| ------------------------------------------------------------------ | -------------------------------------------------------------- |
 | Native folder picker                                               | Operating system                                               |
 | File open/save dialogs                                             | Operating system                                               |
 | Source registration and relocation workflows                       | Dekzer-authored icons, with native meaning                     |
@@ -111,7 +111,7 @@ Rows expose stable icon roles and row states. They do not expose rendered artwor
 A row projection may include:
 
 | Field class      | Meaning                                                                                                                                                                           |
-|------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Icon base role   | Stable canonical base role resolved by the icon registry                                                                                                                          |
 | Row kind         | Place, volume, source root, hierarchy node, media candidate, product object                                                                                                       |
 | Source row state | Proposed, registered, scanning, missing, permission required, offline                                                                                                             |
@@ -142,7 +142,7 @@ Base icon roles identify the underlying object or place before state badges are 
 ### Places
 
 | Canonical name    | Current drawing intent               |
-|-------------------|--------------------------------------|
+| ----------------- | ------------------------------------ |
 | `place.desktop`   | Small monitor or workspace rectangle |
 | `place.downloads` | Arrow entering tray or folder        |
 | `place.music`     | Folder with subtle waveform mark     |
@@ -156,7 +156,7 @@ collection object.
 ### Volumes
 
 | Canonical name    | Current drawing intent               |
-|-------------------|--------------------------------------|
+| ----------------- | ------------------------------------ |
 | `volume.internal` | Drive slab                           |
 | `volume.system`   | Drive slab with subtle system marker |
 | `volume.external` | Detachable drive glyph               |
@@ -172,7 +172,7 @@ Volume labels remain platform-specific. The icon roles remain product-owned.
 ### Media and file roles
 
 | Canonical name          | Current drawing intent                         |
-|-------------------------|------------------------------------------------|
+| ----------------------- | ---------------------------------------------- |
 | `media.audio`           | Audio file or audio candidate glyph            |
 | `media.video`           | Video file or video candidate glyph            |
 | `media.companion`       | Companion metadata file, such as `.cue`        |
@@ -188,7 +188,7 @@ mode.
 Product objects never use OS icons.
 
 | Canonical name            | Meaning                                                    |
-|---------------------------|------------------------------------------------------------|
+| ------------------------- | ---------------------------------------------------------- |
 | `product.track`           | Canonical track object                                     |
 | `product.crate`           | Manual crate                                               |
 | `product.smartList`       | Query-backed or rule-backed list                           |
@@ -217,7 +217,7 @@ The icon registry composes source presentation as:
 Most source states are therefore compositions, not separate glyphs.
 
 | Source row state            | Actual icon composition                                                    |
-|-----------------------------|----------------------------------------------------------------------------|
+| --------------------------- | -------------------------------------------------------------------------- |
 | `source.registered`         | Root-class base + `badge.source`                                           |
 | `source.scanning`           | Root-class base + `badge.scanActive` when no higher-priority badge applies |
 | `source.missing`            | Root-class base + `badge.warning`                                          |
@@ -239,7 +239,7 @@ A source rooted at a normal music folder uses a folder-like base.
 A source rooted at a drive or broad volume uses a volume-like base.
 
 | Root class             | Base icon                                                                      |
-|------------------------|--------------------------------------------------------------------------------|
+| ---------------------- | ------------------------------------------------------------------------------ |
 | `normal_music_root`    | `place.folder` or a specific place role such as `place.music`                  |
 | `system_volume_root`   | `volume.system`                                                                |
 | `broad_drive_root`     | `volume.internal` or `volume.external`, depending on the volume                |
@@ -268,7 +268,7 @@ apply the pending treatment.
 The first implementation uses:
 
 | Property            | Treatment                                                                          |
-|---------------------|------------------------------------------------------------------------------------|
+| ------------------- | ---------------------------------------------------------------------------------- |
 | Base glyph          | Resolved from root class                                                           |
 | Foreground          | Secondary foreground token                                                         |
 | Badge               | None                                                                               |
@@ -292,7 +292,7 @@ Badges communicate state on top of a base icon. They prevent combinatorial icon 
 ### Badge canon
 
 | Badge               | Meaning                                                                                  |
-|---------------------|------------------------------------------------------------------------------------------|
+| ------------------- | ---------------------------------------------------------------------------------------- |
 | `badge.source`      | Registered source root                                                                   |
 | `badge.scanActive`  | Scan active                                                                              |
 | `badge.warning`     | Missing, unreachable, lost identity, failed structural state, or urgent structural issue |
@@ -309,7 +309,7 @@ At most one badge appears on an icon.
 When multiple states apply, the highest-priority badge wins.
 
 | Priority | Badge               | Condition                                            |
-|----------|---------------------|------------------------------------------------------|
+| -------- | ------------------- | ---------------------------------------------------- |
 | 1        | `badge.warning`     | Missing, unreachable, lost identity                  |
 | 2        | `badge.lock`        | Permission denied or required                        |
 | 3        | `badge.offline`     | Removable volume unavailable but not lost            |
@@ -347,7 +347,7 @@ The badge vocabulary covers source, classification, and high-salience structural
 expressed through row-level color treatment, columns, facets, or status text.
 
 | Readiness state | Icon badge behavior                                                                                   |
-|-----------------|-------------------------------------------------------------------------------------------------------|
+| --------------- | ----------------------------------------------------------------------------------------------------- |
 | `ready`         | No readiness badge by default                                                                         |
 | `degraded`      | Row-level treatment or readiness column, not an icon badge                                            |
 | `pending`       | Row-level treatment or readiness column, not `badge.scanActive` unless scan is actually active        |
@@ -365,7 +365,7 @@ Muted is the default. Hidden is only appropriate when the user explicitly filter
 The browser must not silently collapse empty territory.
 
 | Case                                                | Default treatment                                      |
-|-----------------------------------------------------|--------------------------------------------------------|
+| --------------------------------------------------- | ------------------------------------------------------ |
 | Folder exists but has no media-relevant descendants | Show as muted                                          |
 | Folder was skipped by policy                        | Show as muted or explainable, depending on browse mode |
 | Folder is unavailable due to permissions            | Show with permission state                             |
@@ -382,7 +382,7 @@ Opacity alone is too fragile in dense dark UI.
 The local-source icon set should be compact, monochrome, and designed for dense professional tooling.
 
 | Property                 | Decision                                                        |
-|--------------------------|-----------------------------------------------------------------|
+| ------------------------ | --------------------------------------------------------------- |
 | Base dense size          | 16px                                                            |
 | Larger panel size        | 20px                                                            |
 | Style                    | Mostly filled or semi-filled silhouettes with small cut details |

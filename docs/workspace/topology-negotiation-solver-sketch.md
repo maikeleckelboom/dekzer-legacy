@@ -1,7 +1,7 @@
 # Workspace Topology Negotiation — Solver Sketch
 
 > This document describes one viable implementation family for the negotiation law defined in
-> `workspace-topology-negotiation-law.md`. Nothing here is architectural canon. The law doc states what must be true. This
+> `topology-negotiation-law.md`. Nothing here is architectural canon. The law doc states what must be true. This
 > doc shows one way to make it true. Specific formulas, type shapes, and pseudocode may change without violating the law.
 >
 > Read the law doc first. Do not treat anything in this doc as a constraint on future implementations unless it has been

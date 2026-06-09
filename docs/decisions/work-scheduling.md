@@ -1,6 +1,6 @@
 # Work Scheduling and Large-File Fairness
 
-**Status:** FUTURE ARCHITECTURE — This document describes the long-term work scheduler design. The schema vocabulary (`library_item`, `library_items`, `item_readiness`, `file_identity`) predates the v1 substrate decision at `docs/decisions/library-preparation-substrate-v1.md`. The v1 substrate uses `tracks`, `work_runs`, `work_items`, `artifacts`, `preparation_facet_states`. The scheduler tables (`scan_runs`, `resource_budget_groups`, `work_items` shape) in this document are forward-looking and not yet ratified by the v1 schema. Do not treat table shapes or column names here as current v1 implementation targets.
+**Status:** FUTURE ARCHITECTURE — This document describes the long-term work scheduler design. The schema vocabulary (`library_item`, `library_items`, `item_readiness`, `file_identity`) predates the v1 substrate decision at `docs/decisions/library-preparation-substrate.md`. The v1 substrate uses `tracks`, `work_runs`, `work_items`, `artifacts`, `preparation_facet_states`. The scheduler tables (`scan_runs`, `resource_budget_groups`, `work_items` shape) in this document are forward-looking and not yet ratified by the v1 schema. Do not treat table shapes or column names here as current v1 implementation targets.
 
 _Companion to `media-role-classification.md` and `source-access-and-scan-coverage.md`. Governs how the library pipeline
 schedules, prioritizes, budgets, checkpoints, cancels, and recovers work across scanner, sniffer, probe, identity,

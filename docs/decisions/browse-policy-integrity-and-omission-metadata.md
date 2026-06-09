@@ -125,13 +125,13 @@ The renderer must consult both the returned coverage state and `hasPolicyOmitted
 copy. Authoritative empty copy is only valid when coverage is complete.
 
 | Coverage   | Returned rows | hasPolicyOmittedRows | Correct renderer meaning                                                                         |
-| ---------- | :-----------: | :--------------------: | ------------------------------------------------------------------------------------------------ |
-| complete   |       0       |         false          | The scope has no browse-relevant inventory. Render authoritative empty copy.                     |
-| complete   |       0       |          true          | Browse-relevant inventory exists but is excluded by the active policy.                           |
-| incomplete |       0       |         false          | No rows known yet. Coverage incomplete. Do not render authoritative empty.                       |
-| incomplete |       0       |          true          | Omitted inventory is known, but coverage is still incomplete. Do not render authoritative empty. |
-| any        |      > 0      |         false          | Show returned rows. No omission note needed.                                                     |
-| any        |      > 0      |          true          | Show returned rows. Optional compact policy-omission note; not required now.                     |
+| ---------- | :-----------: | :------------------: | ------------------------------------------------------------------------------------------------ |
+| complete   |       0       |        false         | The scope has no browse-relevant inventory. Render authoritative empty copy.                     |
+| complete   |       0       |         true         | Browse-relevant inventory exists but is excluded by the active policy.                           |
+| incomplete |       0       |        false         | No rows known yet. Coverage incomplete. Do not render authoritative empty.                       |
+| incomplete |       0       |         true         | Omitted inventory is known, but coverage is still incomplete. Do not render authoritative empty. |
+| any        |      > 0      |        false         | Show returned rows. No omission note needed.                                                     |
+| any        |      > 0      |         true         | Show returned rows. Optional compact policy-omission note; not required now.                     |
 
 ### Rule 10 — Copy is policy-driven, not hardcoded
 

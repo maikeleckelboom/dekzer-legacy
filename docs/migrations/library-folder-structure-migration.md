@@ -116,16 +116,16 @@ The values must be copied exactly from the current codebase.
 ```ts
 export const libraryControlChannels = {
   attachmentIdentity: {
-    read: '<existing string value>',
+    read: '<existing string value>'
   },
   contents: {
-    read: '<existing string value>',
+    read: '<existing string value>'
   },
   hierarchy: {
-    read: '<existing string value>',
+    read: '<existing string value>'
   },
   navigation: {
-    read: '<existing string value>',
+    read: '<existing string value>'
   },
   roots: {
     cancel: '<existing string value>',
@@ -133,21 +133,21 @@ export const libraryControlChannels = {
     read: '<existing string value>',
     register: '<existing string value>',
     scan: '<existing string value>',
-    unregister: '<existing string value>',
+    unregister: '<existing string value>'
   },
   source: {
     fileHashing: '<existing string value>',
     lifecycle: '<existing string value>',
-    maintenance: '<existing string value>',
+    maintenance: '<existing string value>'
   },
   trackIdentity: {
     candidates: '<existing string value>',
-    decisions: '<existing string value>',
+    decisions: '<existing string value>'
   },
   viewState: {
     read: '<existing string value>',
-    write: '<existing string value>',
-  },
+    write: '<existing string value>'
+  }
 } as const
 ```
 
@@ -203,7 +203,7 @@ Use this map as the canonical migration source. Do not keep files at old locatio
 ### Main layer
 
 | Pre-migration path                                           | Canonical path                                 |
-|--------------------------------------------------------------|------------------------------------------------|
+| ------------------------------------------------------------ | ---------------------------------------------- |
 | `src/main/libraryAttachmentIdentity/read.ts`                 | `src/main/library/attachmentIdentity/read.ts`  |
 | `src/main/libraryBoundary/config.ts`                         | `src/main/library/boundary/config.ts`          |
 | `src/main/libraryBoundary/errors.ts`                         | `src/main/library/boundary/errors.ts`          |
@@ -232,13 +232,13 @@ Use this map as the canonical migration source. Do not keep files at old locatio
 Add:
 
 | New path                                       | Purpose                                                    |
-|------------------------------------------------|------------------------------------------------------------|
+| ---------------------------------------------- | ---------------------------------------------------------- |
 | `src/main/library/boundary/commandRegistry.ts` | Inert ownership stub for future command registration spine |
 
 ### Shared layer
 
 | Pre-migration path                                             | Canonical path                                   |
-|----------------------------------------------------------------|--------------------------------------------------|
+| -------------------------------------------------------------- | ------------------------------------------------ |
 | `src/shared/libraryAttachmentIdentity/read.ts`                 | `src/shared/library/attachmentIdentity/read.ts`  |
 | `src/shared/libraryBoundary/eventParser.ts`                    | `src/shared/library/boundary/eventParser.ts`     |
 | `src/shared/libraryBoundary/events.ts`                         | `src/shared/library/boundary/events.ts`          |
@@ -262,7 +262,7 @@ Add:
 Add:
 
 | New path                                          | Purpose                                                  |
-|---------------------------------------------------|----------------------------------------------------------|
+| ------------------------------------------------- | -------------------------------------------------------- |
 | `src/shared/library/boundary/controlPlane.ts`     | Single owner for command/read IPC channel constants      |
 | `src/shared/library/boundary/publicationPlane.ts` | Single owner for publication/event IPC channel constants |
 | `src/shared/library/boundary/rendererApi.ts`      | Library-domain renderer API surface type                 |

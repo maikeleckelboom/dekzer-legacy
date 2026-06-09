@@ -52,53 +52,53 @@ consistency concern but still within the adapter boundary.
 
 ### 2.1 Exported Icons (Complete)
 
-| #  | Export Name            | Lucide Source    | Custom  | Used?   | Usage Files                                   |
-|----|------------------------|------------------|---------|---------|-----------------------------------------------|
-| 1  | `Icon` (component)     | —                | —       | Yes     | `treeRow.vue`, `table.vue`, `panel.vue`       |
-| 2  | `ArchiveIcon`          | `Archive`        | No      | No      | —                                             |
-| 3  | `CircleCheckIcon`      | `CircleCheck`    | No      | No      | —                                             |
-| 4  | `CircleDotIcon`        | `CircleDot`      | No      | No      | —                                             |
-| 5  | `CircleIcon`           | `Circle`         | No      | No      | —                                             |
-| 6  | `CircleOffIcon`        | `CircleOff`      | No      | No      | —                                             |
-| 7  | `CircleXIcon`          | `CircleX`        | No      | **Yes** | `panel.vue` (remove source button)            |
-| 8  | `CloudIcon`            | `Cloud`          | No      | No      | —                                             |
-| 9  | `CloudSyncIcon`        | `CloudSync`      | No      | No      | —                                             |
-| 10 | `DatabaseIcon`         | `Database`       | No      | No      | —                                             |
-| 11 | `DisclosureOpenIcon`   | `ChevronDown`    | No      | **Yes** | `treeRow.vue` (expand affordance)             |
-| 12 | `DisclosureClosedIcon` | `ChevronRight`   | No      | **Yes** | `treeRow.vue` (expand affordance)             |
-| 13 | `DiscIcon`             | `Disc`           | No      | No      | —                                             |
-| 14 | `FileIcon`             | `File`           | No      | No      | —                                             |
-| 15 | `FileTextIcon`         | `FileText`       | No      | **Yes** | `table.vue` (cueSheet, metadata icons)        |
-| 16 | `FolderIcon`           | `Folder`         | No      | **Yes** | `presentation.ts`, `table.vue`                |
-| 17 | `FolderOpenIcon`       | `FolderOpen`     | No      | **Yes** | `presentation.ts`, `table.vue`                |
-| 18 | `FolderPlusIcon`       | `FolderPlus`     | No      | No      | —                                             |
-| 19 | `HardDriveIcon`        | `HardDrive`      | No      | No      | —                                             |
-| 20 | `ImageIcon`            | `Image`          | No      | **Yes** | `table.vue` (image file icon)                 |
-| 21 | `ListMusicIcon`        | `ListMusic`      | No      | **Yes** | `presentation.ts`, `table.vue`                |
-| 22 | `LoadingIcon`          | `Loader2`        | No      | **Yes** | `presentation.ts`, `table.vue`                |
-| 23 | `LockIcon`             | `Lock`           | No      | No      | —                                             |
-| 24 | `MoreIcon`             | `MoreHorizontal` | No      | **Yes** | `presentation.ts`, `table.vue`                |
-| 25 | `MusicIcon`            | `Music`          | No      | **Yes** | `table.vue` (audio file icon)                 |
-| 26 | `NavigationIcon`       | `Compass`        | No      | **Yes** | `presentation.ts` (collectionView, smartView) |
-| 27 | `NetworkIcon`          | `Network`        | No      | No      | —                                             |
-| 28 | `PinIcon`              | `Pin`            | No      | No      | —                                             |
-| 29 | `PinOffIcon`           | `PinOff`         | No      | No      | —                                             |
-| 30 | `RefreshCwIcon`        | `RefreshCw`      | No      | No      | —                                             |
-| 31 | `ScanIcon`             | `ScanLine`       | No      | **Yes** | `panel.vue` (scan button)                     |
-| 32 | `ServerIcon`           | `Server`         | No      | No      | —                                             |
-| 33 | `SmartphoneIcon`       | `Smartphone`     | No      | No      | —                                             |
-| 34 | `SourceIcon`           | `Library`        | No      | **Yes** | `presentation.ts` (source role)               |
-| 35 | `StateIcon`            | `Info`           | No      | **Yes** | `presentation.ts`, `table.vue`                |
-| 36 | `TriangleAlertIcon`    | `TriangleAlert`  | No      | No      | —                                             |
-| 37 | `UsbIcon`              | `Usb`            | No      | No      | —                                             |
-| 38 | `VideoIcon`            | `Video`          | No      | **Yes** | `table.vue` (video file icon)                 |
-| 39 | `WarningIcon`          | `AlertCircle`    | No      | **Yes** | `presentation.ts`, `table.vue`                |
-| 40 | `SdCardIcon`           | —                | **Yes** | No      | —                                             |
+| #   | Export Name            | Lucide Source    | Custom  | Used?   | Usage Files                                   |
+| --- | ---------------------- | ---------------- | ------- | ------- | --------------------------------------------- |
+| 1   | `Icon` (component)     | —                | —       | Yes     | `treeRow.vue`, `table.vue`, `panel.vue`       |
+| 2   | `ArchiveIcon`          | `Archive`        | No      | No      | —                                             |
+| 3   | `CircleCheckIcon`      | `CircleCheck`    | No      | No      | —                                             |
+| 4   | `CircleDotIcon`        | `CircleDot`      | No      | No      | —                                             |
+| 5   | `CircleIcon`           | `Circle`         | No      | No      | —                                             |
+| 6   | `CircleOffIcon`        | `CircleOff`      | No      | No      | —                                             |
+| 7   | `CircleXIcon`          | `CircleX`        | No      | **Yes** | `panel.vue` (remove source button)            |
+| 8   | `CloudIcon`            | `Cloud`          | No      | No      | —                                             |
+| 9   | `CloudSyncIcon`        | `CloudSync`      | No      | No      | —                                             |
+| 10  | `DatabaseIcon`         | `Database`       | No      | No      | —                                             |
+| 11  | `DisclosureOpenIcon`   | `ChevronDown`    | No      | **Yes** | `treeRow.vue` (expand affordance)             |
+| 12  | `DisclosureClosedIcon` | `ChevronRight`   | No      | **Yes** | `treeRow.vue` (expand affordance)             |
+| 13  | `DiscIcon`             | `Disc`           | No      | No      | —                                             |
+| 14  | `FileIcon`             | `File`           | No      | No      | —                                             |
+| 15  | `FileTextIcon`         | `FileText`       | No      | **Yes** | `table.vue` (cueSheet, metadata icons)        |
+| 16  | `FolderIcon`           | `Folder`         | No      | **Yes** | `presentation.ts`, `table.vue`                |
+| 17  | `FolderOpenIcon`       | `FolderOpen`     | No      | **Yes** | `presentation.ts`, `table.vue`                |
+| 18  | `FolderPlusIcon`       | `FolderPlus`     | No      | No      | —                                             |
+| 19  | `HardDriveIcon`        | `HardDrive`      | No      | No      | —                                             |
+| 20  | `ImageIcon`            | `Image`          | No      | **Yes** | `table.vue` (image file icon)                 |
+| 21  | `ListMusicIcon`        | `ListMusic`      | No      | **Yes** | `presentation.ts`, `table.vue`                |
+| 22  | `LoadingIcon`          | `Loader2`        | No      | **Yes** | `presentation.ts`, `table.vue`                |
+| 23  | `LockIcon`             | `Lock`           | No      | No      | —                                             |
+| 24  | `MoreIcon`             | `MoreHorizontal` | No      | **Yes** | `presentation.ts`, `table.vue`                |
+| 25  | `MusicIcon`            | `Music`          | No      | **Yes** | `table.vue` (audio file icon)                 |
+| 26  | `NavigationIcon`       | `Compass`        | No      | **Yes** | `presentation.ts` (collectionView, smartView) |
+| 27  | `NetworkIcon`          | `Network`        | No      | No      | —                                             |
+| 28  | `PinIcon`              | `Pin`            | No      | No      | —                                             |
+| 29  | `PinOffIcon`           | `PinOff`         | No      | No      | —                                             |
+| 30  | `RefreshCwIcon`        | `RefreshCw`      | No      | No      | —                                             |
+| 31  | `ScanIcon`             | `ScanLine`       | No      | **Yes** | `panel.vue` (scan button)                     |
+| 32  | `ServerIcon`           | `Server`         | No      | No      | —                                             |
+| 33  | `SmartphoneIcon`       | `Smartphone`     | No      | No      | —                                             |
+| 34  | `SourceIcon`           | `Library`        | No      | **Yes** | `presentation.ts` (source role)               |
+| 35  | `StateIcon`            | `Info`           | No      | **Yes** | `presentation.ts`, `table.vue`                |
+| 36  | `TriangleAlertIcon`    | `TriangleAlert`  | No      | No      | —                                             |
+| 37  | `UsbIcon`              | `Usb`            | No      | No      | —                                             |
+| 38  | `VideoIcon`            | `Video`          | No      | **Yes** | `table.vue` (video file icon)                 |
+| 39  | `WarningIcon`          | `AlertCircle`    | No      | **Yes** | `presentation.ts`, `table.vue`                |
+| 40  | `SdCardIcon`           | —                | **Yes** | No      | —                                             |
 
 ### 2.2 Exported Types
 
 | Export          | Used? | Usage                                         |
-|-----------------|-------|-----------------------------------------------|
+| --------------- | ----- | --------------------------------------------- |
 | `IconComponent` | Yes   | `presentation.ts`, `treeRow.vue`, `table.vue` |
 | `IconSize`      | Yes   | `tokens.ts` (internal), `icon.vue`            |
 | `IconTone`      | Yes   | `treeRow.vue`, `table.vue`                    |
@@ -114,7 +114,7 @@ consistency concern but still within the adapter boundary.
 **Imports:** `DisclosureClosedIcon`, `DisclosureOpenIcon`, `Icon`
 
 | Site                        | Icon                                          | Semantic Meaning                             |
-|-----------------------------|-----------------------------------------------|----------------------------------------------|
+| --------------------------- | --------------------------------------------- | -------------------------------------------- |
 | Disclosure button (line 98) | `DisclosureOpenIcon` / `DisclosureClosedIcon` | Expand/collapse state of tree node           |
 | Row icon slot (line 103)    | resolved via `resolveBrowserTreeRowIcon()`    | Node-type icon (source, folder, state, etc.) |
 
@@ -126,7 +126,7 @@ consistency concern but still within the adapter boundary.
 `NavigationIcon`, `SourceIcon`, `StateIcon`, `WarningIcon`
 
 | Tree Role            | Icon                                        | Condition                    |
-|----------------------|---------------------------------------------|------------------------------|
+| -------------------- | ------------------------------------------- | ---------------------------- |
 | `collectionView`     | `NavigationIcon`                            | always                       |
 | `source`             | `SourceIcon`                                | always                       |
 | `sourceLocation`     | `FolderOpenIcon` / `FolderIcon`             | `isExpanded` toggle          |
@@ -138,10 +138,10 @@ consistency concern but still within the adapter boundary.
 | `action`             | `LoadingIcon` / `WarningIcon` / `MoreIcon`  | depends on `node.icon` value |
 
 **Critical callout: Folder expansion mapping.** `sourceLocation` and `literalDirectory` currently swap between
-`FolderIcon` (collapsed) and `FolderOpenIcon` (expanded). This couples expansion disclosure to the folder icon shape. *
+`FolderIcon` (collapsed) and `FolderOpenIcon` (expanded). This couples expansion disclosure to the folder icon shape. \*
 *The long-term contract is that the chevron (`DisclosureOpenIcon`/`DisclosureClosedIcon`) owns expansion state and the
-folder icon is always `folder.plain` regardless of expansion.** This split is already partially realized: the chevron
-*does* render independently in the disclosure button slot. The folder shape swap is a visual duplicate of information
+folder icon is always `folder.plain` regardless of expansion.\*\* This split is already partially realized: the chevron
+*does\* render independently in the disclosure button slot. The folder shape swap is a visual duplicate of information
 already conveyed by the chevron.
 
 ### 3.3 `library/contents/table.vue`
@@ -150,7 +150,7 @@ already conveyed by the chevron.
 `MoreIcon`, `MusicIcon`, `StateIcon`, `VideoIcon`, `WarningIcon`
 
 | Content Row Icon Key | Resolved Icon   | Semantic Meaning           |
-|----------------------|-----------------|----------------------------|
+| -------------------- | --------------- | -------------------------- |
 | `folder`             | `FolderIcon`    | Directory in contents list |
 | `music`              | `MusicIcon`     | Audio file                 |
 | `video`              | `VideoIcon`     | Video file                 |
@@ -170,7 +170,7 @@ already conveyed by the chevron.
 **Imports:** `CircleXIcon`, `Icon`, `ScanIcon`
 
 | Site                            | Icon          | Semantic Meaning            |
-|---------------------------------|---------------|-----------------------------|
+| ------------------------------- | ------------- | --------------------------- |
 | Scan button (line 615)          | `ScanIcon`    | Initiate media scan on root |
 | Remove source button (line 627) | `CircleXIcon` | Remove a registered source  |
 
@@ -193,19 +193,19 @@ Both go through the adapter, but the barrel is the preferred import surface for 
 ## 5. Semantic Icon Role Namespace (Proposed)
 
 Define a flat namespace of semantic roles. These replace the current Lucide-aliased export names. Each role encodes
-*what the icon communicates*, not *which icon pack shape it uses*.
+_what the icon communicates_, not _which icon pack shape it uses_.
 
 ### 5.1 Disclosure
 
 | Role                | Context                     |
-|---------------------|-----------------------------|
+| ------------------- | --------------------------- |
 | `disclosure.closed` | Tree/branch can be expanded |
 | `disclosure.open`   | Tree/branch is expanded     |
 
 ### 5.2 Folder
 
 | Role                  | Context                                  |
-|-----------------------|------------------------------------------|
+| --------------------- | ---------------------------------------- |
 | `folder.plain`        | Generic directory (no known media facet) |
 | `folder.audioFacet`   | Directory known to contain audio         |
 | `folder.videoFacet`   | Directory known to contain video         |
@@ -218,7 +218,7 @@ Define a flat namespace of semantic roles. These replace the current Lucide-alia
 ### 5.3 Source
 
 | Role             | Context                             |
-|------------------|-------------------------------------|
+| ---------------- | ----------------------------------- |
 | `source.local`   | Local library/root source           |
 | `source.drive`   | Drive/volume (internal or external) |
 | `source.service` | Network/cloud service source        |
@@ -226,7 +226,7 @@ Define a flat namespace of semantic roles. These replace the current Lucide-alia
 ### 5.4 Media
 
 | Role             | Context                   |
-|------------------|---------------------------|
+| ---------------- | ------------------------- |
 | `media.audio`    | Audio file                |
 | `media.video`    | Video file                |
 | `media.image`    | Image file                |
@@ -238,7 +238,7 @@ Define a flat namespace of semantic roles. These replace the current Lucide-alia
 ### 5.5 State
 
 | Role            | Context                     |
-|-----------------|-----------------------------|
+| --------------- | --------------------------- |
 | `state.loading` | Content or node is loading  |
 | `state.warning` | Warning or error state      |
 | `state.unknown` | Generic/informational state |
@@ -247,7 +247,7 @@ Define a flat namespace of semantic roles. These replace the current Lucide-alia
 ### 5.6 Action
 
 | Role              | Context                  |
-|-------------------|--------------------------|
+| ----------------- | ------------------------ |
 | `action.more`     | More items/load more     |
 | `action.scan`     | Initiate scan            |
 | `action.remove`   | Remove/delete            |
@@ -257,7 +257,7 @@ Define a flat namespace of semantic roles. These replace the current Lucide-alia
 ### 5.7 Navigation
 
 | Role                    | Context                 |
-|-------------------------|-------------------------|
+| ----------------------- | ----------------------- |
 | `navigation.collection` | Collection view         |
 | `navigation.view`       | Smart view / saved view |
 
@@ -266,7 +266,7 @@ Define a flat namespace of semantic roles. These replace the current Lucide-alia
 ## 6. Migration Map: Current Icon → Proposed Fluent Status
 
 | Current Export         | Proposed Role                       | Fluent Status                | Notes                                                             |
-|------------------------|-------------------------------------|------------------------------|-------------------------------------------------------------------|
+| ---------------------- | ----------------------------------- | ---------------------------- | ----------------------------------------------------------------- |
 | `DisclosureOpenIcon`   | `disclosure.open`                   | **Replace now**              | Direct Fluent chevron equivalent                                  |
 | `DisclosureClosedIcon` | `disclosure.closed`                 | **Replace now**              | Direct Fluent chevron equivalent                                  |
 | `FolderIcon`           | `folder.plain`                      | **Replace now**              | Stop toggling shape on expansion                                  |
@@ -349,7 +349,7 @@ currently have **no visual icon mapping** — they are pure semantic labels. The
 subset:
 
 | `LocationSourceIcon` | Proposed Role                                |
-|----------------------|----------------------------------------------|
+| -------------------- | -------------------------------------------- |
 | `library`            | `source.local`                               |
 | `folder`             | `folder.plain`                               |
 | `drive`              | `source.drive`                               |
@@ -374,7 +374,7 @@ This mapping is for future use. No source-kind icons are currently rendered.
 ## 9. Violations and Near-Issues
 
 | Severity       | File                              | Issue                                                               |
-|----------------|-----------------------------------|---------------------------------------------------------------------|
+| -------------- | --------------------------------- | ------------------------------------------------------------------- |
 | **Near-issue** | `library/tree/presentation.ts:12` | Imports from `../../icons/lucide` instead of `../../icons` (barrel) |
 | **None**       | —                                 | No direct `@lucide/vue` import in product components                |
 
@@ -408,7 +408,7 @@ features or may be removed in the Fluence migration pass:
 ## Files Referenced
 
 | File                                                           | Role                                    |
-|----------------------------------------------------------------|-----------------------------------------|
+| -------------------------------------------------------------- | --------------------------------------- |
 | `apps/desktop/src/renderer/icons/index.ts`                     | Icon barrel                             |
 | `apps/desktop/src/renderer/icons/lucide.ts`                    | Lucide adapter                          |
 | `apps/desktop/src/renderer/icons/types.ts`                     | Icon types                              |

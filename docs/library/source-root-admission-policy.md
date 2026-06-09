@@ -417,8 +417,8 @@ The following invariants must be covered by admission unit/integration tests.
 ## What is not covered here
 
 - Track identity and audio deduplication: see identity docs
-- Contents browse policy: see `library-contents-browse-policy.md`
-- Audio browse row: see `audio-browse-row-v0.md`
+- Contents browse policy: see `contents-browse-policy.md`
+- Audio browse row: see `audio-browse-row-implementation.md`
 - Source scan implementation details: service-level
 - File classification and media class taxonomy: separate doc
 - Default music source discovery behavior: see `default-music-source-discovery.md`

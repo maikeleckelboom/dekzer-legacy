@@ -134,15 +134,15 @@ models do not recompute it from `relative_path`.
 
 The following surfaces have not yet been migrated to natural browse sort keys:
 
-| Surface | File | Current ordering | Backend paginated | Requires cursor change |
-|---|---|---|---|---|
-| **Contents primary-media** | `contents.rs` `PRIMARY_MEDIA_CONTENTS_ORDER_SQL` | `lower(title/artist/album/relative_path)` | Yes | Yes |
-| **Library browser default** | `library_browser.rs` `AGGREGATE_DEFAULT_ORDER` | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No |
-| **Library browser scoped** | `library_browser.rs` `read_scoped_window_rows` | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No |
-| **Library browser prep-policy** | `library_browser.rs` `read_prep_policy_window_rows` | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No |
-| **Library browser search** | `library_browser.rs` search order clauses | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No |
-| **Navigation** | `navigation.rs` (projections) | `sibling_position` | No | N/A |
-| **Playlists** | `projections.rs` | `lower(display_name)` | No | N/A |
+| Surface                         | File                                                | Current ordering                          | Backend paginated        | Requires cursor change |
+| ------------------------------- | --------------------------------------------------- | ----------------------------------------- | ------------------------ | ---------------------- |
+| **Contents primary-media**      | `contents.rs` `PRIMARY_MEDIA_CONTENTS_ORDER_SQL`    | `lower(title/artist/album/relative_path)` | Yes                      | Yes                    |
+| **Library browser default**     | `library_browser.rs` `AGGREGATE_DEFAULT_ORDER`      | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
+| **Library browser scoped**      | `library_browser.rs` `read_scoped_window_rows`      | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
+| **Library browser prep-policy** | `library_browser.rs` `read_prep_policy_window_rows` | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
+| **Library browser search**      | `library_browser.rs` search order clauses           | `lower(title/artist/album/relative_path)` | Offset-based (no cursor) | No                     |
+| **Navigation**                  | `navigation.rs` (projections)                       | `sibling_position`                        | No                       | N/A                    |
+| **Playlists**                   | `projections.rs`                                    | `lower(display_name)`                     | No                       | N/A                    |
 
 ### Rationale for deferral
 

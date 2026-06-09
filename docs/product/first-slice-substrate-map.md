@@ -7,7 +7,7 @@ canonical-context:
   - product/product-doctrine
   - source-root-scan-admission-contract
   - source-hierarchy-contract
-  - library-tree-frame-stability-contract
+  - tree-frame-stability-contract
 scope:
   - first-slice-authority-map
   - first-slice-path

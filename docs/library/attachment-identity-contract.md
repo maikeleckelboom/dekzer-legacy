@@ -11,7 +11,7 @@ scope:
   - source-file-attachment-links
 ---
 
-# Attachment Identity Foundation Contract
+# Attachment Identity Contract
 
 ## Status
 

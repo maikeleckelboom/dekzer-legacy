@@ -9,7 +9,7 @@ canonical-context:
   - product/product-doctrine
   - source-access-and-scan-coverage
   - source-locations-lifecycle-contract
-  - library-preparation-substrate-v1
+  - library-preparation-substrate
   - source-hierarchy-contract
   - first-slice-substrate-map
 scope:
@@ -29,15 +29,15 @@ scope:
 This contract defines the desired scan architecture. The following are not yet fully implemented
 and must not be presented as current implementation reality:
 
-| Aspect                                | Current state                                                                                  |
-|---------------------------------------|------------------------------------------------------------------------------------------------|
-| Source root classification            | Defined in contract; partial implementation. Classification into `system_volume_root`, `broad_drive_root`, etc. is not yet applied before traversal. |
-| Density sampling / preflight          | Not yet implemented. Current `runRootScan` begins traversal without prior density sampling.     |
-| Scan plan model                       | Desired architecture. Current implementation has no formal scan plan stage.                    |
-| Work budget per scan unit             | Desired architecture. Current implementation lacks bounded work units with yield points.        |
-| Magic signature reads                 | Not yet implemented. No 8–16 byte signature read exists before inspection work queueing.       |
-| Candidate admission gating persistence | Desired architecture. Current implementation persists `source_files` before candidate admission. |
-| Background scan jobs                  | **Next implementation frontier.** Current `runRootScan` is synchronous and runs on the blocking command path. Background scan job lifecycle (non-blocking `StartRootScan` → progress events → terminal events) is not yet implemented. |
+| Aspect                                 | Current state                                                                                                                                                                                                                          |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source root classification             | Defined in contract; partial implementation. Classification into `system_volume_root`, `broad_drive_root`, etc. is not yet applied before traversal.                                                                                   |
+| Density sampling / preflight           | Not yet implemented. Current `runRootScan` begins traversal without prior density sampling.                                                                                                                                            |
+| Scan plan model                        | Desired architecture. Current implementation has no formal scan plan stage.                                                                                                                                                            |
+| Work budget per scan unit              | Desired architecture. Current implementation lacks bounded work units with yield points.                                                                                                                                               |
+| Magic signature reads                  | Not yet implemented. No 8–16 byte signature read exists before inspection work queueing.                                                                                                                                               |
+| Candidate admission gating persistence | Desired architecture. Current implementation persists `source_files` before candidate admission.                                                                                                                                       |
+| Background scan jobs                   | **Next implementation frontier.** Current `runRootScan` is synchronous and runs on the blocking command path. Background scan job lifecycle (non-blocking `StartRootScan` → progress events → terminal events) is not yet implemented. |
 
 The contract's product ambition remains authoritative. Implementation must not water down
 the ambition. Each future implementation slice should move closer to the full contract,
@@ -69,7 +69,7 @@ This document governs the first substrate path from root selection to media atta
 It covers:
 
 | Area                       | Included                                                                                            |
-|----------------------------|-----------------------------------------------------------------------------------------------------|
+| -------------------------- | --------------------------------------------------------------------------------------------------- |
 | Source root selection      | User-selected folders, drives, shares, cloud roots, and indirection paths.                          |
 | Source root classification | Normal, broad, system, user profile, network, cloud-backed, protected, and unknown roots.           |
 | Source root identity       | Durable identity where possible, path as current resolution claim.                                  |
@@ -91,7 +91,7 @@ The first slice must not choose names, tables, APIs, or job behavior that make t
 ## Required concepts
 
 | Concept                      | Meaning                                                                                              |
-|------------------------------|------------------------------------------------------------------------------------------------------|
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Source root                  | User-declared location Dekzer is allowed to inspect.                                                 |
 | Root resolution              | Current path, mount, or provider route through which the source root is reachable.                   |
 | Root identity                | Durable identity of the selected root, independent of current path where possible.                   |
@@ -115,7 +115,7 @@ Candidate admission facts and doctrine evidence grades must not share names unle
 The most important separation:
 
 | Layer          | Term               | Meaning                                                                                |
-|----------------|--------------------|----------------------------------------------------------------------------------------|
+| -------------- | ------------------ | -------------------------------------------------------------------------------------- |
 | Scan admission | extension_admitted | The scan policy admitted a file because its path or extension is plausible.            |
 | Evidence grade | declared           | A format declaration exists, usually extension, container claim, or external metadata. |
 | Evidence grade | detected           | Bytes or parser evidence indicate a container or media family.                         |
@@ -123,7 +123,7 @@ The most important separation:
 A file named `song.mp3` may have both:
 
 | Fact                     | Meaning                                             |
-|--------------------------|-----------------------------------------------------|
+| ------------------------ | --------------------------------------------------- |
 | extension_admitted       | The scanner is allowed to perform cheap inspection. |
 | declared format evidence | The extension declares MP3.                         |
 
@@ -138,7 +138,7 @@ Paths are current resolution claims. They may change without the underlying sour
 Examples:
 
 | Case                                        | Problem with path-only identity        | Required behavior                                                           |
-|---------------------------------------------|----------------------------------------|-----------------------------------------------------------------------------|
+| ------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------- |
 | USB drive was E:\ and reappears as F:\      | Same drive appears to be a new source. | Detect same volume identity and surface relocation.                         |
 | NAS share remounts through a different path | Same source gets duplicated.           | Prefer stable share identity where available.                               |
 | Folder renamed or moved within same volume  | Same source becomes missing.           | Prefer directory file identity when available.                              |
@@ -147,7 +147,7 @@ Examples:
 ### Platform identity sources
 
 | Platform/source type   | Preferred durable identity                                                   | Fallback                                   |
-|------------------------|------------------------------------------------------------------------------|--------------------------------------------|
+| ---------------------- | ---------------------------------------------------------------------------- | ------------------------------------------ |
 | Windows volume root    | Volume GUID path and/or volume serial number with filesystem metadata.       | Current drive path plus user confirmation. |
 | Windows directory      | File ID from FileIdInfo or BY_HANDLE_FILE_INFORMATION, plus volume identity. | Canonical path.                            |
 | POSIX volume/directory | Device and inode from stat.                                                  | Canonical path.                            |
@@ -157,7 +157,7 @@ Examples:
 ### Stored root identity shape
 
 | Field                          | Meaning                                                              |
-|--------------------------------|----------------------------------------------------------------------|
+| ------------------------------ | -------------------------------------------------------------------- |
 | declared_path                  | Path selected by the user at registration time.                      |
 | current_resolved_path          | Path through which the source is currently reachable.                |
 | root_identity_kind             | volume, directory, network_share, cloud_root, path_only, unresolved. |
@@ -190,7 +190,7 @@ so the upgrade is additive rather than a migration from a false model.
 Before scanning, Dekzer classifies the selected root.
 
 | Root class         | Examples                                 | Default behavior                                                            |
-|--------------------|------------------------------------------|-----------------------------------------------------------------------------|
+| ------------------ | ---------------------------------------- | --------------------------------------------------------------------------- |
 | normal_music_root  | D:\Music, ~/Music/DJ                     | Allow normal scan plan.                                                     |
 | broad_drive_root   | E:\, external disk root                  | Allow broad-root scan plan after summary.                                   |
 | system_volume_root | C:\                                      | Warn, suggest narrower roots, require explicit confirmation for broad scan. |
@@ -214,7 +214,7 @@ For broad roots, Dekzer performs a cheap breadth-first sample before building th
 Rules:
 
 | Rule            | Requirement                                                                       |
-|-----------------|-----------------------------------------------------------------------------------|
+| --------------- | --------------------------------------------------------------------------------- |
 | Byte reads      | None during density sampling. Directory listing only.                             |
 | Depth           | Usually first two visible levels, policy-configurable.                            |
 | Work bound      | Stop after a bounded number of directories and entries.                           |
@@ -235,7 +235,7 @@ If the first sample yields no admitted media or companion candidates, Dekzer sho
 Density verdicts describe candidate concentration only. They do not describe access failures or policy exclusions.
 
 | Verdict        | Meaning                                       | Scan-plan effect                  |
-|----------------|-----------------------------------------------|-----------------------------------|
+| -------------- | --------------------------------------------- | --------------------------------- |
 | high_density   | Many admitted candidates relative to entries. | Prioritize subtree.               |
 | medium_density | Some admitted candidates.                     | Traverse normally.                |
 | low_density    | Few candidates.                               | Deprioritize.                     |
@@ -246,7 +246,7 @@ Density verdicts describe candidate concentration only. They do not describe acc
 Traversal outcomes discovered during sampling are recorded separately.
 
 | Observation               | Meaning                                                                                    | Scan-plan effect                                              |
-|---------------------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------|
+| ------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | sampling_inaccessible     | Directory could not be listed.                                                             | Record and continue.                                          |
 | sampling_excluded         | Directory skipped by policy.                                                               | Record exclusion, do not traverse.                            |
 | sampling_indirection      | Directory is symlink, junction, mount point, shortcut, or provider-specific reparse point. | Apply reparse policy.                                         |
@@ -261,7 +261,7 @@ A scan plan is the authoritative traversal contract for a source scan job.
 It defines:
 
 | Area                | Required contents                                                   |
-|---------------------|---------------------------------------------------------------------|
+| ------------------- | ------------------------------------------------------------------- |
 | Root identity       | Which source root and current resolution are being scanned.         |
 | Root class          | Classification used to choose policy.                               |
 | Density result      | Preflight sample summary and prioritized subtrees.                  |
@@ -288,7 +288,7 @@ distinguish 2,000 FLAC files from 2,000 DLL files.
 The primary model is a work budget per scan unit.
 
 | Work-budget property           | Requirement                                                                                        |
-|--------------------------------|----------------------------------------------------------------------------------------------------|
+| ------------------------------ | -------------------------------------------------------------------------------------------------- |
 | Directory entries per unit     | Bounded by policy.                                                                                 |
 | Candidate inspections per unit | Bounded separately from directory listing.                                                         |
 | Byte reads per unit            | Bounded separately from candidate count.                                                           |
@@ -332,7 +332,7 @@ suspicious media.
 Outputs:
 
 | Output                      | Meaning                                                       |
-|-----------------------------|---------------------------------------------------------------|
+| --------------------------- | ------------------------------------------------------------- |
 | hierarchy nodes             | Directories that were traversed or represented.               |
 | skipped observations        | Paths skipped by policy.                                      |
 | inaccessible observations   | Paths that could not be listed or opened.                     |
@@ -347,7 +347,7 @@ A file becomes a candidate only when policy admits it.
 Default candidate classes:
 
 | Candidate class    | Examples                                       | First-slice behavior                            |
-|--------------------|------------------------------------------------|-------------------------------------------------|
+| ------------------ | ---------------------------------------------- | ----------------------------------------------- |
 | primary_audio      | mp3, flac, wav, aiff, aif, m4a, aac, ogg, opus | Admit by extension, then magic-read.            |
 | supported_video    | mp4, mov, mkv                                  | Optional or later, depending product scope.     |
 | companion_metadata | cue, m3u, m3u8, pls                            | Admit as companion, not track.                  |
@@ -365,7 +365,7 @@ heavier parsing.
 It is cheaper than metadata parsing and much cheaper than decode probing.
 
 | Format             | Signature policy                                  |
-|--------------------|---------------------------------------------------|
+| ------------------ | ------------------------------------------------- |
 | FLAC               | fLaC at start.                                    |
 | MP3 with ID3       | ID3 at start.                                     |
 | MP3 frame sync     | Restricted. See MP3 false-positive policy below.  |
@@ -385,7 +385,7 @@ F2 near the start of a file will incorrectly flag many non-audio files.
 Rules:
 
 | Case                                             | Policy                                                                                                              |
-|--------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
 | Declared MP3 candidate by extension              | ID3 header or plausible frame sync at expected offset may advance to metadata parse.                                |
 | Unknown extension rescue under normal music root | ID3 header may advance. Frame sync alone is insufficient unless the scan plan explicitly enables deeper MP3 rescue. |
 | Unknown extension under broad/system root        | Frame sync alone must not admit the file.                                                                           |
@@ -395,7 +395,7 @@ Rules:
 For unknown extension rescue, MP3 frame sync alone is not enough. Require at least one of:
 
 | Evidence                          | Meaning                                                         |
-|-----------------------------------|-----------------------------------------------------------------|
+| --------------------------------- | --------------------------------------------------------------- |
 | ID3 header                        | Strong cheap indication of MP3-family file.                     |
 | Multiple plausible MP3 frames     | Requires deeper probe and separate budget.                      |
 | User-enabled advanced import mode | Explicit permission to pay higher false-positive and work cost. |
@@ -409,7 +409,7 @@ Dekzer must not magic-read every arbitrary binary under a broad root.
 However, a scan plan may allow tiny signature reads for unknown extensions under explicit policy.
 
 | Policy               | Unknown extension magic reads                                                     |
-|----------------------|-----------------------------------------------------------------------------------|
+| -------------------- | --------------------------------------------------------------------------------- |
 | normal_music_root    | Allowed within work budget.                                                       |
 | broad_drive_root     | Allowed only in high-density subtrees or when user enables deep candidate rescue. |
 | system_volume_root   | Disabled by default. User must opt in.                                            |
@@ -426,7 +426,7 @@ Only files that pass candidate admission and magic signature checks reach metada
 Metadata parsing and decode probing are not the same thing.
 
 | Step                 | Meaning                                                 | Authority produced                                     |
-|----------------------|---------------------------------------------------------|--------------------------------------------------------|
+| -------------------- | ------------------------------------------------------- | ------------------------------------------------------ |
 | Metadata parse       | Reads container metadata and stream description.        | Parsed media information, not proof of playable audio. |
 | Decode probe         | Attempts a small bounded decode/read of media frames.   | Evidence that audio is usable enough for inventory.    |
 | Attachment inventory | Creates durable media attachment/file instance records. | Readable media attachment authority for first slice.   |
@@ -434,7 +434,7 @@ Metadata parsing and decode probing are not the same thing.
 Outputs:
 
 | Output                    | Meaning                                                                       |
-|---------------------------|-------------------------------------------------------------------------------|
+| ------------------------- | ----------------------------------------------------------------------------- |
 | readable media attachment | Media object admitted into inventory after required checks.                   |
 | file instance             | Current path and filesystem resolution claim.                                 |
 | basic media metadata      | Duration, sample rate, channels, container, codec where available.            |
@@ -449,7 +449,7 @@ Analysis is not part of source traversal.
 Later jobs may compute:
 
 | Job output            | Examples                                         |
-|-----------------------|--------------------------------------------------|
+| --------------------- | ------------------------------------------------ |
 | fingerprints          | Audio fingerprint, file fingerprint.             |
 | waveform artifacts    | Overview/detail waveform.                        |
 | musical analysis      | BPM, key, beatgrid, loudness, phrase candidates. |
@@ -466,7 +466,7 @@ Canonical evidence grades are defined by the product doctrine. This contract use
 scan mechanics and reserves doctrine evidence grade names for claim/evidence interpretation.
 
 | Scan observation or evidence | Produced by                                                 | Meaning                                            |
-|------------------------------|-------------------------------------------------------------|----------------------------------------------------|
+| ---------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
 | extension_admitted           | Candidate policy.                                           | Plausible candidate, not media authority.          |
 | companion_admitted           | Companion policy.                                           | Plausible companion artifact, not track authority. |
 | declared                     | Extension, container declaration, or imported format claim. | Format declaration exists.                         |
@@ -485,21 +485,21 @@ and target context.
 
 Windows indirection must be classified precisely. “Do not follow symlinks blindly” is not enough.
 
-| Type                            | Meaning                                                      | Default behavior                                                                       |
-|---------------------------------|--------------------------------------------------------------|----------------------------------------------------------------------------------------|
-| Symbolic link, file             | File points to another file.                                 | Represent as indirection; inspect target only if admitted and not already inventoried. |
-| Symbolic link, directory        | Directory points to another directory.                       | Represent as indirection node; do not descend unless policy or user opts in.           |
-| Junction                        | Directory redirection, often a same-volume filesystem link.  | Follow only if target is allowed by policy and visited identity is new.                |
-| Mount point                     | Separate volume mounted inside a path.                       | Surface as separate source-root candidate, not silent child traversal.                 |
-| Cloud placeholder reparse point | File exists logically but bytes may not be local.            | Record placeholder state; hydrate only under explicit policy.                          |
-| Unknown reparse point           | Provider-specific behavior.                                  | Do not descend by default; record unsupported indirection.                             |
+| Type                            | Meaning                                                     | Default behavior                                                                       |
+| ------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Symbolic link, file             | File points to another file.                                | Represent as indirection; inspect target only if admitted and not already inventoried. |
+| Symbolic link, directory        | Directory points to another directory.                      | Represent as indirection node; do not descend unless policy or user opts in.           |
+| Junction                        | Directory redirection, often a same-volume filesystem link. | Follow only if target is allowed by policy and visited identity is new.                |
+| Mount point                     | Separate volume mounted inside a path.                      | Surface as separate source-root candidate, not silent child traversal.                 |
+| Cloud placeholder reparse point | File exists logically but bytes may not be local.           | Record placeholder state; hydrate only under explicit policy.                          |
+| Unknown reparse point           | Provider-specific behavior.                                 | Do not descend by default; record unsupported indirection.                             |
 
 ### Loop detection
 
 Traversal must track visited identities.
 
 | Platform | Visited identity                                                                        |
-|----------|-----------------------------------------------------------------------------------------|
+| -------- | --------------------------------------------------------------------------------------- |
 | Windows  | Volume identity plus file ID.                                                           |
 | POSIX    | Device plus inode.                                                                      |
 | Network  | Server/share plus file ID where available, otherwise conservative path cycle detection. |
@@ -516,14 +516,14 @@ A CUE sheet is a companion metadata artifact that may describe segmentation over
 Example:
 
 | File       | Role                                |
-|------------|-------------------------------------|
+| ---------- | ----------------------------------- |
 | album.flac | Primary media attachment candidate. |
 | album.cue  | Companion segmentation artifact.    |
 
 First-slice behavior:
 
 | Requirement                                | Meaning                                                              |
-|--------------------------------------------|----------------------------------------------------------------------|
+| ------------------------------------------ | -------------------------------------------------------------------- |
 | Detect CUE files                           | Admit as companion metadata candidates.                              |
 | Associate obvious adjacent CUE/media pairs | Example: same basename or same directory album pattern.              |
 | Do not create independent tracks from CUE  | Segmentation semantics require a later contract.                     |
@@ -537,7 +537,7 @@ Later behavior may project CUE indexes into track-like segments, but that is not
 For Windows system volume roots, the default broad-root plan skips obvious non-library territory.
 
 | Path class                                                        | Default behavior                               |
-|-------------------------------------------------------------------|------------------------------------------------|
+| ----------------------------------------------------------------- | ---------------------------------------------- |
 | Windows                                                           | Skip.                                          |
 | Program Files                                                     | Skip.                                          |
 | Program Files (x86)                                               | Skip.                                          |
@@ -545,7 +545,7 @@ For Windows system volume roots, the default broad-root plan skips obvious non-l
 | System Volume Information                                         | Skip.                                          |
 | $Recycle.Bin                                                      | Skip.                                          |
 | Recovery                                                          | Skip.                                          |
-| Users/*/AppData                                                   | Skip.                                          |
+| Users/\*/AppData                                                  | Skip.                                          |
 | Temp/cache directories                                            | Skip or aggregate only.                        |
 | node_modules/dependency forests                                   | Skip or aggregate only.                        |
 | Rust target directories                                           | Skip or aggregate only.                        |
@@ -560,7 +560,7 @@ Skipped does not mean nonexistent. Skipped paths are observations.
 Dekzer must not store a row for every irrelevant file under a broad root.
 
 | Observation type        | Persistence requirement                                             |
-|-------------------------|---------------------------------------------------------------------|
+| ----------------------- | ------------------------------------------------------------------- |
 | Traversed directory     | Persist if needed for hierarchy or resume.                          |
 | Skipped directory       | Persist path/class/reason.                                          |
 | Inaccessible directory  | Persist path/error class/retry possibility.                         |
@@ -582,7 +582,7 @@ When the user selects C:\, Dekzer should say:
 Required actions:
 
 | Action                           | Meaning                                                       |
-|----------------------------------|---------------------------------------------------------------|
+| -------------------------------- | ------------------------------------------------------------- |
 | Choose narrower folder           | Return to folder picker or suggestions.                       |
 | Scan with safe broad-root policy | Continue with system-volume scan plan.                        |
 | Advanced scan options            | Let user opt into deeper candidate rescue or wider traversal. |
@@ -614,7 +614,7 @@ stateDiagram-v2
 Durability rules:
 
 | State            | Durable?                                                          | Meaning                                                                   |
-|------------------|-------------------------------------------------------------------|---------------------------------------------------------------------------|
+| ---------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | Selected         | Optional                                                          | UI intent may exist before persistence.                                   |
 | Classified       | Durable for broad/protected/indirection roots.                    | Root classification and current resolution can be restored after restart. |
 | PreflightSampled | Durable for broad roots.                                          | Sampling evidence can be shown after restart.                             |
@@ -663,7 +663,7 @@ stateDiagram-v2
 State meanings:
 
 | State     | Meaning                                                          | Recovery behavior                                                     |
-|-----------|------------------------------------------------------------------|-----------------------------------------------------------------------|
+| --------- | ---------------------------------------------------------------- | --------------------------------------------------------------------- |
 | Paused    | Work stopped intentionally or because the app shut down cleanly. | Resume from last committed work unit.                                 |
 | Cancelled | User or policy ended the job.                                    | No further work. Committed observations remain valid.                 |
 | Failed    | Unrecoverable system condition interrupted the job.              | Preserve failure observation and valid partial state. User may retry. |
@@ -672,7 +672,7 @@ State meanings:
 Examples of Failed:
 
 | Failure                             | Why not Cancelled                                             |
-|-------------------------------------|---------------------------------------------------------------|
+| ----------------------------------- | ------------------------------------------------------------- |
 | Drive ejected during scan           | System/source condition, not user cancellation inside Dekzer. |
 | Database write unavailable          | Substrate failure.                                            |
 | Job worker crashed                  | Process failure.                                              |
@@ -685,7 +685,7 @@ Failed does not mean partial state is corrupt. It means the job did not complete
 ### Root classification
 
 | Scenario                                    | Required result                                                                        |
-|---------------------------------------------|----------------------------------------------------------------------------------------|
+| ------------------------------------------- | -------------------------------------------------------------------------------------- |
 | User selects C:\                            | Root is classified as system_volume_root.                                              |
 | User selects external drive root            | Root is classified as broad_drive_root unless recognized as a narrow music volume.     |
 | USB drive letter changes                    | Same durable root identity is recognized when possible.                                |
@@ -696,7 +696,7 @@ Failed does not mean partial state is corrupt. It means the job did not complete
 ### Preflight and scan plan
 
 | Scenario                             | Required result                                                     |
-|--------------------------------------|---------------------------------------------------------------------|
+| ------------------------------------ | ------------------------------------------------------------------- |
 | Broad root selected                  | Cheap BFS density sample runs before real traversal.                |
 | Density sample finds no candidates   | User sees early no-music-near-top warning.                          |
 | High-density subtree found           | Scan plan prioritizes that subtree.                                 |
@@ -708,7 +708,7 @@ Failed does not mean partial state is corrupt. It means the job did not complete
 ### Candidate admission
 
 | Scenario                                             | Required result                                                               |
-|------------------------------------------------------|-------------------------------------------------------------------------------|
+| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Scanner sees DLL/EXE/SYS under C:\                   | File is ignored by candidate gate and not opened.                             |
 | Scanner sees MP3/FLAC/WAV                            | File receives extension_admitted observation and may receive magic read.      |
 | MP3 extension contains non-media bytes               | Candidate is rejected, scan continues.                                        |
@@ -720,7 +720,7 @@ Failed does not mean partial state is corrupt. It means the job did not complete
 ### Traversal safety
 
 | Scenario                                    | Required result                                                |
-|---------------------------------------------|----------------------------------------------------------------|
+| ------------------------------------------- | -------------------------------------------------------------- |
 | Permission denied folder                    | Recorded as inaccessible, scan continues.                      |
 | Windows directory symlink                   | Represented as indirection, not followed by default.           |
 | Junction points to already visited identity | Loop/duplicate observation recorded, not descended.            |
@@ -731,7 +731,7 @@ Failed does not mean partial state is corrupt. It means the job did not complete
 ### Work budget and partial state
 
 | Scenario                        | Required result                                                                                      |
-|---------------------------------|------------------------------------------------------------------------------------------------------|
+| ------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Huge directory tree             | Scan yields progress after bounded work units.                                                       |
 | User cancels scan               | Partial observations remain valid.                                                                   |
 | Drive disappears mid-scan       | Job enters Failed with failure observation.                                                          |
@@ -742,7 +742,7 @@ Failed does not mean partial state is corrupt. It means the job did not complete
 ### CUE behavior
 
 | Scenario                                | Required result                                                         |
-|-----------------------------------------|-------------------------------------------------------------------------|
+| --------------------------------------- | ----------------------------------------------------------------------- |
 | album.flac and album.cue found together | FLAC is media candidate; CUE is companion artifact candidate.           |
 | CUE without adjacent media              | CUE is unresolved companion observation.                                |
 | CUE contains track indexes              | No independent library tracks are created in first slice.               |
@@ -753,7 +753,7 @@ Failed does not mean partial state is corrupt. It means the job did not complete
 A change fails this contract if it does any of the following:
 
 | Failure                                                                  | Why it is rejected                                              |
-|--------------------------------------------------------------------------|-----------------------------------------------------------------|
+| ------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | Recursively scans C:\ as an ordinary folder                              | Ignores root classification and scan planning.                  |
 | Opens every file to see if it might be audio                             | Couples traversal to analysis and violates candidate admission. |
 | Uses declared_candidate as a stored fact name                            | Collides with doctrine evidence grade vocabulary.               |
@@ -773,7 +773,7 @@ A change fails this contract if it does any of the following:
 Recommended internal split:
 
 | Component                   | Responsibility                                                           |
-|-----------------------------|--------------------------------------------------------------------------|
+| --------------------------- | ------------------------------------------------------------------------ |
 | root classifier             | Classifies selected source root and current resolution.                  |
 | identity resolver           | Produces durable root and directory identities where possible.           |
 | registration proposal store | Persists broad-root setup state before active source root creation.      |
@@ -816,7 +816,7 @@ model must not pretend the path string is the identity.
 Before accepting a scan-related change, ask:
 
 | Question                                                     | Required answer                                |
-|--------------------------------------------------------------|------------------------------------------------|
+| ------------------------------------------------------------ | ---------------------------------------------- |
 | Does it separate traversal from media inspection?            | Yes.                                           |
 | Does it classify broad/system roots before scanning?         | Yes.                                           |
 | Does it avoid opening arbitrary binaries by default?         | Yes.                                           |

@@ -2,7 +2,7 @@
 
 **Governs:** size classes, topology substitution by mode and size, collapse order.
 **Does not govern:** topology family definitions, optical law, or slot representation.
-**See also:** `canonical-topology-families.md`.
+**See also:** `topology-families.md`.
 
 ---
 
@@ -158,6 +158,6 @@ Reject any responsive design that:
 
 ## See also
 
-- `canonical-topology-families.md` — definitions of each named topology family
+- `topology-families.md` — definitions of each named topology family
 - `visual-workspace-doctrine.md` — visual law governing all topology substitutions
 - `topology-modeling-law.md` — slot identity and continuity during substitution

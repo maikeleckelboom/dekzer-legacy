@@ -4,8 +4,8 @@ doctrine-version: 0.1
 last-reviewed: 2026-06-09
 owner: renderer-substrate-boundary
 canonical-context:
-  - library-tree-selection-contents-contract
-  - library-contents-browse-policy
+  - tree-selection-contents-contract
+  - contents-browse-policy
   - media-relevant-file-inventory-contract
 scope:
   - source-hierarchy-tree

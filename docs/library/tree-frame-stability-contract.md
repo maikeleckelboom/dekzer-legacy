@@ -578,9 +578,9 @@ affect frame behavior directly and are not optional polish.
 This contract intentionally does not govern:
 
 - Tree row admission and contents-row separation (see `source-hierarchy-contract`,
-  `library-tree-selection-contents-contract`, and `contents-policy-shape`)
-- Tree selection → contents coupling (see `library-tree-selection-contents-contract`)
-- Contents row presentation (see `library-tree-selection-contents-contract` and `library-contents-browse-policy`)
+  `tree-selection-contents-contract`, and `contents-policy-implementation`)
+- Tree selection → contents coupling (see `tree-selection-contents-contract`)
+- Contents row presentation (see `tree-selection-contents-contract` and `contents-browse-policy`)
 - Source lifecycle visible states (see `source-lifecycle-visible-state-contract`)
 
 It does require the first implementation to stop empty-frame flicker by preserving branch state, using stable substrate

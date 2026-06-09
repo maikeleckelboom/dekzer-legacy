@@ -271,5 +271,5 @@ That is the minimum discipline required to preserve clarity while integrating fe
 ## See also
 
 - `visual-workspace-doctrine.md` — visual product law governing surface appearance
-- `canonical-topology-families.md` — legal topology families and their slot compositions
+- `topology-families.md` — legal topology families and their slot compositions
 - `responsive-topology-matrix.md` — which slots participate at each size class

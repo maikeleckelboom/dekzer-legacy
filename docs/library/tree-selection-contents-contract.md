@@ -4,8 +4,8 @@ doctrine-version: 0.2
 last-reviewed: 2026-06-06
 owner: renderer-substrate-boundary
 canonical-context:
-  - library-tree-frame-stability-contract
-  - library-contents-browse-policy
+  - tree-frame-stability-contract
+  - contents-browse-policy
   - decisions/library-contents-read-boundary
   - source-hierarchy-contract
 scope:
@@ -29,7 +29,7 @@ contents does not read from the tree cache.
 ## Ownership Boundaries
 
 | Owner                      | Owns                                                                         | Must not own                                               |
-|----------------------------|------------------------------------------------------------------------------|------------------------------------------------------------|
+| -------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | Tree controller            | Expanded/collapsed state, selection state, hierarchy row cache.              | Contents rows, contents read state.                        |
 | Selection model            | Selected navigation row identity and derived contents scope.                 | Tree expansion, contents rendering.                        |
 | Contents panel             | Contents rows, pagination, loading and refresh presentation.                 | Tree structure, hierarchy node identity, browse authority. |
@@ -44,7 +44,7 @@ not sort, filter, fan out hierarchy children, or synthesize rows to invent brows
 Current selectable navigation rows derive contents scopes as follows:
 
 | Tree row            | Derived contents scope                                                                       |
-|---------------------|----------------------------------------------------------------------------------------------|
+| ------------------- | -------------------------------------------------------------------------------------------- |
 | Source row          | Media-relevant source-file inventory under that source, subject to contents policy.          |
 | Source-location row | Media-relevant source-file inventory under that source location, subject to contents policy. |
 | Directory row       | Media-relevant source-file inventory under that directory, subject to contents policy.       |
@@ -64,7 +64,7 @@ readContents(scope, policy, scopeDepth, limit, cursor)
 Tree selection establishes scope only. The initial **Audio** workflow filter supplies `audioBrowse`:
 
 | Field         | Initial Audio value |
-|---------------|---------------------|
+| ------------- | ------------------- |
 | `policy.kind` | `audioBrowse`       |
 | `scopeDepth`  | recursive           |
 
@@ -78,7 +78,7 @@ readiness.
 ## Contents Panel States
 
 | State          | Meaning                                                                                                 | Required behavior                                                                    |
-|----------------|---------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| -------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `no_selection` | No selectable navigation row is selected.                                                               | Clear contents intentionally.                                                        |
 | `loading`      | A scope is set, no prior accepted rows exist, and the first read is pending past the display threshold. | Show stable loading state. Do not flash empty.                                       |
 | `ready`        | Rows loaded for the current policy and scope.                                                           | Render returned rows normally.                                                       |
@@ -100,7 +100,7 @@ affected visible/current work, then asks Main for authoritative reads.
 Current scoped refresh behavior:
 
 | Input                         | Refresh planning                                                                                                                       |
-|-------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `navigationRows` invalidation | Refresh navigation rows and visible source lifecycle state.                                                                            |
 | `libraryBrowser` invalidation | Refresh expanded browser windows, refresh current contents, clear contents warm snapshots, and refresh visible source lifecycle state. |
 | Event gap recovery            | Refresh active first-slice projections by bounded policy and clear contents warm snapshots.                                            |

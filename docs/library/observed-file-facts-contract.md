@@ -117,10 +117,10 @@ typed failure and stops the source batch without treating the source as an empty
 
 The current product boundary exposes bounded source-file hash evidence maintenance through:
 
-| Layer | Command |
-| --- | --- |
-| Rust protocol | `SourceFileHash.HashSourceFilesBlake3` |
-| Generated TS contract | `hashSourceFilesBlake3` |
+| Layer                   | Command                                                      |
+| ----------------------- | ------------------------------------------------------------ |
+| Rust protocol           | `SourceFileHash.HashSourceFilesBlake3`                       |
+| Generated TS contract   | `hashSourceFilesBlake3`                                      |
 | Desktop IPC/preload API | `library.hashing.hashSourceFilesBlake3({ sourceId, limit })` |
 
 The public request is source-scoped: `sourceId` is required and `limit` is optional. The renderer never supplies

@@ -1,4 +1,4 @@
-# Dekzer Workspace Engine Foundation Spec
+# Workspace Engine Spec
 
 ## Status
 

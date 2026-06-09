@@ -1,4 +1,4 @@
-# Prepared Room — Canonical Foundations
+# Prepared Room Model
 
 **Status:** Foundational canon. Domain model and substrate constraints are locked. UX shape and implementation detail of
 future layers are intentionally deferred.

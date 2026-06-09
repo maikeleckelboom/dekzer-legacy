@@ -30,7 +30,7 @@ contract that must be honored.
 For current Dekzer work, this means:
 
 | Rule                     | Meaning                                                                    |
-|--------------------------|----------------------------------------------------------------------------|
+| ------------------------ | -------------------------------------------------------------------------- |
 | No compatibility aliases | Do not alias old identifiers to new concepts.                              |
 | No dual model            | Do not keep old and new substrate concepts alive as equal public surfaces. |
 | No wrapper endpoint      | Do not preserve an old boundary shape by wrapping new internals.           |
@@ -48,7 +48,7 @@ Large substrate changes must be sliced by ownership layer, not by whatever happe
 Preferred order:
 
 | Slice                         | Purpose                                                         |
-|-------------------------------|-----------------------------------------------------------------|
+| ----------------------------- | --------------------------------------------------------------- |
 | Schema and validation         | Land the durable shape and cross-table invariants.              |
 | Domain vocabulary and IDs     | Make Rust/domain names match the schema and ownership model.    |
 | Store authority paths         | Port writes, reads, validation, and projection generation.      |
@@ -70,7 +70,7 @@ Use current equivalents, not stale filenames from old briefs.
 Minimum read-first set for substrate work:
 
 | Area                   | Current source of authority                 |
-|------------------------|---------------------------------------------|
+| ---------------------- | ------------------------------------------- |
 | Product position       | Product doctrine.                           |
 | First slice            | First-slice substrate map.                  |
 | Source scanning        | Source-root scan admission contract.        |
@@ -86,7 +86,7 @@ When a concept is replaced, old public names must disappear from active implemen
 This applies to:
 
 | Surface              | Requirement                                                        |
-|----------------------|--------------------------------------------------------------------|
+| -------------------- | ------------------------------------------------------------------ |
 | Schema               | No old table/column names in active baseline.                      |
 | Rust domain types    | No old IDs/types kept as aliases.                                  |
 | Boundary protocol    | No deprecated fields or wrapper commands.                          |
@@ -104,7 +104,7 @@ Substrate store logic must preserve ownership and invariant boundaries.
 Durable lessons from the old brief:
 
 | Law                                                | Meaning                                                                                              |
-|----------------------------------------------------|------------------------------------------------------------------------------------------------------|
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Work runs own work items                           | A work item belongs to an execution context.                                                         |
 | Work items produce artifacts                       | Artifacts are evidence outputs, not free-floating facts.                                             |
 | Artifact supersession is an edge                   | Do not mutate history into disappearance.                                                            |
@@ -121,7 +121,7 @@ Boundary changes must not keep old concepts alive for convenience.
 Rules:
 
 | Rule                              | Meaning                                                                          |
-|-----------------------------------|----------------------------------------------------------------------------------|
+| --------------------------------- | -------------------------------------------------------------------------------- |
 | No old wrappers                   | A removed command should not survive as a wrapper around new internals.          |
 | No deprecated fields              | Do not keep dead fields to make consumers temporarily happy.                     |
 | No renderer dependency inversion  | Renderer needs must not force substrate authority into the UI.                   |
@@ -133,28 +133,28 @@ If the renderer still needs old names, report the follow-up. Do not preserve the
 
 Contents reads support cursor pagination. The following rules apply:
 
-| Rule                                          | Requirement                                                    |
-|-----------------------------------------------|----------------------------------------------------------------|
-| Contents reads support cursor pagination      | Cursor identity is encoded, validated, and used for continuation. |
-| Cursor field is active                        | It is real pagination support, not a deferred shape.           |
-| Provided cursor must fail explicitly          | Return a non-success `cursorInvalid` result.                   |
-| Do not silently restart                       | A provided cursor must not be ignored and treated as page one. |
-| Successful read may emit next cursor          | `nextCursor` is produced when more rows exist.                 |
-| Renderer may accumulate pages                 | The contents boundary accumulates rows and sends cursors through `loadContentsPage`. |
-| Tree load-more is separate                    | Tree load-more (`loadChildren`) and contents pagination (`loadContentsPage`) are distinct. |
+| Rule                                     | Requirement                                                                                |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Contents reads support cursor pagination | Cursor identity is encoded, validated, and used for continuation.                          |
+| Cursor field is active                   | It is real pagination support, not a deferred shape.                                       |
+| Provided cursor must fail explicitly     | Return a non-success `cursorInvalid` result.                                               |
+| Do not silently restart                  | A provided cursor must not be ignored and treated as page one.                             |
+| Successful read may emit next cursor     | `nextCursor` is produced when more rows exist.                                             |
+| Renderer may accumulate pages            | The contents boundary accumulates rows and sends cursors through `loadContentsPage`.       |
+| Tree load-more is separate               | Tree load-more (`loadChildren`) and contents pagination (`loadContentsPage`) are distinct. |
 
 Cursor identity is bound to:
 
-| Cursor identity input | Why it matters                                                   |
-|-----------------------|------------------------------------------------------------------|
-| cursor version        | Prevents stale cursor interpretation.                            |
-| scope                 | Cursor is only valid for the same browse/read scope.             |
-| policy                | Visibility/filter policy changes invalidate cursor.              |
+| Cursor identity input | Why it matters                                                      |
+| --------------------- | ------------------------------------------------------------------- |
+| cursor version        | Prevents stale cursor interpretation.                               |
+| scope                 | Cursor is only valid for the same browse/read scope.                |
+| policy                | Visibility/filter policy changes invalidate cursor.                 |
 | scopeDepth            | Descendant and immediate scope reads are not the same result space. |
-| row profile           | Row shape affects continuation meaning.                          |
-| media class set       | Media filters affect ordering and membership.                    |
-| query/order identity  | Cursor depends on the exact result order.                        |
-| last-row key tuple    | Continuation must resume from a deterministic ordering key.      |
+| row profile           | Row shape affects continuation meaning.                             |
+| media class set       | Media filters affect ordering and membership.                       |
+| query/order identity  | Cursor depends on the exact result order.                           |
+| last-row key tuple    | Continuation must resume from a deterministic ordering key.         |
 
 Do not let unrelated substrate work break cursor pagination in the contents boundary.
 
@@ -163,7 +163,7 @@ Do not let unrelated substrate work break cursor pagination in the contents boun
 A coding agent must stop and report instead of widening scope when:
 
 | Stop condition                                                                       | Required response                                                             |
-|--------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
 | Canonical docs do not match current repo shape                                       | Report the mismatch and propose the smallest next slice.                      |
 | A new crate/package seems necessary                                                  | Stop before inventing it. Explain why existing owners cannot absorb the work. |
 | The task requires simultaneous schema, Rust, generated TS, renderer, and UI redesign | Split the work.                                                               |
@@ -181,7 +181,7 @@ Agent final reports should stay compact.
 Required report:
 
 | Item                       | Meaning                              |
-|----------------------------|--------------------------------------|
+| -------------------------- | ------------------------------------ |
 | Files changed              | Exact paths.                         |
 | Files deleted              | Exact paths.                         |
 | Validation run             | Exact commands and results.          |
@@ -200,7 +200,7 @@ The superseded brief should not be kept alive through hidden fragments.
 The following were intentionally not preserved as active instruction:
 
 | Old material                           | Reason                                                        |
-|----------------------------------------|---------------------------------------------------------------|
+| -------------------------------------- | ------------------------------------------------------------- |
 | Specific V1 substrate port sequence    | Stale implementation context.                                 |
 | Specific schema epoch references       | Current schema/source docs must own that.                     |
 | Old read-first filename list           | May point to stale docs.                                      |

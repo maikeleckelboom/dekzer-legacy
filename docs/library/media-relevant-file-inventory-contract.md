@@ -5,7 +5,7 @@ owner: library-substrate-boundary
 canonical-context:
   - source-root-scan-admission-contract
   - decisions/library-contents-read-boundary
-  - library-tree-selection-contents-contract
+  - tree-selection-contents-contract
 scope:
   - source-file-inventory
   - contents-read-policy
@@ -28,7 +28,7 @@ This preserves diagnostic and future migration room while making the contents pa
 `source_files` owns durable file facts. The required inventory facts are:
 
 | Fact                         | Meaning                                                                                                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------|
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `source_file_id`             | Stable durable file row identity inside the store.                                                        |
 | `source_id`                  | Owning source root.                                                                                       |
 | `parent_source_directory_id` | Immediate directory when known.                                                                           |
@@ -47,7 +47,7 @@ identity, or artwork role.
 The product's initial active workflow filter is **Audio**:
 
 | Field         | Value         |
-|---------------|---------------|
+| ------------- | ------------- |
 | `policy.kind` | `audioBrowse` |
 | `scopeDepth`  | recursive     |
 
@@ -65,7 +65,7 @@ fan out tree children, synthesize directory contents, or answer the selected sco
 ## Scope Behavior
 
 | Scope          | Recursive behavior                                                                                              |
-|----------------|-----------------------------------------------------------------------------------------------------------------|
+| -------------- | --------------------------------------------------------------------------------------------------------------- |
 | source         | Reads rows under the whole source, or under accepted source locations when user-visible source locations exist. |
 | sourceLocation | Reads rows under that registered location prefix.                                                               |
 | directory      | Reads rows under that directory prefix.                                                                         |
@@ -83,7 +83,7 @@ or indexing is incomplete.
 Explicit non-default source-file inventory reads may include:
 
 | Stored facts                                                                    | Explicit inventory admission                                 |
-|---------------------------------------------------------------------------------|--------------------------------------------------------------|
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `file_class = audio`                                                            | Include.                                                     |
 | `file_class = video`                                                            | Include when policy requests video.                          |
 | `file_class = image`                                                            | Include when policy requests image.                          |
@@ -144,7 +144,7 @@ Rust and SQLite own durable facts and read-model admission. Boundary protocol ex
 The renderer may project icons and labels:
 
 | Row facts              | Renderer projection |
-|------------------------|---------------------|
+| ---------------------- | ------------------- |
 | audio                  | music/file row      |
 | video                  | video/file row      |
 | image                  | image/file row      |

@@ -1,6 +1,6 @@
 # Library to Deck Performance Boundary
 
-**Status:** FUTURE ARCHITECTURE — This document defines the library-to-deck ownership boundary. The schema vocabulary (`library_item`, `library_items`, `item_readiness`, `library_item_roles`) predates the v1 substrate decision at `docs/decisions/library-preparation-substrate-v1.md`. The v1 substrate uses `tracks`, `track_attachments`, `preparation_facet_states`. Deck runtime, performance sessions, and broadcast projection are beyond v1 scope. The authority boundaries, entity chain, and rejection cases remain valid architectural constraints. Do not treat table shapes or column names here as current v1 implementation targets.
+**Status:** FUTURE ARCHITECTURE — This document defines the library-to-deck ownership boundary. The schema vocabulary (`library_item`, `library_items`, `item_readiness`, `library_item_roles`) predates the v1 substrate decision at `docs/decisions/library-preparation-substrate.md`. The v1 substrate uses `tracks`, `track_attachments`, `preparation_facet_states`. Deck runtime, performance sessions, and broadcast projection are beyond v1 scope. The authority boundaries, entity chain, and rejection cases remain valid architectural constraints. Do not treat table shapes or column names here as current v1 implementation targets.
 
 _Canonical authority boundary document. Defines the ownership domains that separate library substrate,
 deck runtime, performance session, and broadcast projection. Governs all future readiness, scheduler,

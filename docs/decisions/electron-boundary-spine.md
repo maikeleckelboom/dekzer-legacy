@@ -111,31 +111,31 @@ The spine has six owners.
 
 ```typescript
 export const ControlPlane = {
-  ContentsRead:        'library.contents.read',
-  HierarchyRead:       'library.hierarchy.read',
-  SourceAdd:           'library.source.add',
-  SourceRemove:        'library.source.remove',
-  ScanStart:           'library.scan.start',
-  ScanCancel:          'library.scan.cancel',
-  SourceLifecycleRead: 'library.source.lifecycle.read',
-} as const;
+  ContentsRead: 'library.contents.read',
+  HierarchyRead: 'library.hierarchy.read',
+  SourceAdd: 'library.source.add',
+  SourceRemove: 'library.source.remove',
+  ScanStart: 'library.scan.start',
+  ScanCancel: 'library.scan.cancel',
+  SourceLifecycleRead: 'library.source.lifecycle.read'
+} as const
 
 export const PublicationPlane = {
-  BrowserInvalidated:     'library.invalidation.browser',
+  BrowserInvalidated: 'library.invalidation.browser',
   SourceLifecycleChanged: 'library.source.lifecycle.changed',
-  ScanEvent:              'library.scan.event',
-  BoundaryGapDetected:    'library.boundary.gap.detected',
-} as const;
+  ScanEvent: 'library.scan.event',
+  BoundaryGapDetected: 'library.boundary.gap.detected'
+} as const
 
 export const ResourcePlane = {
   // Reserved. Future: WaveformReadRange, ArtworkOpen, AnalysisBlobReadRange.
-} as const;
+} as const
 
 // Type-level plane membership — used to enforce primitive selection in
 // the registry and emit helpers.
-export type ControlChannel     = typeof ControlPlane[keyof typeof ControlPlane];
-export type PublicationChannel = typeof PublicationPlane[keyof typeof PublicationPlane];
-export type ResourceChannel    = typeof ResourcePlane[keyof typeof ResourcePlane];
+export type ControlChannel = (typeof ControlPlane)[keyof typeof ControlPlane]
+export type PublicationChannel = (typeof PublicationPlane)[keyof typeof PublicationPlane]
+export type ResourceChannel = (typeof ResourcePlane)[keyof typeof ResourcePlane]
 ```
 
 No constant appears in more than one plane. If a channel moves between planes, the old
@@ -170,10 +170,12 @@ Dependency injection shape:
 
 ```typescript
 export function registerLibraryCommands(deps: {
-  ipcMain:        Electron.IpcMain;
-  libraryService: LibraryService;   // typed service, not ambient global or singleton
-  getWindows:     () => BrowserWindow[];
-}): void { /* ... */ }
+  ipcMain: Electron.IpcMain
+  libraryService: LibraryService // typed service, not ambient global or singleton
+  getWindows: () => BrowserWindow[]
+}): void {
+  /* ... */
+}
 ```
 
 #### Exposure Classes and Local-Root Trust
@@ -189,7 +191,7 @@ absolute path. `registerLocalRoot` is host-internal and must not be exposed thro
 feature APIs.
 
 | Operation                | Exposure          | Boundary rule                                                               |
-|--------------------------|-------------------|-----------------------------------------------------------------------------|
+| ------------------------ | ----------------- | --------------------------------------------------------------------------- |
 | `chooseAndRegisterLocal` | renderer-callable | Takes no absolute-path input; Desktop Main owns native selection.           |
 | `registerLocalRoot`      | host-internal     | May accept the host-selected absolute path inside the trusted host path.    |
 | `runScan`                | renderer-callable | Accepts source/root identity, not an absolute path.                         |
@@ -234,14 +236,14 @@ Interface shape:
 
 ```typescript
 interface MainLibraryEventPump {
-  start(deps: PumpDeps): void;
-  stop(): void;
+  start(deps: PumpDeps): void
+  stop(): void
 }
 
 interface PumpDeps {
-  boundaryClient: RustBoundaryClient;
-  emitHelpers:    LibraryEmitHelpers;
-  onGap:          (gap: BoundaryGapEvent) => void;
+  boundaryClient: RustBoundaryClient
+  emitHelpers: LibraryEmitHelpers
+  onGap: (gap: BoundaryGapEvent) => void
 }
 // Must not: author events, own scan policy, touch renderer state,
 // register command handlers, or make product decisions.
@@ -317,17 +319,15 @@ library failures.
 // The service ran and returned a domain outcome.
 // Examples: contentsReadOk, sourceAlreadyRegistered, invalidCursor,
 //           scanAlreadyRunning, policyConflict.
-type LibraryResult<T> =
-  | { kind: 'ok';  value: T }
-  | { kind: 'err'; error: LibraryError }
+type LibraryResult<T> = { kind: 'ok'; value: T } | { kind: 'err'; error: LibraryError }
 
 // ── Layer 2: Host command failure ────────────────────────────────────────────
 // The handler ran, but the host infrastructure failed during handling.
 // Examples: handler threw unexpectedly, serialisation failed inside main,
 //           response failed validation, service not yet ready.
 type HostCommandFailure = {
-  kind:    'hostFailure'
-  reason:  'handlerCrashed' | 'serializationFailed' | 'validationFailed' | 'serviceNotReady'
+  kind: 'hostFailure'
+  reason: 'handlerCrashed' | 'serializationFailed' | 'validationFailed' | 'serviceNotReady'
   detail?: string
 }
 
@@ -338,7 +338,7 @@ type HostCommandFailure = {
 // The command wrapper may never run in this case. The renderer boundary
 // client is responsible for catching invoke rejection and producing this shape.
 type TransportFailure = {
-  kind:   'transportFailure'
+  kind: 'transportFailure'
   reason: 'channelMissing' | 'preloadMissing' | 'rendererDestroyed' | 'invokeRejected'
 }
 
@@ -387,7 +387,7 @@ Do not invent a parallel local schema system in the first spine slice.
 **The four named validation hooks:**
 
 | Hook                      | Direction       | Location                                   | Role                                               |
-|---------------------------|-----------------|--------------------------------------------|----------------------------------------------------|
+| ------------------------- | --------------- | ------------------------------------------ | -------------------------------------------------- |
 | `decodeCommandRequest`    | renderer → main | command registry, main ingress             | `unknown → Req` before service call                |
 | `validateCommandResponse` | main → renderer | command registry, main egress              | `LibraryResult<T>` before IPC send; often identity |
 | `decodeCommandResponse`   | main → renderer | renderer boundary client, renderer ingress | `unknown → BoundaryResult<T>`                      |
