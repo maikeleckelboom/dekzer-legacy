@@ -40,7 +40,7 @@ Implementation companions may describe narrower implemented shapes but do not ov
 | `docs/library/library-browser-workspace-surface-contract.md`      | canonical owner          | Library Browser surface identity, internal panel containment, geometry hints, and workspace handoff.                    |
 | `docs/decisions/library-contents-read-boundary.md`                | canonical owner          | Parameterized contents read contract, scope, policy, depth, pagination, coverage, and omission metadata.                |
 | `docs/decisions/selected-contents-scope-depth-rule.md`            | canonical owner          | Selected-scope depth semantics.                                                                                         |
-| `docs/library/library-contents-browse-policy.md`                  | canonical owner          | Product workflow-filter to contents-policy mapping and empty-state semantics.                                           |
+| `docs/library/library-contents-browse-policy.md`                  | implementation companion | Current product-filter to implemented backend contents policy mapping, current renderer/backend fallback state, omission metadata mapping, and empty-state semantics for implemented policies.                                                |
 | `docs/library/contents-policy-shape.md`                           | implementation companion | Implemented policy union, file-class vocabulary, cursor identity, and policy-specific omission behavior.                |
 | `docs/library/audio-browse-row-v0.md`                             | implementation companion | Implemented `audioBrowse` row shape and boundary behavior.                                                              |
 | `docs/decisions/browse-policy-integrity-and-omission-metadata.md` | implementation companion | Integrity rules for implemented policy variants and omission metadata.                                                  |
@@ -50,7 +50,7 @@ Implementation companions may describe narrower implemented shapes but do not ov
 
 | Doc                                                       | Role            | Ownership                                                                                                                                                                      |
 | --------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `docs/library/library-browse-policy-and-classification.md` | canonical owner | Eight-owner separation model (source structure, source-file facts, classification, identity/evidence, interpretation, content projection, browse policy, facet projection), built-in filter registry, complete vocabulary, CUE/sidecar rules, tree/facet behavior, row identity, and navigation readiness probe relationship. |
+| `docs/library/library-browse-policy-and-classification.md` | canonical owner | Product/domain browse policy, built-in filter registry, classification vocabulary, interpretation links, row universes, facets, row identity, filter-aware content/facet projection behavior, filter-agnostic tree containment constraints, CUE/companion-file rules, and navigation readiness probe independence. |
 
 ## File Facts, Identity, And Classification
 

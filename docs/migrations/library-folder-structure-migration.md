@@ -2,12 +2,14 @@
 
 ## Status
 
-Status: implementation companion
+Status: migration companion — temporary
 Owner: Electron library boundary and renderer architecture
 Companion architecture doc: `docs/decisions/library-folder-structure.md`
 
 This document defines the mechanical migration from the current Electron library folder layout to the ratified
 `main/library/` and `shared/library/` structure.
+
+This document is a temporary migration companion. It will be deleted after the folder-structure migration lands and validation passes. It is not ongoing product authority.
 
 The migration is behavior-preserving. It removes the previous structure rather than supporting it.
 

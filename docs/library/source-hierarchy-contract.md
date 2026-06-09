@@ -1,7 +1,7 @@
 ---
-status: candidate
+status: accepted
 doctrine-version: 0.1
-last-reviewed: 2026-06-05
+last-reviewed: 2026-06-09
 owner: renderer-substrate-boundary
 canonical-context:
   - library-tree-selection-contents-contract

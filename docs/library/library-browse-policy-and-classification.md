@@ -3,8 +3,7 @@
 **Status:** Canon — implementation-gate
 **Domain:** Library / Browse / Classification
 **Revision:** 2026-06-08
-**Depends on:** `background-root-scan-lifecycle-diagrams.md`, `electron-boundary-spine.md`,
-`cue-backed-disc-image-model.md`
+**Depends on:** `background-root-scan-lifecycle-diagrams.md`, `electron-boundary-spine.md`
 
 ---
 
@@ -17,7 +16,7 @@ classification, interpretation, and facet systems bleed into each other and prod
 god object.
 
 This document establishes the canonical separation of concerns, the complete vocabulary, the built-in filter registry,
-the CUE and sidecar rules, the facet behaviour contract, and the relationship to the navigation readiness probe. No code
+the CUE and companion-file rules, the facet behaviour contract, and the relationship to the navigation readiness probe. No code
 may be written against the filter registry, content read policy, or facet projection without this document reaching
 canon status.
 
@@ -104,7 +103,7 @@ For every source file discovered, the classifier produces a classification recor
 |-----------------------|--------------------------------------------------------------------------------------------------|
 | `fileClass`           | What kind of file this is (see §4.1)                                                             |
 | `mediaKind`           | What playable experience it contributes to, if directly inferable from the file alone (see §4.2) |
-| `sidecarRole`         | Whether the file is a companion to another file, if directly inferable                           |
+| `companionRole`       | Whether the file is a companion to another file, if directly inferable                           |
 | `classificationState` | `pending` / `classified` / `failed` / `blocked`                                                  |
 
 Classification references source-file facts (§3.2) by `sourceFileId` and may later reference identity facts (§3.4), but
@@ -287,7 +286,7 @@ concept.
 | `playableVideoAsset` | A directly playable video file row                                                                 |
 | `cueBackedDisc`      | An interpreted disc image produced from a resolved CUE + audio relationship                        |
 | `cueTrack`           | An individual track within a cue-backed disc (reserved; not modelled as a separate row kind in V0) |
-| `companionFile`      | A sidecar or companion file shown as a file row (CUE sheet, playlist, etc.)                        |
+| `companionFile`      | A companion file shown as a file row (CUE sheet, playlist, etc.)                                   |
 | `rawSourceFile`      | Any source file shown as a raw inventory row                                                       |
 
 `cueTrack` is reserved for a future release when the disc image model is ready to expose internal track structure —
@@ -427,7 +426,7 @@ inserted. This is raw inventory mode.
 
 ---
 
-## 6. CUE and sidecar rules
+## 6. CUE and companion-file rules
 
 ### 6.1 Canonical CUE rule
 
@@ -471,9 +470,9 @@ do not become playable rows and do not receive `allowed`, `warning`, or `blocked
 A future Library Problems surface will surface broken and ambiguous links as actionable issues. That surface is out of
 scope for this document.
 
-### 6.4 Playlist sidecar rules
+### 6.4 Playlist companion-file rules
 
-Playlist sidecar interpretation is reserved for V0. Under `companionFiles`, raw playlist files (`.m3u`, `.m3u8`, `.pls`,
+Playlist companion-file interpretation is reserved for V0. Under `companionFiles`, raw playlist files (`.m3u`, `.m3u8`, `.pls`,
 `.xspf`) are visible as `companionFile` rows. Under `allSourceFiles`, they appear as `rawSourceFile` rows.
 
 Whether resolved playlist files produce browse scopes, content rows, or imported library objects is owned by a separate
@@ -745,7 +744,7 @@ These criteria must be satisfied before any implementation against this document
    first view of this scope under this filter), the pane may show a scoped loading state — not a blank pane or a
    misleading empty-state message.
 
-### 12.2 CUE and sidecar behaviour
+### 12.2 CUE and companion-file behaviour
 
 6. Under the `audio` filter: a scope containing a resolved `cueBackedDisc` asset with
    `interpretationReadiness = verified` must show that disc row in the content pane. The raw `.cue` file and its
@@ -874,6 +873,7 @@ the document body and are not listed here.
 | #  | Question                                                                                                                     | Relevant section |
 |----|------------------------------------------------------------------------------------------------------------------------------|------------------|
 | Q2 | Should broken interpretation links surface in a dedicated "Library Problems" view, and if so, what authority owns that view? | §6.3             |
+| Q7 | A dedicated cue-backed disc image model document (`cue-backed-disc-image-model.md`) is deferred until implementation of `cueBackedDisc` content rows, internal track structure, timing, and track identity for interpreted disc images. The `cueBackedDisc` content row kind definition, interpretation policy, and CUE behaviour are already specified in this document (§3.5, §4.3, §5, §6). | §3.5, §4.3, §6 |
 
 ### 13.2 Must resolve before implementing the related surface
 
