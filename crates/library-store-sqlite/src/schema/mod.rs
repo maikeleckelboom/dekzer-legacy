@@ -100,6 +100,7 @@ mod tests {
         "LibraryMetadata",
         "browser_user_order",
         "browser_user_prefs",
+        "source_root_navigation_state",
         "source_state",
         "source_scan_state",
         "source_locations",
@@ -367,6 +368,25 @@ mod tests {
         assert!(
             table_index_names(&connection, "source_files")
                 .contains(&"source_files_source_browse_order".to_string())
+        );
+        assert_eq!(
+            table_column_names(&connection, "source_root_navigation_state"),
+            vec![
+                "source_id",
+                "root_window_state",
+                "immediate_child_directory_count",
+                "issue_kind",
+                "detail",
+                "checked_at",
+                "updated_at",
+            ]
+        );
+        assert!(
+            table_foreign_keys(&connection, "source_root_navigation_state").contains(&(
+                "sources".to_string(),
+                "source_id".to_string(),
+                "CASCADE".to_string(),
+            ))
         );
         assert!(
             table_foreign_keys(&connection, "source_directories").contains(&(

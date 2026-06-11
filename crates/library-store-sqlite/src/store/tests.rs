@@ -23,7 +23,7 @@ use library_domain::{
     SourceId, SourcePresenceState, SourceScanPhase, SourceSegmentId, SourceSegmentSetId,
     WorkItemId, WorkPriorityClass, WorkRunOutcome, encode_selector,
 };
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use std::fs;
 use tempfile::TempDir;
 
@@ -103,6 +103,21 @@ fn open_mutation_connection(path: &std::path::Path) -> Connection {
         .execute_batch("PRAGMA foreign_keys = ON;")
         .expect("enable foreign keys");
     connection
+}
+
+fn root_navigation_state(path: &std::path::Path, source_id: i64) -> Option<(String, i64)> {
+    let connection = open_mutation_connection(path);
+    connection
+        .query_row(
+            "SELECT root_window_state,
+                    immediate_child_directory_count
+             FROM source_root_navigation_state
+             WHERE source_id = ?1",
+            [source_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .expect("read root navigation state")
 }
 
 fn assert_fixed_top_level_navigation_rows(rows: &[crate::NavigationRow]) {
@@ -1389,6 +1404,11 @@ fn register_local_root_establishes_immediate_root_child_directories_before_scan(
             absolute_path: root_path.clone(),
         })
         .expect("register local root");
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("established".to_string(), 2)),
+        "non-empty registration must persist the immediate root navigation window state"
+    );
 
     let window = durable_store
         .read_literal_hierarchy_children(
@@ -1437,6 +1457,52 @@ fn register_local_root_establishes_immediate_root_child_directories_before_scan(
 }
 
 #[test]
+fn empty_registration_writes_empty_root_navigation_state_without_marker_rows() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("empty-root");
+    fs::create_dir_all(&root_path).expect("create empty root");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register local root");
+
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("empty".to_string(), 0))
+    );
+
+    let window = durable_store
+        .read_literal_hierarchy_children(
+            StoreLiteralHierarchyEntryPoint::Source {
+                source_id: root.root_id,
+            },
+            None,
+            0,
+            50,
+            SourceFileClassFilter::NavigationOnly,
+        )
+        .expect("read literal hierarchy")
+        .expect("registered source has hierarchy window");
+
+    assert_eq!(window.total_rows, 0);
+    assert!(window.rows.is_empty());
+    let connection = open_mutation_connection(&db_path);
+    let source_directory_count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM source_directories", [], |row| {
+            row.get(0)
+        })
+        .expect("count source directories");
+    assert_eq!(
+        source_directory_count, 0,
+        "empty root navigation state must not create a fake visible directory row"
+    );
+}
+
+#[test]
 fn established_non_empty_root_navigation_window_is_not_reestablished_while_idle() {
     let tempdir = TempDir::new().expect("create tempdir");
     let db_path = tempdir.path().join("library.sqlite3");
@@ -1457,7 +1523,11 @@ fn established_non_empty_root_navigation_window_is_not_reestablished_while_idle(
 
     assert_eq!(
         establishment.state,
-        RootNavigationWindowEstablishmentState::NotRequired
+        RootNavigationWindowEstablishmentState::Established
+    );
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("established".to_string(), 1))
     );
 
     let connection = open_mutation_connection(&db_path);
@@ -1482,6 +1552,50 @@ fn established_non_empty_root_navigation_window_is_not_reestablished_while_idle(
 }
 
 #[test]
+fn established_empty_root_navigation_window_is_not_reestablished_while_idle() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("registered-empty-root");
+    fs::create_dir_all(&root_path).expect("create empty root");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register local root");
+
+    fs::create_dir_all(root_path.join("late-child")).expect("create child after establishment");
+    let establishment = durable_store
+        .establish_root_navigation_window(root.root_id)
+        .expect("establish root navigation window");
+
+    assert_eq!(
+        establishment.state,
+        RootNavigationWindowEstablishmentState::Empty
+    );
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("empty".to_string(), 0))
+    );
+
+    let connection = open_mutation_connection(&db_path);
+    let child_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM source_directories
+             WHERE source_id = ?1",
+            [root.root_id],
+            |row| row.get(0),
+        )
+        .expect("count source directory rows");
+    assert_eq!(
+        child_count, 0,
+        "ordinary repeated root reads must not re-enumerate an established empty root window"
+    );
+}
+
+#[test]
 fn unestablished_idle_root_navigation_window_establishes_on_first_read_fallback() {
     let tempdir = TempDir::new().expect("create tempdir");
     let db_path = tempdir.path().join("library.sqlite3");
@@ -1502,6 +1616,10 @@ fn unestablished_idle_root_navigation_window_establishes_on_first_read_fallback(
         RootNavigationWindowEstablishmentState::Established
     );
     assert_eq!(establishment.immediate_child_directory_count, 1);
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("established".to_string(), 1))
+    );
 
     let connection = open_mutation_connection(&db_path);
     let child_count: i64 = connection
@@ -1542,6 +1660,7 @@ fn non_idle_root_navigation_window_skips_first_read_fallback() {
         establishment.state,
         RootNavigationWindowEstablishmentState::NotRequired
     );
+    assert_eq!(root_navigation_state(&db_path, root.root_id), None);
 
     let connection = open_mutation_connection(&db_path);
     let child_count: i64 = connection
@@ -1556,6 +1675,61 @@ fn non_idle_root_navigation_window_skips_first_read_fallback() {
     assert_eq!(
         child_count, 0,
         "non-idle scan phases must not establish the immediate root window from the read fallback"
+    );
+}
+
+#[test]
+fn unestablished_missing_root_navigation_window_writes_missing_state() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("missing-root");
+    fs::create_dir_all(&root_path).expect("create root before bootstrap");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .bootstrap_root(&root_path)
+        .expect("bootstrap root without registration establishment");
+    fs::remove_dir_all(&root_path).expect("remove root before first establishment");
+
+    let establishment = durable_store
+        .establish_root_navigation_window(root.root_id)
+        .expect("establish root navigation window");
+
+    assert_eq!(
+        establishment.state,
+        RootNavigationWindowEstablishmentState::Missing
+    );
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("missing".to_string(), 0))
+    );
+}
+
+#[test]
+fn unestablished_not_directory_root_navigation_window_writes_blocked_state() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("blocked-root");
+    fs::create_dir_all(&root_path).expect("create root before bootstrap");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .bootstrap_root(&root_path)
+        .expect("bootstrap root without registration establishment");
+    fs::remove_dir_all(&root_path).expect("remove root directory");
+    fs::write(&root_path, b"not-a-directory").expect("replace root with file");
+
+    let establishment = durable_store
+        .establish_root_navigation_window(root.root_id)
+        .expect("establish root navigation window");
+
+    assert_eq!(
+        establishment.state,
+        RootNavigationWindowEstablishmentState::Blocked
+    );
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("blocked".to_string(), 0))
     );
 }
 

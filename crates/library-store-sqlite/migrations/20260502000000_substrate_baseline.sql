@@ -149,6 +149,40 @@ CREATE TABLE source_scan_state
     CHECK (scan_phase NOT IN ('blocked', 'partial') OR scan_issue_kind IS NOT NULL)
 ) STRICT;
 
+CREATE TABLE source_root_navigation_state
+(
+    source_id                         INTEGER PRIMARY KEY REFERENCES sources (source_id) ON DELETE CASCADE,
+    root_window_state                 TEXT    NOT NULL
+        CHECK (root_window_state IN ('unknown', 'established', 'empty', 'missing', 'blocked', 'failed')),
+    immediate_child_directory_count   INTEGER NOT NULL DEFAULT 0 CHECK (immediate_child_directory_count >= 0),
+    issue_kind                        TEXT
+        CHECK (
+            issue_kind IS NULL
+                OR issue_kind IN (
+                    'missing',
+                    'not_directory',
+                    'permission_denied',
+                    'privacy_permission_required',
+                    'unavailable_mount',
+                    'resource_busy',
+                    'stale_network_handle',
+                    'symlink_loop',
+                    'symlink_escape_blocked',
+                    'unsupported_path',
+                    'invalid_path',
+                    'io_interrupted',
+                    'timed_out',
+                    'unknown_io'
+                )
+        ),
+    detail                            TEXT,
+    checked_at                        INTEGER,
+    updated_at                        INTEGER NOT NULL,
+    CHECK (root_window_state NOT IN ('missing', 'blocked', 'failed') OR issue_kind IS NOT NULL),
+    CHECK (root_window_state != 'established' OR immediate_child_directory_count > 0),
+    CHECK (root_window_state != 'empty' OR immediate_child_directory_count = 0)
+) STRICT;
+
 CREATE TABLE source_locations
 (
     source_location_id INTEGER PRIMARY KEY,

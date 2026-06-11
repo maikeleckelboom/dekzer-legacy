@@ -15,9 +15,11 @@ use crate::authority::sources::{
 };
 use crate::authority::sources::{
     RecordSourceFileObservationInput, SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx,
-    SourceLocationsAuthorityTx, SourceLocatorsAuthorityTx, SourceStateAuthorityTx,
-    SourcesAuthorityTx, UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
-    UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
+    SourceLocationsAuthorityTx, SourceLocatorsAuthorityTx, SourceRootNavigationStateAuthorityTx,
+    SourceRootNavigationWindowState, SourceStateAuthorityTx, SourcesAuthorityTx,
+    UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
+    UpsertSourceLocatorInput, UpsertSourceRootNavigationStateInput, UpsertSourceScanStateInput,
+    UpsertSourceStateInput, read_source_root_navigation_state,
 };
 use crate::authority::work::{QueueInspectSourceWorkInput, WorkItemsAuthorityTx};
 use crate::authority::write_lane::AdmittedWrite;
@@ -60,6 +62,7 @@ pub struct RootNavigationWindowEstablishment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RootNavigationWindowEstablishmentState {
     Established,
+    Empty,
     NotRequired,
     Missing,
     Blocked,
@@ -422,13 +425,8 @@ impl SqliteDurableStore {
         &self,
         root_id: i64,
     ) -> LibrarySqliteResult<RootNavigationWindowEstablishment> {
-        if !self.root_navigation_window_establishment_required(root_id)? {
-            return Ok(RootNavigationWindowEstablishment {
-                root_id,
-                state: RootNavigationWindowEstablishmentState::NotRequired,
-                immediate_child_directory_count: 0,
-                detail: None,
-            });
+        if let Some(establishment) = self.root_navigation_window_establishment_gate(root_id)? {
+            return Ok(establishment);
         }
 
         let root_path = self.read_root_scan_path(root_id)?;
@@ -441,6 +439,7 @@ impl SqliteDurableStore {
         let effective_root = match &access_probe {
             SourceAccessProbeResult::Accessible { effective_root, .. } => effective_root.clone(),
             _ => {
+                self.write_root_navigation_state_from_access_probe(root_id, &access_probe)?;
                 self.sync_root_projection_state(&[root_id])?;
                 return Ok(root_establishment_from_access_probe(root_id, &access_probe));
             }
@@ -451,6 +450,15 @@ impl SqliteDurableStore {
             match collect_immediate_root_child_directories(&effective_root, observed_at) {
                 Ok(child_directories) => child_directories,
                 Err(failure) => {
+                    self.write_root_navigation_state(
+                        root_id,
+                        root_navigation_window_state_for_establishment(failure.state),
+                        0,
+                        Some(failure.issue_kind),
+                        Some(failure.detail.clone()),
+                        Some(checked_at_ms),
+                        observed_at,
+                    )?;
                     self.sync_root_projection_state(&[root_id])?;
                     return Ok(RootNavigationWindowEstablishment {
                         root_id,
@@ -481,22 +489,46 @@ impl SqliteDurableStore {
                 &observed_relative_paths,
                 observed_at,
             )?;
+            SourceRootNavigationStateAuthorityTx::new(write).upsert_source_root_navigation_state(
+                &UpsertSourceRootNavigationStateInput {
+                    source_id: root_id,
+                    root_window_state: if child_directories.is_empty() {
+                        SourceRootNavigationWindowState::Empty
+                    } else {
+                        SourceRootNavigationWindowState::Established
+                    },
+                    immediate_child_directory_count: i64::try_from(child_directories.len())
+                        .map_err(|_| {
+                            LibrarySqliteError::WriteInvariant(
+                                "immediate root child directory count does not fit i64".to_string(),
+                            )
+                        })?,
+                    issue_kind: None,
+                    detail: None,
+                    checked_at: Some(checked_at_ms),
+                    updated_at: observed_at,
+                },
+            )?;
             publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
             Ok(())
         })?;
 
         Ok(RootNavigationWindowEstablishment {
             root_id,
-            state: RootNavigationWindowEstablishmentState::Established,
+            state: if child_directories.is_empty() {
+                RootNavigationWindowEstablishmentState::Empty
+            } else {
+                RootNavigationWindowEstablishmentState::Established
+            },
             immediate_child_directory_count: child_directories.len(),
             detail: None,
         })
     }
 
-    fn root_navigation_window_establishment_required(
+    fn root_navigation_window_establishment_gate(
         &self,
         root_id: i64,
-    ) -> LibrarySqliteResult<bool> {
+    ) -> LibrarySqliteResult<Option<RootNavigationWindowEstablishment>> {
         let connection = self.open_read_connection()?;
         let scan_phase = connection
             .query_row(
@@ -508,22 +540,113 @@ impl SqliteDurableStore {
             )
             .optional()?;
         if !matches!(scan_phase.as_deref(), None | Some("idle")) {
-            return Ok(false);
+            return Ok(Some(RootNavigationWindowEstablishment {
+                root_id,
+                state: RootNavigationWindowEstablishmentState::NotRequired,
+                immediate_child_directory_count: 0,
+                detail: None,
+            }));
         }
 
-        let has_immediate_root_directory_rows = connection.query_row(
-            "SELECT EXISTS(
-                 SELECT 1
-                 FROM source_directories
-                 WHERE source_id = ?1
-                   AND parent_source_directory_id IS NULL
-                   AND relative_path <> ''
-             )",
-            [root_id],
-            |row| row.get::<_, bool>(0),
-        )?;
-        Ok(!has_immediate_root_directory_rows)
+        let Some(root_navigation_state) = read_source_root_navigation_state(&connection, root_id)?
+        else {
+            return Ok(None);
+        };
+        if matches!(
+            root_navigation_state.root_window_state,
+            SourceRootNavigationWindowState::Unknown
+        ) {
+            return Ok(None);
+        }
+
+        Ok(Some(root_establishment_from_root_navigation_state(
+            root_navigation_state,
+        )?))
     }
+
+    fn write_root_navigation_state_from_access_probe(
+        &self,
+        root_id: i64,
+        access_probe: &SourceAccessProbeResult,
+    ) -> LibrarySqliteResult<()> {
+        let issue_kind = access_probe.issue_kind();
+        let Some(issue_kind) = issue_kind else {
+            return Ok(());
+        };
+        self.write_root_navigation_state(
+            root_id,
+            root_navigation_window_state_for_establishment(root_establishment_state_for_issue(
+                issue_kind,
+            )),
+            0,
+            Some(issue_kind),
+            access_probe.diagnostic_detail().map(str::to_string),
+            Some(access_probe.checked_at_ms()),
+            access_probe.checked_at_ms(),
+        )
+    }
+
+    fn write_root_navigation_state(
+        &self,
+        root_id: i64,
+        root_window_state: SourceRootNavigationWindowState,
+        immediate_child_directory_count: i64,
+        issue_kind: Option<SourceAccessIssueKind>,
+        detail: Option<String>,
+        checked_at: Option<i64>,
+        updated_at: i64,
+    ) -> LibrarySqliteResult<()> {
+        self.with_write(|write| {
+            SourceRootNavigationStateAuthorityTx::new(write).upsert_source_root_navigation_state(
+                &UpsertSourceRootNavigationStateInput {
+                    source_id: root_id,
+                    root_window_state,
+                    immediate_child_directory_count,
+                    issue_kind,
+                    detail,
+                    checked_at,
+                    updated_at,
+                },
+            )?;
+            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
+            Ok(())
+        })
+    }
+}
+
+fn root_establishment_from_root_navigation_state(
+    state: crate::authority::sources::SourceRootNavigationStateRecord,
+) -> LibrarySqliteResult<RootNavigationWindowEstablishment> {
+    let immediate_child_directory_count =
+        usize::try_from(state.immediate_child_directory_count).map_err(|_| {
+            LibrarySqliteError::MalformedSchemaState(format!(
+                "source_root_navigation_state.immediate_child_directory_count does not fit usize: {}",
+                state.immediate_child_directory_count
+            ))
+        })?;
+    Ok(RootNavigationWindowEstablishment {
+        root_id: state.source_id,
+        state: match state.root_window_state {
+            SourceRootNavigationWindowState::Established => {
+                RootNavigationWindowEstablishmentState::Established
+            }
+            SourceRootNavigationWindowState::Empty => RootNavigationWindowEstablishmentState::Empty,
+            SourceRootNavigationWindowState::Missing => {
+                RootNavigationWindowEstablishmentState::Missing
+            }
+            SourceRootNavigationWindowState::Blocked => {
+                RootNavigationWindowEstablishmentState::Blocked
+            }
+            SourceRootNavigationWindowState::Failed => {
+                RootNavigationWindowEstablishmentState::Failed
+            }
+            SourceRootNavigationWindowState::Unknown => {
+                RootNavigationWindowEstablishmentState::NotRequired
+            }
+        },
+        immediate_child_directory_count,
+        detail: state.detail,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -536,6 +659,7 @@ struct ImmediateRootChildDirectory {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RootNavigationWindowReadFailure {
     state: RootNavigationWindowEstablishmentState,
+    issue_kind: SourceAccessIssueKind,
     detail: String,
 }
 
@@ -561,6 +685,7 @@ fn collect_immediate_root_child_directories(
             .map(str::to_string)
             .ok_or_else(|| RootNavigationWindowReadFailure {
                 state: RootNavigationWindowEstablishmentState::Failed,
+                issue_kind: SourceAccessIssueKind::InvalidPath,
                 detail: format!("non-UTF-8 child directory name under {root_path:?}"),
             })?;
         if name.is_empty() {
@@ -588,7 +713,25 @@ fn root_window_read_failure_from_io(error: std::io::Error) -> RootNavigationWind
     let issue_kind = source_access_issue_kind_from_io_error(&error);
     RootNavigationWindowReadFailure {
         state: root_establishment_state_for_issue(issue_kind),
+        issue_kind,
         detail: error.to_string(),
+    }
+}
+
+fn root_navigation_window_state_for_establishment(
+    state: RootNavigationWindowEstablishmentState,
+) -> SourceRootNavigationWindowState {
+    match state {
+        RootNavigationWindowEstablishmentState::Established => {
+            SourceRootNavigationWindowState::Established
+        }
+        RootNavigationWindowEstablishmentState::Empty => SourceRootNavigationWindowState::Empty,
+        RootNavigationWindowEstablishmentState::Missing => SourceRootNavigationWindowState::Missing,
+        RootNavigationWindowEstablishmentState::Blocked => SourceRootNavigationWindowState::Blocked,
+        RootNavigationWindowEstablishmentState::Failed => SourceRootNavigationWindowState::Failed,
+        RootNavigationWindowEstablishmentState::NotRequired => {
+            SourceRootNavigationWindowState::Unknown
+        }
     }
 }
 

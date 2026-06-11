@@ -5,6 +5,7 @@ pub(crate) mod source_files;
 pub(crate) mod source_locations;
 pub(crate) mod source_locators;
 pub(crate) mod source_records;
+pub(crate) mod source_root_navigation_state;
 pub(crate) mod source_state;
 
 pub(crate) use source_access::{
@@ -26,6 +27,11 @@ pub use source_locators::{
     SourceLocatorInput, SourceLocatorsAuthorityTx, UpsertSourceLocatorInput,
 };
 pub use source_records::{SourcesAuthorityTx, UpsertSourceInput, format_source_identity_key};
+pub(crate) use source_root_navigation_state::{
+    SourceRootNavigationStateAuthorityTx, SourceRootNavigationStateRecord,
+    SourceRootNavigationWindowState, UpsertSourceRootNavigationStateInput,
+    read_source_root_navigation_state,
+};
 pub use source_state::{
     SourceStateAuthorityTx, UpsertSourceScanStateInput, UpsertSourceStateInput,
 };

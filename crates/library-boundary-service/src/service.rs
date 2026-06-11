@@ -995,8 +995,11 @@ fn apply_root_navigation_window_establishment(
     match establishment.state {
         RootNavigationWindowEstablishmentState::NotRequired => {}
         RootNavigationWindowEstablishmentState::Established => {
-            window.coverage.empty_result_authoritative = window.total_rows == 0;
-            if window.total_rows == 0 && window.coverage.detail.is_none() {
+            window.coverage.empty_result_authoritative = false;
+        }
+        RootNavigationWindowEstablishmentState::Empty => {
+            window.coverage.empty_result_authoritative = true;
+            if window.coverage.detail.is_none() {
                 window.coverage.detail =
                     Some("The immediate source root child-directory window is empty.".to_string());
             }

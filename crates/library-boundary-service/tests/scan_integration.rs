@@ -15,6 +15,8 @@ use library_boundary_protocol::{
     StartRootScanRequest,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
+use library_store_sqlite::durable_store_path;
+use rusqlite::Connection;
 use tempfile::TempDir;
 
 fn open_service(tempdir: &TempDir) -> LibraryBoundaryService {
@@ -23,6 +25,20 @@ fn open_service(tempdir: &TempDir) -> LibraryBoundaryService {
         environment: StoreEnvironment::Development,
     })
     .expect("open boundary service")
+}
+
+fn delete_root_navigation_state(tempdir: &TempDir, root_id: i64) {
+    let db_path = durable_store_path(
+        &tempdir.path().to_string_lossy(),
+        StoreEnvironment::Development,
+    );
+    let connection = Connection::open(db_path).expect("open durable store");
+    connection
+        .execute(
+            "DELETE FROM source_root_navigation_state WHERE source_id = ?1",
+            [root_id],
+        )
+        .expect("delete root navigation state");
 }
 
 fn write_file(path: &Path, bytes: &[u8]) {
@@ -286,6 +302,42 @@ fn repeated_non_empty_root_reads_do_not_refresh_established_navigation_window() 
 }
 
 #[test]
+fn repeated_empty_root_reads_do_not_refresh_established_navigation_window() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let empty_root = tempdir.path().join("empty-root");
+    fs::create_dir_all(&empty_root).expect("create empty root");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &empty_root);
+
+    let first_reply = read_library_tree(&service, registered.root_id, None);
+    let first_window = first_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window");
+    assert_eq!(first_window.total_rows, 0);
+    assert!(first_window.coverage.empty_result_authoritative);
+
+    fs::create_dir_all(empty_root.join("late-child")).expect("create child after establishment");
+
+    let second_reply = read_library_tree(&service, registered.root_id, None);
+    let second_window = second_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window");
+
+    assert_eq!(
+        second_window.total_rows, 0,
+        "normal repeated root reads must not refresh established empty root windows"
+    );
+    assert!(second_window.rows.is_empty());
+    assert!(
+        second_window.coverage.empty_result_authoritative,
+        "empty remains authoritative for the already-established immediate window only"
+    );
+}
+
+#[test]
 fn empty_registered_source_root_is_authoritative_empty_for_immediate_window_only() {
     let tempdir = TempDir::new().expect("create tempdir");
     let empty_root = tempdir.path().join("empty-root");
@@ -324,6 +376,7 @@ fn missing_registered_source_root_is_not_authoritative_empty() {
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &root_path);
+    delete_root_navigation_state(&tempdir, registered.root_id);
     fs::remove_dir_all(&root_path).expect("remove root after registration");
 
     let root_reply = read_library_tree(&service, registered.root_id, None);
@@ -349,6 +402,7 @@ fn blocked_registered_source_root_is_not_authoritative_empty() {
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &root_path);
+    delete_root_navigation_state(&tempdir, registered.root_id);
     fs::remove_dir_all(&root_path).expect("remove root directory after registration");
     fs::write(&root_path, b"not-a-directory").expect("replace root with file");
 
