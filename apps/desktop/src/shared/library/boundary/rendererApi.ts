@@ -8,6 +8,7 @@ import type {
 import type { ReadRequest, ReadResult } from '../hierarchy/read'
 import type { NavigationReadRowsRequest, NavigationReadRowsResult } from '../navigation/read'
 import type { ContentsReadRequest, ContentsReadResult } from '../contents/read'
+import type { SearchFilterReadRequest, SearchFilterReadResult } from '../searchFilter/read'
 import type { ReadSourceLifecycleRequest, ReadSourceLifecycleResult } from '../source/lifecycle'
 import type {
   ReadAttachmentSourceFilesRequest,
@@ -49,6 +50,7 @@ export type LibraryApi = {
   readonly trackIdentityDecisions: LibraryTrackIdentityDecisionApi
   readonly trackIdentityReview: TrackIdentityReviewApi
   readonly contents: LibraryContentsApi
+  readonly searchFilter: LibrarySearchFilterApi
   readonly roots: LibraryRootsApi
   readonly viewState: LibraryViewStateApi
   readonly events: LibraryBoundaryEventApi
@@ -75,6 +77,10 @@ export type LibraryNavigationApi = {
 
 export type LibraryContentsApi = {
   read(request: ContentsReadRequest): Promise<ContentsReadResult>
+}
+
+export type LibrarySearchFilterApi = {
+  read(request: SearchFilterReadRequest): Promise<SearchFilterReadResult>
 }
 
 export type LibrarySourceLifecycleApi = {

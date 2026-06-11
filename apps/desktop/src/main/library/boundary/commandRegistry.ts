@@ -7,6 +7,7 @@ import {
 import { readContentsThroughHost } from '../contents/read'
 import { readThroughHost } from '../hierarchy/read'
 import { readNavigationRowsThroughHost } from '../navigation/read'
+import { readSearchFilterThroughHost } from '../searchFilter/read'
 import { cancelRootScanThroughHost, type CancelScanLogger } from '../roots/cancel'
 import { chooseAndRegisterLocalRoot, type LocalRootChoiceDependencies } from '../roots/chooseLocal'
 import { readLocalRootsThroughHost } from '../roots/read'
@@ -128,6 +129,9 @@ export function registerLibraryIpcCommands(options: RegisterLibraryIpcCommandsOp
   )
   ipcMain.handle(libraryControlChannels.contents.read, (_event, request) =>
     readContentsThroughHost(host, request)
+  )
+  ipcMain.handle(libraryControlChannels.searchFilter.read, (_event, request) =>
+    readSearchFilterThroughHost(host, request)
   )
   ipcMain.handle(libraryControlChannels.roots.chooseLocal, () =>
     chooseAndRegisterLocalRoot(host, localRootChoiceDependencies)

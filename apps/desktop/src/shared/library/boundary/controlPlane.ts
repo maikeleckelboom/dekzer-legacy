@@ -15,6 +15,9 @@ export const libraryControlChannels = {
   contents: {
     read: 'desktop:library-contents:read'
   },
+  searchFilter: {
+    read: 'desktop:library-search-filter:read'
+  },
   hierarchy: {
     read: 'desktop:library-hierarchy:read-children'
   },

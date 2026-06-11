@@ -96,6 +96,7 @@ function expectedLibraryControlChannels(): readonly string[] {
     libraryControlChannels.boundary.events.subscribe,
     libraryControlChannels.boundary.events.unsubscribe,
     libraryControlChannels.contents.read,
+    libraryControlChannels.searchFilter.read,
     libraryControlChannels.hierarchy.read,
     libraryControlChannels.navigation.read,
     libraryControlChannels.roots.cancel,

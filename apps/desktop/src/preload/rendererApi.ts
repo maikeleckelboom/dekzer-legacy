@@ -12,6 +12,10 @@ import {
   type NavigationReadRowsResult
 } from '../shared/library/navigation/read'
 import { type ContentsReadResult, type ContentsReadRequest } from '../shared/library/contents/read'
+import type {
+  SearchFilterReadRequest,
+  SearchFilterReadResult
+} from '../shared/library/searchFilter/read'
 
 import type {
   ReadSourceLifecycleResult,
@@ -222,6 +226,14 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             libraryControlChannels.contents.read,
             request
           )) as ContentsReadResult
+        }
+      },
+      searchFilter: {
+        async read(request: SearchFilterReadRequest): Promise<SearchFilterReadResult> {
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.searchFilter.read,
+            request
+          )) as SearchFilterReadResult
         }
       },
       roots: {
