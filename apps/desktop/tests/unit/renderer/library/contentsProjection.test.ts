@@ -749,6 +749,53 @@ describe('projectContents', () => {
     })
   })
 
+  it('does not project unavailable or terminal zero-row states as empty', () => {
+    for (const [state, coverageState, expectedState, expectedLabel] of [
+      ['blocked', 'blocked', 'failed', 'Contents blocked'],
+      ['failed', 'failed', 'failed', 'Contents failed'],
+      ['locationMissing', 'locationMissing', 'unsupported', 'Folder missing'],
+      ['sourceUnavailable', 'sourceUnavailable', 'unsupported', 'Source unavailable']
+    ] as const) {
+      const contents = projectForSelection(
+        browserState({}),
+        'navigation-row:7',
+        readyContents({
+          rows: [],
+          state,
+          coverageState,
+          subtreeCoverageComplete: false,
+          emptyAuthoritative: false
+        })
+      )
+
+      expect(contents.rows[0], state).toMatchObject({
+        kind: 'state',
+        state: expectedState,
+        label: expectedLabel
+      })
+      expect(contents.rows[0], state).not.toMatchObject({ state: 'empty' })
+    }
+
+    const cursorInvalid = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'ready',
+      requestKey: 'source:7:playableMediaBrowse:recursive',
+      result: {
+        state: 'cursorInvalid',
+        error: {
+          code: 'cursorInvalid',
+          message: 'The contents cursor is invalid.'
+        }
+      }
+    })
+
+    expect(cursorInvalid.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'unsupported',
+      label: 'Contents unavailable'
+    })
+    expect(cursorInvalid.rows[0]).not.toMatchObject({ state: 'empty' })
+  })
+
   it('projects empty selection, unsupported selection, and host state', () => {
     const state = browserState({})
     const projection = browserProjection(state)

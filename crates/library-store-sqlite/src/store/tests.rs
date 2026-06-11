@@ -14,9 +14,11 @@ use crate::{
     DeleteSourceLocationInput, FinishWorkRunInput, InspectSourcePromotionInput,
     RecordArtifactInput, RecordInlineArtifactInput, ReplaceAcceptedSourceSegmentSetInput,
     ResolveLibraryAssetPromotionInput, SourceFileClassFilter, StartWorkRunInput,
-    StoreLiteralHierarchyCoverageState, StoreLiteralHierarchyEntryPoint, UpsertPrepPolicyInput,
-    UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
-    UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
+    StoreContentsReadPolicy, StoreContentsScope, StoreContentsScopeCoverageState,
+    StoreContentsScopeDepth, StoreContentsState, StoreLiteralHierarchyCoverageState,
+    StoreLiteralHierarchyEntryPoint, UpsertPrepPolicyInput, UpsertSourceDirectoryInput,
+    UpsertSourceInput, UpsertSourceLocationInput, UpsertSourceLocatorInput,
+    UpsertSourceScanStateInput, UpsertSourceStateInput,
 };
 use library_domain::{
     ArtifactKind, ArtifactRole, NavigationSelector, PrepPolicyId, SourceAccessState, SourceFileId,
@@ -1500,6 +1502,88 @@ fn empty_registration_writes_empty_root_navigation_state_without_marker_rows() {
         source_directory_count, 0,
         "empty root navigation state must not create a fake visible directory row"
     );
+}
+
+#[test]
+fn empty_root_navigation_state_is_not_contents_empty_before_scan_coverage() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("empty-root");
+    fs::create_dir_all(&root_path).expect("create empty root");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register local root");
+
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("empty".to_string(), 0))
+    );
+
+    let result = durable_store
+        .read_contents(
+            StoreContentsScope::Source {
+                source_id: root.root_id,
+            },
+            StoreContentsReadPolicy::PlayableMediaBrowse,
+            StoreContentsScopeDepth::Recursive,
+            100,
+            None,
+        )
+        .expect("read source contents");
+
+    assert!(result.rows.is_empty());
+    assert_eq!(result.state, StoreContentsState::Partial);
+    assert_eq!(
+        result.scope_coverage.state,
+        StoreContentsScopeCoverageState::Pending
+    );
+    assert!(!result.scope_coverage.subtree_coverage_complete);
+    assert!(!result.scope_coverage.empty_result_authoritative);
+}
+
+#[test]
+fn newly_registered_source_with_loose_unscanned_files_is_not_contents_empty() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("registered-root");
+    fs::create_dir_all(root_path.join("artists")).expect("create artists directory");
+    fs::write(root_path.join("loose.wav"), b"not-real-wav").expect("write loose file");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register local root");
+
+    assert_eq!(
+        root_navigation_state(&db_path, root.root_id),
+        Some(("established".to_string(), 1))
+    );
+
+    let result = durable_store
+        .read_contents(
+            StoreContentsScope::Source {
+                source_id: root.root_id,
+            },
+            StoreContentsReadPolicy::PlayableMediaBrowse,
+            StoreContentsScopeDepth::Recursive,
+            100,
+            None,
+        )
+        .expect("read source contents");
+
+    assert!(result.rows.is_empty());
+    assert_eq!(result.state, StoreContentsState::Partial);
+    assert_eq!(
+        result.scope_coverage.state,
+        StoreContentsScopeCoverageState::Pending
+    );
+    assert!(!result.scope_coverage.empty_result_authoritative);
 }
 
 #[test]
