@@ -74,7 +74,6 @@ function defineSvgComponent(svg: string): Component {
           {
             xmlns: 'http://www.w3.org/2000/svg',
             viewBox,
-            'aria-hidden': 'true',
             focusable: 'false'
           },
           paths.map((d) => h('path', { d, fill: 'currentColor' }))
