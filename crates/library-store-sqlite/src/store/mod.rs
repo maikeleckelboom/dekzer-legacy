@@ -68,6 +68,7 @@ pub use source_file_media_probe::{
 };
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
+    RootNavigationWindowEstablishment, RootNavigationWindowEstablishmentState,
     UnregisterLocalRootInput, UnregisterLocalRootResult,
 };
 pub use track_identity_candidates::{

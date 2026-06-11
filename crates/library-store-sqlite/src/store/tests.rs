@@ -13,7 +13,8 @@ use crate::{
     CommitAcceptedSourceFactsMergePolicy, CompleteMachineWorkInput, ContentHashEvidence,
     DeleteSourceLocationInput, FinishWorkRunInput, InspectSourcePromotionInput,
     RecordArtifactInput, RecordInlineArtifactInput, ReplaceAcceptedSourceSegmentSetInput,
-    ResolveLibraryAssetPromotionInput, StartWorkRunInput, UpsertPrepPolicyInput,
+    ResolveLibraryAssetPromotionInput, SourceFileClassFilter, StartWorkRunInput,
+    StoreLiteralHierarchyCoverageState, StoreLiteralHierarchyEntryPoint, UpsertPrepPolicyInput,
     UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
     UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
 };
@@ -1371,6 +1372,68 @@ fn register_local_root_initializes_lifecycle_side_rows() {
         SourceAccessState::Accessible.as_str()
     );
     assert_eq!(lifecycle.scan_phase, SourceScanPhase::Idle.as_str());
+}
+
+#[test]
+fn register_local_root_establishes_immediate_root_child_directories_before_scan() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("registered-root");
+    fs::create_dir_all(root_path.join("artists")).expect("create artists directory");
+    fs::create_dir_all(root_path.join("crates")).expect("create crates directory");
+    fs::write(root_path.join("loose.wav"), b"not-real-wav").expect("write loose file");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register local root");
+
+    let window = durable_store
+        .read_literal_hierarchy_children(
+            StoreLiteralHierarchyEntryPoint::Source {
+                source_id: root.root_id,
+            },
+            None,
+            0,
+            50,
+            SourceFileClassFilter::NavigationOnly,
+        )
+        .expect("read literal hierarchy")
+        .expect("registered source has hierarchy window");
+
+    assert_eq!(window.total_rows, 2);
+    assert_eq!(
+        window
+            .rows
+            .iter()
+            .map(|row| row.display_name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["artists", "crates"]
+    );
+    assert!(window.rows.iter().all(|row| row.node_kind == "directory"));
+    assert!(
+        window
+            .rows
+            .iter()
+            .all(|row| row.dir_scan_state.as_deref() == Some("pending"))
+    );
+    assert_eq!(
+        window.coverage.state,
+        StoreLiteralHierarchyCoverageState::Pending
+    );
+    assert!(!window.coverage.subtree_coverage_complete);
+    assert!(!window.coverage.empty_result_authoritative);
+
+    let connection = open_mutation_connection(&db_path);
+    let source_file_count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM source_files", [], |row| row.get(0))
+        .expect("count source files");
+    assert_eq!(
+        source_file_count, 0,
+        "root navigation establishment must not ingest files"
+    );
 }
 
 #[test]

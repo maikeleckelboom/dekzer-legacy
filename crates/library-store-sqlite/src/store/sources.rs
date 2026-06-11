@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use rusqlite::OptionalExtension;
@@ -8,6 +9,10 @@ use crate::authority::roots::{
     CanonicalSourcePath, RegisterRemovableRootInput, ResolvedRoot, RootStatusDelta,
 };
 use crate::authority::sources::DeleteSourceLocationInput;
+use crate::authority::sources::{
+    EstablishRootChildDirectoryInput, SourceAccessProbeResult, probe_source_access,
+    source_access_issue_kind_from_io_error,
+};
 use crate::authority::sources::{
     RecordSourceFileObservationInput, SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx,
     SourceLocationsAuthorityTx, SourceLocatorsAuthorityTx, SourceStateAuthorityTx,
@@ -20,7 +25,9 @@ use crate::browse_media::classify_relative_path_file_kind;
 use crate::publication;
 use crate::time::unix_time_ms;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
-use library_domain::{ProjectionDomain, SourceFileId, SourcePresenceState, WorkPriorityClass};
+use library_domain::{
+    ProjectionDomain, SourceAccessIssueKind, SourceFileId, SourcePresenceState, WorkPriorityClass,
+};
 
 use super::{SqliteDurableStore, bootstrap::open_connection};
 
@@ -40,6 +47,23 @@ pub struct LocalRoot {
 pub enum LocalRootAvailability {
     Available,
     Unavailable,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RootNavigationWindowEstablishment {
+    pub root_id: i64,
+    pub state: RootNavigationWindowEstablishmentState,
+    pub immediate_child_directory_count: usize,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootNavigationWindowEstablishmentState {
+    Established,
+    NotRequired,
+    Missing,
+    Blocked,
+    Failed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,6 +186,7 @@ impl SqliteDurableStore {
         input: RegisterLocalRootInput,
     ) -> LibrarySqliteResult<LocalRoot> {
         let resolved_root = self.bootstrap_root(&input.absolute_path)?;
+        let _ = self.establish_root_navigation_window(resolved_root.root_id)?;
         Ok(LocalRoot {
             root_id: resolved_root.root_id,
             canonical_path: resolved_root.canonical_path,
@@ -391,6 +416,217 @@ impl SqliteDurableStore {
             Ok(())
         })?;
         self.sync_root_projection_state(&root_ids)
+    }
+
+    pub fn establish_root_navigation_window(
+        &self,
+        root_id: i64,
+    ) -> LibrarySqliteResult<RootNavigationWindowEstablishment> {
+        if !self.root_navigation_window_establishment_required(root_id)? {
+            return Ok(RootNavigationWindowEstablishment {
+                root_id,
+                state: RootNavigationWindowEstablishmentState::NotRequired,
+                immediate_child_directory_count: 0,
+                detail: None,
+            });
+        }
+
+        let root_path = self.read_root_scan_path(root_id)?;
+        let checked_at_ms = unix_time_ms()?;
+        let access_probe = probe_source_access(&root_path, checked_at_ms);
+        self.with_source_lifecycle_tx(|tx| {
+            tx.apply_root_access_probe_result(root_id, &access_probe)
+        })?;
+
+        let effective_root = match &access_probe {
+            SourceAccessProbeResult::Accessible { effective_root, .. } => effective_root.clone(),
+            _ => {
+                self.sync_root_projection_state(&[root_id])?;
+                return Ok(root_establishment_from_access_probe(root_id, &access_probe));
+            }
+        };
+
+        let observed_at = unix_time_ms()?;
+        let child_directories =
+            match collect_immediate_root_child_directories(&effective_root, observed_at) {
+                Ok(child_directories) => child_directories,
+                Err(failure) => {
+                    self.sync_root_projection_state(&[root_id])?;
+                    return Ok(RootNavigationWindowEstablishment {
+                        root_id,
+                        state: failure.state,
+                        immediate_child_directory_count: 0,
+                        detail: Some(failure.detail),
+                    });
+                }
+            };
+        let observed_relative_paths = child_directories
+            .iter()
+            .map(|directory| directory.relative_path.clone())
+            .collect::<HashSet<_>>();
+
+        self.with_write(|write| {
+            let directories = SourceDirectoriesAuthorityTx::new(write);
+            for directory in &child_directories {
+                directories.establish_root_child_directory(&EstablishRootChildDirectoryInput {
+                    source_id: root_id,
+                    name: directory.name.clone(),
+                    relative_path: directory.relative_path.clone(),
+                    mtime_ns: directory.mtime_ns,
+                    observed_at,
+                })?;
+            }
+            let _ = directories.mark_absent_root_child_directories_missing(
+                root_id,
+                &observed_relative_paths,
+                observed_at,
+            )?;
+            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
+            Ok(())
+        })?;
+
+        Ok(RootNavigationWindowEstablishment {
+            root_id,
+            state: RootNavigationWindowEstablishmentState::Established,
+            immediate_child_directory_count: child_directories.len(),
+            detail: None,
+        })
+    }
+
+    fn root_navigation_window_establishment_required(
+        &self,
+        root_id: i64,
+    ) -> LibrarySqliteResult<bool> {
+        let connection = self.open_read_connection()?;
+        let scan_phase = connection
+            .query_row(
+                "SELECT scan_phase
+                 FROM source_scan_state
+                 WHERE source_id = ?1",
+                [root_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        Ok(matches!(scan_phase.as_deref(), None | Some("idle")))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ImmediateRootChildDirectory {
+    name: String,
+    relative_path: String,
+    mtime_ns: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RootNavigationWindowReadFailure {
+    state: RootNavigationWindowEstablishmentState,
+    detail: String,
+}
+
+fn collect_immediate_root_child_directories(
+    root_path: &Path,
+    _observed_at: i64,
+) -> Result<Vec<ImmediateRootChildDirectory>, RootNavigationWindowReadFailure> {
+    let entries = std::fs::read_dir(root_path).map_err(root_window_read_failure_from_io)?;
+    let mut child_directories = Vec::new();
+
+    for entry in entries {
+        let entry = entry.map_err(root_window_read_failure_from_io)?;
+        let file_type = entry
+            .file_type()
+            .map_err(root_window_read_failure_from_io)?;
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let name = entry
+            .file_name()
+            .to_str()
+            .map(str::to_string)
+            .ok_or_else(|| RootNavigationWindowReadFailure {
+                state: RootNavigationWindowEstablishmentState::Failed,
+                detail: format!("non-UTF-8 child directory name under {root_path:?}"),
+            })?;
+        if name.is_empty() {
+            continue;
+        }
+
+        let mtime_ns = entry
+            .metadata()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+            .and_then(|duration| i64::try_from(duration.as_nanos()).ok());
+        child_directories.push(ImmediateRootChildDirectory {
+            relative_path: name.clone(),
+            name,
+            mtime_ns,
+        });
+    }
+
+    child_directories.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
+    Ok(child_directories)
+}
+
+fn root_window_read_failure_from_io(error: std::io::Error) -> RootNavigationWindowReadFailure {
+    let issue_kind = source_access_issue_kind_from_io_error(&error);
+    RootNavigationWindowReadFailure {
+        state: root_establishment_state_for_issue(issue_kind),
+        detail: error.to_string(),
+    }
+}
+
+fn root_establishment_from_access_probe(
+    root_id: i64,
+    probe: &SourceAccessProbeResult,
+) -> RootNavigationWindowEstablishment {
+    match probe {
+        SourceAccessProbeResult::Accessible { .. } => RootNavigationWindowEstablishment {
+            root_id,
+            state: RootNavigationWindowEstablishmentState::Established,
+            immediate_child_directory_count: 0,
+            detail: None,
+        },
+        SourceAccessProbeResult::Missing {
+            diagnostic_detail, ..
+        } => RootNavigationWindowEstablishment {
+            root_id,
+            state: RootNavigationWindowEstablishmentState::Missing,
+            immediate_child_directory_count: 0,
+            detail: diagnostic_detail.clone(),
+        },
+        SourceAccessProbeResult::Blocked {
+            issue_kind,
+            diagnostic_detail,
+            ..
+        } => RootNavigationWindowEstablishment {
+            root_id,
+            state: root_establishment_state_for_issue(*issue_kind),
+            immediate_child_directory_count: 0,
+            detail: diagnostic_detail.clone(),
+        },
+    }
+}
+
+fn root_establishment_state_for_issue(
+    issue_kind: SourceAccessIssueKind,
+) -> RootNavigationWindowEstablishmentState {
+    match issue_kind {
+        SourceAccessIssueKind::Missing => RootNavigationWindowEstablishmentState::Missing,
+        SourceAccessIssueKind::PermissionDenied
+        | SourceAccessIssueKind::PrivacyPermissionRequired
+        | SourceAccessIssueKind::UnavailableMount
+        | SourceAccessIssueKind::ResourceBusy
+        | SourceAccessIssueKind::StaleNetworkHandle
+        | SourceAccessIssueKind::SymlinkLoop
+        | SourceAccessIssueKind::SymlinkEscapeBlocked
+        | SourceAccessIssueKind::UnsupportedPath
+        | SourceAccessIssueKind::NotDirectory => RootNavigationWindowEstablishmentState::Blocked,
+        SourceAccessIssueKind::InvalidPath
+        | SourceAccessIssueKind::IoInterrupted
+        | SourceAccessIssueKind::TimedOut
+        | SourceAccessIssueKind::UnknownIo => RootNavigationWindowEstablishmentState::Failed,
     }
 }
 

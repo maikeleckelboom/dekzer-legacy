@@ -3,7 +3,7 @@ use std::path::Path;
 
 use library_boundary_protocol::{
     CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, CommandErrorEnvelope,
-    CommandOutcome, CommandReply, CommandRequest, LibraryBoundaryEvent,
+    CommandOutcome, CommandReply, CommandRequest, DirectoryScanState, LibraryBoundaryEvent,
     LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
     LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
     LibraryTreePresenceState, MaintainedSnapshotScope, NavigableChildScopeState, NavigationRow,
@@ -177,6 +177,8 @@ fn registered_source_is_navigation_readable_before_recursive_scan() {
     let tempdir = TempDir::new().expect("create tempdir");
     let music_root = tempdir.path().join("music-root");
     fs::create_dir_all(music_root.join("artists")).expect("create root child directory");
+    fs::create_dir_all(music_root.join("crates")).expect("create sibling root child directory");
+    write_file(&music_root.join("loose.mp3"), b"not-real-mp3");
 
     let service = open_service(&tempdir);
     let registered = register_root(&service, &music_root);
@@ -217,9 +219,116 @@ fn registered_source_is_navigation_readable_before_recursive_scan() {
         "pre-scan source hierarchy coverage cannot claim authoritative empty"
     );
     assert_eq!(
-        root_window.total_rows, 0,
-        "pre-scan read may have no accepted rows without being authoritative empty"
+        root_window.total_rows, 2,
+        "pre-scan root window must expose immediate child directories before recursive scan"
     );
+    assert_eq!(
+        root_window
+            .rows
+            .iter()
+            .map(|row| row.display_name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["artists", "crates"]
+    );
+    assert!(
+        !root_window
+            .rows
+            .iter()
+            .any(|row| row.display_name == "loose.mp3"),
+        "root hierarchy establishment must not return source-file rows"
+    );
+    for row in &root_window.rows {
+        assert_eq!(row.node_kind, LibraryTreeNodeKind::Directory);
+        assert_eq!(row.parent_source_directory_id, None);
+        assert_eq!(row.directory_scan_state, Some(DirectoryScanState::Pending));
+        assert_eq!(
+            row.navigable_child_scope_state,
+            Some(NavigableChildScopeState::Unknown),
+            "pre-scan child directories must keep descendant readiness unknown"
+        );
+    }
+}
+
+#[test]
+fn empty_registered_source_root_is_authoritative_empty_for_immediate_window_only() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let empty_root = tempdir.path().join("empty-root");
+    fs::create_dir_all(&empty_root).expect("create empty root");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &empty_root);
+
+    let root_reply = read_library_tree(&service, registered.root_id, None);
+    let root_window = root_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window before scan");
+
+    assert_eq!(root_window.total_rows, 0);
+    assert!(root_window.rows.is_empty());
+    assert_eq!(
+        root_window.coverage.state,
+        LibraryTreeCoverageState::Pending
+    );
+    assert!(
+        !root_window.coverage.subtree_coverage_complete,
+        "an empty immediate root window must not claim recursive subtree completion"
+    );
+    assert!(
+        root_window.coverage.empty_result_authoritative,
+        "empty is authoritative only after the immediate root directory read succeeds"
+    );
+}
+
+#[test]
+fn missing_registered_source_root_is_not_authoritative_empty() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let root_path = tempdir.path().join("missing-after-register");
+    fs::create_dir_all(&root_path).expect("create root before registration");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &root_path);
+    fs::remove_dir_all(&root_path).expect("remove root after registration");
+
+    let root_reply = read_library_tree(&service, registered.root_id, None);
+    let root_window = root_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window");
+
+    assert_eq!(
+        root_window.coverage.state,
+        LibraryTreeCoverageState::LocationMissing
+    );
+    assert!(!root_window.coverage.subtree_coverage_complete);
+    assert!(!root_window.coverage.empty_result_authoritative);
+    assert!(root_window.rows.is_empty());
+}
+
+#[test]
+fn blocked_registered_source_root_is_not_authoritative_empty() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let root_path = tempdir.path().join("blocked-after-register");
+    fs::create_dir_all(&root_path).expect("create root before registration");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &root_path);
+    fs::remove_dir_all(&root_path).expect("remove root directory after registration");
+    fs::write(&root_path, b"not-a-directory").expect("replace root with file");
+
+    let root_reply = read_library_tree(&service, registered.root_id, None);
+    let root_window = root_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window");
+
+    assert_eq!(
+        root_window.coverage.state,
+        LibraryTreeCoverageState::Blocked
+    );
+    assert!(!root_window.coverage.subtree_coverage_complete);
+    assert!(!root_window.coverage.empty_result_authoritative);
+    assert!(root_window.rows.is_empty());
 }
 
 #[test]
