@@ -18,7 +18,7 @@ describe('createContentsReadController', () => {
     vi.useRealTimers()
   })
 
-  it('requests recursive canonical playable-media contents for selected directories', async () => {
+  it('requests recursive canonical audio contents for selected directories', async () => {
     let capturedRequest: ContentsReadRequest | undefined
     const contentsApi: LibraryContentsApi = {
       async read(request): Promise<ContentsReadResult> {
@@ -53,12 +53,12 @@ describe('createContentsReadController', () => {
         sourceDirectoryId: '11'
       },
       policy: {
-        kind: 'playableMediaBrowse'
+        kind: 'audioBrowse'
       },
       scopeDepth: 'recursive',
       limit: 100
     })
-    expect(capturedRequest?.policy).toEqual({ kind: 'playableMediaBrowse' })
+    expect(capturedRequest?.policy).toEqual({ kind: 'audioBrowse' })
     expect(capturedRequest?.policy).not.toHaveProperty('fileClasses')
   })
 
@@ -98,6 +98,112 @@ describe('createContentsReadController', () => {
         'recursive'
       )
     ).toBe('directory:7:11:primaryMedia:audio,video:recursive')
+  })
+
+  it('maps all activated built-in filters to distinct contents identities', async () => {
+    const requests: ContentsReadRequest[] = []
+    const contentsApi: LibraryContentsApi = {
+      async read(request): Promise<ContentsReadResult> {
+        requests.push(request)
+        return readyContents(request, [], 'empty')
+      }
+    }
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+
+    await controller.readForBinding(directoryBinding())
+    controller.setActiveFilter('video')
+    await controller.readForBinding(directoryBinding())
+    controller.setActiveFilter('media')
+    await controller.readForBinding(directoryBinding())
+    controller.setActiveFilter('companionFiles')
+    await controller.readForBinding(directoryBinding())
+    controller.setActiveFilter('allSourceFiles')
+    await controller.readForBinding(directoryBinding())
+
+    expect(requests.map((request) => request.policy)).toEqual([
+      { kind: 'audioBrowse' },
+      { kind: 'primaryMedia', mediaKinds: ['video'] },
+      { kind: 'playableMediaBrowse' },
+      { kind: 'sourceFileInventory', fileClasses: ['unsupported'] },
+      { kind: 'sourceFileInventory', fileClasses: ['audio', 'video', 'image', 'unsupported'] }
+    ])
+    expect(
+      requests.map((request) =>
+        contentsRequestKey(request.scope, request.policy, request.scopeDepth)
+      )
+    ).toEqual([
+      'directory:7:11:audioBrowse:recursive',
+      'directory:7:11:primaryMedia:video:recursive',
+      'directory:7:11:playableMediaBrowse:recursive',
+      'directory:7:11:sourceFileInventory:unsupported:recursive',
+      'directory:7:11:sourceFileInventory:audio,video,image,unsupported:recursive'
+    ])
+  })
+
+  it('retains accepted rows while a filter switch is pending', async () => {
+    vi.useFakeTimers()
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    controller.setActiveFilter('media')
+    const switched = controller.readForBinding(directoryBinding())
+
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      requestKey: 'directory:7:11:audioBrowse:recursive',
+      pending: {
+        requestKey: 'directory:7:11:playableMediaBrowse:recursive',
+        presentation: 'deferred'
+      }
+    })
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('b', 'B.mp4')]))
+    await expect(switched).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['B.mp4'])
+  })
+
+  it('rejects ready responses whose echoed identity does not match the active request', async () => {
+    const contentsApi = deferredContentsApi()
+    const controller = createContentsReadController(contentsApi)
+
+    controller.start()
+    const initial = controller.readForBinding(directoryBinding())
+    contentsApi.resolveNext(readyContents(requestAt(contentsApi, 0), [contentsRow('a', 'A.wav')]))
+    await initial
+
+    const refresh = controller.readForBinding(directoryBinding(), { force: true })
+    const request = requestAt(contentsApi, 1)
+    contentsApi.resolveNext({
+      state: 'ready',
+      result: {
+        state: 'empty',
+        scope: request.scope,
+        policy: { kind: 'playableMediaBrowse' },
+        scopeDepth: request.scopeDepth,
+        rows: [],
+        scopeCoverage: {
+          state: 'complete',
+          subtreeCoverageComplete: true,
+          emptyResultAuthoritative: true
+        },
+        hasPolicyOmittedRows: false
+      }
+    })
+
+    await expect(refresh).resolves.toBe(true)
+    expect(visibleLabels(controller.state.value)).toEqual(['A.wav'])
+    expect(controller.state.value).toMatchObject({
+      kind: 'ready',
+      refreshError: 'Unable to request library contents.'
+    })
   })
 
   it('preloadForBinding schedules no IPC before the rest threshold', async () => {
@@ -192,7 +298,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:12:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:12:audioBrowse:recursive',
         sequence: 1
       }
     })
@@ -235,7 +341,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:11:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:11:audioBrowse:recursive',
         sequence: 1
       }
     })
@@ -328,7 +434,7 @@ describe('createContentsReadController', () => {
     expect(contentsApi.requests[1]).toMatchObject({
       cursor: 'cursor-a',
       policy: {
-        kind: 'playableMediaBrowse'
+        kind: 'audioBrowse'
       }
     })
     contentsApi.resolveNext(readyContents(requestAt(contentsApi, 1), [contentsRow('a2', 'A2.wav')]))
@@ -433,7 +539,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:11:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:11:audioBrowse:recursive',
         sequence: 1
       }
     })
@@ -444,7 +550,7 @@ describe('createContentsReadController', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(controller.state.value).toMatchObject({
       kind: 'loading',
-      requestKey: 'directory:7:11:playableMediaBrowse:recursive',
+      requestKey: 'directory:7:11:audioBrowse:recursive',
       sequence: 1
     })
 
@@ -468,7 +574,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:11:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:11:audioBrowse:recursive',
         sequence: 2,
         presentation: 'deferred'
       }
@@ -479,7 +585,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:11:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:11:audioBrowse:recursive',
         sequence: 2,
         presentation: 'visible'
       }
@@ -525,7 +631,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:12:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:12:audioBrowse:recursive',
         sequence: 2,
         presentation: 'deferred'
       }
@@ -544,7 +650,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:12:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:12:audioBrowse:recursive',
         sequence: 2,
         presentation: 'visible'
       }
@@ -604,7 +710,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'ready',
       pending: {
-        requestKey: 'directory:7:13:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:13:audioBrowse:recursive',
         sequence: 3,
         presentation: 'deferred'
       }
@@ -659,7 +765,7 @@ describe('createContentsReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'idle',
       pending: {
-        requestKey: 'directory:7:12:playableMediaBrowse:recursive',
+        requestKey: 'directory:7:12:audioBrowse:recursive',
         sequence: 2
       }
     })

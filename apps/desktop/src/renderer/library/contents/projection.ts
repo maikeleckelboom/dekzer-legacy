@@ -853,27 +853,51 @@ function contentsCountSubject(result: ContentsResult, count: number): string {
 function policyEmptyLabel(policy: ContentsResult['policy']): string {
   switch (policy.kind) {
     case 'playableMediaBrowse':
-      return 'No playable media in this view'
+      return 'No playable media in this scope.'
     case 'audioBrowse':
-      return 'No audio tracks in this view'
+      return 'No audio items in this scope.'
     case 'sourceFileInventory':
-      return 'No requested files in this view'
+      return sourceFileInventoryEmptyLabel(policy)
     case 'primaryMedia':
-      return 'No primary media in this view'
+      return primaryMediaEmptyLabel(policy)
   }
 }
 
 function trueEmptyLabel(policy: ContentsResult['policy']): string {
   switch (policy.kind) {
     case 'playableMediaBrowse':
-      return 'No playable media found'
+      return 'No playable media in this scope.'
     case 'audioBrowse':
-      return 'No audio tracks found'
+      return 'No audio items in this scope.'
     case 'sourceFileInventory':
-      return 'No requested files found'
+      return sourceFileInventoryEmptyLabel(policy)
     case 'primaryMedia':
-      return 'No primary media found'
+      return primaryMediaEmptyLabel(policy)
   }
+}
+
+function primaryMediaEmptyLabel(
+  policy: Extract<ContentsResult['policy'], { kind: 'primaryMedia' }>
+): string {
+  return policy.mediaKinds.length === 1 && policy.mediaKinds[0] === 'video'
+    ? 'No video items in this scope.'
+    : 'No primary media in this scope.'
+}
+
+function sourceFileInventoryEmptyLabel(
+  policy: Extract<ContentsResult['policy'], { kind: 'sourceFileInventory' }>
+): string {
+  const fileClasses = policy.fileClasses.join(',')
+
+  if (fileClasses === 'unsupported') {
+    return 'No companion files in this scope.'
+  }
+
+  if (fileClasses === 'audio,video,image,unsupported') {
+    return 'No files in this scope.'
+  }
+
+  return 'No requested files in this scope.'
 }
 
 function contentsCoveragePrefix(result: ContentsResult): string | undefined {

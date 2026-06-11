@@ -9,6 +9,11 @@ import type {
 } from '../../../shared/library/contents/read'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { RowBinding } from '../state'
+import {
+  builtInContentsFilter,
+  defaultContentsFilterId,
+  type BuiltInContentsFilterId
+} from '../contents/filters'
 
 export type ContentsBoundaryState =
   | {
@@ -47,6 +52,8 @@ export type ContentsPendingRead = {
 
 export type ContentsReadController = {
   readonly state: Ref<ContentsBoundaryState>
+  readonly activeFilterId: Ref<BuiltInContentsFilterId>
+  readonly setActiveFilter: (filterId: BuiltInContentsFilterId) => void
   readonly readForBinding: (
     binding: RowBinding | undefined,
     options?: ReadOptions
@@ -73,13 +80,10 @@ const warmSnapshotTtlMs = 10_000
 const maxWarmSnapshots = 16
 const maxSpeculativeReads = 1
 const safeContentsRequestFailure = 'Unable to request library contents.'
-const defaultContentsPolicy: ContentsReadPolicy = {
-  kind: 'playableMediaBrowse'
-}
-const contentsScopeDepth: ContentsScopeDepth = 'recursive'
 
 type ContentsReadTarget = {
   readonly scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>
+  readonly filterId: BuiltInContentsFilterId
   readonly policy: ContentsReadPolicy
   readonly scopeDepth: ContentsScopeDepth
   readonly requestKey: string
@@ -119,12 +123,16 @@ function getRendererApi(): RendererApi {
 }
 
 export function createContentsReadController(
-  contentsApi: LibraryContentsApi
+  contentsApi: LibraryContentsApi,
+  options: { readonly initialFilterId?: BuiltInContentsFilterId } = {}
 ): ContentsReadController {
   const state = ref<ContentsBoundaryState>({
     kind: 'idle',
     detail: 'No contents scope has been requested.'
   })
+  const activeFilterId = ref<BuiltInContentsFilterId>(
+    options.initialFilterId ?? defaultContentsFilterId
+  )
   let readSequence = 0
   let started = false
   let thresholdTimer: ReturnType<typeof setTimeout> | undefined = undefined
@@ -154,11 +162,20 @@ export function createContentsReadController(
     }
   }
 
+  function setActiveFilter(filterId: BuiltInContentsFilterId): void {
+    if (activeFilterId.value === filterId) {
+      return
+    }
+
+    activeFilterId.value = filterId
+    clearPreloadTimer()
+  }
+
   async function readForBinding(
     binding: RowBinding | undefined,
     options: ReadOptions = {}
   ): Promise<boolean> {
-    const target = contentsReadTargetForBinding(binding)
+    const target = contentsReadTargetForBinding(binding, activeFilterId.value)
 
     if (target === undefined) {
       clear()
@@ -212,6 +229,21 @@ export function createContentsReadController(
       }
 
       clearThresholdTimer()
+
+      if (!contentsReadResultMatchesTarget(result, target)) {
+        if (hasAcceptedSnapshot()) {
+          retainAcceptedSnapshot(safeContentsRequestFailure)
+          return true
+        }
+
+        state.value = {
+          kind: 'failed',
+          requestKey,
+          detail: safeContentsRequestFailure
+        }
+        return true
+      }
+
       let rows: readonly ContentsFileRow[]
       const readyResult = result.state === 'ready' ? result.result : undefined
       const previousRows = currentAcceptedRows(requestKey)
@@ -264,7 +296,7 @@ export function createContentsReadController(
   }
 
   function preloadForBinding(binding: RowBinding | undefined): void {
-    const target = contentsReadTargetForBinding(binding)
+    const target = contentsReadTargetForBinding(binding, activeFilterId.value)
 
     clearPreloadTimer()
 
@@ -286,7 +318,7 @@ export function createContentsReadController(
   }
 
   function cancelPreloadForBinding(binding: RowBinding | undefined): void {
-    const target = contentsReadTargetForBinding(binding)
+    const target = contentsReadTargetForBinding(binding, activeFilterId.value)
 
     if (target === undefined || scheduledPreloadKey !== target.requestKey) {
       return
@@ -604,6 +636,8 @@ export function createContentsReadController(
 
   return {
     state,
+    activeFilterId,
+    setActiveFilter,
     readForBinding,
     preloadForBinding,
     cancelPreloadForBinding,
@@ -615,7 +649,8 @@ export function createContentsReadController(
 }
 
 function contentsReadTargetForBinding(
-  binding: RowBinding | undefined
+  binding: RowBinding | undefined,
+  filterId: BuiltInContentsFilterId
 ): ContentsReadTarget | undefined {
   const scope = contentsScopeForBinding(binding)
 
@@ -623,12 +658,13 @@ function contentsReadTargetForBinding(
     return undefined
   }
 
-  const policy = defaultContentsPolicy
+  const filter = builtInContentsFilter(filterId)
   return {
     scope,
-    policy,
-    scopeDepth: contentsScopeDepth,
-    requestKey: contentsRequestKey(scope, policy, contentsScopeDepth)
+    filterId,
+    policy: filter.policy,
+    scopeDepth: filter.scopeDepth,
+    requestKey: contentsRequestKey(scope, filter.policy, filter.scopeDepth)
   }
 }
 
@@ -692,5 +728,34 @@ function contentsPolicyKey(policy: ContentsReadPolicy): string {
       return `${policy.kind}:${policy.fileClasses.join(',')}`
     case 'primaryMedia':
       return `${policy.kind}:${policy.mediaKinds.join(',')}`
+  }
+}
+
+function contentsReadResultMatchesTarget(
+  result: ContentsReadResult,
+  target: ContentsReadTarget
+): boolean {
+  if (result.state !== 'ready') {
+    return true
+  }
+
+  const accepted = result.result
+  return (
+    contentsScopeKey(accepted.scope) === contentsScopeKey(target.scope) &&
+    accepted.scopeDepth === target.scopeDepth &&
+    contentsPolicyKey(accepted.policy) === contentsPolicyKey(target.policy)
+  )
+}
+
+function contentsScopeKey(
+  scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>
+): string {
+  switch (scope.kind) {
+    case 'source':
+      return `source:${scope.sourceId}`
+    case 'sourceLocation':
+      return `source-location:${scope.sourceLocationId}`
+    case 'directory':
+      return `directory:${scope.sourceId}:${scope.sourceDirectoryId}`
   }
 }

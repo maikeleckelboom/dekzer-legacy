@@ -308,7 +308,7 @@ describe('projectContents', () => {
     expect(empty.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media found'
+      label: 'No playable media in this scope.'
     })
 
     const partial = projectForSelection(browserState({}), 'navigation-row:7', {
@@ -464,7 +464,7 @@ describe('projectContents', () => {
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
         requestKey: 'source:7',
-        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:recursive',
         pendingPresentation: 'deferred'
       })
     )
@@ -490,8 +490,8 @@ describe('projectContents', () => {
       'source-directory:12',
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
-        requestKey: 'directory:7:11:audioBrowse:audio:recursive',
-        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
+        requestKey: 'directory:7:11:audioBrowse:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:recursive',
         pendingPresentation: 'deferred'
       })
     )
@@ -515,7 +515,7 @@ describe('projectContents', () => {
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
         requestKey: 'source:7',
-        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:recursive',
         pendingPresentation: 'deferred'
       })
     )
@@ -524,7 +524,7 @@ describe('projectContents', () => {
       'source-directory:12',
       readyContents({
         rows: [sourceFileRow('new', 'new.wav', 'audio')],
-        requestKey: 'directory:7:12:audioBrowse:audio:recursive'
+        requestKey: 'directory:7:12:audioBrowse:recursive'
       })
     )
 
@@ -547,7 +547,7 @@ describe('projectContents', () => {
       readyContents({
         rows: [sourceFileRow('old', 'old.wav', 'audio')],
         requestKey: 'source:7',
-        pendingRequestKey: 'directory:7:12:audioBrowse:audio:recursive',
+        pendingRequestKey: 'directory:7:12:audioBrowse:recursive',
         pendingPresentation: 'visible'
       })
     )
@@ -627,7 +627,7 @@ describe('projectContents', () => {
     expect(authoritative.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media found'
+      label: 'No playable media in this scope.'
     })
   })
 
@@ -707,8 +707,8 @@ describe('projectContents', () => {
     expect(audioBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No audio tracks in this view',
-      detail: 'No audio tracks in this view'
+      label: 'No audio items in this scope.',
+      detail: 'No audio items in this scope.'
     })
 
     const playableMediaBrowse = projectForSelection(
@@ -725,7 +725,61 @@ describe('projectContents', () => {
     expect(playableMediaBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media in this view'
+      label: 'No playable media in this scope.'
+    })
+
+    const video = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        profile: { kind: 'primaryMedia', mediaKinds: ['video'] },
+        emptyAuthoritative: false,
+        omittedRows: true
+      })
+    )
+    expect(video.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No video items in this scope.'
+    })
+
+    const companionFiles = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        profile: { kind: 'sourceFileInventory', fileClasses: ['unsupported'] },
+        emptyAuthoritative: false,
+        omittedRows: true
+      })
+    )
+    expect(companionFiles.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No companion files in this scope.'
+    })
+
+    const allFiles = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        profile: {
+          kind: 'sourceFileInventory',
+          fileClasses: ['audio', 'video', 'image', 'unsupported']
+        },
+        emptyAuthoritative: false,
+        omittedRows: true
+      })
+    )
+    expect(allFiles.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No files in this scope.'
     })
   })
 
