@@ -154,6 +154,7 @@ export function useTreeController(options: UseTreeControllerOptions): TreeContex
         }
         return
 
+      case 'unknown':
       case 'none':
         return
     }

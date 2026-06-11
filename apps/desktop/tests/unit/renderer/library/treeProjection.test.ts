@@ -16,11 +16,13 @@ import type { BrowserState, LoadedChildren } from '../../../../src/renderer/libr
 import {
   canRevealBrowserTreeChildren,
   flattenVisibleTree,
-  isBrowserTreeBranch
+  isBrowserTreeBranch,
+  isBrowserTreeLeaf
 } from '../../../../src/renderer/library/tree/listProjection'
 import {
   hasDisclosureAffordance,
   isConfirmedDirectoryLeaf,
+  isUnknownDirectoryChildReadiness,
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
@@ -534,6 +536,66 @@ describe('projectState', () => {
     }
   })
 
+  it('blocked hierarchy coverage is neither empty nor leaf', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: makeCoverageChildren({
+          coverageState: 'blocked',
+          emptyResultAuthoritative: false,
+          detail: 'Access was blocked.'
+        })
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.children.kind).toBe('loaded')
+    expect(isBrowserTreeLeaf(sourceNode)).toBe(false)
+    expect(canRevealBrowserTreeChildren(sourceNode)).toBe(false)
+
+    if (sourceNode.children.kind === 'loaded') {
+      const stateNode = sourceNode.children.nodes[0]
+      expect(stateNode).toMatchObject({
+        role: 'state',
+        label: 'Access blocked',
+        detail: 'Access was blocked.'
+      })
+      expect(projection.bindingsById.get(stateNode?.id ?? '')).toMatchObject({
+        kind: 'readState',
+        state: 'error'
+      })
+    }
+  })
+
+  it('failed hierarchy coverage is neither empty nor leaf', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: makeCoverageChildren({
+          coverageState: 'failed',
+          emptyResultAuthoritative: false,
+          detail: 'Scan failed.'
+        })
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+    expect(sourceNode.children.kind).toBe('loaded')
+    expect(isBrowserTreeLeaf(sourceNode)).toBe(false)
+    expect(canRevealBrowserTreeChildren(sourceNode)).toBe(false)
+
+    if (sourceNode.children.kind === 'loaded') {
+      const stateNode = sourceNode.children.nodes[0]
+      expect(stateNode).toMatchObject({
+        role: 'state',
+        label: 'Scan failed',
+        detail: 'Scan failed.'
+      })
+      expect(projection.bindingsById.get(stateNode?.id ?? '')).toMatchObject({
+        kind: 'readState',
+        state: 'error'
+      })
+    }
+  })
+
   it('loaded source with locationMissing coverage keeps source row bound', () => {
     const projection = projectTree(
       browserState({
@@ -636,7 +698,7 @@ describe('projectState', () => {
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
   })
 
-  it('unknown navigable child scope state is not projected as expandable', () => {
+  it('unknown navigable child scope state is neither leaf nor expandable', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -652,12 +714,20 @@ describe('projectState', () => {
     )
     const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('none')
+    expect(node.children.kind).toBe('unknown')
     expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(isBrowserTreeLeaf(node)).toBe(false)
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    if (node.children.kind === 'unknown') {
+      expect(node.children.stateNode).toMatchObject({
+        role: 'state',
+        label: 'Folder child scopes not proven',
+        detail: 'Folder child scopes have not been proven yet.'
+      })
+    }
   })
 
-  it('folder with unknown scope state does not reveal disclosure after child read', () => {
+  it('folder with unknown scope state ignores cached children without becoming leaf', () => {
     const projection = projectTree(
       browserState({
         sourceChildren: loadedChildren([
@@ -684,8 +754,9 @@ describe('projectState', () => {
     )
     const node = requiredNode(projection.nodes, 'source-directory:12')
 
-    expect(node.children.kind).toBe('none')
+    expect(node.children.kind).toBe('unknown')
     expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(isBrowserTreeLeaf(node)).toBe(false)
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
     expect(projection.bindingsById.has('source-file:15')).toBe(false)
   })
@@ -846,6 +917,8 @@ describe('projectState', () => {
 
     expect(isConfirmedDirectoryLeaf(unknownDir)).toBe(false)
     expect(isConfirmedDirectoryLeaf(leafDir)).toBe(true)
+    expect(isUnknownDirectoryChildReadiness(unknownDir)).toBe(true)
+    expect(isUnknownDirectoryChildReadiness(leafDir)).toBe(false)
     expect(hasDisclosureAffordance(unknownDir)).toBe(false)
     expect(hasDisclosureAffordance(leafDir)).toBe(false)
   })
@@ -928,9 +1001,10 @@ describe('projectState', () => {
       })
     )
     const unknownNode = requiredNode(unknownProjection.nodes, 'source-directory:12')
-    expect(unknownNode.children.kind).toBe('none')
+    expect(unknownNode.children.kind).toBe('unknown')
     expect(canRevealBrowserTreeChildren(unknownNode)).toBe(false)
     expect(isBrowserTreeBranch(unknownNode)).toBe(false)
+    expect(isBrowserTreeLeaf(unknownNode)).toBe(false)
 
     const branchProjection = projectTree(
       browserState({

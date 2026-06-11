@@ -631,6 +631,67 @@ describe('projectContents', () => {
     })
   })
 
+  it('does not verify empty from complete zero rows without explicit empty evidence', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        coverageState: 'complete',
+        subtreeCoverageComplete: true,
+        emptyAuthoritative: false,
+        omittedRows: false
+      })
+    )
+
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'loading',
+      label: 'Contents coverage unverified'
+    })
+  })
+
+  it('does not verify empty without complete subtree coverage', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        coverageState: 'complete',
+        subtreeCoverageComplete: false,
+        emptyAuthoritative: true
+      })
+    )
+
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'loading',
+      label: 'Contents coverage unverified'
+    })
+  })
+
+  it('does not verify empty from pending zero-row coverage', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        coverageState: 'pending',
+        subtreeCoverageComplete: false,
+        emptyAuthoritative: true
+      })
+    )
+
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'loading',
+      label: 'Still indexing'
+    })
+  })
+
   it('projects policy-empty copy from service-owned omission metadata', () => {
     const audioBrowse = projectForSelection(
       browserState({}),
@@ -923,6 +984,8 @@ function readyContents(options: {
   readonly state?: ContentsResult['state']
   readonly detail?: string
   readonly profile?: ContentsReadPolicy
+  readonly coverageState?: ContentsResult['scopeCoverage']['state']
+  readonly subtreeCoverageComplete?: boolean
   readonly emptyAuthoritative?: boolean
   readonly omittedRows?: boolean
   readonly requestKey?: string
@@ -956,11 +1019,22 @@ function contentsResult(options: {
   readonly state?: ContentsResult['state']
   readonly detail?: string
   readonly profile?: ContentsReadPolicy
+  readonly coverageState?: ContentsResult['scopeCoverage']['state']
+  readonly subtreeCoverageComplete?: boolean
   readonly emptyAuthoritative?: boolean
   readonly omittedRows?: boolean
 }): ContentsResult {
   const state = options.state ?? 'ready'
   const policy = options.profile ?? ({ kind: 'playableMediaBrowse' } satisfies ContentsReadPolicy)
+  const coverageState =
+    options.coverageState ??
+    (state === 'failed'
+      ? 'failed'
+      : state === 'sourceUnavailable'
+        ? 'sourceUnavailable'
+        : state === 'partial'
+          ? 'scanning'
+          : 'complete')
   return {
     state,
     scope: { kind: 'source', sourceId: '7' },
@@ -968,15 +1042,8 @@ function contentsResult(options: {
     scopeDepth: 'recursive',
     rows: options.rows,
     scopeCoverage: {
-      state:
-        state === 'failed'
-          ? 'failed'
-          : state === 'sourceUnavailable'
-            ? 'sourceUnavailable'
-            : state === 'partial'
-              ? 'scanning'
-              : 'complete',
-      subtreeCoverageComplete: state !== 'partial',
+      state: coverageState,
+      subtreeCoverageComplete: options.subtreeCoverageComplete ?? state !== 'partial',
       emptyResultAuthoritative: options.emptyAuthoritative ?? state !== 'partial'
     },
     hasPolicyOmittedRows: options.omittedRows ?? false,

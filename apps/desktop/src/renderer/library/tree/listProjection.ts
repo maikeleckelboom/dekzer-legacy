@@ -31,7 +31,7 @@ export function getFirstVisibleNodeId(
 }
 
 export function isBrowserTreeLeaf(node: BrowserTreeNode): boolean {
-  return !isBrowserTreeBranch(node)
+  return node.children.kind === 'none'
 }
 
 export function isBrowserTreeBranch(node: BrowserTreeNode): boolean {
@@ -49,6 +49,7 @@ export function getLoadedBrowserTreeChildren(node: BrowserTreeNode): readonly Br
 export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
   switch (node.children.kind) {
     case 'none':
+    case 'unknown':
       return false
     case 'deferred':
     case 'loading':
@@ -62,6 +63,7 @@ export function canRevealBrowserTreeChildren(node: BrowserTreeNode): boolean {
 export function getBrowserTreeChildRows(node: BrowserTreeNode): readonly BrowserTreeNode[] {
   switch (node.children.kind) {
     case 'none':
+    case 'unknown':
       return []
     case 'deferred':
     case 'loading':

@@ -5,6 +5,10 @@ export type BrowserTreeChildren =
       readonly kind: 'none'
     }
   | {
+      readonly kind: 'unknown'
+      readonly stateNode: BrowserTreeNode
+    }
+  | {
       readonly kind: 'deferred'
       readonly stateNode: BrowserTreeNode
     }

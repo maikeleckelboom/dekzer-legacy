@@ -7,11 +7,12 @@ use library_boundary_protocol::{
     LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
     LibraryRootReply, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeNodeKind,
     LibraryTreePresenceState, MaintainedSnapshotScope, NavigableChildScopeState, NavigationRow,
-    NavigationRowFamily, NavigationRowKind, ReadLibraryBoundaryEventsAfterReply,
-    ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenReply,
-    ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest, RegisterLocalRootReply,
-    RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand, SnapshotReadReply,
-    SourceScanEvent, SourceScanEventKind, StartRootScanReply, StartRootScanRequest,
+    NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
+    ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
+    ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest,
+    RegisterLocalRootReply, RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand,
+    SnapshotReadReply, SourceScanEvent, SourceScanEventKind, StartRootScanReply,
+    StartRootScanRequest,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use tempfile::TempDir;
@@ -169,6 +170,56 @@ fn read_library_tree(
         CommandReply::SnapshotRead(SnapshotReadReply::LibraryTreeChildren(r)) => r,
         other => panic!("Expected library tree reply, got {other:?}"),
     }
+}
+
+#[test]
+fn registered_source_is_navigation_readable_before_recursive_scan() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    fs::create_dir_all(music_root.join("artists")).expect("create root child directory");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+    let root_id_text = registered.root_id.to_string();
+
+    let root_nav_rows = read_navigation_rows(&service, None);
+    let source_row = root_nav_rows
+        .iter()
+        .find(|row| {
+            matches!(row.family, Some(NavigationRowFamily::Sources))
+                && row.row_kind == NavigationRowKind::Source
+                && row.selector_kind == Some(NavigationRowSelectorKind::Source)
+                && row.selector_payload.as_deref() == Some(root_id_text.as_str())
+        })
+        .expect("registered source appears in navigation before scan");
+    assert!(
+        source_row.selectable,
+        "registered source must be selectable before recursive scan"
+    );
+
+    let root_reply = read_library_tree(&service, registered.root_id, None);
+    let root_window = root_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window before scan");
+
+    assert_eq!(
+        root_window.coverage.state,
+        LibraryTreeCoverageState::Pending,
+        "pre-scan source hierarchy coverage must remain pending instead of empty"
+    );
+    assert!(
+        !root_window.coverage.subtree_coverage_complete,
+        "pre-scan source hierarchy coverage cannot claim complete subtree coverage"
+    );
+    assert!(
+        !root_window.coverage.empty_result_authoritative,
+        "pre-scan source hierarchy coverage cannot claim authoritative empty"
+    );
+    assert_eq!(
+        root_window.total_rows, 0,
+        "pre-scan read may have no accepted rows without being authoritative empty"
+    );
 }
 
 #[test]

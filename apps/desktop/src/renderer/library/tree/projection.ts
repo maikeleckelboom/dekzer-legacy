@@ -409,7 +409,7 @@ function projectLiteralDirectoryNode(options: {
 
   const directoryState = options.directoryReadStates.get(node.directoryId)
 
-  if (!hasDisclosureAffordance(node)) {
+  if (isConfirmedDirectoryLeaf(node)) {
     return {
       id: node.id,
       role: 'literalDirectory',
@@ -417,6 +417,25 @@ function projectLiteralDirectoryNode(options: {
       icon: 'folder',
       detail: formatDirectoryDetail(node.presence),
       children: { kind: 'none' }
+    }
+  }
+
+  if (isUnknownDirectoryChildReadiness(node)) {
+    const detail = formatUnknownDirectoryChildReadinessDetail(node)
+    return {
+      id: node.id,
+      role: 'literalDirectory',
+      label: node.label,
+      icon: 'folder',
+      detail,
+      children: unknownChildren(
+        {
+          ownerId: node.id,
+          label: 'Folder child scopes not proven',
+          detail
+        },
+        options.bindingsById
+      )
     }
   }
 
@@ -445,6 +464,12 @@ export function hasDisclosureAffordance(
   node: Extract<ChildRow, { readonly kind: 'directory' }>
 ): boolean {
   return node.navigableChildScopeState === 'hasNavigableChildScopes'
+}
+
+export function isUnknownDirectoryChildReadiness(
+  node: Extract<ChildRow, { readonly kind: 'directory' }>
+): boolean {
+  return node.navigableChildScopeState === 'unknown'
 }
 
 const sourceUnavailableErrorCodes = new Set([
@@ -494,6 +519,26 @@ function isRetryableChildrenReadError(errorCode: string): boolean {
 
 function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTreeChildren {
   return nodes.length === 0 ? { kind: 'none' } : { kind: 'loaded', nodes }
+}
+
+function unknownChildren(
+  options: {
+    readonly ownerId: string
+    readonly label: string
+    readonly detail: string
+  },
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
+): BrowserTreeChildren {
+  return {
+    kind: 'unknown',
+    stateNode: trackedReadStateNode(
+      {
+        ...options,
+        state: 'loading'
+      },
+      bindingsById
+    )
+  }
 }
 
 function deferredChildren(
@@ -882,5 +927,22 @@ function formatDirectoryDetail(presence: ChildRow['presence']): string {
       return 'Folder missing'
     case 'removed':
       return 'Folder removed'
+  }
+}
+
+function formatUnknownDirectoryChildReadinessDetail(
+  node: Extract<ChildRow, { readonly kind: 'directory' }>
+): string {
+  switch (node.directoryScanState) {
+    case 'pending':
+      return 'Folder child scopes have not been proven yet.'
+    case 'scanning':
+      return 'Folder child scopes are being probed.'
+    case 'blocked':
+      return 'Folder child scopes are blocked.'
+    case 'failed':
+      return 'Folder child scope read failed.'
+    case 'complete':
+      return 'Folder child scopes are not yet proven.'
   }
 }

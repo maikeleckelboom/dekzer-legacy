@@ -577,8 +577,8 @@ function projectContentsResult(options: {
       rows: [
         stateRow({
           ownerId: options.ownerId,
-          state: contentsStateRowState(result),
-          label: contentsStateLabel(result),
+          state: contentsStateRowState(result, rows.length),
+          label: contentsStateLabel(result, rows.length),
           detail: contentsDetail(result, options.accumulatedRows)
         })
       ]
@@ -715,11 +715,14 @@ function contentsProjectionKind(result: ContentsResult): ContentProjectionKind {
   }
 }
 
-function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['state'], undefined> {
+function contentsStateRowState(
+  result: ContentsResult,
+  rowCount: number
+): Exclude<ContentRow['state'], undefined> {
   switch (result.state) {
     case 'ready':
     case 'empty':
-      return result.scopeCoverage.state === 'complete' ? 'empty' : 'loading'
+      return isVerifiedEmptyResult(result, rowCount) ? 'empty' : 'loading'
     case 'partial':
       // Partial coverage can legitimately contain zero known rows while scanning is incomplete.
       return 'loading'
@@ -732,17 +735,52 @@ function contentsStateRowState(result: ContentsResult): Exclude<ContentRow['stat
   }
 }
 
-function contentsStateLabel(result: ContentsResult): string {
+function contentsStateLabel(result: ContentsResult, rowCount: number): string {
   switch (result.state) {
     case 'ready':
     case 'empty':
-      if (result.scopeCoverage.state !== 'complete') {
-        return 'Still indexing'
+      if (!isVerifiedEmptyResult(result, rowCount)) {
+        return unverifiedEmptyLabel(result)
       }
       return result.hasPolicyOmittedRows
         ? policyEmptyLabel(result.policy)
         : trueEmptyLabel(result.policy)
     case 'partial':
+      return 'Still indexing'
+    case 'sourceUnavailable':
+      return 'Source unavailable'
+    case 'locationMissing':
+      return 'Folder missing'
+    case 'blocked':
+      return 'Contents blocked'
+    case 'failed':
+      return 'Contents failed'
+  }
+}
+
+function isVerifiedEmptyResult(result: ContentsResult, rowCount: number): boolean {
+  if (rowCount !== 0) {
+    return false
+  }
+
+  if (result.state !== 'ready' && result.state !== 'empty') {
+    return false
+  }
+
+  if (result.scopeCoverage.state !== 'complete' || !result.scopeCoverage.subtreeCoverageComplete) {
+    return false
+  }
+
+  return result.scopeCoverage.emptyResultAuthoritative || result.hasPolicyOmittedRows
+}
+
+function unverifiedEmptyLabel(result: ContentsResult): string {
+  switch (result.scopeCoverage.state) {
+    case 'complete':
+      return 'Contents coverage unverified'
+    case 'pending':
+    case 'scanning':
+    case 'incomplete':
       return 'Still indexing'
     case 'sourceUnavailable':
       return 'Source unavailable'
@@ -766,7 +804,7 @@ function contentsDetail(
   }
 
   if (rowCount === 0 && (result.state === 'ready' || result.state === 'empty')) {
-    return contentsStateLabel(result)
+    return contentsStateLabel(result, rowCount)
   }
 
   if (rowCount === 1) {
