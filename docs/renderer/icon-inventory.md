@@ -1,17 +1,18 @@
 ---
 status: candidate
 ratification-target: renderer-icon-inventory-v1
-revision: inventory-pass-1
-doctrine-version: 0.1
-last-reviewed: 2026-06-06
+revision: inventory-pass-3
+doctrine-version: 0.2
+last-reviewed: 2026-06-11
 owner: renderer-icon-surface
 canonical-context:
   - product/product-doctrine
   - local-source-icon-doctrine
 scope:
-  - renderer-icon-adapter
+  - renderer-icon-registry
   - icon-semantic-roles
-  - lucide-to-fluent-migration
+  - lucide-to-semantic-registry-migration
+  - vendored-svg-substrate
   - tree-icon-resolution
   - contents-table-icon-resolution
 ---
@@ -20,14 +21,17 @@ scope:
 
 ## Purpose
 
-Inventory every current renderer icon export and every usage site. Define the semantic role namespace for a controlled
-migration from the Lucide-backed surface to a Fluent-backed semantic surface.
+Inventory every current renderer icon export and every usage site. Define the semantic role namespace and
+implementation constraints for a controlled migration from the Lucide-backed surface to a **Dekzer semantic icon
+registry backed by vendored Fluent SVGs**.
 
 This document is a **design inventory and boundary map**. No visual migration is performed in this pass.
 
 ---
 
 ## 1. Icon Adapter Architecture
+
+### 1.1 Current state
 
 ```
 src/renderer/icons/
@@ -45,6 +49,44 @@ are violations.
 
 **Current state:** `presentation.ts` imports from `../../icons/lucide` directly instead of the barrel. This is a
 consistency concern but still within the adapter boundary.
+
+### 1.2 Target architecture
+
+The migration replaces `lucide.ts` with a Dekzer semantic icon registry. This is not a Fluent adapter replacing a
+Lucide adapter. It is a product-owned registry that happens to be backed by vendored Fluent SVGs as source material.
+
+Product code does not gain a Fluent dependency. Product code does not gain knowledge of Fluent names, Fluent package
+identifiers, or icon-library internals. The registry is the only place that knows which vendored SVG asset backs
+which semantic role.
+
+```
+src/renderer/icons/
+  index.ts          barrel: re-exports roles, types, and the Icon component
+  types.ts          IconRole, IconComponent, IconSize, IconTone, IconFrame, IconProps
+  tokens.ts         CSS class maps for size/tone (unchanged)
+  icon.vue          Icon wrapper component (unchanged interface)
+  registry.ts       Dekzer semantic registry: canonical role → vendored SVG asset
+  vendor/           vendored Fluent SVG sources (selected subset only)
+    *.svg
+```
+
+`lucide.ts` is removed. `custom.ts` is absorbed into `registry.ts` or maintained alongside it for product-specific
+drawings not covered by vendored Fluent sources.
+
+**Registry responsibilities** (per local-source-icon-doctrine):
+
+- Canonical name to asset mapping
+- Size-specific asset selection (16px and 20px as separate targets)
+- Badge overlay mapping
+- Foreground token behavior
+- Selected, muted, disabled, pending, and active state rendering
+
+The registry does not decide source state, readiness, or row kind. Those are substrate and projection
+responsibilities.
+
+**Updated boundary rule:** All product code imports semantic role identifiers from `src/renderer/icons` (the
+barrel). No product code imports Fluent names, Lucide names, or raw SVG paths. The registry is the only place those
+implementation details live.
 
 ---
 
@@ -138,11 +180,11 @@ consistency concern but still within the adapter boundary.
 | `action`             | `LoadingIcon` / `WarningIcon` / `MoreIcon`  | depends on `node.icon` value |
 
 **Critical callout: Folder expansion mapping.** `sourceLocation` and `literalDirectory` currently swap between
-`FolderIcon` (collapsed) and `FolderOpenIcon` (expanded). This couples expansion disclosure to the folder icon shape. \*
-*The long-term contract is that the chevron (`DisclosureOpenIcon`/`DisclosureClosedIcon`) owns expansion state and the
-folder icon is always `folder.plain` regardless of expansion.\*\* This split is already partially realized: the chevron
-*does\* render independently in the disclosure button slot. The folder shape swap is a visual duplicate of information
-already conveyed by the chevron.
+`FolderIcon` (collapsed) and `FolderOpenIcon` (expanded). This couples expansion disclosure to the folder icon
+shape. **The long-term contract is that the chevron (`disclosure.open`/`disclosure.closed`) owns expansion state
+and the folder icon is always `folder.plain` regardless of expansion.** This split is already partially realized:
+the chevron does render independently in the disclosure button slot. The folder shape swap is a visual duplicate of
+information already conveyed by the chevron.
 
 ### 3.3 `library/contents/table.vue`
 
@@ -185,15 +227,16 @@ already conveyed by the chevron.
 
 No product component imports from `@lucide/vue` directly.
 
-**Near-issue:** `library/tree/presentation.ts` imports from `../../icons/lucide` instead of `../../icons` (the barrel).
-Both go through the adapter, but the barrel is the preferred import surface for product code.
+**Near-issue:** `library/tree/presentation.ts` imports from `../../icons/lucide` instead of `../../icons` (the
+barrel). Both go through the adapter, but the barrel is the preferred import surface for product code.
 
 ---
 
-## 5. Semantic Icon Role Namespace (Proposed)
+## 5. Semantic Icon Role Namespace
 
-Define a flat namespace of semantic roles. These replace the current Lucide-aliased export names. Each role encodes
-_what the icon communicates_, not _which icon pack shape it uses_.
+A flat namespace of stable product-facing role identifiers. Product code requests roles; the registry resolves
+roles to vendored SVG assets. Each role encodes _what the icon communicates_, not which library drew the shape.
+Role names do not change when the underlying asset changes.
 
 ### 5.1 Disclosure
 
@@ -263,49 +306,49 @@ _what the icon communicates_, not _which icon pack shape it uses_.
 
 ---
 
-## 6. Migration Map: Current Icon → Proposed Fluent Status
+## 6. Migration Map: Current Export → Registry Role
 
-| Current Export         | Proposed Role                       | Fluent Status                | Notes                                                             |
-| ---------------------- | ----------------------------------- | ---------------------------- | ----------------------------------------------------------------- |
-| `DisclosureOpenIcon`   | `disclosure.open`                   | **Replace now**              | Direct Fluent chevron equivalent                                  |
-| `DisclosureClosedIcon` | `disclosure.closed`                 | **Replace now**              | Direct Fluent chevron equivalent                                  |
-| `FolderIcon`           | `folder.plain`                      | **Replace now**              | Stop toggling shape on expansion                                  |
-| `FolderOpenIcon`       | —                                   | **Remove**                   | Superseded by `disclosure.open`; remove expansion-coupled variant |
-| `ListMusicIcon`        | `media.playlist`                    | **Replace now**              |                                                                   |
-| `LoadingIcon`          | `state.loading`                     | **Replace now**              |                                                                   |
-| `MoreIcon`             | `action.more`                       | **Replace now**              |                                                                   |
-| `NavigationIcon`       | `navigation.collection`             | **Replace now**              |                                                                   |
-| `SourceIcon`           | `source.local`                      | **Replace now**              |                                                                   |
-| `StateIcon`            | `state.unknown`                     | **Replace now**              |                                                                   |
-| `WarningIcon`          | `state.warning`                     | **Replace now**              |                                                                   |
-| `FileTextIcon`         | `media.cueSheet` / `media.metadata` | **Replace now**              | May bifurcate into two roles later                                |
-| `ImageIcon`            | `media.image`                       | **Replace now**              |                                                                   |
-| `MusicIcon`            | `media.audio`                       | **Replace now**              |                                                                   |
-| `VideoIcon`            | `media.video`                       | **Replace now**              |                                                                   |
-| `CircleXIcon`          | `action.remove`                     | **Replace now**              |                                                                   |
-| `ScanIcon`             | `action.scan`                       | **Replace now**              |                                                                   |
-| `ArchiveIcon`          | (future)                            | **Keep temporarily**         | Needed for future source kinds                                    |
-| `CircleCheckIcon`      | (future)                            | **Keep temporarily**         |                                                                   |
-| `CircleDotIcon`        | (future)                            | **Keep temporarily**         |                                                                   |
-| `CircleIcon`           | (future)                            | **Keep temporarily**         |                                                                   |
-| `CircleOffIcon`        | (future)                            | **Keep temporarily**         |                                                                   |
-| `CloudIcon`            | (future)                            | **Keep temporarily**         | Needed for cloud sources                                          |
-| `CloudSyncIcon`        | (future)                            | **Keep temporarily**         |                                                                   |
-| `DatabaseIcon`         | (future)                            | **Keep temporarily**         |                                                                   |
-| `DiscIcon`             | (future)                            | **Keep temporarily**         | Disc/cd icon                                                      |
-| `FileIcon`             | (future)                            | **Keep temporarily**         |                                                                   |
-| `FolderPlusIcon`       | (future)                            | **Keep temporarily**         |                                                                   |
-| `HardDriveIcon`        | `source.drive`                      | **Keep temporarily**         | Will become `source.drive` when used                              |
-| `LockIcon`             | (future)                            | **Keep temporarily**         | Permission/locked badge                                           |
-| `NetworkIcon`          | `source.service`                    | **Keep temporarily**         | Will become `source.service` when used                            |
-| `PinIcon`              | (future)                            | **Keep temporarily**         |                                                                   |
-| `PinOffIcon`           | (future)                            | **Keep temporarily**         |                                                                   |
-| `RefreshCwIcon`        | `action.refresh`                    | **Keep temporarily**         |                                                                   |
-| `ServerIcon`           | (future)                            | **Keep temporarily**         |                                                                   |
-| `SmartphoneIcon`       | (future)                            | **Keep temporarily**         |                                                                   |
-| `TriangleAlertIcon`    | `state.warning`                     | **Remove**                   | Superseded by `WarningIcon` → `state.warning`                     |
-| `UsbIcon`              | (future)                            | **Keep temporarily**         | USB drive badge/icon                                              |
-| `SdCardIcon`           | (future)                            | **Custom derivative needed** | Custom SVG; Fluent equivalent audit needed                        |
+| Current Export         | Proposed Role                       | Action      | Notes                                                                      |
+| ---------------------- | ----------------------------------- | ----------- | -------------------------------------------------------------------------- |
+| `DisclosureOpenIcon`   | `disclosure.open`                   | **Replace** | Vendor Fluent chevron SVG; map to role in registry                         |
+| `DisclosureClosedIcon` | `disclosure.closed`                 | **Replace** | Vendor Fluent chevron SVG; map to role in registry                         |
+| `FolderIcon`           | `folder.plain`                      | **Replace** | Stop toggling shape on expansion; see Section 7                            |
+| `ListMusicIcon`        | `media.playlist`                    | **Replace** |                                                                            |
+| `LoadingIcon`          | `state.loading`                     | **Replace** |                                                                            |
+| `MoreIcon`             | `action.more`                       | **Replace** |                                                                            |
+| `NavigationIcon`       | `navigation.collection`             | **Replace** |                                                                            |
+| `SourceIcon`           | `source.local`                      | **Replace** |                                                                            |
+| `StateIcon`            | `state.unknown`                     | **Replace** |                                                                            |
+| `WarningIcon`          | `state.warning`                     | **Replace** |                                                                            |
+| `FileTextIcon`         | `media.cueSheet` / `media.metadata` | **Replace** | May bifurcate into two roles later; one vendored SVG can back both         |
+| `ImageIcon`            | `media.image`                       | **Replace** |                                                                            |
+| `MusicIcon`            | `media.audio`                       | **Replace** |                                                                            |
+| `VideoIcon`            | `media.video`                       | **Replace** |                                                                            |
+| `CircleXIcon`          | `action.remove`                     | **Replace** |                                                                            |
+| `ScanIcon`             | `action.scan`                       | **Replace** |                                                                            |
+| `FolderOpenIcon`       | —                                   | **Delete**  | Expansion-coupled; superseded by `disclosure.open`; no registry equivalent |
+| `TriangleAlertIcon`    | —                                   | **Delete**  | Duplicate of `WarningIcon`; no consumer                                    |
+| `ArchiveIcon`          | —                                   | **Delete**  | No consumer; vendor fresh SVG when archive role is defined                 |
+| `CircleCheckIcon`      | —                                   | **Delete**  | No consumer                                                                |
+| `CircleDotIcon`        | —                                   | **Delete**  | No consumer                                                                |
+| `CircleIcon`           | —                                   | **Delete**  | No consumer                                                                |
+| `CircleOffIcon`        | —                                   | **Delete**  | No consumer                                                                |
+| `CloudIcon`            | —                                   | **Delete**  | No consumer; `volume.cloud` / `source.service` cover when needed           |
+| `CloudSyncIcon`        | —                                   | **Delete**  | No consumer                                                                |
+| `DatabaseIcon`         | —                                   | **Delete**  | No consumer                                                                |
+| `DiscIcon`             | —                                   | **Delete**  | No consumer; disc role not yet in namespace                                |
+| `FileIcon`             | —                                   | **Delete**  | No consumer                                                                |
+| `FolderPlusIcon`       | —                                   | **Delete**  | No consumer                                                                |
+| `HardDriveIcon`        | `source.drive`                      | **Delete**  | No consumer; role defined; vendor fresh SVG when feature lands             |
+| `LockIcon`             | `badge.lock`                        | **Delete**  | No consumer; role defined in doctrine; vendor when permission badges land  |
+| `NetworkIcon`          | `source.service`                    | **Delete**  | No consumer; role defined; vendor fresh SVG when feature lands             |
+| `PinIcon`              | —                                   | **Delete**  | No consumer                                                                |
+| `PinOffIcon`           | —                                   | **Delete**  | No consumer                                                                |
+| `RefreshCwIcon`        | `action.refresh`                    | **Delete**  | No consumer; role defined; vendor fresh SVG when feature lands             |
+| `ServerIcon`           | —                                   | **Delete**  | No consumer                                                                |
+| `SmartphoneIcon`       | —                                   | **Delete**  | No consumer                                                                |
+| `UsbIcon`              | —                                   | **Delete**  | No consumer; drive/badge roles cover when needed                           |
+| `SdCardIcon`           | —                                   | **Delete**  | No consumer; not a Lucide import (`custom.ts`); deleted in cleanup         |
 
 ---
 
@@ -314,39 +357,41 @@ _what the icon communicates_, not _which icon pack shape it uses_.
 ### Current behavior
 
 ```
-sourceLocation  → isExpanded ? FolderOpenIcon : FolderIcon
+sourceLocation   → isExpanded ? FolderOpenIcon : FolderIcon
 literalDirectory → isExpanded ? FolderOpenIcon : FolderIcon
 ```
 
-The folder shape changes between closed and open based on the node expansion state. The disclosure chevron (
-`DisclosureOpenIcon`/`DisclosureClosedIcon`) also renders independently in the button slot.
+The folder shape changes between closed and open based on the node expansion state. The disclosure chevron
+(`DisclosureOpenIcon`/`DisclosureClosedIcon`) also renders independently in the button slot.
 
 ### Target behavior
 
-The chevron (`disclosure.open` / `disclosure.closed`) is the sole visual indicator of expansion. The folder icon is
-always `folder.plain` (or a faceted variant like `folder.audioFacet` when the directory's media composition is known)
-and does not change shape on expansion.
+The chevron (`disclosure.open` / `disclosure.closed`) is the sole visual indicator of expansion. The folder icon
+is always `folder.plain` (or a faceted variant like `folder.audioFacet` when the directory's media composition is
+known) and does not change shape on expansion.
 
 **Migration step:** In `presentation.ts`, change the `sourceLocation` and `literalDirectory` cases to always return
-`FolderIcon` (mapped to `folder.plain`). The `FolderOpenIcon` export can then be removed from the adapter.
+`folder.plain`. In `table.vue`, change the `loadChildren` action icon from `FolderOpenIcon` to an appropriate
+non-folder-open role. `FolderOpenIcon` is removed from the registry with no equivalent.
 
 ### Facet differentiation
 
 The `ChildRow` type (from `shared/library/hierarchy/read.ts`) already carries `directoryPrimaryMediaState`,
-`directoryImageMediaState`, and `directoryScanState`. These fields can drive facet selection on directory nodes in a
-future pass:
+`directoryImageMediaState`, and `directoryScanState`. These fields can drive facet selection on directory nodes in
+a future pass:
 
 - `directoryPrimaryMediaState` → `folder.audioFacet` / `folder.videoFacet` / `folder.mixedFacet`
 
-This is **not implemented** in this pass — it is called out here as the designated data binding for folder facet icons.
+This is **not implemented** in this pass — it is called out here as the designated data binding for folder facet
+icons.
 
 ---
 
 ## 8. `LocationSourceIcon` Type Alignment
 
 `sourcePresentation.ts` defines a `LocationSourceIcon` union type with 16 values that describe source-kinds. These
-currently have **no visual icon mapping** — they are pure semantic labels. The proposed `source.*` roles above map to a
-subset:
+currently have **no visual icon mapping** — they are pure semantic labels. The proposed `source.*` roles above map
+to a subset:
 
 | `LocationSourceIcon` | Proposed Role                                |
 | -------------------- | -------------------------------------------- |
@@ -386,22 +431,99 @@ This mapping is for future use. No source-kind icons are currently rendered.
 - [x] Every usage site is documented (4 files: `treeRow.vue`, `presentation.ts`, `table.vue`, `panel.vue`)
 - [x] Tree folder expansion behavior explicitly called out
 - [x] Semantic role namespace defined (disclosure, folder, source, media, state, action, navigation)
-- [x] Migration status assigned for every current icon
+- [x] Migration action assigned for every current icon
 - [x] No Fluent dependency added; no SVGs copied
 - [x] No visual migration performed
+- [x] Target registry architecture defined
+- [x] Implementation constraints documented
+- [x] Sprint scheduling positioned
 
 ---
 
-## 11. Unused Exports — Summary
+## 11. Unused Exports — Deletion List
 
-The following 22 exports have no consumer in the renderer product code. They are retained in the adapter for future
-features or may be removed in the Fluence migration pass:
+The following 23 exports have no consumer in the renderer product code. All are deleted in the icon registry
+sprint. The Lucide stubs are not carried forward as placeholders.
 
 `ArchiveIcon`, `CircleCheckIcon`, `CircleDotIcon`, `CircleIcon`, `CircleOffIcon`, `CloudIcon`, `CloudSyncIcon`,
-`DatabaseIcon`, `DiscIcon`, `FileIcon`, `FolderPlusIcon`, `HardDriveIcon`, `LockIcon`, `NetworkIcon`, `PinIcon`,
-`PinOffIcon`, `RefreshCwIcon`, `ServerIcon`, `SmartphoneIcon`, `TriangleAlertIcon`, `UsbIcon`, `SdCardIcon`
+`DatabaseIcon`, `DiscIcon`, `FileIcon`, `FolderOpenIcon`, `FolderPlusIcon`, `HardDriveIcon`, `LockIcon`,
+`NetworkIcon`, `PinIcon`, `PinOffIcon`, `RefreshCwIcon`, `ServerIcon`, `SmartphoneIcon`, `TriangleAlertIcon`,
+`UsbIcon`, `SdCardIcon`
 
-`TriangleAlertIcon` duplicates `WarningIcon` (both are alert/warning shapes) — it should be removed.
+Where a semantic role is already defined for a deleted export (`source.drive`, `source.service`, `action.refresh`,
+`badge.lock`), the role remains in the namespace. A fresh SVG will be vendored when the feature that needs it
+lands. The Lucide shape is not the reference point for that future drawing.
+
+`SdCardIcon` is in `custom.ts`, not `lucide.ts`. It has no consumer and is deleted as part of the same cleanup.
+`FolderOpenIcon` has consumers but is deleted because the expansion-coupling it encodes is prohibited.
+
+---
+
+## 12. Implementation Constraints
+
+These constraints apply to the icon registry sprint. They are not implementation notes — they are binding
+decisions.
+
+### 1. Vendor SVGs into the repo
+
+Selected Fluent SVG sources are committed to `src/renderer/icons/vendor/`. There is no runtime dependency on
+`@fluentui/svg-icons` or any other icon package. There is no live Icones lookup. There is no CDN reference. Fluent
+names do not appear in product code.
+
+Vendored SVGs are treated as source material for Dekzer-owned drawings. They may be edited for optical weight,
+badge anchor points, or size-specific variants.
+
+### 2. Semantic roles before assets
+
+The registry must define the role namespace before SVG assets are bound to it. Product code references roles like
+`media.audio`, `action.scan`, `disclosure.closed`. Product code never references `FluentMusicNote24Regular`,
+`LucideMusic`, or any icon-library identifier.
+
+### 3. Total Lucide prune — no holdovers
+
+The `lucide.ts` adapter is removed in full. Every export is either replaced by a registry role lookup or deleted.
+Unused exports are not carried forward as stubs or placeholders — they are deleted now. When a new role is needed
+in the future, vendor a fresh SVG and define the role at that time. The Lucide shape is not the baseline for
+that drawing.
+
+`custom.ts` exports with no consumer are deleted in the same pass.
+
+### 4. Stop folder-open shape toggling
+
+The folder glyph does not change on node expansion. `folder.plain` is the stable identity of a generic directory.
+Expansion state is owned entirely by `disclosure.open` and `disclosure.closed`. The only permissible folder shape
+changes are facet-based (e.g., `folder.audioFacet` when media composition is known), and those must not be driven
+by expansion state.
+
+### 5. Preserve customization path
+
+Vendored SVGs are source material, not locked assets. The registry implementation must allow:
+
+- Editing optical weight and stroke for Dekzer's visual density
+- Size-specific source files at 16px and 20px (separate design targets per the local-source-icon-doctrine)
+- Custom badge anchor points
+- Dark-mode behavioral overrides
+- Entirely product-owned drawings for roles where no Fluent SVG is suitable
+
+---
+
+## 13. Sprint Scheduling
+
+The icon registry sprint is renderer-edge work. It must not cut ahead of the source → tree → contents → scan →
+readiness loop. Premature execution risks re-touching the same files during browser-flow stabilization.
+
+| Step  | Work item                                | Dependency                                     |
+| ----- | ---------------------------------------- | ---------------------------------------------- |
+| 1     | Scope identity / readiness gate          | —                                              |
+| 2     | Activated browser-flow audit             | Step 1                                         |
+| 3     | Browser-flow stabilization               | Step 2                                         |
+| 4     | Scan invalidation tightening             | Step 3                                         |
+| **5** | **Fluent-backed semantic icon registry** | **Step 4**                                     |
+| 6     | Explicit source refresh                  | Step 5 (unless refresh becomes urgent earlier) |
+
+The icon sprint is scheduled before larger product surfaces — crates, playlists, CUE, Prepared Rooms. The visual
+language layer is foundational to every subsequent renderer surface. Resolving it early prevents drift in later
+work.
 
 ---
 
