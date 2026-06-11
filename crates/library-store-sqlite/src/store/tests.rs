@@ -1,7 +1,7 @@
 use super::discovery::{RootScanHierarchyObservationReason, RootScanObservation};
 use super::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, RegisterLocalRootInput,
-    SqliteDurableStore,
+    RootNavigationWindowEstablishmentState, SqliteDurableStore,
 };
 use crate::authority::ingest::{DiscoveredFileInput, DiscoveryBatch};
 use crate::authority::roots::{
@@ -1433,6 +1433,129 @@ fn register_local_root_establishes_immediate_root_child_directories_before_scan(
     assert_eq!(
         source_file_count, 0,
         "root navigation establishment must not ingest files"
+    );
+}
+
+#[test]
+fn established_non_empty_root_navigation_window_is_not_reestablished_while_idle() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("registered-root");
+    fs::create_dir_all(root_path.join("artists")).expect("create artists directory");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register local root");
+
+    fs::remove_dir_all(root_path.join("artists")).expect("remove established child directory");
+    let establishment = durable_store
+        .establish_root_navigation_window(root.root_id)
+        .expect("establish root navigation window");
+
+    assert_eq!(
+        establishment.state,
+        RootNavigationWindowEstablishmentState::NotRequired
+    );
+
+    let connection = open_mutation_connection(&db_path);
+    let child_row: (String, String) = connection
+        .query_row(
+            "SELECT name, presence_state
+             FROM source_directories
+             WHERE source_id = ?1
+               AND parent_source_directory_id IS NULL
+               AND relative_path = 'artists'",
+            [root.root_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read established child directory row");
+
+    assert_eq!(child_row.0, "artists");
+    assert_eq!(
+        child_row.1,
+        SourcePresenceState::Present.as_str(),
+        "idle establishment fallback must not mark removed children missing once the window is established"
+    );
+}
+
+#[test]
+fn unestablished_idle_root_navigation_window_establishes_on_first_read_fallback() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("older-root");
+    fs::create_dir_all(root_path.join("artists")).expect("create artists directory");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .bootstrap_root(&root_path)
+        .expect("bootstrap root without registration establishment");
+
+    let establishment = durable_store
+        .establish_root_navigation_window(root.root_id)
+        .expect("establish root navigation window");
+
+    assert_eq!(
+        establishment.state,
+        RootNavigationWindowEstablishmentState::Established
+    );
+    assert_eq!(establishment.immediate_child_directory_count, 1);
+
+    let connection = open_mutation_connection(&db_path);
+    let child_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM source_directories
+             WHERE source_id = ?1
+               AND parent_source_directory_id IS NULL
+               AND relative_path = 'artists'
+               AND presence_state = 'present'",
+            [root.root_id],
+            |row| row.get(0),
+        )
+        .expect("count established child directory row");
+    assert_eq!(child_count, 1);
+}
+
+#[test]
+fn non_idle_root_navigation_window_skips_first_read_fallback() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("scanning-root");
+    fs::create_dir_all(root_path.join("artists")).expect("create artists directory");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .bootstrap_root(&root_path)
+        .expect("bootstrap root without registration establishment");
+    durable_store
+        .mark_root_scan_started(root.root_id, 1_000)
+        .expect("mark root scan started");
+
+    let establishment = durable_store
+        .establish_root_navigation_window(root.root_id)
+        .expect("establish root navigation window");
+
+    assert_eq!(
+        establishment.state,
+        RootNavigationWindowEstablishmentState::NotRequired
+    );
+
+    let connection = open_mutation_connection(&db_path);
+    let child_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM source_directories
+             WHERE source_id = ?1",
+            [root.root_id],
+            |row| row.get(0),
+        )
+        .expect("count source directory rows");
+    assert_eq!(
+        child_count, 0,
+        "non-idle scan phases must not establish the immediate root window from the read fallback"
     );
 }
 

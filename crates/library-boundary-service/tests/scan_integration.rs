@@ -250,6 +250,42 @@ fn registered_source_is_navigation_readable_before_recursive_scan() {
 }
 
 #[test]
+fn repeated_non_empty_root_reads_do_not_refresh_established_navigation_window() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let music_root = tempdir.path().join("music-root");
+    fs::create_dir_all(music_root.join("artists")).expect("create root child directory");
+
+    let service = open_service(&tempdir);
+    let registered = register_root(&service, &music_root);
+
+    let first_reply = read_library_tree(&service, registered.root_id, None);
+    let first_window = first_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window");
+    assert_eq!(first_window.total_rows, 1);
+    assert_eq!(first_window.rows[0].display_name, "artists");
+
+    fs::remove_dir_all(music_root.join("artists")).expect("remove established child directory");
+
+    let second_reply = read_library_tree(&service, registered.root_id, None);
+    let second_window = second_reply
+        .window
+        .as_ref()
+        .expect("registered source root resolves to a hierarchy window");
+
+    assert_eq!(
+        second_window.total_rows, 1,
+        "normal repeated root reads must not refresh or mark missing established child directories"
+    );
+    assert_eq!(second_window.rows[0].display_name, "artists");
+    assert_eq!(
+        second_window.rows[0].presence_state,
+        LibraryTreePresenceState::Present
+    );
+}
+
+#[test]
 fn empty_registered_source_root_is_authoritative_empty_for_immediate_window_only() {
     let tempdir = TempDir::new().expect("create tempdir");
     let empty_root = tempdir.path().join("empty-root");

@@ -507,7 +507,22 @@ impl SqliteDurableStore {
                 |row| row.get::<_, String>(0),
             )
             .optional()?;
-        Ok(matches!(scan_phase.as_deref(), None | Some("idle")))
+        if !matches!(scan_phase.as_deref(), None | Some("idle")) {
+            return Ok(false);
+        }
+
+        let has_immediate_root_directory_rows = connection.query_row(
+            "SELECT EXISTS(
+                 SELECT 1
+                 FROM source_directories
+                 WHERE source_id = ?1
+                   AND parent_source_directory_id IS NULL
+                   AND relative_path <> ''
+             )",
+            [root_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        Ok(!has_immediate_root_directory_rows)
     }
 }
 
