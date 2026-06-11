@@ -205,7 +205,7 @@ fn scope_source_ids(
             .map(Some)
             .map_err(Into::into),
         StoreSearchScope::Source { source_id } => {
-            if source_exists(connection, *source_id)? {
+            if source_is_user_visible(connection, *source_id)? {
                 Ok(Some(vec![*source_id]))
             } else {
                 Ok(None)
@@ -214,29 +214,60 @@ fn scope_source_ids(
         StoreSearchScope::SourceLocation { source_location_id } => {
             let source_id = connection
                 .query_row(
-                    "SELECT source_id
-                     FROM source_locations
-                     WHERE source_location_id = ?1",
+                    "SELECT location.source_id
+                     FROM source_locations location
+                     JOIN sources source ON source.source_id = location.source_id
+                     WHERE location.source_location_id = ?1
+                       AND location.is_user_visible = 1
+                       AND source.is_user_visible = 1",
                     [source_location_id],
                     |row| row.get::<_, i64>(0),
                 )
                 .optional()?;
             Ok(source_id.map(|source_id| vec![source_id]))
         }
-        StoreSearchScope::Directory { source_id, .. } => {
-            if source_exists(connection, *source_id)? {
-                Ok(Some(vec![*source_id]))
-            } else {
-                Ok(None)
-            }
-        }
+        StoreSearchScope::Directory {
+            source_id,
+            source_directory_id,
+        } => connection
+            .query_row(
+                "SELECT directory.source_id
+                 FROM source_directories directory
+                 JOIN sources source ON source.source_id = directory.source_id
+                 WHERE directory.source_id = ?1
+                   AND directory.source_directory_id = ?2
+                   AND source.is_user_visible = 1",
+                [source_id, source_directory_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .map(|source_id| source_id.map(|source_id| vec![source_id]))
+            .map_err(Into::into),
     }
 }
 
-fn source_exists(connection: &Connection, source_id: i64) -> LibrarySqliteResult<bool> {
+pub(crate) fn source_exists(connection: &Connection, source_id: i64) -> LibrarySqliteResult<bool> {
     connection
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sources WHERE source_id = ?1)",
+            [source_id],
+            |row| row.get::<_, i64>(0).map(|value| value != 0),
+        )
+        .map_err(Into::into)
+}
+
+pub(crate) fn source_is_user_visible(
+    connection: &Connection,
+    source_id: i64,
+) -> LibrarySqliteResult<bool> {
+    connection
+        .query_row(
+            "SELECT EXISTS(
+                 SELECT 1
+                 FROM sources
+                 WHERE source_id = ?1
+                   AND is_user_visible = 1
+             )",
             [source_id],
             |row| row.get::<_, i64>(0).map(|value| value != 0),
         )

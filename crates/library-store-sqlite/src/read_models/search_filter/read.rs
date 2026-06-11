@@ -59,6 +59,24 @@ pub(crate) fn read_search_filter(
         &identity.scope,
         identity.recursion,
     )?;
+    predicates.push(
+        "EXISTS (
+             SELECT 1
+             FROM sources visible_source
+             WHERE visible_source.source_id = search_rows.source_id
+               AND visible_source.is_user_visible = 1
+         )"
+        .to_string(),
+    );
+    predicates.push(
+        "(source_location_id IS NULL OR EXISTS (
+             SELECT 1
+             FROM source_locations visible_location
+             WHERE visible_location.source_location_id = search_rows.source_location_id
+               AND visible_location.is_user_visible = 1
+         ))"
+        .to_string(),
+    );
     push_in_values(
         &mut predicates,
         &mut values,

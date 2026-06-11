@@ -1,7 +1,10 @@
 use rusqlite::{Connection, Row, params};
 
 use super::SEARCH_INDEXER_VERSION;
-use super::coverage::{mark_source_coverage_ready, mark_source_coverage_rebuilding};
+use super::coverage::{
+    mark_source_coverage_ready, mark_source_coverage_rebuilding, source_exists,
+    source_is_user_visible,
+};
 use super::types::RebuildSearchFilterIndexForSourceResult;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
@@ -10,18 +13,33 @@ pub(crate) fn rebuild_search_filter_index_for_source(
     source_id: i64,
     rebuilt_at_ms: i64,
 ) -> LibrarySqliteResult<RebuildSearchFilterIndexForSourceResult> {
-    let source_exists: bool = connection
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM sources WHERE source_id = ?1)",
-            [source_id],
-            |row| row.get::<_, i64>(0).map(|value| value != 0),
-        )
-        .map_err(LibrarySqliteError::from)?;
-    if !source_exists {
+    if !source_exists(connection, source_id)? {
         return Err(LibrarySqliteError::Canonical(crate::CanonicalError::new(
             crate::CanonicalErrorCode::NotFound,
             format!("source {source_id} does not exist"),
         )));
+    }
+
+    if !source_is_user_visible(connection, source_id)? {
+        let generation =
+            purge_source_index_rows_and_advance_generation(connection, source_id, rebuilt_at_ms)?;
+        connection.execute(
+            "DELETE FROM search_filter_index_source_coverage
+             WHERE source_id = ?1",
+            [source_id],
+        )?;
+        connection.execute(
+            "UPDATE search_filter_index_metadata
+             SET state = 'ready',
+                 updated_at = ?1
+             WHERE search_filter_index_id = 1",
+            [rebuilt_at_ms],
+        )?;
+        return Ok(RebuildSearchFilterIndexForSourceResult {
+            source_id,
+            generation,
+            rows_indexed: 0,
+        });
     }
 
     mark_source_coverage_rebuilding(connection, source_id, rebuilt_at_ms)?;
@@ -33,24 +51,7 @@ pub(crate) fn rebuild_search_filter_index_for_source(
         [rebuilt_at_ms],
     )?;
 
-    let old_row_ids = connection
-        .prepare(
-            "SELECT row_id
-             FROM search_filter_index_rows
-             WHERE source_id = ?1",
-        )?
-        .query_map([source_id], |row| row.get::<_, i64>(0))?
-        .collect::<Result<Vec<_>, _>>()?;
-    for row_id in old_row_ids {
-        connection.execute(
-            "DELETE FROM search_filter_index_fts WHERE rowid = ?1",
-            [row_id],
-        )?;
-    }
-    connection.execute(
-        "DELETE FROM search_filter_index_rows WHERE source_id = ?1",
-        [source_id],
-    )?;
+    purge_source_index_rows(connection, source_id)?;
 
     let generation = connection.query_row(
         "UPDATE search_filter_index_metadata
@@ -98,6 +99,48 @@ pub(crate) fn rebuild_search_filter_index_for_source(
         generation,
         rows_indexed,
     })
+}
+
+fn purge_source_index_rows_and_advance_generation(
+    connection: &Connection,
+    source_id: i64,
+    updated_at_ms: i64,
+) -> LibrarySqliteResult<i64> {
+    purge_source_index_rows(connection, source_id)?;
+    connection
+        .query_row(
+            "UPDATE search_filter_index_metadata
+             SET generation = generation + 1,
+                 updated_at = ?1
+             WHERE search_filter_index_id = 1
+               AND indexer_version = ?2
+             RETURNING generation",
+            params![updated_at_ms, SEARCH_INDEXER_VERSION],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(Into::into)
+}
+
+fn purge_source_index_rows(connection: &Connection, source_id: i64) -> LibrarySqliteResult<()> {
+    let old_row_ids = connection
+        .prepare(
+            "SELECT row_id
+             FROM search_filter_index_rows
+             WHERE source_id = ?1",
+        )?
+        .query_map([source_id], |row| row.get::<_, i64>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for row_id in old_row_ids {
+        connection.execute(
+            "DELETE FROM search_filter_index_fts WHERE rowid = ?1",
+            [row_id],
+        )?;
+    }
+    connection.execute(
+        "DELETE FROM search_filter_index_rows WHERE source_id = ?1",
+        [source_id],
+    )?;
+    Ok(())
 }
 
 fn insert_source_rows(

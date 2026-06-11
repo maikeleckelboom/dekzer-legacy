@@ -2,6 +2,12 @@ use rusqlite::Connection;
 
 use super::*;
 use crate::schema::install_baseline_schema_for_test;
+use crate::{
+    RecordSourceFileObservationInput, RegisterLocalRootInput, SqliteDurableStore,
+    UnregisterLocalRootInput, UpsertSourceDirectoryInput, UpsertSourceLocationInput,
+};
+use library_domain::SourcePresenceState;
+use tempfile::TempDir;
 
 fn open_connection() -> Connection {
     let mut connection = Connection::open_in_memory().expect("open in-memory");
@@ -91,6 +97,26 @@ fn seed_second_visible_source(connection: &Connection) {
              ) VALUES (2, 'complete', 1);",
         )
         .expect("seed second source");
+}
+
+fn hide_source(connection: &Connection, source_id: i64) {
+    connection
+        .execute(
+            "UPDATE sources
+             SET is_user_visible = 0,
+                 updated_at = updated_at + 1
+             WHERE source_id = ?1",
+            [source_id],
+        )
+        .expect("hide source");
+}
+
+fn result_keys(result: &StoreSearchResult) -> Vec<String> {
+    result
+        .rows
+        .iter()
+        .map(|row| row.stable_key.clone())
+        .collect()
 }
 
 fn request(query: Option<&str>) -> StoreSearchRequest {
@@ -207,6 +233,91 @@ fn rebuild_indexes_rows_updates_coverage_and_searches_path_names() {
 }
 
 #[test]
+fn visible_source_appears_in_library_search() {
+    let connection = open_connection();
+    seed_source(&connection);
+    rebuild_search_filter_index_for_source(&connection, 1, 10).expect("rebuild");
+
+    let mut search = request(Some("search test"));
+    search.target_kinds = vec![StoreSearchResultKind::Source];
+    let result = read_search_filter(&connection, search).expect("search");
+
+    assert_eq!(result.state, StoreSearchState::Ready);
+    assert_eq!(result.rows.len(), 1);
+    assert_eq!(result.rows[0].result_kind, StoreSearchResultKind::Source);
+    assert_eq!(result.rows[0].stable_key, "source:1");
+}
+
+#[test]
+fn library_coverage_ignores_hidden_sources() {
+    let connection = open_connection();
+    seed_source(&connection);
+    seed_second_visible_source(&connection);
+    hide_source(&connection, 1);
+    rebuild_search_filter_index_for_source(&connection, 2, 10).expect("rebuild visible source");
+
+    let result = read_search_filter(&connection, request(Some("not-found"))).expect("search");
+
+    assert_eq!(result.state, StoreSearchState::Empty);
+    assert_eq!(result.index_state, StoreSearchIndexState::Ready);
+    assert!(result.rows.is_empty());
+}
+
+#[test]
+fn stale_index_rows_for_hidden_source_are_not_returned_by_library_or_scopes() {
+    let connection = open_connection();
+    seed_source(&connection);
+    rebuild_search_filter_index_for_source(&connection, 1, 10).expect("rebuild");
+
+    hide_source(&connection, 1);
+
+    let library = read_search_filter(&connection, request(None)).expect("library search");
+    assert_eq!(library.state, StoreSearchState::Empty);
+    assert!(library.rows.is_empty());
+
+    let mut direct_source = request(None);
+    direct_source.scope = StoreSearchScope::Source { source_id: 1 };
+    let source_result = read_search_filter(&connection, direct_source).expect("source search");
+    assert_eq!(source_result.state, StoreSearchState::Partial);
+    assert_eq!(source_result.index_state, StoreSearchIndexState::Missing);
+    assert!(source_result.rows.is_empty());
+
+    let mut location = request(None);
+    location.scope = StoreSearchScope::SourceLocation {
+        source_location_id: 100,
+    };
+    let location_result = read_search_filter(&connection, location).expect("location search");
+    assert_eq!(location_result.state, StoreSearchState::Partial);
+    assert_eq!(location_result.index_state, StoreSearchIndexState::Missing);
+    assert!(location_result.rows.is_empty());
+
+    let mut directory = request(None);
+    directory.scope = StoreSearchScope::Directory {
+        source_id: 1,
+        source_directory_id: 11,
+    };
+    let directory_result = read_search_filter(&connection, directory).expect("directory search");
+    assert_eq!(directory_result.state, StoreSearchState::Partial);
+    assert_eq!(directory_result.index_state, StoreSearchIndexState::Missing);
+    assert!(directory_result.rows.is_empty());
+}
+
+#[test]
+fn hidden_source_fts_rows_do_not_match_search_results() {
+    let connection = open_connection();
+    seed_source(&connection);
+    rebuild_search_filter_index_for_source(&connection, 1, 10).expect("rebuild");
+    let visible = read_search_filter(&connection, request(Some("amen"))).expect("visible search");
+    assert_eq!(result_keys(&visible), vec!["sourceFile:1000".to_string()]);
+
+    hide_source(&connection, 1);
+    let hidden = read_search_filter(&connection, request(Some("amen"))).expect("hidden search");
+
+    assert_eq!(hidden.state, StoreSearchState::Empty);
+    assert!(hidden.rows.is_empty());
+}
+
+#[test]
 fn scoped_search_and_file_class_filter_use_index_rows() {
     let connection = open_connection();
     seed_source(&connection);
@@ -286,6 +397,117 @@ fn deterministic_pagination_and_cursor_identity_are_enforced() {
         read_search_filter(&connection, stale_generation).expect("invalid generation");
     assert_eq!(invalid_generation.state, StoreSearchState::CursorInvalid);
     assert!(invalid_generation.index_generation > rebuild.generation);
+}
+
+#[test]
+fn unregister_local_root_hides_rows_purges_rebuild_and_invalidates_old_cursor() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let root_path = tempdir.path().join("registered-root");
+    std::fs::create_dir_all(root_path.join("Music")).expect("create music directory");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let root = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path,
+        })
+        .expect("register local root");
+    let changed_at = 9_000_000_000_000i64;
+    let directory_id = durable_store
+        .upsert_source_directory(UpsertSourceDirectoryInput {
+            source_directory_id: None,
+            source_id: root.root_id,
+            parent_source_directory_id: None,
+            name: "Music".to_string(),
+            relative_path: "Music".to_string(),
+            presence_state: SourcePresenceState::Present,
+            dir_scan_state: Some("complete".to_string()),
+            dir_scan_issue_kind: None,
+            dir_scan_error_detail: None,
+            scanned_at: Some(changed_at),
+            mtime_ns: None,
+            first_created_at: Some(1),
+            changed_at,
+        })
+        .expect("upsert directory");
+    let source_location_id = durable_store
+        .upsert_source_location(UpsertSourceLocationInput {
+            source_location_id: None,
+            source_id: root.root_id,
+            authority: "user".to_string(),
+            location_kind: "registered_subpath".to_string(),
+            relative_path: "Music".to_string(),
+            display_name: Some("Music".to_string()),
+            is_user_visible: true,
+            browser_order_ordinal: Some(0),
+            first_created_at: Some(changed_at),
+            changed_at,
+        })
+        .expect("upsert source location");
+    let source_file_id = durable_store
+        .record_source_file_observation(RecordSourceFileObservationInput {
+            source_file_id: None,
+            source_id: root.root_id,
+            parent_source_directory_id: Some(directory_id),
+            name: "HiddenHook.wav".to_string(),
+            relative_path: "Music/HiddenHook.wav".to_string(),
+            size_bytes: Some(12),
+            mtime_ns: Some(34),
+            presence_state: SourcePresenceState::Present,
+            first_discovered_at: Some(changed_at),
+            observed_at: Some(changed_at),
+            presence_changed_at: changed_at,
+            updated_at: changed_at,
+        })
+        .expect("record source file");
+
+    durable_store
+        .rebuild_search_filter_index_for_source(root.root_id)
+        .expect("rebuild visible source");
+    let mut first_page = request(None);
+    first_page.limit = 1;
+    let page = durable_store
+        .read_search_filter(first_page.clone())
+        .expect("read first page");
+    let cursor = page.next_cursor.clone().expect("cursor");
+
+    let visible = durable_store
+        .read_search_filter(request(Some("hiddenhook")))
+        .expect("visible fts search");
+    assert!(result_keys(&visible).contains(&format!("sourceFile:{source_file_id}")));
+
+    durable_store
+        .unregister_local_root(UnregisterLocalRootInput {
+            root_id: root.root_id,
+        })
+        .expect("unregister local root");
+
+    let hidden = durable_store
+        .read_search_filter(request(Some("hiddenhook")))
+        .expect("hidden fts search");
+    assert_eq!(hidden.state, StoreSearchState::Empty);
+    assert!(hidden.rows.is_empty());
+
+    let mut source_location = request(None);
+    source_location.scope = StoreSearchScope::SourceLocation { source_location_id };
+    let source_location_result = durable_store
+        .read_search_filter(source_location)
+        .expect("source location search");
+    assert_eq!(source_location_result.state, StoreSearchState::Partial);
+    assert!(source_location_result.rows.is_empty());
+
+    let purged = durable_store
+        .rebuild_search_filter_index_for_source(root.root_id)
+        .expect("rebuild hidden source");
+    assert_eq!(purged.rows_indexed, 0);
+
+    let mut stale_cursor_request = first_page;
+    stale_cursor_request.cursor = Some(cursor);
+    let invalid = durable_store
+        .read_search_filter(stale_cursor_request)
+        .expect("read with stale cursor");
+    assert_eq!(invalid.state, StoreSearchState::CursorInvalid);
+    assert!(invalid.index_generation >= purged.generation);
 }
 
 #[test]
