@@ -15,6 +15,7 @@ scope:
   - library-representation-composition
   - representation-root-realization
   - unified-library-sidebar
+  - browse-column-projection
   - independent-library-panels
   - grouped-library-panels
   - topology-hosted-library-surfaces
@@ -126,6 +127,8 @@ Examples:
 
 - selected scope within that panel;
 - expanded rows within that panel;
+- selected path within a column-browser realization;
+- focused column within a column-browser realization;
 - local scroll position;
 - local column visibility;
 - local sort selection where the representation allows it;
@@ -166,6 +169,8 @@ In V0 there may be one effective library browse session. Future multiple panels 
 - selected scope;
 - active browse policy;
 - expansion state;
+- selected path for column-browser realizations;
+- focused column for column-browser realizations;
 - pagination state;
 - scroll position;
 - focused row;
@@ -198,7 +203,7 @@ A composition shell may decide:
 - which panel instances are visible;
 - their order in the group;
 - whether they are collapsed or expanded;
-- whether they are shown as tabs, accordions, split panes, or stacked sections;
+- whether they are shown as tabs, accordions, split panes, stacked sections, or column-browser panes;
 - local group density;
 - local group header labels;
 - local group affordances such as pin, close, split, or open separately.
@@ -304,6 +309,7 @@ A panel realization is one concrete visual and interaction form for a representa
 Examples:
 
 - compact tree panel;
+- column browser panel;
 - browser plus contents panel;
 - contents-only panel;
 - inspector-heavy panel;
@@ -374,6 +380,72 @@ available but not dominate the workstation.
 The unified sidebar is not the library model.
 
 It is a composition shell over representation roots.
+
+### Browse Column Projection
+
+A representation root may support a column-browser realization.
+
+A browse column projection presents the current path as adjacent child-window columns. Each column represents one
+path segment and projects the readable children for that segment.
+
+Example:
+
+Sources
+
+- Local Files;
+- External Libraries;
+- Imports later.
+
+Local Files
+
+- Music;
+- DJ Edits;
+- Downloads;
+- Recordings.
+
+Music
+
+- House;
+- Techno;
+- Minimal;
+- Disco.
+
+House
+
+- Deep House;
+- Tech House;
+- Afro House;
+- Progressive House.
+
+A browse column projection is useful for fast source digging, deep folder navigation, external drive browsing,
+import review, and preparation workflows where sibling scopes need to remain visible.
+
+It is a realization of the same representation and hierarchy contracts. It is not a second hierarchy model.
+
+For Local Files, a browse column projection uses the same source readiness, child-readiness, hierarchy coverage,
+child-window, retained-pending, blocked, failed, incomplete, and empty-state contracts as the tree realization.
+
+Each column projects an accepted read result for one path segment. A column must not infer durable hierarchy facts from
+an empty child array, a stale cache, a visible row count, or another panel’s projected rows.
+
+Selecting a row in one column may open the next column and update the active contents scope for that panel instance.
+
+Column selection must not mutate the representation root’s meaning.
+
+Column selection must not mutate another panel instance unless an explicit linked-panel model is designed.
+
+A browse column projection may render counts, readiness, loading, retained, blocked, failed, incomplete, or empty states
+only from the same read contracts that authorize those states in the tree realization.
+
+Filter and browse-policy changes affect contents projection. They must not change column containment,
+child-readiness, source structure, or leaf/disclosure meaning.
+
+A composition shell may place a column browser beside a contents table, details panel, preparation panel, or import
+comparison panel. The placement does not change source ownership, row capability, external provenance, or authored
+semantics.
+
+Browse column projection is future-supported. It is not a Library V0 implementation requirement unless a sprint
+explicitly scopes it.
 
 ### Independent Workspace Panel
 
@@ -491,6 +563,20 @@ A preparation-forward layout may show:
 
 This supports finding music from raw and external sources.
 
+### Source Column Digging Layout
+
+A preparation-forward layout may show:
+
+- Local Files column browser;
+- contents table;
+- details panel;
+- source readiness or import review surface.
+
+This supports fast navigation through deep source hierarchies without making the tree realization the only serious
+source-browsing surface.
+
+The column browser and tree browser must remain different projections over the same source/hierarchy read contracts.
+
 ### Organization Layout
 
 A preparation-forward layout may show:
@@ -533,6 +619,7 @@ A panel realization must use the read boundary owned by its representation.
 Examples:
 
 - Local Files tree uses hierarchy reads for child rows;
+- Local Files column browser uses hierarchy reads for path-segment child windows;
 - Local Files contents uses contents reads for selected scopes;
 - Collection projections use collection/material projection reads when implemented;
 - Crates and playlists use authored membership reads when implemented;
@@ -558,418 +645,3 @@ A row being inside a sidebar does not mean it is a navigation-only row.
 A row being inside a large panel does not mean it is authored.
 
 A row being in a split comparison does not mean it can be dragged into the other side.
-
-A row being shown inside a Prepared Room-related group does not mean it has become a Prepared Room membership.
-
-Drag-and-drop must ask:
-
-- What is the source representation kind?
-- What is the target representation kind?
-- What source capability is present?
-- What target capability is present?
-- Is this an import, copy, membership add, reorder, reparent, fork, snapshot, route operation, or file operation?
-- Does the operation mutate a Dekzer-owned representation, an external representation, a source record, or only create a
-  new reference?
-
-The composition shell cannot grant permissions.
-
-The topology host cannot grant permissions.
-
-Only representation capabilities and explicit product contracts can grant permissions.
-
-## Local Files Composition Rule
-
-Local Files may appear:
-
-- inside the unified Library sidebar;
-- as its own panel;
-- as part of a Sources group;
-- beside External Libraries;
-- beside Collection;
-- beside Crates or Playlists for copy/add workflows;
-- compacted in performance-forward layouts.
-
-Local Files remains raw source representation in all forms.
-
-Local Files must not expose:
-
-- authored order;
-- playlist-like membership editing;
-- drag reparenting of filesystem folders;
-- manual ordering as durable user order;
-- hidden conversion into a crate or playlist.
-
-A composition shell may make Local Files convenient. It must not make Local Files authored.
-
-## Collection Composition Rule
-
-Collection may appear:
-
-- inside the unified Library sidebar;
-- as its own canonical material panel;
-- beside Local Files;
-- beside Crates or Playlists;
-- beside Smart Lists;
-- in a preparation-forward layout.
-
-Collection remains a projection over admitted musical material.
-
-Collection is not Local Files.
-
-Collection is not a playlist.
-
-Collection may later expose metadata, identity, duplicate, preparation, and review workflows according to its own
-contracts.
-
-## Authored Organization Composition Rule
-
-Crates, playlists, sleeves, and other authored organization roots may appear:
-
-- inside the unified Library sidebar;
-- as independent panels;
-- in grouped organization panels;
-- beside Collection;
-- beside Local Files;
-- beside Smart Lists;
-- inside preparation-forward layouts.
-
-Authored organization representations may own membership and order where their domain contract allows it.
-
-Their authored behavior does not leak into Local Files, Collection projections, Smart List results, External Libraries,
-or History records.
-
-## Generated Representation Composition Rule
-
-Smart Lists and search-like generated representations may appear:
-
-- inside the unified Library sidebar;
-- as independent panels;
-- grouped with Crates or Playlists;
-- beside Collection;
-- beside Prepared Room or Sleeves later.
-
-The user may own the definition.
-
-The live result set remains generated unless an explicit snapshot, priority overlay, pinned exception, or conversion
-model exists.
-
-Composition must not imply manual ordering of generated results.
-
-## External Library Composition Rule
-
-External Libraries may appear:
-
-- inside the unified Library sidebar;
-- as independent adapter panels;
-- beside Local Files;
-- beside Collection;
-- beside Dekzer-owned Crates or Playlists;
-- in import/review layouts.
-
-External rows preserve provenance in all realization forms.
-
-A Serato crate, Traktor playlist, or Rekordbox-style collection is not automatically Dekzer-owned because it appears
-beside Dekzer-owned surfaces.
-
-Composition may support import, copy, mirror, or inspect actions only through explicit product contracts.
-
-## History Composition Rule
-
-History may appear:
-
-- inside the unified Library sidebar;
-- as an independent performance record panel;
-- beside Collection;
-- beside Crates or Playlists;
-- beside Prepared Room;
-- in a post-set review layout.
-
-History remains a record representation.
-
-Composition may support annotation, copy, fork, conversion, and review workflows.
-
-It must not silently turn the source history record into an editable playlist.
-
-## Prepared Room, Sleeves, and Routes Composition Rule
-
-Prepared Rooms, Sleeves, Routes, Live Path, Shadow Paths, and related workflow objects may appear:
-
-- inside the unified Library sidebar;
-- as independent workflow panels;
-- grouped into preparation surfaces;
-- beside Crates, Playlists, Smart Lists, Collection, or History;
-- as focused preparation-forward surfaces;
-- as future VR/AR or spatial projections over the same domain model.
-
-These objects are workflow representations, not prettier playlists.
-
-Composition must preserve semantics such as:
-
-- readiness;
-- proximity;
-- reserve depth;
-- alternatives;
-- commitment;
-- performed state;
-- post-set memory;
-- route or transition meaning.
-
-A panel group may make these objects easier to use. It must not reduce them to generic list folders.
-
-## Panel Identity
-
-Every panel instance should have a stable identity separate from the representation root identity.
-
-A representation root answers:
-
-Which library representation is this?
-
-A panel instance answers:
-
-Which live realization of that representation is this?
-
-This allows:
-
-- multiple Local Files panels;
-- multiple Crates panels;
-- multiple History panels;
-- a compact sidebar and a focused panel showing the same root;
-- independent scroll and expansion state;
-- explicit linked-panel behavior later if designed.
-
-Panel identity must not become durable musical identity.
-
-Closing a panel must not delete the representation root.
-
-Rearranging a panel must not mutate the represented musical material.
-
-## Composition Persistence
-
-Workspace composition may be persisted as layout/session state.
-
-Examples:
-
-- which representation panels are open;
-- where they are placed;
-- grouped or split arrangement;
-- compact or expanded state;
-- panel-local session state where appropriate.
-
-Persisted composition state must not be confused with durable library substrate state.
-
-A saved workspace layout may remember that a Crates panel and Local Files panel were open side by side.
-
-That does not change crate membership, file paths, source registration, or history records.
-
-### Degraded Layout and Hydration Rule
-
-If a saved workspace references a representation root, panel realization, panel instance, or topology-hosted library
-surface that cannot hydrate, the composition shell must degrade gracefully.
-
-It must:
-
-- preserve the rest of the layout when possible;
-- show an unavailable, unsupported, or missing panel state where appropriate;
-- avoid deleting durable library data;
-- avoid deleting authored representation data;
-- avoid corrupting the saved workspace state during failed hydration;
-- never treat failed panel hydration as proof that the underlying musical material or representation no longer exists.
-
-## Relationship To Existing Docs
-
-[The Library Browser Representation Contract](representation-contract.md) owns representation semantics.
-
-This document owns realization and composition rules for representation roots.
-
-[Source Activation and Navigation Readiness](../../product/source-activation-and-navigation-readiness.md) owns Local Files readiness behavior before recursive scan completion.
-
-[First Slice Substrate Map](../../product/first-slice-substrate-map.md) owns current first-slice scope and active read-boundary ownership.
-
-[Prepared Room docs](../prepared-room/model.md) own Prepared Room and workflow semantics.
-
-Workspace topology docs own host topology, size negotiation, placement, and layout realization.
-
-[Row action and drag-and-drop contracts](../tree/row-action-and-dnd-scope-contract.md) own pointer surfaces, action legality, and drag/drop behavior.
-
-This document sits between library representation semantics and workspace topology realization.
-
-It prevents layout placement from becoming domain meaning.
-
-## Implementation Notes for Library V0
-
-Library V0 may implement only Local Files/source hierarchy and contents.
-
-That is acceptable.
-
-But the implementation must not name or structure the browser as if Local Files is the whole library.
-
-Prefer names that leave room for representation roots and panel realizations.
-
-Good conceptual names:
-
-- representation root;
-- representation kind;
-- browser surface;
-- panel instance;
-- composition shell;
-- library panel;
-- source browser;
-- contents projection;
-- capability profile.
-
-Avoid names that imply permanent placement when the concept is not placement-owned.
-
-Bad conceptual names:
-
-- sidebar item as the only identity;
-- folder browser as the whole library;
-- source tree as the whole library;
-- local files root as the library root;
-- playlist panel as a separate snowflake architecture;
-- crates sidebar as a unique subsystem unrelated to representation panels.
-
-### V0 Realization Boundary
-
-V0 required and current:
-
-- a unified Library sidebar and current Local Files realization is allowed and sufficient for the first implementation
-  slice;
-- one effective Library browse session is acceptable in V0 when the implementation has not introduced multiple
-  independent library panels.
-
-Architecture must allow later:
-
-- independent workspace panels;
-- grouped workspace panels;
-- focused preparation surfaces;
-- split and compare surfaces;
-- compact surfaces;
-- topology-hosted library surfaces.
-
-V0 must not:
-
-- implement fake Crates, Playlists, Smart Lists, External Libraries, History, Prepared Rooms, Sleeves, or Routes just to
-  satisfy the composition model;
-- hard-code sidebar-only architecture;
-- make Local Files the definition of Library;
-- make panel placement determine representation semantics.
-
-## Suggested Future Substrate Shape
-
-A future library panel substrate should be able to describe a panel instance with at least:
-
-- panel instance identity;
-- representation root identity;
-- representation kind;
-- realization kind;
-- current scope;
-- capability profile;
-- local view state;
-- read model binding;
-- composition group membership;
-- topology host placement where applicable.
-
-This is not a mandate to implement these fields now.
-
-It is a direction marker to prevent hard-coding one sidebar-only model.
-
-## Rejection Cases
-
-### Treating Sidebar Placement As Domain Meaning
-
-A representation root appearing in the sidebar does not make it a sidebar-only concept.
-
-### Treating Panel Placement As Domain Meaning
-
-A representation root appearing as an independent panel does not give it new semantic powers.
-
-### Building One Snowflake Panel Per Representation
-
-Do not create unrelated architectural systems for Local Files, Crates, Playlists, Smart Lists, History, and Prepared
-Room when a shared representation-panel substrate can carry the common concerns.
-
-### Letting Composition Grant Actions
-
-A composition shell cannot grant reorder, reparent, import, delete, edit, fork, or snapshot behavior.
-
-Actions must come from representation capabilities.
-
-### Letting Topology Grant Actions
-
-A topology host cannot make a raw source row authored, make a Smart List result reorderable, or make an external row
-Dekzer-owned.
-
-### Sharing Panel State Accidentally
-
-Two panels showing the same representation root must not accidentally share scroll, focus, expansion, selection,
-pagination, or local filters.
-
-Any shared state must be explicit.
-
-### Collapsing Representation Into One Library Tree
-
-The library may be composed into one sidebar, but it must not become one generic tree where all roots share the same
-semantics.
-
-### Treating Prepared Room As Playlist Placement
-
-A Prepared Room panel may appear beside playlists or crates. That does not make it a playlist.
-
-### Treating External Libraries As Native Objects
-
-An external library panel may appear beside Dekzer-native organization panels. That does not make external objects
-Dekzer-owned.
-
-### Treating History As Editable Authored Order
-
-History may appear in a panel, group, or sidebar. It remains a record representation unless explicitly forked or copied
-into an authored object.
-
-### Making First-Slice Local Files The Permanent Model
-
-Library V0 may begin with Local Files. It must not encode that the whole library is Local Files.
-
-## Acceptance Criteria
-
-The composition model is acceptable when:
-
-- Collection, Local Files, Playlists, Crates, Smart Lists, External Libraries, History, Prepared Rooms, Sleeves, and
-  Routes are treated as representation roots, not sidebar-only entries;
-- a representation root can be realized inside a unified sidebar;
-- a representation root can later be opened as an independent workspace panel;
-- multiple representation roots can be grouped without merging their semantics;
-- the same representation root can have multiple panel instances with independent local state;
-- sidebar, panel, group, split, and topology host are realization forms, not domain owners;
-- topology placement changes size and authority, not representation meaning;
-- actions and drag/drop behavior come from representation capabilities, not placement;
-- Local Files remains raw source representation in every realization;
-- authored organization remains authored in every realization;
-- generated views remain generated in every realization;
-- external library rows preserve provenance in every realization;
-- history rows remain record representations in every realization;
-- Prepared Room and workflow objects preserve workflow semantics in every realization;
-- Library V0 can remain narrow without hard-coding a sidebar-only future.
-
-## Final Statement
-
-Dekzer’s library representations must be composable.
-
-They can come together into one Library sidebar.
-
-They can split apart into separate workspace panels.
-
-They can be grouped, focused, compacted, compared, and topology-hosted.
-
-The composition changes how the user works with the representation.
-
-It does not change what the representation means.
-
-Representation kind owns meaning.
-
-Panel instance owns local view and session state.
-
-Composition shell owns grouping.
-
-Topology owns placement and size.
-
-That is the contract.
