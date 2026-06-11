@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   createSearchFilterReadController,
+  createSearchQueryIdFromIdentity,
   createSearchQueryId,
   type SearchQueryState
 } from '../../../../src/renderer/library/runtime/searchFilterState'
 import type {
+  SearchFilterQueryIdentity,
   SearchFilterReadRequest,
   SearchFilterReadResult,
   SearchFilterResult,
@@ -55,6 +57,205 @@ describe('createSearchFilterReadController', () => {
     expect(controller.state.value).toMatchObject({
       kind: 'Pending',
       requestToken: 1
+    })
+  })
+
+  it('accepts backend default targetKinds echo for an empty request targetKinds', async () => {
+    const api = deferredSearchApi()
+    const controller = createSearchFilterReadController(api)
+    const readRequest = request({ targetKinds: [] })
+    const backendIdentity = echoIdentity(readRequest, {
+      targetKinds: ['directory', 'source', 'sourceFile', 'sourceLocation']
+    })
+
+    controller.start()
+    const submitted = controller.submit(readRequest)
+    api.resolveNext(
+      readyResult(
+        requestAt(api, 0),
+        [row('source-file:1', 'Amen.wav')],
+        undefined,
+        'ready',
+        '1',
+        backendIdentity
+      )
+    )
+
+    await expect(submitted).resolves.toBe(true)
+    expect(retainedRows(controller.state.value).map((resultRow) => resultRow.displayLabel)).toEqual(
+      ['Amen.wav']
+    )
+  })
+
+  it('accepts backend normalized textQuery echo for whitespace and uppercase input', async () => {
+    const api = deferredSearchApi()
+    const controller = createSearchFilterReadController(api)
+    const readRequest = request({ textQuery: '  AMEN  ' })
+    const backendIdentity = echoIdentity(readRequest, { textQuery: 'amen' })
+
+    controller.start()
+    const submitted = controller.submit(readRequest)
+    api.resolveNext(
+      readyResult(
+        requestAt(api, 0),
+        [row('source-file:1', 'Amen.wav')],
+        undefined,
+        'ready',
+        '1',
+        backendIdentity
+      )
+    )
+
+    await expect(submitted).resolves.toBe(true)
+    expect(retainedRows(controller.state.value)).toHaveLength(1)
+  })
+
+  it('accepts backend sorted and deduped targetKinds echo', async () => {
+    const api = deferredSearchApi()
+    const controller = createSearchFilterReadController(api)
+    const readRequest = request({
+      targetKinds: ['sourceFile', 'source', 'sourceFile', 'directory']
+    })
+    const backendIdentity = echoIdentity(readRequest, {
+      targetKinds: ['directory', 'source', 'sourceFile']
+    })
+
+    controller.start()
+    const submitted = controller.submit(readRequest)
+    api.resolveNext(
+      readyResult(
+        requestAt(api, 0),
+        [row('source-file:1', 'Amen.wav')],
+        undefined,
+        'ready',
+        '1',
+        backendIdentity
+      )
+    )
+
+    await expect(submitted).resolves.toBe(true)
+    expect(retainedRows(controller.state.value)).toHaveLength(1)
+  })
+
+  it('accepts backend sorted and deduped filter array echo', async () => {
+    const api = deferredSearchApi()
+    const controller = createSearchFilterReadController(api)
+    const readRequest = request({
+      filters: {
+        fileClasses: ['video', 'audio', 'audio'],
+        fileKinds: ['video', 'archive', 'archive'],
+        mediaRelevance: ['playableMedia', 'audioWorkflow', 'playableMedia'],
+        presenceStates: ['removed', 'present', 'present'],
+        sourceAccessStates: ['unknown', 'blocked', 'blocked'],
+        blake3: 'hasCurrent',
+        probe: 'missingCurrent',
+        attachmentLinkStates: ['stale', 'current', 'current']
+      }
+    })
+    const backendIdentity = echoIdentity(readRequest, {
+      filters: {
+        fileClasses: ['audio', 'video'],
+        fileKinds: ['archive', 'video'],
+        mediaRelevance: ['audioWorkflow', 'playableMedia'],
+        presenceStates: ['present', 'removed'],
+        sourceAccessStates: ['blocked', 'unknown'],
+        blake3: 'hasCurrent',
+        probe: 'missingCurrent',
+        attachmentLinkStates: ['current', 'stale']
+      }
+    })
+
+    controller.start()
+    const submitted = controller.submit(readRequest)
+    api.resolveNext(
+      readyResult(
+        requestAt(api, 0),
+        [row('source-file:1', 'Amen.wav')],
+        undefined,
+        'ready',
+        '1',
+        backendIdentity
+      )
+    )
+
+    await expect(submitted).resolves.toBe(true)
+    expect(retainedRows(controller.state.value)).toHaveLength(1)
+  })
+
+  it('still rejects a genuinely different backend echoed identity', async () => {
+    const api = deferredSearchApi()
+    const controller = createSearchFilterReadController(api)
+    const readRequest = request({ textQuery: 'amen' })
+    const backendIdentity = echoIdentity(readRequest, { textQuery: 'break' })
+
+    controller.start()
+    const submitted = controller.submit(readRequest)
+    api.resolveNext(
+      readyResult(
+        requestAt(api, 0),
+        [row('source-file:1', 'Break.wav')],
+        undefined,
+        'ready',
+        '1',
+        backendIdentity
+      )
+    )
+
+    await expect(submitted).resolves.toBe(false)
+    expect(controller.state.value).toMatchObject({
+      kind: 'Pending',
+      requestToken: 1
+    })
+  })
+
+  it('uses the backend echo-derived queryId for Retained and preserves it while Accumulating', async () => {
+    const api = deferredSearchApi()
+    const controller = createSearchFilterReadController(api)
+    const readRequest = request({ textQuery: '  AMEN  ', targetKinds: [] })
+    const backendIdentity = echoIdentity(readRequest, {
+      textQuery: 'amen',
+      targetKinds: ['directory', 'source', 'sourceFile', 'sourceLocation']
+    })
+    const expectedQueryId = createSearchQueryIdFromIdentity(backendIdentity)
+
+    controller.start()
+    const submitted = controller.submit(readRequest)
+    api.resolveNext(
+      readyResult(
+        requestAt(api, 0),
+        [row('source-file:1', 'Amen.wav')],
+        'c1',
+        'ready',
+        '1',
+        backendIdentity
+      )
+    )
+
+    await expect(submitted).resolves.toBe(true)
+    expect(controller.state.value).toMatchObject({
+      kind: 'Retained',
+      queryId: expectedQueryId
+    })
+
+    const loaded = controller.loadNext()
+    expect(controller.state.value).toMatchObject({
+      kind: 'Accumulating',
+      queryId: expectedQueryId
+    })
+    api.resolveNext(
+      readyResult(
+        requestAt(api, 1),
+        [row('source-file:2', 'Amen 2.wav')],
+        undefined,
+        'ready',
+        '1',
+        backendIdentity
+      )
+    )
+    await expect(loaded).resolves.toBe(true)
+    expect(controller.state.value).toMatchObject({
+      kind: 'Retained',
+      queryId: expectedQueryId
     })
   })
 
@@ -318,29 +519,39 @@ function readyResult(
   rows: readonly SearchFilterResultRow[],
   nextCursor?: string,
   state: SearchFilterResult['state'] = 'ready',
-  indexGeneration = '1'
+  indexGeneration = '1',
+  queryIdentity: SearchFilterQueryIdentity = echoIdentity(readRequest, {}, indexGeneration)
 ): SearchFilterReadResult {
   return {
     state: 'ready',
     reply: {
       result: {
         state,
-        queryIdentity: {
-          scope: readRequest.scope,
-          recursion: readRequest.recursion,
-          ...(readRequest.textQuery === undefined ? {} : { textQuery: readRequest.textQuery }),
-          targetKinds: readRequest.targetKinds ?? [],
-          filters: readRequest.filters,
-          sort: readRequest.sort,
-          pageSize: readRequest.limit ?? 100,
-          indexGeneration
-        },
+        queryIdentity,
         indexGeneration,
         indexState: 'ready',
         rows: [...rows],
         ...(nextCursor === undefined ? {} : { nextCursor })
       }
     }
+  }
+}
+
+function echoIdentity(
+  readRequest: SearchFilterReadRequest,
+  overrides: Partial<SearchFilterQueryIdentity> = {},
+  indexGeneration = '1'
+): SearchFilterQueryIdentity {
+  return {
+    scope: readRequest.scope,
+    recursion: readRequest.recursion,
+    ...(readRequest.textQuery === undefined ? {} : { textQuery: readRequest.textQuery }),
+    targetKinds: readRequest.targetKinds ?? [],
+    filters: readRequest.filters,
+    sort: readRequest.sort,
+    pageSize: readRequest.limit ?? 100,
+    indexGeneration,
+    ...overrides
   }
 }
 

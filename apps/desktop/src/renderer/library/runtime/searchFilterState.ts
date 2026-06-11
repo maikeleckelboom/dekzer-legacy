@@ -214,7 +214,10 @@ export function createSearchFilterReadController(
         return false
       }
 
-      state.value = retainedStateFromResult(currentState.queryId, result)
+      state.value = retainedStateFromResult(
+        createSearchQueryIdFromIdentity(result.queryIdentity),
+        result
+      )
       return true
     }
 
@@ -307,6 +310,10 @@ export function createSearchQueryId(request: SearchFilterReadRequest): QueryId {
   return stableStringify(searchQueryIdentityInput(request)) as QueryId
 }
 
+export function createSearchQueryIdFromIdentity(identity: SearchFilterQueryIdentity): QueryId {
+  return stableStringify(searchQueryIdentityInputFromEcho(identity)) as QueryId
+}
+
 export function queryIdentityMatchesRequest(
   identity: SearchFilterQueryIdentity,
   request: SearchFilterReadRequest | undefined
@@ -395,13 +402,89 @@ type SearchQueryIdentityInput = {
   readonly pageSize: number
 }
 
+const defaultSearchFilterTargetKinds = [
+  'source',
+  'sourceLocation',
+  'directory',
+  'sourceFile'
+] satisfies NonNullable<SearchFilterReadRequest['targetKinds']>
+
+const searchFilterTargetKindStorageValues = {
+  source: 'source',
+  sourceLocation: 'source_location',
+  directory: 'directory',
+  sourceFile: 'source_file'
+} satisfies Record<NonNullable<SearchFilterReadRequest['targetKinds']>[number], string>
+
+const searchFilterFileClassStorageValues = {
+  audio: 'audio',
+  video: 'video',
+  image: 'image',
+  unsupported: 'unsupported',
+  none: 'none'
+} satisfies Record<NonNullable<SearchFilterReadRequest['filters']['fileClasses']>[number], string>
+
+const searchFilterFileKindStorageValues = {
+  audio: 'audio',
+  video: 'video',
+  image: 'image',
+  cueSheet: 'cue_sheet',
+  logDoc: 'log_doc',
+  textDoc: 'text_doc',
+  archive: 'archive',
+  other: 'other',
+  unknown: 'unknown'
+} satisfies Record<NonNullable<SearchFilterReadRequest['filters']['fileKinds']>[number], string>
+
+const searchFilterMediaRelevanceStorageValues = {
+  audioWorkflow: 'audio_workflow',
+  playableMedia: 'playable_media',
+  explicitInventory: 'explicit_inventory',
+  companionFile: 'companion_file',
+  notMediaRelevant: 'not_media_relevant'
+} satisfies Record<
+  NonNullable<SearchFilterReadRequest['filters']['mediaRelevance']>[number],
+  string
+>
+
+const searchFilterPresenceStateStorageValues = {
+  present: 'present',
+  missing: 'missing',
+  removed: 'removed'
+} satisfies Record<
+  NonNullable<SearchFilterReadRequest['filters']['presenceStates']>[number],
+  string
+>
+
+const searchFilterSourceAccessStateStorageValues = {
+  accessible: 'accessible',
+  missing: 'missing',
+  blocked: 'blocked',
+  unknown: 'unknown'
+} satisfies Record<
+  NonNullable<SearchFilterReadRequest['filters']['sourceAccessStates']>[number],
+  string
+>
+
+const searchFilterAttachmentLinkStateStorageValues = {
+  current: 'current',
+  stale: 'stale',
+  missing: 'missing',
+  notApplicable: 'not_applicable'
+} satisfies Record<
+  NonNullable<SearchFilterReadRequest['filters']['attachmentLinkStates']>[number],
+  string
+>
+
 function searchQueryIdentityInput(request: SearchFilterReadRequest): SearchQueryIdentityInput {
+  const textQuery = normalizeTextQuery(request.textQuery)
+
   return {
     scope: request.scope,
     recursion: request.recursion,
-    ...(request.textQuery === undefined ? {} : { textQuery: request.textQuery }),
-    targetKinds: [...(request.targetKinds ?? [])].sort(),
-    filters: request.filters,
+    ...(textQuery === undefined ? {} : { textQuery }),
+    targetKinds: canonicalTargetKinds(request.targetKinds),
+    filters: canonicalFilters(request.filters),
     sort: request.sort,
     pageSize: request.limit ?? defaultSearchFilterLimit
   }
@@ -410,15 +493,99 @@ function searchQueryIdentityInput(request: SearchFilterReadRequest): SearchQuery
 function searchQueryIdentityInputFromEcho(
   identity: SearchFilterQueryIdentity
 ): SearchQueryIdentityInput {
+  const textQuery = normalizeTextQuery(identity.textQuery)
+
   return {
     scope: identity.scope,
     recursion: identity.recursion,
-    ...(identity.textQuery === undefined ? {} : { textQuery: identity.textQuery }),
-    targetKinds: [...identity.targetKinds].sort(),
-    filters: identity.filters,
+    ...(textQuery === undefined ? {} : { textQuery }),
+    targetKinds: canonicalTargetKinds(identity.targetKinds),
+    filters: canonicalFilters(identity.filters),
     sort: identity.sort,
     pageSize: identity.pageSize
   }
+}
+
+function normalizeTextQuery(query: string | undefined): string | undefined {
+  const normalized = query?.trim().toLowerCase()
+  return normalized === undefined || normalized === '' ? undefined : normalized
+}
+
+function canonicalTargetKinds(
+  targetKinds: SearchFilterReadRequest['targetKinds']
+): NonNullable<SearchFilterReadRequest['targetKinds']> {
+  const kinds =
+    targetKinds === undefined || targetKinds.length === 0
+      ? defaultSearchFilterTargetKinds
+      : targetKinds
+
+  return sortAndDedupeByStorage(kinds, searchFilterTargetKindStorageValues)
+}
+
+function canonicalFilters(
+  filters: SearchFilterReadRequest['filters']
+): SearchFilterReadRequest['filters'] {
+  const canonical: SearchFilterReadRequest['filters'] = {}
+  const fileClasses = sortAndDedupeByStorage(
+    filters.fileClasses ?? [],
+    searchFilterFileClassStorageValues
+  )
+  const fileKinds = sortAndDedupeByStorage(
+    filters.fileKinds ?? [],
+    searchFilterFileKindStorageValues
+  )
+  const mediaRelevance = sortAndDedupeByStorage(
+    filters.mediaRelevance ?? [],
+    searchFilterMediaRelevanceStorageValues
+  )
+  const presenceStates = sortAndDedupeByStorage(
+    filters.presenceStates ?? [],
+    searchFilterPresenceStateStorageValues
+  )
+  const sourceAccessStates = sortAndDedupeByStorage(
+    filters.sourceAccessStates ?? [],
+    searchFilterSourceAccessStateStorageValues
+  )
+  const attachmentLinkStates = sortAndDedupeByStorage(
+    filters.attachmentLinkStates ?? [],
+    searchFilterAttachmentLinkStateStorageValues
+  )
+
+  if (fileClasses.length > 0) {
+    canonical.fileClasses = fileClasses
+  }
+  if (fileKinds.length > 0) {
+    canonical.fileKinds = fileKinds
+  }
+  if (mediaRelevance.length > 0) {
+    canonical.mediaRelevance = mediaRelevance
+  }
+  if (presenceStates.length > 0) {
+    canonical.presenceStates = presenceStates
+  }
+  if (sourceAccessStates.length > 0) {
+    canonical.sourceAccessStates = sourceAccessStates
+  }
+  if (filters.blake3 !== undefined) {
+    canonical.blake3 = filters.blake3
+  }
+  if (filters.probe !== undefined) {
+    canonical.probe = filters.probe
+  }
+  if (attachmentLinkStates.length > 0) {
+    canonical.attachmentLinkStates = attachmentLinkStates
+  }
+
+  return canonical
+}
+
+function sortAndDedupeByStorage<Value extends string>(
+  values: readonly Value[],
+  storageValues: Record<Value, string>
+): Value[] {
+  return [...new Set(values)].sort((left, right) =>
+    storageValues[left].localeCompare(storageValues[right])
+  )
 }
 
 function stableStringify(value: unknown): string {
