@@ -450,15 +450,17 @@ impl SqliteDurableStore {
             match collect_immediate_root_child_directories(&effective_root, observed_at) {
                 Ok(child_directories) => child_directories,
                 Err(failure) => {
-                    self.write_root_navigation_state(
+                    self.write_root_navigation_state(RootNavigationStateWrite {
                         root_id,
-                        root_navigation_window_state_for_establishment(failure.state),
-                        0,
-                        Some(failure.issue_kind),
-                        Some(failure.detail.clone()),
-                        Some(checked_at_ms),
-                        observed_at,
-                    )?;
+                        root_window_state: root_navigation_window_state_for_establishment(
+                            failure.state,
+                        ),
+                        immediate_child_directory_count: 0,
+                        issue_kind: Some(failure.issue_kind),
+                        detail: Some(failure.detail.clone()),
+                        checked_at: Some(checked_at_ms),
+                        updated_at: observed_at,
+                    })?;
                     self.sync_root_projection_state(&[root_id])?;
                     return Ok(RootNavigationWindowEstablishment {
                         root_id,
@@ -573,45 +575,49 @@ impl SqliteDurableStore {
         let Some(issue_kind) = issue_kind else {
             return Ok(());
         };
-        self.write_root_navigation_state(
+        self.write_root_navigation_state(RootNavigationStateWrite {
             root_id,
-            root_navigation_window_state_for_establishment(root_establishment_state_for_issue(
-                issue_kind,
-            )),
-            0,
-            Some(issue_kind),
-            access_probe.diagnostic_detail().map(str::to_string),
-            Some(access_probe.checked_at_ms()),
-            access_probe.checked_at_ms(),
-        )
+            root_window_state: root_navigation_window_state_for_establishment(
+                root_establishment_state_for_issue(issue_kind),
+            ),
+            immediate_child_directory_count: 0,
+            issue_kind: Some(issue_kind),
+            detail: access_probe.diagnostic_detail().map(str::to_string),
+            checked_at: Some(access_probe.checked_at_ms()),
+            updated_at: access_probe.checked_at_ms(),
+        })
     }
 
     fn write_root_navigation_state(
         &self,
-        root_id: i64,
-        root_window_state: SourceRootNavigationWindowState,
-        immediate_child_directory_count: i64,
-        issue_kind: Option<SourceAccessIssueKind>,
-        detail: Option<String>,
-        checked_at: Option<i64>,
-        updated_at: i64,
+        input: RootNavigationStateWrite,
     ) -> LibrarySqliteResult<()> {
         self.with_write(|write| {
             SourceRootNavigationStateAuthorityTx::new(write).upsert_source_root_navigation_state(
                 &UpsertSourceRootNavigationStateInput {
-                    source_id: root_id,
-                    root_window_state,
-                    immediate_child_directory_count,
-                    issue_kind,
-                    detail,
-                    checked_at,
-                    updated_at,
+                    source_id: input.root_id,
+                    root_window_state: input.root_window_state,
+                    immediate_child_directory_count: input.immediate_child_directory_count,
+                    issue_kind: input.issue_kind,
+                    detail: input.detail,
+                    checked_at: input.checked_at,
+                    updated_at: input.updated_at,
                 },
             )?;
             publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
             Ok(())
         })
     }
+}
+
+struct RootNavigationStateWrite {
+    root_id: i64,
+    root_window_state: SourceRootNavigationWindowState,
+    immediate_child_directory_count: i64,
+    issue_kind: Option<SourceAccessIssueKind>,
+    detail: Option<String>,
+    checked_at: Option<i64>,
+    updated_at: i64,
 }
 
 fn root_establishment_from_root_navigation_state(

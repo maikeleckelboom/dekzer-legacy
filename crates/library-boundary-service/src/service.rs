@@ -501,7 +501,7 @@ impl LibraryBoundaryService {
         let window = self
             .durable_store
             .read_literal_hierarchy_children(
-                store_library_tree_entry_point(request.entry_point.clone()),
+                store_library_tree_entry_point(request.entry_point),
                 request.parent_source_directory_id,
                 request.offset,
                 request.limit,
