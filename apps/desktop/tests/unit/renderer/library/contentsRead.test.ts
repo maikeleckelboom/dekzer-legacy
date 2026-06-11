@@ -10,8 +10,8 @@ import type {
   ContentsFileRow,
   ContentsReadRequest,
   ContentsReadResult
-} from '../../../../src/shared/libraryContents/read'
-import type { LibraryContentsApi } from '../../../../src/shared/rendererApi'
+} from '../../../../src/shared/library/contents/read'
+import type { LibraryContentsApi } from '../../../../src/shared/library/boundary/rendererApi'
 
 describe('createContentsReadController', () => {
   afterEach(() => {

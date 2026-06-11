@@ -5,7 +5,7 @@ import type {
   ReadSourceAttachmentSummaryResult,
   ReadSourceFileAttachmentRequest,
   ReadSourceFileAttachmentResult
-} from '../../../shared/libraryAttachmentIdentity/read'
+} from '../../../shared/library/attachmentIdentity/read'
 import type { RendererApi } from '../../../shared/rendererApi'
 
 export type LibraryAttachmentIdentityApi = RendererApi['library']['attachmentIdentity']

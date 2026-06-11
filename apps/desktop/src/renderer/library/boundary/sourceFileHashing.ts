@@ -1,7 +1,7 @@
 import type {
   HashSourceFilesBlake3Request,
   HashSourceFilesBlake3Result
-} from '../../../shared/librarySourceFileHashing/hashSourceFilesBlake3'
+} from '../../../shared/library/source/fileHashing'
 import type { RendererApi } from '../../../shared/rendererApi'
 
 export type LibrarySourceFileHashingApi = RendererApi['library']['hashing']

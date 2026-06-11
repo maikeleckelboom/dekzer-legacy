@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { mapLibraryTreeNode } from '../../../../src/main/libraryHierarchy/mapping'
+import { mapLibraryTreeNode } from '../../../../src/main/library/hierarchy/mapping'
 import type { LibraryTreeNode } from '@dekzer/library-boundary-contract'
 
 function makeDirectoryNode(overrides: Partial<LibraryTreeNode> = {}): LibraryTreeNode {

@@ -7,7 +7,7 @@ import {
   type AppBoundaryEvent,
   type AppMaintainedSnapshotInvalidatedEvent,
   type AppSourceScanEvent
-} from '../../../shared/libraryBoundary/eventParser'
+} from '../../../shared/library/boundary/eventParser'
 
 export type ScanProgressState =
   | { readonly kind: 'idle' }

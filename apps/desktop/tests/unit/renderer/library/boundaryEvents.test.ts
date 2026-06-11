@@ -4,7 +4,7 @@ import {
   createBoundaryEventsController,
   type BoundaryEventApi
 } from '../../../../src/renderer/library/boundary/boundaryEvents'
-import type { BoundaryEventDeliveryPayload } from '../../../../src/shared/libraryBoundary/events'
+import type { BoundaryEventDeliveryPayload } from '../../../../src/shared/library/boundary/events'
 
 describe('createBoundaryEventsController', () => {
   it('consumes Main-delivered event batches without polling', () => {

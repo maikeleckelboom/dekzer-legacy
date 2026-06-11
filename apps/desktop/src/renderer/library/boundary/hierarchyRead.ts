@@ -1,7 +1,7 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 
-import type { LibraryBoundaryHostStatus } from '../../../shared/libraryBoundary/status'
+import type { LibraryBoundaryHostStatus } from '../../../shared/library/boundary/status'
 import type {
   EntryPoint,
   ChildRow,
@@ -9,8 +9,8 @@ import type {
   ReadResult,
   ReadRoot,
   ChildWindow
-} from '../../../shared/libraryHierarchy/readChildren'
-import type { NavigationReadRowsResult } from '../../../shared/libraryNavigation/readRows'
+} from '../../../shared/library/hierarchy/read'
+import type { NavigationReadRowsResult } from '../../../shared/library/navigation/read'
 import type { RendererApi } from '../../../shared/rendererApi'
 import { projectState, type BrowserProjection } from '../tree/projection'
 import type {

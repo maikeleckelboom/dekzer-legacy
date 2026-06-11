@@ -22,12 +22,12 @@ import type {
   ChildRow,
   EntryPoint,
   HierarchyCoverage
-} from '../../../../src/shared/libraryHierarchy/readChildren'
+} from '../../../../src/shared/library/hierarchy/read'
 import type {
   NavigationReadRowsResult,
   NavigationRow
-} from '../../../../src/shared/libraryNavigation/readRows'
-import type { SourceLifecycleRecord } from '../../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
+} from '../../../../src/shared/library/navigation/read'
+import type { SourceLifecycleRecord } from '../../../../src/shared/library/source/lifecycle'
 
 describe('source readiness', () => {
   it('scan progress drives scanning without synthesizing children', () => {

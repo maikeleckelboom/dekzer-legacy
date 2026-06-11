@@ -2,7 +2,7 @@ import type {
   LibraryViewStateReadResult,
   LibraryViewStateWriteResult,
   PersistedLibraryViewState
-} from '../../../shared/libraryViewState/viewState'
+} from '../../../shared/library/viewState/persistence'
 
 export type ViewStateApi = {
   readonly library: {

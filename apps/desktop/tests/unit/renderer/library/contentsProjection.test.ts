@@ -21,16 +21,16 @@ import type {
   NavigableChildScopeState,
   EntryPoint,
   HierarchyCoverage
-} from '../../../../src/shared/libraryHierarchy/readChildren'
+} from '../../../../src/shared/library/hierarchy/read'
 import type {
   ContentsFileRow,
   ContentsReadPolicy,
   ContentsResult
-} from '../../../../src/shared/libraryContents/read'
+} from '../../../../src/shared/library/contents/read'
 import type {
   NavigationReadRowsResult,
   NavigationRow
-} from '../../../../src/shared/libraryNavigation/readRows'
+} from '../../../../src/shared/library/navigation/read'
 
 describe('projectContents', () => {
   it('projects selected source contents from contents state', () => {

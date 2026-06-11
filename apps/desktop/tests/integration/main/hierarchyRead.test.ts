@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,32 +9,23 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
-import {
-  readThroughHost,
-  registerReadChildrenIpc
-} from '../../../src/main/libraryHierarchy/readChildren'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
+import { readThroughHost, registerReadChildrenIpc } from '../../../src/main/library/hierarchy/read'
 import {
   readNavigationRowsThroughHost,
   registerReadNavigationRowsIpc
-} from '../../../src/main/libraryNavigation/readRows'
-import {
-  hierarchyReadChannels,
-  type ReadResult
-} from '../../../src/shared/libraryHierarchy/readChildren'
+} from '../../../src/main/library/navigation/read'
+import { type ReadResult } from '../../../src/shared/library/hierarchy/read'
 import type { LibraryTreeCoverage } from '@dekzer/library-boundary-contract'
-import {
-  navigationReadChannels,
-  type NavigationReadRowsResult
-} from '../../../src/shared/libraryNavigation/readRows'
+import { type NavigationReadRowsResult } from '../../../src/shared/library/navigation/read'
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
-import { firstAvailableSourceReadRequest } from '../../support/libraryHierarchy'
+} from '../../support/library/boundary'
+import { firstAvailableSourceReadRequest } from '../../support/library/hierarchy'
 
 const tempRoots: string[] = []
 
@@ -292,7 +284,7 @@ describe('hierarchy and navigation reads through the host', () => {
       },
       idleHost
     )
-    expect(hierarchyRegistration.channel).toBe(hierarchyReadChannels.readChildren)
+    expect(hierarchyRegistration.channel).toBe(libraryControlChannels.hierarchy.read)
     expect(typeof hierarchyRegistration.handler).toBe('function')
 
     const navigationRegistration: {
@@ -308,7 +300,7 @@ describe('hierarchy and navigation reads through the host', () => {
       },
       idleHost
     )
-    expect(navigationRegistration.channel).toBe(navigationReadChannels.readRows)
+    expect(navigationRegistration.channel).toBe(libraryControlChannels.navigation.read)
     expect(typeof navigationRegistration.handler).toBe('function')
   })
 })

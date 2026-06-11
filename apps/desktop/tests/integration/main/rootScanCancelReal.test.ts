@@ -6,18 +6,18 @@ import process from 'node:process'
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import type { LibraryBoundaryHostConfig } from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
-import { registerLocalRoot } from '../../../src/main/libraryRoots/registerLocalRoot'
-import { runLocalRootScanThroughHost } from '../../../src/main/libraryRoots/runScan'
-import { cancelRootScanThroughHost } from '../../../src/main/libraryRoots/cancelScan'
-import type { LocalRootScanResult } from '../../../src/shared/libraryRoots/runScan'
+import type { LibraryBoundaryHostConfig } from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
+import { registerLocalRoot } from '../../../src/main/library/roots/register'
+import { runLocalRootScanThroughHost } from '../../../src/main/library/roots/scan'
+import { cancelRootScanThroughHost } from '../../../src/main/library/roots/cancel'
+import type { LocalRootScanResult } from '../../../src/shared/library/roots/scan'
 import type {
   CancelRootScanResult,
   CancelRootScanAcceptedResult
-} from '../../../src/shared/libraryRoots/cancelScan'
-import type { LocalRootRegistrationResult } from '../../../src/shared/libraryRoots/registerLocalRoot'
-import { silentLogger } from '../../support/libraryBoundary'
+} from '../../../src/shared/library/roots/cancel'
+import type { LocalRootRegistrationResult } from '../../../src/shared/library/roots/register'
+import { silentLogger } from '../../support/library/boundary'
 
 const boundaryStdioBinaryPathEnvVar = 'DEKZER_LIBRARY_BOUNDARY_STDIO_BINARY'
 

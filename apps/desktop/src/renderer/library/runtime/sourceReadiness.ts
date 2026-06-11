@@ -1,5 +1,5 @@
-import type { LocalRoot } from '../../../shared/libraryRoots/readLocalRoots'
-import type { SourceLifecycleRecord } from '../../../shared/librarySourceLifecycle/readSourceLifecycle'
+import type { LocalRoot } from '../../../shared/library/roots/read'
+import type { SourceLifecycleRecord } from '../../../shared/library/source/lifecycle'
 import type { ScanProgressState } from '../boundary/boundaryEvents'
 import type { LocalRootScanStatus, LocalRootsReadState } from '../boundary/localRootActions'
 import type { RowBinding, SourceState } from '../state'

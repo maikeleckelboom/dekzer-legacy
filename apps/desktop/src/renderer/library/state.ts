@@ -1,13 +1,6 @@
-import type { LibraryBoundaryHostStatus } from '../../shared/libraryBoundary/status'
-import type {
-  EntryPoint,
-  ChildRow,
-  HierarchyCoverage
-} from '../../shared/libraryHierarchy/readChildren'
-import type {
-  NavigationReadRowsResult,
-  NavigationRow
-} from '../../shared/libraryNavigation/readRows'
+import type { LibraryBoundaryHostStatus } from '../../shared/library/boundary/status'
+import type { EntryPoint, ChildRow, HierarchyCoverage } from '../../shared/library/hierarchy/read'
+import type { NavigationReadRowsResult, NavigationRow } from '../../shared/library/navigation/read'
 import type { SourceReadiness } from './runtime/sourceReadiness'
 
 export type DirectoryTarget = {

@@ -1,3 +1,5 @@
+import { libraryPublicationChannels } from '../../../../src/shared/library/boundary/publicationPlane'
+import { libraryControlChannels } from '../../../../src/shared/library/boundary/controlPlane'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
@@ -5,8 +7,7 @@ import {
   registerBoundaryEventPumpIpc,
   type BoundaryEventPumpIpcMain,
   type BoundaryEventPumpWebContents
-} from '../../../../src/main/libraryBoundary/eventPump'
-import { boundaryEventChannels } from '../../../../src/shared/libraryBoundary/events'
+} from '../../../../src/main/library/boundary/eventPump'
 
 type TestHost = {
   readonly client: {
@@ -48,7 +49,7 @@ describe('BoundaryEventPump', () => {
     })
     expect(pump.lastSeenEventSequence).toBe(1)
     expect(subscriber.sent[0]).toMatchObject({
-      channel: boundaryEventChannels.batch,
+      channel: libraryPublicationChannels.boundary.events.batch,
       payload: {
         kind: 'batch',
         latestEventSequence: 1,
@@ -132,7 +133,7 @@ describe('BoundaryEventPump', () => {
     expect(host.client.readAfterBoundaryEvents).toHaveBeenCalledTimes(1)
     expect(healthySubscriber.sent).toHaveLength(1)
     expect(healthySubscriber.sent[0]).toMatchObject({
-      channel: boundaryEventChannels.batch,
+      channel: libraryPublicationChannels.boundary.events.batch,
       payload: { kind: 'batch', latestEventSequence: 1 }
     })
     expect(pump.subscriberCount).toBe(1)
@@ -185,7 +186,7 @@ describe('BoundaryEventPump', () => {
     expect(host.client.readAfterBoundaryEvents).toHaveBeenCalledTimes(1)
     expect(subscriber.sent).toEqual([
       {
-        channel: boundaryEventChannels.batch,
+        channel: libraryPublicationChannels.boundary.events.batch,
         payload: { kind: 'failed', detail: 'host read failed' }
       }
     ])
@@ -214,14 +215,14 @@ describe('BoundaryEventPump', () => {
 
     await expect(
       registered
-        .find((handler) => handler.channel === boundaryEventChannels.subscribe)
+        .find((handler) => handler.channel === libraryControlChannels.boundary.events.subscribe)
         ?.listener({ sender: webContents })
     ).resolves.toEqual({ kind: 'subscribed' })
     expect(pump.subscriberCount).toBe(1)
 
     await expect(
       registered
-        .find((handler) => handler.channel === boundaryEventChannels.unsubscribe)
+        .find((handler) => handler.channel === libraryControlChannels.boundary.events.unsubscribe)
         ?.listener({ sender: webContents })
     ).resolves.toEqual({ kind: 'unsubscribed' })
     expect(pump.subscriberCount).toBe(0)

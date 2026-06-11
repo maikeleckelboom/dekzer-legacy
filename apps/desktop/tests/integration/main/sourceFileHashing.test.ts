@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,22 +10,19 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   hashSourceFilesBlake3ThroughHost,
   registerSourceFileHashingIpc
-} from '../../../src/main/librarySourceFileHashing/hashSourceFilesBlake3'
-import {
-  sourceFileHashingChannels,
-  type HashSourceFilesBlake3Result
-} from '../../../src/shared/librarySourceFileHashing/hashSourceFilesBlake3'
+} from '../../../src/main/library/source/fileHashing'
+import { type HashSourceFilesBlake3Result } from '../../../src/shared/library/source/fileHashing'
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -130,7 +128,7 @@ describe('source file BLAKE3 hashing through the host', () => {
       idleHost
     )
 
-    expect(registration.channel).toBe(sourceFileHashingChannels.hashSourceFilesBlake3)
+    expect(registration.channel).toBe(libraryControlChannels.source.fileHashing)
     expect(typeof registration.handler).toBe('function')
   })
 })

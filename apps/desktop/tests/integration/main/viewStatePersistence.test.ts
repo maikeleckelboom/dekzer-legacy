@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,10 +10,9 @@ import {
   readViewStateFromHost,
   registerLibraryViewStateIpc,
   writeViewStateToHost
-} from '../../../src/main/libraryViewState/viewState'
-import type { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
-import type { LibraryBoundaryHostConfig } from '../../../src/main/libraryBoundary/config'
-import { libraryViewStateChannels } from '../../../src/shared/libraryViewState/viewState'
+} from '../../../src/main/library/viewState/persistence'
+import type { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
+import type { LibraryBoundaryHostConfig } from '../../../src/main/library/boundary/config'
 
 const tempRoots: string[] = []
 
@@ -74,11 +74,11 @@ describe('persisted library view state', () => {
     registerLibraryViewStateIpc(
       {
         handle(channel, listener): void {
-          if (channel === libraryViewStateChannels.readViewState) {
+          if (channel === libraryControlChannels.viewState.read) {
             registration.read = () => listener({})
           }
 
-          if (channel === libraryViewStateChannels.writeViewState) {
+          if (channel === libraryControlChannels.viewState.write) {
             registration.write = (viewState) => listener({}, viewState)
           }
         }

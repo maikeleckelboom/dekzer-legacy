@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -12,26 +13,26 @@ import {
   resolveHostStdioBinaryPath,
   selectHostEnvironment,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHostError } from '../../../src/main/libraryBoundary/errors'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHostError } from '../../../src/main/library/boundary/errors'
 import {
   LibraryBoundaryHost,
   type LibraryBoundaryHostTransport,
   type LibraryBoundaryHostTransportOptions
-} from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/host'
 import {
   projectHostStatus,
   HostStatusController,
   registerHostStatusIpc
-} from '../../../src/main/libraryBoundary/status'
-import { hostStatusChannels } from '../../../src/shared/libraryBoundary/status'
+} from '../../../src/main/library/boundary/status'
+
 import {
   createFakeClient,
   deferred,
   silentLogger,
   silentStatusLogger,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -244,7 +245,7 @@ describe('library boundary host', () => {
       controller
     )
 
-    expect(registration.channel).toBe(hostStatusChannels.getStatus)
+    expect(registration.channel).toBe(libraryControlChannels.boundary.getStatus)
     expect(registration.handler?.().state).toBe('idle')
   })
 

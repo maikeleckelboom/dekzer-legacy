@@ -1,26 +1,26 @@
+import { libraryPublicationChannels } from '../shared/library/boundary/publicationPlane'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { createLibraryBoundaryHost } from './libraryBoundary/host'
-import { registerReadChildrenIpc } from './libraryHierarchy/readChildren'
-import { registerReadNavigationRowsIpc } from './libraryNavigation/readRows'
-import { registerContentsReadIpc } from './libraryContents/read'
-import { registerReadSourceLifecycleIpc } from './librarySourceLifecycle/readSourceLifecycle'
-import { registerAttachmentIdentityReadIpc } from './libraryAttachmentIdentity/read'
-import { registerSourceFileHashingIpc } from './librarySourceFileHashing/hashSourceFilesBlake3'
-import { registerSourceMaintenanceIpc } from './librarySourceMaintenance/sourceMaintenance'
-import { registerTrackIdentityDecisionIpc } from './libraryTrackIdentityDecisions/decisionCommands'
-import { registerTrackIdentityReviewCandidatesIpc } from './libraryTrackIdentityReview/candidates'
-import { registerLocalRootChoiceIpc } from './libraryRoots/chooseAndRegisterLocal'
-import { registerLocalRootScanIpc } from './libraryRoots/runScan'
-import { registerCancelRootScanIpc } from './libraryRoots/cancelScan'
-import { registerReadLocalRootsIpc } from './libraryRoots/readLocalRoots'
-import { registerUnregisterLocalRootIpc } from './libraryRoots/unregisterLocalRoot'
-import { registerLibraryViewStateIpc } from './libraryViewState/viewState'
-import { BoundaryEventPump, registerBoundaryEventPumpIpc } from './libraryBoundary/eventPump'
-import { HostStatusController, registerHostStatusIpc } from './libraryBoundary/status'
-import { hostStatusChannels } from '../shared/libraryBoundary/status'
+import { createLibraryBoundaryHost } from './library/boundary/host'
+import { registerReadChildrenIpc } from './library/hierarchy/read'
+import { registerReadNavigationRowsIpc } from './library/navigation/read'
+import { registerContentsReadIpc } from './library/contents/read'
+import { registerReadSourceLifecycleIpc } from './library/source/lifecycle'
+import { registerAttachmentIdentityReadIpc } from './library/attachmentIdentity/read'
+import { registerSourceFileHashingIpc } from './library/source/fileHashing'
+import { registerSourceMaintenanceIpc } from './library/source/maintenance'
+import { registerTrackIdentityDecisionIpc } from './library/trackIdentity/decisions'
+import { registerTrackIdentityReviewCandidatesIpc } from './library/trackIdentity/candidates'
+import { registerLocalRootChoiceIpc } from './library/roots/chooseLocal'
+import { registerLocalRootScanIpc } from './library/roots/scan'
+import { registerCancelRootScanIpc } from './library/roots/cancel'
+import { registerReadLocalRootsIpc } from './library/roots/read'
+import { registerUnregisterLocalRootIpc } from './library/roots/unregister'
+import { registerLibraryViewStateIpc } from './library/viewState/persistence'
+import { BoundaryEventPump, registerBoundaryEventPumpIpc } from './library/boundary/eventPump'
+import { HostStatusController, registerHostStatusIpc } from './library/boundary/status'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
@@ -93,7 +93,7 @@ app.whenReady().then(() => {
   hostStatusController.onStatusChanged((status) => {
     boundaryEventPump?.setHostStarted(status.state === 'started')
     for (const window of BrowserWindow.getAllWindows()) {
-      window.webContents.send(hostStatusChannels.statusChanged, status)
+      window.webContents.send(libraryPublicationChannels.boundary.statusChanged, status)
     }
   })
 

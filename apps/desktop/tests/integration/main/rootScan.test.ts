@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,26 +11,26 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   type ScanLogger,
   registerLocalRootScanIpc,
   runLocalRootScanThroughHost
-} from '../../../src/main/libraryRoots/runScan'
+} from '../../../src/main/library/roots/scan'
 import {
   registerCancelRootScanIpc,
   cancelRootScanThroughHost
-} from '../../../src/main/libraryRoots/cancelScan'
-import { rootChannels } from '../../../src/shared/libraryRoots/channels'
-import type { LocalRootScanResult } from '../../../src/shared/libraryRoots/runScan'
-import type { CancelRootScanResult } from '../../../src/shared/libraryRoots/cancelScan'
+} from '../../../src/main/library/roots/cancel'
+
+import type { LocalRootScanResult } from '../../../src/shared/library/roots/scan'
+import type { CancelRootScanResult } from '../../../src/shared/library/roots/cancel'
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -206,7 +207,7 @@ describe('local root scan boundary', () => {
       new LibraryBoundaryHost(hostConfig(), silentLogger())
     )
 
-    expect(registration.channel).toBe(rootChannels.runScan)
+    expect(registration.channel).toBe(libraryControlChannels.roots.scan)
     expect(typeof registration.handler).toBe('function')
   })
 })
@@ -401,7 +402,7 @@ describe('local root scan cancellation boundary', () => {
       new LibraryBoundaryHost(hostConfig(), silentLogger())
     )
 
-    expect(registration.channel).toBe(rootChannels.cancelScan)
+    expect(registration.channel).toBe(libraryControlChannels.roots.cancel)
     expect(typeof registration.handler).toBe('function')
   })
 })

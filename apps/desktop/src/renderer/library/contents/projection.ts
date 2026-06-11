@@ -1,10 +1,10 @@
-import type { ChildRow, Presence } from '../../../shared/libraryHierarchy/readChildren'
+import type { ChildRow, Presence } from '../../../shared/library/hierarchy/read'
 import type {
   ContentsReadResult,
   ContentsResult,
   ContentsFileRow,
   PrimaryMediaSummary
-} from '../../../shared/libraryContents/read'
+} from '../../../shared/library/contents/read'
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'

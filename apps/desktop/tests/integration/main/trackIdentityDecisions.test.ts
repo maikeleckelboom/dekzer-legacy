@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,24 +15,21 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   acceptTrackIdentityCandidateThroughHost,
   deferTrackIdentityCandidateThroughHost,
   registerTrackIdentityDecisionIpc,
   rejectTrackIdentityCandidateThroughHost
-} from '../../../src/main/libraryTrackIdentityDecisions/decisionCommands'
-import {
-  trackIdentityDecisionChannels,
-  type TrackIdentityDecisionCommandResult
-} from '../../../src/shared/libraryTrackIdentityDecisions/decisionCommands'
+} from '../../../src/main/library/trackIdentity/decisions'
+import { type TrackIdentityDecisionCommandResult } from '../../../src/shared/library/trackIdentity/decisions'
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -191,9 +189,9 @@ describe('track identity decision commands through the host', () => {
       silentDecisionLogger
     )
 
-    expect(registration.has(trackIdentityDecisionChannels.acceptTrackIdentityCandidate)).toBe(true)
-    expect(registration.has(trackIdentityDecisionChannels.rejectTrackIdentityCandidate)).toBe(true)
-    expect(registration.has(trackIdentityDecisionChannels.deferTrackIdentityCandidate)).toBe(true)
+    expect(registration.has(libraryControlChannels.trackIdentity.decisions.accept)).toBe(true)
+    expect(registration.has(libraryControlChannels.trackIdentity.decisions.reject)).toBe(true)
+    expect(registration.has(libraryControlChannels.trackIdentity.decisions.defer)).toBe(true)
   })
 })
 

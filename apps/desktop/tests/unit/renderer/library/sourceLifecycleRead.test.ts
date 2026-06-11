@@ -7,8 +7,8 @@ import {
 } from '../../../../src/renderer/library/boundary/sourceLifecycleRead'
 import type { RowBinding } from '../../../../src/renderer/library/state'
 import type { BrowserProjection } from '../../../../src/renderer/library/tree/projection'
-import type { NavigationRow } from '../../../../src/shared/libraryNavigation/readRows'
-import type { SourceLifecycleRecord } from '../../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
+import type { NavigationRow } from '../../../../src/shared/library/navigation/read'
+import type { SourceLifecycleRecord } from '../../../../src/shared/library/source/lifecycle'
 
 describe('createSourceLifecycleReadController', () => {
   it('hydrates lifecycle records by source id', async () => {

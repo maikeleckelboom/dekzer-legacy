@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import type { LibraryBoundaryHostStatus } from '../../../../src/shared/libraryBoundary/status'
+import type { LibraryBoundaryHostStatus } from '../../../../src/shared/library/boundary/status'
 import type {
   ChildRow,
   EntryPoint,
   HierarchyCoverage,
   NavigableChildScopeState
-} from '../../../../src/shared/libraryHierarchy/readChildren'
+} from '../../../../src/shared/library/hierarchy/read'
 import type {
   NavigationReadRowsResult,
   NavigationRow,
   NavigationRowSelectorKind
-} from '../../../../src/shared/libraryNavigation/readRows'
+} from '../../../../src/shared/library/navigation/read'
 import type { BrowserState, LoadedChildren } from '../../../../src/renderer/library/state'
 import {
   canRevealBrowserTreeChildren,

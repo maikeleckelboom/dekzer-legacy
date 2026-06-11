@@ -13,9 +13,9 @@ import {
   sourceRegistrationIntent,
   type SourceRegistrationIntent
 } from '../../../../src/renderer/library/runtime/sourceActions'
-import type { LocalRootChoiceResult } from '../../../../src/shared/libraryRoots/chooseAndRegisterLocal'
-import type { ReadLocalRootsOutcome } from '../../../../src/shared/libraryRoots/readLocalRoots'
-import type { LocalRootScanResult } from '../../../../src/shared/libraryRoots/runScan'
+import type { LocalRootChoiceResult } from '../../../../src/shared/library/roots/chooseLocal'
+import type { ReadLocalRootsOutcome } from '../../../../src/shared/library/roots/read'
+import type { LocalRootScanResult } from '../../../../src/shared/library/roots/scan'
 
 describe('local root scan lifecycle', () => {
   it('keeps scan unavailable before registration', async () => {

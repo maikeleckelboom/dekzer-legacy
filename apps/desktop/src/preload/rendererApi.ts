@@ -1,34 +1,23 @@
+import { libraryPublicationChannels } from '../shared/library/boundary/publicationPlane'
+import { libraryControlChannels } from '../shared/library/boundary/controlPlane'
+import { type LibraryBoundaryHostStatus } from '../shared/library/boundary/status'
 import {
-  hostStatusChannels,
-  type LibraryBoundaryHostStatus
-} from '../shared/libraryBoundary/status'
-import {
-  libraryViewStateChannels,
   type LibraryViewStateReadResult,
   type LibraryViewStateWriteResult,
   type PersistedLibraryViewState
-} from '../shared/libraryViewState/viewState'
+} from '../shared/library/viewState/persistence'
+import { type ReadRequest, type ReadResult } from '../shared/library/hierarchy/read'
 import {
-  hierarchyReadChannels,
-  type ReadRequest,
-  type ReadResult
-} from '../shared/libraryHierarchy/readChildren'
-import {
-  navigationReadChannels,
   type NavigationReadRowsRequest,
   type NavigationReadRowsResult
-} from '../shared/libraryNavigation/readRows'
-import {
-  contentsReadChannels,
-  type ContentsReadResult,
-  type ContentsReadRequest
-} from '../shared/libraryContents/read'
-import { sourceLifecycleReadChannels } from '../shared/librarySourceLifecycle/channels'
+} from '../shared/library/navigation/read'
+import { type ContentsReadResult, type ContentsReadRequest } from '../shared/library/contents/read'
+
 import type {
   ReadSourceLifecycleResult,
   ReadSourceLifecycleRequest
-} from '../shared/librarySourceLifecycle/readSourceLifecycle'
-import { attachmentIdentityReadChannels } from '../shared/libraryAttachmentIdentity/channels'
+} from '../shared/library/source/lifecycle'
+
 import type {
   ReadAttachmentSourceFilesRequest,
   ReadAttachmentSourceFilesResult,
@@ -36,44 +25,39 @@ import type {
   ReadSourceAttachmentSummaryResult,
   ReadSourceFileAttachmentRequest,
   ReadSourceFileAttachmentResult
-} from '../shared/libraryAttachmentIdentity/read'
+} from '../shared/library/attachmentIdentity/read'
 import {
-  sourceFileHashingChannels,
   type HashSourceFilesBlake3Request,
   type HashSourceFilesBlake3Result
-} from '../shared/librarySourceFileHashing/hashSourceFilesBlake3'
+} from '../shared/library/source/fileHashing'
 import {
-  sourceMaintenanceChannels,
   type ReadSourceMaintenanceRequest,
   type ReadSourceMaintenanceResult,
   type RunSourceMaintenanceRequest,
   type RunSourceMaintenanceResult
-} from '../shared/librarySourceMaintenance/sourceMaintenance'
+} from '../shared/library/source/maintenance'
 import {
-  trackIdentityDecisionChannels,
   type TrackIdentityDecisionRequest,
   type TrackIdentityDecisionCommandResult
-} from '../shared/libraryTrackIdentityDecisions/decisionCommands'
+} from '../shared/library/trackIdentity/decisions'
 import {
-  channels as trackIdentityReviewChannels,
   type ReadCandidatesRequest,
   type ReadCandidatesResult
-} from '../shared/libraryTrackIdentityReview/candidates'
-import { rootChannels } from '../shared/libraryRoots/channels'
-import { boundaryEventChannels } from '../shared/libraryBoundary/events'
+} from '../shared/library/trackIdentity/candidates'
+
 import type {
   BoundaryEventDeliveryPayload,
   BoundaryEventSubscribeResult,
   BoundaryEventUnsubscribeResult
-} from '../shared/libraryBoundary/events'
-import type { LocalRootChoiceResult } from '../shared/libraryRoots/chooseAndRegisterLocal'
-import type { ReadLocalRootsOutcome } from '../shared/libraryRoots/readLocalRoots'
-import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/libraryRoots/runScan'
-import type { CancelRootScanRequest, CancelRootScanResult } from '../shared/libraryRoots/cancelScan'
+} from '../shared/library/boundary/events'
+import type { LocalRootChoiceResult } from '../shared/library/roots/chooseLocal'
+import type { ReadLocalRootsOutcome } from '../shared/library/roots/read'
+import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/library/roots/scan'
+import type { CancelRootScanRequest, CancelRootScanResult } from '../shared/library/roots/cancel'
 import type {
   UnregisterLocalRootRequest,
   UnregisterLocalRootResult
-} from '../shared/libraryRoots/unregisterLocalRoot'
+} from '../shared/library/roots/unregister'
 import type { RendererApi } from '../shared/rendererApi'
 
 type IpcRendererEventLike = unknown
@@ -101,7 +85,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       host: {
         async getStatus(): Promise<LibraryBoundaryHostStatus> {
           return (await ipcRenderer.invoke(
-            hostStatusChannels.getStatus
+            libraryControlChannels.boundary.getStatus
           )) as LibraryBoundaryHostStatus
         },
         onStatusChanged(callback) {
@@ -109,17 +93,17 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             callback(payload as LibraryBoundaryHostStatus)
           }
 
-          ipcRenderer.on(hostStatusChannels.statusChanged, listener)
+          ipcRenderer.on(libraryPublicationChannels.boundary.statusChanged, listener)
 
           return () => {
-            ipcRenderer.off(hostStatusChannels.statusChanged, listener)
+            ipcRenderer.off(libraryPublicationChannels.boundary.statusChanged, listener)
           }
         }
       },
       navigation: {
         async readRows(request: NavigationReadRowsRequest): Promise<NavigationReadRowsResult> {
           return (await ipcRenderer.invoke(
-            navigationReadChannels.readRows,
+            libraryControlChannels.navigation.read,
             request
           )) as NavigationReadRowsResult
         }
@@ -127,7 +111,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       hierarchy: {
         async readChildren(request: ReadRequest): Promise<ReadResult> {
           return (await ipcRenderer.invoke(
-            hierarchyReadChannels.readChildren,
+            libraryControlChannels.hierarchy.read,
             request
           )) as ReadResult
         }
@@ -137,7 +121,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: ReadSourceLifecycleRequest
         ): Promise<ReadSourceLifecycleResult> {
           return (await ipcRenderer.invoke(
-            sourceLifecycleReadChannels.readSourceLifecycle,
+            libraryControlChannels.source.lifecycle,
             request
           )) as ReadSourceLifecycleResult
         }
@@ -147,7 +131,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: ReadSourceFileAttachmentRequest
         ): Promise<ReadSourceFileAttachmentResult> {
           return (await ipcRenderer.invoke(
-            attachmentIdentityReadChannels.readSourceFileAttachment,
+            libraryControlChannels.attachmentIdentity.readSourceFileAttachment,
             request
           )) as ReadSourceFileAttachmentResult
         },
@@ -155,7 +139,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: ReadAttachmentSourceFilesRequest
         ): Promise<ReadAttachmentSourceFilesResult> {
           return (await ipcRenderer.invoke(
-            attachmentIdentityReadChannels.readAttachmentSourceFiles,
+            libraryControlChannels.attachmentIdentity.readAttachmentSourceFiles,
             request
           )) as ReadAttachmentSourceFilesResult
         },
@@ -163,7 +147,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: ReadSourceAttachmentSummaryRequest
         ): Promise<ReadSourceAttachmentSummaryResult> {
           return (await ipcRenderer.invoke(
-            attachmentIdentityReadChannels.readSourceAttachmentSummary,
+            libraryControlChannels.attachmentIdentity.readSourceAttachmentSummary,
             request
           )) as ReadSourceAttachmentSummaryResult
         }
@@ -173,7 +157,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: HashSourceFilesBlake3Request
         ): Promise<HashSourceFilesBlake3Result> {
           return (await ipcRenderer.invoke(
-            sourceFileHashingChannels.hashSourceFilesBlake3,
+            libraryControlChannels.source.fileHashing,
             request
           )) as HashSourceFilesBlake3Result
         }
@@ -183,7 +167,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: RunSourceMaintenanceRequest
         ): Promise<RunSourceMaintenanceResult> {
           return (await ipcRenderer.invoke(
-            sourceMaintenanceChannels.runSourceMaintenance,
+            libraryControlChannels.source.maintenance.run,
             request
           )) as RunSourceMaintenanceResult
         },
@@ -191,7 +175,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: ReadSourceMaintenanceRequest
         ): Promise<ReadSourceMaintenanceResult> {
           return (await ipcRenderer.invoke(
-            sourceMaintenanceChannels.readSourceMaintenance,
+            libraryControlChannels.source.maintenance.read,
             request
           )) as ReadSourceMaintenanceResult
         }
@@ -201,7 +185,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: TrackIdentityDecisionRequest
         ): Promise<TrackIdentityDecisionCommandResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityDecisionChannels.acceptTrackIdentityCandidate,
+            libraryControlChannels.trackIdentity.decisions.accept,
             request
           )) as TrackIdentityDecisionCommandResult
         },
@@ -209,7 +193,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: TrackIdentityDecisionRequest
         ): Promise<TrackIdentityDecisionCommandResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityDecisionChannels.rejectTrackIdentityCandidate,
+            libraryControlChannels.trackIdentity.decisions.reject,
             request
           )) as TrackIdentityDecisionCommandResult
         },
@@ -217,7 +201,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: TrackIdentityDecisionRequest
         ): Promise<TrackIdentityDecisionCommandResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityDecisionChannels.deferTrackIdentityCandidate,
+            libraryControlChannels.trackIdentity.decisions.defer,
             request
           )) as TrackIdentityDecisionCommandResult
         }
@@ -227,7 +211,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           request: ReadCandidatesRequest
         ): Promise<ReadCandidatesResult> {
           return (await ipcRenderer.invoke(
-            trackIdentityReviewChannels.readCandidates,
+            libraryControlChannels.trackIdentity.candidates.read,
             request
           )) as ReadCandidatesResult
         }
@@ -235,7 +219,7 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       contents: {
         async read(request: ContentsReadRequest): Promise<ContentsReadResult> {
           return (await ipcRenderer.invoke(
-            contentsReadChannels.read,
+            libraryControlChannels.contents.read,
             request
           )) as ContentsReadResult
         }
@@ -243,26 +227,31 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       roots: {
         async chooseAndRegisterLocal(): Promise<LocalRootChoiceResult> {
           return (await ipcRenderer.invoke(
-            rootChannels.chooseAndRegisterLocal
+            libraryControlChannels.roots.chooseLocal
           )) as LocalRootChoiceResult
         },
         async runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult> {
-          return (await ipcRenderer.invoke(rootChannels.runScan, request)) as LocalRootScanResult
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.roots.scan,
+            request
+          )) as LocalRootScanResult
         },
         async cancelScan(request: CancelRootScanRequest): Promise<CancelRootScanResult> {
           return (await ipcRenderer.invoke(
-            rootChannels.cancelScan,
+            libraryControlChannels.roots.cancel,
             request
           )) as CancelRootScanResult
         },
         async readLocalRoots(): Promise<ReadLocalRootsOutcome> {
-          return (await ipcRenderer.invoke(rootChannels.readLocalRoots)) as ReadLocalRootsOutcome
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.roots.read
+          )) as ReadLocalRootsOutcome
         },
         async unregisterLocalRoot(
           request: UnregisterLocalRootRequest
         ): Promise<UnregisterLocalRootResult> {
           return (await ipcRenderer.invoke(
-            rootChannels.unregisterLocalRoot,
+            libraryControlChannels.roots.unregister,
             request
           )) as UnregisterLocalRootResult
         }
@@ -270,14 +259,14 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
       viewState: {
         readViewState: async (): Promise<LibraryViewStateReadResult> => {
           return (await ipcRenderer.invoke(
-            libraryViewStateChannels.readViewState
+            libraryControlChannels.viewState.read
           )) as LibraryViewStateReadResult
         },
         writeViewState: async (
           viewState: PersistedLibraryViewState
         ): Promise<LibraryViewStateWriteResult> => {
           return (await ipcRenderer.invoke(
-            libraryViewStateChannels.writeViewState,
+            libraryControlChannels.viewState.write,
             viewState
           )) as LibraryViewStateWriteResult
         }
@@ -289,13 +278,15 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             callback(payload as BoundaryEventDeliveryPayload)
           }
 
-          ipcRenderer.on(boundaryEventChannels.batch, listener)
+          ipcRenderer.on(libraryPublicationChannels.boundary.events.batch, listener)
           void ipcRenderer
-            .invoke(boundaryEventChannels.subscribe)
+            .invoke(libraryControlChannels.boundary.events.subscribe)
             .then((result) => {
               const subscribeResult = result as BoundaryEventSubscribeResult
               if (!active) {
-                void ipcRenderer.invoke(boundaryEventChannels.unsubscribe).catch(() => undefined)
+                void ipcRenderer
+                  .invoke(libraryControlChannels.boundary.events.unsubscribe)
+                  .catch(() => undefined)
                 return
               }
               if (subscribeResult.kind === 'failed') {
@@ -315,9 +306,9 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
 
           return () => {
             active = false
-            ipcRenderer.off(boundaryEventChannels.batch, listener)
+            ipcRenderer.off(libraryPublicationChannels.boundary.events.batch, listener)
             void ipcRenderer
-              .invoke(boundaryEventChannels.unsubscribe)
+              .invoke(libraryControlChannels.boundary.events.unsubscribe)
               .then((result) => {
                 const unsubscribeResult = result as BoundaryEventUnsubscribeResult
                 if (unsubscribeResult.kind === 'failed') {

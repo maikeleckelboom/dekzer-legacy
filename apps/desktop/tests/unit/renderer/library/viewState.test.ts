@@ -4,7 +4,7 @@ import {
   createViewStateStore,
   type ViewStateApi
 } from '../../../../src/renderer/library/runtime/viewState'
-import type { PersistedLibraryViewState } from '../../../../src/shared/libraryViewState/viewState'
+import type { PersistedLibraryViewState } from '../../../../src/shared/library/viewState/persistence'
 
 describe('createViewStateStore', () => {
   it('coalesces queued writes to the newest pending state', async () => {

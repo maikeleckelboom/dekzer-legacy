@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,22 +14,19 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   readContentsThroughHost,
   registerContentsReadIpc
-} from '../../../src/main/libraryContents/read'
-import {
-  contentsReadChannels,
-  type ContentsReadResult
-} from '../../../src/shared/libraryContents/read'
+} from '../../../src/main/library/contents/read'
+import { type ContentsReadResult } from '../../../src/shared/library/contents/read'
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -191,7 +189,7 @@ describe('contents reads through the host', () => {
       idleHost
     )
 
-    expect(registration.channel).toBe(contentsReadChannels.read)
+    expect(registration.channel).toBe(libraryControlChannels.contents.read)
     expect(typeof registration.handler).toBe('function')
   })
 

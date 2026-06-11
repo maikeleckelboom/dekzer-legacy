@@ -2,8 +2,8 @@ import type {
   EntryPoint,
   ChildRow,
   HierarchyCoverage
-} from '../../../shared/libraryHierarchy/readChildren'
-import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
+} from '../../../shared/library/hierarchy/read'
+import type { NavigationRow } from '../../../shared/library/navigation/read'
 import type {
   DirectoryState,
   LoadedChildren,

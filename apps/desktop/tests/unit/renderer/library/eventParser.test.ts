@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseBoundaryEvent } from '../../../../src/shared/libraryBoundary/eventParser'
+import { parseBoundaryEvent } from '../../../../src/shared/library/boundary/eventParser'
 
 describe('parseBoundaryEvent', () => {
   it('rejects null and non-object inputs as unsupported', () => {

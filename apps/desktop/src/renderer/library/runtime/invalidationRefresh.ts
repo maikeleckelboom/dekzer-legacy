@@ -1,7 +1,7 @@
 import type {
   AppMaintainedSnapshotInvalidatedEvent,
   AppSourceScanEvent
-} from '../../../shared/libraryBoundary/eventParser'
+} from '../../../shared/library/boundary/eventParser'
 import type { LibraryHierarchyReadController } from '../boundary/hierarchyRead'
 import type { SourceLifecycleReadController } from '../boundary/sourceLifecycleRead'
 import type { BrowserTreeNodeId } from '../tree/types'

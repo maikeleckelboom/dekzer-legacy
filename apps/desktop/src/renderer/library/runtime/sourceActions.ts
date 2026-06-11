@@ -1,5 +1,5 @@
-import type { LocalRoot } from '../../../shared/libraryRoots/readLocalRoots'
-import type { EntryPoint } from '../../../shared/libraryHierarchy/readChildren'
+import type { LocalRoot } from '../../../shared/library/roots/read'
+import type { EntryPoint } from '../../../shared/library/hierarchy/read'
 import type {
   LocalRootScanStatus,
   LocalRootsReadState,

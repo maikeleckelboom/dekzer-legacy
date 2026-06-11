@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,22 +13,19 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   readCandidatesThroughHost,
   registerTrackIdentityReviewCandidatesIpc
-} from '../../../src/main/libraryTrackIdentityReview/candidates'
-import {
-  channels,
-  type ReadCandidatesResult
-} from '../../../src/shared/libraryTrackIdentityReview/candidates'
+} from '../../../src/main/library/trackIdentity/candidates'
+import { type ReadCandidatesResult } from '../../../src/shared/library/trackIdentity/candidates'
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -139,7 +137,7 @@ describe('track identity review candidate reads through the host', () => {
       idleHost
     )
 
-    expect(registration.has(channels.readCandidates)).toBe(true)
+    expect(registration.has(libraryControlChannels.trackIdentity.candidates.read)).toBe(true)
   })
 })
 

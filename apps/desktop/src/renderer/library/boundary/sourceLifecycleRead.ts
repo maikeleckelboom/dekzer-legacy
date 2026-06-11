@@ -5,7 +5,7 @@ import type {
   ReadSourceLifecycleError,
   ReadSourceLifecycleErrorState,
   SourceLifecycleRecord
-} from '../../../shared/librarySourceLifecycle/readSourceLifecycle'
+} from '../../../shared/library/source/lifecycle'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { RowBinding } from '../state'
 import type { BrowserProjection } from '../tree/projection'

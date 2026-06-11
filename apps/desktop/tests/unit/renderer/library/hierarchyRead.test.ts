@@ -11,8 +11,8 @@ import type {
   ReadErrorCode,
   ReadRequest,
   ReadResult
-} from '../../../../src/shared/libraryHierarchy/readChildren'
-import type { NavigationReadRowsResult } from '../../../../src/shared/libraryNavigation/readRows'
+} from '../../../../src/shared/library/hierarchy/read'
+import type { NavigationReadRowsResult } from '../../../../src/shared/library/navigation/read'
 
 describe('createLibraryHierarchyReadController', () => {
   it('refreshes navigation, reads the first source, and loads directory children', async () => {

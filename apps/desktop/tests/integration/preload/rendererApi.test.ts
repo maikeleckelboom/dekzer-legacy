@@ -1,65 +1,41 @@
+import { libraryPublicationChannels } from '../../../src/shared/library/boundary/publicationPlane'
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { describe, expect, it } from 'vitest'
 
 import { createRendererApi, exposeRendererApi } from '../../../src/preload/rendererApi'
+import { type LibraryBoundaryHostStatus } from '../../../src/shared/library/boundary/status'
 import {
-  hostStatusChannels,
-  type LibraryBoundaryHostStatus
-} from '../../../src/shared/libraryBoundary/status'
-import {
-  libraryViewStateChannels,
   type LibraryViewStateReadResult,
   type LibraryViewStateWriteResult,
   type PersistedLibraryViewState
-} from '../../../src/shared/libraryViewState/viewState'
-import {
-  hierarchyReadChannels,
-  type ReadResult
-} from '../../../src/shared/libraryHierarchy/readChildren'
-import {
-  navigationReadChannels,
-  type NavigationReadRowsResult
-} from '../../../src/shared/libraryNavigation/readRows'
-import { rootChannels } from '../../../src/shared/libraryRoots/channels'
-import type { LocalRootChoiceResult } from '../../../src/shared/libraryRoots/chooseAndRegisterLocal'
-import type { ReadLocalRootsOutcome } from '../../../src/shared/libraryRoots/readLocalRoots'
-import type { LocalRootScanResult } from '../../../src/shared/libraryRoots/runScan'
-import type { CancelRootScanResult } from '../../../src/shared/libraryRoots/cancelScan'
-import type { UnregisterLocalRootResult } from '../../../src/shared/libraryRoots/unregisterLocalRoot'
-import {
-  contentsReadChannels,
-  type ContentsReadResult
-} from '../../../src/shared/libraryContents/read'
-import { sourceLifecycleReadChannels } from '../../../src/shared/librarySourceLifecycle/channels'
-import type { ReadSourceLifecycleResult } from '../../../src/shared/librarySourceLifecycle/readSourceLifecycle'
-import { attachmentIdentityReadChannels } from '../../../src/shared/libraryAttachmentIdentity/channels'
+} from '../../../src/shared/library/viewState/persistence'
+import { type ReadResult } from '../../../src/shared/library/hierarchy/read'
+import { type NavigationReadRowsResult } from '../../../src/shared/library/navigation/read'
+
+import type { LocalRootChoiceResult } from '../../../src/shared/library/roots/chooseLocal'
+import type { ReadLocalRootsOutcome } from '../../../src/shared/library/roots/read'
+import type { LocalRootScanResult } from '../../../src/shared/library/roots/scan'
+import type { CancelRootScanResult } from '../../../src/shared/library/roots/cancel'
+import type { UnregisterLocalRootResult } from '../../../src/shared/library/roots/unregister'
+import { type ContentsReadResult } from '../../../src/shared/library/contents/read'
+
+import type { ReadSourceLifecycleResult } from '../../../src/shared/library/source/lifecycle'
+
 import type {
   ReadAttachmentSourceFilesResult,
   ReadSourceAttachmentSummaryResult,
   ReadSourceFileAttachmentResult
-} from '../../../src/shared/libraryAttachmentIdentity/read'
+} from '../../../src/shared/library/attachmentIdentity/read'
+import { type HashSourceFilesBlake3Result } from '../../../src/shared/library/source/fileHashing'
 import {
-  sourceFileHashingChannels,
-  type HashSourceFilesBlake3Result
-} from '../../../src/shared/librarySourceFileHashing/hashSourceFilesBlake3'
-import {
-  sourceMaintenanceChannels,
   type ReadSourceMaintenanceResult,
   type RunSourceMaintenanceResult
-} from '../../../src/shared/librarySourceMaintenance/sourceMaintenance'
-import {
-  trackIdentityDecisionChannels,
-  type TrackIdentityDecisionCommandResult
-} from '../../../src/shared/libraryTrackIdentityDecisions/decisionCommands'
-import {
-  channels as trackIdentityReviewChannels,
-  type ReadCandidatesResult
-} from '../../../src/shared/libraryTrackIdentityReview/candidates'
-import {
-  boundaryEventChannels,
-  type BoundaryEventDeliveryPayload
-} from '../../../src/shared/libraryBoundary/events'
-import { emitStatus, testStatus } from '../../support/libraryBoundary'
-import { firstAvailableSourceReadRequest } from '../../support/libraryHierarchy'
+} from '../../../src/shared/library/source/maintenance'
+import { type TrackIdentityDecisionCommandResult } from '../../../src/shared/library/trackIdentity/decisions'
+import { type ReadCandidatesResult } from '../../../src/shared/library/trackIdentity/candidates'
+import { type BoundaryEventDeliveryPayload } from '../../../src/shared/library/boundary/events'
+import { emitStatus, testStatus } from '../../support/library/boundary'
+import { firstAvailableSourceReadRequest } from '../../support/library/hierarchy'
 
 describe('preload renderer API', () => {
   it('exposes the library API and forwards calls over owned IPC channels', async () => {
@@ -457,122 +433,122 @@ describe('preload renderer API', () => {
     const listeners = new Map<string, Set<(event: unknown, payload: unknown) => void>>()
     const ipcRenderer = {
       invoke: async (channel: string, ...args: readonly unknown[]): Promise<unknown> => {
-        if (channel === hostStatusChannels.getStatus) {
+        if (channel === libraryControlChannels.boundary.getStatus) {
           expect(args).toEqual([])
           return status
         }
 
-        if (channel === navigationReadChannels.readRows) {
+        if (channel === libraryControlChannels.navigation.read) {
           receivedNavigationRequest = args[0]
           return navigationResult
         }
 
-        if (channel === hierarchyReadChannels.readChildren) {
+        if (channel === libraryControlChannels.hierarchy.read) {
           receivedHierarchyRequest = args[0]
           return hierarchyResult
         }
 
-        if (channel === contentsReadChannels.read) {
+        if (channel === libraryControlChannels.contents.read) {
           receivedContentsRequest = args[0]
           return contentsResult
         }
 
-        if (channel === sourceLifecycleReadChannels.readSourceLifecycle) {
+        if (channel === libraryControlChannels.source.lifecycle) {
           receivedSourceLifecycleRequest = args[0]
           return sourceLifecycleResult
         }
 
-        if (channel === attachmentIdentityReadChannels.readSourceFileAttachment) {
+        if (channel === libraryControlChannels.attachmentIdentity.readSourceFileAttachment) {
           receivedSourceFileAttachmentRequest = args[0]
           return sourceFileAttachmentResult
         }
 
-        if (channel === attachmentIdentityReadChannels.readAttachmentSourceFiles) {
+        if (channel === libraryControlChannels.attachmentIdentity.readAttachmentSourceFiles) {
           receivedAttachmentSourceFilesRequest = args[0]
           return attachmentSourceFilesResult
         }
 
-        if (channel === attachmentIdentityReadChannels.readSourceAttachmentSummary) {
+        if (channel === libraryControlChannels.attachmentIdentity.readSourceAttachmentSummary) {
           receivedSourceAttachmentSummaryRequest = args[0]
           return sourceAttachmentSummaryResult
         }
 
-        if (channel === sourceFileHashingChannels.hashSourceFilesBlake3) {
+        if (channel === libraryControlChannels.source.fileHashing) {
           receivedHashRequest = args[0]
           return hashResult
         }
 
-        if (channel === sourceMaintenanceChannels.runSourceMaintenance) {
+        if (channel === libraryControlChannels.source.maintenance.run) {
           receivedRunSourceMaintenanceRequest = args[0]
           return runSourceMaintenanceResult
         }
 
-        if (channel === sourceMaintenanceChannels.readSourceMaintenance) {
+        if (channel === libraryControlChannels.source.maintenance.read) {
           receivedReadSourceMaintenanceRequest = args[0]
           return readSourceMaintenanceResult
         }
 
-        if (channel === trackIdentityDecisionChannels.acceptTrackIdentityCandidate) {
+        if (channel === libraryControlChannels.trackIdentity.decisions.accept) {
           receivedAcceptTrackIdentityCandidateRequest = args[0]
           return acceptTrackIdentityCandidateResult
         }
 
-        if (channel === trackIdentityDecisionChannels.rejectTrackIdentityCandidate) {
+        if (channel === libraryControlChannels.trackIdentity.decisions.reject) {
           receivedRejectTrackIdentityCandidateRequest = args[0]
           return rejectTrackIdentityCandidateResult
         }
 
-        if (channel === trackIdentityDecisionChannels.deferTrackIdentityCandidate) {
+        if (channel === libraryControlChannels.trackIdentity.decisions.defer) {
           receivedDeferTrackIdentityCandidateRequest = args[0]
           return deferTrackIdentityCandidateResult
         }
 
-        if (channel === trackIdentityReviewChannels.readCandidates) {
+        if (channel === libraryControlChannels.trackIdentity.candidates.read) {
           receivedReadTrackIdentityReviewCandidatesRequest = args[0]
           return readTrackIdentityReviewCandidatesResult
         }
 
-        if (channel === rootChannels.chooseAndRegisterLocal) {
+        if (channel === libraryControlChannels.roots.chooseLocal) {
           receivedChoiceArgs = args
           return choiceResult
         }
 
-        if (channel === rootChannels.runScan) {
+        if (channel === libraryControlChannels.roots.scan) {
           receivedScanRequest = args[0]
           return scanResult
         }
 
-        if (channel === rootChannels.cancelScan) {
+        if (channel === libraryControlChannels.roots.cancel) {
           receivedCancelScanRequest = args[0]
           return cancelScanResult
         }
 
-        if (channel === rootChannels.readLocalRoots) {
+        if (channel === libraryControlChannels.roots.read) {
           expect(args).toEqual([])
           return readLocalRootsResult
         }
 
-        if (channel === rootChannels.unregisterLocalRoot) {
+        if (channel === libraryControlChannels.roots.unregister) {
           return unregisterLocalRootResult
         }
 
-        if (channel === libraryViewStateChannels.readViewState) {
+        if (channel === libraryControlChannels.viewState.read) {
           expect(args).toEqual([])
           return viewStateReadResult
         }
 
-        if (channel === libraryViewStateChannels.writeViewState) {
+        if (channel === libraryControlChannels.viewState.write) {
           receivedViewStatePayload = args[0]
           return viewStateWriteResult
         }
 
-        if (channel === boundaryEventChannels.subscribe) {
+        if (channel === libraryControlChannels.boundary.events.subscribe) {
           expect(args).toEqual([])
           subscribeCount += 1
           return { kind: 'subscribed' }
         }
 
-        if (channel === boundaryEventChannels.unsubscribe) {
+        if (channel === libraryControlChannels.boundary.events.unsubscribe) {
           expect(args).toEqual([])
           unsubscribeCount += 1
           return { kind: 'unsubscribed' }
@@ -715,7 +691,7 @@ describe('preload renderer API', () => {
 
     await waitForMicrotasks()
     expect(subscribeCount).toBe(1)
-    for (const listener of listeners.get(boundaryEventChannels.batch) ?? []) {
+    for (const listener of listeners.get(libraryPublicationChannels.boundary.events.batch) ?? []) {
       listener({}, eventPayload)
     }
     expect(receivedEventPayload).toBe(eventPayload)
@@ -724,7 +700,7 @@ describe('preload renderer API', () => {
     await waitForMicrotasks()
     expect(unsubscribeCount).toBe(1)
     receivedEventPayload = undefined
-    for (const listener of listeners.get(boundaryEventChannels.batch) ?? []) {
+    for (const listener of listeners.get(libraryPublicationChannels.boundary.events.batch) ?? []) {
       listener({}, eventPayload)
     }
     expect(receivedEventPayload).toBeUndefined()

@@ -156,7 +156,7 @@ authoritative reread, not user blame.
 
 ### Shared parser location
 
-The boundary event parser is at `apps/desktop/src/shared/libraryBoundary/eventParser.ts`.
+The boundary event parser is at `apps/desktop/src/shared/library/boundary/eventParser.ts`.
 It is the single point of event shape validation shared between all consumers.
 
 ### Parser rules
@@ -214,7 +214,7 @@ This is not yet implemented. The current docs must not claim live progress is ac
 ## Desktop delivery and renderer event consumption
 
 Desktop Main owns `BoundaryEventPump` v1
-(`apps/desktop/src/main/libraryBoundary/eventPump.ts`). The pump starts when the library boundary
+(`apps/desktop/src/main/library/boundary/eventPump.ts`). The pump starts when the library boundary
 host is started and at least one renderer subscriber exists. It polls `ReadAfter`, owns
 `lastSeenEventSequence`, detects `gapDetected`, and forwards batches through typed IPC.
 

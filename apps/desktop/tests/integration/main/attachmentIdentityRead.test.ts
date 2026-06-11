@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,21 +14,21 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   readAttachmentSourceFilesThroughHost,
   readSourceAttachmentSummaryThroughHost,
   readSourceFileAttachmentThroughHost,
   registerAttachmentIdentityReadIpc
-} from '../../../src/main/libraryAttachmentIdentity/read'
-import { attachmentIdentityReadChannels } from '../../../src/shared/libraryAttachmentIdentity/channels'
+} from '../../../src/main/library/attachmentIdentity/read'
+
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -188,9 +189,15 @@ describe('attachment identity reads through the host', () => {
       idleHost
     )
 
-    expect(registrations.has(attachmentIdentityReadChannels.readSourceFileAttachment)).toBe(true)
-    expect(registrations.has(attachmentIdentityReadChannels.readAttachmentSourceFiles)).toBe(true)
-    expect(registrations.has(attachmentIdentityReadChannels.readSourceAttachmentSummary)).toBe(true)
+    expect(
+      registrations.has(libraryControlChannels.attachmentIdentity.readSourceFileAttachment)
+    ).toBe(true)
+    expect(
+      registrations.has(libraryControlChannels.attachmentIdentity.readAttachmentSourceFiles)
+    ).toBe(true)
+    expect(
+      registrations.has(libraryControlChannels.attachmentIdentity.readSourceAttachmentSummary)
+    ).toBe(true)
   })
 })
 

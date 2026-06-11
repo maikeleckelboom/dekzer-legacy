@@ -6,7 +6,7 @@ import type {
   ContentsReadResult,
   ContentsScopeDepth,
   ContentsFileRow
-} from '../../../shared/libraryContents/read'
+} from '../../../shared/library/contents/read'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { RowBinding } from '../state'
 

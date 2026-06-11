@@ -3,7 +3,7 @@ import type { ComputedRef, Ref } from 'vue'
 
 import type { LibraryHierarchyReadController } from '../boundary/hierarchyRead'
 import type { LocalRootActionsController } from '../boundary/localRootActions'
-import type { LocalRootRegistrationRoot } from '../../../shared/libraryRoots/registerLocalRoot'
+import type { LocalRootRegistrationRoot } from '../../../shared/library/roots/register'
 
 export type RootLifecycleRefreshStatus = 'idle' | 'refreshing' | 'refreshed' | 'failed'
 

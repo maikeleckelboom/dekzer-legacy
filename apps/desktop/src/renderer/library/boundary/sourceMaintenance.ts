@@ -3,7 +3,7 @@ import type {
   ReadSourceMaintenanceResult,
   RunSourceMaintenanceRequest,
   RunSourceMaintenanceResult
-} from '../../../shared/librarySourceMaintenance/sourceMaintenance'
+} from '../../../shared/library/source/maintenance'
 import type { RendererApi } from '../../../shared/rendererApi'
 
 export type LibrarySourceMaintenanceApi = RendererApi['library']['sourceMaintenance']

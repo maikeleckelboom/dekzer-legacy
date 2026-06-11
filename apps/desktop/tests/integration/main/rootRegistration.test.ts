@@ -1,3 +1,4 @@
+import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,23 +9,23 @@ import {
   boundaryStdioBinaryPathEnvVar,
   resolveHostConfig,
   type LibraryBoundaryHostConfig
-} from '../../../src/main/libraryBoundary/config'
-import { LibraryBoundaryHost } from '../../../src/main/libraryBoundary/host'
+} from '../../../src/main/library/boundary/config'
+import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   chooseAndRegisterLocalRoot,
   registerLocalRootChoiceIpc,
   type LocalRootChoiceDialog
-} from '../../../src/main/libraryRoots/chooseAndRegisterLocal'
-import { registerLocalRoot } from '../../../src/main/libraryRoots/registerLocalRoot'
-import { rootChannels } from '../../../src/shared/libraryRoots/channels'
-import type { LocalRootChoiceResult } from '../../../src/shared/libraryRoots/chooseAndRegisterLocal'
-import type { LocalRootRegistrationResult } from '../../../src/shared/libraryRoots/registerLocalRoot'
+} from '../../../src/main/library/roots/chooseLocal'
+import { registerLocalRoot } from '../../../src/main/library/roots/register'
+
+import type { LocalRootChoiceResult } from '../../../src/shared/library/roots/chooseLocal'
+import type { LocalRootRegistrationResult } from '../../../src/shared/library/roots/register'
 import {
   createFakeClient,
   silentLogger,
   startedHostWithClient,
   testApp
-} from '../../support/libraryBoundary'
+} from '../../support/library/boundary'
 
 const tempRoots: string[] = []
 
@@ -123,7 +124,7 @@ describe('local root registration boundaries', () => {
       }
     )
 
-    expect(registration.channel).toBe(rootChannels.chooseAndRegisterLocal)
+    expect(registration.channel).toBe(libraryControlChannels.roots.chooseLocal)
 
     const result = await registration.handler?.({ absolutePath: 'C:/RendererProvidedPath' })
 

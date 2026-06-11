@@ -332,7 +332,7 @@ and does not change shape on expansion.
 
 ### Facet differentiation
 
-The `ChildRow` type (from `shared/libraryHierarchy/readChildren.ts`) already carries `directoryPrimaryMediaState`,
+The `ChildRow` type (from `shared/library/hierarchy/read.ts`) already carries `directoryPrimaryMediaState`,
 `directoryImageMediaState`, and `directoryScanState`. These fields can drive facet selection on directory nodes in a
 future pass:
 
@@ -423,4 +423,4 @@ features or may be removed in the Fluence migration pass:
 | `apps/desktop/src/renderer/library/contents/table.vue`         | Contents table component                |
 | `apps/desktop/src/renderer/library/contents/projection.ts`     | Contents state-to-row projection        |
 | `apps/desktop/src/renderer/library/panel.vue`                  | Library panel                           |
-| `apps/desktop/src/shared/libraryHierarchy/readChildren.ts`     | `ChildRow` type with media state fields |
+| `apps/desktop/src/shared/library/hierarchy/read.ts`     | `ChildRow` type with media state fields |

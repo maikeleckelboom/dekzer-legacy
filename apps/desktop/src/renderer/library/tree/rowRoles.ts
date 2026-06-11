@@ -1,4 +1,4 @@
-import type { NavigationRow } from '../../../shared/libraryNavigation/readRows'
+import type { NavigationRow } from '../../../shared/library/navigation/read'
 import type { BrowserTreeRowRole } from './types'
 
 export function browserRowRoleForNavigationRow(row: NavigationRow): BrowserTreeRowRole {

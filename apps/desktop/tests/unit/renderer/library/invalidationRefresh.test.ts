@@ -13,12 +13,12 @@ import {
 import type {
   AppMaintainedSnapshotInvalidatedEvent,
   AppSourceScanEvent
-} from '../../../../src/shared/libraryBoundary/eventParser'
+} from '../../../../src/shared/library/boundary/eventParser'
 import type {
   ContentsFileRow,
   ContentsReadRequest,
   ContentsReadResult
-} from '../../../../src/shared/libraryContents/read'
+} from '../../../../src/shared/library/contents/read'
 
 describe('classify', () => {
   it('maps known scopes and rejects unknown scopes', () => {
