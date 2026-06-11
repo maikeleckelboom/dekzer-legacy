@@ -194,6 +194,30 @@ fires differently depending on where the application believes focus currently li
 DJs operate in high-stress environments where accidental playback state changes have consequences. If in doubt, Space
 belongs to transport and Enter is the canonical tree activation key.
 
+### Visual state dimensions must not overload each other
+
+Dekzer's local file tree uses one visual dimension for one state dimension. A visual cue must not carry two meanings,
+and two cues must not compete for the same meaning.
+
+The locked mapping is:
+
+| Visual dimension                | Owns                                                              | Does not own                                     |
+| ------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------ |
+| Disclosure affordance           | Expanded/collapsed/loading branch state                           | Selection, contents scope, source health         |
+| Folder/source icon style        | Child-readiness category                                          | Expanded/collapsed state                         |
+| Selected row background or rail | Current browse scope driving the contents pane                    | Keyboard focus, hover, drop target               |
+| Keyboard focus outline          | Current keyboard command target                                   | Current contents scope                           |
+| Ambient status slot             | Sparse readiness, availability, refresh, blocked, or failed hints | Selection, expansion, child existence, emptiness |
+| Future drop-hover layer         | Temporary drag target feedback                                    | Selection, focus, expanded/collapsed state       |
+
+The folder icon must not become the expansion signal. Expansion is disclosed by the disclosure affordance and keyboard
+Right/Left. Folder iconography may reinforce child-readiness, but it must not replace or contradict disclosure state.
+
+Ambient status indicators must be sparse. No indicator means normal. A status indicator appears only when there is a
+state worth noticing: active refresh/probe/scan activity, incomplete coverage, degraded access, blocked access, failure,
+or a meaningful ready/healthy state on a row where that status is useful. Do not paint every row with a status dot by
+default.
+
 ---
 
 ## 5. The Canonical Dekzer Library Tree Contract
@@ -219,16 +243,39 @@ already-loaded children.
 
 Tracks and audio files are never rendered as nodes in this tree. They live in the content pane.
 
+### Structural iconography
+
+The disclosure affordance is the primary structural signal for whether a row can reveal child scopes. Folder/source
+iconography is a secondary reinforcement of child-readiness.
+
+For local filesystem directory rows:
+
+| Child-readiness      | Disclosure                                                           | Folder icon                    | Meaning                                                |
+| -------------------- | -------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------ |
+| Known branch-capable | Present                                                              | Solid folder                   | The directory has known navigable child folders/scopes |
+| Known leaf           | Absent                                                               | Outline folder                 | The directory has no navigable child folders/scopes    |
+| Unknown/probing      | Pending/probe treatment or no confident affordance                   | Neutral/probing treatment      | Child-readiness is not yet proven                      |
+| Blocked/failed       | Blocked/failed affordance attached to last accepted structural state | Last accepted or degraded icon | The branch cannot currently be resolved honestly       |
+
+A solid folder does not mean expanded. A solid folder may be collapsed, expanded, loading, retained, or refreshing. A
+folder outline does not mean empty. It means no navigable child folders/scopes are known to exist. It may still be a
+valid browse scope with tracks in the contents pane.
+
+Unknown child-readiness must never be rendered as a confident known leaf. Unknown is not a leaf.
+
 ### Pointer contract
 
 **Row body click:**
 Sets the clicked node as the current browse scope. Triggers content pane refresh with that scope's content. Does not
-change the node's expanded state. Applies identically to container nodes and leaf nodes.
+change the node's expanded state. Applies identically to container nodes and leaf nodes. The ordinary icon, label,
+metadata, and empty right-side row area are row-body selection territory for local hierarchy rows.
 
 **Disclosure click:**
 Toggles the clicked node's expanded state (collapsed → expanded, or expanded → collapsed). On first expansion of an
 unloaded container, triggers deferred child fetch and shows loading state in the disclosure slot. Does not change the
-clicked node's selected state. Does not change the content pane.
+clicked node's selected state. Does not change the content pane. The disclosure hit target is rectangular, not
+glyph-shaped: padding, border, and gutter inside the reveal lane are disclosure intent. The reveal lane does not consume
+the ordinary folder/source icon or label.
 
 **Double-click:**
 Not part of the primary interaction contract. If implemented at all, it must be a non-destructive alias for an action
@@ -243,8 +290,8 @@ any state change.
 ### Keyboard contract
 
 **Up / Down:**
-Move selection to the previous or next visible row in the tree. Each movement updates the content pane immediately,
-because selection and content pane are always in sync. Invisible rows (collapsed children) are skipped.
+Move keyboard focus to the previous or next visible row in the tree. Invisible rows (collapsed children) are skipped.
+Focus movement does not change the selected browse scope and does not update the content pane.
 
 **Right (ArrowRight):**
 If the focused node is a collapsed container: expand it (same as disclosure click). Spinner in disclosure slot if
@@ -260,7 +307,8 @@ If the focused node is a leaf: no-op.
 
 **Enter:**
 Selects the currently focused node as browse scope and updates the content pane. Identical to row-body click. This is
-the canonical keyboard activation key for tree selection.
+the canonical keyboard activation key for tree selection. The selected row may already be focused, but selection and
+focus remain separate state axes.
 
 **Space:**
 Bound to transport/playback unless the tree has explicit, unambiguous keyboard focus AND Space is provably unmapped from
@@ -272,40 +320,60 @@ Move focus to the library search field. Standard and expected by users coming fr
 
 ### State model
 
-Each node carries exactly four independent state bits relevant to rendering:
+Each visible row is rendered from independent state axes. The implementation may encode these axes in more specific
+types, but it must not collapse them into one row-state enum that hides ownership or creates false transitions.
 
-`selected: boolean` — this node is the current browse scope; drives content pane content
-`expanded: boolean` — this node's children are currently visible in the tree (containers only; undefined for leaves)
-`loading: boolean` — this node's children are currently being fetched (containers only; for deferred/service nodes)
-`hovered: boolean` — the pointer is currently over this row
+Primary axes:
 
-These four bits are orthogonal. No transition on one bit is allowed to automatically mutate another. Specifically:
+- `selected` — this node is the current browse scope; drives content pane content
+- `focused` — this node is the current keyboard command target
+- `expanded` — this node's children are currently visible in the tree (containers only; not present for leaves)
+- `branchLoading` — this node's children are currently being fetched or probed (containers/deferred nodes only)
+- `hovered` — the pointer is currently over this row
+- `childReadiness` — unknown, probing, known branch-capable, known leaf, loaded, incomplete, blocked, or failed
+- `freshness` — fresh, retained, refreshing, or stale-safe
+- `availability` — available, unavailable, missing, permission denied, or failed
+- `ambientStatus` — omitted for normal, otherwise a sparse readiness/availability/refresh hint
+
+These axes are orthogonal. No transition on one axis is allowed to automatically mutate another. Specifically:
 
 - Selecting a node does not expand it.
 - Expanding a node does not select it.
-- Loading children does not change selection or expansion state (expansion is set when the load completes, not when it
-  starts — the disclosure transitions: ▶ idle → ⟳ loading → ▼ expanded).
+- Moving keyboard focus does not select the row and does not update the content pane.
+- Loading children does not change selection or contents scope.
+- Unknown child-readiness does not become known leaf until coverage proves it.
+- Ambient status indicators do not decide children, emptiness, coverage, or source availability.
+- Expansion transitions visually through the disclosure affordance: collapsed idle → branch loading/probing → expanded,
+  or back to collapsed if loading fails.
 
 ### Content pane update timing
 
-The content pane updates only on selection change events. It does not update on expansion, collapse, hover, or child
-loading. When selection changes:
+The content pane updates only on selection change events: row-body click or Enter on the focused row. It does not
+update on focus movement, expansion, collapse, hover, ambient status changes, drag hover, or child loading. When
+selection changes:
 
 - If warm/cached content exists for the new scope: swap content immediately, no loading state
 - If content is being fetched: retain the currently displayed rows, mark them visually as stale (subtle), show a loading
   indicator attached to the content pane header or breadcrumb — not on the tree row
 - When fresh content arrives: replace stale content with live content
 
-The selected tree node and the content pane always agree on the current scope. There is no state where the tree
-selection and the content pane scope are out of sync. If a selection event fires, the content pane must at minimum show
-the stale-retained version of that scope immediately, even if a fresh fetch is still in flight.
+The selected tree node and the content pane always agree on the current scope. Keyboard focus may temporarily sit on a
+different visible row while the selected scope and content pane remain unchanged. If a selection event fires, the
+content pane must at minimum show the stale-retained version of that scope immediately, even if a fresh fetch is still
+in flight.
 
 ### Disclosure hit target
 
 The disclosure affordance is a dedicated hit target occupying a fixed-width zone at the start of the row, before the
 node icon and label. Its width must be sufficient for comfortable pointer interaction (minimum effective tap/click size
-applies) but should be clearly narrower than the remaining row body. It must not overlap with the node icon or label
-zone. The disclosure zone is absent entirely on leaf nodes — no placeholder, no padding substitute, no disabled element.
+applies) but should be clearly narrower than the remaining row body.
+
+The disclosure hit target is rectangular, not glyph-shaped. Any pointer event inside the reveal lane — including the
+visible glyph, padding, border, and gutter assigned to the lane — is disclosure intent. It must not select the row.
+
+The reveal lane must not overlap with the node icon or label zone. For local hierarchy rows, the folder/source icon and
+label remain part of the row body and select the browse scope. The disclosure zone is absent entirely on leaf nodes —
+no placeholder, no padding substitute, no disabled element.
 
 ### Loading state in disclosure slot
 
@@ -322,13 +390,12 @@ While deferred children are being fetched:
 
 ## 6. Open Questions Requiring a Product Decision
 
-**Left-arrow on collapsed node → move to parent:**
+**Left-arrow on collapsed node → move focus to parent:**
 The full tree-widget keyboard convention (as in macOS Finder) moves focus to the parent node when pressing Left on an
-already-collapsed node. None of the researched products clearly document this behavior for their DJ library trees, and
-it carries a meaningful cost: moving to the parent node triggers a scope change (content pane update to the parent's
-scope). That is a high-impact side effect of a navigation keystroke. The safer default is to make Left a no-op when
-already collapsed, and only add the parent-navigation behavior if there is explicit user demand for it. Decide before
-first keyboard implementation, not after.
+already-collapsed node. None of the researched products clearly document this behavior for their DJ library trees. With
+Dekzer's focus-first keyboard model, this optional behavior would move focus only; it must not select the parent or
+update the content pane. The safer default is to make Left a no-op when already collapsed, and only add parent-focus
+movement if there is explicit user demand for it. Decide before first keyboard implementation, not after.
 
 **Space in transport context:**
 Dekzer likely has a transport/performance layer. The binding contract between the tree focus context and the transport
@@ -336,10 +403,10 @@ shortcut layer must be defined explicitly, not resolved at runtime through impli
 product-level decision that affects every keyboard interaction in the application.
 
 **Node iconography for container vs. leaf:**
-The research shows that the disclosure triangle's presence or absence is the primary structural signal. A secondary
-signal via node iconography — e.g., a folder icon with a chevron/hierarchy indicator for containers, a flat list icon
-for leaves — would reinforce the structural difference without adding complexity. This is a design decision, but one
-worth making explicitly rather than defaulting to identical icons for all node types.
+Resolved for local filesystem folders: disclosure presence/absence remains the primary structural signal, and folder
+fill/outline reinforces child-readiness. Solid folder means known branch-capable. Outline folder means known leaf.
+Unknown/probing must not be rendered as a confident outline leaf. This does not decide future iconography for crates,
+playlists, prepared rooms, or external library adapters.
 
 **Inline rename affordance:**
 If Dekzer supports renaming user-created nodes (custom playlists, crates, folders), the rename trigger needs an explicit
@@ -359,8 +426,10 @@ The research validates the following elements of the current Dekzer contract wit
 - Leaf folders are selectable and have no disclosure
 - Parent folders are both selectable and expandable
 - Tracks live in the content pane, not the tree
-- ArrowRight reveals (not "reveal then move to first child")
+- ArrowRight reveals (not "reveal then move to first child" in the default contract)
 - ArrowLeft collapses
+- Up/Down move keyboard focus without changing the selected browse scope
+- Enter selects the focused row as the browse scope
 
 The research identifies the following elements that need explicit refinement:
 
@@ -368,8 +437,8 @@ The research identifies the following elements that need explicit refinement:
   between Enter and Space
 - **Space requires scoping** — either it belongs to transport and is absent from the tree contract, or it is a
   focus-scoped alias; the current ambiguity must be resolved
-- **Visual separation of selected vs. expanded** — the four-state combination table above must be fully implemented; any
-  UI review should confirm all four combinations are distinguishable at a glance
+- **Visual separation of selected vs. expanded vs. focused** — the four-state selection×expansion table above must be
+  fully implemented, with keyboard focus rendered as a separate overlay/outline rather than as selected state
 - **Disclosure slot as the exclusive home for loading state** — if this is not currently specified, add it; do not let
   loading state bleed into the row body
 

@@ -1,6 +1,6 @@
 # Library Tree Row Action Surface and Drag Scope Contract
 
-**Revision:** 2026-06-08
+**Revision:** 2026-06-11
 
 ## Purpose
 
@@ -126,6 +126,22 @@ Do not create multiple keyboard stops inside a normal tree row.
 Do not allow the visible label/icon/right-side empty space to be non-clickable. These regions route to the primary row
 action, which is browse-scope selection for local hierarchy rows.
 
+## Visual Dimension Contract
+
+A row may show several visual layers, but each layer has one meaning:
+
+| Visual layer                         | Meaning                                                              |
+| ------------------------------------ | -------------------------------------------------------------------- |
+| Full-row selected background or rail | Selected browse scope driving the contents pane                      |
+| Full-row focus outline               | Keyboard command target                                              |
+| Disclosure/reveal lane               | Expand, collapse, or load branch                                     |
+| Folder/source icon                   | Structural/media/source identity and child-readiness reinforcement   |
+| Ambient status slot                  | Sparse readiness, refresh, availability, blocked, or failed signal   |
+| Drag-hover overlay                   | Future temporary drop-target feedback during supported drag sessions |
+
+No row state may steal another visual layer. Focus is not selection. Drag hover is not selection. Ambient status is not
+child existence. Folder icon fill is not expanded state.
+
 ## Target DOM Concept
 
 Use one row shell and one action surface.
@@ -139,6 +155,9 @@ Recommended conceptual structure:
       data-selected
       data-expanded
       data-expandable
+      data-focused
+      data-child-readiness
+      data-ambient-status
 
       div.tree-row-action
         role treeitem
@@ -154,6 +173,7 @@ Recommended conceptual structure:
         span.tree-row-icon
         span.tree-row-label
         span.tree-row-meta
+        span.tree-row-status
 
       div.tree-row-drag-overlay
         aria-hidden true
@@ -170,12 +190,17 @@ The visible disclosure icon may remain visually small. The reveal hit target mus
 distinct secondary intent from row-body selection.
 
 For local hierarchy rows, the row controller must support a dedicated reveal lane. The reveal lane may be wider than the
-visible chevron and may include the disclosure gutter/indent region, but it must not consume the ordinary icon, label,
-metadata, or empty right-side row body. Those regions select the browse scope.
+visible chevron and may include the disclosure gutter/indent region, padding, and border assigned to that lane, but it
+must not consume the ordinary icon, label, metadata, status slot, or empty right-side row body. Those regions select the
+browse scope or remain informational/action-specific as described below.
+
+The reveal hit target is rectangular, not glyph-shaped. Any pointer event inside the reveal lane is reveal/collapse/load
+intent. Pointer routing must not depend on hitting the chevron pixels exactly.
 
 Implementation rule:
 
 - the visible chevron is presentation;
+- the folder/source icon is not the expansion control for local hierarchy rows;
 - reveal/collapse intent is handled by the row controller;
 - the primary row action surface spans the row width and selects the browse scope;
 - the reveal lane is a distinct pointer zone owned by the row controller;
@@ -191,11 +216,13 @@ For local source hierarchy rows, the product intent is locked:
 
 - ordinary row-body click selects the browse scope only;
 - icon, label, metadata, and empty right-side row space all route to browse-scope selection;
+- status-slot indicators are informational unless a specific explicit action is present;
 - reveal/collapse is a separate secondary intent exposed through a forgiving reveal lane;
 - reveal-lane click reveals/collapses only and does not select as a hidden side effect;
 - keyboard ArrowRight/ArrowLeft own deterministic expand/collapse behavior;
 - selected and expanded state remain visually distinguishable;
-- no padding or empty space blocks the primary selection action.
+- no padding or empty space blocks the primary selection action;
+- no ambient status indicator changes selection, expansion, focus, or contents scope.
 
 There is no implementation option where a normal single click both selects and reveals. There is no implementation
 option where double-click becomes the primary reveal contract. Double-click may remain a benign no-op or repeat
@@ -204,12 +231,31 @@ selection unless a later, explicit product contract assigns it to a different no
 The non-negotiable part: the current tiny chevron-only hit target and dead row padding are unacceptable, but the fix is
 not row-click expansion. The fix is a full-width selection surface plus a distinct, forgiving reveal lane.
 
+## Ambient Status Slot
+
+The status slot is a sparse informational layer for readiness, refresh, availability, blocked, or failed signals. It is
+not a default decoration applied to every row.
+
+Rules:
+
+- no indicator means normal;
+- blue or cyan may indicate active refresh, probe, scan, or retained/pending activity;
+- amber may indicate incomplete, degraded, partial, or permission-warning state;
+- red may indicate blocked or failed state;
+- green may indicate ready/healthy only where that status is useful enough to display;
+- status indicators must not decide child existence, emptiness, scan completion, or source availability;
+- status indicators must not select, reveal, focus, or update contents unless a later explicit action contract assigns a
+  specific control to that slot.
+
+The status slot projects state owned by upstream readiness/lifecycle/projection owners. The DOM does not infer status.
+
 Tests must prove:
 
 - clicking row body selects only;
 - clicking icon/label/metadata/empty right-side row area selects only;
 - clicking reveal lane reveals/collapses only;
-- selection and expansion state stay independently coherent;
+- clicking status indicator does not accidentally select, reveal, or focus unless an explicit action exists;
+- selection, focus, and expansion state stay independently coherent;
 - there is no dead row space;
 - the reveal lane is forgiving and not limited to the visible chevron pixels.
 
@@ -253,6 +299,32 @@ They are computed during a drag session from:
 - last-in-group state;
 - allowed target operations.
 
+## Drag-Hover Auto-Expand for Future Authored Trees
+
+Auto-expand during drag is future-scope and applies only to supported authored hierarchy rows, such as crates/playlists
+or prepared-room organization surfaces. It does not apply to local filesystem hierarchy rows in the first local-library
+implementation.
+
+If implemented later, the contract is:
+
+- drag hover is drag intent, not selection intent;
+- drag hover must not change the selected browse scope;
+- drag hover must not update the contents pane;
+- drag hover must not masquerade as keyboard focus;
+- valid/denied drop target feedback appears immediately, usually within 0-100ms;
+- auto-expand arms only after a stable dwell, roughly 250-350ms;
+- collapsed branch expansion or child-readiness probing fires only after a longer stable dwell, roughly 600-800ms;
+- the dwell resets when the pointer leaves the row, moves to another row, drag mode/modifier changes, the row becomes
+  invalid, or the drag cancels;
+- a short cooldown after auto-expand prevents dragging down a tree from exploding every branch open;
+- branches opened only by drag are tagged in a drag expansion session;
+- drag-opened branches may be restored on cancel/leave without drop;
+- a successful drop inside a drag-opened branch may keep that branch open;
+- explicit user expansion during a drag commits as normal expansion.
+
+Auto-expand never changes selection and never causes contents refresh. It is a temporary branch visibility operation
+inside a drag session.
+
 ## Last-in-Group Reparenting
 
 The multi-dimensional model depends on last-in-group rows.
@@ -289,14 +361,17 @@ Keyboard behavior belongs to the focused tree row.
 
 Required behavior:
 
-- ArrowDown moves to next visible row.
-- ArrowUp moves to previous visible row.
+- ArrowDown moves focus to next visible row.
+- ArrowUp moves focus to previous visible row.
 - ArrowRight expands/reveals expandable collapsed row.
-- ArrowRight on expanded row may move to first child.
+- ArrowRight on expanded row is a no-op by default unless a later contract adds focus-to-first-child.
 - ArrowLeft collapses expanded row.
-- ArrowLeft on collapsed or leaf row may move to parent.
-- Enter activates/selects the row according to the current tree contract.
+- ArrowLeft on collapsed or leaf row is a no-op by default unless a later contract adds focus-to-parent.
+- Enter activates/selects the focused row according to the current tree contract.
 - Space remains reserved unless deliberately assigned later.
+
+Focus movement is not selection. The selected browse scope and content pane remain unchanged until row-body click or
+Enter selects a row.
 
 Keyboard drag-and-drop is out of scope for now. The DOM must not prevent it later.
 
@@ -307,12 +382,14 @@ The row must behave as one continuous hit surface.
 Requirements:
 
 - full-row hover background;
-- full-row selected background;
-- full-row focus ring;
-- no pointer-dead padding between disclosure, icon, label, and right-side empty space;
+- full-row selected background or selection rail;
+- full-row focus ring that is visually distinct from selected state;
+- no pointer-dead padding between disclosure, icon, label, status slot, and right-side empty space;
 - leaf rows keep alignment without showing fake disabled chevrons;
 - icon and label clicks route to the row action;
-- empty right-side row area routes to the row action.
+- empty right-side row area routes to the row action;
+- status indicators are sparse and absent for normal rows;
+- status indicators do not create extra tab stops.
 
 If an element exists only for layout, it must not block pointer events.
 
@@ -326,6 +403,9 @@ Recommended row attributes:
 - data-selected
 - data-expanded
 - data-expandable
+- data-focused
+- data-child-readiness
+- data-ambient-status
 - data-action-mode
 
 Recommended drag-only attributes:
@@ -345,7 +425,10 @@ Tree projection owns:
 - row depth;
 - row kind;
 - expanded/collapsed projection;
+- focused projection;
 - selected/active projection;
+- child-readiness projection;
+- ambient status projection;
 - last-in-group metadata for future D&D.
 
 Tree controller owns:
@@ -353,7 +436,7 @@ Tree controller owns:
 - row activation;
 - selection requests;
 - expansion/reveal requests;
-- keyboard navigation;
+- keyboard focus movement;
 - click routing;
 - future drag session lifecycle.
 
@@ -408,7 +491,23 @@ Do not keep an old row and a new row alive as compatibility paths.
 
 ### Icon owns expansion
 
-The icon communicates structural/media meaning. Expansion is row/disclosure state.
+The icon communicates structural/media meaning and routes to row-body selection for local hierarchy rows. Expansion is
+row/disclosure state.
+
+### Always-on status LEDs
+
+Status dots on every row create noise and dilute the meaning of real readiness, warning, and failure states. No status
+indicator means normal.
+
+### Focus equals selection
+
+Keyboard focus and selected browse scope are separate. A focus ring must not replace selected state, and selected state
+must not masquerade as focus.
+
+### Drag hover selects or refreshes contents
+
+Drag hover is future drag-session geometry. It must not select a row, change keyboard focus, or refresh the contents
+pane.
 
 ## Implementation Sequence
 
@@ -419,6 +518,8 @@ The icon communicates structural/media meaning. Expansion is row/disclosure stat
 - Keep one roving focus target per row.
 - Keep ARIA tree semantics valid.
 - Ensure icon/label/empty-space clicks route to row action.
+- Keep selected and focus visuals separate.
+- Keep status indicators sparse and non-focusable.
 - Keep leaf alignment without fake disclosure.
 
 ### Phase 2: Implement and test local hierarchy activation
@@ -427,8 +528,11 @@ Implement the locked policy:
 
 - row body selects only;
 - icon, label, metadata, and empty right-side row area select only;
+- status slot does not accidentally select/reveal/focus;
 - reveal lane reveals/collapses only;
 - ArrowRight/ArrowLeft reveal/collapse deterministically;
+- Up/Down move focus without changing selected scope;
+- Enter selects focused row;
 - double-click is not a primary reveal contract.
 
 Then test it.
@@ -460,12 +564,13 @@ The row action surface work is acceptable when:
 - clicking icon/label/right-side empty row area selects the browse scope and is not blocked;
 - local hierarchy rows can be revealed through a distinct, forgiving reveal lane without targeting a tiny chevron;
 - tab focus lands on the row, not an inner disclosure button;
-- focus ring covers the row;
+- focus ring covers the row and is visually distinct from selected state;
 - hover and selected background cover the row;
 - leaf rows do not show fake disabled disclosure;
 - ArrowRight and ArrowLeft keep deterministic tree behavior;
 - ARIA tree semantics remain valid;
 - no local filesystem drag-and-drop behavior is introduced;
+- no always-on row status-dot pattern is introduced;
 - no old row implementation remains as a compatibility path.
 
 The future D&D work is acceptable only when:
@@ -475,6 +580,8 @@ The future D&D work is acceptable only when:
 - it supports ancestor-level reparent zones for last-in-group rows;
 - invalid targets reject explicitly;
 - drop zones are not focusable;
+- drag-hover auto-expand never selects or refreshes contents;
+- drag-opened branches are session-scoped unless a successful drop or explicit user action commits them;
 - domain validation owns final legality.
 
 ## Source Guards
@@ -486,7 +593,10 @@ After row-surface implementation, search for and reject:
 - pointer-blocking layout spans inside the row;
 - row click handlers split across unrelated child controls;
 - row-body click that both selects and reveals;
+- icon click that expands local hierarchy rows;
 - double-click as the primary reveal/collapse path;
+- always-on status dots on normal rows;
+- focus styling that is indistinguishable from selected styling;
 - permanent drop target elements;
 - native draggable attributes on local hierarchy rows;
 - old row component wrappers kept for compatibility.
@@ -500,11 +610,14 @@ Stop and report instead of continuing if:
 - ARIA becomes invalid;
 - multiple tab stops per row are introduced;
 - implementation needs two competing tree-row components;
-- tests require weakening keyboard navigation.
+- tests require weakening keyboard navigation;
+- focus movement starts changing selected browse scope implicitly;
+- visual status indicators start deciding substrate facts.
 
 ## Final Product Statement
 
 Dekzer local hierarchy rows are full-width browse-scope selection surfaces with a distinct, forgiving reveal lane. They
-are not tiny chevron targets, and they are not row-click expansion surfaces. Crate and playlist rows may later become
-authored drag-and-drop surfaces with multi-dimensional reparent geometry. These two interaction classes share a row
-foundation but must not be confused.
+are not tiny chevron targets, and they are not row-click expansion surfaces. The icon and label select; the reveal lane
+reveals; status hints stay sparse and informational; keyboard focus remains distinct from selected browse scope. Crate
+and playlist rows may later become authored drag-and-drop surfaces with multi-dimensional reparent geometry. These two
+interaction classes share a row foundation but must not be confused.
