@@ -18,6 +18,11 @@ Tree expansion and contents selection are separate product surfaces:
 - Tree expansion shows immediate hierarchy children for navigation.
 - Tree selection shows recursive primary media descendant contents for work.
 
+`immediate` and `recursive` are first-class read identity values. They must not share cursor identity, retained contents
+snapshots, page accumulators, coverage state, omission metadata, or verified-empty state. A hierarchy child read for
+immediate navigation cannot satisfy a recursive selected-contents read, and a recursive selected-contents cursor cannot
+continue an immediate hierarchy or contents read.
+
 The contents table must not show only the immediate loaded tree children unless the selected row is known to have no
 relevant descendants beyond them.
 

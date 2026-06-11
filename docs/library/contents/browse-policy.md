@@ -9,9 +9,10 @@ The canonical product/domain browse policy, filter registry, classification voca
 The product's initial active workflow filter is **Audio**. Product filters map to backend-owned policies:
 
 ```ts
-Audio     -> { policy: { kind: 'audioBrowse' }, scopeDepth: 'recursive' }
-Media     -> { policy: { kind: 'playableMediaBrowse' }, scopeDepth: 'recursive' }
-All Files -> { policy: { kind: 'sourceFileInventory', fileClasses: [...] }, scopeDepth: 'recursive' }
+Audio           -> { policy: { kind: 'audioBrowse' }, scopeDepth: 'recursive' }
+Media           -> { policy: { kind: 'playableMediaBrowse' }, scopeDepth: 'recursive' }
+All Files       -> { policy: { kind: 'sourceFileInventory', fileClasses: [...] }, scopeDepth: 'recursive' }
+Companion Files -> { policy: { kind: 'sourceFileInventory', fileClasses: [...] }, scopeDepth: 'recursive' }
 ```
 
 `playableMediaBrowse` includes durable `source_files.file_class` values `audio` and `video`. It excludes images,
@@ -24,8 +25,20 @@ stronger facts for a specific file.
 **All Files** is raw source inventory. It is not interpreted content and not a problems view. The exact admitted
 inventory classes remain owned by `sourceFileInventory`.
 
+**Companion Files** is explicit admitted companion inventory. It is not a workflow media filter and not a problems view.
+The canonical product semantics are owned by `policy-and-classification.md`.
+
+The canonical built-in registry also includes **Video** as a distinct workflow filter and **Media** as the audio+video
+workflow filter. This implementation companion must not be read as dropping either built-in. Any renderer activation of
+Video must use distinct read policy/filter identity and must not reuse Audio or Media rows, cursors, retained snapshots,
+or verified-empty state.
+
 The renderer requests a policy and presents returned facts. It does not supply `['audio', 'video']` as a default
 `sourceFileInventory` filter, inspect raw source inventory, filter rows, sort rows, or infer hidden content.
+
+Active filter selection participates in contents identity. Switching filter must schedule a re-keyed contents read for
+the same selected scope and selected depth. It must not mutate tree containment, selected scope, expansion, scroll, or
+focus. It may change content rows, folder facets, omission metadata, and empty-state eligibility.
 
 ## Omission Metadata
 
@@ -50,6 +63,10 @@ Coverage and omission metadata jointly define zero-row presentation:
 - incomplete coverage: `Still indexing` or equivalent;
 - complete coverage plus omissions: policy-empty copy such as `No audio tracks in this view`;
 - complete coverage without omissions: true empty copy for the active policy.
+
+Verified-empty language is legal only for a matching accepted result whose selected scope, active policy/filter,
+scopeDepth, complete coverage, and zero-row count prove absence. Pending, retained-pending, incomplete, blocked, failed,
+missing, unavailable, stale, cursor-invalid, and unsupported-selection states must not render verified-empty language.
 
 A folder containing only MP4 files returns video rows under `playableMediaBrowse`. The same folder returns zero rows and
 `hasPolicyOmittedRows: true` under `audioBrowse`; it is not presented as truly empty.

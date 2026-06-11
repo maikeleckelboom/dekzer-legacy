@@ -156,6 +156,7 @@ Contents cursor identity binds:
 - the complete policy discriminant;
 - canonicalized `sourceFileInventory.fileClasses` or `primaryMedia.mediaKinds`;
 - scopeDepth;
+- request generation/key at the renderer contents boundary;
 - the policy-specific ordering position.
 
 Required invariants:
@@ -165,6 +166,10 @@ Required invariants:
 - `audioBrowse` cursors cannot be reused by `primaryMedia`;
 - `sourceFileInventory` cursors reject changed `fileClasses`;
 - `primaryMedia` cursors reject changed `mediaKinds`;
+- `immediate` and `recursive` scopeDepth values reject each other's cursors;
+- source, source-location, and directory scopes reject each other's cursors even when their current filesystem ranges
+  overlap;
+- filter switches re-key contents reads and do not reuse retained rows as accepted rows for the new policy identity;
 - ordering and pagination behavior remain unchanged.
 
 The schema and row-field rename does not alter cursor policy identity.

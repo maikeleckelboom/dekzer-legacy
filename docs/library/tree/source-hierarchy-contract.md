@@ -42,6 +42,23 @@ A directory with no navigable child directories is a valid selectable destinatio
 
 Leaf directories do not show a disclosure affordance. A directory may show disclosure only when it has navigable child directories or an explicit hierarchy continuation action.
 
+## Disclosure Affordance Law
+
+Tree disclosure is earned only by confirmed child browse-scope presence.
+
+For Local Files sources, child browse scopes are child directory scopes. A source or directory row may show a disclosure
+affordance only when the hierarchy authority has confirmed child directory scopes or returned an explicit hierarchy
+continuation action. A folder that contains matching media files but no child directory scopes is selectable and useful,
+but it is not expandable.
+
+Content/media presence must not create a chevron. Folder usefulness, folder admission, content rows, and facets may be
+filter-aware, but they do not decide tree disclosure. Audio files, video files, companion files, artwork, raw inventory,
+or known descendant media facts do not make a row expandable unless child browse scopes are confirmed.
+
+Unknown child-scope readiness must not be rendered as known expandable. A row whose child browse-scope state is unknown
+must show honest pending, probing, retained, blocked, failed, or absent disclosure state according to the active tree
+readiness contract; it must not show a disclosure affordance that implies confirmed children.
+
 ## Contents and Inventory
 
 The contents pane owns file rows for the selected source or directory scope. Selecting a tree row establishes browse

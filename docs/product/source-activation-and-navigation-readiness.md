@@ -63,8 +63,8 @@ browsable before recursive classification finishes.
 
 Empty is a proven state.
 
-“No Songs” or equivalent empty copy is only valid when the requested scope, recursion mode, and active browse policy
-have sufficient coverage to prove that no matching rows exist.
+“No Songs” or equivalent empty copy is only valid when the selected scope, active browse policy/filter, selected depth,
+coverage, and accepted row count prove that no matching rows exist.
 
 Absence of rows is not proof of emptiness.
 
@@ -243,6 +243,33 @@ A selected source or folder with incomplete recursive audio coverage must not sh
 If the active policy is audio browse with recursive scope, verified empty requires enough recursive coverage to prove
 that no matching audio rows exist under that scope.
 
+### Readiness label state machine
+
+Readiness labels are outputs of state. They are not copy polish. A renderer may choose visual emphasis, iconography, and
+layout, but it must not choose a verified-empty label unless the state row below allows it.
+
+The V0 contents readiness labels are:
+
+| State condition                                                                                       | V0 label output                                                                                                                                                                                               | Verified-empty language allowed |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| A selected scope has no accepted rows for the active identity and the first read is pending           | "Loading contents..."                                                                                                                                                                                         | No                              |
+| Accepted rows for the same identity are retained while a refresh is pending                           | "Updating contents..."                                                                                                                                                                                        | No                              |
+| Coverage is incomplete or still indexing for the selected scope, filter, and depth                    | "Still indexing. Results may be incomplete."                                                                                                                                                                  | No                              |
+| No accepted rows exist and coverage has not proven complete, blocked, failed, missing, or unavailable | "Nothing proven yet."                                                                                                                                                                                         | No                              |
+| Coverage is complete, rows are zero, access is valid, and no policy omissions alter the meaning       | Filter-specific verified-empty label: "No audio items in this scope.", "No video items in this scope.", "No playable media in this scope.", "No companion files in this scope.", or "No files in this scope." | Yes                             |
+| Coverage is complete, rows are zero, and `hasPolicyOmittedRows = true`                                | Filter-specific policy-empty label for the active filter                                                                                                                                                      | Yes, for the active policy only |
+| The source containing the selected scope is unavailable                                               | "Source unavailable."                                                                                                                                                                                         | No                              |
+| The selected source identity no longer resolves                                                       | "Source missing."                                                                                                                                                                                             | No                              |
+| The selected folder or source-location identity no longer resolves                                    | "Folder missing."                                                                                                                                                                                             | No                              |
+| Access is denied or policy blocks the selected scope                                                  | "Access blocked."                                                                                                                                                                                             | No                              |
+| The contents read failed                                                                              | "Could not load contents."                                                                                                                                                                                    | No                              |
+| Cursor identity is invalid or a response is stale for the current scope, filter, depth, or generation | "Refreshing contents..."                                                                                                                                                                                      | No                              |
+| The selected navigation row cannot produce a contents scope                                           | "Unsupported selection."                                                                                                                                                                                      | No                              |
+
+The verified-empty labels are legal only for a matching accepted result. Pending, retained-pending, incomplete,
+blocked, failed, missing, unavailable, stale, cursor-invalid, unsupported-selection, and no-proof states must not use
+"No Songs", "No audio", "No playable media", "No files", or any equivalent absence-proven language.
+
 ## Retention Rule
 
 Pending work must not wipe accepted state.
@@ -262,10 +289,11 @@ The projection should be able to express retained, pending, incomplete, or stale
 A scope is verified empty only when all of these are true:
 
 - the requested scope identity is known;
-- the requested browse policy is known;
-- the requested recursion mode is known;
+- the requested browse policy/filter is known;
+- the requested selected depth is known;
 - the relevant source/folder access is not blocked;
 - the read did not fail;
+- the cursor and response identity match the current request generation/key;
 - coverage is complete enough for the requested policy;
 - the accepted result contains no matching rows.
 
@@ -304,6 +332,10 @@ Examples of explicit user actions:
 - invoking refresh/rescan commands;
 - choosing a browse policy/filter.
 
+Choosing a browse policy/filter changes contents identity only. It must not mutate selected scope, expansion, scroll, or
+focus. It may change content rows, folder facets, omission metadata, and verified-empty eligibility after a matching
+contents result is accepted.
+
 ## Disclosure and Selection
 
 Disclosure and selection are separate contracts.
@@ -325,6 +357,10 @@ ArrowRight and ArrowLeft may operate disclosure according to tree rules.
 Enter may select/activate according to row rules.
 
 Space must not be stolen for tree selection if it conflicts with transport or broader DJ workflow expectations.
+
+Disclosure affordance is about child browse scopes, not media presence. For Local Files, child browse scopes are child
+directory scopes. A folder containing matching media files and no child directory scopes is selectable and useful, but
+not expandable. Unknown child-scope readiness must not be rendered as known expandable.
 
 ## Renderer Responsibility
 
@@ -450,6 +486,26 @@ This contract is implemented well enough when:
 - disclosure and selection remain separate in pointer and keyboard paths;
 - renderer state remains projection/interaction state, not filesystem authority;
 - backend contracts expose honest readiness and coverage state instead of making the renderer guess.
+
+## Activated Source Browser Flow Audit
+
+The next browser-flow audit exits only by reporting each checklist item explicitly:
+
+- user can add a source;
+- user can see the source;
+- user can see immediate folders;
+- user can select a source or folder;
+- contents readiness is honest for the selected scope, filter, and depth;
+- scan can progress;
+- rows can appear;
+- no false empty state appears;
+- no false disclosure affordance appears;
+- no background event mutates selection, expansion, scroll, or focus;
+- built-in filter selection is wired into contents identity;
+- readiness labels match the state-machine outputs in this document.
+
+The audit is allowed to fail. A failed audit item must be reported as failed with the observed state and owning contract.
+The audit must not hide failed checklist items behind broad fixes or unrelated implementation changes.
 
 ## Suggested First Implementation Slice
 

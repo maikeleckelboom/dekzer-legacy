@@ -438,6 +438,23 @@ Five filters ship as built-ins. They are the complete default set.
 **Default active filter:** `audio`. Dekzer's V0 slice is audio-first. Showing video, companion, and raw files by default
 makes the application feel like a file manager rather than a DJ library.
 
+**Built-in activation contract:** All five built-ins are active registry members in the browser-flow arc. Audio, Video,
+Media, Companion Files, and All Files each carry a distinct filter identity. Activating a built-in filter sets the
+library browse session's active filter id and requires a re-keyed contents read for the selected scope and selected
+depth. A contents read, retained snapshot, cursor, stale-response guard, and verified-empty result must include the
+active filter identity through the concrete read policy/filter state used for that filter.
+
+| Active filter   | Required read policy/filter semantics                                                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Audio           | Interpreted playable rows where `mediaKind = audio`; V0 protocol activation uses `audioBrowse`.                                                                  |
+| Video           | Interpreted playable rows where `mediaKind = video`; identity is distinct from Audio and Media.                                                                  |
+| Media           | Interpreted playable rows where `mediaKind` is in the registered media default set; V0 uses `{audio, video}` and protocol activation uses `playableMediaBrowse`. |
+| Companion Files | Raw companion rows where `fileClass ∈ {cueSheet, playlistFile}`; identity is distinct from All Files.                                                            |
+| All Files       | Raw source-file inventory rows with no predicate filtering; no interpreted assets are inserted.                                                                  |
+
+The **Media** filter is not optional in the activated browser-flow contract. Dropping Media from filter wiring, treating
+Media as Audio, or treating Media as All Files is a contract violation.
+
 **Custom filters** are a V2+ feature. The architecture supports them as user-named browse policy records following the
 same schema. No special-casing is required.
 
@@ -588,7 +605,9 @@ The following must hold on every filter switch:
 - No tree node changes expansion state.
 - No tree node changes disclosure affordance (`hasChildren` / `leaf`).
 - No tree node is removed or added.
+- Selection, scroll position, and focus do not change.
 - A content read is scheduled immediately using the new policy.
+- The content read is re-keyed because active filter identity is part of contents identity.
 - The renderer retains the last accepted content snapshot until the new read completes (see §12.1, criterion 5).
 - Facet visual prominence re-weights synchronously from the last accepted facet snapshot when enough facet data already
   exists. If new facet data is required, the prior accepted facet presentation is retained and marked pending without
@@ -691,7 +710,8 @@ must not look empty, failed, or complete.
 ### 9.4 Empty state
 
 When the content pane has zero rows for the selected scope under the active filter, it must display a filter-specific
-empty state message.
+empty state message only after the contents readiness state proves verified empty. These labels are outputs of the
+state machine, not copy polish.
 
 | Active filter   | Empty state message                 |
 | --------------- | ----------------------------------- |
@@ -700,6 +720,10 @@ empty state message.
 | Media           | "No playable media in this scope."  |
 | Companion Files | "No companion files in this scope." |
 | All Files       | "No files in this scope."           |
+
+Verified-empty labels are legal only when selected scope identity, active filter identity, selected depth, coverage, and
+row count all prove absence for the active contents identity. Pending, incomplete, blocked, failed, missing,
+unavailable, stale, cursor-invalid, unsupported-selection, and retained-pending states must not use these labels.
 
 The empty state must never say "This folder is empty" without qualification when the folder contains content that is
 hidden by the active filter.
@@ -800,123 +824,127 @@ These criteria must be satisfied before any implementation against this document
    a
    scoped loading state — not a blank pane or a misleading empty-state message.
 
+6. Filter switch handling must preserve selected scope, expansion state, tree containment, disclosure affordances,
+   scroll position, and focus. It may change content rows, retained content state, omission metadata, verified-empty
+   eligibility, and facet prominence.
+
 ### 12.2 CUE and companion-file behaviour
 
-6. Under the `audio` filter: a scope containing a resolved `cueBackedDisc` asset with
+7. Under the `audio` filter: a scope containing a resolved `cueBackedDisc` asset with
    `interpretationReadiness = verified` must show that disc row in the content pane. The raw `.cue` file and its
    associated raw audio file must not appear as separate rows.
 
-7. Under the `audio` filter: a scope containing a `cueBackedDisc` with `interpretationReadiness = stale` must show that
+8. Under the `audio` filter: a scope containing a `cueBackedDisc` with `interpretationReadiness = stale` must show that
    disc row with a visible stale indicator. `loadEligibility` must be `warning`. The row must remain visible while
    background re-resolution is running and must not be removed until re-resolution completes.
 
-8. Under the `audio` filter: a scope containing an unresolved, ambiguous, or broken `.cue` file must produce no
+9. Under the `audio` filter: a scope containing an unresolved, ambiguous, or broken `.cue` file must produce no
    `cueBackedDisc` row. The raw `.cue` must not appear. A directly playable associated audio file may remain visible as
    a
    `playableAudioAsset` unless it is hidden by a resolved or stale `cueBackedDisc` projection.
 
-9. Under the `companionFiles` filter: a raw `.cue` file must appear as a `companionFile` row, regardless of whether an
-   interpretation link exists.
+10. Under the `companionFiles` filter: a raw `.cue` file must appear as a `companionFile` row, regardless of whether an
+    interpretation link exists.
 
-10. Under the `companionFiles` filter: a broken `.cue` file must appear with an error affordance indicating the related
+11. Under the `companionFiles` filter: a broken `.cue` file must appear with an error affordance indicating the related
     broken interpretation state. Its `loadEligibility` must be `nonLoadable`.
 
-11. Under the `allSourceFiles` filter: a raw `.cue` file must appear as a `rawSourceFile` row. Its associated audio file
+12. Under the `allSourceFiles` filter: a raw `.cue` file must appear as a `rawSourceFile` row. Its associated audio file
     must also appear as a `rawSourceFile` row. No `cueBackedDisc` row must appear. Raw rows must carry
     `loadEligibility = nonLoadable` even when they annotate a related interpretation state.
 
 ### 12.3 Artwork behaviour
 
-12. Under `audio`, `video`, `media`, and `companionFiles` filters: artwork image files (`.jpg`, `.png`, and similar
+13. Under `audio`, `video`, `media`, and `companionFiles` filters: artwork image files (`.jpg`, `.png`, and similar
     `artworkImage` file class members) must not appear in the content pane.
 
-13. Under `allSourceFiles`: artwork image files must appear as `rawSourceFile` rows.
+14. Under `allSourceFiles`: artwork image files must appear as `rawSourceFile` rows.
 
 ### 12.4 Facet behaviour
 
-14. Immediately after the navigation readiness probe commits the first child window for a **newly admitted** source, all
+15. Immediately after the navigation readiness probe commits the first child window for a **newly admitted** source, all
     visible folder facets must be in `probing` or `unscanned` state. No facet content may appear before classification
     data is available.
 
-15. For a **previously scanned source** at reopen: persisted facets may be displayed immediately, provided their
+16. For a **previously scanned source** at reopen: persisted facets may be displayed immediately, provided their
     `coverage` field matches the current scope/projection policy and their `generatedAt` epoch is within the valid
     retention window. Facets whose `coverage` does not match the current policy (for example, `directOnly` facets when
     the current policy requires `descendants`) must be treated as invalid and regenerated. Previously scanned sources
     must not be reset to `probing` when their persisted facets are epoch-valid and coverage-compatible.
 
-16. Facet state transitions must not change disclosure state, sort order, or selection state of any tree node.
+17. Facet state transitions must not change disclosure state, sort order, or selection state of any tree node.
 
-17. A folder with only video content and 0 audio content must not show a prominent audio facet when the active filter is
+18. A folder with only video content and 0 audio content must not show a prominent audio facet when the active filter is
     `audio`.
 
-18. A folder with 0 audio content and non-zero video content must show a subdued video facet when the active filter is
+19. A folder with 0 audio content and non-zero video content must show a subdued video facet when the active filter is
     `audio`, provided the video count clears the significance threshold.
 
 ### 12.5 Persistence behaviour
 
-19. Closing Dekzer while `audio`, `video`, or `media` is active must restore that filter on next launch.
+20. Closing Dekzer while `audio`, `video`, or `media` is active must restore that filter on next launch.
 
-20. Closing Dekzer while `companionFiles` or `allSourceFiles` is active must restore the last persisted workflow filter
+21. Closing Dekzer while `companionFiles` or `allSourceFiles` is active must restore the last persisted workflow filter
     on next launch, not the inspection filter.
 
-21. The active browse policy must be stored as a session-context parameter. It must not be read or written as a
+22. The active browse policy must be stored as a session-context parameter. It must not be read or written as a
     process-global variable.
 
 ### 12.6 Navigation probe independence
 
-22. The navigation readiness probe must complete its structural enumeration without reading or consulting active browse
+23. The navigation readiness probe must complete its structural enumeration without reading or consulting active browse
     policy state. A code dependency from probe code to the browse policy registry, to any `BrowsePolicy` record, or to
     any filter-specific predicate is a contract violation. The probe must compile and execute correctly in a build where
     the browse policy registry does not exist.
 
-23. The navigation readiness probe must not produce classification records, interpretation links, content row
+24. The navigation readiness probe must not produce classification records, interpretation links, content row
     projections, identity facts, or facet values.
 
 ### 12.7 Row identity
 
-24. Two content rows produced for the same physical file under different row universes must have distinct row ids that
+25. Two content rows produced for the same physical file under different row universes must have distinct row ids that
     do not alias.
 
-25. A `cueBackedDisc` row id must remain stable while the underlying interpretation link is in `resolved` or `stale`
+26. A `cueBackedDisc` row id must remain stable while the underlying interpretation link is in `resolved` or `stale`
     state. It must not change when the stale indicator is added or removed.
 
-26. Switching the active filter must not reuse the same row id for a different row kind. Reuse of a row id across
+27. Switching the active filter must not reuse the same row id for a different row kind. Reuse of a row id across
     different `ContentRowKind` values is a contract violation.
 
-27. A `playableAudioAsset` or `playableVideoAsset` row produced by direct projection from a source file must not share
+28. A `playableAudioAsset` or `playableVideoAsset` row produced by direct projection from a source file must not share
     its row id with the `rawSourceFile` row for the same source file. Direct playable asset row ids must derive from a
     projected identity space distinct from the raw row id.
 
-28. A content snapshot must carry the scope identity and `browsePolicyId` used to produce it. The renderer must reject
+29. A content snapshot must carry the scope identity and `browsePolicyId` used to produce it. The renderer must reject
     or ignore snapshots whose scope identity, policy id, request token, or continuity token does not match the currently
     accepted request.
 
 ### 12.8 Renderer constraints
 
-29. The renderer must not infer `ScopeFacet` values by counting visible content rows.
+30. The renderer must not infer `ScopeFacet` values by counting visible content rows.
 
-30. The renderer must not infer `hasChildren` or `leaf` from the presence or absence of content rows.
+31. The renderer must not infer `hasChildren` or `leaf` from the presence or absence of content rows.
 
-31. The renderer must not infer `MediaKind` or `FileClass` from file extensions visible in row display names.
+32. The renderer must not infer `MediaKind` or `FileClass` from file extensions visible in row display names.
 
-32. The renderer must not infer `interpretationReadiness`, `relatedInterpretationState`, or `loadEligibility` from row
+33. The renderer must not infer `interpretationReadiness`, `relatedInterpretationState`, or `loadEligibility` from row
     appearance alone. These must be supplied as explicit projection fields on each content row when applicable.
 
-33. The renderer must consume and display the projection state it is supplied. It must not derive or override structural
+34. The renderer must consume and display the projection state it is supplied. It must not derive or override structural
     or classification facts from any other source.
 
 ### 12.9 Source guards
 
-34. Navigation readiness probe modules must not import the browse policy registry, filter registry, built-in filter
+35. Navigation readiness probe modules must not import the browse policy registry, filter registry, built-in filter
     definitions, or filter-specific predicates.
 
-35. Renderer modules must not import file-extension classification helpers to infer `FileClass`, `MediaKind`, facets, or
+36. Renderer modules must not import file-extension classification helpers to infer `FileClass`, `MediaKind`, facets, or
     content row eligibility.
 
-36. Facet renderer modules must not import content row reducers or count visible content rows to infer `ScopeFacet`
+37. Facet renderer modules must not import content row reducers or count visible content rows to infer `ScopeFacet`
     values.
 
-37. Content read code must receive the active `browsePolicyId` as an explicit request/session parameter. It must not
+38. Content read code must receive the active `browsePolicyId` as an explicit request/session parameter. It must not
     read process-global browse policy state directly.
 
 ---

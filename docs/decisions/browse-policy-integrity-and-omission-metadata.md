@@ -175,10 +175,16 @@ The field is presentation metadata. The renderer must not use it to:
 
 ## Current Product Direction
 
-The product's initial active workflow filter is **Audio** and maps to `audioBrowse`. **Media** is a separate workflow
-filter backed by `playableMediaBrowse` for audio and video. **All Files** is raw source inventory backed by an explicit
-`sourceFileInventory` request; it is not interpreted content or a problems view.
-The store owns included durable classes, omitted classes, cursor policy identity, scopeDepth, and ordering.
+The product's initial active workflow filter is **Audio** and maps to `audioBrowse`. The canonical built-in filter
+registry contains **Audio**, **Video**, **Media**, **Companion Files**, and **All Files**. **Media** is a separate
+workflow filter backed by `playableMediaBrowse` for audio and video. **Companion Files** is explicit admitted companion
+inventory. **All Files** is raw source inventory backed by an explicit `sourceFileInventory` request; it is not
+interpreted content or a problems view.
+The store owns included durable classes, omitted classes, active policy/filter identity, cursor policy identity,
+scopeDepth, and ordering.
+
+Switching active policy/filter or scopeDepth requires a re-keyed contents read. Rows, cursors, omission metadata, and
+verified-empty state from one policy/filter or depth must not be reused as accepted state for another.
 
 The implementation does not widen `audioBrowse`, implement source admission/default discovery, add renderer filtering,
 or add row fields such as duration, BPM, key, codec, artwork, canonical track identity, or analysis readiness.

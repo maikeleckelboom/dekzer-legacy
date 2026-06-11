@@ -16,6 +16,7 @@ A contents read is parameterized by:
 - scopeDepth
 - limit
 - cursor
+- request generation/key
 
 Renderer product modes compile into a typed contents policy at the renderer edge. Backend, shared, protocol, and query
 code does not branch on UI mode names.
@@ -139,6 +140,8 @@ type ContentsReadRequest = {
   readonly scopeDepth: ContentsScopeDepth
   readonly limit?: number
   readonly cursor?: string
+  readonly requestKey: string
+  readonly requestGeneration: number
 }
 
 type ContentsScope =
@@ -182,6 +185,37 @@ type ContentsResult = {
 
 ---
 
+## Request Identity
+
+Contents read identity is the complete tuple that decides whether a request, response, cursor, retained snapshot, or
+accumulated page belongs to the same logical contents stream.
+
+The identity tuple is:
+
+- selected scope identity: `ContentsScope.kind` plus its stable source, source-location, or directory identifiers;
+- browse policy/filter selection: the complete `ContentsReadPolicy` discriminant plus canonicalized variant state;
+- selected depth: `scopeDepth`;
+- cursor identity: cursor version, encoded identity fields, and policy-specific ordering position;
+- request generation/key: the renderer-owned monotonic generation and stable request key for the active selected
+  scope, policy, depth, and pagination stream.
+
+`scope`, `policy`, and `scopeDepth` are not display inputs. They are identity dimensions. A response whose echoed
+`scope`, `policy`, `scopeDepth`, cursor continuity, request key, or request generation does not match the active request
+must be ignored or rejected. It must not append rows, replace rows, prove empty, or change readiness state for the
+current selection.
+
+Switching the active filter changes contents identity. The next contents read must use a new request key or generation,
+and it must not reuse rows, pages, cursors, omission metadata, or verified-empty state produced under another
+policy/filter. Retained rows from the previous accepted identity may stay visible only as retained-pending presentation
+until a matching response for the new identity is accepted.
+
+Switching selected depth changes contents identity. `immediate` and `recursive` reads for the same source, source
+location, or directory must not share cursor identity, page accumulators, retained snapshots, omission metadata, or
+verified-empty state. Source, source-location, and directory scopes also remain distinct identity values even when they
+currently resolve to overlapping filesystem prefixes.
+
+---
+
 ## Invariants
 
 - One contents read boundary owns contents-pane reads.
@@ -190,6 +224,8 @@ type ContentsResult = {
 - Backend and query code own profile-specific filtering.
 - Store/service own required scope-level `hasPolicyOmittedRows`; renderer does not inspect raw inventory.
 - Renderer does not answer authoritative selected scope contents from loaded hierarchy cache.
+- Selected scope, browse policy/filter selection, and selected depth are first-class contents identity dimensions.
+- Switching browse policy/filter or selected depth invalidates the active contents stream and requires a re-keyed read.
 - The product's initial active workflow filter is **Audio** and maps to `audioBrowse`.
 - `playableMediaBrowse` backs the separate **Media** filter and may include audio and video only.
 - `playableMediaBrowse` has no caller-supplied file class filter.
@@ -236,10 +272,16 @@ Cursor pagination is implemented for contents reads:
 
 - Cursor is encoded as base64url JSON with scope, the full policy discriminant and variant filter state, scopeDepth,
   and last-row ordering position.
-- Cursor identity is validated against the current request; mismatches return `cursorInvalid`.
+- Cursor identity is validated against the current request identity tuple; mismatches return `cursorInvalid`.
 - `nextCursor` is produced when more rows exist beyond the limit.
 - The renderer sends cursors through `loadContentsPage` and accumulates pages in the contents boundary.
 - Contents pagination (`loadContentsPage`) is distinct from tree load-more (`loadChildren`).
+- A cursor from `immediate` scopeDepth is invalid for `recursive`, and a cursor from `recursive` is invalid for
+  `immediate`.
+- A cursor from one selected scope kind or stable scope id is invalid for any other scope kind or stable scope id.
+- A cursor from one browse policy/filter selection is invalid for every other policy/filter selection, including
+  different canonicalized `fileClasses` or `mediaKinds` arrays.
+- A stale response or cursor-invalid response must not produce verified-empty presentation.
 
 Future cursor work, if any, should extend cursor identity fields rather than replace the encoding or validation
 mechanism.
