@@ -119,9 +119,17 @@ export type SearchFilterSourceAccessState = "accessible" | "missing" | "blocked"
 
 export type SearchFilterEvidenceAvailability = "hasCurrent" | "missingCurrent";
 
-export type SearchFilterAttachmentLinkState = "current" | "stale" | "missing";
+export type SearchFilterAttachmentLinkState = "current" | "stale" | "missing" | "notApplicable";
 
 export type SearchFilterMediaRelevance = "audioWorkflow" | "playableMedia" | "explicitInventory" | "companionFile" | "notMediaRelevant";
+
+export type SearchFilterIndexState = "ready" | "rebuilding" | "partial" | "failed" | "missing";
+
+export type SearchFilterAuthorityLayer = "source" | "sourceLocation" | "sourceHierarchy" | "sourceFileInventory";
+
+export type SearchFilterEvidenceCoverageState = "indexed" | "notApplicable";
+
+export type SearchFilterMatchReason = "filter" | "exactLabel" | "labelPrefix" | "label" | "path" | "text";
 
 export type ContentsScope = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
 
@@ -308,13 +316,13 @@ export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: num
 
 export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, scopeDepth: ContentsScopeDepth, rows: Array<ContentsFileRow>, scopeCoverage: ContentsScopeCoverage, hasPolicyOmittedRows: boolean, nextCursor?: string, detail?: string, };
 
-export type SearchFilterResult = { state: SearchFilterState, queryIdentity: SearchFilterQueryIdentity, indexGeneration: string, indexState: string, rows: Array<SearchFilterResultRow>, nextCursor?: string, detail?: string, };
+export type SearchFilterResult = { state: SearchFilterState, queryIdentity: SearchFilterQueryIdentity, indexGeneration: string, indexState: SearchFilterIndexState, rows: Array<SearchFilterResultRow>, nextCursor?: string, detail?: string, };
 
-export type SearchFilterState = "ready" | "empty" | "cursorInvalid" | "unsupported";
+export type SearchFilterState = "ready" | "empty" | "partial" | "cursorInvalid" | "unsupported";
 
 export type SearchFilterQueryIdentity = { scope: SearchFilterScope, recursion: SearchFilterRecursion, textQuery?: string, targetKinds: Array<SearchFilterResultKind>, filters: SearchFilterSet, sort: SearchFilterSort, pageSize: number, indexGeneration: string, };
 
-export type SearchFilterResultRow = { resultKind: SearchFilterResultKind, authorityLayer: string, stableKey: string, sourceId: string | null, sourceLocationId: string | null, sourceDirectoryId: string | null, parentSourceDirectoryId: string | null, sourceFileId: string | null, displayLabel: string, displayPath?: string, relativePath?: string, fileClass?: SearchFilterFileClass, fileKind?: ContentsFileKind, mediaRelevance?: SearchFilterMediaRelevance, presenceState?: ContentsPresenceState, sourceAccessState?: SearchFilterSourceAccessState, sourceScanPhase?: SourceScanPhase, hasCurrentBlake3: boolean, hasCurrentProbe: boolean, attachmentLinkState: string, attachmentId: string | null, contentHashAlgorithm?: string, contentHashValue?: string, evidenceCoverageState: string, matchReason: string, updatedAtMs: number, };
+export type SearchFilterResultRow = { resultKind: SearchFilterResultKind, authorityLayer: SearchFilterAuthorityLayer, stableKey: string, sourceId: string | null, sourceLocationId: string | null, sourceDirectoryId: string | null, parentSourceDirectoryId: string | null, sourceFileId: string | null, displayLabel: string, displayPath?: string, relativePath?: string, fileClass?: SearchFilterFileClass, fileKind?: ContentsFileKind, mediaRelevance?: SearchFilterMediaRelevance, presenceState?: ContentsPresenceState, sourceAccessState?: SearchFilterSourceAccessState, sourceScanPhase?: SourceScanPhase, hasCurrentBlake3: boolean, hasCurrentProbe: boolean, attachmentLinkState: SearchFilterAttachmentLinkState, attachmentId: string | null, contentHashAlgorithm?: string, contentHashValue?: string, evidenceCoverageState: SearchFilterEvidenceCoverageState, matchReason: SearchFilterMatchReason, updatedAtMs: number, };
 
 export type ContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed" | "policyConflict" | "cursorInvalid";
 

@@ -108,6 +108,7 @@ mod tests {
         "search_filter_index_fts",
         "search_filter_index_metadata",
         "search_filter_index_rows",
+        "search_filter_index_source_coverage",
         "navigation_rows",
         "LibraryBrowserRows",
         "LibraryBrowserRows_fts",
@@ -485,6 +486,18 @@ mod tests {
                 "generation",
                 "state",
                 "updated_at",
+            ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "search_filter_index_source_coverage"),
+            vec![
+                "source_id",
+                "indexer_version",
+                "generation",
+                "state",
+                "rebuilt_at",
+                "updated_at",
+                "detail",
             ]
         );
         assert_eq!(

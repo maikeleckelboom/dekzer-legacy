@@ -4129,7 +4129,17 @@
       "enum": [
         "current",
         "stale",
-        "missing"
+        "missing",
+        "notApplicable"
+      ]
+    },
+    "SearchFilterAuthorityLayer": {
+      "type": "string",
+      "enum": [
+        "source",
+        "sourceLocation",
+        "sourceHierarchy",
+        "sourceFileInventory"
       ]
     },
     "SearchFilterEvidenceAvailability": {
@@ -4137,6 +4147,13 @@
       "enum": [
         "hasCurrent",
         "missingCurrent"
+      ]
+    },
+    "SearchFilterEvidenceCoverageState": {
+      "type": "string",
+      "enum": [
+        "indexed",
+        "notApplicable"
       ]
     },
     "SearchFilterFileClass": {
@@ -4147,6 +4164,27 @@
         "image",
         "unsupported",
         "none"
+      ]
+    },
+    "SearchFilterIndexState": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "rebuilding",
+        "partial",
+        "failed",
+        "missing"
+      ]
+    },
+    "SearchFilterMatchReason": {
+      "type": "string",
+      "enum": [
+        "filter",
+        "exactLabel",
+        "labelPrefix",
+        "label",
+        "path",
+        "text"
       ]
     },
     "SearchFilterMediaRelevance": {
@@ -4285,7 +4323,7 @@
           "type": "string"
         },
         "indexState": {
-          "type": "string"
+          "$ref": "#/$defs/SearchFilterIndexState"
         },
         "nextCursor": {
           "type": [
@@ -4333,10 +4371,10 @@
           ]
         },
         "attachmentLinkState": {
-          "type": "string"
+          "$ref": "#/$defs/SearchFilterAttachmentLinkState"
         },
         "authorityLayer": {
-          "type": "string"
+          "$ref": "#/$defs/SearchFilterAuthorityLayer"
         },
         "contentHashAlgorithm": {
           "type": [
@@ -4360,7 +4398,7 @@
           ]
         },
         "evidenceCoverageState": {
-          "type": "string"
+          "$ref": "#/$defs/SearchFilterEvidenceCoverageState"
         },
         "fileClass": {
           "anyOf": [
@@ -4389,7 +4427,7 @@
           "type": "boolean"
         },
         "matchReason": {
-          "type": "string"
+          "$ref": "#/$defs/SearchFilterMatchReason"
         },
         "mediaRelevance": {
           "anyOf": [
@@ -4665,6 +4703,7 @@
       "enum": [
         "ready",
         "empty",
+        "partial",
         "cursorInvalid",
         "unsupported"
       ]

@@ -82,6 +82,10 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SearchFilterEvidenceAvailability>(&cfg, &mut output);
     push_ts_decl::<crate::SearchFilterAttachmentLinkState>(&cfg, &mut output);
     push_ts_decl::<crate::SearchFilterMediaRelevance>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterIndexState>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterAuthorityLayer>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterEvidenceCoverageState>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterMatchReason>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsScope>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadPolicy>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileClass>(&cfg, &mut output);
@@ -308,6 +312,23 @@ mod tests {
         assert!(!ts.contains("searchLibraryBrowserWindow"));
         assert!(ts.contains("navigationRowId: string"));
         assert!(ts.contains("rowVersion: string"));
+    }
+
+    #[test]
+    fn generated_typescript_exports_typed_search_filter_status_fields() {
+        let ts = generated_contract_index_ts();
+
+        assert!(ts.contains("export type SearchFilterIndexState"));
+        assert!(ts.contains("export type SearchFilterAuthorityLayer"));
+        assert!(ts.contains("export type SearchFilterEvidenceCoverageState"));
+        assert!(ts.contains("export type SearchFilterMatchReason"));
+        assert!(ts.contains("indexState: SearchFilterIndexState"));
+        assert!(ts.contains("authorityLayer: SearchFilterAuthorityLayer"));
+        assert!(ts.contains("attachmentLinkState: SearchFilterAttachmentLinkState"));
+        assert!(ts.contains("evidenceCoverageState: SearchFilterEvidenceCoverageState"));
+        assert!(ts.contains("matchReason: SearchFilterMatchReason"));
+        assert!(ts.contains("\"notApplicable\""));
+        assert!(ts.contains("\"partial\""));
     }
 
     #[test]

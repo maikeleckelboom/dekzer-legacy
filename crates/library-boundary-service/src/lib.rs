@@ -1,5 +1,6 @@
 #![deny(unsafe_code)]
 
+mod search_filter_protocol;
 mod service;
 mod session_events;
 mod snapshot_read_protocol;

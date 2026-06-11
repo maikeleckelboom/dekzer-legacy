@@ -266,6 +266,17 @@ V0 sort options are conservative:
 `relevance` is a text-search ranking over indexed fields only. It is not musical similarity, readiness, popularity, user
 preference, collection identity, or track identity.
 
+When implemented in v0, relevance order is deterministic and limited to indexed text evidence:
+
+1. exact label match;
+2. label prefix match;
+3. label contains match;
+4. path contains match;
+5. FTS/text-only match;
+6. stable path/name sort key;
+7. result kind order;
+8. stable result id.
+
 All sorts must end in a deterministic tie-breaker:
 
 1. source-relative normalized path or display sort key where applicable;
@@ -352,6 +363,11 @@ Index generation:
 
 - The backend should maintain an index generation or snapshot token per whole index, per source, or per maintained
   partition.
+- Source, source-location, and directory scopes derive coverage from the owning source's search index coverage row.
+- Library scope is complete only when every visible source relevant to the query has ready source coverage for the
+  current indexer version.
+- Missing, rebuilding, partial, or failed source coverage may return retained rows, but it must not return an
+  authoritative empty result.
 - Search responses echo the generation/snapshot token they read.
 - Cursors include that token if exposed.
 - When generation changes, old cursors are invalid unless the backend can prove the cursor's snapshot remains readable.
@@ -422,6 +438,7 @@ A-8 should add:
 - a normalized search-index row table owned by the search/filter index;
 - a SQLite FTS5 table keyed to normalized search-index rows;
 - generation/version metadata for the index or index partitions;
+- source-owned coverage rows keyed by source id, indexer version, generation, and ready/rebuilding/partial/failed state;
 - optional backend-owned rebuild job/state rows if needed for bounded rebuild.
 
 A-8 must not add:
@@ -451,8 +468,8 @@ The response must include:
 
 - `state`: ready, rebuilding/partial, cursorInvalid, unsupported/policyConflict, or readFailed;
 - echoed query identity;
-- result rows with result kind, stable identity, authority layer, display fields, match reason where possible, and
-  index state;
+- result rows with result kind, stable identity, typed authority layer, display fields, typed match reason where
+  possible, and typed index/evidence/link state;
 - scope/index coverage state;
 - `nextCursor` only when more rows exist for the same identity;
 - generation/snapshot token if implemented.

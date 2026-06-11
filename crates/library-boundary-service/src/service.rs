@@ -16,6 +16,7 @@ use library_store_sqlite::{
     SourceFileBlake3HashAdmissionScope, SqliteDurableStore, UnregisterLocalRootInput,
 };
 
+use crate::search_filter_protocol::{map_search_filter_read_reply, store_search_filter_request};
 use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
 use crate::snapshot_read_protocol::{
     map_load_navigation_row_by_stable_key_reply, map_load_navigation_row_reply,
@@ -25,9 +26,8 @@ use crate::snapshot_read_protocol::{
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
     map_read_source_attachment_summary_reply, map_read_source_file_attachment_reply,
     map_read_source_lifecycle_reply, map_read_track_identity_review_candidates_reply,
-    map_search_filter_read_reply, map_search_navigation_node_library_browser_window_reply,
-    store_contents_policy, store_contents_scope, store_contents_scope_depth,
-    store_library_tree_entry_point, store_search_filter_request,
+    map_search_navigation_node_library_browser_window_reply, store_contents_policy,
+    store_contents_scope, store_contents_scope_depth, store_library_tree_entry_point,
     store_track_identity_review_state_filter,
 };
 use crate::source_file_hash_protocol::{
@@ -1475,12 +1475,12 @@ mod tests {
         ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
         ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
         RejectTrackIdentityCandidateRequest, RenamePlaylistReply, RenamePlaylistRequest,
-        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SearchFilterFileClass,
-        SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
-        SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
-        SearchFilterState, SnapshotReadCommand, SnapshotReadReply, SourceFileAttachmentLinkStatus,
-        SourceFileHashCommand, SourceFileHashReply, SourceMaintenanceCommand,
-        SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
+        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SearchFilterAuthorityLayer,
+        SearchFilterFileClass, SearchFilterReadReply, SearchFilterReadRequest,
+        SearchFilterRecursion, SearchFilterResultKind, SearchFilterScope, SearchFilterSet,
+        SearchFilterSort, SearchFilterState, SnapshotReadCommand, SnapshotReadReply,
+        SourceFileAttachmentLinkStatus, SourceFileHashCommand, SourceFileHashReply,
+        SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
         TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
         TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
@@ -1786,7 +1786,10 @@ mod tests {
         assert_eq!(row.display_label, "Amen Break.wav");
         assert_eq!(row.file_class, Some(SearchFilterFileClass::Audio));
         assert_eq!(row.source_id, Some(registered.root_id));
-        assert_eq!(row.authority_layer, "source_file_inventory");
+        assert_eq!(
+            row.authority_layer,
+            SearchFilterAuthorityLayer::SourceFileInventory
+        );
         assert_eq!(
             text_reply.result.query_identity.text_query.as_deref(),
             Some("amen")

@@ -1,5 +1,6 @@
 pub mod library_roots;
 pub mod playlist_writes;
+pub mod search_filter;
 pub mod session_events;
 pub mod snapshot_reads;
 pub mod source_file_hash;
@@ -8,6 +9,7 @@ pub mod track_identity_decisions;
 
 pub use library_roots::*;
 pub use playlist_writes::*;
+pub use search_filter::*;
 pub use session_events::*;
 pub use snapshot_reads::*;
 pub use source_file_hash::*;

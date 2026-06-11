@@ -90,11 +90,12 @@ pub use read_models::observed_file_facts::{
 };
 pub use read_models::search_filter::{
     RebuildSearchFilterIndexForSourceResult, StoreSearchAccessState,
-    StoreSearchAttachmentLinkState, StoreSearchEvidenceAvailability, StoreSearchFileClass,
-    StoreSearchFileKind, StoreSearchFilters, StoreSearchMediaRelevance, StoreSearchPresenceState,
-    StoreSearchQueryIdentity, StoreSearchRecursion, StoreSearchRequest, StoreSearchResult,
-    StoreSearchResultKind, StoreSearchResultRow, StoreSearchScope, StoreSearchSort,
-    StoreSearchState,
+    StoreSearchAttachmentLinkState, StoreSearchAuthorityLayer, StoreSearchEvidenceAvailability,
+    StoreSearchEvidenceCoverageState, StoreSearchFileClass, StoreSearchFileKind,
+    StoreSearchFilters, StoreSearchIndexState, StoreSearchMatchReason, StoreSearchMediaRelevance,
+    StoreSearchPresenceState, StoreSearchQueryIdentity, StoreSearchRecursion, StoreSearchRequest,
+    StoreSearchResult, StoreSearchResultKind, StoreSearchResultRow, StoreSearchScope,
+    StoreSearchSort, StoreSearchState,
 };
 pub use read_models::source_lifecycle::StoreSourceLifecycle;
 pub use read_models::track_identity_candidates::{

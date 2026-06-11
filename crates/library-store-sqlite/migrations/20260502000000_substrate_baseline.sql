@@ -759,8 +759,20 @@ CREATE TABLE search_filter_index_metadata
     search_filter_index_id INTEGER PRIMARY KEY CHECK (search_filter_index_id = 1),
     indexer_version        TEXT    NOT NULL CHECK (indexer_version = 'search_filter_v0'),
     generation             INTEGER NOT NULL CHECK (generation >= 0),
-    state                  TEXT    NOT NULL CHECK (state IN ('ready', 'rebuilding', 'partial')),
+    state                  TEXT    NOT NULL CHECK (state IN ('ready', 'rebuilding', 'partial', 'failed')),
     updated_at             INTEGER NOT NULL
+) STRICT;
+
+CREATE TABLE search_filter_index_source_coverage
+(
+    source_id       INTEGER PRIMARY KEY REFERENCES sources (source_id) ON DELETE CASCADE,
+    indexer_version TEXT    NOT NULL CHECK (indexer_version = 'search_filter_v0'),
+    generation      INTEGER NOT NULL CHECK (generation >= 0),
+    state           TEXT    NOT NULL CHECK (state IN ('ready', 'rebuilding', 'partial', 'failed')),
+    rebuilt_at      INTEGER,
+    updated_at      INTEGER NOT NULL,
+    detail          TEXT,
+    CHECK (rebuilt_at IS NULL OR updated_at >= rebuilt_at)
 ) STRICT;
 
 CREATE TABLE search_filter_index_rows

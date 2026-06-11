@@ -146,7 +146,10 @@ fn validate_search_filter_index_metadata_row(connection: &Connection) -> Library
         [(1, indexer_version, generation, state)]
             if indexer_version == "search_filter_v0"
                 && *generation >= 0
-                && matches!(state.as_str(), "ready" | "rebuilding" | "partial") =>
+                && matches!(
+                    state.as_str(),
+                    "ready" | "rebuilding" | "partial" | "failed"
+                ) =>
         {
             Ok(())
         }
