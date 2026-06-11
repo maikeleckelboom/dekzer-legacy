@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import { createContentsReadController } from '../../../../src/renderer/library/boundary/contentsRead'
@@ -27,6 +29,7 @@ describe('classify', () => {
     expect(classifyInvalidationScope('LibraryBrowser')).toBe('unknown')
     expect(classifyInvalidationScope('contents')).toBe('unknown')
     expect(classifyInvalidationScope('sourceLifecycle')).toBe('unknown')
+    expect(classifyInvalidationScope('searchFilter')).toBe('unknown')
   })
 })
 
@@ -51,6 +54,7 @@ describe('buildInvalidationPlan', () => {
       refreshNavigationRows: true,
       refreshExpandedBrowserWindows: true,
       refreshCurrentContents: true,
+      refreshActiveSearchFilter: true,
       clearAllContentsWarmSnapshots: true,
       refreshSourceLifecycleIds: ['7', '9'],
       acknowledgeGapAfterExecution: false,
@@ -69,11 +73,30 @@ describe('buildInvalidationPlan', () => {
       refreshNavigationRows: false,
       refreshExpandedBrowserWindows: false,
       refreshCurrentContents: false,
+      refreshActiveSearchFilter: false,
       clearAllContentsWarmSnapshots: false,
       refreshSourceLifecycleIds: [],
       acknowledgeGapAfterExecution: false,
       broadRecovery: false
     })
+  })
+
+  it('refreshes active search/filter for library browser invalidation', () => {
+    const plan = buildInvalidationPlan({
+      invalidations: [invalidation('libraryBrowser', '1')],
+      sourceLifecycleSourceIds: []
+    })
+
+    expect(plan.refreshActiveSearchFilter).toBe(true)
+  })
+
+  it('does not refresh active search/filter for navigation rows alone', () => {
+    const plan = buildInvalidationPlan({
+      invalidations: [invalidation('navigationRows', '1')],
+      sourceLifecycleSourceIds: []
+    })
+
+    expect(plan.refreshActiveSearchFilter).toBe(false)
   })
 })
 
@@ -93,8 +116,39 @@ describe('buildScanPlan', () => {
       refreshSourceLifecycleIds: ['7', '9'],
       refreshNavigationRows: false,
       refreshExpandedBrowserWindows: false,
-      refreshCurrentContents: false
+      refreshCurrentContents: false,
+      refreshActiveSearchFilter: true
     })
+  })
+
+  it('does not refresh active search/filter for started or progressed scan events', () => {
+    const plan = buildScanPlan({
+      events: [
+        sourceScanEvent('7', 1, 'sourceScanStarted'),
+        sourceScanEvent('7', 2, 'sourceScanProgressed')
+      ],
+      sourceLifecycleSourceIds: new Set(['7'])
+    })
+
+    expect(plan.refreshActiveSearchFilter).toBe(false)
+  })
+
+  it('refreshes active search/filter for terminal scan events', () => {
+    const terminalKinds = [
+      'sourceScanCompleted',
+      'sourceScanFailed',
+      'sourceScanBlocked',
+      'sourceScanCancelled'
+    ] as const
+
+    for (const [index, kind] of terminalKinds.entries()) {
+      const plan = buildScanPlan({
+        events: [sourceScanEvent('7', index + 1, kind)],
+        sourceLifecycleSourceIds: new Set(['7'])
+      })
+
+      expect(plan.refreshActiveSearchFilter).toBe(true)
+    }
   })
 })
 
@@ -105,6 +159,7 @@ describe('buildGapPlan', () => {
       refreshNavigationRows: false,
       refreshExpandedBrowserWindows: false,
       refreshCurrentContents: false,
+      refreshActiveSearchFilter: true,
       clearAllContentsWarmSnapshots: true,
       refreshSourceLifecycleIds: [],
       acknowledgeGapAfterExecution: true,
@@ -119,7 +174,8 @@ describe('executeRefreshPlan', () => {
       sourceLifecycleSourceIds: new Set(['7', '7', '9']),
       sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) },
       clearContentsWarmSnapshots: vi.fn(),
-      refreshContentsForCurrentSelection: vi.fn(async () => true)
+      refreshContentsForCurrentSelection: vi.fn(async () => true),
+      refreshActiveSearchFilter: vi.fn(async () => true)
     })
     const sourceLifecycleSourceIds = deps.sourceLifecycleSourceIds
     const plan = buildInvalidationPlan({
@@ -145,6 +201,7 @@ describe('executeRefreshPlan', () => {
     )
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
     expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
+    expect(deps.refreshActiveSearchFilter).toHaveBeenCalledTimes(1)
   })
 
   it('continues independent refreshes after one failure', async () => {
@@ -152,7 +209,8 @@ describe('executeRefreshPlan', () => {
       sourceLifecycleSourceIds: new Set(['7']),
       sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) },
       clearContentsWarmSnapshots: vi.fn(),
-      refreshContentsForCurrentSelection: vi.fn(async () => true)
+      refreshContentsForCurrentSelection: vi.fn(async () => true),
+      refreshActiveSearchFilter: vi.fn(async () => true)
     })
     vi.mocked(deps.hierarchyRead.refreshNavigationRows).mockRejectedValueOnce(
       new Error('navigation failed')
@@ -170,6 +228,7 @@ describe('executeRefreshPlan', () => {
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
     expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
+    expect(deps.refreshActiveSearchFilter).toHaveBeenCalledTimes(1)
   })
 
   it('gap recovery prefers full hierarchy refresh and clears warm contents', async () => {
@@ -207,6 +266,53 @@ describe('executeRefreshPlan', () => {
     expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
     expect(deps.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(new Set(['7']))
+    expect(deps.refreshActiveSearchFilter).toHaveBeenCalledTimes(1)
+  })
+
+  it('continues independent refreshes after search/filter refresh fails', async () => {
+    const deps = testDeps({
+      sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) },
+      clearContentsWarmSnapshots: vi.fn(),
+      refreshContentsForCurrentSelection: vi.fn(async () => true),
+      refreshActiveSearchFilter: vi.fn(async () => {
+        throw new Error('search failed')
+      })
+    })
+    const plan = buildInvalidationPlan({
+      invalidations: [invalidation('libraryBrowser', '1')],
+      sourceLifecycleSourceIds: ['7']
+    })
+
+    await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
+
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
+    expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
+    expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
+    expect(deps.refreshActiveSearchFilter).toHaveBeenCalledTimes(1)
+  })
+
+  it('search/filter refresh false result contributes to final failure', async () => {
+    const deps = testDeps({
+      refreshActiveSearchFilter: vi.fn(async () => false)
+    })
+    const plan = buildGapPlan()
+
+    await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
+
+    expect(deps.hierarchyRead.refresh).toHaveBeenCalledTimes(1)
+    expect(deps.refreshActiveSearchFilter).toHaveBeenCalledTimes(1)
+  })
+
+  it('missing search/filter dependency does not fail execution', async () => {
+    const deps = testDeps()
+    const depsWithoutSearchFilter = {
+      hierarchyRead: deps.hierarchyRead,
+      expandedNodeIds: deps.expandedNodeIds
+    }
+    const plan = buildGapPlan()
+
+    await expect(executeRefreshPlan(plan, depsWithoutSearchFilter)).resolves.toBe(true)
   })
 
   it('refreshes current contents through the owner', async () => {
@@ -322,6 +428,18 @@ describe('executeRefreshPlan', () => {
   })
 })
 
+describe('panel runtime wiring', () => {
+  it('uses the search/filter controller invalidation signal in refresh dependencies', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain("import { useSearchFilterRead } from './runtime/searchFilterState'")
+    expect(panel).toContain('const searchFilterRead = useSearchFilterRead()')
+    expect(panel).toContain(
+      'refreshActiveSearchFilter: () => searchFilterRead.invalidationSignal()'
+    )
+  })
+})
+
 function testDeps(overrides: Partial<RefreshPlanDeps> = {}): RefreshPlanDeps {
   const { hierarchyRead, ...rest } = overrides
 
@@ -334,6 +452,7 @@ function testDeps(overrides: Partial<RefreshPlanDeps> = {}): RefreshPlanDeps {
     },
     expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12']),
     refreshContentsForCurrentSelection: vi.fn(),
+    refreshActiveSearchFilter: vi.fn(),
     ...rest
   }
 }
@@ -349,11 +468,15 @@ function invalidation(scope: string, revision: string): AppMaintainedSnapshotInv
   }
 }
 
-function sourceScanEvent(rootId: string, eventSequence: number): AppSourceScanEvent {
+function sourceScanEvent(
+  rootId: string,
+  eventSequence: number,
+  kind: AppSourceScanEvent['kind'] = 'sourceScanCompleted'
+): AppSourceScanEvent {
   return {
     eventSequence,
     occurredAtMs: 1000 + eventSequence,
-    kind: 'sourceScanCompleted',
+    kind,
     rootId,
     scanRunId: `scan-${eventSequence}`,
     phase: 'scanning',
@@ -408,6 +531,7 @@ function planSnapshot(plan: ReturnType<typeof buildGapPlan>): {
   readonly refreshNavigationRows: boolean
   readonly refreshExpandedBrowserWindows: boolean
   readonly refreshCurrentContents: boolean
+  readonly refreshActiveSearchFilter: boolean
   readonly clearAllContentsWarmSnapshots: boolean
   readonly refreshSourceLifecycleIds: readonly string[]
   readonly acknowledgeGapAfterExecution: boolean
@@ -418,9 +542,19 @@ function planSnapshot(plan: ReturnType<typeof buildGapPlan>): {
     refreshNavigationRows: plan.refreshNavigationRows,
     refreshExpandedBrowserWindows: plan.refreshExpandedBrowserWindows,
     refreshCurrentContents: plan.refreshCurrentContents,
+    refreshActiveSearchFilter: plan.refreshActiveSearchFilter,
     clearAllContentsWarmSnapshots: plan.clearAllContentsWarmSnapshots,
     refreshSourceLifecycleIds: [...plan.refreshSourceLifecycleIds],
     acknowledgeGapAfterExecution: plan.acknowledgeGapAfterExecution,
     broadRecovery: plan.broadRecovery
   }
+}
+
+function readRendererSource(relativePath: string): string {
+  return readFileSync(
+    new URL(`../../../../src/renderer/library/${relativePath}`, import.meta.url),
+    {
+      encoding: 'utf8'
+    }
+  )
 }

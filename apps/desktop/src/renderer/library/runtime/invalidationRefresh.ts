@@ -18,6 +18,7 @@ export type RefreshPlan = {
   readonly refreshNavigationRows: boolean
   readonly refreshExpandedBrowserWindows: boolean
   readonly refreshCurrentContents: boolean
+  readonly refreshActiveSearchFilter: boolean
   readonly clearAllContentsWarmSnapshots: boolean
   readonly refreshSourceLifecycleIds: ReadonlySet<string>
   readonly acknowledgeGapAfterExecution: boolean
@@ -44,6 +45,7 @@ export type RefreshPlanDeps = {
   readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   readonly clearContentsWarmSnapshots?: () => void
   readonly refreshContentsForCurrentSelection?: () => Promise<boolean> | boolean | void
+  readonly refreshActiveSearchFilter?: () => Promise<boolean> | boolean | void
 }
 
 export function classifyInvalidationScope(scope: string): InvalidationScope {
@@ -61,6 +63,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
   let refreshNavigationRows = false
   let refreshExpandedBrowserWindows = false
   let refreshCurrentContents = false
+  let refreshActiveSearchFilter = false
   let clearAllContentsWarmSnapshots = false
   const refreshSourceLifecycleIds = new Set<string>()
 
@@ -73,6 +76,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
       case 'libraryBrowser':
         refreshExpandedBrowserWindows = true
         refreshCurrentContents = true
+        refreshActiveSearchFilter = true
         clearAllContentsWarmSnapshots = true
         addSourceLifecycleIds(refreshSourceLifecycleIds, input.sourceLifecycleSourceIds)
         break
@@ -87,6 +91,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
     refreshNavigationRows,
     refreshExpandedBrowserWindows,
     refreshCurrentContents,
+    refreshActiveSearchFilter,
     clearAllContentsWarmSnapshots,
     refreshSourceLifecycleIds
   })
@@ -95,6 +100,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
 export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
   const refreshSourceLifecycleIds = new Set<string>()
   const visibleSourceIds = input.sourceLifecycleSourceIds
+  let refreshActiveSearchFilter = false
 
   if (visibleSourceIds !== undefined) {
     for (const event of input.events) {
@@ -104,12 +110,20 @@ export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
     }
   }
 
-  return refreshPlan({ refreshSourceLifecycleIds })
+  for (const event of input.events) {
+    if (isTerminalSourceScanEvent(event)) {
+      refreshActiveSearchFilter = true
+      break
+    }
+  }
+
+  return refreshPlan({ refreshSourceLifecycleIds, refreshActiveSearchFilter })
 }
 
 export function buildGapPlan(): RefreshPlan {
   return refreshPlan({
     refreshRootHierarchy: true,
+    refreshActiveSearchFilter: true,
     clearAllContentsWarmSnapshots: true,
     acknowledgeGapAfterExecution: true,
     broadRecovery: true
@@ -156,6 +170,11 @@ export async function executeRefreshPlan(
     succeeded = runSync(dependencies.clearContentsWarmSnapshots) && succeeded
   }
 
+  if (plan.refreshActiveSearchFilter) {
+    succeeded =
+      (await runOptionalBooleanRefresh(dependencies.refreshActiveSearchFilter)) && succeeded
+  }
+
   return succeeded
 }
 
@@ -171,6 +190,7 @@ function refreshPlan(
     refreshNavigationRows: input.refreshNavigationRows ?? false,
     refreshExpandedBrowserWindows: input.refreshExpandedBrowserWindows ?? false,
     refreshCurrentContents: input.refreshCurrentContents ?? false,
+    refreshActiveSearchFilter: input.refreshActiveSearchFilter ?? false,
     clearAllContentsWarmSnapshots: input.clearAllContentsWarmSnapshots ?? false,
     refreshSourceLifecycleIds: new Set(input.refreshSourceLifecycleIds ?? []),
     acknowledgeGapAfterExecution: input.acknowledgeGapAfterExecution ?? false,
@@ -205,6 +225,12 @@ async function runRefresh(refresh: (() => Promise<boolean>) | undefined): Promis
 async function runCurrentContentsRefresh(
   refresh: (() => Promise<boolean> | boolean | void) | undefined
 ): Promise<boolean> {
+  return runOptionalBooleanRefresh(refresh)
+}
+
+async function runOptionalBooleanRefresh(
+  refresh: (() => Promise<boolean> | boolean | void) | undefined
+): Promise<boolean> {
   if (refresh === undefined) {
     return true
   }
@@ -214,6 +240,19 @@ async function runCurrentContentsRefresh(
     return refreshed !== false
   } catch {
     return false
+  }
+}
+
+function isTerminalSourceScanEvent(event: AppSourceScanEvent): boolean {
+  switch (event.kind) {
+    case 'sourceScanCompleted':
+    case 'sourceScanFailed':
+    case 'sourceScanBlocked':
+    case 'sourceScanCancelled':
+      return true
+    case 'sourceScanStarted':
+    case 'sourceScanProgressed':
+      return false
   }
 }
 

@@ -152,7 +152,7 @@ export function createSearchFilterReadController(
 
   async function invalidationSignal(): Promise<boolean> {
     if (activeRequest === undefined) {
-      return false
+      return true
     }
 
     return issueFirstPageRead(firstPageRequest(activeRequest), retainedSnapshot(state.value))

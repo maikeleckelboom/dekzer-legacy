@@ -19,6 +19,7 @@ import {
   executeRefreshPlan,
   type RefreshPlanDeps
 } from './runtime/invalidationRefresh'
+import { useSearchFilterRead } from './runtime/searchFilterState'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import {
   deriveSourceActionModel,
@@ -55,6 +56,7 @@ const contentsRead = useContentsRead()
 const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
+const searchFilterRead = useSearchFilterRead()
 
 const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
   const root = rootActions.registeredRoot.value
@@ -507,7 +509,8 @@ function refreshPlanExecutionDependencies(): RefreshPlanDeps {
     sourceLifecycleRead,
     expandedNodeIds: expandedNodeIds.value,
     clearContentsWarmSnapshots: () => contentsRead.clearWarmSnapshots(),
-    refreshContentsForCurrentSelection
+    refreshContentsForCurrentSelection,
+    refreshActiveSearchFilter: () => searchFilterRead.invalidationSignal()
   }
 }
 

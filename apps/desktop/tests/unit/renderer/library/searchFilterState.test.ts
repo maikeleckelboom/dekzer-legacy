@@ -420,6 +420,17 @@ describe('createSearchFilterReadController', () => {
     await refreshed
   })
 
+  it('13b. invalidationSignal is a successful no-op without an active query', async () => {
+    const api = deferredSearchApi()
+    const controller = createSearchFilterReadController(api)
+
+    controller.start()
+
+    await expect(controller.invalidationSignal()).resolves.toBe(true)
+    expect(api.requests).toHaveLength(0)
+    expect(controller.state.value).toEqual({ kind: 'Idle' })
+  })
+
   it('14. partial response does not prove the result set empty, current, or complete', async () => {
     const api = deferredSearchApi()
     const controller = createSearchFilterReadController(api)
