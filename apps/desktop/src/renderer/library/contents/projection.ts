@@ -567,7 +567,17 @@ function projectContentsResult(options: {
 }): ContentProjection {
   const result = options.result
   const rows = (options.accumulatedRows ?? result.rows).map(contentsRow)
-  const hasMore = options.nextCursor !== undefined
+  const nextCursor = options.nextCursor ?? result.nextCursor
+  const hasMore = nextCursor !== undefined
+
+  if (rows.length === 0 && nextCursor !== undefined) {
+    return {
+      kind: contentsProjectionKind(result),
+      title: options.title,
+      detail: contentsDetailWithContinuation(result, hasMore, options.accumulatedRows),
+      rows: [loadMoreRow(options.ownerId, result, nextCursor)]
+    }
+  }
 
   if (rows.length === 0) {
     return {
@@ -585,8 +595,8 @@ function projectContentsResult(options: {
     }
   }
 
-  const contentRows = hasMore
-    ? [...rows, loadMoreRow(options.ownerId, result, options.nextCursor!)]
+  const contentRows = nextCursor !== undefined
+    ? [...rows, loadMoreRow(options.ownerId, result, nextCursor)]
     : rows
 
   return {
@@ -760,6 +770,10 @@ function contentsStateLabel(result: ContentsResult, rowCount: number): string {
 
 function isVerifiedEmptyResult(result: ContentsResult, rowCount: number): boolean {
   if (rowCount !== 0) {
+    return false
+  }
+
+  if (result.nextCursor !== undefined) {
     return false
   }
 

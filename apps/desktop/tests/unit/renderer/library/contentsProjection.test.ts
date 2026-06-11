@@ -240,6 +240,74 @@ describe('projectContents', () => {
     })
   })
 
+  it('projects zero rows plus nextCursor as continuation instead of empty', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        nextCursor: 'c2Y6...'
+      })
+    )
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.detail).toBe('0 playable media items loaded. More available.')
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'more',
+      label: 'More playable media items available',
+      action: {
+        kind: 'loadContentsPage',
+        cursor: 'c2Y6...'
+      }
+    })
+    expect(contents.rows[0]).not.toMatchObject({ state: 'empty' })
+  })
+
+  it('does not render verified-empty policy labels while nextCursor exists', () => {
+    const verifiedEmptyLabels = [
+      'No audio items in this scope.',
+      'No video items in this scope.',
+      'No companion files in this scope.',
+      'No files in this scope.'
+    ]
+
+    for (const profile of [
+      { kind: 'audioBrowse' },
+      { kind: 'primaryMedia', mediaKinds: ['video'] },
+      { kind: 'sourceFileInventory', fileClasses: ['unsupported'] },
+      {
+        kind: 'sourceFileInventory',
+        fileClasses: ['audio', 'video', 'image', 'unsupported']
+      }
+    ] satisfies readonly ContentsReadPolicy[]) {
+      const contents = projectForSelection(
+        browserState({}),
+        'navigation-row:7',
+        readyContents({
+          rows: [],
+          state: 'empty',
+          profile,
+          emptyAuthoritative: false,
+          omittedRows: true,
+          nextCursor: 'c2Y6...'
+        })
+      )
+      const projectedText = [
+        contents.detail,
+        ...contents.rows.flatMap((row) => [row.label, row.detail])
+      ]
+        .filter((value): value is string => value !== undefined)
+        .join('\n')
+
+      expect(contents.rows[0]).toMatchObject({ kind: 'more' })
+      for (const label of verifiedEmptyLabels) {
+        expect(projectedText).not.toContain(label)
+      }
+    }
+  })
+
   it('shows accumulated row count in detail string when nextCursor exists', () => {
     const contents = projectForSelection(browserState({}), 'navigation-row:7', {
       kind: 'ready',
@@ -629,6 +697,49 @@ describe('projectContents', () => {
       state: 'empty',
       label: 'No playable media in this scope.'
     })
+  })
+
+  it('renders verified-empty policy copy when the cursor is exhausted', () => {
+    const contents = projectForSelection(
+      browserState({}),
+      'navigation-row:7',
+      readyContents({
+        rows: [],
+        state: 'empty',
+        profile: { kind: 'audioBrowse' },
+        emptyAuthoritative: true
+      })
+    )
+
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      state: 'empty',
+      label: 'No audio items in this scope.',
+      detail: 'No audio items in this scope.'
+    })
+  })
+
+  it('does not verify empty when only the raw contents result carries nextCursor', () => {
+    const contents = projectForSelection(browserState({}), 'navigation-row:7', {
+      kind: 'ready',
+      requestKey: 'source:7',
+      result: {
+        state: 'ready',
+        result: contentsResult({
+          rows: [],
+          state: 'empty',
+          profile: { kind: 'audioBrowse' },
+          emptyAuthoritative: true,
+          nextCursor: 'c2Y6...'
+        })
+      }
+    })
+
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'more',
+      label: 'More audio tracks available'
+    })
+    expect(contents.rows[0]).not.toMatchObject({ state: 'empty' })
   })
 
   it('does not verify empty from complete zero rows without explicit empty evidence', () => {
@@ -1093,6 +1204,7 @@ function readyContents(options: {
   readonly pendingRequestKey?: string
   readonly pendingPresentation?: 'deferred' | 'visible'
   readonly refreshError?: string
+  readonly nextCursor?: string
 }): ContentsBoundaryState {
   return {
     kind: 'ready',
@@ -1101,6 +1213,7 @@ function readyContents(options: {
       state: 'ready',
       result: contentsResult(options)
     },
+    ...(options.nextCursor === undefined ? {} : { nextCursor: options.nextCursor }),
     ...(options.pendingRequestKey === undefined
       ? {}
       : {
@@ -1124,6 +1237,7 @@ function contentsResult(options: {
   readonly subtreeCoverageComplete?: boolean
   readonly emptyAuthoritative?: boolean
   readonly omittedRows?: boolean
+  readonly nextCursor?: string
 }): ContentsResult {
   const state = options.state ?? 'ready'
   const policy = options.profile ?? ({ kind: 'playableMediaBrowse' } satisfies ContentsReadPolicy)
@@ -1148,6 +1262,7 @@ function contentsResult(options: {
       emptyResultAuthoritative: options.emptyAuthoritative ?? state !== 'partial'
     },
     hasPolicyOmittedRows: options.omittedRows ?? false,
+    ...(options.nextCursor === undefined ? {} : { nextCursor: options.nextCursor }),
     ...(options.detail === undefined ? {} : { detail: options.detail })
   }
 }
