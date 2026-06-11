@@ -36,6 +36,7 @@ impl MaintainedSnapshotScope {
             | SnapshotReadCommand::LoadNavigationRowByStableKey(_) => Some(Self::NavigationRows),
             SnapshotReadCommand::ReadLibraryTreeChildren(_)
             | SnapshotReadCommand::ReadSourceLifecycle(_)
+            | SnapshotReadCommand::ReadSourceIntegrity(_)
             | SnapshotReadCommand::ReadSourceMaintenance(_)
             | SnapshotReadCommand::ReadTrackIdentityReviewCandidates(_)
             | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
@@ -273,7 +274,7 @@ mod tests {
         ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
         ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsRequest, ReadSourceAttachmentSummaryRequest,
-        ReadSourceFileAttachmentRequest, ReadSourceLifecycleRequest,
+        ReadSourceFileAttachmentRequest, ReadSourceIntegrityRequest, ReadSourceLifecycleRequest,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand,
     };
     use serde_json::json;
@@ -309,6 +310,7 @@ mod tests {
                 limit: 100,
             }),
             SnapshotReadCommand::ReadSourceLifecycle(ReadSourceLifecycleRequest { source_id: 8 }),
+            SnapshotReadCommand::ReadSourceIntegrity(ReadSourceIntegrityRequest { source_id: 8 }),
             SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
                 ReadNavigationNodeLibraryBrowserWindowRequest {
                     navigation_row_id: 8,

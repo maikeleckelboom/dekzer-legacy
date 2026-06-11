@@ -143,6 +143,58 @@ pub(crate) fn map_read_source_lifecycle_reply(
     })
 }
 
+pub(crate) fn map_read_source_integrity_reply(
+    source_integrity: store::StoreSourceIntegrity,
+    maintenance: crate::source_maintenance::SourceMaintenanceSnapshot,
+) -> store::LibrarySqliteResult<protocol::ReadSourceIntegrityReply> {
+    let source_failure = maintenance.source_failure.clone();
+    let source_availability = protocol::SourceIntegrityAvailability {
+        state: source_integrity_availability_state(
+            source_integrity.lifecycle.as_ref(),
+            source_failure.as_ref(),
+        ),
+        lifecycle: source_integrity
+            .lifecycle
+            .clone()
+            .map(map_source_lifecycle)
+            .transpose()?,
+        source_failure: source_failure.clone(),
+    };
+
+    Ok(protocol::ReadSourceIntegrityReply {
+        source_id: source_integrity.source_id,
+        source_availability,
+        coverage_integrity: map_source_integrity_coverage(source_integrity.coverage),
+        inventory: source_integrity
+            .inventory
+            .map(map_source_integrity_inventory)
+            .transpose()?,
+        evidence_and_maintenance: protocol::SourceIntegrityEvidenceAndMaintenance {
+            remaining_hash_candidates: maintenance.remaining_hash_candidates,
+            remaining_probe_candidates: maintenance.remaining_probe_candidates,
+            remaining_primary_media_promotion_candidates: maintenance
+                .remaining_primary_media_promotion_candidates,
+            remaining_track_identity_candidate_production_candidates: maintenance
+                .remaining_track_identity_candidate_production_candidates,
+            remaining_track_identity_decision_production_candidates: maintenance
+                .remaining_track_identity_decision_production_candidates,
+            source_failure,
+        },
+        attachment_integrity: maintenance
+            .attachment_links
+            .map(map_source_integrity_attachment_integrity),
+        runtime_maintenance: protocol::SourceIntegrityRuntimeMaintenance {
+            state: match maintenance.status {
+                protocol::SourceMaintenanceSnapshotStatus::Running => {
+                    protocol::SourceIntegrityRuntimeMaintenanceState::Running
+                }
+                _ => protocol::SourceIntegrityRuntimeMaintenanceState::Idle,
+            },
+            last_run: maintenance.last_run,
+        },
+    })
+}
+
 pub(crate) fn map_read_source_file_attachment_reply(
     attachment_link: Option<store::StoreSourceFileAttachmentLink>,
 ) -> store::LibrarySqliteResult<protocol::ReadSourceFileAttachmentReply> {
@@ -462,6 +514,173 @@ fn map_source_lifecycle(
         last_seen_at_ms: lifecycle.last_seen_at,
         updated_at_ms: lifecycle.updated_at,
     })
+}
+
+fn source_integrity_availability_state(
+    lifecycle: Option<&store::StoreSourceLifecycle>,
+    source_failure: Option<&protocol::SourceMaintenanceSourceFailure>,
+) -> protocol::SourceIntegrityAvailabilityState {
+    match source_failure {
+        Some(protocol::SourceMaintenanceSourceFailure::SourceNotFound) => {
+            return protocol::SourceIntegrityAvailabilityState::NotFound;
+        }
+        Some(protocol::SourceMaintenanceSourceFailure::SourceUnavailable(_)) => {
+            return protocol::SourceIntegrityAvailabilityState::Unavailable;
+        }
+        Some(protocol::SourceMaintenanceSourceFailure::SourceRootMissing(_)) => {
+            return protocol::SourceIntegrityAvailabilityState::Missing;
+        }
+        Some(protocol::SourceMaintenanceSourceFailure::SourceRootBlocked(_)) => {
+            return protocol::SourceIntegrityAvailabilityState::Blocked;
+        }
+        None => {}
+    }
+
+    let Some(lifecycle) = lifecycle else {
+        return protocol::SourceIntegrityAvailabilityState::NotFound;
+    };
+
+    if lifecycle.scan_phase == "partial" {
+        return protocol::SourceIntegrityAvailabilityState::Partial;
+    }
+    if lifecycle.mount_status == "mounted" && lifecycle.access_state == "accessible" {
+        return protocol::SourceIntegrityAvailabilityState::Mounted;
+    }
+    if lifecycle.access_state == "missing" {
+        return protocol::SourceIntegrityAvailabilityState::Missing;
+    }
+    if lifecycle.access_state == "blocked" {
+        return protocol::SourceIntegrityAvailabilityState::Blocked;
+    }
+    if lifecycle.mount_status != "mounted" {
+        return protocol::SourceIntegrityAvailabilityState::Unavailable;
+    }
+
+    protocol::SourceIntegrityAvailabilityState::Unknown
+}
+
+fn map_source_integrity_coverage(
+    coverage: store::StoreSourceIntegrityCoverage,
+) -> protocol::SourceIntegrityCoverage {
+    protocol::SourceIntegrityCoverage {
+        state: match coverage.state {
+            store::StoreSourceIntegrityCoverageState::Complete => {
+                protocol::ContentsScopeCoverageState::Complete
+            }
+            store::StoreSourceIntegrityCoverageState::Pending => {
+                protocol::ContentsScopeCoverageState::Pending
+            }
+            store::StoreSourceIntegrityCoverageState::Scanning => {
+                protocol::ContentsScopeCoverageState::Scanning
+            }
+            store::StoreSourceIntegrityCoverageState::Blocked => {
+                protocol::ContentsScopeCoverageState::Blocked
+            }
+            store::StoreSourceIntegrityCoverageState::Failed => {
+                protocol::ContentsScopeCoverageState::Failed
+            }
+            store::StoreSourceIntegrityCoverageState::SourceUnavailable => {
+                protocol::ContentsScopeCoverageState::SourceUnavailable
+            }
+            store::StoreSourceIntegrityCoverageState::LocationMissing => {
+                protocol::ContentsScopeCoverageState::LocationMissing
+            }
+            store::StoreSourceIntegrityCoverageState::Incomplete => {
+                protocol::ContentsScopeCoverageState::Incomplete
+            }
+        },
+        subtree_coverage_complete: coverage.subtree_coverage_complete,
+        empty_result_authoritative: coverage.empty_result_authoritative,
+        total_directories_count: coverage.total_directories_count,
+        pending_directories_count: coverage.pending_directories_count,
+        scanning_directories_count: coverage.scanning_directories_count,
+        blocked_directories_count: coverage.blocked_directories_count,
+        failed_directories_count: coverage.failed_directories_count,
+    }
+}
+
+fn map_source_integrity_inventory(
+    inventory: store::StoreSourceIntegrityInventory,
+) -> store::LibrarySqliteResult<protocol::SourceIntegrityInventory> {
+    Ok(protocol::SourceIntegrityInventory {
+        counts_by_presence_state: inventory
+            .counts_by_presence_state
+            .into_iter()
+            .map(map_source_integrity_presence_count)
+            .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
+        counts_by_file_class: inventory
+            .counts_by_file_class
+            .into_iter()
+            .map(map_source_integrity_file_class_count)
+            .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
+        counts_by_file_kind: inventory
+            .counts_by_file_kind
+            .into_iter()
+            .map(map_source_integrity_file_kind_count)
+            .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
+        media_relevant_files_count: inventory.media_relevant_files_count,
+        present_media_relevant_files_count: inventory.present_media_relevant_files_count,
+    })
+}
+
+fn map_source_integrity_presence_count(
+    count: store::StoreSourceIntegrityCount,
+) -> store::LibrarySqliteResult<protocol::SourceIntegrityPresenceCount> {
+    let presence_state = protocol::ContentsPresenceState::from_projection_value(&count.value)
+        .ok_or_else(|| invalid_source_integrity_value("presence_state", &count.value))?;
+    Ok(protocol::SourceIntegrityPresenceCount {
+        presence_state,
+        count: count.count,
+    })
+}
+
+fn map_source_integrity_file_class_count(
+    count: store::StoreSourceIntegrityCount,
+) -> store::LibrarySqliteResult<protocol::SourceIntegrityFileClassCount> {
+    let file_class = match count.value.as_str() {
+        "audio" => protocol::SourceIntegrityFileClass::Audio,
+        "video" => protocol::SourceIntegrityFileClass::Video,
+        "image" => protocol::SourceIntegrityFileClass::Image,
+        "unsupported" => protocol::SourceIntegrityFileClass::Unsupported,
+        "none" => protocol::SourceIntegrityFileClass::None,
+        _ => return Err(invalid_source_integrity_value("file_class", &count.value)),
+    };
+    Ok(protocol::SourceIntegrityFileClassCount {
+        file_class,
+        count: count.count,
+    })
+}
+
+fn map_source_integrity_file_kind_count(
+    count: store::StoreSourceIntegrityCount,
+) -> store::LibrarySqliteResult<protocol::SourceIntegrityFileKindCount> {
+    let file_kind = protocol::ContentsFileKind::from_projection_value(&count.value)
+        .ok_or_else(|| invalid_source_integrity_value("file_kind", &count.value))?;
+    Ok(protocol::SourceIntegrityFileKindCount {
+        file_kind,
+        count: count.count,
+    })
+}
+
+fn map_source_integrity_attachment_integrity(
+    attachment_links: protocol::SourceMaintenanceAttachmentLinkSummary,
+) -> protocol::SourceIntegrityAttachmentIntegrity {
+    protocol::SourceIntegrityAttachmentIntegrity {
+        current_links_count: attachment_links.current_links_count,
+        stale_links_count: attachment_links.stale_links_count,
+        missing_links_count: attachment_links.source_files_missing_attachment_links_count,
+        source_files_with_current_blake3_facts_count: attachment_links
+            .source_files_with_current_blake3_facts_count,
+        source_files_with_attachment_links_count: attachment_links
+            .source_files_with_attachment_links_count,
+        unmaterialized_blake3_facts_count: attachment_links.unmaterialized_blake3_facts_count,
+    }
+}
+
+fn invalid_source_integrity_value(field_name: &str, value: &str) -> store::LibrarySqliteError {
+    malformed_store_state(format!(
+        "source integrity field {field_name} contains unsupported value {value:?}"
+    ))
 }
 
 fn map_attachment_identity(

@@ -8,6 +8,7 @@ import type {
   MaintainedSnapshotInvalidation,
   ProtocolError,
   HashSourceFilesBlake3Reply,
+  ReadSourceIntegrityReply,
   ReadSourceMaintenanceReply,
   ReadSourceFileAttachmentReply,
   ReadTrackIdentityReviewCandidatesReply,
@@ -75,6 +76,13 @@ type ReadSourceMaintenanceReturnIsGenerated = AssertType<
   >
 >
 
+type ReadSourceIntegrityReturnIsGenerated = AssertType<
+  EqualTypes<
+    Awaited<ReturnType<LibraryBoundaryClient['readSourceIntegrity']>>,
+    ReadSourceIntegrityReply
+  >
+>
+
 type ReadSourceFileAttachmentReturnIsGenerated = AssertType<
   EqualTypes<
     Awaited<ReturnType<LibraryBoundaryClient['readSourceFileAttachment']>>,
@@ -103,10 +111,11 @@ const compileTimeAssertions: [
   RunSourceMaintenanceReturnIsGenerated,
   AcceptTrackIdentityCandidateReturnIsGenerated,
   ReadSourceMaintenanceReturnIsGenerated,
+  ReadSourceIntegrityReturnIsGenerated,
   ReadSourceFileAttachmentReturnIsGenerated,
   ReadTrackIdentityReviewCandidatesReturnIsGenerated,
   ContentsReadAcceptsAudioBrowseProfile
-] = [true, true, true, true, true, true, true, true, true]
+] = [true, true, true, true, true, true, true, true, true, true]
 void compileTimeAssertions
 
 type Resolve<T> = (value: T | PromiseLike<T>) => void
@@ -543,6 +552,91 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
     readReply.attachmentLinks?.currentLinksCount,
     1,
     'readSourceMaintenance unwraps attachment link summary'
+  )
+}
+
+async function validatesSourceIntegrityReadRequestAndReply(): Promise<void> {
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(
+    success({
+      type: 'snapshotRead',
+      payload: {
+        type: 'sourceIntegrity',
+        payload: {
+          sourceId: '7',
+          sourceAvailability: {
+            state: 'mounted'
+          },
+          coverageIntegrity: {
+            state: 'complete',
+            subtreeCoverageComplete: true,
+            emptyResultAuthoritative: true,
+            totalDirectoriesCount: 1,
+            pendingDirectoriesCount: 0,
+            scanningDirectoriesCount: 0,
+            blockedDirectoriesCount: 0,
+            failedDirectoriesCount: 0
+          },
+          inventory: {
+            countsByPresenceState: [{ presenceState: 'present', count: 2 }],
+            countsByFileClass: [
+              { fileClass: 'audio', count: 1 },
+              { fileClass: 'image', count: 1 }
+            ],
+            countsByFileKind: [
+              { fileKind: 'audio', count: 1 },
+              { fileKind: 'image', count: 1 }
+            ],
+            mediaRelevantFilesCount: 2,
+            presentMediaRelevantFilesCount: 2
+          },
+          evidenceAndMaintenance: {
+            remainingHashCandidates: 2,
+            remainingProbeCandidates: 1,
+            remainingPrimaryMediaPromotionCandidates: 0,
+            remainingTrackIdentityCandidateProductionCandidates: 0,
+            remainingTrackIdentityDecisionProductionCandidates: 0
+          },
+          attachmentIntegrity: {
+            currentLinksCount: 0,
+            staleLinksCount: 0,
+            missingLinksCount: 0,
+            sourceFilesWithCurrentBlake3FactsCount: 0,
+            sourceFilesWithAttachmentLinksCount: 0,
+            unmaterializedBlake3FactsCount: 0
+          },
+          runtimeMaintenance: {
+            state: 'idle'
+          }
+        }
+      }
+    })
+  )
+  const client = new LibraryBoundaryClient(transport)
+
+  const reply = await client.readSourceIntegrity({ sourceId: '7' })
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: 'snapshotRead',
+      payload: {
+        type: 'readSourceIntegrity',
+        payload: { sourceId: '7' }
+      }
+    } satisfies CommandRequest,
+    'readSourceIntegrity sends the generated snapshot command'
+  )
+  equal(reply.sourceAvailability.state, 'mounted', 'readSourceIntegrity unwraps availability')
+  equal(
+    reply.inventory?.mediaRelevantFilesCount,
+    2,
+    'readSourceIntegrity unwraps inventory facet'
+  )
+  equal(
+    reply.evidenceAndMaintenance.remainingHashCandidates,
+    2,
+    'readSourceIntegrity unwraps maintenance backlog facet'
   )
 }
 
@@ -1294,6 +1388,7 @@ async function rejects<ErrorType extends Error>(
 await validatesRegisterLocalRootRequestAndReply()
 await validatesHashSourceFilesBlake3RequestAndReply()
 await validatesSourceMaintenanceRequestsAndReplies()
+await validatesSourceIntegrityReadRequestAndReply()
 await validatesTrackIdentityDecisionRequestsAndReplies()
 await validatesTrackIdentityReviewCandidateReads()
 await validatesAttachmentIdentityReadRequestsAndReplies()

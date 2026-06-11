@@ -27,6 +27,8 @@ import type {
   ReadSourceAttachmentSummaryRequest,
   ReadSourceFileAttachmentReply,
   ReadSourceFileAttachmentRequest,
+  ReadSourceIntegrityReply,
+  ReadSourceIntegrityRequest,
   ReadSourceLifecycleReply,
   ReadSourceLifecycleRequest,
   ReadSourceMaintenanceReply,
@@ -256,6 +258,20 @@ export class LibraryBoundaryClient {
       },
       'snapshotRead',
       'sourceLifecycle'
+    )
+  }
+
+  readSourceIntegrity(request: ReadSourceIntegrityRequest): Promise<ReadSourceIntegrityReply> {
+    return this.sendAndExpect(
+      {
+        type: 'snapshotRead',
+        payload: {
+          type: 'readSourceIntegrity',
+          payload: request
+        }
+      },
+      'snapshotRead',
+      'sourceIntegrity'
     )
   }
 

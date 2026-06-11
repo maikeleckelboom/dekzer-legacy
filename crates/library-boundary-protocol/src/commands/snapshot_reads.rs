@@ -1,5 +1,6 @@
 use super::{
-    ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest, TrackIdentityDecisionState,
+    ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest, SourceMaintenanceLastRunSummary,
+    SourceMaintenanceSourceFailure, TrackIdentityDecisionState,
     TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityUserBlockingDecisionState,
     search_filter::*,
 };
@@ -1807,6 +1808,271 @@ pub struct ReadSourceLifecycleReply {
 }
 
 #[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceIntegrityRequest {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadSourceIntegrityReply {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub source_id: i64,
+    pub source_availability: SourceIntegrityAvailability,
+    pub coverage_integrity: SourceIntegrityCoverage,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub inventory: Option<SourceIntegrityInventory>,
+    pub evidence_and_maintenance: SourceIntegrityEvidenceAndMaintenance,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub attachment_integrity: Option<SourceIntegrityAttachmentIntegrity>,
+    pub runtime_maintenance: SourceIntegrityRuntimeMaintenance,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityAvailability {
+    pub state: SourceIntegrityAvailabilityState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub lifecycle: Option<SourceLifecycle>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub source_failure: Option<SourceMaintenanceSourceFailure>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceIntegrityAvailabilityState {
+    NotFound,
+    Mounted,
+    Unavailable,
+    Missing,
+    Blocked,
+    Partial,
+    Unknown,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityCoverage {
+    pub state: ContentsScopeCoverageState,
+    pub subtree_coverage_complete: bool,
+    pub empty_result_authoritative: bool,
+    pub total_directories_count: usize,
+    pub pending_directories_count: usize,
+    pub scanning_directories_count: usize,
+    pub blocked_directories_count: usize,
+    pub failed_directories_count: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityInventory {
+    pub counts_by_presence_state: Vec<SourceIntegrityPresenceCount>,
+    pub counts_by_file_class: Vec<SourceIntegrityFileClassCount>,
+    pub counts_by_file_kind: Vec<SourceIntegrityFileKindCount>,
+    pub media_relevant_files_count: usize,
+    pub present_media_relevant_files_count: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceIntegrityFileClass {
+    Audio,
+    Video,
+    Image,
+    Unsupported,
+    None,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityPresenceCount {
+    pub presence_state: ContentsPresenceState,
+    pub count: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityFileClassCount {
+    pub file_class: SourceIntegrityFileClass,
+    pub count: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityFileKindCount {
+    pub file_kind: ContentsFileKind,
+    pub count: usize,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityEvidenceAndMaintenance {
+    pub remaining_hash_candidates: usize,
+    pub remaining_probe_candidates: usize,
+    pub remaining_primary_media_promotion_candidates: usize,
+    pub remaining_track_identity_candidate_production_candidates: usize,
+    pub remaining_track_identity_decision_production_candidates: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub source_failure: Option<SourceMaintenanceSourceFailure>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityAttachmentIntegrity {
+    pub current_links_count: usize,
+    pub stale_links_count: usize,
+    pub missing_links_count: usize,
+    pub source_files_with_current_blake3_facts_count: usize,
+    pub source_files_with_attachment_links_count: usize,
+    pub unmaterialized_blake3_facts_count: usize,
+}
+
+#[derive(
+    Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceIntegrityRuntimeMaintenance {
+    pub state: SourceIntegrityRuntimeMaintenanceState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub last_run: Option<SourceMaintenanceLastRunSummary>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceIntegrityRuntimeMaintenanceState {
+    Idle,
+    Running,
+}
+
+#[derive(
     Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema, ts_rs::TS,
 )]
 #[serde(rename_all = "camelCase")]
@@ -2324,6 +2590,7 @@ pub enum SnapshotReadCommand {
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
     ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
     ReadSourceLifecycle(ReadSourceLifecycleRequest),
+    ReadSourceIntegrity(ReadSourceIntegrityRequest),
     ReadSourceMaintenance(ReadSourceMaintenanceRequest),
     ReadSourceFileAttachment(ReadSourceFileAttachmentRequest),
     ReadAttachmentSourceFiles(ReadAttachmentSourceFilesRequest),
@@ -2348,6 +2615,7 @@ pub enum SnapshotReadReply {
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     SourceLifecycle(ReadSourceLifecycleReply),
+    SourceIntegrity(Box<ReadSourceIntegrityReply>),
     SourceMaintenance(Box<ReadSourceMaintenanceReply>),
     SourceFileAttachment(ReadSourceFileAttachmentReply),
     AttachmentSourceFiles(ReadAttachmentSourceFilesReply),

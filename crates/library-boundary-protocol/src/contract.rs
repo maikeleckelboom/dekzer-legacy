@@ -58,6 +58,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadLibraryTreeChildrenRequest>(&cfg, &mut output);
     push_ts_decl::<crate::NavigableChildScopeState>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceIntegrityRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceMaintenanceRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SourceClass>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMountStatus>(&cfg, &mut output);
@@ -128,6 +129,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LoadNavigationRowByStableKeyReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadSourceIntegrityReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceMaintenanceReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceFileAttachmentReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadAttachmentSourceFilesReply>(&cfg, &mut output);
@@ -163,6 +165,18 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::DirectoryImageMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
     push_ts_decl::<crate::SourceLifecycle>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityAvailability>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityAvailabilityState>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityCoverage>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityInventory>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityFileClass>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityPresenceCount>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityFileClassCount>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityFileKindCount>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityEvidenceAndMaintenance>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityAttachmentIntegrity>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityRuntimeMaintenance>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceIntegrityRuntimeMaintenanceState>(&cfg, &mut output);
     push_ts_decl::<crate::AttachmentIdentityReadStatus>(&cfg, &mut output);
     push_ts_decl::<crate::AttachmentIdentity>(&cfg, &mut output);
     push_ts_decl::<crate::SourceFileAttachmentLink>(&cfg, &mut output);

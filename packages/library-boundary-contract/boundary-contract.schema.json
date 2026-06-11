@@ -3699,6 +3699,64 @@
         "sourceFileId"
       ]
     },
+    "ReadSourceIntegrityReply": {
+      "type": "object",
+      "properties": {
+        "attachmentIntegrity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceIntegrityAttachmentIntegrity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverageIntegrity": {
+          "$ref": "#/$defs/SourceIntegrityCoverage"
+        },
+        "evidenceAndMaintenance": {
+          "$ref": "#/$defs/SourceIntegrityEvidenceAndMaintenance"
+        },
+        "inventory": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceIntegrityInventory"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runtimeMaintenance": {
+          "$ref": "#/$defs/SourceIntegrityRuntimeMaintenance"
+        },
+        "sourceAvailability": {
+          "$ref": "#/$defs/SourceIntegrityAvailability"
+        },
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId",
+        "sourceAvailability",
+        "coverageIntegrity",
+        "evidenceAndMaintenance",
+        "runtimeMaintenance"
+      ]
+    },
+    "ReadSourceIntegrityRequest": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceId"
+      ]
+    },
     "ReadSourceLifecycleReply": {
       "type": "object",
       "properties": {
@@ -4836,6 +4894,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadSourceIntegrityRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readSourceIntegrity"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadSourceMaintenanceRequest"
             },
             "type": {
@@ -5085,6 +5159,22 @@
             "type": {
               "type": "string",
               "const": "sourceLifecycle"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadSourceIntegrityReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceIntegrity"
             }
           },
           "required": [
@@ -5424,6 +5514,317 @@
             "payload"
           ]
         }
+      ]
+    },
+    "SourceIntegrityAttachmentIntegrity": {
+      "type": "object",
+      "properties": {
+        "currentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "missingLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesWithAttachmentLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFilesWithCurrentBlake3FactsCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "staleLinksCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "unmaterializedBlake3FactsCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "currentLinksCount",
+        "staleLinksCount",
+        "missingLinksCount",
+        "sourceFilesWithCurrentBlake3FactsCount",
+        "sourceFilesWithAttachmentLinksCount",
+        "unmaterializedBlake3FactsCount"
+      ]
+    },
+    "SourceIntegrityAvailability": {
+      "type": "object",
+      "properties": {
+        "lifecycle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceFailure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceSourceFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SourceIntegrityAvailabilityState"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "SourceIntegrityAvailabilityState": {
+      "type": "string",
+      "enum": [
+        "notFound",
+        "mounted",
+        "unavailable",
+        "missing",
+        "blocked",
+        "partial",
+        "unknown"
+      ]
+    },
+    "SourceIntegrityCoverage": {
+      "type": "object",
+      "properties": {
+        "blockedDirectoriesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "emptyResultAuthoritative": {
+          "type": "boolean"
+        },
+        "failedDirectoriesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "pendingDirectoriesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "scanningDirectoriesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "state": {
+          "$ref": "#/$defs/ContentsScopeCoverageState"
+        },
+        "subtreeCoverageComplete": {
+          "type": "boolean"
+        },
+        "totalDirectoriesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "state",
+        "subtreeCoverageComplete",
+        "emptyResultAuthoritative",
+        "totalDirectoriesCount",
+        "pendingDirectoriesCount",
+        "scanningDirectoriesCount",
+        "blockedDirectoriesCount",
+        "failedDirectoriesCount"
+      ]
+    },
+    "SourceIntegrityEvidenceAndMaintenance": {
+      "type": "object",
+      "properties": {
+        "remainingHashCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingPrimaryMediaPromotionCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingProbeCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingTrackIdentityCandidateProductionCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "remainingTrackIdentityDecisionProductionCandidates": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "sourceFailure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceSourceFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "remainingHashCandidates",
+        "remainingProbeCandidates",
+        "remainingPrimaryMediaPromotionCandidates",
+        "remainingTrackIdentityCandidateProductionCandidates",
+        "remainingTrackIdentityDecisionProductionCandidates"
+      ]
+    },
+    "SourceIntegrityFileClass": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video",
+        "image",
+        "unsupported",
+        "none"
+      ]
+    },
+    "SourceIntegrityFileClassCount": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "fileClass": {
+          "$ref": "#/$defs/SourceIntegrityFileClass"
+        }
+      },
+      "required": [
+        "fileClass",
+        "count"
+      ]
+    },
+    "SourceIntegrityFileKindCount": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "fileKind": {
+          "$ref": "#/$defs/ContentsFileKind"
+        }
+      },
+      "required": [
+        "fileKind",
+        "count"
+      ]
+    },
+    "SourceIntegrityInventory": {
+      "type": "object",
+      "properties": {
+        "countsByFileClass": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceIntegrityFileClassCount"
+          }
+        },
+        "countsByFileKind": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceIntegrityFileKindCount"
+          }
+        },
+        "countsByPresenceState": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceIntegrityPresenceCount"
+          }
+        },
+        "mediaRelevantFilesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "presentMediaRelevantFilesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "countsByPresenceState",
+        "countsByFileClass",
+        "countsByFileKind",
+        "mediaRelevantFilesCount",
+        "presentMediaRelevantFilesCount"
+      ]
+    },
+    "SourceIntegrityPresenceCount": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "presenceState": {
+          "$ref": "#/$defs/ContentsPresenceState"
+        }
+      },
+      "required": [
+        "presenceState",
+        "count"
+      ]
+    },
+    "SourceIntegrityRuntimeMaintenance": {
+      "type": "object",
+      "properties": {
+        "lastRun": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceMaintenanceLastRunSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SourceIntegrityRuntimeMaintenanceState"
+        }
+      },
+      "required": [
+        "state"
+      ]
+    },
+    "SourceIntegrityRuntimeMaintenanceState": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "running"
       ]
     },
     "SourceLifecycle": {

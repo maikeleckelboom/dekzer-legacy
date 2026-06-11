@@ -61,7 +61,7 @@ export type RejectTrackIdentityCandidateRequest = { candidateId: string, reason?
 
 export type DeferTrackIdentityCandidateRequest = { candidateId: string, reason?: string, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceIntegrity", "payload": ReadSourceIntegrityRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -74,6 +74,8 @@ export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint
 export type NavigableChildScopeState = "unknown" | "hasNavigableChildScopes" | "noNavigableChildScopes";
 
 export type ReadSourceLifecycleRequest = { sourceId: string, };
+
+export type ReadSourceIntegrityRequest = { sourceId: string, };
 
 export type ReadSourceMaintenanceRequest = { sourceId: string, };
 
@@ -222,7 +224,7 @@ export type TrackIdentityEffectiveDecisionPrecedence = "user" | "system" | "none
 
 export type TrackIdentityUserBlockingDecisionState = "none" | "rejected" | "deferred";
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceIntegrity", "payload": ReadSourceIntegrityReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -233,6 +235,8 @@ export type LoadNavigationRowByStableKeyReply = { row: NavigationRow | null, };
 export type ReadLibraryTreeChildrenReply = { window: LibraryTreeWindow | null, };
 
 export type ReadSourceLifecycleReply = { lifecycle: SourceLifecycle | null, };
+
+export type ReadSourceIntegrityReply = { sourceId: string, sourceAvailability: SourceIntegrityAvailability, coverageIntegrity: SourceIntegrityCoverage, inventory?: SourceIntegrityInventory, evidenceAndMaintenance: SourceIntegrityEvidenceAndMaintenance, attachmentIntegrity?: SourceIntegrityAttachmentIntegrity, runtimeMaintenance: SourceIntegrityRuntimeMaintenance, };
 
 export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
 
@@ -303,6 +307,30 @@ export type DirectoryImageMediaState = { "kind": "unknown" } | { "kind": "hasIma
 export type DirectoryScanState = "pending" | "scanning" | "complete" | "failed" | "blocked";
 
 export type SourceLifecycle = { sourceId: string, sourceClass: SourceClass, isUserVisible: boolean, mountStatus: SourceMountStatus, accessState: SourceAccessState, accessIssueKind?: SourceLifecycleIssueKind, scanPhase: SourceScanPhase, scanIssueKind?: SourceLifecycleIssueKind, lastScanStartedAtMs?: number, lastScanFinishedAtMs?: number, lastSuccessfulScanAtMs?: number, lastSeenAtMs?: number, updatedAtMs: number, };
+
+export type SourceIntegrityAvailability = { state: SourceIntegrityAvailabilityState, lifecycle?: SourceLifecycle, sourceFailure?: SourceMaintenanceSourceFailure, };
+
+export type SourceIntegrityAvailabilityState = "notFound" | "mounted" | "unavailable" | "missing" | "blocked" | "partial" | "unknown";
+
+export type SourceIntegrityCoverage = { state: ContentsScopeCoverageState, subtreeCoverageComplete: boolean, emptyResultAuthoritative: boolean, totalDirectoriesCount: number, pendingDirectoriesCount: number, scanningDirectoriesCount: number, blockedDirectoriesCount: number, failedDirectoriesCount: number, };
+
+export type SourceIntegrityInventory = { countsByPresenceState: Array<SourceIntegrityPresenceCount>, countsByFileClass: Array<SourceIntegrityFileClassCount>, countsByFileKind: Array<SourceIntegrityFileKindCount>, mediaRelevantFilesCount: number, presentMediaRelevantFilesCount: number, };
+
+export type SourceIntegrityFileClass = "audio" | "video" | "image" | "unsupported" | "none";
+
+export type SourceIntegrityPresenceCount = { presenceState: ContentsPresenceState, count: number, };
+
+export type SourceIntegrityFileClassCount = { fileClass: SourceIntegrityFileClass, count: number, };
+
+export type SourceIntegrityFileKindCount = { fileKind: ContentsFileKind, count: number, };
+
+export type SourceIntegrityEvidenceAndMaintenance = { remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
+
+export type SourceIntegrityAttachmentIntegrity = { currentLinksCount: number, staleLinksCount: number, missingLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
+
+export type SourceIntegrityRuntimeMaintenance = { state: SourceIntegrityRuntimeMaintenanceState, lastRun?: SourceMaintenanceLastRunSummary, };
+
+export type SourceIntegrityRuntimeMaintenanceState = "idle" | "running";
 
 export type AttachmentIdentityReadStatus = "ok" | "notFound" | "invalidRequest" | "readFailed";
 

@@ -25,7 +25,8 @@ use crate::snapshot_read_protocol::{
     map_read_library_asset_waveform_overview_reply, map_read_library_tree_children_reply,
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
     map_read_source_attachment_summary_reply, map_read_source_file_attachment_reply,
-    map_read_source_lifecycle_reply, map_read_track_identity_review_candidates_reply,
+    map_read_source_integrity_reply, map_read_source_lifecycle_reply,
+    map_read_track_identity_review_candidates_reply,
     map_search_navigation_node_library_browser_window_reply, store_contents_policy,
     store_contents_scope, store_contents_scope_depth, store_library_tree_entry_point,
     store_track_identity_review_state_filter,
@@ -528,6 +529,21 @@ impl LibraryBoundaryService {
         map_read_source_lifecycle_reply(lifecycle).map_err(map_store_error)
     }
 
+    pub fn read_source_integrity(
+        &self,
+        request: protocol::ReadSourceIntegrityRequest,
+    ) -> protocol::ProtocolResult<protocol::ReadSourceIntegrityReply> {
+        let source_id = require_positive_i64(request.source_id, "sourceId")?;
+        let source_integrity = self
+            .durable_store
+            .read_source_integrity(source_id)
+            .map_err(map_store_error)?;
+        let maintenance = self
+            .source_maintenance
+            .read_snapshot(&self.durable_store, source_id)?;
+        map_read_source_integrity_reply(source_integrity, maintenance).map_err(map_store_error)
+    }
+
     pub fn read_source_file_attachment(
         &self,
         request: protocol::ReadSourceFileAttachmentRequest,
@@ -955,6 +971,10 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ReadSourceLifecycle(request) => self
                 .read_source_lifecycle(request)
                 .map(protocol::SnapshotReadReply::SourceLifecycle),
+            protocol::SnapshotReadCommand::ReadSourceIntegrity(request) => self
+                .read_source_integrity(request)
+                .map(Box::new)
+                .map(protocol::SnapshotReadReply::SourceIntegrity),
             protocol::SnapshotReadCommand::ReadSourceMaintenance(request) => self
                 .read_source_maintenance(request)
                 .map(Box::new)
@@ -1458,7 +1478,7 @@ mod tests {
         AcceptTrackIdentityCandidateRequest, AttachmentIdentityReadStatus, CancelRootScanReply,
         CancelRootScanRequest, CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest,
         ContentsFileClass, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
-        ContentsScopeDepth, CreatePlaylistReply, CreatePlaylistRequest,
+        ContentsScopeCoverageState, ContentsScopeDepth, CreatePlaylistReply, CreatePlaylistRequest,
         DeferTrackIdentityCandidateRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
         HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
@@ -1471,15 +1491,16 @@ mod tests {
         ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
         ReadLibraryTreeChildrenRequest, ReadSourceAttachmentSummaryReply,
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
-        ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
-        RejectTrackIdentityCandidateRequest, RenamePlaylistReply, RenamePlaylistRequest,
-        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SearchFilterAuthorityLayer,
-        SearchFilterFileClass, SearchFilterReadReply, SearchFilterReadRequest,
-        SearchFilterRecursion, SearchFilterResultKind, SearchFilterScope, SearchFilterSet,
-        SearchFilterSort, SearchFilterState, SnapshotReadCommand, SnapshotReadReply,
-        SourceFileAttachmentLinkStatus, SourceFileHashCommand, SourceFileHashReply,
+        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceIntegrityRequest,
+        ReadSourceLifecycleReply, ReadSourceLifecycleRequest, ReadSourceMaintenanceReply,
+        ReadSourceMaintenanceRequest, ReadTrackIdentityReviewCandidatesRequest,
+        RegisterLocalRootReply, RegisterLocalRootRequest, RejectTrackIdentityCandidateRequest,
+        RenamePlaylistReply, RenamePlaylistRequest, RunSourceMaintenanceReply,
+        RunSourceMaintenanceRequest, SearchFilterAuthorityLayer, SearchFilterFileClass,
+        SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
+        SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
+        SearchFilterState, SnapshotReadCommand, SnapshotReadReply, SourceFileAttachmentLinkStatus,
+        SourceFileHashCommand, SourceFileHashReply, SourceIntegrityAvailabilityState,
         SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
         TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
         TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
@@ -1935,6 +1956,13 @@ mod tests {
         }
     }
 
+    fn expect_read_source_integrity_reply(reply: CommandReply) -> ReadSourceIntegrityReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::SourceIntegrity(reply)) => *reply,
+            other => panic!("expected source integrity snapshot reply, got {other:?}"),
+        }
+    }
+
     fn expect_event_stream_read_after_reply(
         reply: CommandReply,
     ) -> ReadLibraryBoundaryEventsAfterReply {
@@ -2090,6 +2118,17 @@ mod tests {
         expect_read_source_maintenance_reply(expect_success(service.handle_command(
             CommandRequest::SnapshotRead(SnapshotReadCommand::ReadSourceMaintenance(
                 ReadSourceMaintenanceRequest { source_id },
+            )),
+        )))
+    }
+
+    fn read_source_integrity(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+    ) -> ReadSourceIntegrityReply {
+        expect_read_source_integrity_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadSourceIntegrity(
+                ReadSourceIntegrityRequest { source_id },
             )),
         )))
     }
@@ -2815,6 +2854,121 @@ mod tests {
                 "{table} must not be created by source maintenance"
             );
         }
+    }
+
+    #[test]
+    fn source_integrity_read_reports_facets_without_running_maintenance() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("source-integrity-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_present_source_file(&service, registered.root_id, 100, "track.wav", 10);
+        record_present_source_file(&service, registered.root_id, 101, "cover.jpg", 10);
+        service
+            .durable_store
+            .upsert_source_scan_state(UpsertSourceScanStateInput {
+                source_id: registered.root_id,
+                scan_phase: SourceScanPhase::Complete,
+                last_scan_started_at: Some(10),
+                last_scan_finished_at: Some(20),
+                last_successful_scan_at: Some(20),
+                scan_issue_kind: None,
+                error_detail: None,
+                updated_at: 20,
+            })
+            .expect("complete source scan");
+
+        let integrity = read_source_integrity(&service, registered.root_id);
+
+        assert_eq!(
+            integrity.source_availability.state,
+            SourceIntegrityAvailabilityState::Mounted
+        );
+        assert_eq!(
+            integrity.coverage_integrity.state,
+            ContentsScopeCoverageState::Complete
+        );
+        assert!(integrity.coverage_integrity.empty_result_authoritative);
+
+        let inventory = integrity.inventory.expect("known source inventory exists");
+        assert_eq!(inventory.media_relevant_files_count, 2);
+        assert_eq!(inventory.present_media_relevant_files_count, 2);
+        assert_eq!(
+            integrity.evidence_and_maintenance.remaining_hash_candidates,
+            2
+        );
+        assert_eq!(
+            integrity.runtime_maintenance.state,
+            library_boundary_protocol::SourceIntegrityRuntimeMaintenanceState::Idle
+        );
+        assert!(
+            service
+                .source_maintenance
+                .completed_runs_for_test()
+                .is_empty(),
+            "readSourceIntegrity must not run maintenance"
+        );
+    }
+
+    #[test]
+    fn source_integrity_read_distinguishes_missing_source() {
+        let (_tempdir, _context, service) = open_service_with_context();
+
+        let integrity = read_source_integrity(&service, 999);
+
+        assert_eq!(
+            integrity.source_availability.state,
+            SourceIntegrityAvailabilityState::NotFound
+        );
+        assert!(integrity.source_availability.lifecycle.is_none());
+        assert!(integrity.inventory.is_none());
+        assert_eq!(
+            integrity.coverage_integrity.state,
+            ContentsScopeCoverageState::SourceUnavailable
+        );
+        assert!(!integrity.coverage_integrity.empty_result_authoritative);
+        assert!(integrity.evidence_and_maintenance.source_failure.is_some());
+    }
+
+    #[test]
+    fn source_integrity_read_does_not_report_blocked_access_as_empty() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("source-integrity-blocked-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        service
+            .durable_store
+            .upsert_source_state(UpsertSourceStateInput {
+                source_id: registered.root_id,
+                mount_status: "mounted".to_string(),
+                mount_epoch: 2,
+                access_state: SourceAccessState::Blocked,
+                access_issue_kind: Some(SourceAccessIssueKind::PermissionDenied),
+                access_error_detail: None,
+                access_checked_at: Some(30),
+                mount_root: None,
+                effective_path: Some(source_root.to_string_lossy().into_owned()),
+                observed_volume_label: None,
+                filesystem_type: None,
+                last_seen_at: Some(25),
+                updated_at: 31,
+            })
+            .expect("block source state");
+
+        let integrity = read_source_integrity(&service, registered.root_id);
+
+        assert_eq!(
+            integrity.source_availability.state,
+            SourceIntegrityAvailabilityState::Blocked
+        );
+        assert_eq!(
+            integrity.coverage_integrity.state,
+            ContentsScopeCoverageState::Blocked
+        );
+        assert!(!integrity.coverage_integrity.empty_result_authoritative);
+        assert!(integrity.evidence_and_maintenance.source_failure.is_some());
     }
 
     #[test]

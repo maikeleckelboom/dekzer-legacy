@@ -97,6 +97,10 @@ pub use read_models::search_filter::{
     StoreSearchResult, StoreSearchResultKind, StoreSearchResultRow, StoreSearchScope,
     StoreSearchSort, StoreSearchState,
 };
+pub use read_models::source_integrity::{
+    StoreSourceIntegrity, StoreSourceIntegrityCount, StoreSourceIntegrityCoverage,
+    StoreSourceIntegrityCoverageState, StoreSourceIntegrityInventory,
+};
 pub use read_models::source_lifecycle::StoreSourceLifecycle;
 pub use read_models::track_identity_candidates::{
     StoreTrackIdentityCandidate, StoreTrackIdentityCandidateEvidence,

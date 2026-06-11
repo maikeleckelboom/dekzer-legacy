@@ -30,6 +30,7 @@ mod revisions;
 mod search_filter_reads;
 mod source_file_hash;
 mod source_file_media_probe;
+mod source_integrity_reads;
 mod source_lifecycle_reads;
 mod sources;
 mod track_identity_candidate_reads;
