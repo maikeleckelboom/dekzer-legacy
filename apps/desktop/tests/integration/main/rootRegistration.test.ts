@@ -10,10 +10,12 @@ import {
   resolveHostConfig,
   type LibraryBoundaryHostConfig
 } from '../../../src/main/library/boundary/config'
+import { registerLibraryIpcCommands } from '../../../src/main/library/boundary/commandRegistry'
+import { BoundaryEventPump } from '../../../src/main/library/boundary/eventPump'
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
+import { HostStatusController } from '../../../src/main/library/boundary/status'
 import {
   chooseAndRegisterLocalRoot,
-  registerLocalRootChoiceIpc,
   type LocalRootChoiceDialog
 } from '../../../src/main/library/roots/chooseLocal'
 import { registerLocalRoot } from '../../../src/main/library/roots/register'
@@ -23,6 +25,7 @@ import type { LocalRootRegistrationResult } from '../../../src/shared/library/ro
 import {
   createFakeClient,
   silentLogger,
+  silentStatusLogger,
   startedHostWithClient,
   testApp
 } from '../../support/library/boundary'
@@ -99,20 +102,22 @@ describe('local root registration boundaries', () => {
 
   it('ignores renderer-provided paths at the choice IPC boundary', async () => {
     let receivedAbsolutePath = ''
-    const registration: {
-      channel?: string
-      handler?: (...args: readonly unknown[]) => Promise<LocalRootChoiceResult>
-    } = {}
+    const host = unusedHost()
+    const registrations = new Map<
+      string,
+      (event: unknown, ...args: readonly unknown[]) => Promise<unknown> | unknown
+    >()
 
-    registerLocalRootChoiceIpc(
-      {
+    registerLibraryIpcCommands({
+      ipcMain: {
         handle(channel, listener): void {
-          registration.channel = channel
-          registration.handler = (...args) => listener({}, ...args)
+          registrations.set(channel, listener)
         }
       },
-      unusedHost(),
-      {
+      host,
+      hostStatusController: new HostStatusController(host, silentStatusLogger()),
+      boundaryEventPump: new BoundaryEventPump(host),
+      localRootChoiceDependencies: {
         dialog: fakeDialog({ canceled: false, filePaths: ['C:/MainSelectedMusic'] }),
         registerLocalRoot: async (_host, request) => {
           receivedAbsolutePath = request.absolutePath
@@ -122,11 +127,12 @@ describe('local root registration boundaries', () => {
           })
         }
       }
-    )
+    })
 
-    expect(registration.channel).toBe(libraryControlChannels.roots.chooseLocal)
+    const handler = registrations.get(libraryControlChannels.roots.chooseLocal)
+    expect(typeof handler).toBe('function')
 
-    const result = await registration.handler?.({ absolutePath: 'C:/RendererProvidedPath' })
+    const result = await handler?.({}, { absolutePath: 'C:/RendererProvidedPath' })
 
     expect(receivedAbsolutePath).toBe('C:/MainSelectedMusic')
     expect(result).toEqual({

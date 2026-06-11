@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
@@ -9,30 +8,7 @@ import type {
 } from '../../../shared/library/viewState/persistence'
 import type { LibraryBoundaryHost } from '../boundary/host'
 
-export type LibraryViewStateIpcMain = {
-  handle(channel: string, listener: (...args: readonly unknown[]) => unknown): void
-}
-
 const viewStateFileName = 'library-view-state.json'
-
-export function registerLibraryViewStateIpc(
-  ipcMain: LibraryViewStateIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.viewState.read, () => readViewStateFromHost(host))
-
-  ipcMain.handle(libraryControlChannels.viewState.write, (_event: unknown, viewState: unknown) => {
-    if (!isValidViewState(viewState)) {
-      const result: LibraryViewStateWriteResult = {
-        state: 'failed',
-        detail: 'Invalid view state payload.'
-      }
-      return result
-    }
-
-    return writeViewStateToHost(host, viewState)
-  })
-}
 
 export async function readViewStateFromHost(
   host: LibraryBoundaryHost
@@ -83,6 +59,20 @@ export async function writeViewStateToHost(
       detail: 'Unable to write library view state.'
     }
   }
+}
+
+export function writeViewStateThroughHost(
+  host: LibraryBoundaryHost,
+  viewState: unknown
+): Promise<LibraryViewStateWriteResult> | LibraryViewStateWriteResult {
+  if (!isValidViewState(viewState)) {
+    return {
+      state: 'failed',
+      detail: 'Invalid view state payload.'
+    }
+  }
+
+  return writeViewStateToHost(host, viewState)
 }
 
 function userDataPath(host: LibraryBoundaryHost): string {

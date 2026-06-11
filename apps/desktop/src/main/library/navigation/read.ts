@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type {
   NavigationRow as ContractNavigationRow,
   ReadNavigationRowsRequest
@@ -13,23 +12,7 @@ import {
   type NavigationRow
 } from '../../../shared/library/navigation/read'
 
-export type LibraryNavigationReadRowsIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<NavigationReadRowsResult>
-  ): void
-}
-
 const signedOpaqueIdPattern = /^-?[1-9]\d*$/
-
-export function registerReadNavigationRowsIpc(
-  ipcMain: LibraryNavigationReadRowsIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.navigation.read, (_event, request) =>
-    readNavigationRowsThroughHost(host, request)
-  )
-}
 
 export async function readNavigationRowsThroughHost(
   host: LibraryBoundaryHost,

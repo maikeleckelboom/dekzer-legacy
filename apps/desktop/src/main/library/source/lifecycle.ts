@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type {
   ReadSourceLifecycleRequest as ContractReadSourceLifecycleRequest,
   SourceLifecycle
@@ -15,23 +14,7 @@ import type {
   SourceLifecycleRecord
 } from '../../../shared/library/source/lifecycle'
 
-export type ReadSourceLifecycleIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<ReadSourceLifecycleResult>
-  ): void
-}
-
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
-
-export function registerReadSourceLifecycleIpc(
-  ipcMain: ReadSourceLifecycleIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.source.lifecycle, (_event, request) =>
-    readSourceLifecycleThroughHost(host, request)
-  )
-}
 
 export async function readSourceLifecycleThroughHost(
   host: LibraryBoundaryHost,

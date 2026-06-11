@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,11 +11,7 @@ import {
   type LibraryBoundaryHostConfig
 } from '../../../src/main/library/boundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
-import {
-  hashSourceFilesBlake3ThroughHost,
-  registerSourceFileHashingIpc
-} from '../../../src/main/library/source/fileHashing'
-import { type HashSourceFilesBlake3Result } from '../../../src/shared/library/source/fileHashing'
+import { hashSourceFilesBlake3ThroughHost } from '../../../src/main/library/source/fileHashing'
 import {
   createFakeClient,
   silentLogger,
@@ -108,28 +103,6 @@ describe('source file BLAKE3 hashing through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
-  })
-
-  it('registers the source file hashing IPC channel', () => {
-    const config = hostConfig()
-    const idleHost = new LibraryBoundaryHost(config, silentLogger())
-    const registration: {
-      channel?: string
-      handler?: (request: unknown) => Promise<HashSourceFilesBlake3Result>
-    } = {}
-
-    registerSourceFileHashingIpc(
-      {
-        handle(channel, listener): void {
-          registration.channel = channel
-          registration.handler = (request) => listener({}, request)
-        }
-      },
-      idleHost
-    )
-
-    expect(registration.channel).toBe(libraryControlChannels.source.fileHashing)
-    expect(typeof registration.handler).toBe('function')
   })
 })
 

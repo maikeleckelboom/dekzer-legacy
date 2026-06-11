@@ -1,5 +1,4 @@
 import { libraryPublicationChannels } from '../../../shared/library/boundary/publicationPlane'
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { ReadLibraryBoundaryEventsAfterReply } from '@dekzer/library-boundary-contract'
 
 import type { LibraryBoundaryHost } from './host'
@@ -234,23 +233,18 @@ export class BoundaryEventPump {
   }
 }
 
-export function registerBoundaryEventPumpIpc(
-  ipcMain: BoundaryEventPumpIpcMain,
-  pump: BoundaryEventPump
-): void {
-  ipcMain.handle(
-    libraryControlChannels.boundary.events.subscribe,
-    async (event): Promise<BoundaryEventSubscribeResult> => {
-      pump.subscribe(event.sender)
-      return { kind: 'subscribed' }
-    }
-  )
+export function subscribeBoundaryEventsForSender(
+  pump: BoundaryEventPump,
+  webContents: BoundaryEventPumpWebContents
+): BoundaryEventSubscribeResult {
+  pump.subscribe(webContents)
+  return { kind: 'subscribed' }
+}
 
-  ipcMain.handle(
-    libraryControlChannels.boundary.events.unsubscribe,
-    async (event): Promise<BoundaryEventUnsubscribeResult> => {
-      pump.unsubscribe(event.sender)
-      return { kind: 'unsubscribed' }
-    }
-  )
+export function unsubscribeBoundaryEventsForSender(
+  pump: BoundaryEventPump,
+  webContents: BoundaryEventPumpWebContents
+): BoundaryEventUnsubscribeResult {
+  pump.unsubscribe(webContents)
+  return { kind: 'unsubscribed' }
 }

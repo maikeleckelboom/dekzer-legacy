@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { UnregisterLocalRootRequest as ContractRequest } from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../boundary/errors'
@@ -10,25 +9,6 @@ import type {
   UnregisterLocalRootRequest,
   UnregisterLocalRootResult
 } from '../../../shared/library/roots/unregister'
-
-export type UnregisterLocalRootIpcMain = {
-  handle(
-    channel: string,
-    listener: (
-      event: unknown,
-      request: UnregisterLocalRootRequest
-    ) => Promise<UnregisterLocalRootResult>
-  ): void
-}
-
-export function registerUnregisterLocalRootIpc(
-  ipcMain: UnregisterLocalRootIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.roots.unregister, (_event, request) =>
-    unregisterLocalRootThroughHost(host, request)
-  )
-}
 
 export async function unregisterLocalRootThroughHost(
   host: LibraryBoundaryHost,

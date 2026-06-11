@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   isValidViewState,
   readViewStateFromHost,
-  registerLibraryViewStateIpc,
+  writeViewStateThroughHost,
   writeViewStateToHost
 } from '../../../src/main/library/viewState/persistence'
 import type { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
@@ -64,34 +63,15 @@ describe('persisted library view state', () => {
     })
   })
 
-  it('validates IPC write payloads before touching persistence', async () => {
+  it('validates write payloads before touching persistence', async () => {
     const dir = tempRootFor('dekzer-desktop-view-state-ipc-')
-    const registration: {
-      read?: () => unknown
-      write?: (viewState: unknown) => unknown
-    } = {}
-
-    registerLibraryViewStateIpc(
-      {
-        handle(channel, listener): void {
-          if (channel === libraryControlChannels.viewState.read) {
-            registration.read = () => listener({})
-          }
-
-          if (channel === libraryControlChannels.viewState.write) {
-            registration.write = (viewState) => listener({}, viewState)
-          }
-        }
-      },
-      fakeHost(dir)
-    )
 
     expect(isValidViewState({ version: 1, expandedNodeIds: [] })).toBe(true)
     expect(isValidViewState({ version: 2, expandedNodeIds: [] })).toBe(false)
     expect(isValidViewState({ version: 1, selectedNodeId: 42, expandedNodeIds: [] })).toBe(false)
     expect(isValidViewState({ version: 1, expandedNodeIds: ['valid', 42] })).toBe(false)
 
-    expect(registration.write?.({ version: 1 })).toEqual({
+    expect(writeViewStateThroughHost(fakeHost(dir), { version: 1 })).toEqual({
       state: 'failed',
       detail: 'Invalid view state payload.'
     })

@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { ReadLibraryTreeChildrenRequest } from '@dekzer/library-boundary-contract'
 
 import {
@@ -12,19 +11,6 @@ import { LibraryBoundaryHostError } from '../boundary/errors'
 import { mapLibraryTreeNode } from './mapping'
 import { createHierarchyReadErrorResult, isReadResult, normalizeRequest } from './request'
 import { resolveTarget } from './target'
-
-export type LibraryHierarchyReadChildrenIpcMain = {
-  handle(channel: string, listener: (event: unknown, request: unknown) => Promise<ReadResult>): void
-}
-
-export function registerReadChildrenIpc(
-  ipcMain: LibraryHierarchyReadChildrenIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.hierarchy.read, (_event, request) =>
-    readThroughHost(host, request)
-  )
-}
 
 export async function readThroughHost(
   host: LibraryBoundaryHost,

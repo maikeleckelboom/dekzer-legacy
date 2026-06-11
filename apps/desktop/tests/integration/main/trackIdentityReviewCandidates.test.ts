@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,11 +14,7 @@ import {
   type LibraryBoundaryHostConfig
 } from '../../../src/main/library/boundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
-import {
-  readCandidatesThroughHost,
-  registerTrackIdentityReviewCandidatesIpc
-} from '../../../src/main/library/trackIdentity/candidates'
-import { type ReadCandidatesResult } from '../../../src/shared/library/trackIdentity/candidates'
+import { readCandidatesThroughHost } from '../../../src/main/library/trackIdentity/candidates'
 import {
   createFakeClient,
   silentLogger,
@@ -121,23 +116,6 @@ describe('track identity review candidate reads through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
-  })
-
-  it('registers track identity review candidate read IPC channel', () => {
-    const config = hostConfig()
-    const idleHost = new LibraryBoundaryHost(config, silentLogger())
-    const registration = new Map<string, (request: unknown) => Promise<ReadCandidatesResult>>()
-
-    registerTrackIdentityReviewCandidatesIpc(
-      {
-        handle(channel, listener): void {
-          registration.set(channel, (request) => listener({}, request))
-        }
-      },
-      idleHost
-    )
-
-    expect(registration.has(libraryControlChannels.trackIdentity.candidates.read)).toBe(true)
   })
 })
 

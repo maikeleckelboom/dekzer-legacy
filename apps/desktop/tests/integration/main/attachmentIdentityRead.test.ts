@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,8 +18,7 @@ import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   readAttachmentSourceFilesThroughHost,
   readSourceAttachmentSummaryThroughHost,
-  readSourceFileAttachmentThroughHost,
-  registerAttachmentIdentityReadIpc
+  readSourceFileAttachmentThroughHost
 } from '../../../src/main/library/attachmentIdentity/read'
 
 import {
@@ -173,31 +171,6 @@ describe('attachment identity reads through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
-  })
-
-  it('registers attachment identity read IPC channels', () => {
-    const config = hostConfig()
-    const idleHost = new LibraryBoundaryHost(config, silentLogger())
-    const registrations = new Map<string, (request: unknown) => Promise<unknown>>()
-
-    registerAttachmentIdentityReadIpc(
-      {
-        handle(channel, listener): void {
-          registrations.set(channel, (request) => listener({}, request))
-        }
-      },
-      idleHost
-    )
-
-    expect(
-      registrations.has(libraryControlChannels.attachmentIdentity.readSourceFileAttachment)
-    ).toBe(true)
-    expect(
-      registrations.has(libraryControlChannels.attachmentIdentity.readAttachmentSourceFiles)
-    ).toBe(true)
-    expect(
-      registrations.has(libraryControlChannels.attachmentIdentity.readSourceAttachmentSummary)
-    ).toBe(true)
   })
 })
 

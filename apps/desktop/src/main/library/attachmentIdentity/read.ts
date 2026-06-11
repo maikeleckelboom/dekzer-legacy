@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import {
   LibraryBoundaryProtocolError,
   LibraryBoundaryReplyMismatchError,
@@ -25,30 +24,8 @@ import type {
   ReadSourceFileAttachmentResult
 } from '../../../shared/library/attachmentIdentity/read'
 
-export type AttachmentIdentityReadIpcMain = {
-  handle(channel: string, listener: (event: unknown, request: unknown) => Promise<unknown>): void
-}
-
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 const maxAttachmentSourceFilesLimit = 200
-
-export function registerAttachmentIdentityReadIpc(
-  ipcMain: AttachmentIdentityReadIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(
-    libraryControlChannels.attachmentIdentity.readSourceFileAttachment,
-    (_event, request) => readSourceFileAttachmentThroughHost(host, request)
-  )
-  ipcMain.handle(
-    libraryControlChannels.attachmentIdentity.readAttachmentSourceFiles,
-    (_event, request) => readAttachmentSourceFilesThroughHost(host, request)
-  )
-  ipcMain.handle(
-    libraryControlChannels.attachmentIdentity.readSourceAttachmentSummary,
-    (_event, request) => readSourceAttachmentSummaryThroughHost(host, request)
-  )
-}
 
 export async function readSourceFileAttachmentThroughHost(
   host: LibraryBoundaryHost,

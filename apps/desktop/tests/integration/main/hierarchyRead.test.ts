@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,14 +10,9 @@ import {
   type LibraryBoundaryHostConfig
 } from '../../../src/main/library/boundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
-import { readThroughHost, registerReadChildrenIpc } from '../../../src/main/library/hierarchy/read'
-import {
-  readNavigationRowsThroughHost,
-  registerReadNavigationRowsIpc
-} from '../../../src/main/library/navigation/read'
-import { type ReadResult } from '../../../src/shared/library/hierarchy/read'
+import { readThroughHost } from '../../../src/main/library/hierarchy/read'
+import { readNavigationRowsThroughHost } from '../../../src/main/library/navigation/read'
 import type { LibraryTreeCoverage } from '@dekzer/library-boundary-contract'
-import { type NavigationReadRowsResult } from '../../../src/shared/library/navigation/read'
 import {
   createFakeClient,
   silentLogger,
@@ -270,38 +264,6 @@ describe('hierarchy and navigation reads through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
-
-    const hierarchyRegistration: {
-      channel?: string
-      handler?: (request: unknown) => Promise<ReadResult>
-    } = {}
-    registerReadChildrenIpc(
-      {
-        handle(channel, listener): void {
-          hierarchyRegistration.channel = channel
-          hierarchyRegistration.handler = (request) => listener({}, request)
-        }
-      },
-      idleHost
-    )
-    expect(hierarchyRegistration.channel).toBe(libraryControlChannels.hierarchy.read)
-    expect(typeof hierarchyRegistration.handler).toBe('function')
-
-    const navigationRegistration: {
-      channel?: string
-      handler?: (request: unknown) => Promise<NavigationReadRowsResult>
-    } = {}
-    registerReadNavigationRowsIpc(
-      {
-        handle(channel, listener): void {
-          navigationRegistration.channel = channel
-          navigationRegistration.handler = (request) => listener({}, request)
-        }
-      },
-      idleHost
-    )
-    expect(navigationRegistration.channel).toBe(libraryControlChannels.navigation.read)
-    expect(typeof navigationRegistration.handler).toBe('function')
   })
 })
 

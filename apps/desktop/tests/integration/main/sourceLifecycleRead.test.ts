@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,12 +10,7 @@ import {
   type LibraryBoundaryHostConfig
 } from '../../../src/main/library/boundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
-import {
-  readSourceLifecycleThroughHost,
-  registerReadSourceLifecycleIpc
-} from '../../../src/main/library/source/lifecycle'
-
-import type { ReadSourceLifecycleResult } from '../../../src/shared/library/source/lifecycle'
+import { readSourceLifecycleThroughHost } from '../../../src/main/library/source/lifecycle'
 import {
   createFakeClient,
   silentLogger,
@@ -107,22 +101,6 @@ describe('source lifecycle reads through the host', () => {
       state: 'notFound',
       error: { code: 'notFound' }
     })
-
-    const registration: {
-      channel?: string
-      handler?: (request: unknown) => Promise<ReadSourceLifecycleResult>
-    } = {}
-    registerReadSourceLifecycleIpc(
-      {
-        handle(channel, listener): void {
-          registration.channel = channel
-          registration.handler = (request) => listener({}, request)
-        }
-      },
-      idleHost
-    )
-    expect(registration.channel).toBe(libraryControlChannels.source.lifecycle)
-    expect(typeof registration.handler).toBe('function')
   })
 })
 

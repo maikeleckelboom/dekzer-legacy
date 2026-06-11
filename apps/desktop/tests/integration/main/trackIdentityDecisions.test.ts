@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -20,10 +19,8 @@ import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   acceptTrackIdentityCandidateThroughHost,
   deferTrackIdentityCandidateThroughHost,
-  registerTrackIdentityDecisionIpc,
   rejectTrackIdentityCandidateThroughHost
 } from '../../../src/main/library/trackIdentity/decisions'
-import { type TrackIdentityDecisionCommandResult } from '../../../src/shared/library/trackIdentity/decisions'
 import {
   createFakeClient,
   silentLogger,
@@ -169,29 +166,6 @@ describe('track identity decision commands through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
-  })
-
-  it('registers track identity decision authority IPC channels', () => {
-    const config = hostConfig()
-    const idleHost = new LibraryBoundaryHost(config, silentLogger())
-    const registration = new Map<
-      string,
-      (request: unknown) => Promise<TrackIdentityDecisionCommandResult>
-    >()
-
-    registerTrackIdentityDecisionIpc(
-      {
-        handle(channel, listener): void {
-          registration.set(channel, (request) => listener({}, request))
-        }
-      },
-      idleHost,
-      silentDecisionLogger
-    )
-
-    expect(registration.has(libraryControlChannels.trackIdentity.decisions.accept)).toBe(true)
-    expect(registration.has(libraryControlChannels.trackIdentity.decisions.reject)).toBe(true)
-    expect(registration.has(libraryControlChannels.trackIdentity.decisions.defer)).toBe(true)
   })
 })
 

@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type {
   LocalRootAvailability,
   ReadLocalRootsRequest
@@ -13,17 +12,6 @@ import type {
   ReadLocalRootsOutcome,
   LocalRoot
 } from '../../../shared/library/roots/read'
-
-export type ReadLocalRootsIpcMain = {
-  handle(channel: string, listener: (event: unknown) => Promise<ReadLocalRootsOutcome>): void
-}
-
-export function registerReadLocalRootsIpc(
-  ipcMain: ReadLocalRootsIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.roots.read, () => readLocalRootsThroughHost(host))
-}
 
 export async function readLocalRootsThroughHost(
   host: LibraryBoundaryHost

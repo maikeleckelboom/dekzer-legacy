@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { HashSourceFilesBlake3Request as ContractHashSourceFilesBlake3Request } from '@dekzer/library-boundary-contract'
 
 import {
@@ -20,24 +19,7 @@ export type SourceFileHashingLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
 }
 
-export type SourceFileHashingIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<HashSourceFilesBlake3Result>
-  ): void
-}
-
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
-
-export function registerSourceFileHashingIpc(
-  ipcMain: SourceFileHashingIpcMain,
-  host: LibraryBoundaryHost,
-  logger: SourceFileHashingLogger = console
-): void {
-  ipcMain.handle(libraryControlChannels.source.fileHashing, (_event, request) =>
-    hashSourceFilesBlake3ThroughHost(host, request, logger)
-  )
-}
 
 export async function hashSourceFilesBlake3ThroughHost(
   host: LibraryBoundaryHost,

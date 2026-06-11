@@ -1,11 +1,10 @@
 import { libraryPublicationChannels } from '../../../../src/shared/library/boundary/publicationPlane'
-import { libraryControlChannels } from '../../../../src/shared/library/boundary/controlPlane'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   BoundaryEventPump,
-  registerBoundaryEventPumpIpc,
-  type BoundaryEventPumpIpcMain,
+  subscribeBoundaryEventsForSender,
+  unsubscribeBoundaryEventsForSender,
   type BoundaryEventPumpWebContents
 } from '../../../../src/main/library/boundary/eventPump'
 
@@ -195,36 +194,15 @@ describe('BoundaryEventPump', () => {
     pump.stop()
   })
 
-  it('registers explicit subscribe and unsubscribe IPC handlers', async () => {
+  it('subscribes and unsubscribes a sender', () => {
     const host = testHost([emptyReply(null)])
     const pump = new BoundaryEventPump(host as never)
-    const registered: Array<{
-      readonly channel: string
-      readonly listener: Parameters<BoundaryEventPumpIpcMain['handle']>[1]
-    }> = []
     const webContents = testWebContents(7)
 
-    registerBoundaryEventPumpIpc(
-      {
-        handle(channel, listener): void {
-          registered.push({ channel, listener })
-        }
-      },
-      pump
-    )
-
-    await expect(
-      registered
-        .find((handler) => handler.channel === libraryControlChannels.boundary.events.subscribe)
-        ?.listener({ sender: webContents })
-    ).resolves.toEqual({ kind: 'subscribed' })
+    expect(subscribeBoundaryEventsForSender(pump, webContents)).toEqual({ kind: 'subscribed' })
     expect(pump.subscriberCount).toBe(1)
 
-    await expect(
-      registered
-        .find((handler) => handler.channel === libraryControlChannels.boundary.events.unsubscribe)
-        ?.listener({ sender: webContents })
-    ).resolves.toEqual({ kind: 'unsubscribed' })
+    expect(unsubscribeBoundaryEventsForSender(pump, webContents)).toEqual({ kind: 'unsubscribed' })
     expect(pump.subscriberCount).toBe(0)
   })
 })

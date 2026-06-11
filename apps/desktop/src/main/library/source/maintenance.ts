@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type {
   ReadSourceMaintenanceRequest as ContractReadSourceMaintenanceRequest,
   RunSourceMaintenanceRequest as ContractRunSourceMaintenanceRequest
@@ -20,29 +19,7 @@ import {
   type SourceMaintenanceErrorCode
 } from '../../../shared/library/source/maintenance'
 
-export type SourceMaintenanceIpcMain = {
-  handle(
-    channel: string,
-    listener: (
-      event: unknown,
-      request: unknown
-    ) => Promise<RunSourceMaintenanceResult | ReadSourceMaintenanceResult>
-  ): void
-}
-
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
-
-export function registerSourceMaintenanceIpc(
-  ipcMain: SourceMaintenanceIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.source.maintenance.run, (_event, request) =>
-    runSourceMaintenanceThroughHost(host, request)
-  )
-  ipcMain.handle(libraryControlChannels.source.maintenance.read, (_event, request) =>
-    readSourceMaintenanceThroughHost(host, request)
-  )
-}
 
 export async function runSourceMaintenanceThroughHost(
   host: LibraryBoundaryHost,

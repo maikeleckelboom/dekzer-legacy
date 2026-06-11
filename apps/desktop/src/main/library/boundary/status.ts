@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import {
   type LibraryBoundaryHostStatus,
   type LibraryBoundaryHostStatusBinaryPolicy,
@@ -16,13 +15,6 @@ import {
 
 export type HostStatusLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
-}
-
-export type HostStatusIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, ...args: readonly unknown[]) => LibraryBoundaryHostStatus
-  ): void
 }
 
 export class HostStatusController {
@@ -97,13 +89,6 @@ export class HostStatusController {
       listener(status)
     }
   }
-}
-
-export function registerHostStatusIpc(
-  ipcMain: HostStatusIpcMain,
-  controller: HostStatusController
-): void {
-  ipcMain.handle(libraryControlChannels.boundary.getStatus, () => controller.getStatus())
 }
 
 export function projectHostStatus(

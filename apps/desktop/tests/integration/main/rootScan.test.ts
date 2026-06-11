@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,18 +12,11 @@ import {
   type LibraryBoundaryHostConfig
 } from '../../../src/main/library/boundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
-import {
-  type ScanLogger,
-  registerLocalRootScanIpc,
-  runLocalRootScanThroughHost
-} from '../../../src/main/library/roots/scan'
-import {
-  registerCancelRootScanIpc,
-  cancelRootScanThroughHost
-} from '../../../src/main/library/roots/cancel'
+import { type ScanLogger, runLocalRootScanThroughHost } from '../../../src/main/library/roots/scan'
+import { cancelRootScanThroughHost } from '../../../src/main/library/roots/cancel'
 
-import type { LocalRootScanResult } from '../../../src/shared/library/roots/scan'
 import type { CancelRootScanResult } from '../../../src/shared/library/roots/cancel'
+import type { LocalRootScanResult } from '../../../src/shared/library/roots/scan'
 import {
   createFakeClient,
   silentLogger,
@@ -189,26 +181,6 @@ describe('local root scan boundary', () => {
     expect(logEntries.length).toBe(1)
     expect(logEntries[0]![0]).toBe('[local-root-scan] failed')
     expect(logEntries[0]![1]).toMatchObject({ rootId: 'root-diag' })
-  })
-
-  it('registers the scan IPC channel', () => {
-    const registration: {
-      channel?: string
-      handler?: (request: unknown) => Promise<LocalRootScanResult>
-    } = {}
-
-    registerLocalRootScanIpc(
-      {
-        handle(channel, listener): void {
-          registration.channel = channel
-          registration.handler = (request) => listener({}, request)
-        }
-      },
-      new LibraryBoundaryHost(hostConfig(), silentLogger())
-    )
-
-    expect(registration.channel).toBe(libraryControlChannels.roots.scan)
-    expect(typeof registration.handler).toBe('function')
   })
 })
 
@@ -384,26 +356,6 @@ describe('local root scan cancellation boundary', () => {
       state: 'hostUnavailable',
       error: { code: 'hostNotStarted' }
     })
-  })
-
-  it('registers the cancel scan IPC channel', () => {
-    const registration: {
-      channel?: string
-      handler?: (request: unknown) => Promise<CancelRootScanResult>
-    } = {}
-
-    registerCancelRootScanIpc(
-      {
-        handle(channel, listener): void {
-          registration.channel = channel
-          registration.handler = (request) => listener({}, request)
-        }
-      },
-      new LibraryBoundaryHost(hostConfig(), silentLogger())
-    )
-
-    expect(registration.channel).toBe(libraryControlChannels.roots.cancel)
-    expect(typeof registration.handler).toBe('function')
   })
 })
 

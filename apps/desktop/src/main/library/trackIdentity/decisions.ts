@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type {
   AcceptTrackIdentityCandidateRequest as ContractAcceptTrackIdentityCandidateRequest,
   DeferTrackIdentityCandidateRequest as ContractDeferTrackIdentityCandidateRequest,
@@ -25,33 +24,10 @@ export type TrackIdentityDecisionCommandLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
 }
 
-export type TrackIdentityDecisionCommandIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<TrackIdentityDecisionCommandResult>
-  ): void
-}
-
 type DecisionCommandIntent = 'accept' | 'reject' | 'defer'
 
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 const maxReasonCharacters = 512
-
-export function registerTrackIdentityDecisionIpc(
-  ipcMain: TrackIdentityDecisionCommandIpcMain,
-  host: LibraryBoundaryHost,
-  logger: TrackIdentityDecisionCommandLogger = console
-): void {
-  ipcMain.handle(libraryControlChannels.trackIdentity.decisions.accept, (_event, request) =>
-    acceptTrackIdentityCandidateThroughHost(host, request, logger)
-  )
-  ipcMain.handle(libraryControlChannels.trackIdentity.decisions.reject, (_event, request) =>
-    rejectTrackIdentityCandidateThroughHost(host, request, logger)
-  )
-  ipcMain.handle(libraryControlChannels.trackIdentity.decisions.defer, (_event, request) =>
-    deferTrackIdentityCandidateThroughHost(host, request, logger)
-  )
-}
 
 export async function acceptTrackIdentityCandidateThroughHost(
   host: LibraryBoundaryHost,

@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -20,11 +19,7 @@ import {
   type LibraryBoundaryHostTransport,
   type LibraryBoundaryHostTransportOptions
 } from '../../../src/main/library/boundary/host'
-import {
-  projectHostStatus,
-  HostStatusController,
-  registerHostStatusIpc
-} from '../../../src/main/library/boundary/status'
+import { HostStatusController } from '../../../src/main/library/boundary/status'
 
 import {
   createFakeClient,
@@ -226,29 +221,6 @@ describe('library boundary host', () => {
     })
     expect(failingController.getStatus().lastError?.message.includes(secretBinaryPath)).toBe(false)
   })
-
-  it('registers host status IPC on the status channel', () => {
-    const host = new LibraryBoundaryHost(hostConfig(), silentLogger())
-    const controller = new HostStatusController(host, silentStatusLogger())
-    const registration: {
-      channel?: string
-      handler?: () => ReturnType<typeof projectHostStatus>
-    } = {}
-
-    registerHostStatusIpc(
-      {
-        handle(channel, listener): void {
-          registration.channel = channel
-          registration.handler = () => listener({})
-        }
-      },
-      controller
-    )
-
-    expect(registration.channel).toBe(libraryControlChannels.boundary.getStatus)
-    expect(registration.handler?.().state).toBe('idle')
-  })
-
   it('classifies schema mismatch startup failures from startup diagnostics', async () => {
     const config = hostConfig()
     const schemaDiagnostic =

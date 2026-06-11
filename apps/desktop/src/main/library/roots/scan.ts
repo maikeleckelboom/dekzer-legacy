@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { StartRootScanRequest } from '@dekzer/library-boundary-contract'
 
 import {
@@ -19,23 +18,6 @@ import type {
 
 export type ScanLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
-}
-
-export type LocalRootScanIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<LocalRootScanResult>
-  ): void
-}
-
-export function registerLocalRootScanIpc(
-  ipcMain: LocalRootScanIpcMain,
-  host: LibraryBoundaryHost,
-  logger: ScanLogger = console
-): void {
-  ipcMain.handle(libraryControlChannels.roots.scan, (_event, request) =>
-    runLocalRootScanThroughHost(host, request, logger)
-  )
 }
 
 export async function runLocalRootScanThroughHost(

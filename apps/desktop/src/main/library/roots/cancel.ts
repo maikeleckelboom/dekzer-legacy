@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { CancelRootScanRequest as ContractCancelRequest } from '@dekzer/library-boundary-contract'
 
 import {
@@ -19,23 +18,6 @@ import type {
 
 export type CancelScanLogger = {
   error(message?: unknown, ...optionalParams: unknown[]): void
-}
-
-export type CancelRootScanIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<CancelRootScanResult>
-  ): void
-}
-
-export function registerCancelRootScanIpc(
-  ipcMain: CancelRootScanIpcMain,
-  host: LibraryBoundaryHost,
-  logger: CancelScanLogger = console
-): void {
-  ipcMain.handle(libraryControlChannels.roots.cancel, (_event, request) =>
-    cancelRootScanThroughHost(host, request, logger)
-  )
 }
 
 export async function cancelRootScanThroughHost(

@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -16,11 +15,7 @@ import {
   type LibraryBoundaryHostConfig
 } from '../../../src/main/library/boundary/config'
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
-import {
-  readContentsThroughHost,
-  registerContentsReadIpc
-} from '../../../src/main/library/contents/read'
-import { type ContentsReadResult } from '../../../src/shared/library/contents/read'
+import { readContentsThroughHost } from '../../../src/main/library/contents/read'
 import {
   createFakeClient,
   silentLogger,
@@ -169,28 +164,6 @@ describe('contents reads through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
-  })
-
-  it('registers the contents read IPC channel', () => {
-    const config = hostConfig()
-    const idleHost = new LibraryBoundaryHost(config, silentLogger())
-    const registration: {
-      channel?: string
-      handler?: (request: unknown) => Promise<ContentsReadResult>
-    } = {}
-
-    registerContentsReadIpc(
-      {
-        handle(channel, listener): void {
-          registration.channel = channel
-          registration.handler = (request) => listener({}, request)
-        }
-      },
-      idleHost
-    )
-
-    expect(registration.channel).toBe(libraryControlChannels.contents.read)
-    expect(typeof registration.handler).toBe('function')
   })
 
   it('passes audioBrowse policy through with no caller filter', async () => {

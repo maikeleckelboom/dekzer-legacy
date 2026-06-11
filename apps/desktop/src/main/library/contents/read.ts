@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type {
   ContentsFileRow as ContractContentsFileRow,
   ContentsReadPolicy as ContractContentsReadPolicy,
@@ -25,13 +24,6 @@ import {
   type PrimaryMediaSummary
 } from '../../../shared/library/contents/read'
 
-export type LibraryContentsReadIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<ContentsReadResult>
-  ): void
-}
-
 const defaultContentsLimit = 100
 const maxContentsLimit = 200
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
@@ -42,15 +34,6 @@ const canonicalFileClassOrder: readonly ContentsFileClass[] = [
   'unsupported'
 ]
 const canonicalPrimaryMediaKindOrder: readonly PrimaryMediaKind[] = ['audio', 'video']
-
-export function registerContentsReadIpc(
-  ipcMain: LibraryContentsReadIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.contents.read, (_event, request) =>
-    readContentsThroughHost(host, request)
-  )
-}
 
 export async function readContentsThroughHost(
   host: LibraryBoundaryHost,

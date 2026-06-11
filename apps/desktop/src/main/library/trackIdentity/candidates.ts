@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { ReadTrackIdentityReviewCandidatesRequest as ContractReadTrackIdentityReviewCandidatesRequest } from '@dekzer/library-boundary-contract'
 
 import {
@@ -16,13 +15,6 @@ import {
   type ReadErrorState
 } from '../../../shared/library/trackIdentity/candidates'
 
-export type TrackIdentityReviewCandidatesIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, request: unknown) => Promise<ReadCandidatesResult>
-  ): void
-}
-
 const positiveOpaqueIdPattern = /^[1-9]\d*$/
 const reviewStateValues = new Set([
   'needsUserDecision',
@@ -32,15 +24,6 @@ const reviewStateValues = new Set([
   'userDeferred',
   'staleDecision'
 ])
-
-export function registerTrackIdentityReviewCandidatesIpc(
-  ipcMain: TrackIdentityReviewCandidatesIpcMain,
-  host: LibraryBoundaryHost
-): void {
-  ipcMain.handle(libraryControlChannels.trackIdentity.candidates.read, (_event, request) =>
-    readCandidatesThroughHost(host, request)
-  )
-}
 
 export async function readCandidatesThroughHost(
   host: LibraryBoundaryHost,

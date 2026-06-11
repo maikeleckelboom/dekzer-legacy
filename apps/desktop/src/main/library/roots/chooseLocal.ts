@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../shared/library/boundary/controlPlane'
 import type { BrowserWindow, OpenDialogOptions, OpenDialogReturnValue } from 'electron'
 
 import type { LibraryBoundaryHost } from '../boundary/host'
@@ -9,13 +8,6 @@ import type {
   LocalRootRegistrationResult
 } from '../../../shared/library/roots/register'
 import { registerLocalRoot } from './register'
-
-export type LocalRootChoiceIpcMain = {
-  handle(
-    channel: string,
-    listener: (event: unknown, ...args: readonly unknown[]) => Promise<LocalRootChoiceResult>
-  ): void
-}
 
 export type LocalRootChoiceDialog = {
   showOpenDialog(options: OpenDialogOptions): Promise<OpenDialogReturnValue>
@@ -39,16 +31,6 @@ const directoryPickerOptions = {
   buttonLabel: 'Add Music Folder',
   properties: ['openDirectory']
 } satisfies OpenDialogOptions
-
-export function registerLocalRootChoiceIpc(
-  ipcMain: LocalRootChoiceIpcMain,
-  host: LibraryBoundaryHost,
-  dependencies: LocalRootChoiceDependencies
-): void {
-  ipcMain.handle(libraryControlChannels.roots.chooseLocal, () =>
-    chooseAndRegisterLocalRoot(host, dependencies)
-  )
-}
 
 export async function chooseAndRegisterLocalRoot(
   host: LibraryBoundaryHost,

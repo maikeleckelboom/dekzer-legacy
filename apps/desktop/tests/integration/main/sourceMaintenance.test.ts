@@ -1,4 +1,3 @@
-import { libraryControlChannels } from '../../../src/shared/library/boundary/controlPlane'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,13 +16,8 @@ import {
 import { LibraryBoundaryHost } from '../../../src/main/library/boundary/host'
 import {
   readSourceMaintenanceThroughHost,
-  registerSourceMaintenanceIpc,
   runSourceMaintenanceThroughHost
 } from '../../../src/main/library/source/maintenance'
-import {
-  type ReadSourceMaintenanceResult,
-  type RunSourceMaintenanceResult
-} from '../../../src/shared/library/source/maintenance'
 import {
   createFakeClient,
   silentLogger,
@@ -250,27 +244,6 @@ describe('source maintenance through the host', () => {
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
-  })
-
-  it('registers source maintenance IPC channels', () => {
-    const config = hostConfig()
-    const idleHost = new LibraryBoundaryHost(config, silentLogger())
-    const registration = new Map<
-      string,
-      (request: unknown) => Promise<RunSourceMaintenanceResult | ReadSourceMaintenanceResult>
-    >()
-
-    registerSourceMaintenanceIpc(
-      {
-        handle(channel, listener): void {
-          registration.set(channel, (request) => listener({}, request))
-        }
-      },
-      idleHost
-    )
-
-    expect(registration.has(libraryControlChannels.source.maintenance.run)).toBe(true)
-    expect(registration.has(libraryControlChannels.source.maintenance.read)).toBe(true)
   })
 })
 

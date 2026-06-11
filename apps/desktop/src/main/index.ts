@@ -4,23 +4,9 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { createLibraryBoundaryHost } from './library/boundary/host'
-import { registerReadChildrenIpc } from './library/hierarchy/read'
-import { registerReadNavigationRowsIpc } from './library/navigation/read'
-import { registerContentsReadIpc } from './library/contents/read'
-import { registerReadSourceLifecycleIpc } from './library/source/lifecycle'
-import { registerAttachmentIdentityReadIpc } from './library/attachmentIdentity/read'
-import { registerSourceFileHashingIpc } from './library/source/fileHashing'
-import { registerSourceMaintenanceIpc } from './library/source/maintenance'
-import { registerTrackIdentityDecisionIpc } from './library/trackIdentity/decisions'
-import { registerTrackIdentityReviewCandidatesIpc } from './library/trackIdentity/candidates'
-import { registerLocalRootChoiceIpc } from './library/roots/chooseLocal'
-import { registerLocalRootScanIpc } from './library/roots/scan'
-import { registerCancelRootScanIpc } from './library/roots/cancel'
-import { registerReadLocalRootsIpc } from './library/roots/read'
-import { registerUnregisterLocalRootIpc } from './library/roots/unregister'
-import { registerLibraryViewStateIpc } from './library/viewState/persistence'
-import { BoundaryEventPump, registerBoundaryEventPumpIpc } from './library/boundary/eventPump'
-import { HostStatusController, registerHostStatusIpc } from './library/boundary/status'
+import { registerLibraryIpcCommands } from './library/boundary/commandRegistry'
+import { BoundaryEventPump } from './library/boundary/eventPump'
+import { HostStatusController } from './library/boundary/status'
 
 const appUserModelId = 'com.dekzer.desktop'
 const windowTitle = 'Dekzer'
@@ -70,26 +56,16 @@ app.whenReady().then(() => {
   })
   hostStatusController = new HostStatusController(host)
   boundaryEventPump = new BoundaryEventPump(host)
-  registerHostStatusIpc(ipcMain, hostStatusController)
-  registerReadNavigationRowsIpc(ipcMain, host)
-  registerReadChildrenIpc(ipcMain, host)
-  registerReadSourceLifecycleIpc(ipcMain, host)
-  registerAttachmentIdentityReadIpc(ipcMain, host)
-  registerSourceFileHashingIpc(ipcMain, host)
-  registerSourceMaintenanceIpc(ipcMain, host)
-  registerTrackIdentityDecisionIpc(ipcMain, host)
-  registerTrackIdentityReviewCandidatesIpc(ipcMain, host)
-  registerContentsReadIpc(ipcMain, host)
-  registerLocalRootChoiceIpc(ipcMain, host, {
-    dialog,
-    getParentWindow: getLibraryRootChoiceParentWindow
+  registerLibraryIpcCommands({
+    ipcMain,
+    host,
+    hostStatusController,
+    boundaryEventPump,
+    localRootChoiceDependencies: {
+      dialog,
+      getParentWindow: getLibraryRootChoiceParentWindow
+    }
   })
-  registerLocalRootScanIpc(ipcMain, host)
-  registerCancelRootScanIpc(ipcMain, host)
-  registerReadLocalRootsIpc(ipcMain, host)
-  registerUnregisterLocalRootIpc(ipcMain, host)
-  registerLibraryViewStateIpc(ipcMain, host)
-  registerBoundaryEventPumpIpc(ipcMain, boundaryEventPump)
   hostStatusController.onStatusChanged((status) => {
     boundaryEventPump?.setHostStarted(status.state === 'started')
     for (const window of BrowserWindow.getAllWindows()) {
