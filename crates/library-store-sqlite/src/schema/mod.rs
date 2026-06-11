@@ -105,6 +105,9 @@ mod tests {
         "source_scan_state",
         "source_locations",
         "sources",
+        "search_filter_index_fts",
+        "search_filter_index_metadata",
+        "search_filter_index_rows",
         "navigation_rows",
         "LibraryBrowserRows",
         "LibraryBrowserRows_fts",
@@ -162,6 +165,7 @@ mod tests {
                  WHERE type = 'table'
                    AND name NOT LIKE 'sqlite_%'
                    AND name NOT LIKE 'LibraryBrowserRows_fts_%'
+                   AND name NOT LIKE 'search_filter_index_fts_%'
                  ORDER BY name",
             )
             .expect("prepare table-name query");
@@ -472,6 +476,53 @@ mod tests {
                 "created_at",
                 "updated_at",
             ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "search_filter_index_metadata"),
+            vec![
+                "search_filter_index_id",
+                "indexer_version",
+                "generation",
+                "state",
+                "updated_at",
+            ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "search_filter_index_rows"),
+            vec![
+                "row_id",
+                "generation",
+                "result_kind",
+                "authority_layer",
+                "stable_key",
+                "source_id",
+                "source_location_id",
+                "source_directory_id",
+                "parent_source_directory_id",
+                "source_file_id",
+                "display_label",
+                "display_path",
+                "relative_path",
+                "sort_key",
+                "file_class",
+                "file_kind",
+                "media_relevance",
+                "presence_state",
+                "source_access_state",
+                "source_scan_phase",
+                "has_current_blake3",
+                "has_current_probe",
+                "attachment_link_state",
+                "attachment_id",
+                "content_hash_algorithm",
+                "content_hash_value",
+                "evidence_coverage_state",
+                "updated_at",
+            ]
+        );
+        assert!(
+            table_index_names(&connection, "search_filter_index_rows")
+                .contains(&"search_filter_index_rows_source".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "primary_media_candidates"),
@@ -1209,8 +1260,10 @@ mod tests {
                     object.reason,
                     introspection::IgnoredObjectReason::SqliteInternalPrefix
                         | introspection::IgnoredObjectReason::LibraryBrowserFtsShadowObject
+                        | introspection::IgnoredObjectReason::SearchFilterIndexFtsShadowObject
                 ) && (object.name.starts_with("sqlite_")
-                    || object.name.starts_with("LibraryBrowserRows_fts_"))
+                    || object.name.starts_with("LibraryBrowserRows_fts_")
+                    || object.name.starts_with("search_filter_index_fts_"))
             }),
             "only sqlite-internal objects may be ignored: {:?}",
             canonical.ignored_objects

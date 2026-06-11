@@ -53,6 +53,7 @@ fn validate_residual_semantic_checks(connection: &Connection) -> LibrarySqliteRe
     validate_work_item_constraints(connection)?;
     validate_artifact_constraints(connection)?;
     validate_library_browser_fts_configuration(connection)?;
+    validate_search_filter_index_fts_configuration(connection)?;
     validate_projection_subscribers_constraints(connection)?;
     Ok(())
 }
@@ -315,6 +316,27 @@ fn validate_library_browser_fts_configuration(connection: &Connection) -> Librar
             fragment,
             format!(
                 "LibraryBrowserRows_fts must retain searchable library-browser configuration fragment {fragment:?}"
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+fn validate_search_filter_index_fts_configuration(
+    connection: &Connection,
+) -> LibrarySqliteResult<()> {
+    let sql = read_required_normalized_table_sql(connection, "search_filter_index_fts")?;
+    for fragment in [
+        "USING fts5",
+        "display_label",
+        "display_path",
+        "unicode61 remove_diacritics 1",
+    ] {
+        require_sql_fragment(
+            &sql,
+            fragment,
+            format!(
+                "search_filter_index_fts must retain searchable search/filter configuration fragment {fragment:?}"
             ),
         )?;
     }

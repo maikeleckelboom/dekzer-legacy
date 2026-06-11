@@ -27,6 +27,7 @@ mod primary_media_promotion;
 mod projections;
 mod promotion;
 mod revisions;
+mod search_filter_reads;
 mod source_file_hash;
 mod source_file_media_probe;
 mod source_lifecycle_reads;

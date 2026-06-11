@@ -6,6 +6,7 @@ pub mod library_browser;
 pub mod literal_hierarchy;
 pub mod navigation;
 pub mod observed_file_facts;
+pub mod search_filter;
 pub mod source_lifecycle;
 pub(crate) mod source_location_coverage;
 pub mod track_identity_candidates;

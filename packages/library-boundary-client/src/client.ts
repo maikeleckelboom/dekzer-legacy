@@ -31,6 +31,8 @@ import type {
   ReadSourceLifecycleRequest,
   ReadSourceMaintenanceReply,
   ReadSourceMaintenanceRequest,
+  SearchFilterReadReply,
+  SearchFilterReadRequest,
   ReadLocalRootsReply,
   ReadLocalRootsRequest,
   ReadNavigationNodeLibraryBrowserWindowReply,
@@ -380,6 +382,20 @@ export class LibraryBoundaryClient {
       },
       'snapshotRead',
       'contents'
+    )
+  }
+
+  readSearchFilter(request: SearchFilterReadRequest): Promise<SearchFilterReadReply> {
+    return this.sendAndExpect(
+      {
+        type: 'snapshotRead',
+        payload: {
+          type: 'searchFilterRead',
+          payload: request
+        }
+      },
+      'snapshotRead',
+      'searchFilter'
     )
   }
 

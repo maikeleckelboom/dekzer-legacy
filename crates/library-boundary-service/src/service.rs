@@ -25,8 +25,9 @@ use crate::snapshot_read_protocol::{
     map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
     map_read_source_attachment_summary_reply, map_read_source_file_attachment_reply,
     map_read_source_lifecycle_reply, map_read_track_identity_review_candidates_reply,
-    map_search_navigation_node_library_browser_window_reply, store_contents_policy,
-    store_contents_scope, store_contents_scope_depth, store_library_tree_entry_point,
+    map_search_filter_read_reply, map_search_navigation_node_library_browser_window_reply,
+    store_contents_policy, store_contents_scope, store_contents_scope_depth,
+    store_library_tree_entry_point, store_search_filter_request,
     store_track_identity_review_state_filter,
 };
 use crate::source_file_hash_protocol::{
@@ -651,6 +652,32 @@ impl LibraryBoundaryService {
         map_read_contents_reply(result).map_err(map_store_error)
     }
 
+    pub fn read_search_filter(
+        &self,
+        request: protocol::SearchFilterReadRequest,
+    ) -> protocol::ProtocolResult<protocol::SearchFilterReadReply> {
+        validate_search_filter_scope(&request.scope)?;
+        let limit = request.limit.unwrap_or(100);
+        validate_search_filter_limit(limit)?;
+        if matches!(request.sort, protocol::SearchFilterSort::Relevance)
+            && request
+                .text_query
+                .as_deref()
+                .map(str::trim)
+                .unwrap_or_default()
+                .is_empty()
+        {
+            return Err(protocol::ProtocolError::InvalidRequest {
+                detail: "searchFilterRead relevance sort requires a textQuery".to_string(),
+            });
+        }
+        let result = self
+            .durable_store
+            .read_search_filter(store_search_filter_request(request, limit))
+            .map_err(map_store_error)?;
+        map_search_filter_read_reply(result).map_err(map_store_error)
+    }
+
     pub fn read_library_asset_waveform_overview(
         &self,
         request: protocol::ReadLibraryAssetWaveformOverviewRequest,
@@ -714,6 +741,9 @@ impl LibraryBoundaryService {
                 source_id,
                 SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT,
             )
+            .map_err(map_store_error)?;
+        self.durable_store
+            .rebuild_search_filter_index_for_source(source_id)
             .map_err(map_store_error)?;
         self.publish_maintained_snapshot_invalidations()?;
         Ok(map_hash_source_files_blake3_reply(result, None))
@@ -951,6 +981,10 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ContentsRead(request) => self
                 .read_contents(request)
                 .map(protocol::SnapshotReadReply::Contents),
+            protocol::SnapshotReadCommand::SearchFilterRead(request) => self
+                .read_search_filter(request)
+                .map(Box::new)
+                .map(protocol::SnapshotReadReply::SearchFilter),
             protocol::SnapshotReadCommand::ReadLibraryAssetWaveformOverview(request) => self
                 .read_library_asset_waveform_overview(request)
                 .map(protocol::SnapshotReadReply::LibraryAssetWaveformOverview),
@@ -1346,6 +1380,39 @@ fn validate_contents_limit(limit: usize) -> protocol::ProtocolResult<()> {
     }
 }
 
+fn validate_search_filter_scope(
+    scope: &protocol::SearchFilterScope,
+) -> protocol::ProtocolResult<()> {
+    match scope {
+        protocol::SearchFilterScope::Library => {}
+        protocol::SearchFilterScope::Source { source_id } => {
+            require_positive_i64(*source_id, "searchFilter sourceId")?;
+        }
+        protocol::SearchFilterScope::SourceLocation { source_location_id } => {
+            require_positive_i64(*source_location_id, "searchFilter sourceLocationId")?;
+        }
+        protocol::SearchFilterScope::Directory {
+            source_id,
+            source_directory_id,
+        } => {
+            require_positive_i64(*source_id, "searchFilter sourceId")?;
+            require_positive_i64(*source_directory_id, "searchFilter sourceDirectoryId")?;
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_search_filter_limit(limit: usize) -> protocol::ProtocolResult<()> {
+    if (1..=200).contains(&limit) {
+        Ok(())
+    } else {
+        Err(protocol::ProtocolError::InvalidRequest {
+            detail: "searchFilter limit must be between 1 and 200".to_string(),
+        })
+    }
+}
+
 fn validate_attachment_source_files_limit(limit: usize) -> protocol::ProtocolResult<()> {
     if (1..=200).contains(&limit) {
         Ok(())
@@ -1408,10 +1475,13 @@ mod tests {
         ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
         ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
         RejectTrackIdentityCandidateRequest, RenamePlaylistReply, RenamePlaylistRequest,
-        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SnapshotReadCommand,
-        SnapshotReadReply, SourceFileAttachmentLinkStatus, SourceFileHashCommand,
-        SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
-        StartRootScanRequest, TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
+        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SearchFilterFileClass,
+        SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
+        SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
+        SearchFilterState, SnapshotReadCommand, SnapshotReadReply, SourceFileAttachmentLinkStatus,
+        SourceFileHashCommand, SourceFileHashReply, SourceMaintenanceCommand,
+        SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
+        TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
         TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
         TrackIdentityReviewReadStatus, TrackIdentityReviewState,
@@ -1675,6 +1745,85 @@ mod tests {
         assert!(audio.has_policy_omitted_rows);
     }
 
+    #[test]
+    fn search_filter_snapshot_read_uses_backend_index_rows() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir.path().join("search-filter-root");
+        let set_dir = source_root.join("sets");
+        std::fs::create_dir_all(&set_dir).expect("create source root");
+        std::fs::write(
+            set_dir.join("Amen Break.wav"),
+            tiny_wav_bytes(44_100, 2, 16, 128),
+        )
+        .expect("write audio file");
+        std::fs::write(set_dir.join("cover.jpg"), b"cover").expect("write image file");
+
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        let _scan = start_root_scan(&service, registered.root_id);
+        wait_for_scan_completed(&service, registered.root_id);
+
+        let text_reply = expect_search_filter_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::SearchFilterRead(
+                SearchFilterReadRequest {
+                    scope: SearchFilterScope::Source {
+                        source_id: registered.root_id,
+                    },
+                    recursion: SearchFilterRecursion::Recursive,
+                    text_query: Some("amen".to_string()),
+                    target_kinds: vec![SearchFilterResultKind::SourceFile],
+                    filters: SearchFilterSet::default(),
+                    sort: SearchFilterSort::PathName,
+                    limit: Some(10),
+                    cursor: None,
+                },
+            )),
+        )));
+        assert_eq!(text_reply.result.state, SearchFilterState::Ready);
+        assert_eq!(text_reply.result.rows.len(), 1);
+        let row = &text_reply.result.rows[0];
+        assert_eq!(row.result_kind, SearchFilterResultKind::SourceFile);
+        assert_eq!(row.display_label, "Amen Break.wav");
+        assert_eq!(row.file_class, Some(SearchFilterFileClass::Audio));
+        assert_eq!(row.source_id, Some(registered.root_id));
+        assert_eq!(row.authority_layer, "source_file_inventory");
+        assert_eq!(
+            text_reply.result.query_identity.text_query.as_deref(),
+            Some("amen")
+        );
+        assert_eq!(text_reply.result.query_identity.page_size, 10);
+
+        let audio_reply = expect_search_filter_reply(expect_success(service.handle_command(
+            CommandRequest::SnapshotRead(SnapshotReadCommand::SearchFilterRead(
+                SearchFilterReadRequest {
+                    scope: SearchFilterScope::Source {
+                        source_id: registered.root_id,
+                    },
+                    recursion: SearchFilterRecursion::Recursive,
+                    text_query: None,
+                    target_kinds: vec![SearchFilterResultKind::SourceFile],
+                    filters: SearchFilterSet {
+                        file_classes: vec![SearchFilterFileClass::Audio],
+                        ..SearchFilterSet::default()
+                    },
+                    sort: SearchFilterSort::PathName,
+                    limit: Some(10),
+                    cursor: None,
+                },
+            )),
+        )));
+        assert_eq!(audio_reply.result.state, SearchFilterState::Ready);
+        assert_eq!(
+            audio_reply
+                .result
+                .rows
+                .iter()
+                .map(|row| row.display_label.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Amen Break.wav"]
+        );
+    }
+
     fn expect_success(outcome: CommandOutcome) -> CommandReply {
         match outcome {
             CommandOutcome::Success(envelope) => envelope.reply,
@@ -1821,6 +1970,13 @@ mod tests {
         match reply {
             CommandReply::SnapshotRead(SnapshotReadReply::NavigationRowByStableKey(reply)) => reply,
             other => panic!("expected load navigation row by stable key reply, got {other:?}"),
+        }
+    }
+
+    fn expect_search_filter_reply(reply: CommandReply) -> SearchFilterReadReply {
+        match reply {
+            CommandReply::SnapshotRead(SnapshotReadReply::SearchFilter(reply)) => *reply,
+            other => panic!("expected search filter reply, got {other:?}"),
         }
     }
 

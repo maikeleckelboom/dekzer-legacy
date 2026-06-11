@@ -754,6 +754,86 @@ CREATE INDEX source_file_attachment_links_source_file
 CREATE INDEX source_file_attachment_links_attachment
     ON source_file_attachment_links (attachment_id);
 
+CREATE TABLE search_filter_index_metadata
+(
+    search_filter_index_id INTEGER PRIMARY KEY CHECK (search_filter_index_id = 1),
+    indexer_version        TEXT    NOT NULL CHECK (indexer_version = 'search_filter_v0'),
+    generation             INTEGER NOT NULL CHECK (generation >= 0),
+    state                  TEXT    NOT NULL CHECK (state IN ('ready', 'rebuilding', 'partial')),
+    updated_at             INTEGER NOT NULL
+) STRICT;
+
+CREATE TABLE search_filter_index_rows
+(
+    row_id                       INTEGER PRIMARY KEY,
+    generation                   INTEGER NOT NULL CHECK (generation >= 0),
+    result_kind                  TEXT    NOT NULL
+        CHECK (result_kind IN ('source', 'source_location', 'directory', 'source_file')),
+    authority_layer              TEXT    NOT NULL
+        CHECK (authority_layer IN ('source', 'source_location', 'source_hierarchy', 'source_file_inventory')),
+    stable_key                   TEXT    NOT NULL UNIQUE CHECK (length(trim(stable_key)) > 0),
+    source_id                    INTEGER REFERENCES sources (source_id) ON DELETE CASCADE,
+    source_location_id           INTEGER REFERENCES source_locations (source_location_id) ON DELETE CASCADE,
+    source_directory_id          INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
+    parent_source_directory_id   INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
+    source_file_id               INTEGER REFERENCES source_files (source_file_id) ON DELETE CASCADE,
+    display_label                TEXT    NOT NULL CHECK (length(trim(display_label)) > 0),
+    display_path                 TEXT,
+    relative_path                TEXT,
+    sort_key                     TEXT    NOT NULL,
+    file_class                   TEXT
+        CHECK (file_class IS NULL OR file_class IN ('audio', 'video', 'image', 'unsupported', 'none')),
+    file_kind                    TEXT
+        CHECK (file_kind IS NULL OR file_kind IN ('audio', 'video', 'image', 'cue_sheet', 'log_doc', 'text_doc', 'archive', 'other', 'unknown')),
+    media_relevance              TEXT
+        CHECK (media_relevance IS NULL OR media_relevance IN ('audio_workflow', 'playable_media', 'explicit_inventory', 'companion_file', 'not_media_relevant')),
+    presence_state               TEXT
+        CHECK (presence_state IS NULL OR presence_state IN ('present', 'missing', 'removed')),
+    source_access_state          TEXT
+        CHECK (source_access_state IS NULL OR source_access_state IN ('accessible', 'missing', 'blocked', 'unknown')),
+    source_scan_phase            TEXT
+        CHECK (source_scan_phase IS NULL OR source_scan_phase IN ('idle', 'scanning', 'complete', 'partial', 'blocked', 'failed')),
+    has_current_blake3           INTEGER NOT NULL DEFAULT 0 CHECK (has_current_blake3 IN (0, 1)),
+    has_current_probe            INTEGER NOT NULL DEFAULT 0 CHECK (has_current_probe IN (0, 1)),
+    attachment_link_state        TEXT    NOT NULL DEFAULT 'not_applicable'
+        CHECK (attachment_link_state IN ('current', 'stale', 'missing', 'not_applicable')),
+    attachment_id                INTEGER REFERENCES content_attachments (attachment_id) ON DELETE SET NULL,
+    content_hash_algorithm       TEXT CHECK (content_hash_algorithm IS NULL OR content_hash_algorithm = 'blake3'),
+    content_hash_value           TEXT,
+    evidence_coverage_state      TEXT    NOT NULL CHECK (evidence_coverage_state IN ('indexed', 'not_applicable')),
+    updated_at                   INTEGER NOT NULL,
+    CHECK (
+        (result_kind = 'source' AND source_id IS NOT NULL AND source_location_id IS NULL AND source_directory_id IS NULL AND source_file_id IS NULL)
+            OR (result_kind = 'source_location' AND source_id IS NOT NULL AND source_location_id IS NOT NULL AND source_directory_id IS NULL AND source_file_id IS NULL)
+            OR (result_kind = 'directory' AND source_id IS NOT NULL AND source_location_id IS NULL AND source_directory_id IS NOT NULL AND source_file_id IS NULL)
+            OR (result_kind = 'source_file' AND source_id IS NOT NULL AND source_location_id IS NULL AND source_file_id IS NOT NULL)
+    )
+) STRICT;
+
+CREATE INDEX search_filter_index_rows_source
+    ON search_filter_index_rows (source_id, result_kind, sort_key, stable_key);
+
+CREATE INDEX search_filter_index_rows_directory_scope
+    ON search_filter_index_rows (source_id, parent_source_directory_id, result_kind, sort_key, stable_key);
+
+CREATE INDEX search_filter_index_rows_filters
+    ON search_filter_index_rows (
+        result_kind,
+        file_class,
+        file_kind,
+        presence_state,
+        source_access_state,
+        has_current_blake3,
+        has_current_probe,
+        attachment_link_state
+    );
+
+CREATE VIRTUAL TABLE search_filter_index_fts USING fts5(
+    display_label,
+    display_path,
+    tokenize = 'unicode61 remove_diacritics 1'
+);
+
 CREATE TABLE primary_media_candidates
 (
     primary_media_candidate_id  INTEGER PRIMARY KEY,

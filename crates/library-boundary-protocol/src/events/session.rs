@@ -47,7 +47,8 @@ impl MaintainedSnapshotScope {
             }
             SnapshotReadCommand::ReadSourceFileAttachment(_)
             | SnapshotReadCommand::ReadAttachmentSourceFiles(_)
-            | SnapshotReadCommand::ReadSourceAttachmentSummary(_) => None,
+            | SnapshotReadCommand::ReadSourceAttachmentSummary(_)
+            | SnapshotReadCommand::SearchFilterRead(_) => None,
         }
     }
 }

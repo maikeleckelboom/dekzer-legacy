@@ -88,6 +88,14 @@ pub use read_models::observed_file_facts::{
     StoreContentHashEvidence, StoreObservedFileFactStatus, StoreObservedFileFacts,
     read_observed_file_facts_for_source_file,
 };
+pub use read_models::search_filter::{
+    RebuildSearchFilterIndexForSourceResult, StoreSearchAccessState,
+    StoreSearchAttachmentLinkState, StoreSearchEvidenceAvailability, StoreSearchFileClass,
+    StoreSearchFileKind, StoreSearchFilters, StoreSearchMediaRelevance, StoreSearchPresenceState,
+    StoreSearchQueryIdentity, StoreSearchRecursion, StoreSearchRequest, StoreSearchResult,
+    StoreSearchResultKind, StoreSearchResultRow, StoreSearchScope, StoreSearchSort,
+    StoreSearchState,
+};
 pub use read_models::source_lifecycle::StoreSourceLifecycle;
 pub use read_models::track_identity_candidates::{
     StoreTrackIdentityCandidate, StoreTrackIdentityCandidateEvidence,

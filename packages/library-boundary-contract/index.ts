@@ -61,7 +61,7 @@ export type RejectTrackIdentityCandidateRequest = { candidateId: string, reason?
 
 export type DeferTrackIdentityCandidateRequest = { candidateId: string, reason?: string, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -100,6 +100,28 @@ export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: s
 export type SearchNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, query: string, offset: number, limit: number, };
 
 export type ContentsReadRequest = { scope: ContentsScope, policy: ContentsReadPolicy, scopeDepth: ContentsScopeDepth, limit?: number, cursor?: string, };
+
+export type SearchFilterReadRequest = { scope: SearchFilterScope, recursion: SearchFilterRecursion, textQuery?: string, targetKinds?: Array<SearchFilterResultKind>, filters: SearchFilterSet, sort: SearchFilterSort, limit?: number, cursor?: string, };
+
+export type SearchFilterScope = { "type": "library" } | { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
+
+export type SearchFilterRecursion = "immediate" | "recursive";
+
+export type SearchFilterSort = "pathName" | "relevance";
+
+export type SearchFilterResultKind = "source" | "sourceLocation" | "directory" | "sourceFile";
+
+export type SearchFilterSet = { fileClasses?: Array<SearchFilterFileClass>, fileKinds?: Array<ContentsFileKind>, mediaRelevance?: Array<SearchFilterMediaRelevance>, presenceStates?: Array<ContentsPresenceState>, sourceAccessStates?: Array<SearchFilterSourceAccessState>, blake3?: SearchFilterEvidenceAvailability, probe?: SearchFilterEvidenceAvailability, attachmentLinkStates?: Array<SearchFilterAttachmentLinkState>, };
+
+export type SearchFilterFileClass = "audio" | "video" | "image" | "unsupported" | "none";
+
+export type SearchFilterSourceAccessState = "accessible" | "missing" | "blocked" | "unknown";
+
+export type SearchFilterEvidenceAvailability = "hasCurrent" | "missingCurrent";
+
+export type SearchFilterAttachmentLinkState = "current" | "stale" | "missing";
+
+export type SearchFilterMediaRelevance = "audioWorkflow" | "playableMedia" | "explicitInventory" | "companionFile" | "notMediaRelevant";
 
 export type ContentsScope = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
 
@@ -192,7 +214,7 @@ export type TrackIdentityEffectiveDecisionPrecedence = "user" | "system" | "none
 
 export type TrackIdentityUserBlockingDecisionState = "none" | "rejected" | "deferred";
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -235,6 +257,8 @@ export type ReadNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrows
 export type SearchNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
 
 export type ContentsReadReply = { result: ContentsResult, };
+
+export type SearchFilterReadReply = { result: SearchFilterResult, };
 
 export type ReadLibraryAssetWaveformOverviewReply = { overview: LibraryAssetWaveformOverview | null, };
 
@@ -283,6 +307,14 @@ export type SourceFileAttachmentLinkStatus = "current" | "stale";
 export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
 
 export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, scopeDepth: ContentsScopeDepth, rows: Array<ContentsFileRow>, scopeCoverage: ContentsScopeCoverage, hasPolicyOmittedRows: boolean, nextCursor?: string, detail?: string, };
+
+export type SearchFilterResult = { state: SearchFilterState, queryIdentity: SearchFilterQueryIdentity, indexGeneration: string, indexState: string, rows: Array<SearchFilterResultRow>, nextCursor?: string, detail?: string, };
+
+export type SearchFilterState = "ready" | "empty" | "cursorInvalid" | "unsupported";
+
+export type SearchFilterQueryIdentity = { scope: SearchFilterScope, recursion: SearchFilterRecursion, textQuery?: string, targetKinds: Array<SearchFilterResultKind>, filters: SearchFilterSet, sort: SearchFilterSort, pageSize: number, indexGeneration: string, };
+
+export type SearchFilterResultRow = { resultKind: SearchFilterResultKind, authorityLayer: string, stableKey: string, sourceId: string | null, sourceLocationId: string | null, sourceDirectoryId: string | null, parentSourceDirectoryId: string | null, sourceFileId: string | null, displayLabel: string, displayPath?: string, relativePath?: string, fileClass?: SearchFilterFileClass, fileKind?: ContentsFileKind, mediaRelevance?: SearchFilterMediaRelevance, presenceState?: ContentsPresenceState, sourceAccessState?: SearchFilterSourceAccessState, sourceScanPhase?: SourceScanPhase, hasCurrentBlake3: boolean, hasCurrentProbe: boolean, attachmentLinkState: string, attachmentId: string | null, contentHashAlgorithm?: string, contentHashValue?: string, evidenceCoverageState: string, matchReason: string, updatedAtMs: number, };
 
 export type ContentsState = "ready" | "empty" | "partial" | "sourceUnavailable" | "locationMissing" | "blocked" | "failed" | "policyConflict" | "cursorInvalid";
 

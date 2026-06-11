@@ -382,6 +382,9 @@ impl SourceMaintenanceController {
         publish_maintained_snapshot_invalidations(store, events)?;
 
         if self.stop_requested.load(Ordering::Acquire) {
+            store
+                .rebuild_search_filter_index_for_source(input.source_id)
+                .map_err(crate::service::map_store_error)?;
             run.stopped = true;
             run.status = protocol::SourceMaintenanceRunStatus::Partial;
             return Ok(run);
@@ -405,6 +408,9 @@ impl SourceMaintenanceController {
         };
         run.remaining_probe_candidates = probe_result.remaining_candidates;
         publish_maintained_snapshot_invalidations(store, events)?;
+        store
+            .rebuild_search_filter_index_for_source(input.source_id)
+            .map_err(crate::service::map_store_error)?;
 
         if self.stop_requested.load(Ordering::Acquire) {
             run.stopped = true;

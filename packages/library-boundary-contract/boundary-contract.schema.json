@@ -4124,6 +4124,551 @@
         }
       ]
     },
+    "SearchFilterAttachmentLinkState": {
+      "type": "string",
+      "enum": [
+        "current",
+        "stale",
+        "missing"
+      ]
+    },
+    "SearchFilterEvidenceAvailability": {
+      "type": "string",
+      "enum": [
+        "hasCurrent",
+        "missingCurrent"
+      ]
+    },
+    "SearchFilterFileClass": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video",
+        "image",
+        "unsupported",
+        "none"
+      ]
+    },
+    "SearchFilterMediaRelevance": {
+      "type": "string",
+      "enum": [
+        "audioWorkflow",
+        "playableMedia",
+        "explicitInventory",
+        "companionFile",
+        "notMediaRelevant"
+      ]
+    },
+    "SearchFilterQueryIdentity": {
+      "type": "object",
+      "properties": {
+        "filters": {
+          "$ref": "#/$defs/SearchFilterSet"
+        },
+        "indexGeneration": {
+          "type": "string"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "recursion": {
+          "$ref": "#/$defs/SearchFilterRecursion"
+        },
+        "scope": {
+          "$ref": "#/$defs/SearchFilterScope"
+        },
+        "sort": {
+          "$ref": "#/$defs/SearchFilterSort"
+        },
+        "targetKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchFilterResultKind"
+          }
+        },
+        "textQuery": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "scope",
+        "recursion",
+        "targetKinds",
+        "filters",
+        "sort",
+        "pageSize",
+        "indexGeneration"
+      ]
+    },
+    "SearchFilterReadReply": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "$ref": "#/$defs/SearchFilterResult"
+        }
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "SearchFilterReadRequest": {
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filters": {
+          "$ref": "#/$defs/SearchFilterSet",
+          "default": {}
+        },
+        "limit": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "recursion": {
+          "$ref": "#/$defs/SearchFilterRecursion"
+        },
+        "scope": {
+          "$ref": "#/$defs/SearchFilterScope"
+        },
+        "sort": {
+          "$ref": "#/$defs/SearchFilterSort"
+        },
+        "targetKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchFilterResultKind"
+          }
+        },
+        "textQuery": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "scope",
+        "recursion",
+        "sort"
+      ]
+    },
+    "SearchFilterRecursion": {
+      "type": "string",
+      "enum": [
+        "immediate",
+        "recursive"
+      ]
+    },
+    "SearchFilterResult": {
+      "type": "object",
+      "properties": {
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "indexGeneration": {
+          "type": "string"
+        },
+        "indexState": {
+          "type": "string"
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "queryIdentity": {
+          "$ref": "#/$defs/SearchFilterQueryIdentity"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchFilterResultRow"
+          }
+        },
+        "state": {
+          "$ref": "#/$defs/SearchFilterState"
+        }
+      },
+      "required": [
+        "state",
+        "queryIdentity",
+        "indexGeneration",
+        "indexState",
+        "rows"
+      ]
+    },
+    "SearchFilterResultKind": {
+      "type": "string",
+      "enum": [
+        "source",
+        "sourceLocation",
+        "directory",
+        "sourceFile"
+      ]
+    },
+    "SearchFilterResultRow": {
+      "type": "object",
+      "properties": {
+        "attachmentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "attachmentLinkState": {
+          "type": "string"
+        },
+        "authorityLayer": {
+          "type": "string"
+        },
+        "contentHashAlgorithm": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contentHashValue": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "displayLabel": {
+          "type": "string"
+        },
+        "displayPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidenceCoverageState": {
+          "type": "string"
+        },
+        "fileClass": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchFilterFileClass"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fileKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentsFileKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "hasCurrentBlake3": {
+          "type": "boolean"
+        },
+        "hasCurrentProbe": {
+          "type": "boolean"
+        },
+        "matchReason": {
+          "type": "string"
+        },
+        "mediaRelevance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchFilterMediaRelevance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parentSourceDirectoryId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "presenceState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentsPresenceState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "relativePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resultKind": {
+          "$ref": "#/$defs/SearchFilterResultKind"
+        },
+        "sourceAccessState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchFilterSourceAccessState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceDirectoryId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceFileId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceLocationId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceScanPhase": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceScanPhase"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stableKey": {
+          "type": "string"
+        },
+        "updatedAtMs": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "resultKind",
+        "authorityLayer",
+        "stableKey",
+        "displayLabel",
+        "hasCurrentBlake3",
+        "hasCurrentProbe",
+        "attachmentLinkState",
+        "evidenceCoverageState",
+        "matchReason",
+        "updatedAtMs"
+      ]
+    },
+    "SearchFilterScope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "library"
+            }
+          },
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "type": "object",
+              "properties": {
+                "sourceId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sourceId"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "source"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "type": "object",
+              "properties": {
+                "sourceLocationId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sourceLocationId"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "sourceLocation"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "type": "object",
+              "properties": {
+                "sourceDirectoryId": {
+                  "type": "string"
+                },
+                "sourceId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sourceId",
+                "sourceDirectoryId"
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "directory"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "SearchFilterSet": {
+      "type": "object",
+      "properties": {
+        "attachmentLinkStates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchFilterAttachmentLinkState"
+          }
+        },
+        "blake3": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchFilterEvidenceAvailability"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fileClasses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchFilterFileClass"
+          }
+        },
+        "fileKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentsFileKind"
+          }
+        },
+        "mediaRelevance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchFilterMediaRelevance"
+          }
+        },
+        "presenceStates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentsPresenceState"
+          }
+        },
+        "probe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchFilterEvidenceAvailability"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceAccessStates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SearchFilterSourceAccessState"
+          }
+        }
+      }
+    },
+    "SearchFilterSort": {
+      "type": "string",
+      "enum": [
+        "pathName",
+        "relevance"
+      ]
+    },
+    "SearchFilterSourceAccessState": {
+      "type": "string",
+      "enum": [
+        "accessible",
+        "missing",
+        "blocked",
+        "unknown"
+      ]
+    },
+    "SearchFilterState": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "empty",
+        "cursorInvalid",
+        "unsupported"
+      ]
+    },
     "SearchNavigationNodeLibraryBrowserWindowReply": {
       "type": "object",
       "properties": {
@@ -4380,6 +4925,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/SearchFilterReadRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "searchFilterRead"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadLibraryAssetWaveformOverviewRequest"
             },
             "type": {
@@ -4613,6 +5174,22 @@
             "type": {
               "type": "string",
               "const": "contents"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SearchFilterReadReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "searchFilter"
             }
           },
           "required": [

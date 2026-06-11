@@ -71,6 +71,17 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterReadRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterScope>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterRecursion>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterSort>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterResultKind>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterSet>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterFileClass>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterSourceAccessState>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterEvidenceAvailability>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterAttachmentLinkState>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterMediaRelevance>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsScope>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadPolicy>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileClass>(&cfg, &mut output);
@@ -129,6 +140,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
     push_ts_decl::<crate::SearchNavigationNodeLibraryBrowserWindowReply>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadReply>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterReadReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetWaveformOverviewReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryAssetPreparationDetailReply>(&cfg, &mut output);
     push_ts_decl::<crate::NavigationRow>(&cfg, &mut output);
@@ -153,6 +165,10 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SourceFileAttachmentLinkStatus>(&cfg, &mut output);
     push_ts_decl::<crate::SourceAttachmentSummary>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsResult>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterResult>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterState>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterQueryIdentity>(&cfg, &mut output);
+    push_ts_decl::<crate::SearchFilterResultRow>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsState>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsScopeCoverage>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsScopeCoverageState>(&cfg, &mut output);
