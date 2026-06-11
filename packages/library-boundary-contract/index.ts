@@ -312,7 +312,7 @@ export type SourceIntegrityAvailability = { state: SourceIntegrityAvailabilitySt
 
 export type SourceIntegrityAvailabilityState = "notFound" | "mounted" | "unavailable" | "missing" | "blocked" | "partial" | "unknown";
 
-export type SourceIntegrityCoverage = { state: ContentsScopeCoverageState, subtreeCoverageComplete: boolean, emptyResultAuthoritative: boolean, totalDirectoriesCount: number, pendingDirectoriesCount: number, scanningDirectoriesCount: number, blockedDirectoriesCount: number, failedDirectoriesCount: number, };
+export type SourceIntegrityCoverage = { state: ContentsScopeCoverageState, subtreeCoverageComplete: boolean, emptyResultAuthoritative: boolean, totalDirectoriesCount: number, missingDirectoriesCount: number, pendingDirectoriesCount: number, scanningDirectoriesCount: number, blockedDirectoriesCount: number, failedDirectoriesCount: number, };
 
 export type SourceIntegrityInventory = { countsByPresenceState: Array<SourceIntegrityPresenceCount>, countsByFileClass: Array<SourceIntegrityFileClassCount>, countsByFileKind: Array<SourceIntegrityFileKindCount>, mediaRelevantFilesCount: number, presentMediaRelevantFilesCount: number, };
 

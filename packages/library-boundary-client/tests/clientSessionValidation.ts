@@ -572,6 +572,7 @@ async function validatesSourceIntegrityReadRequestAndReply(): Promise<void> {
             subtreeCoverageComplete: true,
             emptyResultAuthoritative: true,
             totalDirectoriesCount: 1,
+            missingDirectoriesCount: 0,
             pendingDirectoriesCount: 0,
             scanningDirectoriesCount: 0,
             blockedDirectoriesCount: 0,

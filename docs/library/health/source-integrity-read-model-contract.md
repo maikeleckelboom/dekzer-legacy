@@ -66,6 +66,21 @@ Evidence backlog and runtime maintenance state remain source maintenance snapsho
 
 This read may aggregate these facts, but must not duplicate their semantics or make a second durable state model.
 
+## Coverage Count Semantics
+
+`coverageIntegrity.totalDirectoriesCount` counts source directory rows that participate in source integrity coverage:
+present rows plus known missing rows. `coverageIntegrity.missingDirectoriesCount` counts known directory rows where
+`source_directories.presence_state = 'missing'`.
+
+Known missing descendant directories make whole-source coverage `incomplete` and make
+`emptyResultAuthoritative = false`, unless source/root-level lifecycle evidence already produces
+`sourceUnavailable` or `locationMissing`. Blocked, failed, scanning, and pending directory coverage keep their existing
+precedence over descendant missing-directory coverage.
+
+Removed directory rows are not counted in Source Integrity V0 coverage. Current substrate contracts establish missing
+directories as successful absence observations for coverage, but do not yet prove that removed directory rows participate
+in health coverage.
+
 ## Collection Aggregate
 
 No collection-level aggregate is introduced in V0. A correct aggregate would be only a pure rollup over source-scoped

@@ -1519,7 +1519,8 @@ mod tests {
     use library_store_sqlite::{
         LibraryStoreContext, ReadSourceFileBlake3HashCandidatesInput,
         RecordSourceFileObservationInput, SourceFileBlake3HashAdmissionScope, StoreEnvironment,
-        UpsertSourceInput, UpsertSourceScanStateInput, UpsertSourceStateInput, durable_store_path,
+        UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceScanStateInput,
+        UpsertSourceStateInput, durable_store_path,
     };
 
     use crate::source_maintenance::{
@@ -1617,6 +1618,38 @@ mod tests {
                 updated_at: 10 + source_file_id,
             })
             .expect("record source file");
+    }
+
+    fn record_source_directory(
+        service: &LibraryBoundaryService,
+        source_id: i64,
+        source_directory_id: i64,
+        relative_path: &str,
+        presence_state: SourcePresenceState,
+        dir_scan_state: &str,
+    ) {
+        service
+            .durable_store
+            .upsert_source_directory(UpsertSourceDirectoryInput {
+                source_directory_id: Some(source_directory_id),
+                source_id,
+                parent_source_directory_id: None,
+                name: relative_path
+                    .rsplit('/')
+                    .next()
+                    .expect("relative path has directory name")
+                    .to_string(),
+                relative_path: relative_path.to_string(),
+                presence_state,
+                dir_scan_state: Some(dir_scan_state.to_string()),
+                dir_scan_issue_kind: None,
+                dir_scan_error_detail: None,
+                scanned_at: Some(30 + source_directory_id),
+                mtime_ns: Some(source_directory_id),
+                first_created_at: Some(20 + source_directory_id),
+                changed_at: 30 + source_directory_id,
+            })
+            .expect("record source directory");
     }
 
     fn tiny_wav_bytes(
@@ -2909,6 +2942,57 @@ mod tests {
                 .is_empty(),
             "readSourceIntegrity must not run maintenance"
         );
+    }
+
+    #[test]
+    fn source_integrity_read_reports_missing_directory_coverage() {
+        let (tempdir, _context, service) = open_service_with_context();
+        let source_root = tempdir
+            .path()
+            .join("source-integrity-missing-directory-root");
+        std::fs::create_dir_all(&source_root).expect("create source root");
+        let (_json, registered) =
+            register_local_root(&service, source_root.to_string_lossy().into_owned());
+        record_source_directory(
+            &service,
+            registered.root_id,
+            100,
+            "Present",
+            SourcePresenceState::Present,
+            "complete",
+        );
+        record_source_directory(
+            &service,
+            registered.root_id,
+            101,
+            "Missing",
+            SourcePresenceState::Missing,
+            "complete",
+        );
+        service
+            .durable_store
+            .upsert_source_scan_state(UpsertSourceScanStateInput {
+                source_id: registered.root_id,
+                scan_phase: SourceScanPhase::Complete,
+                last_scan_started_at: Some(10),
+                last_scan_finished_at: Some(20),
+                last_successful_scan_at: Some(20),
+                scan_issue_kind: None,
+                error_detail: None,
+                updated_at: 20,
+            })
+            .expect("complete source scan");
+
+        let integrity = read_source_integrity(&service, registered.root_id);
+
+        assert_eq!(
+            integrity.coverage_integrity.state,
+            ContentsScopeCoverageState::Incomplete
+        );
+        assert!(!integrity.coverage_integrity.subtree_coverage_complete);
+        assert!(!integrity.coverage_integrity.empty_result_authoritative);
+        assert_eq!(integrity.coverage_integrity.total_directories_count, 2);
+        assert_eq!(integrity.coverage_integrity.missing_directories_count, 1);
     }
 
     #[test]

@@ -29,6 +29,7 @@ pub struct StoreSourceIntegrityCoverage {
     pub subtree_coverage_complete: bool,
     pub empty_result_authoritative: bool,
     pub total_directories_count: usize,
+    pub missing_directories_count: usize,
     pub pending_directories_count: usize,
     pub scanning_directories_count: usize,
     pub blocked_directories_count: usize,
@@ -53,6 +54,7 @@ pub struct StoreSourceIntegrityCount {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DirectoryCoverageCounts {
     total: usize,
+    missing: usize,
     pending: usize,
     scanning: usize,
     blocked: usize,
@@ -90,6 +92,7 @@ fn read_source_coverage(
             false,
             DirectoryCoverageCounts {
                 total: 0,
+                missing: 0,
                 pending: 0,
                 scanning: 0,
                 blocked: 0,
@@ -146,22 +149,23 @@ fn read_directory_coverage_counts(
 ) -> LibrarySqliteResult<DirectoryCoverageCounts> {
     connection
         .query_row(
-            "SELECT COUNT(*),
-                    SUM(CASE WHEN dir_scan_state = 'pending' THEN 1 ELSE 0 END),
-                    SUM(CASE WHEN dir_scan_state = 'scanning' THEN 1 ELSE 0 END),
-                    SUM(CASE WHEN dir_scan_state = 'blocked' THEN 1 ELSE 0 END),
-                    SUM(CASE WHEN dir_scan_state = 'failed' THEN 1 ELSE 0 END)
+            "SELECT SUM(CASE WHEN presence_state IN ('present', 'missing') THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN presence_state = 'missing' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN presence_state = 'present' AND dir_scan_state = 'pending' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN presence_state = 'present' AND dir_scan_state = 'scanning' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN presence_state = 'present' AND dir_scan_state = 'blocked' THEN 1 ELSE 0 END),
+                    SUM(CASE WHEN presence_state = 'present' AND dir_scan_state = 'failed' THEN 1 ELSE 0 END)
              FROM source_directories
-             WHERE source_id = ?1
-               AND presence_state = 'present'",
+             WHERE source_id = ?1",
             [source_id],
             |row| {
                 Ok(DirectoryCoverageCounts {
-                    total: read_count(row, 0)?,
-                    pending: read_optional_count(row, 1)?,
-                    scanning: read_optional_count(row, 2)?,
-                    blocked: read_optional_count(row, 3)?,
-                    failed: read_optional_count(row, 4)?,
+                    total: read_optional_count(row, 0)?,
+                    missing: read_optional_count(row, 1)?,
+                    pending: read_optional_count(row, 2)?,
+                    scanning: read_optional_count(row, 3)?,
+                    blocked: read_optional_count(row, 4)?,
+                    failed: read_optional_count(row, 5)?,
                 })
             },
         )
@@ -190,6 +194,9 @@ fn source_coverage_from_counts(
     }
     if counts.pending > 0 {
         return source_coverage(StoreSourceIntegrityCoverageState::Pending, false, counts);
+    }
+    if counts.missing > 0 {
+        return source_coverage(StoreSourceIntegrityCoverageState::Incomplete, false, counts);
     }
 
     match lifecycle.scan_phase.as_str() {
@@ -220,6 +227,7 @@ fn source_coverage(
         empty_result_authoritative: state == StoreSourceIntegrityCoverageState::Complete
             && subtree_coverage_complete,
         total_directories_count: counts.total,
+        missing_directories_count: counts.missing,
         pending_directories_count: counts.pending,
         scanning_directories_count: counts.scanning,
         blocked_directories_count: counts.blocked,
@@ -386,15 +394,45 @@ mod tests {
         relative_path: &str,
         scan_state: &str,
     ) {
+        insert_directory_with_presence(
+            connection,
+            directory_id,
+            source_id,
+            relative_path,
+            "present",
+            scan_state,
+        );
+    }
+
+    fn insert_directory_with_presence(
+        connection: &Connection,
+        directory_id: i64,
+        source_id: i64,
+        relative_path: &str,
+        presence_state: &str,
+        scan_state: &str,
+    ) {
+        let issue_kind = match scan_state {
+            "blocked" => Some("permission_denied"),
+            "failed" => Some("unknown_io"),
+            _ => None,
+        };
         connection
             .execute(
                 "INSERT INTO source_directories (
                      source_directory_id, source_id, parent_source_directory_id, name,
                      name_browse_sort_key, relative_path, presence_state, dir_scan_state,
-                     dir_scan_updated_at, created_at, updated_at
+                     dir_scan_issue_kind, dir_scan_updated_at, created_at, updated_at
                  )
-                 VALUES (?1, ?2, NULL, ?3, ?3, ?3, 'present', ?4, 1, 1, 1)",
-                params![directory_id, source_id, relative_path, scan_state],
+                 VALUES (?1, ?2, NULL, ?3, ?3, ?3, ?4, ?5, ?6, 1, 1, 1)",
+                params![
+                    directory_id,
+                    source_id,
+                    relative_path,
+                    presence_state,
+                    scan_state,
+                    issue_kind
+                ],
             )
             .expect("insert directory");
     }
@@ -489,6 +527,110 @@ mod tests {
                 .iter()
                 .any(|count| count.value == "missing" && count.count == 1)
         );
+    }
+
+    #[test]
+    fn missing_directory_only_makes_complete_source_non_authoritative() {
+        let connection = test_connection();
+        insert_source(&connection, 7, "complete");
+        insert_directory_with_presence(&connection, 70, 7, "Missing", "missing", "complete");
+
+        let read = read_source_integrity(&connection, 7).expect("read source integrity");
+
+        assert_eq!(
+            read.coverage.state,
+            StoreSourceIntegrityCoverageState::Incomplete
+        );
+        assert!(!read.coverage.subtree_coverage_complete);
+        assert!(!read.coverage.empty_result_authoritative);
+        assert_eq!(read.coverage.total_directories_count, 1);
+        assert_eq!(read.coverage.missing_directories_count, 1);
+    }
+
+    #[test]
+    fn missing_directory_with_complete_present_directories_keeps_coverage_incomplete() {
+        let connection = test_connection();
+        insert_source(&connection, 7, "complete");
+        insert_directory(&connection, 70, 7, "Present", "complete");
+        insert_directory_with_presence(&connection, 71, 7, "Missing", "missing", "complete");
+
+        let read = read_source_integrity(&connection, 7).expect("read source integrity");
+
+        assert_eq!(
+            read.coverage.state,
+            StoreSourceIntegrityCoverageState::Incomplete
+        );
+        assert!(!read.coverage.empty_result_authoritative);
+        assert_eq!(read.coverage.total_directories_count, 2);
+        assert_eq!(read.coverage.missing_directories_count, 1);
+    }
+
+    #[test]
+    fn source_level_missing_state_wins_over_descendant_missing_directory() {
+        let connection = test_connection();
+        insert_source(&connection, 7, "complete");
+        insert_directory_with_presence(&connection, 70, 7, "Missing", "missing", "complete");
+        connection
+            .execute(
+                "UPDATE source_state
+                 SET access_state = 'missing',
+                     access_issue_kind = 'missing'
+                 WHERE source_id = 7",
+                [],
+            )
+            .expect("mark source root missing");
+
+        let read = read_source_integrity(&connection, 7).expect("read source integrity");
+
+        assert_eq!(
+            read.coverage.state,
+            StoreSourceIntegrityCoverageState::LocationMissing
+        );
+        assert!(!read.coverage.empty_result_authoritative);
+        assert_eq!(read.coverage.missing_directories_count, 1);
+    }
+
+    #[test]
+    fn unavailable_mount_wins_over_descendant_missing_directory() {
+        let connection = test_connection();
+        insert_source(&connection, 7, "complete");
+        insert_directory_with_presence(&connection, 70, 7, "Missing", "missing", "complete");
+        connection
+            .execute(
+                "UPDATE source_state
+                 SET mount_status = 'unmounted'
+                 WHERE source_id = 7",
+                [],
+            )
+            .expect("mark source unavailable");
+
+        let read = read_source_integrity(&connection, 7).expect("read source integrity");
+
+        assert_eq!(
+            read.coverage.state,
+            StoreSourceIntegrityCoverageState::SourceUnavailable
+        );
+        assert!(!read.coverage.empty_result_authoritative);
+        assert_eq!(read.coverage.missing_directories_count, 1);
+    }
+
+    #[test]
+    fn blocked_and_failed_directory_precedence_wins_over_missing_directory() {
+        for (scan_state, expected) in [
+            ("blocked", StoreSourceIntegrityCoverageState::Blocked),
+            ("failed", StoreSourceIntegrityCoverageState::Failed),
+        ] {
+            let connection = test_connection();
+            insert_source(&connection, 7, "complete");
+            insert_directory(&connection, 70, 7, "Trouble", scan_state);
+            insert_directory_with_presence(&connection, 71, 7, "Missing", "missing", "complete");
+
+            let read = read_source_integrity(&connection, 7).expect("read source integrity");
+
+            assert_eq!(read.coverage.state, expected, "{scan_state}");
+            assert!(!read.coverage.empty_result_authoritative);
+            assert_eq!(read.coverage.missing_directories_count, 1);
+        }
     }
 
     #[test]

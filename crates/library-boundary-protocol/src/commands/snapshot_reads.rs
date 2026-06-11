@@ -1905,6 +1905,7 @@ pub struct SourceIntegrityCoverage {
     pub subtree_coverage_complete: bool,
     pub empty_result_authoritative: bool,
     pub total_directories_count: usize,
+    pub missing_directories_count: usize,
     pub pending_directories_count: usize,
     pub scanning_directories_count: usize,
     pub blocked_directories_count: usize,
@@ -2633,33 +2634,37 @@ pub enum SnapshotReadReply {
 mod tests {
     use super::{
         AttachmentIdentity, AttachmentIdentityReadStatus, ContentsFileClass, ContentsFileKind,
-        ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeDepth,
-        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
-        LibraryAssetAvailabilityState, LibraryAssetBrowserRow, LibraryAssetPrepReadinessSummary,
-        LibraryAssetPreparationArtifactCoverageState, LibraryAssetPreparationCapabilityKey,
-        LibraryAssetPreparationDetail, LibraryAssetPreparationDetailGroup,
-        LibraryAssetPreparationDetailGroupKey, LibraryAssetPreparationDetailRow,
-        LibraryAssetPreparationOutcomeKind, LibraryAssetPreparationOutcomeState,
-        LibraryAssetPreparationRequirementClass, LibraryAssetPreparationSatisfactionState,
-        LibraryAssetPreparationWorkState, LibraryAssetStemsStateSummary,
-        LibraryAssetWaveformOverview, LibraryAssetWaveformOverviewAmplitudeScale,
-        LibraryAssetWaveformOverviewBucket, LibraryAssetWaveformOverviewCapabilityState,
-        LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint, LibraryTreeFileClass,
-        LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState, LibraryTreeWindow,
-        LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest, NavigableChildScopeState,
-        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
-        PrimaryMediaKind, ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeCoverageState,
+        ContentsScopeDepth, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
+        LibraryAssetPrepReadinessSummary, LibraryAssetPreparationArtifactCoverageState,
+        LibraryAssetPreparationCapabilityKey, LibraryAssetPreparationDetail,
+        LibraryAssetPreparationDetailGroup, LibraryAssetPreparationDetailGroupKey,
+        LibraryAssetPreparationDetailRow, LibraryAssetPreparationOutcomeKind,
+        LibraryAssetPreparationOutcomeState, LibraryAssetPreparationRequirementClass,
+        LibraryAssetPreparationSatisfactionState, LibraryAssetPreparationWorkState,
+        LibraryAssetStemsStateSummary, LibraryAssetWaveformOverview,
+        LibraryAssetWaveformOverviewAmplitudeScale, LibraryAssetWaveformOverviewBucket,
+        LibraryAssetWaveformOverviewCapabilityState, LibraryTreeCoverage, LibraryTreeCoverageState,
+        LibraryTreeEntryPoint, LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind,
+        LibraryTreePresenceState, LibraryTreeWindow, LoadNavigationRowByStableKeyRequest,
+        LoadNavigationRowRequest, NavigableChildScopeState, NavigationRow, NavigationRowFamily,
+        NavigationRowKind, NavigationRowSelectorKind, PrimaryMediaKind,
+        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
         ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
         ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
         ReadNavigationNodeLibraryBrowserWindowReply, ReadNavigationNodeLibraryBrowserWindowRequest,
         ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
-        SearchNavigationNodeLibraryBrowserWindowReply,
+        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceLifecycleReply,
+        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
+        ReadTrackIdentityReviewCandidatesRequest, SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
         SourceAccessState, SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
-        SourceFileAttachmentLinkStatus, SourceLifecycle, SourceLifecycleIssueKind,
+        SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
+        SourceIntegrityAvailabilityState, SourceIntegrityCoverage,
+        SourceIntegrityEvidenceAndMaintenance, SourceIntegrityRuntimeMaintenance,
+        SourceIntegrityRuntimeMaintenanceState, SourceLifecycle, SourceLifecycleIssueKind,
         SourceMountStatus, SourceScanPhase, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityReviewCandidate,
         TrackIdentityReviewCandidateStatus, TrackIdentityReviewDecision,
@@ -2868,6 +2873,54 @@ mod tests {
                 command
             );
         }
+    }
+
+    #[test]
+    fn source_integrity_coverage_exposes_missing_directory_count() {
+        let reply = SnapshotReadReply::SourceIntegrity(Box::new(ReadSourceIntegrityReply {
+            source_id: 7,
+            source_availability: SourceIntegrityAvailability {
+                state: SourceIntegrityAvailabilityState::Mounted,
+                lifecycle: None,
+                source_failure: None,
+            },
+            coverage_integrity: SourceIntegrityCoverage {
+                state: ContentsScopeCoverageState::Incomplete,
+                subtree_coverage_complete: false,
+                empty_result_authoritative: false,
+                total_directories_count: 2,
+                missing_directories_count: 1,
+                pending_directories_count: 0,
+                scanning_directories_count: 0,
+                blocked_directories_count: 0,
+                failed_directories_count: 0,
+            },
+            inventory: None,
+            evidence_and_maintenance: SourceIntegrityEvidenceAndMaintenance {
+                remaining_hash_candidates: 0,
+                remaining_probe_candidates: 0,
+                remaining_primary_media_promotion_candidates: 0,
+                remaining_track_identity_candidate_production_candidates: 0,
+                remaining_track_identity_decision_production_candidates: 0,
+                source_failure: None,
+            },
+            attachment_integrity: None,
+            runtime_maintenance: SourceIntegrityRuntimeMaintenance {
+                state: SourceIntegrityRuntimeMaintenanceState::Idle,
+                last_run: None,
+            },
+        }));
+
+        let json = serde_json::to_value(&reply).expect("serialize source integrity reply");
+        assert_eq!(
+            json["payload"]["coverageIntegrity"]["missingDirectoriesCount"],
+            json!(1)
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(json)
+                .expect("deserialize source integrity reply"),
+            reply
+        );
     }
 
     #[test]

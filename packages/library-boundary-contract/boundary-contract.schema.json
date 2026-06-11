@@ -5618,6 +5618,11 @@
           "format": "uint",
           "minimum": 0
         },
+        "missingDirectoriesCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
         "pendingDirectoriesCount": {
           "type": "integer",
           "format": "uint",
@@ -5645,6 +5650,7 @@
         "subtreeCoverageComplete",
         "emptyResultAuthoritative",
         "totalDirectoriesCount",
+        "missingDirectoriesCount",
         "pendingDirectoriesCount",
         "scanningDirectoriesCount",
         "blockedDirectoriesCount",

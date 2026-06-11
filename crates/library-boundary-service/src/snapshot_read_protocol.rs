@@ -592,6 +592,7 @@ fn map_source_integrity_coverage(
         subtree_coverage_complete: coverage.subtree_coverage_complete,
         empty_result_authoritative: coverage.empty_result_authoritative,
         total_directories_count: coverage.total_directories_count,
+        missing_directories_count: coverage.missing_directories_count,
         pending_directories_count: coverage.pending_directories_count,
         scanning_directories_count: coverage.scanning_directories_count,
         blocked_directories_count: coverage.blocked_directories_count,
