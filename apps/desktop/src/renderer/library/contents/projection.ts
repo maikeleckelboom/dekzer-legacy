@@ -595,9 +595,8 @@ function projectContentsResult(options: {
     }
   }
 
-  const contentRows = nextCursor !== undefined
-    ? [...rows, loadMoreRow(options.ownerId, result, nextCursor)]
-    : rows
+  const contentRows =
+    nextCursor !== undefined ? [...rows, loadMoreRow(options.ownerId, result, nextCursor)] : rows
 
   return {
     kind: contentsProjectionKind(result),

@@ -2,8 +2,7 @@
 import { computed } from 'vue'
 
 import type { BrowserTreeVisibleItem } from './types'
-import type { IconComponent, IconTone } from '../../icons'
-import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
+import { Icon, type IconRole, type IconTone } from '../../icons'
 import { resolveBrowserTreeRowIcon, resolveBrowserTreeStateIcon } from './presentation'
 
 defineOptions({
@@ -30,9 +29,7 @@ const rowStyle = computed(() => ({
 
 const hasAffordance = computed(() => props.item.canRevealChildren)
 
-const rowIcon = computed<IconComponent | undefined>(() =>
-  resolveBrowserTreeRowIcon(props.item.node, props.item.isExpanded)
-)
+const rowIcon = computed<IconRole | undefined>(() => resolveBrowserTreeRowIcon(props.item.node))
 
 const iconTone = computed<IconTone>(() => {
   const icon = props.item.node.icon
@@ -61,7 +58,7 @@ const iconTone = computed<IconTone>(() => {
   }
 })
 
-const childReadinessIcon = computed<IconComponent | undefined>(() =>
+const childReadinessIcon = computed<IconRole | undefined>(() =>
   props.item.childReadinessNode === undefined
     ? undefined
     : resolveBrowserTreeStateIcon(props.item.childReadinessNode.icon)
@@ -112,12 +109,12 @@ const labelClass = computed(() => {
       @click.stop="emit('revealNode')"
       @mousedown.prevent
     >
-      <Icon :icon="item.isExpanded ? DisclosureOpenIcon : DisclosureClosedIcon" size="sm" />
+      <Icon :role="item.isExpanded ? 'disclosure.open' : 'disclosure.closed'" size="sm" />
     </button>
     <span v-else class="grid size-6 shrink-0 place-items-center" aria-hidden="true"> </span>
 
     <span class="grid size-6 shrink-0 place-items-center" aria-hidden="true">
-      <Icon v-if="rowIcon" :icon="rowIcon" size="sm" :tone="iconTone" />
+      <Icon v-if="rowIcon" :role="rowIcon" size="sm" :tone="iconTone" />
     </span>
 
     <span class="min-w-0 flex-1 truncate text-sm font-medium leading-5" :class="labelClass">
@@ -131,7 +128,7 @@ const labelClass = computed(() => {
     >
       <Icon
         v-if="childReadinessIcon"
-        :icon="childReadinessIcon"
+        :role="childReadinessIcon"
         size="xs"
         :tone="childReadinessTone"
       />

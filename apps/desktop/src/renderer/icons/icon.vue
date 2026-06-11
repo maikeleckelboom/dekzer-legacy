@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+import { resolveIconAsset } from './registry'
 import { iconSizeClass, iconToneClass } from './tokens'
 import type { IconProps } from './types'
 
@@ -14,6 +15,7 @@ const resolvedTone = computed(() => props.tone ?? 'inherit')
 const isHidden = computed(() => props.accessibility === 'hidden')
 const sizeClass = computed(() => iconSizeClass[resolvedSize.value])
 const toneClass = computed(() => iconToneClass[resolvedTone.value])
+const iconComponent = computed(() => resolveIconAsset(props.role).component)
 const iconClass = computed(() => {
   const classes = ['app-icon', sizeClass.value, toneClass.value]
   if (props.frame === 'square') {
@@ -25,7 +27,7 @@ const iconClass = computed(() => {
 
 <template>
   <component
-    :is="icon"
+    :is="iconComponent"
     :class="iconClass"
     :aria-hidden="isHidden ? 'true' : undefined"
     :aria-label="isHidden ? undefined : label"

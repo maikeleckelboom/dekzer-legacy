@@ -1,19 +1,5 @@
 <script setup lang="ts">
-import {
-  FileTextIcon,
-  FolderIcon,
-  FolderOpenIcon,
-  Icon,
-  ImageIcon,
-  ListMusicIcon,
-  LoadingIcon,
-  MoreIcon,
-  MusicIcon,
-  StateIcon,
-  VideoIcon,
-  WarningIcon
-} from '../../icons'
-import type { IconComponent, IconTone } from '../../icons'
+import { Icon, type IconRole, type IconTone } from '../../icons'
 import { type ContentProjection, type ContentRow, type ContentRowIcon } from './projection'
 
 defineOptions({
@@ -69,30 +55,30 @@ function formatContentDetail(row: ContentRow): string {
   return ''
 }
 
-function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconComponent | undefined {
+function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconRole | undefined {
   switch (icon) {
     case 'folder':
-      return FolderIcon
+      return 'folder.plain'
     case 'music':
-      return MusicIcon
+      return 'media.audio'
     case 'video':
-      return VideoIcon
+      return 'media.video'
     case 'image':
-      return ImageIcon
+      return 'media.image'
     case 'cueSheet':
-      return FileTextIcon
+      return 'media.cueSheet'
     case 'playlist':
-      return ListMusicIcon
+      return 'media.playlist'
     case 'metadata':
-      return FileTextIcon
+      return 'media.metadata'
     case 'more':
-      return MoreIcon
+      return 'action.more'
     case 'loading':
-      return LoadingIcon
+      return 'state.loading'
     case 'warning':
-      return WarningIcon
+      return 'state.warning'
     case 'state':
-      return StateIcon
+      return 'state.unknown'
     default:
       return undefined
   }
@@ -149,8 +135,8 @@ function labelClassForRow(row: ContentRow): string {
   }
 }
 
-function resolveContentActionIcon(row: ContentRow): IconComponent {
-  return row.action?.kind === 'loadChildren' ? FolderOpenIcon : MoreIcon
+function resolveContentActionIcon(): IconRole {
+  return 'action.more'
 }
 </script>
 
@@ -202,7 +188,7 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
                 <span class="grid h-7 w-7 shrink-0 place-items-center" aria-hidden="true">
                   <Icon
                     v-if="row.icon !== undefined"
-                    :icon="resolveContentRowIcon(row.icon) ?? StateIcon"
+                    :role="resolveContentRowIcon(row.icon) ?? 'state.unknown'"
                     size="sm"
                     :tone="iconToneForRow(row)"
                   />
@@ -216,7 +202,7 @@ function resolveContentActionIcon(row: ContentRow): IconComponent {
                   class="inline-flex min-h-8 shrink-0 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-surface) px-2.5 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background)"
                   @click="activateRowAction(row)"
                 >
-                  <Icon :icon="resolveContentActionIcon(row)" size="xs" />
+                  <Icon :role="resolveContentActionIcon()" size="xs" />
                   <span>{{ row.action.label }}</span>
                 </button>
               </div>

@@ -133,8 +133,12 @@ function hostConfig(): ConstructorParameters<typeof LibraryBoundaryHost>[0] {
 }
 
 function testWebContents(id: number): Parameters<BoundaryEventPump['subscribe']>[0] {
+  const sentMessages: unknown[] = []
+
   return {
     id,
-    send() {}
+    send: (...args: unknown[]) => {
+      sentMessages.push(args)
+    }
   }
 }

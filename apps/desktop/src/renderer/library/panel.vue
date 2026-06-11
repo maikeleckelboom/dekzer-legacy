@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { CircleXIcon, Icon, ScanIcon } from '../icons'
+import { Icon } from '../icons'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
@@ -612,7 +612,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           :disabled="!rootLifecycle.canScanRoot.value"
           @click="rootLifecycle.scanRoot"
         >
-          <Icon :icon="ScanIcon" size="md" />
+          <Icon role="action.scan" size="md" />
           <span>{{ rootActions.scanButtonLabel.value }}</span>
         </button>
 
@@ -624,7 +624,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           :title="sourceActionModel.reasonUnavailable"
           @click="handleRemoveSource"
         >
-          <Icon :icon="CircleXIcon" size="md" />
+          <Icon role="action.remove" size="md" />
           <span>{{ rootActions.removeSourceButtonLabel.value }}</span>
         </button>
       </div>

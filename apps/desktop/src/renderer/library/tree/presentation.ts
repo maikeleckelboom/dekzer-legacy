@@ -1,36 +1,21 @@
-import type { IconComponent } from '../../icons/types'
-import {
-  FolderIcon,
-  FolderOpenIcon,
-  ListMusicIcon,
-  LoadingIcon,
-  MoreIcon,
-  NavigationIcon,
-  SourceIcon,
-  StateIcon,
-  WarningIcon
-} from '../../icons/lucide'
+import type { IconRole } from '../../icons/types'
 import type { BrowserTreeNode } from './types'
 
-export function resolveBrowserTreeRowIcon(
-  node: BrowserTreeNode,
-  isExpanded: boolean
-): IconComponent | undefined {
+export function resolveBrowserTreeRowIcon(node: BrowserTreeNode): IconRole | undefined {
   switch (node.role) {
     case 'collectionView':
-      return NavigationIcon
+      return 'navigation.collection'
     case 'source':
-      return SourceIcon
+      return 'source.local'
     case 'sourceLocation':
-      return isExpanded ? FolderOpenIcon : FolderIcon
     case 'literalDirectory':
-      return isExpanded ? FolderOpenIcon : FolderIcon
+      return 'folder.plain'
     case 'preparationSurface':
-      return StateIcon
+      return 'state.unknown'
     case 'playlistSurface':
-      return ListMusicIcon
+      return 'media.playlist'
     case 'smartView':
-      return NavigationIcon
+      return 'navigation.view'
     case 'state':
       return resolveBrowserTreeStateIcon(node.icon)
     case 'action':
@@ -38,24 +23,24 @@ export function resolveBrowserTreeRowIcon(
   }
 }
 
-export function resolveBrowserTreeStateIcon(icon: BrowserTreeNode['icon']): IconComponent {
+export function resolveBrowserTreeStateIcon(icon: BrowserTreeNode['icon']): IconRole {
   switch (icon) {
     case 'loading':
-      return LoadingIcon
+      return 'state.loading'
     case 'warning':
-      return WarningIcon
+      return 'state.warning'
     default:
-      return StateIcon
+      return 'state.unknown'
   }
 }
 
-function resolveActionIcon(icon: BrowserTreeNode['icon']): IconComponent {
+function resolveActionIcon(icon: BrowserTreeNode['icon']): IconRole {
   switch (icon) {
     case 'loading':
-      return LoadingIcon
+      return 'state.loading'
     case 'warning':
-      return WarningIcon
+      return 'state.warning'
     default:
-      return MoreIcon
+      return 'action.more'
   }
 }
