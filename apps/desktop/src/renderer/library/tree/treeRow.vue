@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import type { BrowserTreeVisibleItem } from './types'
 import type { IconComponent, IconTone } from '../../icons'
 import { DisclosureClosedIcon, DisclosureOpenIcon, Icon } from '../../icons'
-import { resolveBrowserTreeRowIcon } from './presentation'
+import { resolveBrowserTreeRowIcon, resolveBrowserTreeStateIcon } from './presentation'
 
 defineOptions({
   name: 'TreeRow'
@@ -61,6 +61,23 @@ const iconTone = computed<IconTone>(() => {
   }
 })
 
+const childReadinessIcon = computed<IconComponent | undefined>(() =>
+  props.item.childReadinessNode === undefined
+    ? undefined
+    : resolveBrowserTreeStateIcon(props.item.childReadinessNode.icon)
+)
+
+const childReadinessTone = computed<IconTone>(() => {
+  switch (props.item.childReadinessNode?.icon) {
+    case 'warning':
+      return 'warning'
+    case 'loading':
+      return 'muted'
+    default:
+      return 'muted'
+  }
+})
+
 const labelClass = computed(() => {
   const icon = props.item.node.icon
 
@@ -105,6 +122,20 @@ const labelClass = computed(() => {
 
     <span class="min-w-0 flex-1 truncate text-sm font-medium leading-5" :class="labelClass">
       {{ item.node.label }}
+    </span>
+
+    <span
+      v-if="item.childReadinessNode"
+      class="flex min-w-0 max-w-[45%] shrink items-center gap-1 text-xs leading-4 text-(--color-text-muted)"
+      :title="item.childReadinessNode.detail"
+    >
+      <Icon
+        v-if="childReadinessIcon"
+        :icon="childReadinessIcon"
+        size="xs"
+        :tone="childReadinessTone"
+      />
+      <span class="min-w-0 truncate">{{ item.childReadinessNode.label }}</span>
     </span>
   </div>
 </template>

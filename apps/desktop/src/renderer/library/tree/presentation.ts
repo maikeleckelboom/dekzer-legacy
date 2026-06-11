@@ -32,13 +32,13 @@ export function resolveBrowserTreeRowIcon(
     case 'smartView':
       return NavigationIcon
     case 'state':
-      return resolveStateIcon(node.icon)
+      return resolveBrowserTreeStateIcon(node.icon)
     case 'action':
       return resolveActionIcon(node.icon)
   }
 }
 
-function resolveStateIcon(icon: BrowserTreeNode['icon']): IconComponent {
+export function resolveBrowserTreeStateIcon(icon: BrowserTreeNode['icon']): IconComponent {
   switch (icon) {
     case 'loading':
       return LoadingIcon

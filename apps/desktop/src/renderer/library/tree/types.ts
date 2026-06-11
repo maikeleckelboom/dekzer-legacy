@@ -89,6 +89,7 @@ export type BrowserTreeNode = {
 export type BrowserTreeVisibleItem = {
   readonly id: BrowserTreeNodeId
   readonly node: BrowserTreeNode
+  readonly childReadinessNode?: BrowserTreeNode
   readonly parentId?: BrowserTreeNodeId
   readonly level: number
   readonly visibleIndex: number

@@ -74,6 +74,12 @@ export function getBrowserTreeChildRows(node: BrowserTreeNode): readonly Browser
   }
 }
 
+export function getBrowserTreeVisibleChildReadiness(
+  node: BrowserTreeNode
+): BrowserTreeNode | undefined {
+  return node.children.kind === 'unknown' ? node.children.stateNode : undefined
+}
+
 export function canActivateBrowserTreeAction(node: BrowserTreeNode): boolean {
   return node.action?.state.kind === 'idle' || node.action?.state.kind === 'failed'
 }
@@ -153,10 +159,12 @@ function appendVisibleNodes(options: {
     const isActionLoading = isBrowserTreeActionLoading(node)
     const isExpanded = isBranch && options.expandedNodeIds.has(node.id)
     const isActionItem = node.action !== undefined && !isBranch
+    const childReadinessNode = getBrowserTreeVisibleChildReadiness(node)
 
     options.visibleItems.push({
       id: node.id,
       node,
+      ...(childReadinessNode === undefined ? {} : { childReadinessNode }),
       ...(options.parentId === undefined ? {} : { parentId: options.parentId }),
       level: options.level,
       visibleIndex: options.visibleItems.length,

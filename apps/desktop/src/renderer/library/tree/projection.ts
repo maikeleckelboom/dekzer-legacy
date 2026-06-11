@@ -421,6 +421,7 @@ function projectLiteralDirectoryNode(options: {
   }
 
   if (isUnknownDirectoryChildReadiness(node)) {
+    const readState = unknownDirectoryChildReadinessState(node)
     const detail = formatUnknownDirectoryChildReadinessDetail(node)
     return {
       id: node.id,
@@ -431,7 +432,8 @@ function projectLiteralDirectoryNode(options: {
       children: unknownChildren(
         {
           ownerId: node.id,
-          label: 'Folder child scopes not proven',
+          state: readState,
+          label: formatUnknownDirectoryChildReadinessLabel(node),
           detail
         },
         options.bindingsById
@@ -524,6 +526,7 @@ function childrenForProjectedNodes(nodes: readonly BrowserTreeNode[]): BrowserTr
 function unknownChildren(
   options: {
     readonly ownerId: string
+    readonly state: BrowserTreeReadState
     readonly label: string
     readonly detail: string
   },
@@ -531,13 +534,7 @@ function unknownChildren(
 ): BrowserTreeChildren {
   return {
     kind: 'unknown',
-    stateNode: trackedReadStateNode(
-      {
-        ...options,
-        state: 'loading'
-      },
-      bindingsById
-    )
+    stateNode: trackedReadStateNode(options, bindingsById)
   }
 }
 
@@ -944,5 +941,38 @@ function formatUnknownDirectoryChildReadinessDetail(
       return 'Folder child scope read failed.'
     case 'complete':
       return 'Folder child scopes are not yet proven.'
+  }
+}
+
+function formatUnknownDirectoryChildReadinessLabel(
+  node: Extract<ChildRow, { readonly kind: 'directory' }>
+): string {
+  switch (node.directoryScanState) {
+    case 'pending':
+      return 'Folder child scopes pending'
+    case 'scanning':
+      return 'Probing folder child scopes'
+    case 'blocked':
+      return 'Folder child scopes blocked'
+    case 'failed':
+      return 'Folder child scope read failed'
+    case 'complete':
+      return 'Folder child scopes unproven'
+  }
+}
+
+function unknownDirectoryChildReadinessState(
+  node: Extract<ChildRow, { readonly kind: 'directory' }>
+): BrowserTreeReadState {
+  switch (node.directoryScanState) {
+    case 'pending':
+    case 'scanning':
+      return 'loading'
+    case 'blocked':
+      return 'unavailable'
+    case 'failed':
+      return 'error'
+    case 'complete':
+      return 'notLoaded'
   }
 }

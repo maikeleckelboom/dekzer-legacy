@@ -262,6 +262,33 @@ describe('useTreeController', () => {
     expect(harness.events.select).toEqual([])
     expect(harness.events.log).toEqual(['toggle:source-a'])
   })
+
+  it('does not expand or load unknown child-readiness rows through reveal or ArrowRight', () => {
+    const harness = treeHarness({
+      nodes: [unknownChildReadinessNode('folder-a', 'Folder A')]
+    })
+    const unknownRow = visibleItem(harness, 'folder-a')
+    const intent = harness.controller.resolveKeyboardIntent(unknownRow, 'ArrowRight')
+
+    expect(unknownRow).toMatchObject({
+      isBranch: false,
+      canRevealChildren: false,
+      isExpanded: false
+    })
+    expect(unknownRow.childReadinessNode).toMatchObject({
+      role: 'state',
+      label: 'Folder child scopes pending'
+    })
+    expect(intent).toEqual({ kind: 'none', shouldPreventDefault: true })
+
+    harness.controller.revealNode('folder-a')
+    harness.controller.activatePrimary('folder-a')
+
+    expect(harness.expandedNodeIds.value.has('folder-a')).toBe(false)
+    expect(harness.events.toggle).toEqual([])
+    expect(harness.events.activateAction).toEqual([])
+    expect(harness.events.select).toEqual(['folder-a'])
+  })
 })
 
 function treeHarness(
@@ -439,6 +466,19 @@ function failedBranchNode(
           }
         }
       : {})
+  }
+}
+
+function unknownChildReadinessNode(id: BrowserTreeNodeId, label: string): BrowserTreeNode {
+  return {
+    id,
+    label,
+    role: 'literalDirectory',
+    icon: 'folder',
+    children: {
+      kind: 'unknown',
+      stateNode: stateNode(id, 'Folder child scopes pending', 'loading')
+    }
   }
 }
 

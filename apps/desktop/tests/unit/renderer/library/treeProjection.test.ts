@@ -721,11 +721,111 @@ describe('projectState', () => {
     if (node.children.kind === 'unknown') {
       expect(node.children.stateNode).toMatchObject({
         role: 'state',
-        label: 'Folder child scopes not proven',
+        label: 'Folder child scopes pending',
         detail: 'Folder child scopes have not been proven yet.'
       })
     }
+
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+    const visibleUnknown = visibleItems.find((item) => item.id === 'source-directory:12')
+
+    expect(visibleUnknown).toMatchObject({
+      isBranch: false,
+      canRevealChildren: false,
+      isExpanded: false
+    })
+    expect(visibleUnknown?.childReadinessNode).toMatchObject({
+      role: 'state',
+      icon: 'loading',
+      label: 'Folder child scopes pending'
+    })
+    expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
   })
+
+  it.each([
+    {
+      scanState: 'pending',
+      label: 'Folder child scopes pending',
+      detail: 'Folder child scopes have not been proven yet.',
+      bindingState: 'loading',
+      icon: 'loading'
+    },
+    {
+      scanState: 'scanning',
+      label: 'Probing folder child scopes',
+      detail: 'Folder child scopes are being probed.',
+      bindingState: 'loading',
+      icon: 'loading'
+    },
+    {
+      scanState: 'blocked',
+      label: 'Folder child scopes blocked',
+      detail: 'Folder child scopes are blocked.',
+      bindingState: 'unavailable',
+      icon: 'warning'
+    },
+    {
+      scanState: 'failed',
+      label: 'Folder child scope read failed',
+      detail: 'Folder child scope read failed.',
+      bindingState: 'error',
+      icon: 'warning'
+    },
+    {
+      scanState: 'complete',
+      label: 'Folder child scopes unproven',
+      detail: 'Folder child scopes are not yet proven.',
+      bindingState: 'notLoaded',
+      icon: 'state'
+    }
+  ] as const)(
+    'projects unknown child-readiness with $scanState state visibly and without expansion',
+    ({ scanState, label, detail, bindingState, icon }) => {
+      const projection = projectTree(
+        browserState({
+          sourceChildren: loadedChildren([
+            directoryNode('12', 'Unknown Folder', {
+              hasChildDirectories: false,
+              directoryPrimaryMediaState: { kind: 'unknown' },
+              directoryImageMediaState: { kind: 'unknown' },
+              directoryScanState: scanState,
+              navigableChildScopeState: 'unknown'
+            })
+          ])
+        })
+      )
+      const node = requiredNode(projection.nodes, 'source-directory:12')
+      const visibleItems = flattenVisibleTree({
+        nodes: projection.nodes,
+        expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+      })
+      const visibleUnknown = visibleItems.find((item) => item.id === 'source-directory:12')
+
+      expect(node.children.kind).toBe('unknown')
+      expect(isBrowserTreeLeaf(node)).toBe(false)
+      expect(isBrowserTreeBranch(node)).toBe(false)
+      expect(canRevealBrowserTreeChildren(node)).toBe(false)
+      expect(visibleUnknown).toMatchObject({
+        isBranch: false,
+        canRevealChildren: false,
+        isExpanded: false
+      })
+      expect(visibleUnknown?.childReadinessNode).toMatchObject({
+        role: 'state',
+        icon,
+        label,
+        detail
+      })
+      expect(projection.bindingsById.get(`read-state:${node.id}`)).toMatchObject({
+        kind: 'readState',
+        state: bindingState
+      })
+      expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
+    }
+  )
 
   it('folder with unknown scope state ignores cached children without becoming leaf', () => {
     const projection = projectTree(
@@ -759,6 +859,16 @@ describe('projectState', () => {
     expect(isBrowserTreeLeaf(node)).toBe(false)
     expect(canRevealBrowserTreeChildren(node)).toBe(false)
     expect(projection.bindingsById.has('source-file:15')).toBe(false)
+
+    const visibleItems = flattenVisibleTree({
+      nodes: projection.nodes,
+      expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12'])
+    })
+
+    expect(childItemsFor(visibleItems, 'source-directory:12')).toEqual([])
+    expect(visibleItems.find((item) => item.id === 'source-directory:12')?.childReadinessNode).toBe(
+      node.children.kind === 'unknown' ? node.children.stateNode : undefined
+    )
   })
 
   it('noNavigableChildScopes folder is a leaf regardless of loaded state', () => {
