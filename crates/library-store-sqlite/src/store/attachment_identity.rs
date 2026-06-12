@@ -387,19 +387,20 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::read_models::attachment_identity::{
-        StoreSourceFileAttachmentLinkStatus, get_attachment_for_source_file,
-        get_source_attachment_summary, get_source_files_for_attachment,
+        StoreAttachmentOccurrenceStatus, StoreSourceFileAttachmentLinkStatus,
+        get_attachment_for_source_file, get_source_attachment_summary,
+        get_source_files_for_attachment, get_source_files_for_attachment_limited,
     };
     use crate::{
         CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy,
         CompleteMachineWorkInput, ContentHashEvidence, FinishWorkRunInput,
         InspectSourcePromotionInput, QueueInspectSourceWorkInput, RecordArtifactInput,
         RecordInlineArtifactInput, RecordSourceFileObservationInput, StartWorkRunInput,
-        UpsertSourceInput,
+        UpsertSourceInput, UpsertSourceStateInput,
     };
     use library_domain::{
-        ArtifactKind, ArtifactRole, SourceFileId, SourcePresenceState, WorkPriorityClass,
-        WorkRunOutcome,
+        ArtifactKind, ArtifactRole, SourceAccessIssueKind, SourceAccessState, SourceFileId,
+        SourcePresenceState, WorkPriorityClass, WorkRunOutcome,
     };
 
     use super::{MaterializeAttachmentsForSourceResult, SqliteDurableStore};
@@ -434,6 +435,23 @@ mod tests {
                     changed_at: 1,
                 })
                 .expect("upsert source");
+            store
+                .upsert_source_state(UpsertSourceStateInput {
+                    source_id,
+                    mount_status: "mounted".to_string(),
+                    mount_epoch: 1,
+                    access_state: SourceAccessState::Accessible,
+                    access_issue_kind: None,
+                    access_error_detail: None,
+                    access_checked_at: Some(1),
+                    mount_root: None,
+                    effective_path: None,
+                    observed_volume_label: None,
+                    filesystem_type: None,
+                    last_seen_at: Some(1),
+                    updated_at: 1,
+                })
+                .expect("seed source state");
             Self {
                 _tempdir: tempdir,
                 store,
@@ -470,6 +488,63 @@ mod tests {
                     updated_at: changed_at,
                 })
                 .expect("record source file");
+        }
+
+        fn record_source_file_presence(
+            &mut self,
+            source_file_id: i64,
+            relative_path: &str,
+            size_bytes: i64,
+            mtime_ns: i64,
+            presence_state: SourcePresenceState,
+        ) {
+            let changed_at = self.tick();
+            self.store
+                .record_source_file_observation(RecordSourceFileObservationInput {
+                    source_file_id: Some(source_file_id),
+                    source_id: self.source_id,
+                    parent_source_directory_id: None,
+                    name: relative_path
+                        .rsplit('/')
+                        .next()
+                        .expect("relative path has file name")
+                        .to_string(),
+                    relative_path: relative_path.to_string(),
+                    size_bytes: Some(size_bytes),
+                    mtime_ns: Some(mtime_ns),
+                    presence_state,
+                    first_discovered_at: Some(changed_at),
+                    observed_at: Some(changed_at),
+                    presence_changed_at: changed_at,
+                    updated_at: changed_at,
+                })
+                .expect("record source file presence");
+        }
+
+        fn set_source_state(
+            &mut self,
+            mount_status: &str,
+            access_state: SourceAccessState,
+            access_issue_kind: Option<SourceAccessIssueKind>,
+        ) {
+            let updated_at = self.tick();
+            self.store
+                .upsert_source_state(UpsertSourceStateInput {
+                    source_id: self.source_id,
+                    mount_status: mount_status.to_string(),
+                    mount_epoch: 1,
+                    access_state,
+                    access_issue_kind,
+                    access_error_detail: None,
+                    access_checked_at: Some(updated_at),
+                    mount_root: None,
+                    effective_path: None,
+                    observed_volume_label: None,
+                    filesystem_type: None,
+                    last_seen_at: Some(updated_at),
+                    updated_at,
+                })
+                .expect("update source state");
         }
 
         fn commit_blake3_fact(&mut self, source_file_id: i64, hash_value: &str, media_kind: &str) {
@@ -780,10 +855,125 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![100, 101]
         );
+        assert_eq!(
+            links
+                .iter()
+                .map(|link| link.relative_path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Album/a.flac", "Album/b.flac"],
+            "attachment occurrence read order is deterministic by source_id then source_file_id"
+        );
         assert!(
             links
                 .iter()
                 .all(|link| link.link_status == StoreSourceFileAttachmentLinkStatus::Current)
+        );
+        assert!(
+            links
+                .iter()
+                .all(|link| link.occurrence_status == StoreAttachmentOccurrenceStatus::Available)
+        );
+
+        let bounded = get_source_files_for_attachment_limited(&connection, attachment_id, 1)
+            .expect("read bounded attachment source files")
+            .expect("attachment exists");
+        assert_eq!(bounded.source_file_links.len(), 1);
+        assert_eq!(bounded.remaining_source_file_links, 1);
+        assert_eq!(bounded.summary.total_occurrence_count, 2);
+        assert_eq!(bounded.summary.available_occurrence_count, 2);
+        assert_eq!(bounded.summary.unavailable_occurrence_count, 0);
+        assert_eq!(bounded.summary.current_link_occurrence_count, 2);
+        assert_eq!(bounded.summary.stale_link_occurrence_count, 0);
+        assert_eq!(bounded.summary.distinct_source_count, 1);
+        assert!(bounded.summary.has_multiple_occurrences);
+    }
+
+    #[test]
+    fn attachment_occurrence_read_keeps_missing_and_offline_evidence_visible() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/available.flac", 10, 100);
+        fixture.record_source_file(101, "Album/missing.flac", 11, 101);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_fact(101, HASH_A, "audio");
+        fixture.materialize(10);
+        let attachment_id = fixture.attachment_id_for_hash(HASH_A);
+
+        fixture.record_source_file_presence(
+            101,
+            "Album/missing.flac",
+            11,
+            101,
+            SourcePresenceState::Missing,
+        );
+
+        let connection = fixture.read_connection();
+        let links = get_source_files_for_attachment(&connection, attachment_id)
+            .expect("read attachment source files after missing observation");
+        assert_eq!(
+            links
+                .iter()
+                .map(|link| (link.source_file_id, link.presence_state.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(100, "present"), (101, "missing")],
+            "missing source-file occurrence evidence must remain visible"
+        );
+        assert_eq!(
+            links[1].occurrence_status,
+            StoreAttachmentOccurrenceStatus::FileMissing
+        );
+        assert_eq!(
+            links[1].link_status,
+            StoreSourceFileAttachmentLinkStatus::Stale,
+            "presence changes make the old attachment link stale without deleting it"
+        );
+
+        fixture.set_source_state("unmounted", SourceAccessState::Unknown, None);
+        let offline = get_source_files_for_attachment_limited(&connection, attachment_id, 10)
+            .expect("read attachment source files after source offline")
+            .expect("attachment exists");
+        assert_eq!(offline.source_file_links.len(), 2);
+        assert!(
+            offline
+                .source_file_links
+                .iter()
+                .all(|link| link.occurrence_status
+                    == StoreAttachmentOccurrenceStatus::SourceUnavailable),
+            "offline source occurrences must remain visible instead of collapsing into absence"
+        );
+        assert_eq!(offline.summary.total_occurrence_count, 2);
+        assert_eq!(offline.summary.available_occurrence_count, 0);
+        assert_eq!(offline.summary.unavailable_occurrence_count, 2);
+        assert_eq!(offline.summary.current_link_occurrence_count, 1);
+        assert_eq!(offline.summary.stale_link_occurrence_count, 1);
+    }
+
+    #[test]
+    fn attachment_occurrence_read_does_not_require_occurrence_tables() {
+        let mut fixture = AttachmentIdentityFixture::new();
+        fixture.record_source_file(100, "Album/track.flac", 10, 100);
+        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.materialize(10);
+        let attachment_id = fixture.attachment_id_for_hash(HASH_A);
+        let connection = fixture.read_connection();
+
+        let read = get_source_files_for_attachment_limited(&connection, attachment_id, 10)
+            .expect("read attachment source files")
+            .expect("attachment exists");
+        assert_eq!(read.summary.total_occurrence_count, 1);
+
+        let occurrence_tables = connection
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM sqlite_schema
+                 WHERE type = 'table'
+                   AND lower(name) LIKE '%occurrence%'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("count occurrence tables");
+        assert_eq!(
+            occurrence_tables, 0,
+            "A-5 occurrence read must derive from existing attachment/source-file evidence"
         );
     }
 

@@ -250,7 +250,7 @@ export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaint
 
 export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStatus, attachmentLink?: SourceFileAttachmentLink, };
 
-export type ReadAttachmentSourceFilesReply = { status: AttachmentIdentityReadStatus, attachment?: AttachmentIdentity, sourceFileLinks: Array<SourceFileAttachmentLink>, effectiveLimit: number, remainingSourceFileLinks: number, };
+export type ReadAttachmentSourceFilesReply = { status: AttachmentIdentityReadStatus, attachment?: AttachmentIdentity, sourceFileLinks: Array<SourceFileAttachmentLink>, summary?: AttachmentSourceFilesSummary, effectiveLimit: number, remainingSourceFileLinks: number, };
 
 export type ReadSourceAttachmentSummaryReply = { status: AttachmentIdentityReadStatus, summary?: SourceAttachmentSummary, };
 
@@ -344,9 +344,13 @@ export type AttachmentIdentityReadStatus = "ok" | "notFound" | "invalidRequest" 
 
 export type AttachmentIdentity = { attachmentId: string, contentHashAlgorithm: string, contentHashValue: string, };
 
-export type SourceFileAttachmentLink = { attachmentId: string, sourceFileId: string, sourceId: string, contentHashAlgorithm: string, contentHashValue: string, fileKind: ContentsFileKind, linkStatus: SourceFileAttachmentLinkStatus, createdAtMs: number, updatedAtMs: number, };
+export type AttachmentSourceFileOccurrenceStatus = "available" | "sourceUnavailable" | "sourceMissing" | "sourceBlocked" | "fileMissing" | "fileRemoved" | "unknown";
+
+export type SourceFileAttachmentLink = { sourceFileAttachmentLinkId: string, attachmentId: string, sourceFileId: string, sourceId: string, contentHashAlgorithm: string, contentHashValue: string, sourceDisplayName: string, sourceClass: SourceClass, parentSourceDirectoryId?: string, name: string, relativePath: string, sizeBytes?: number, mtimeNs?: number, fileKind: ContentsFileKind, fileClass: SearchFilterFileClass, presenceState: ContentsPresenceState, hasCurrentBlake3Fact: boolean, linkStatus: SourceFileAttachmentLinkStatus, sourceMountStatus: SourceMountStatus, sourceAccessState: SourceAccessState, sourceAccessIssueKind?: SourceLifecycleIssueKind, sourceScanPhase: SourceScanPhase, sourceAvailabilityState: SourceIntegrityAvailabilityState, occurrenceStatus: AttachmentSourceFileOccurrenceStatus, createdAtMs: number, updatedAtMs: number, sourceFileUpdatedAtMs: number, };
 
 export type SourceFileAttachmentLinkStatus = "current" | "stale";
+
+export type AttachmentSourceFilesSummary = { totalOccurrenceCount: number, availableOccurrenceCount: number, unavailableOccurrenceCount: number, currentLinkOccurrenceCount: number, staleLinkOccurrenceCount: number, distinctSourceCount: number, hasMultipleOccurrences: boolean, };
 
 export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
 

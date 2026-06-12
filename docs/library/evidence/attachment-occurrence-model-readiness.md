@@ -161,6 +161,27 @@ Returned occurrence evidence fields should include:
   occurrences, missing occurrences, blocked occurrences, removed occurrences, distinct source count, effective limit,
   and remaining count.
 
+Implemented A-5 shape:
+
+- `readAttachmentSourceFiles` remains the single attachment-to-source-file occurrence read.
+- Each `sourceFileLinks[]` row is one linked `source_files` row and includes `sourceFileAttachmentLinkId`,
+  `sourceFileId`, `sourceId`, source display/class context, source-file `name`, `relativePath`,
+  `parentSourceDirectoryId`, `sizeBytes`, `mtimeNs`, `fileKind`, `fileClass`, `presenceState`, lifecycle-derived
+  `sourceMountStatus`, `sourceAccessState`, `sourceAccessIssueKind`, `sourceScanPhase`, `sourceAvailabilityState`,
+  `hasCurrentBlake3Fact`, `linkStatus`, and derived `occurrenceStatus`.
+- `occurrenceStatus` is source/path availability only: `available`, `sourceUnavailable`, `sourceMissing`,
+  `sourceBlocked`, `fileMissing`, `fileRemoved`, or `unknown`. Content-evidence freshness remains separate in
+  `linkStatus`.
+- The reply includes a derived `summary` with total, available, unavailable, current-link, stale-link, distinct-source,
+  and multiple-occurrence counts.
+- The read preserves the existing bounded one-page limit contract (`effectiveLimit` plus `remainingSourceFileLinks`);
+  it does not introduce cursor pagination in this slice.
+
+Availability limitation: A-5 does not perform filesystem access checks. Source availability is the strongest honest
+state available from persisted `source_state` / `source_scan_state` facts plus `source_files.presence_state`. If
+lifecycle state is absent or stale, the read reports the persisted status rather than collapsing the occurrence row into
+absence.
+
 The boundary must not expose product-facing track-equivalence terms, destructive-action terms, movement-confirmation
 terms, or preferred-copy terms.
 

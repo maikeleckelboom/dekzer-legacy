@@ -222,6 +222,7 @@ pub(crate) fn map_read_attachment_source_files_reply(
                 .into_iter()
                 .map(map_source_file_attachment_link)
                 .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
+            summary: Some(map_attachment_source_files_summary(source_files.summary)),
             effective_limit: source_files.effective_limit,
             remaining_source_file_links: source_files.remaining_source_file_links,
         }),
@@ -229,6 +230,7 @@ pub(crate) fn map_read_attachment_source_files_reply(
             status: protocol::AttachmentIdentityReadStatus::NotFound,
             attachment: None,
             source_file_links: Vec::new(),
+            summary: None,
             effective_limit: 0,
             remaining_source_file_links: 0,
         }),
@@ -699,18 +701,135 @@ fn map_source_file_attachment_link(
 ) -> store::LibrarySqliteResult<protocol::SourceFileAttachmentLink> {
     let file_kind = protocol::ContentsFileKind::from_projection_value(&link.file_kind)
         .ok_or_else(|| invalid_attachment_identity_value("file_kind", &link.file_kind))?;
+    let file_class = map_attachment_source_file_class(&link.file_class)?;
+    let presence_state = protocol::ContentsPresenceState::from_projection_value(
+        &link.presence_state,
+    )
+    .ok_or_else(|| invalid_attachment_identity_value("presence_state", &link.presence_state))?;
+    let source_class = map_source_class(&link.source_class)?;
+    let source_mount_status = map_source_mount_status(&link.source_mount_status)?;
+    let source_access_state = map_source_access_state(&link.source_access_state)?;
+    let source_scan_phase = map_source_scan_phase(&link.source_scan_phase)?;
+    let source_availability_state = source_availability_state_from_lifecycle_values(
+        source_mount_status,
+        source_access_state,
+        source_scan_phase,
+    );
 
     Ok(protocol::SourceFileAttachmentLink {
+        source_file_attachment_link_id: link.source_file_attachment_link_id,
         attachment_id: link.attachment_id,
         source_file_id: link.source_file_id,
         source_id: link.source_id,
         content_hash_algorithm: link.content_hash_algorithm,
         content_hash_value: link.content_hash_value,
+        source_display_name: link.source_display_name,
+        source_class,
+        parent_source_directory_id: link.parent_source_directory_id,
+        name: link.name,
+        relative_path: link.relative_path,
+        size_bytes: link.size_bytes,
+        mtime_ns: link.mtime_ns,
         file_kind,
+        file_class,
+        presence_state,
+        has_current_blake3_fact: link.has_current_blake3_fact,
         link_status: map_source_file_attachment_link_status(link.link_status),
+        source_mount_status,
+        source_access_state,
+        source_access_issue_kind: link
+            .source_access_issue_kind
+            .as_deref()
+            .map(map_source_lifecycle_issue_kind)
+            .transpose()?,
+        source_scan_phase,
+        source_availability_state,
+        occurrence_status: map_attachment_occurrence_status(link.occurrence_status),
         created_at_ms: link.created_at,
         updated_at_ms: link.updated_at,
+        source_file_updated_at_ms: link.source_file_updated_at,
     })
+}
+
+fn map_attachment_source_file_class(
+    value: &str,
+) -> store::LibrarySqliteResult<protocol::SearchFilterFileClass> {
+    match value {
+        "audio" => Ok(protocol::SearchFilterFileClass::Audio),
+        "video" => Ok(protocol::SearchFilterFileClass::Video),
+        "image" => Ok(protocol::SearchFilterFileClass::Image),
+        "unsupported" => Ok(protocol::SearchFilterFileClass::Unsupported),
+        "none" => Ok(protocol::SearchFilterFileClass::None),
+        other => Err(invalid_attachment_identity_value("file_class", other)),
+    }
+}
+
+const fn source_availability_state_from_lifecycle_values(
+    mount_status: protocol::SourceMountStatus,
+    access_state: protocol::SourceAccessState,
+    scan_phase: protocol::SourceScanPhase,
+) -> protocol::SourceIntegrityAvailabilityState {
+    if matches!(scan_phase, protocol::SourceScanPhase::Partial) {
+        return protocol::SourceIntegrityAvailabilityState::Partial;
+    }
+    if matches!(mount_status, protocol::SourceMountStatus::Mounted)
+        && matches!(access_state, protocol::SourceAccessState::Accessible)
+    {
+        return protocol::SourceIntegrityAvailabilityState::Mounted;
+    }
+    if matches!(access_state, protocol::SourceAccessState::Missing) {
+        return protocol::SourceIntegrityAvailabilityState::Missing;
+    }
+    if matches!(access_state, protocol::SourceAccessState::Blocked) {
+        return protocol::SourceIntegrityAvailabilityState::Blocked;
+    }
+    if !matches!(mount_status, protocol::SourceMountStatus::Mounted) {
+        return protocol::SourceIntegrityAvailabilityState::Unavailable;
+    }
+
+    protocol::SourceIntegrityAvailabilityState::Unknown
+}
+
+const fn map_attachment_occurrence_status(
+    status: store::StoreAttachmentOccurrenceStatus,
+) -> protocol::AttachmentSourceFileOccurrenceStatus {
+    match status {
+        store::StoreAttachmentOccurrenceStatus::Available => {
+            protocol::AttachmentSourceFileOccurrenceStatus::Available
+        }
+        store::StoreAttachmentOccurrenceStatus::SourceUnavailable => {
+            protocol::AttachmentSourceFileOccurrenceStatus::SourceUnavailable
+        }
+        store::StoreAttachmentOccurrenceStatus::SourceMissing => {
+            protocol::AttachmentSourceFileOccurrenceStatus::SourceMissing
+        }
+        store::StoreAttachmentOccurrenceStatus::SourceBlocked => {
+            protocol::AttachmentSourceFileOccurrenceStatus::SourceBlocked
+        }
+        store::StoreAttachmentOccurrenceStatus::FileMissing => {
+            protocol::AttachmentSourceFileOccurrenceStatus::FileMissing
+        }
+        store::StoreAttachmentOccurrenceStatus::FileRemoved => {
+            protocol::AttachmentSourceFileOccurrenceStatus::FileRemoved
+        }
+        store::StoreAttachmentOccurrenceStatus::Unknown => {
+            protocol::AttachmentSourceFileOccurrenceStatus::Unknown
+        }
+    }
+}
+
+fn map_attachment_source_files_summary(
+    summary: store::StoreAttachmentSourceFilesSummary,
+) -> protocol::AttachmentSourceFilesSummary {
+    protocol::AttachmentSourceFilesSummary {
+        total_occurrence_count: summary.total_occurrence_count,
+        available_occurrence_count: summary.available_occurrence_count,
+        unavailable_occurrence_count: summary.unavailable_occurrence_count,
+        current_link_occurrence_count: summary.current_link_occurrence_count,
+        stale_link_occurrence_count: summary.stale_link_occurrence_count,
+        distinct_source_count: summary.distinct_source_count,
+        has_multiple_occurrences: summary.has_multiple_occurrences,
+    }
 }
 
 const fn map_source_file_attachment_link_status(

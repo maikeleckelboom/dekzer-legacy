@@ -183,8 +183,10 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SourceIntegrityRuntimeMaintenanceState>(&cfg, &mut output);
     push_ts_decl::<crate::AttachmentIdentityReadStatus>(&cfg, &mut output);
     push_ts_decl::<crate::AttachmentIdentity>(&cfg, &mut output);
+    push_ts_decl::<crate::AttachmentSourceFileOccurrenceStatus>(&cfg, &mut output);
     push_ts_decl::<crate::SourceFileAttachmentLink>(&cfg, &mut output);
     push_ts_decl::<crate::SourceFileAttachmentLinkStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::AttachmentSourceFilesSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceAttachmentSummary>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsResult>(&cfg, &mut output);
     push_ts_decl::<crate::SearchFilterResult>(&cfg, &mut output);

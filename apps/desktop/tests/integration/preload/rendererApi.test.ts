@@ -143,15 +143,32 @@ describe('preload renderer API', () => {
       reply: {
         status: 'ok',
         attachmentLink: {
+          sourceFileAttachmentLinkId: '5',
           attachmentId: '7',
           sourceFileId: '11',
           sourceId: '3',
           contentHashAlgorithm: 'blake3',
           contentHashValue: 'abc',
+          sourceDisplayName: 'Local',
+          sourceClass: 'externalMounted',
+          parentSourceDirectoryId: '2',
+          name: 'track.flac',
+          relativePath: 'Album/track.flac',
+          sizeBytes: 123,
+          mtimeNs: 456,
           fileKind: 'audio',
+          fileClass: 'audio',
+          presenceState: 'present',
+          hasCurrentBlake3Fact: true,
           linkStatus: 'current',
+          sourceMountStatus: 'mounted',
+          sourceAccessState: 'accessible',
+          sourceScanPhase: 'complete',
+          sourceAvailabilityState: 'mounted',
+          occurrenceStatus: 'available',
           createdAtMs: 100,
-          updatedAtMs: 200
+          updatedAtMs: 200,
+          sourceFileUpdatedAtMs: 300
         }
       }
     }

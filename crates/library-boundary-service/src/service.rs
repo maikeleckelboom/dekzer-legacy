@@ -1556,9 +1556,10 @@ fn map_source_registration_root_class(
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
-        AcceptTrackIdentityCandidateRequest, AttachmentIdentityReadStatus, CancelRootScanReply,
-        CancelRootScanRequest, CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest,
-        ContentsFileClass, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
+        AcceptTrackIdentityCandidateRequest, AttachmentIdentityReadStatus,
+        AttachmentSourceFileOccurrenceStatus, CancelRootScanReply, CancelRootScanRequest,
+        CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest, ContentsFileClass,
+        ContentsPresenceState, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
         ContentsScopeCoverageState, ContentsScopeDepth, CreatePlaylistReply, CreatePlaylistRequest,
         DeferTrackIdentityCandidateRequest, DeletePlaylistReply, DeletePlaylistRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
@@ -3642,6 +3643,14 @@ mod tests {
         assert_eq!(limited.source_file_links.len(), 1);
         assert_eq!(limited.effective_limit, 1);
         assert_eq!(limited.remaining_source_file_links, 1);
+        let limited_summary = limited.summary.expect("occurrence summary is included");
+        assert_eq!(limited_summary.total_occurrence_count, 2);
+        assert_eq!(limited_summary.available_occurrence_count, 2);
+        assert_eq!(limited_summary.unavailable_occurrence_count, 0);
+        assert_eq!(limited_summary.current_link_occurrence_count, 2);
+        assert_eq!(limited_summary.stale_link_occurrence_count, 0);
+        assert_eq!(limited_summary.distinct_source_count, 1);
+        assert!(limited_summary.has_multiple_occurrences);
 
         let all_links = read_attachment_source_files(&service, first_link.attachment_id, Some(10));
         assert_eq!(all_links.source_file_links.len(), 2);
@@ -3650,6 +3659,19 @@ mod tests {
                 .source_file_links
                 .iter()
                 .all(|link| link.link_status == SourceFileAttachmentLinkStatus::Current)
+        );
+        assert!(all_links.source_file_links.iter().all(|link| {
+            link.occurrence_status == AttachmentSourceFileOccurrenceStatus::Available
+                && link.presence_state == ContentsPresenceState::Present
+                && link.source_availability_state == SourceIntegrityAvailabilityState::Mounted
+        }));
+        assert_eq!(
+            all_links
+                .source_file_links
+                .iter()
+                .map(|link| link.relative_path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a.flac", "b.flac"]
         );
 
         let summary = read_source_attachment_summary(&service, registered.root_id);

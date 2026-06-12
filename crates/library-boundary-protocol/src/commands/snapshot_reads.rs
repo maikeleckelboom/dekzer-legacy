@@ -2152,6 +2152,30 @@ pub enum SourceFileAttachmentLinkStatus {
 #[derive(
     Debug,
     Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum AttachmentSourceFileOccurrenceStatus {
+    Available,
+    SourceUnavailable,
+    SourceMissing,
+    SourceBlocked,
+    FileMissing,
+    FileRemoved,
+    Unknown,
+}
+
+#[derive(
+    Debug,
+    Clone,
     PartialEq,
     Eq,
     serde::Serialize,
@@ -2186,6 +2210,10 @@ pub struct SourceFileAttachmentLink {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
     #[ts(as = "String")]
+    pub source_file_attachment_link_id: i64,
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
     pub attachment_id: i64,
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
@@ -2197,10 +2225,60 @@ pub struct SourceFileAttachmentLink {
     pub source_id: i64,
     pub content_hash_algorithm: String,
     pub content_hash_value: String,
+    pub source_display_name: String,
+    pub source_class: SourceClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    #[ts(optional)]
+    pub parent_source_directory_id: Option<i64>,
+    pub name: String,
+    pub relative_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub size_bytes: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub mtime_ns: Option<i64>,
     pub file_kind: ContentsFileKind,
+    pub file_class: SearchFilterFileClass,
+    pub presence_state: ContentsPresenceState,
+    pub has_current_blake3_fact: bool,
     pub link_status: SourceFileAttachmentLinkStatus,
+    pub source_mount_status: SourceMountStatus,
+    pub source_access_state: SourceAccessState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub source_access_issue_kind: Option<SourceLifecycleIssueKind>,
+    pub source_scan_phase: SourceScanPhase,
+    pub source_availability_state: SourceIntegrityAvailabilityState,
+    pub occurrence_status: AttachmentSourceFileOccurrenceStatus,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
+    pub source_file_updated_at_ms: i64,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct AttachmentSourceFilesSummary {
+    pub total_occurrence_count: usize,
+    pub available_occurrence_count: usize,
+    pub unavailable_occurrence_count: usize,
+    pub current_link_occurrence_count: usize,
+    pub stale_link_occurrence_count: usize,
+    pub distinct_source_count: usize,
+    pub has_multiple_occurrences: bool,
 }
 
 #[derive(
@@ -2308,6 +2386,9 @@ pub struct ReadAttachmentSourceFilesReply {
     #[ts(optional)]
     pub attachment: Option<AttachmentIdentity>,
     pub source_file_links: Vec<SourceFileAttachmentLink>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub summary: Option<AttachmentSourceFilesSummary>,
     pub effective_limit: usize,
     pub remaining_source_file_links: usize,
 }
@@ -2633,7 +2714,8 @@ pub enum SnapshotReadReply {
 #[cfg(test)]
 mod tests {
     use super::{
-        AttachmentIdentity, AttachmentIdentityReadStatus, ContentsFileClass, ContentsFileKind,
+        AttachmentIdentity, AttachmentIdentityReadStatus, AttachmentSourceFileOccurrenceStatus,
+        AttachmentSourceFilesSummary, ContentsFileClass, ContentsFileKind, ContentsPresenceState,
         ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeCoverageState,
         ContentsScopeDepth, DirectoryImageMediaState, DirectoryPrimaryMediaState,
         DirectoryScanState, LibraryAssetAvailabilityState, LibraryAssetBrowserRow,
@@ -2658,7 +2740,8 @@ mod tests {
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
         ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceLifecycleReply,
         ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
-        ReadTrackIdentityReviewCandidatesRequest, SearchNavigationNodeLibraryBrowserWindowReply,
+        ReadTrackIdentityReviewCandidatesRequest, SearchFilterFileClass,
+        SearchNavigationNodeLibraryBrowserWindowReply,
         SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand, SnapshotReadReply,
         SourceAccessState, SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
         SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
@@ -3403,15 +3486,33 @@ mod tests {
     #[test]
     fn attachment_identity_snapshot_replies_expose_identity_state_only() {
         let link = SourceFileAttachmentLink {
+            source_file_attachment_link_id: 5,
             attachment_id: 7,
             source_file_id: 11,
             source_id: 3,
             content_hash_algorithm: "blake3".to_string(),
             content_hash_value: "abc".to_string(),
+            source_display_name: "Local".to_string(),
+            source_class: SourceClass::ExternalMounted,
+            parent_source_directory_id: Some(2),
+            name: "track.flac".to_string(),
+            relative_path: "Album/track.flac".to_string(),
+            size_bytes: Some(123),
+            mtime_ns: Some(456),
             file_kind: ContentsFileKind::Audio,
+            file_class: SearchFilterFileClass::Audio,
+            presence_state: ContentsPresenceState::Present,
+            has_current_blake3_fact: true,
             link_status: SourceFileAttachmentLinkStatus::Current,
+            source_mount_status: SourceMountStatus::Mounted,
+            source_access_state: SourceAccessState::Accessible,
+            source_access_issue_kind: None,
+            source_scan_phase: SourceScanPhase::Complete,
+            source_availability_state: SourceIntegrityAvailabilityState::Mounted,
+            occurrence_status: AttachmentSourceFileOccurrenceStatus::Available,
             created_at_ms: 100,
             updated_at_ms: 200,
+            source_file_updated_at_ms: 300,
         };
         let source_file_reply =
             SnapshotReadReply::SourceFileAttachment(ReadSourceFileAttachmentReply {
@@ -3439,6 +3540,15 @@ mod tests {
                     content_hash_value: "abc".to_string(),
                 }),
                 source_file_links: vec![link],
+                summary: Some(AttachmentSourceFilesSummary {
+                    total_occurrence_count: 2,
+                    available_occurrence_count: 1,
+                    unavailable_occurrence_count: 1,
+                    current_link_occurrence_count: 1,
+                    stale_link_occurrence_count: 1,
+                    distinct_source_count: 2,
+                    has_multiple_occurrences: true,
+                }),
                 effective_limit: 25,
                 remaining_source_file_links: 1,
             });
@@ -3449,6 +3559,11 @@ mod tests {
             json["payload"]["sourceFileLinks"][0]["linkStatus"],
             json!("current")
         );
+        assert_eq!(
+            json["payload"]["sourceFileLinks"][0]["occurrenceStatus"],
+            json!("available")
+        );
+        assert_eq!(json["payload"]["summary"]["totalOccurrenceCount"], json!(2));
         assert_eq!(
             serde_json::from_value::<SnapshotReadReply>(json)
                 .expect("deserialize attachment reply"),

@@ -94,6 +94,65 @@
         "readFailed"
       ]
     },
+    "AttachmentSourceFileOccurrenceStatus": {
+      "type": "string",
+      "enum": [
+        "available",
+        "sourceUnavailable",
+        "sourceMissing",
+        "sourceBlocked",
+        "fileMissing",
+        "fileRemoved",
+        "unknown"
+      ]
+    },
+    "AttachmentSourceFilesSummary": {
+      "type": "object",
+      "properties": {
+        "availableOccurrenceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "currentLinkOccurrenceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "distinctSourceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "hasMultipleOccurrences": {
+          "type": "boolean"
+        },
+        "staleLinkOccurrenceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "totalOccurrenceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "unavailableOccurrenceCount": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "totalOccurrenceCount",
+        "availableOccurrenceCount",
+        "unavailableOccurrenceCount",
+        "currentLinkOccurrenceCount",
+        "staleLinkOccurrenceCount",
+        "distinctSourceCount",
+        "hasMultipleOccurrences"
+      ]
+    },
     "CancelRootScanReply": {
       "type": "object",
       "properties": {
@@ -3375,6 +3434,16 @@
         },
         "status": {
           "$ref": "#/$defs/AttachmentIdentityReadStatus"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttachmentSourceFilesSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -5492,17 +5561,90 @@
           "type": "integer",
           "format": "int64"
         },
+        "fileClass": {
+          "$ref": "#/$defs/SearchFilterFileClass"
+        },
         "fileKind": {
           "$ref": "#/$defs/ContentsFileKind"
+        },
+        "hasCurrentBlake3Fact": {
+          "type": "boolean"
         },
         "linkStatus": {
           "$ref": "#/$defs/SourceFileAttachmentLinkStatus"
         },
+        "mtimeNs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "occurrenceStatus": {
+          "$ref": "#/$defs/AttachmentSourceFileOccurrenceStatus"
+        },
+        "parentSourceDirectoryId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "presenceState": {
+          "$ref": "#/$defs/ContentsPresenceState"
+        },
+        "relativePath": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "sourceAccessIssueKind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceLifecycleIssueKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceAccessState": {
+          "$ref": "#/$defs/SourceAccessState"
+        },
+        "sourceAvailabilityState": {
+          "$ref": "#/$defs/SourceIntegrityAvailabilityState"
+        },
+        "sourceClass": {
+          "$ref": "#/$defs/SourceClass"
+        },
+        "sourceDisplayName": {
+          "type": "string"
+        },
+        "sourceFileAttachmentLinkId": {
+          "type": "string"
+        },
         "sourceFileId": {
           "type": "string"
         },
+        "sourceFileUpdatedAtMs": {
+          "type": "integer",
+          "format": "int64"
+        },
         "sourceId": {
           "type": "string"
+        },
+        "sourceMountStatus": {
+          "$ref": "#/$defs/SourceMountStatus"
+        },
+        "sourceScanPhase": {
+          "$ref": "#/$defs/SourceScanPhase"
         },
         "updatedAtMs": {
           "type": "integer",
@@ -5510,15 +5652,29 @@
         }
       },
       "required": [
+        "sourceFileAttachmentLinkId",
         "attachmentId",
         "sourceFileId",
         "sourceId",
         "contentHashAlgorithm",
         "contentHashValue",
+        "sourceDisplayName",
+        "sourceClass",
+        "name",
+        "relativePath",
         "fileKind",
+        "fileClass",
+        "presenceState",
+        "hasCurrentBlake3Fact",
         "linkStatus",
+        "sourceMountStatus",
+        "sourceAccessState",
+        "sourceScanPhase",
+        "sourceAvailabilityState",
+        "occurrenceStatus",
         "createdAtMs",
-        "updatedAtMs"
+        "updatedAtMs",
+        "sourceFileUpdatedAtMs"
       ]
     },
     "SourceFileAttachmentLinkStatus": {
