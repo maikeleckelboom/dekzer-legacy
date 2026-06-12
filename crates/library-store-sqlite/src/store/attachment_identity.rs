@@ -932,6 +932,15 @@ mod tests {
             .expect("read attachment source files after source offline")
             .expect("attachment exists");
         assert_eq!(offline.source_file_links.len(), 2);
+        assert_eq!(
+            offline
+                .source_file_links
+                .iter()
+                .map(|link| (link.source_file_id, link.presence_state.as_str()))
+                .collect::<Vec<_>>(),
+            vec![(100, "present"), (101, "missing")],
+            "source unavailability must not erase persisted source-file presence evidence"
+        );
         assert!(
             offline
                 .source_file_links

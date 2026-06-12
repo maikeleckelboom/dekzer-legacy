@@ -38,7 +38,8 @@ workflow.
 
 The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
 
-1. `feat(library): add attachment occurrence model`
+1. A-5 attachment occurrence substrate is implemented and ready for substrate audit at
+   `55fd90356cbfe63fc57693b2afee47d2bcd54b0c`. It must be accepted or repaired before dependent A-6 work begins.
 
 Media probe observations, source integrity / collection health v0, primary-media promotion, exact-content track identity
 candidates, candidate decisions, explicit user decision commands, and the review-candidates read model are already
@@ -399,7 +400,7 @@ Must exist before any product-facing duplicate or relocation surface.
 
 ---
 
-**A-5 [CODE] Attachment occurrence model** [Next executable substrate slice]
+**A-5 [CODE] Attachment occurrence model** [Implemented — ready for substrate audit]
 
 One substrate evidence read over existing attachment identity, source-file inventory, probe evidence, and source
 integrity. No product-facing occurrence views may surface from this slice. The implementation guide is

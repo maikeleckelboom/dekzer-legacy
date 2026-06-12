@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: implemented-review
 last-reviewed: 2026-06-12
 owner: library-substrate-boundary
 canonical-context:
@@ -17,7 +17,7 @@ scope:
 
 ## Verdict
 
-A-5 is ready to implement as a narrow substrate read-model slice.
+A-5 is implemented as a narrow substrate read-model slice and ready for substrate review.
 
 The implementation should not add a durable occurrence table. Current durable occurrence facts already exist as
 `source_files` rows linked to `content_attachments` by `source_file_attachment_links`. A-5 should make those facts
@@ -169,11 +169,17 @@ Implemented A-5 shape:
   `parentSourceDirectoryId`, `sizeBytes`, `mtimeNs`, `fileKind`, `fileClass`, `presenceState`, lifecycle-derived
   `sourceMountStatus`, `sourceAccessState`, `sourceAccessIssueKind`, `sourceScanPhase`, `sourceAvailabilityState`,
   `hasCurrentBlake3Fact`, `linkStatus`, and derived `occurrenceStatus`.
+- `sourceAvailabilityState` reuses `SourceIntegrityAvailabilityState` vocabulary but is locally derived in this read
+  from persisted lifecycle and scan-state facts. It is not a nested `readSourceIntegrity` result and must not imply
+  source-failure or maintenance evaluation.
 - `occurrenceStatus` is source/path availability only: `available`, `sourceUnavailable`, `sourceMissing`,
   `sourceBlocked`, `fileMissing`, `fileRemoved`, or `unknown`. Content-evidence freshness remains separate in
   `linkStatus`.
 - The reply includes a derived `summary` with total, available, unavailable, current-link, stale-link, distinct-source,
   and multiple-occurrence counts.
+- `unavailableOccurrenceCount` is the non-available occurrence count over all linked rows. `distinctSourceCount` counts
+  distinct `source_id` values only. `hasMultipleOccurrences` means multiple linked source-file rows, not a duplicate-song
+  or preferred-copy decision.
 - The read preserves the existing bounded one-page limit contract (`effectiveLimit` plus `remainingSourceFileLinks`);
   it does not introduce cursor pagination in this slice.
 
