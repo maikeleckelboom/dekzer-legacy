@@ -71,6 +71,12 @@ Implementation companions may describe narrower implemented shapes but do not ov
 | [docs/decisions/media-role-classification.md](decisions/media-role-classification.md)                                         | future architecture      | Long-term classification, role, readiness, and projection lessons. Historical schema examples are not current targets. |
 | [docs/decisions/work-scheduling.md](decisions/work-scheduling.md)                                                             | future architecture      | Long-term scheduler, priority, checkpoint, lease, and cancellation model.                                              |
 
+## User Decision Pattern
+
+| Doc                                                                                       | Role            | Ownership                                                                                                                                 |
+| ----------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [docs/library/user-decision-pattern-contract.md](library/user-decision-pattern-contract.md) | canonical owner | A-6 evidence/candidate/decision/projection separation, reusable decision verbs, target identity, provenance, recompute, and conflict law. |
+
 ## Track Identity Decisions
 
 | Doc                                                                                                                                   | Role            | Ownership                                                                                |

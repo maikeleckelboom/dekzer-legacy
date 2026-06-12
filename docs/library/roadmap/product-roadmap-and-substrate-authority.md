@@ -38,8 +38,12 @@ workflow.
 
 The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
 
-1. A-5 attachment occurrence substrate is implemented and ready for substrate audit at
-   `55fd90356cbfe63fc57693b2afee47d2bcd54b0c`. It must be accepted or repaired before dependent A-6 work begins.
+1. A-6 user decision pattern contract is ratified in `docs/library/user-decision-pattern-contract.md`. It is now the
+   reusable gate for later CUE association, canonical track identity, duplicate/relocation handling, prep facets,
+   source-file preference, and future stable item references.
+
+A-5 attachment occurrence remains the accepted evidence-only substrate feeding A-6. It does not decide duplicate song,
+safe deletion, preferred copy, accepted relocation, canonical track, cleanup, or track merge.
 
 Media probe observations, source integrity / collection health v0, primary-media promotion, exact-content track identity
 candidates, candidate decisions, explicit user decision commands, and the review-candidates read model are already
@@ -442,14 +446,14 @@ may proceed in parallel with Phase B.
 
 ---
 
-**A-6 [DOCTRINE] User decision pattern contract** [Doctrine gate]
+**A-6 [DOCTRINE] User decision pattern contract** [Ratified]
 
 Not a table. A law that every subsequent layer must conform to.
 
 Defines:
 
 - Evidence is always a separate record from decision
-- Decision kinds: accept / reject / override / prefer / pin / merge / split
+- Decision kinds: accept / reject / defer / ignore / override / prefer / pin / unpin / merge / split
 - Decisions reference the evidence row and basis they acted on
 - Decisions carry provenance
 - Machine recomputation does not silently overwrite decisions
@@ -457,7 +461,8 @@ Defines:
 
 Deliverable: `docs/library/user-decision-pattern-contract.md`
 
-**This gate must land before CUE association, track identity, and prep facet schemas are designed.**
+**This gate is now in force before CUE association, canonical track identity, duplicate/relocation handling, and prep
+facet schemas are designed.**
 
 ---
 
