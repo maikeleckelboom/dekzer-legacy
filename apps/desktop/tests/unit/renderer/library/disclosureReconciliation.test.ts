@@ -40,8 +40,333 @@ describe('createDisclosureReconciler', () => {
     })
 
     expect(requested).toEqual(['navigation-row:7', 'source-directory:12'])
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toEqual({ status: 'pending' })
+    expect(reconciler.getLedgerEntry('source-directory:12')).toEqual({ status: 'pending' })
     expect(requestNodeChildren).toHaveBeenCalledWith('navigation-row:7')
     expect(requestNodeChildren).toHaveBeenCalledWith('source-directory:12')
+  })
+
+  it('clears pending ledger entries when expanded source and directory children load', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren })
+    const projection = projectionWithBindings(
+      sourceBinding('navigation-row:7'),
+      directoryBinding('source-directory:12', '12')
+    )
+    const expandedNodeIds = new Set(['navigation-row:7', 'source-directory:12'])
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map([['12', { kind: 'unloaded' }]])
+    })
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toEqual({ status: 'pending' })
+    expect(reconciler.getLedgerEntry('source-directory:12')).toEqual({ status: 'pending' })
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'loaded',
+            children: loadedChildren([])
+          }
+        ]
+      ]),
+      directoryReadStates: new Map([
+        [
+          '12',
+          {
+            kind: 'loaded',
+            children: loadedChildren([], { parentDirectoryId: '12' })
+          }
+        ]
+      ])
+    })
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toBeUndefined()
+    expect(reconciler.getLedgerEntry('source-directory:12')).toBeUndefined()
+  })
+
+  it('clears ledger entries for collapsed nodes', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren })
+    const projection = projectionWithBindings(sourceBinding('navigation-row:7'))
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds: new Set(['navigation-row:7']),
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map()
+    })
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toEqual({ status: 'pending' })
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds: new Set(),
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map()
+    })
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toBeUndefined()
+  })
+
+  it('clears ledger entries when current bindings disappear', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren })
+    const expandedNodeIds = new Set(['navigation-row:7'])
+
+    reconciler.reconcile({
+      projection: projectionWithBindings(sourceBinding('navigation-row:7')),
+      expandedNodeIds,
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map()
+    })
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toEqual({ status: 'pending' })
+
+    reconciler.reconcile({
+      projection: projectionWithBindings(),
+      expandedNodeIds,
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map()
+    })
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toBeUndefined()
+  })
+
+  it('transitions pending source and directory ledger entries to failed from read state', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren, now: () => 1234 })
+    const projection = projectionWithBindings(
+      sourceBinding('navigation-row:7'),
+      directoryBinding('source-directory:12', '12')
+    )
+    const expandedNodeIds = new Set(['navigation-row:7', 'source-directory:12'])
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map([['12', { kind: 'unloaded' }]])
+    })
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'failed',
+            detail: 'Source read failed.',
+            errorCode: 'readFailed'
+          }
+        ]
+      ]),
+      directoryReadStates: new Map([
+        [
+          '12',
+          {
+            kind: 'failed',
+            detail: 'Directory read failed.',
+            errorCode: 'readFailed'
+          }
+        ]
+      ])
+    })
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toEqual({
+      status: 'failed',
+      reason: 'Source read failed.',
+      failedAt: 1234
+    })
+    expect(reconciler.getLedgerEntry('source-directory:12')).toEqual({
+      status: 'failed',
+      reason: 'Directory read failed.',
+      failedAt: 1234
+    })
+  })
+
+  it('suppresses automatic retries while a failed ledger entry exists', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren, now: () => 1234 })
+    const projection = projectionWithBindings(sourceBinding('navigation-row:7'))
+    const expandedNodeIds = new Set(['navigation-row:7'])
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map()
+    })
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'failed',
+            detail: 'Source read failed.',
+            errorCode: 'readFailed'
+          }
+        ]
+      ]),
+      directoryReadStates: new Map()
+    })
+
+    requestNodeChildren.mockClear()
+
+    const requested = reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'failed',
+            detail: 'Source read failed.',
+            errorCode: 'readFailed'
+          }
+        ]
+      ]),
+      directoryReadStates: new Map()
+    })
+
+    expect(requested).toEqual([])
+    expect(requestNodeChildren).not.toHaveBeenCalled()
+  })
+
+  it('clears only failed entries on scan-completion recovery', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren, now: () => 1234 })
+    const projection = projectionWithBindings(
+      sourceBinding('navigation-row:7'),
+      sourceBinding('navigation-row:9')
+    )
+    const expandedNodeIds = new Set(['navigation-row:7', 'navigation-row:9'])
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        ['navigation-row:7', { kind: 'unloaded' }],
+        ['navigation-row:9', { kind: 'unloaded' }]
+      ]),
+      directoryReadStates: new Map()
+    })
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'failed',
+            detail: 'Source read failed.',
+            errorCode: 'readFailed'
+          }
+        ],
+        ['navigation-row:9', { kind: 'unloaded' }]
+      ]),
+      directoryReadStates: new Map()
+    })
+
+    reconciler.clearFailed()
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toBeUndefined()
+    expect(reconciler.getLedgerEntry('navigation-row:9')).toEqual({ status: 'pending' })
+  })
+
+  it('requests an expanded failed node again after failed entries are cleared', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren, now: () => 1234 })
+    const projection = projectionWithBindings(sourceBinding('navigation-row:7'))
+    const expandedNodeIds = new Set(['navigation-row:7'])
+    const failedSourceStates = new Map([
+      [
+        'navigation-row:7',
+        {
+          kind: 'failed',
+          detail: 'Source read failed.',
+          errorCode: 'readFailed'
+        }
+      ]
+    ] as const)
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([['navigation-row:7', { kind: 'unloaded' }]]),
+      directoryReadStates: new Map()
+    })
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: failedSourceStates,
+      directoryReadStates: new Map()
+    })
+    reconciler.clearFailed()
+    requestNodeChildren.mockClear()
+
+    const requested = reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: failedSourceStates,
+      directoryReadStates: new Map()
+    })
+
+    expect(requested).toEqual(['navigation-row:7'])
+    expect(requestNodeChildren).toHaveBeenCalledWith('navigation-row:7')
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toEqual({ status: 'pending' })
+  })
+
+  it('clears failed entries for explicit user retry without clearing pending entries', () => {
+    const requestNodeChildren = vi.fn()
+    const reconciler = createDisclosureReconciler({ requestNodeChildren, now: () => 1234 })
+    const projection = projectionWithBindings(
+      sourceBinding('navigation-row:7'),
+      sourceBinding('navigation-row:9')
+    )
+    const expandedNodeIds = new Set(['navigation-row:7', 'navigation-row:9'])
+
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        ['navigation-row:7', { kind: 'unloaded' }],
+        ['navigation-row:9', { kind: 'unloaded' }]
+      ]),
+      directoryReadStates: new Map()
+    })
+    reconciler.reconcile({
+      projection,
+      expandedNodeIds,
+      sourceReadStates: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'failed',
+            detail: 'Source read failed.',
+            errorCode: 'readFailed'
+          }
+        ],
+        ['navigation-row:9', { kind: 'unloaded' }]
+      ]),
+      directoryReadStates: new Map()
+    })
+
+    reconciler.clearFailedForNode('navigation-row:7')
+    reconciler.clearFailedForNode('navigation-row:9')
+
+    expect(reconciler.getLedgerEntry('navigation-row:7')).toBeUndefined()
+    expect(reconciler.getLedgerEntry('navigation-row:9')).toEqual({ status: 'pending' })
   })
 
   it('does nothing for expanded node IDs whose bindings are absent', () => {

@@ -450,6 +450,15 @@ describe('panel runtime wiring', () => {
     expect(panel).toContain('expandedNodeIds: expandedIds')
     expect(panel).not.toContain('requestNodeChildrenIfExpandable')
   })
+
+  it('clears failed disclosure ledger entries from scan completion and manual retries', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain("event.kind === 'sourceScanCompleted'")
+    expect(panel).toContain('disclosureReconciler.clearFailed()')
+    expect(panel).toContain('disclosureReconciler.clearFailedForNode(nodeId)')
+    expect(panel).toContain('disclosureReconciler.clearFailedForNode(action.nodeId)')
+  })
 })
 
 function testDeps(overrides: Partial<RefreshPlanDeps> = {}): RefreshPlanDeps {

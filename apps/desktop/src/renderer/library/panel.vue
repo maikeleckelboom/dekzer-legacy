@@ -313,8 +313,14 @@ watch(
 watch(
   () => boundaryEvents.sourceScanSignal.value,
   () => {
+    const events = boundaryEvents.consumeSourceScanEvents()
+
+    if (events.some((event) => event.kind === 'sourceScanCompleted')) {
+      disclosureReconciler.clearFailed()
+    }
+
     const plan = buildScanPlan({
-      events: boundaryEvents.consumeSourceScanEvents(),
+      events,
       sourceLifecycleSourceIds: sourceLifecycleSourceIds.value
     })
 
@@ -488,6 +494,7 @@ function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
   saveViewState()
 
+  disclosureReconciler.clearFailedForNode(nodeId)
   void hierarchyRead.requestNodeChildren(nodeId)
 }
 
@@ -561,6 +568,7 @@ function activateContentRowAction(row: ContentRow): void {
   if (action.kind === 'loadChildren') {
     expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
     saveViewState()
+    disclosureReconciler.clearFailedForNode(action.nodeId)
     void hierarchyRead.requestNodeChildren(action.nodeId)
   } else if (action.kind === 'loadContentsPage') {
     void contentsRead.readForBinding(browserProjection.value?.bindingsById.get(action.nodeId), {
