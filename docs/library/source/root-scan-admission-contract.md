@@ -47,22 +47,28 @@ not replace it with a minimal interpretation.
 
 Source registration is an admission boundary, not a promise to create a source row.
 
+Arc A implements source registration proposals and broad-root admission guards only. Arc A does not implement density
+sampling, scan-plan confirmation, `ConfirmSourceRegistrationProposal`, or any equivalent confirmation command.
+
 Broad/system/risky root selection creates a registration proposal, not a source root. This includes system-volume
 roots, broad drive roots, user-profile roots, network/cloud roots when cheaply detectable, indirection roots, and
 unknown risky roots. Source root creation happens only after admission. Arc A creates proposals but intentionally
-provides no confirmation command or conversion path from proposal to source.
+provides no confirmation command or conversion path from proposal to source. Arc A provides no path that converts a
+broad/system proposal into a source root.
 
 Protected root selection is rejected, not negotiated. Protected/system-owned locations such as Windows, Program Files,
 ProgramData, System Volume Information, Recovery, WindowsApps, and equivalent cheaply detectable locations must not be
-stored as proposals or sources.
+stored as proposals or sources. In Arc A, `protectedRoot` is rejected: it must not return `proposalRequired`, must not
+create a source row, and must not create a proposed proposal row. Arc A does not store rejected protected-root attempts.
+Arc A does not implement limited protected-root scanning.
 
 Registration proposals are distinct from sources. They are not scannable, are not returned by local-root reads, do not
 create source lifecycle/navigation/browser/scan/maintenance state, and are idempotent by canonical path while their
 status is proposed.
 
 `StartRootScan` is only for admitted source roots. It must defensively reject broad/system/risky/protected roots even if
-a legacy or manually inserted source row points at such a path. Density preflight, scan-plan confirmation, and broad
-scan execution are later arcs.
+a legacy or manually inserted source row points at such a path, because those roots lack confirmed scan-plan admission.
+Density preflight, scan-plan confirmation, limited protected-root scanning, and broad scan execution are later arcs.
 
 ## Core law
 
@@ -218,7 +224,7 @@ Before scanning, Dekzer classifies the selected root.
 | user_profile_root  | C:\Users\Maikel, /home/user              | Warn, suggest Music, Downloads, Desktop, or chosen subfolders.              |
 | cloud_backed_root  | OneDrive, Dropbox, iCloud, Google Drive  | Warn about placeholders, hydration, offline behavior, and provider churn.   |
 | network_root       | NAS, SMB share, mounted share            | Use latency/offline-aware plan.                                             |
-| protected_root     | system/protected/inaccessible path       | Reject or allow limited scan only when readable.                            |
+| protected_root     | system/protected/inaccessible path       | Arc A: reject. Future limited protected scanning requires a separate contract and must not reuse registration proposals. |
 | indirection_root   | shortcut, symlink, junction, mount point | Resolve, classify target, show indirection before scan.                     |
 | unknown_root       | identity or access cannot be determined  | Require conservative plan.                                                  |
 
@@ -617,6 +623,9 @@ The registration proposal state and scan job state are separate. A broad-root pl
 same thing as a running scan job.
 
 ### Registration proposal state
+
+Arc A can create PlanProposed-like proposal records, but Arc A has no confirmation transition. The Confirmed transition
+is future scope and requires density/preflight/scan-plan semantics first.
 
 ```mermaid
 stateDiagram-v2

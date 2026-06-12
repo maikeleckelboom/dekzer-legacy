@@ -3,8 +3,9 @@ use rusqlite::Connection;
 use super::*;
 use crate::schema::install_baseline_schema_for_test;
 use crate::{
-    RecordSourceFileObservationInput, RegisterLocalRootInput, SqliteDurableStore,
-    UnregisterLocalRootInput, UpsertSourceDirectoryInput, UpsertSourceLocationInput,
+    LocalRoot, RecordSourceFileObservationInput, RegisterLocalRootInput, RegisterLocalRootResult,
+    SqliteDurableStore, UnregisterLocalRootInput, UpsertSourceDirectoryInput,
+    UpsertSourceLocationInput,
 };
 use library_domain::SourcePresenceState;
 use tempfile::TempDir;
@@ -13,6 +14,13 @@ fn open_connection() -> Connection {
     let mut connection = Connection::open_in_memory().expect("open in-memory");
     install_baseline_schema_for_test(&mut connection).expect("install schema");
     connection
+}
+
+fn expect_registered_root(result: RegisterLocalRootResult) -> LocalRoot {
+    match result {
+        RegisterLocalRootResult::Registered(root) => root,
+        other => panic!("expected registered local root, got {other:?}"),
+    }
 }
 
 fn seed_source(connection: &Connection) {
@@ -407,11 +415,13 @@ fn unregister_local_root_hides_rows_purges_rebuild_and_invalidates_old_cursor() 
     std::fs::create_dir_all(root_path.join("Music")).expect("create music directory");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path,
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path,
+            })
+            .expect("register local root"),
+    );
     let changed_at = 9_000_000_000_000i64;
     let directory_id = durable_store
         .upsert_source_directory(UpsertSourceDirectoryInput {

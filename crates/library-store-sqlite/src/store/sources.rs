@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use rusqlite::OptionalExtension;
@@ -109,19 +108,6 @@ pub enum RegisterLocalRootResult {
     Registered(LocalRoot),
     ProposalRequired(SourceRegistrationProposal),
     Rejected(SourceRegistrationRejection),
-}
-
-impl Deref for RegisterLocalRootResult {
-    type Target = LocalRoot;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Registered(root) => root,
-            Self::ProposalRequired(_) | Self::Rejected(_) => {
-                panic!("source registration did not produce a registered local root")
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

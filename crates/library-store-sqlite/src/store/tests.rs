@@ -1,8 +1,8 @@
 use super::discovery::{RootScanHierarchyObservationReason, RootScanObservation};
 use super::{
-    DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, RegisterLocalRootInput,
-    RegisterLocalRootResult, RootNavigationWindowEstablishmentState, SourceRegistrationRootClass,
-    SqliteDurableStore,
+    DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, LocalRoot,
+    RegisterLocalRootInput, RegisterLocalRootResult, RootNavigationWindowEstablishmentState,
+    SourceRegistrationRootClass, SqliteDurableStore,
 };
 use crate::authority::ingest::{DiscoveredFileInput, DiscoveryBatch};
 use crate::authority::roots::{
@@ -82,6 +82,13 @@ const FIXED_TOP_LEVEL_NAVIGATION_ROWS: &[(&str, &str, &str, &str, i64, &str)] = 
         "playlist_group",
     ),
 ];
+
+fn expect_registered_root(result: RegisterLocalRootResult) -> LocalRoot {
+    match result {
+        RegisterLocalRootResult::Registered(root) => root,
+        other => panic!("expected registered local root, got {other:?}"),
+    }
+}
 
 const REMOVED_HIGHER_BAR_NAVIGATION_STABLE_KEYS: &[&str] = &[
     "view:top_rated",
@@ -1364,11 +1371,13 @@ fn register_local_root_initializes_lifecycle_side_rows() {
     fs::create_dir_all(&root_path).expect("create root path");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
 
     let connection = open_mutation_connection(&db_path);
     let state_row = connection
@@ -1632,11 +1641,13 @@ fn register_local_root_establishes_immediate_root_child_directories_before_scan(
     fs::write(root_path.join("loose.wav"), b"not-real-wav").expect("write loose file");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
     assert_eq!(
         root_navigation_state(&db_path, root.root_id),
         Some(("established".to_string(), 2)),
@@ -1697,11 +1708,13 @@ fn empty_registration_writes_empty_root_navigation_state_without_marker_rows() {
     fs::create_dir_all(&root_path).expect("create empty root");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
 
     assert_eq!(
         root_navigation_state(&db_path, root.root_id),
@@ -1743,11 +1756,13 @@ fn empty_root_navigation_state_is_not_contents_empty_before_scan_coverage() {
     fs::create_dir_all(&root_path).expect("create empty root");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
 
     assert_eq!(
         root_navigation_state(&db_path, root.root_id),
@@ -1785,11 +1800,13 @@ fn newly_registered_source_with_loose_unscanned_files_is_not_contents_empty() {
     fs::write(root_path.join("loose.wav"), b"not-real-wav").expect("write loose file");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
 
     assert_eq!(
         root_navigation_state(&db_path, root.root_id),
@@ -1825,11 +1842,13 @@ fn established_non_empty_root_navigation_window_is_not_reestablished_while_idle(
     fs::create_dir_all(root_path.join("artists")).expect("create artists directory");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
 
     fs::remove_dir_all(root_path.join("artists")).expect("remove established child directory");
     let establishment = durable_store
@@ -1874,11 +1893,13 @@ fn established_empty_root_navigation_window_is_not_reestablished_while_idle() {
     fs::create_dir_all(&root_path).expect("create empty root");
 
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-    let root = durable_store
-        .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
-        })
-        .expect("register local root");
+    let root = expect_registered_root(
+        durable_store
+            .register_local_root(RegisterLocalRootInput {
+                absolute_path: root_path.clone(),
+            })
+            .expect("register local root"),
+    );
 
     fs::create_dir_all(root_path.join("late-child")).expect("create child after establishment");
     let establishment = durable_store
