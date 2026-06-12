@@ -438,6 +438,18 @@ describe('panel runtime wiring', () => {
       'refreshActiveSearchFilter: () => searchFilterRead.invalidationSignal()'
     )
   })
+
+  it('wires expanded disclosure reconciliation from panel state', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain(
+      "import { createDisclosureReconciler } from './runtime/disclosureReconciliation'"
+    )
+    expect(panel).toContain('const disclosureReconciler = createDisclosureReconciler')
+    expect(panel).toContain('disclosureReconciler.reconcile({')
+    expect(panel).toContain('expandedNodeIds: expandedIds')
+    expect(panel).not.toContain('requestNodeChildrenIfExpandable')
+  })
 })
 
 function testDeps(overrides: Partial<RefreshPlanDeps> = {}): RefreshPlanDeps {

@@ -19,6 +19,7 @@ import {
   executeRefreshPlan,
   type RefreshPlanDeps
 } from './runtime/invalidationRefresh'
+import { createDisclosureReconciler } from './runtime/disclosureReconciliation'
 import { useSearchFilterRead } from './runtime/searchFilterState'
 import { useRootLifecycle } from './runtime/rootLifecycle'
 import {
@@ -57,6 +58,9 @@ const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
 const searchFilterRead = useSearchFilterRead()
+const disclosureReconciler = createDisclosureReconciler({
+  requestNodeChildren: (nodeId) => hierarchyRead.requestNodeChildren(nodeId)
+})
 
 const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
   const root = rootActions.registeredRoot.value
@@ -224,6 +228,19 @@ watch(browserProjection, (projection) => {
   saveViewState()
 })
 
+watch(
+  [() => browserProjection.value, () => expandedNodeIds.value],
+  ([projection, expandedIds]) => {
+    disclosureReconciler.reconcile({
+      projection,
+      expandedNodeIds: expandedIds,
+      sourceReadStates: hierarchyRead.sourceReadStates.value,
+      directoryReadStates: hierarchyRead.directoryReadStates.value
+    })
+  },
+  { immediate: true }
+)
+
 watch(liveTreeNodes, () => {
   if (!restoreState.readStarted) {
     restoreState.readStarted = true
@@ -367,10 +384,6 @@ function applyRestoredExpansion(
   if (visibleIds.length > 0) {
     expandedNodeIds.value = new Set(visibleIds)
     restoreState.initialNodeApplied = true
-
-    for (const nodeId of visibleIds) {
-      requestNodeChildrenIfExpandable(nodeId, bindingsById)
-    }
   }
 
   if (pendingIds.length > 0) {
@@ -411,23 +424,6 @@ function applyPendingRestoreIds(): void {
   pendingRestoreIds.value = remainingIds
   expandedNodeIds.value = new Set([...expandedNodeIds.value, ...appliedIds])
   restoreState.initialNodeApplied = true
-
-  for (const nodeId of appliedIds) {
-    requestNodeChildrenIfExpandable(nodeId, bindingsById)
-  }
-}
-
-function requestNodeChildrenIfExpandable(
-  nodeId: BrowserTreeNodeId,
-  bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>
-): void {
-  const binding = bindingsById.get(nodeId)
-
-  if (binding?.kind !== 'source' && binding?.kind !== 'directory') {
-    return
-  }
-
-  void hierarchyRead.requestNodeChildren(nodeId)
 }
 
 function markUserInteraction(): void {

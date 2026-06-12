@@ -4,7 +4,6 @@ import {
   createLibraryHierarchyReadController,
   type LibraryHierarchyReadApi
 } from '../../../../src/renderer/library/boundary/hierarchyRead'
-import { flattenVisibleTree } from '../../../../src/renderer/library/tree/listProjection'
 import type { BrowserTreeNode } from '../../../../src/renderer/library/tree/types'
 import type {
   ChildRow,
@@ -447,7 +446,7 @@ describe('createLibraryHierarchyReadController', () => {
     ])
   })
 
-  it('refreshBrowserWindows replays expanded descendant reads when bindings reappear', async () => {
+  it('refreshBrowserWindows does not fixed-point replay newly discovered expanded descendants', async () => {
     const readRequests: ReadRequest[] = []
     const expandedNodeIds = new Set([
       'navigation-row:7',
@@ -479,61 +478,11 @@ describe('createLibraryHierarchyReadController', () => {
 
     await expect(controller.refreshBrowserWindows(expandedNodeIds)).resolves.toBe(true)
 
-    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual([
-      'root',
-      '12',
-      '99'
-    ])
-    expect(controller.directoryReadStates.value.get('99')?.kind).toBe('loaded')
-    expect(
-      visibleItems(controller, expandedNodeIds).find((item) => item.id === 'source-directory:99')
-    ).toMatchObject({
-      id: 'source-directory:99',
-      isExpanded: true
-    })
-  })
-
-  it('refreshBrowserWindows does not re-expand a descendant after user collapse', async () => {
-    const readRequests: ReadRequest[] = []
-    const expandedNodeIds = new Set([
-      'navigation-row:7',
-      'source-directory:12',
-      'source-directory:99'
-    ])
-    const controller = createLibraryHierarchyReadController(
-      testLibraryApi({
-        readRows: async () => navigationSourceReadRowsResult(),
-        readChildren: async (request) => {
-          readRequests.push(structuredClone(request))
-
-          if (request.parentDirectoryId === '12') {
-            return loadedDirectoryReadResult('12')
-          }
-
-          if (request.parentDirectoryId === '99') {
-            return nestedDirectoryReadResult('99')
-          }
-
-          return directoryRootHierarchyReadResult()
-        }
-      })
-    )
-
-    await expect(controller.refreshNavigationRows()).resolves.toBe(true)
-    await expect(controller.refreshBrowserWindows(expandedNodeIds)).resolves.toBe(true)
-    readRequests.length = 0
-
-    const collapsedDescendantIds = new Set(['navigation-row:7', 'source-directory:12'])
-    await expect(controller.refreshBrowserWindows(collapsedDescendantIds)).resolves.toBe(true)
-
-    expect(
-      visibleItems(controller, collapsedDescendantIds).find(
-        (item) => item.id === 'source-directory:99'
-      )
-    ).toMatchObject({
-      id: 'source-directory:99',
-      isExpanded: false
-    })
+    expect(readRequests.map((request) => request.parentDirectoryId ?? 'root')).toEqual(['root'])
+    expect(controller.browserProjection.value?.bindingsById.has('source-directory:12')).toBe(true)
+    expect(controller.browserProjection.value?.bindingsById.has('source-directory:99')).toBe(false)
+    expect(controller.directoryReadStates.value.get('12')?.kind).toBe('unloaded')
+    expect(controller.directoryReadStates.value.get('99')).toBeUndefined()
   })
 
   it('load-more requests preserve parentDirectoryId, offset, and limit', async () => {
@@ -1228,16 +1177,6 @@ function treeNodes(
   }
 
   return projection.nodes
-}
-
-function visibleItems(
-  controller: ReturnType<typeof createLibraryHierarchyReadController>,
-  expandedNodeIds: ReadonlySet<string>
-): ReturnType<typeof flattenVisibleTree> {
-  return flattenVisibleTree({
-    nodes: treeNodes(controller),
-    expandedNodeIds
-  })
 }
 
 function firstProjectedDirectoryStateKind(

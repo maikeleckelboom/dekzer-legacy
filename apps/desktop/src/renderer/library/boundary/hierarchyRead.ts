@@ -273,47 +273,29 @@ export function createLibraryHierarchyReadController(
   async function refreshBrowserWindows(
     expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   ): Promise<boolean> {
+    const targets = browserWindowRefreshTargets(expandedNodeIds)
+
+    if (targets === undefined) {
+      return false
+    }
+
     let refreshedAny = false
     let allSucceeded = true
-    const refreshedSourceNodeIds = new Set<string>()
-    const refreshedDirectoryRequestKeys = new Set<string>()
 
-    for (;;) {
-      const targets = pendingBrowserWindowRefreshTargets({
-        expandedNodeIds,
-        refreshedSourceNodeIds,
-        refreshedDirectoryRequestKeys
-      })
+    for (const [nodeId, target] of targets.sourceTargets) {
+      refreshedAny = true
+      allSucceeded = (await readSource(nodeId, target)) && allSucceeded
+    }
 
-      if (targets === undefined) {
-        return refreshedAny ? allSucceeded : false
-      }
-
-      if (targets.sourceTargets.size === 0 && targets.directoryTargets.size === 0) {
-        break
-      }
-
-      for (const [nodeId, target] of targets.sourceTargets) {
-        refreshedSourceNodeIds.add(nodeId)
-        refreshedAny = true
-        allSucceeded = (await readSource(nodeId, target)) && allSucceeded
-      }
-
-      for (const [requestKey, target] of targets.directoryTargets) {
-        refreshedDirectoryRequestKeys.add(requestKey)
-        refreshedAny = true
-        allSucceeded = (await readDirectory(target)) && allSucceeded
-      }
+    for (const target of targets.directoryTargets.values()) {
+      refreshedAny = true
+      allSucceeded = (await readDirectory(target)) && allSucceeded
     }
 
     return refreshedAny ? allSucceeded : true
   }
 
-  function pendingBrowserWindowRefreshTargets(options: {
-    readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
-    readonly refreshedSourceNodeIds: ReadonlySet<string>
-    readonly refreshedDirectoryRequestKeys: ReadonlySet<string>
-  }):
+  function browserWindowRefreshTargets(expandedNodeIds: ReadonlySet<BrowserTreeNodeId>):
     | {
         readonly sourceTargets: ReadonlyMap<string, SourceTarget>
         readonly directoryTargets: ReadonlyMap<string, DirectoryTarget>
@@ -329,9 +311,7 @@ export function createLibraryHierarchyReadController(
     const directoryTargets = new Map<string, DirectoryTarget>()
 
     function addSourceTarget(nodeId: string, target: SourceTarget): void {
-      if (!options.refreshedSourceNodeIds.has(nodeId)) {
-        sourceTargets.set(nodeId, target)
-      }
+      sourceTargets.set(nodeId, target)
     }
 
     function addDirectoryTarget(
@@ -344,9 +324,7 @@ export function createLibraryHierarchyReadController(
       }
       const requestKey = createDirectoryRequestKey(target.entryPoint, target.directoryId)
 
-      if (!options.refreshedDirectoryRequestKeys.has(requestKey)) {
-        directoryTargets.set(requestKey, target)
-      }
+      directoryTargets.set(requestKey, target)
     }
 
     for (const [nodeId, binding] of projection.bindingsById) {
@@ -363,7 +341,7 @@ export function createLibraryHierarchyReadController(
       }
     }
 
-    for (const nodeId of options.expandedNodeIds) {
+    for (const nodeId of expandedNodeIds) {
       const binding = projection.bindingsById.get(nodeId)
 
       if (binding?.kind === 'source') {
