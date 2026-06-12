@@ -1,8 +1,15 @@
-import type { LocalRootRegistrationError, LocalRootRegistrationRoot } from './register'
+import type {
+  LocalRootRegistrationError,
+  LocalRootRegistrationProposal,
+  LocalRootRegistrationRejection,
+  LocalRootRegistrationRoot
+} from './register'
 
 export type LocalRootChoiceState =
   | 'canceled'
   | 'registered'
+  | 'proposalRequired'
+  | 'rejected'
   | 'hostUnavailable'
   | 'registrationFailed'
   | 'dialogFailed'
@@ -23,6 +30,17 @@ export type LocalRootChoiceResult =
       readonly root: LocalRootRegistrationRoot
     }
   | {
-      readonly state: Exclude<LocalRootChoiceState, 'canceled' | 'registered'>
+      readonly state: 'proposalRequired'
+      readonly proposal: LocalRootRegistrationProposal
+    }
+  | {
+      readonly state: 'rejected'
+      readonly rejection: LocalRootRegistrationRejection
+    }
+  | {
+      readonly state: Exclude<
+        LocalRootChoiceState,
+        'canceled' | 'registered' | 'proposalRequired' | 'rejected'
+      >
       readonly error: LocalRootChoiceError
     }

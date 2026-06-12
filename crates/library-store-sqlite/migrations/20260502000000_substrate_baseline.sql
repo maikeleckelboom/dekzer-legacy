@@ -183,6 +183,38 @@ CREATE TABLE source_root_navigation_state
     CHECK (root_window_state != 'empty' OR immediate_child_directory_count = 0)
 ) STRICT;
 
+CREATE TABLE source_registration_proposals
+(
+    source_registration_proposal_id INTEGER PRIMARY KEY,
+    proposal_status                 TEXT    NOT NULL
+        CHECK (proposal_status IN ('proposed', 'discarded', 'expired')),
+    root_class                      TEXT    NOT NULL
+        CHECK (root_class IN (
+            'normal_music_root',
+            'broad_drive_root',
+            'system_volume_root',
+            'user_profile_root',
+            'cloud_backed_root',
+            'network_root',
+            'protected_root',
+            'indirection_root',
+            'unknown_root'
+        )),
+    requested_path                  TEXT    NOT NULL CHECK (length(trim(requested_path)) > 0),
+    canonical_path                  TEXT CHECK (canonical_path IS NULL OR length(trim(canonical_path)) > 0),
+    confirmation_required_reason    TEXT    NOT NULL CHECK (length(trim(confirmation_required_reason)) > 0),
+    suggested_roots_json            TEXT    NOT NULL CHECK (json_valid(suggested_roots_json)),
+    created_at                      INTEGER NOT NULL,
+    updated_at                      INTEGER NOT NULL,
+    CHECK (updated_at >= created_at),
+    CHECK (proposal_status != 'proposed' OR root_class != 'normal_music_root'),
+    CHECK (proposal_status != 'proposed' OR root_class != 'protected_root')
+) STRICT;
+
+CREATE UNIQUE INDEX source_registration_proposals_active_canonical_path
+    ON source_registration_proposals (COALESCE(canonical_path, requested_path))
+    WHERE proposal_status = 'proposed';
+
 CREATE TABLE source_locations
 (
     source_location_id INTEGER PRIMARY KEY,

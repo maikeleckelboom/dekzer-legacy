@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use rusqlite::OptionalExtension;
@@ -36,6 +37,91 @@ use super::{SqliteDurableStore, bootstrap::open_connection};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegisterLocalRootInput {
     pub absolute_path: PathBuf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceRegistrationRootClass {
+    NormalMusicRoot,
+    BroadDriveRoot,
+    SystemVolumeRoot,
+    UserProfileRoot,
+    CloudBackedRoot,
+    NetworkRoot,
+    ProtectedRoot,
+    IndirectionRoot,
+    UnknownRoot,
+}
+
+impl SourceRegistrationRootClass {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::NormalMusicRoot => "normal_music_root",
+            Self::BroadDriveRoot => "broad_drive_root",
+            Self::SystemVolumeRoot => "system_volume_root",
+            Self::UserProfileRoot => "user_profile_root",
+            Self::CloudBackedRoot => "cloud_backed_root",
+            Self::NetworkRoot => "network_root",
+            Self::ProtectedRoot => "protected_root",
+            Self::IndirectionRoot => "indirection_root",
+            Self::UnknownRoot => "unknown_root",
+        }
+    }
+
+    fn parse(value: &str) -> LibrarySqliteResult<Self> {
+        match value {
+            "normal_music_root" => Ok(Self::NormalMusicRoot),
+            "broad_drive_root" => Ok(Self::BroadDriveRoot),
+            "system_volume_root" => Ok(Self::SystemVolumeRoot),
+            "user_profile_root" => Ok(Self::UserProfileRoot),
+            "cloud_backed_root" => Ok(Self::CloudBackedRoot),
+            "network_root" => Ok(Self::NetworkRoot),
+            "protected_root" => Ok(Self::ProtectedRoot),
+            "indirection_root" => Ok(Self::IndirectionRoot),
+            "unknown_root" => Ok(Self::UnknownRoot),
+            other => Err(LibrarySqliteError::MalformedSchemaState(format!(
+                "unexpected value {other:?} for source_registration_proposals.root_class"
+            ))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceRegistrationProposal {
+    pub proposal_id: i64,
+    pub root_class: SourceRegistrationRootClass,
+    pub requested_path: PathBuf,
+    pub canonical_path: Option<PathBuf>,
+    pub confirmation_required_reason: String,
+    pub suggested_roots: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceRegistrationRejection {
+    pub root_class: SourceRegistrationRootClass,
+    pub requested_path: PathBuf,
+    pub canonical_path: Option<PathBuf>,
+    pub rejection_reason: String,
+    pub suggested_roots: Vec<PathBuf>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegisterLocalRootResult {
+    Registered(LocalRoot),
+    ProposalRequired(SourceRegistrationProposal),
+    Rejected(SourceRegistrationRejection),
+}
+
+impl Deref for RegisterLocalRootResult {
+    type Target = LocalRoot;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Registered(root) => root,
+            Self::ProposalRequired(_) | Self::Rejected(_) => {
+                panic!("source registration did not produce a registered local root")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -187,14 +273,48 @@ impl SqliteDurableStore {
     pub fn register_local_root(
         &self,
         input: RegisterLocalRootInput,
-    ) -> LibrarySqliteResult<LocalRoot> {
-        let resolved_root = self.bootstrap_root(&input.absolute_path)?;
-        let _ = self.establish_root_navigation_window(resolved_root.root_id)?;
-        Ok(LocalRoot {
-            root_id: resolved_root.root_id,
-            canonical_path: resolved_root.canonical_path,
-            availability: LocalRootAvailability::Available,
-        })
+    ) -> LibrarySqliteResult<RegisterLocalRootResult> {
+        match classify_source_registration_root(&input.absolute_path) {
+            SourceRegistrationAdmission::AdmitNormal { canonical_path } => {
+                let resolved_root = self.bootstrap_root(&canonical_path)?;
+                let _ = self.establish_root_navigation_window(resolved_root.root_id)?;
+                Ok(RegisterLocalRootResult::Registered(LocalRoot {
+                    root_id: resolved_root.root_id,
+                    canonical_path: resolved_root.canonical_path,
+                    availability: LocalRootAvailability::Available,
+                }))
+            }
+            SourceRegistrationAdmission::RequireProposal {
+                root_class,
+                requested_path,
+                canonical_path,
+                confirmation_required_reason,
+                suggested_roots,
+            } => self
+                .record_or_read_source_registration_proposal(
+                    root_class,
+                    requested_path,
+                    canonical_path,
+                    confirmation_required_reason,
+                    suggested_roots,
+                )
+                .map(RegisterLocalRootResult::ProposalRequired),
+            SourceRegistrationAdmission::Reject {
+                root_class,
+                requested_path,
+                canonical_path,
+                rejection_reason,
+                suggested_roots,
+            } => Ok(RegisterLocalRootResult::Rejected(
+                SourceRegistrationRejection {
+                    root_class,
+                    requested_path,
+                    canonical_path,
+                    rejection_reason,
+                    suggested_roots,
+                },
+            )),
+        }
     }
 
     pub fn read_local_roots(&self) -> LibrarySqliteResult<ReadLocalRootsResult> {
@@ -261,6 +381,90 @@ impl SqliteDurableStore {
             publication::reseed_projection_domains(write, &[ProjectionDomain::Navigation])?;
             Ok(UnregisterLocalRootResult { unregistered: true })
         })
+    }
+
+    fn record_or_read_source_registration_proposal(
+        &self,
+        root_class: SourceRegistrationRootClass,
+        requested_path: PathBuf,
+        canonical_path: Option<PathBuf>,
+        confirmation_required_reason: String,
+        suggested_roots: Vec<PathBuf>,
+    ) -> LibrarySqliteResult<SourceRegistrationProposal> {
+        let canonical_key = proposal_canonical_key(&requested_path, canonical_path.as_deref());
+        let requested_path_text = path_to_text(&requested_path);
+        let canonical_path_text = canonical_path.as_ref().map(|path| path_to_text(path));
+        let suggested_roots_json = serde_json::to_string(
+            &suggested_roots
+                .iter()
+                .map(|path| path_to_text(path))
+                .collect::<Vec<_>>(),
+        )
+        .map_err(|error| {
+            LibrarySqliteError::WriteInvariant(format!(
+                "failed to encode source registration proposal suggestions: {error}"
+            ))
+        })?;
+
+        self.with_write(|write| {
+            if let Some(existing) =
+                read_proposed_source_registration_proposal(write, &canonical_key)?
+            {
+                return Ok(existing);
+            }
+
+            let now_ms = unix_time_ms()?;
+            write.execute(
+                "INSERT INTO source_registration_proposals (
+                     proposal_status,
+                     root_class,
+                     requested_path,
+                     canonical_path,
+                     confirmation_required_reason,
+                     suggested_roots_json,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES ('proposed', ?1, ?2, ?3, ?4, ?5, ?6, ?6)",
+                rusqlite::params![
+                    root_class.as_str(),
+                    requested_path_text,
+                    canonical_path_text.as_deref(),
+                    confirmation_required_reason,
+                    suggested_roots_json,
+                    now_ms,
+                ],
+            )?;
+            let proposal_id = write.last_insert_rowid();
+            Ok(SourceRegistrationProposal {
+                proposal_id,
+                root_class,
+                requested_path,
+                canonical_path,
+                confirmation_required_reason,
+                suggested_roots,
+            })
+        })
+    }
+
+    pub fn classify_local_root_for_registration(
+        path: impl AsRef<Path>,
+    ) -> SourceRegistrationRootClass {
+        match classify_source_registration_root(path.as_ref()) {
+            SourceRegistrationAdmission::AdmitNormal { .. } => {
+                SourceRegistrationRootClass::NormalMusicRoot
+            }
+            SourceRegistrationAdmission::RequireProposal { root_class, .. }
+            | SourceRegistrationAdmission::Reject { root_class, .. } => root_class,
+        }
+    }
+
+    pub fn root_scan_admission_class(
+        &self,
+        root_id: i64,
+    ) -> LibrarySqliteResult<SourceRegistrationRootClass> {
+        let path = self.read_root_scan_path(root_id)?;
+        Ok(Self::classify_local_root_for_registration(path))
     }
 
     #[allow(dead_code)]
@@ -857,4 +1061,367 @@ pub(super) fn source_observation_basis_fingerprint(
     format!(
         "source-observation:file:{source_file_id}:path:{relative_path}:size:{size_fragment}:mtime:{mtime_fragment}:updated:{updated_at}"
     )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SourceRegistrationAdmission {
+    AdmitNormal {
+        canonical_path: PathBuf,
+    },
+    RequireProposal {
+        root_class: SourceRegistrationRootClass,
+        requested_path: PathBuf,
+        canonical_path: Option<PathBuf>,
+        confirmation_required_reason: String,
+        suggested_roots: Vec<PathBuf>,
+    },
+    Reject {
+        root_class: SourceRegistrationRootClass,
+        requested_path: PathBuf,
+        canonical_path: Option<PathBuf>,
+        rejection_reason: String,
+        suggested_roots: Vec<PathBuf>,
+    },
+}
+
+fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission {
+    let requested_path = path.to_path_buf();
+    let canonical_path = std::fs::canonicalize(path).ok();
+    let classification_path = canonical_path.as_deref().unwrap_or(path);
+    let suggested_roots = deterministic_suggested_music_roots();
+
+    if is_indirection_root(path) {
+        if canonical_path
+            .as_deref()
+            .is_some_and(is_protected_windows_location)
+        {
+            return SourceRegistrationAdmission::Reject {
+                root_class: SourceRegistrationRootClass::ProtectedRoot,
+                requested_path,
+                canonical_path,
+                rejection_reason:
+                    "indirection roots that resolve to protected locations cannot be registered"
+                        .to_string(),
+                suggested_roots,
+            };
+        }
+
+        return SourceRegistrationAdmission::RequireProposal {
+            root_class: SourceRegistrationRootClass::IndirectionRoot,
+            requested_path,
+            canonical_path,
+            confirmation_required_reason:
+                "indirection roots require a later scan-plan confirmation before admission"
+                    .to_string(),
+            suggested_roots,
+        };
+    }
+
+    if is_protected_windows_location(classification_path) {
+        return SourceRegistrationAdmission::Reject {
+            root_class: SourceRegistrationRootClass::ProtectedRoot,
+            requested_path,
+            canonical_path,
+            rejection_reason: "protected roots cannot be registered as sources".to_string(),
+            suggested_roots,
+        };
+    }
+
+    if is_network_root(classification_path) {
+        return proposal_required(
+            SourceRegistrationRootClass::NetworkRoot,
+            requested_path,
+            canonical_path,
+            "network roots require a later latency-aware scan-plan confirmation",
+            suggested_roots,
+        );
+    }
+
+    if is_cloud_backed_root(classification_path) {
+        return proposal_required(
+            SourceRegistrationRootClass::CloudBackedRoot,
+            requested_path,
+            canonical_path,
+            "cloud-backed roots require a later provider-aware scan-plan confirmation",
+            suggested_roots,
+        );
+    }
+
+    if is_user_profile_root(classification_path) {
+        return proposal_required(
+            SourceRegistrationRootClass::UserProfileRoot,
+            requested_path,
+            canonical_path,
+            "user profile roots require a later scan-plan confirmation",
+            suggested_roots,
+        );
+    }
+
+    if is_system_drive_root(classification_path) {
+        let canonical_path = canonical_path.or_else(|| normalized_windows_drive_root(path));
+        return proposal_required(
+            SourceRegistrationRootClass::SystemVolumeRoot,
+            requested_path,
+            canonical_path,
+            "system volume roots require a later scan-plan confirmation",
+            suggested_roots,
+        );
+    }
+
+    if is_windows_drive_root(classification_path) {
+        let canonical_path = canonical_path.or_else(|| normalized_windows_drive_root(path));
+        return proposal_required(
+            SourceRegistrationRootClass::BroadDriveRoot,
+            requested_path,
+            canonical_path,
+            "drive roots require a later broad-root scan-plan confirmation",
+            suggested_roots,
+        );
+    }
+
+    if is_unknown_risky_root(classification_path) {
+        return proposal_required(
+            SourceRegistrationRootClass::UnknownRoot,
+            requested_path,
+            canonical_path,
+            "unknown root selections require a later scan-plan confirmation",
+            suggested_roots,
+        );
+    }
+
+    match canonical_path {
+        Some(canonical_path) => SourceRegistrationAdmission::AdmitNormal { canonical_path },
+        None => SourceRegistrationAdmission::Reject {
+            root_class: SourceRegistrationRootClass::UnknownRoot,
+            requested_path,
+            canonical_path: None,
+            rejection_reason: "root path could not be safely canonicalized for registration"
+                .to_string(),
+            suggested_roots,
+        },
+    }
+}
+
+fn proposal_required(
+    root_class: SourceRegistrationRootClass,
+    requested_path: PathBuf,
+    canonical_path: Option<PathBuf>,
+    confirmation_required_reason: &str,
+    suggested_roots: Vec<PathBuf>,
+) -> SourceRegistrationAdmission {
+    SourceRegistrationAdmission::RequireProposal {
+        root_class,
+        requested_path,
+        canonical_path,
+        confirmation_required_reason: confirmation_required_reason.to_string(),
+        suggested_roots,
+    }
+}
+
+fn read_proposed_source_registration_proposal(
+    connection: &rusqlite::Connection,
+    canonical_key: &str,
+) -> LibrarySqliteResult<Option<SourceRegistrationProposal>> {
+    connection
+        .query_row(
+            "SELECT source_registration_proposal_id,
+                    root_class,
+                    requested_path,
+                    canonical_path,
+                    confirmation_required_reason,
+                    suggested_roots_json
+             FROM source_registration_proposals
+             WHERE proposal_status = 'proposed'
+               AND COALESCE(canonical_path, requested_path) = ?1",
+            [canonical_key],
+            |row| {
+                let root_class_text: String = row.get(1)?;
+                let requested_path: String = row.get(2)?;
+                let canonical_path: Option<String> = row.get(3)?;
+                let suggested_roots_json: String = row.get(5)?;
+                let suggested_roots = serde_json::from_str::<Vec<String>>(&suggested_roots_json)
+                    .map_err(|error| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            5,
+                            rusqlite::types::Type::Text,
+                            Box::new(error),
+                        )
+                    })?
+                    .into_iter()
+                    .map(PathBuf::from)
+                    .collect::<Vec<_>>();
+
+                let root_class =
+                    SourceRegistrationRootClass::parse(&root_class_text).map_err(|error| {
+                        rusqlite::Error::FromSqlConversionFailure(
+                            1,
+                            rusqlite::types::Type::Text,
+                            Box::new(error),
+                        )
+                    })?;
+
+                Ok(SourceRegistrationProposal {
+                    proposal_id: row.get(0)?,
+                    root_class,
+                    requested_path: PathBuf::from(requested_path),
+                    canonical_path: canonical_path.map(PathBuf::from),
+                    confirmation_required_reason: row.get(4)?,
+                    suggested_roots,
+                })
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn proposal_canonical_key(requested_path: &Path, canonical_path: Option<&Path>) -> String {
+    path_to_text(canonical_path.unwrap_or(requested_path))
+}
+
+fn is_indirection_root(path: &Path) -> bool {
+    let Ok(metadata) = std::fs::symlink_metadata(path) else {
+        return false;
+    };
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+fn is_network_root(path: &Path) -> bool {
+    let text = comparable_path_text(path);
+    text.starts_with("//") && !text.starts_with("//?/")
+}
+
+fn is_cloud_backed_root(path: &Path) -> bool {
+    let path_text = comparable_path_text(path);
+    for var_name in [
+        "OneDrive",
+        "OneDriveConsumer",
+        "OneDriveCommercial",
+        "Dropbox",
+        "iCloudDrive",
+    ] {
+        let Ok(value) = std::env::var(var_name) else {
+            continue;
+        };
+        if value.trim().is_empty() {
+            continue;
+        }
+        let cloud_root = comparable_path_text(Path::new(&value));
+        if path_text == cloud_root || path_text.starts_with(&(cloud_root + "/")) {
+            return true;
+        }
+    }
+    false
+}
+
+fn is_user_profile_root(path: &Path) -> bool {
+    let Ok(user_profile) = std::env::var("USERPROFILE") else {
+        return false;
+    };
+    if user_profile.trim().is_empty() {
+        return false;
+    }
+    comparable_path_text(path) == comparable_path_text(Path::new(&user_profile))
+}
+
+fn is_system_drive_root(path: &Path) -> bool {
+    let Some(drive_letter) = windows_drive_root_letter(path) else {
+        return false;
+    };
+    let system_drive = std::env::var("SystemDrive")
+        .ok()
+        .and_then(|value| value.chars().find(|c| c.is_ascii_alphabetic()))
+        .unwrap_or('C')
+        .to_ascii_uppercase();
+    drive_letter == system_drive && is_windows_drive_root(path)
+}
+
+fn is_windows_drive_root(path: &Path) -> bool {
+    windows_drive_root_letter(path).is_some()
+}
+
+fn windows_drive_root_letter(path: &Path) -> Option<char> {
+    let text = comparable_path_text(path);
+    let bytes = text.as_bytes();
+    if bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' {
+        return Some((bytes[0] as char).to_ascii_uppercase());
+    }
+    if bytes.len() == 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'/' {
+        return Some((bytes[0] as char).to_ascii_uppercase());
+    }
+    None
+}
+
+fn normalized_windows_drive_root(path: &Path) -> Option<PathBuf> {
+    windows_drive_root_letter(path).map(|letter| PathBuf::from(format!("{letter}:\\")))
+}
+
+fn is_unknown_risky_root(path: &Path) -> bool {
+    comparable_path_text(path) == "/"
+}
+
+fn is_protected_windows_location(path: &Path) -> bool {
+    let text = comparable_path_text(path);
+    let without_drive = if text.len() >= 3
+        && text.as_bytes()[0].is_ascii_alphabetic()
+        && text.as_bytes()[1] == b':'
+        && text.as_bytes()[2] == b'/'
+    {
+        &text[3..]
+    } else {
+        text.as_str()
+    };
+    let first_segment = without_drive.split('/').find(|segment| !segment.is_empty());
+    matches!(
+        first_segment,
+        Some(
+            "windows"
+                | "program files"
+                | "program files (x86)"
+                | "programdata"
+                | "system volume information"
+                | "recovery"
+                | "windowsapps"
+        )
+    ) || without_drive
+        .split('/')
+        .any(|segment| segment == "windowsapps")
+}
+
+fn deterministic_suggested_music_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        if !user_profile.trim().is_empty() {
+            roots.push(Path::new(&user_profile).join("Music"));
+        }
+    }
+    roots
+}
+
+fn path_to_text(path: &Path) -> String {
+    path.to_string_lossy().to_string()
+}
+
+fn comparable_path_text(path: &Path) -> String {
+    let mut text = path_to_text(path).replace('\\', "/");
+    if let Some(stripped) = text.strip_prefix("//?/") {
+        text = stripped.to_string();
+    }
+    while text.len() > 3 && text.ends_with('/') {
+        text.pop();
+    }
+    text.to_ascii_lowercase()
 }

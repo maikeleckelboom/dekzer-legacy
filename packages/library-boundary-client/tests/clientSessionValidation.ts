@@ -45,7 +45,7 @@ type RegisterLocalRootReturnIsGenerated = AssertType<
 >
 
 type RegisterLocalRootIdStaysString = AssertType<
-  EqualTypes<RegisterLocalRootReply['rootId'], string>
+  EqualTypes<Extract<RegisterLocalRootReply, { type: 'registered' }>['payload']['rootId'], string>
 >
 
 type HashSourceFilesBlake3ReturnIsGenerated = AssertType<
@@ -240,8 +240,11 @@ async function validatesRegisterLocalRootRequestAndReply(): Promise<void> {
       payload: {
         type: 'registerLocalRoot',
         payload: {
-          rootId: 'root-1',
-          canonicalPath: 'C:/Music'
+          type: 'registered',
+          payload: {
+            rootId: 'root-1',
+            canonicalPath: 'C:/Music'
+          }
         }
       }
     })
@@ -263,8 +266,12 @@ async function validatesRegisterLocalRootRequestAndReply(): Promise<void> {
     } satisfies CommandRequest,
     'registerLocalRoot sends the generated boundary command'
   )
-  equal(reply.rootId, 'root-1', 'registerLocalRoot unwraps the reply payload')
-  equal(typeof reply.rootId, 'string', 'rootId remains a generated string id')
+  equal(reply.type, 'registered', 'registerLocalRoot unwraps the reply payload')
+  if (reply.type !== 'registered') {
+    throw new Error(`expected registered reply, got ${reply.type}`)
+  }
+  equal(reply.payload.rootId, 'root-1', 'registered root id is preserved')
+  equal(typeof reply.payload.rootId, 'string', 'rootId remains a generated string id')
 }
 
 async function validatesHashSourceFilesBlake3RequestAndReply(): Promise<void> {

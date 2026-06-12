@@ -2,7 +2,11 @@ import type { ComputedRef, Ref } from 'vue'
 import { computed, ref } from 'vue'
 
 import type { LocalRootChoiceResult } from '../../../shared/library/roots/chooseLocal'
-import type { LocalRootRegistrationRoot } from '../../../shared/library/roots/register'
+import type {
+  LocalRootRegistrationProposal,
+  LocalRootRegistrationRejection,
+  LocalRootRegistrationRoot
+} from '../../../shared/library/roots/register'
 import type { LocalRoot, ReadLocalRootsOutcome } from '../../../shared/library/roots/read'
 import type {
   LocalRootScanErrorState,
@@ -13,7 +17,14 @@ import type { RendererApi } from '../../../shared/rendererApi'
 
 export type LibraryRootActionsApi = RendererApi['library']['roots']
 
-export type LocalRootChoiceStatus = 'idle' | 'choosing' | 'canceled' | 'registered' | 'failed'
+export type LocalRootChoiceStatus =
+  | 'idle'
+  | 'choosing'
+  | 'canceled'
+  | 'registered'
+  | 'proposalRequired'
+  | 'rejected'
+  | 'failed'
 
 export type LocalRootScanStatus =
   | 'idle'
@@ -40,6 +51,8 @@ export type LocalRootScanSummary = {
 export type LocalRootActionsController = {
   readonly rootChoiceStatus: Ref<LocalRootChoiceStatus>
   readonly registeredRoot: Ref<LocalRootRegistrationRoot | undefined>
+  readonly registrationProposal: Ref<LocalRootRegistrationProposal | undefined>
+  readonly registrationRejection: Ref<LocalRootRegistrationRejection | undefined>
   readonly registeredRootPath: ComputedRef<string | undefined>
   readonly rootChoiceButtonLabel: ComputedRef<string>
   readonly canChooseLocalRoot: ComputedRef<boolean>
@@ -80,6 +93,8 @@ export function createLocalRootActionsController(
   const rootChoiceStatus = ref<LocalRootChoiceStatus>('idle')
   const rootChoiceFailureMessage = ref<string>()
   const registeredRoot = ref<LocalRootRegistrationRoot>()
+  const registrationProposal = ref<LocalRootRegistrationProposal>()
+  const registrationRejection = ref<LocalRootRegistrationRejection>()
   const scanStatus = ref<LocalRootScanStatus>('idle')
   const scanSummary = ref<LocalRootScanSummary>()
   const scanFailureMessage = ref<string>()
@@ -153,10 +168,30 @@ export function createLocalRootActionsController(
       if (result.state === 'registered') {
         rootChoiceStatus.value = 'registered'
         registeredRoot.value = result.root
+        registrationProposal.value = undefined
+        registrationRejection.value = undefined
         localRootsReadState.value = { kind: 'unread' }
         resetRemoveState()
         resetScanState()
         return true
+      }
+
+      if (result.state === 'proposalRequired') {
+        rootChoiceStatus.value = 'proposalRequired'
+        registeredRoot.value = undefined
+        registrationProposal.value = result.proposal
+        registrationRejection.value = undefined
+        resetScanState()
+        return false
+      }
+
+      if (result.state === 'rejected') {
+        rootChoiceStatus.value = 'rejected'
+        registeredRoot.value = undefined
+        registrationProposal.value = undefined
+        registrationRejection.value = result.rejection
+        resetScanState()
+        return false
       }
 
       if (result.state === 'canceled') {
@@ -404,6 +439,8 @@ export function createLocalRootActionsController(
   return {
     rootChoiceStatus,
     registeredRoot,
+    registrationProposal,
+    registrationRejection,
     registeredRootPath,
     rootChoiceButtonLabel,
     canChooseLocalRoot,
@@ -441,7 +478,10 @@ function getRendererApi(): RendererApi {
 }
 
 function rootChoiceFailureFor(
-  state: Exclude<LocalRootChoiceResult['state'], 'canceled' | 'registered'>
+  state: Exclude<
+    LocalRootChoiceResult['state'],
+    'canceled' | 'registered' | 'proposalRequired' | 'rejected'
+  >
 ): string {
   switch (state) {
     case 'hostUnavailable':

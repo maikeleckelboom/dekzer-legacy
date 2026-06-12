@@ -29,6 +29,10 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadLibraryBoundaryEventsAfterRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryRootCommand>(&cfg, &mut output);
     push_ts_decl::<crate::RegisterLocalRootRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceRegistrationRootClass>(&cfg, &mut output);
+    push_ts_decl::<crate::RegisteredLocalRoot>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceRegistrationProposalRequired>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceRegistrationRejected>(&cfg, &mut output);
     push_ts_decl::<crate::StartRootScanRequest>(&cfg, &mut output);
     push_ts_decl::<crate::CancelRootScanRequest>(&cfg, &mut output);
     push_ts_decl::<crate::CancelRootScanStatus>(&cfg, &mut output);

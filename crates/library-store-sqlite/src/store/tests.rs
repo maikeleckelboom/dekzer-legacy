@@ -1,7 +1,8 @@
 use super::discovery::{RootScanHierarchyObservationReason, RootScanObservation};
 use super::{
     DurableStoreBootstrapStatus, DurableStoreSchemaCompatibilityState, RegisterLocalRootInput,
-    RootNavigationWindowEstablishmentState, SqliteDurableStore,
+    RegisterLocalRootResult, RootNavigationWindowEstablishmentState, SourceRegistrationRootClass,
+    SqliteDurableStore,
 };
 use crate::authority::ingest::{DiscoveredFileInput, DiscoveryBatch};
 use crate::authority::roots::{
@@ -120,6 +121,28 @@ fn root_navigation_state(path: &std::path::Path, source_id: i64) -> Option<(Stri
         )
         .optional()
         .expect("read root navigation state")
+}
+
+fn table_count(path: &std::path::Path, table_name: &str) -> i64 {
+    let connection = open_mutation_connection(path);
+    connection
+        .query_row(&format!("SELECT COUNT(*) FROM {table_name}"), [], |row| {
+            row.get(0)
+        })
+        .expect("count table rows")
+}
+
+fn proposed_registration_proposal_count(path: &std::path::Path) -> i64 {
+    let connection = open_mutation_connection(path);
+    connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM source_registration_proposals
+             WHERE proposal_status = 'proposed'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("count proposed registration proposals")
 }
 
 fn assert_fixed_top_level_navigation_rows(rows: &[crate::NavigationRow]) {
@@ -1389,6 +1412,214 @@ fn register_local_root_initializes_lifecycle_side_rows() {
         SourceAccessState::Accessible.as_str()
     );
     assert_eq!(lifecycle.scan_phase, SourceScanPhase::Idle.as_str());
+}
+
+#[test]
+fn normal_music_folder_registers_as_source_root() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let music_root = tempdir.path().join("Music");
+    fs::create_dir_all(&music_root).expect("create music root");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let result = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: music_root,
+        })
+        .expect("register local root");
+
+    assert!(matches!(result, RegisterLocalRootResult::Registered(_)));
+    assert_eq!(table_count(&db_path, "sources"), 1);
+    assert_eq!(table_count(&db_path, "source_locators"), 1);
+    assert_eq!(table_count(&db_path, "source_state"), 1);
+    assert_eq!(table_count(&db_path, "source_scan_state"), 1);
+    assert_eq!(proposed_registration_proposal_count(&db_path), 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_system_drive_root_registration_returns_proposal_without_source_rows() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let system_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
+    let root_path =
+        std::path::PathBuf::from(format!("{}\\", system_drive.trim_end_matches(['\\', '/'])));
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    assert_eq!(
+        SqliteDurableStore::classify_local_root_for_registration(&root_path),
+        SourceRegistrationRootClass::SystemVolumeRoot
+    );
+
+    let first = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path.clone(),
+        })
+        .expect("register system root");
+    let second = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path,
+        })
+        .expect("register system root again");
+
+    let (first_id, second_id) = match (first, second) {
+        (
+            RegisterLocalRootResult::ProposalRequired(first),
+            RegisterLocalRootResult::ProposalRequired(second),
+        ) => {
+            assert_eq!(
+                first.root_class,
+                SourceRegistrationRootClass::SystemVolumeRoot
+            );
+            assert_eq!(
+                second.root_class,
+                SourceRegistrationRootClass::SystemVolumeRoot
+            );
+            (first.proposal_id, second.proposal_id)
+        }
+        other => panic!("expected proposalRequired results, got {other:?}"),
+    };
+
+    assert_eq!(first_id, second_id);
+    assert_eq!(table_count(&db_path, "sources"), 0);
+    assert_eq!(table_count(&db_path, "source_locators"), 0);
+    assert_eq!(table_count(&db_path, "source_state"), 0);
+    assert_eq!(table_count(&db_path, "source_scan_state"), 0);
+    assert_eq!(table_count(&db_path, "source_root_navigation_state"), 0);
+    assert_eq!(proposed_registration_proposal_count(&db_path), 1);
+}
+
+#[cfg(windows)]
+#[test]
+fn broad_non_system_drive_root_registration_returns_proposal_without_source_rows() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let system_drive_letter = std::env::var("SystemDrive")
+        .ok()
+        .and_then(|value| value.chars().find(|c| c.is_ascii_alphabetic()))
+        .unwrap_or('C')
+        .to_ascii_uppercase();
+    let drive_letter = ('D'..='Z')
+        .find(|letter| *letter != system_drive_letter)
+        .expect("find non-system drive letter");
+    let root_path = std::path::PathBuf::from(format!("{drive_letter}:\\"));
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let result = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: root_path,
+        })
+        .expect("register broad drive root");
+
+    match result {
+        RegisterLocalRootResult::ProposalRequired(proposal) => {
+            assert_eq!(
+                proposal.root_class,
+                SourceRegistrationRootClass::BroadDriveRoot
+            );
+        }
+        other => panic!("expected proposalRequired result, got {other:?}"),
+    }
+    assert_eq!(table_count(&db_path, "sources"), 0);
+    assert_eq!(proposed_registration_proposal_count(&db_path), 1);
+}
+
+#[cfg(windows)]
+#[test]
+fn user_profile_root_registration_returns_proposal_when_detectable() {
+    let Ok(user_profile) = std::env::var("USERPROFILE") else {
+        return;
+    };
+    if user_profile.trim().is_empty() {
+        return;
+    }
+
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let result = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: std::path::PathBuf::from(user_profile),
+        })
+        .expect("register user profile root");
+
+    match result {
+        RegisterLocalRootResult::ProposalRequired(proposal) => {
+            assert_eq!(
+                proposal.root_class,
+                SourceRegistrationRootClass::UserProfileRoot
+            );
+        }
+        other => panic!("expected proposalRequired result, got {other:?}"),
+    }
+    assert_eq!(table_count(&db_path, "sources"), 0);
+    assert_eq!(proposed_registration_proposal_count(&db_path), 1);
+}
+
+#[cfg(windows)]
+#[test]
+fn protected_root_registration_is_rejected_without_source_or_proposal_rows() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let system_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
+    let windows_path = std::path::PathBuf::from(format!(
+        "{}\\Windows",
+        system_drive.trim_end_matches(['\\', '/'])
+    ));
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let result = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: windows_path,
+        })
+        .expect("register protected root");
+
+    match result {
+        RegisterLocalRootResult::Rejected(rejection) => {
+            assert_eq!(
+                rejection.root_class,
+                SourceRegistrationRootClass::ProtectedRoot
+            );
+        }
+        other => panic!("expected rejected result, got {other:?}"),
+    }
+    assert_eq!(table_count(&db_path, "sources"), 0);
+    assert_eq!(proposed_registration_proposal_count(&db_path), 0);
+}
+
+#[test]
+fn indirection_root_registration_returns_proposal_when_detectable() {
+    let tempdir = TempDir::new().expect("create tempdir");
+    let db_path = tempdir.path().join("library.sqlite3");
+    let target_path = tempdir.path().join("target-music");
+    fs::create_dir_all(&target_path).expect("create symlink target");
+    let link_path = tempdir.path().join("link-root");
+
+    #[cfg(windows)]
+    if std::os::windows::fs::symlink_dir(&target_path, &link_path).is_err() {
+        return;
+    }
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&target_path, &link_path).expect("create directory symlink");
+
+    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
+    let result = durable_store
+        .register_local_root(RegisterLocalRootInput {
+            absolute_path: link_path,
+        })
+        .expect("register indirection root");
+
+    match result {
+        RegisterLocalRootResult::ProposalRequired(proposal) => {
+            assert_eq!(
+                proposal.root_class,
+                SourceRegistrationRootClass::IndirectionRoot
+            );
+        }
+        other => panic!("expected proposalRequired result, got {other:?}"),
+    }
+    assert_eq!(table_count(&db_path, "sources"), 0);
+    assert_eq!(proposed_registration_proposal_count(&db_path), 1);
 }
 
 #[test]

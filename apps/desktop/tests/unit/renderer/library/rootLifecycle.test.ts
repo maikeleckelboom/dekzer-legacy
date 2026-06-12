@@ -49,6 +49,55 @@ describe('local root scan lifecycle', () => {
     expect(controller.scanStatus.value).toBe('scanning')
   })
 
+  it('keeps proposal and rejected registration outcomes non-scannable', async () => {
+    const proposalScan = vi.fn(async () => startedRootResult())
+    const proposalController = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () => ({
+          state: 'proposalRequired',
+          proposal: {
+            proposalId: 'proposal-1',
+            rootClass: 'systemVolumeRoot',
+            requestedPath: 'C:/',
+            canonicalPath: 'C:/',
+            confirmationRequiredReason: 'system volume roots require scan-plan confirmation',
+            suggestedRoots: ['C:/Users/Maikel/Music']
+          }
+        }),
+        runScan: proposalScan
+      })
+    )
+
+    await expect(proposalController.chooseAndRegisterLocalRoot()).resolves.toBe(false)
+    expect(proposalController.rootChoiceStatus.value).toBe('proposalRequired')
+    expect(proposalController.registeredRoot.value).toBeUndefined()
+    expect(proposalController.registrationProposal.value?.rootClass).toBe('systemVolumeRoot')
+    expect(proposalController.canRunRegisteredRootScan.value).toBe(false)
+    await expect(proposalController.runRegisteredRootScan()).resolves.toBe(false)
+    expect(proposalScan).not.toHaveBeenCalled()
+
+    const rejectedController = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () => ({
+          state: 'rejected',
+          rejection: {
+            rootClass: 'protectedRoot',
+            requestedPath: 'C:/Windows',
+            canonicalPath: 'C:/Windows',
+            rejectionReason: 'protected roots cannot be registered as sources',
+            suggestedRoots: ['C:/Users/Maikel/Music']
+          }
+        })
+      })
+    )
+
+    await expect(rejectedController.chooseAndRegisterLocalRoot()).resolves.toBe(false)
+    expect(rejectedController.rootChoiceStatus.value).toBe('rejected')
+    expect(rejectedController.registeredRoot.value).toBeUndefined()
+    expect(rejectedController.registrationRejection.value?.rootClass).toBe('protectedRoot')
+    expect(rejectedController.canRunRegisteredRootScan.value).toBe(false)
+  })
+
   it('refreshes after registration before scanning', async () => {
     const events: string[] = []
     const runScan = vi.fn(async (request) => {
@@ -745,7 +794,10 @@ function registeredChoice(
 }
 
 function failedChoice(
-  state: Exclude<LocalRootChoiceResult['state'], 'canceled' | 'registered'>
+  state: Exclude<
+    LocalRootChoiceResult['state'],
+    'canceled' | 'registered' | 'proposalRequired' | 'rejected'
+  >
 ): LocalRootChoiceResult {
   return {
     state,

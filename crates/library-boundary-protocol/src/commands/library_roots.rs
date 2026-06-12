@@ -92,12 +92,99 @@ pub struct RegisterLocalRootRequest {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct RegisterLocalRootReply {
+pub struct RegisteredLocalRoot {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
     #[ts(as = "String")]
     pub root_id: i64,
     pub canonical_path: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum SourceRegistrationRootClass {
+    NormalMusicRoot,
+    BroadDriveRoot,
+    SystemVolumeRoot,
+    UserProfileRoot,
+    CloudBackedRoot,
+    NetworkRoot,
+    ProtectedRoot,
+    IndirectionRoot,
+    UnknownRoot,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceRegistrationProposalRequired {
+    #[serde(with = "crate::wire::i64_string")]
+    #[schemars(with = "String")]
+    #[ts(as = "String")]
+    pub proposal_id: i64,
+    pub root_class: SourceRegistrationRootClass,
+    pub requested_path: String,
+    pub canonical_path: Option<String>,
+    pub confirmation_required_reason: String,
+    pub suggested_roots: Vec<String>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct SourceRegistrationRejected {
+    pub root_class: SourceRegistrationRootClass,
+    pub requested_path: String,
+    pub canonical_path: Option<String>,
+    pub rejection_reason: String,
+    pub suggested_roots: Vec<String>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+#[ts(tag = "type", content = "payload", rename_all = "camelCase")]
+pub enum RegisterLocalRootReply {
+    Registered(RegisteredLocalRoot),
+    ProposalRequired(SourceRegistrationProposalRequired),
+    Rejected(SourceRegistrationRejected),
 }
 
 #[derive(
@@ -294,8 +381,9 @@ mod tests {
         CancelRootScanReply, CancelRootScanRequest, CancelRootScanStatus, LibraryRootCommand,
         LibraryRootReply, LocalRoot, LocalRootAvailability, ReadLocalRootsReply,
         ReadLocalRootsRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
-        StartRootScanReply, StartRootScanRequest, UnregisterLocalRootReply,
-        UnregisterLocalRootRequest,
+        RegisteredLocalRoot, SourceRegistrationProposalRequired, SourceRegistrationRejected,
+        SourceRegistrationRootClass, StartRootScanReply, StartRootScanRequest,
+        UnregisterLocalRootReply, UnregisterLocalRootRequest,
     };
     use serde_json::json;
 
@@ -361,10 +449,32 @@ mod tests {
 
     #[test]
     fn library_root_replies_keep_durable_ids_as_strings() {
-        let registered = LibraryRootReply::RegisterLocalRoot(RegisterLocalRootReply {
-            root_id: 7,
-            canonical_path: "C:/Music".to_string(),
-        });
+        let registered = LibraryRootReply::RegisterLocalRoot(RegisterLocalRootReply::Registered(
+            RegisteredLocalRoot {
+                root_id: 7,
+                canonical_path: "C:/Music".to_string(),
+            },
+        ));
+        let proposal = LibraryRootReply::RegisterLocalRoot(
+            RegisterLocalRootReply::ProposalRequired(SourceRegistrationProposalRequired {
+                proposal_id: 11,
+                root_class: SourceRegistrationRootClass::SystemVolumeRoot,
+                requested_path: "C:/".to_string(),
+                canonical_path: Some("C:/".to_string()),
+                confirmation_required_reason: "system volume roots require scan-plan confirmation"
+                    .to_string(),
+                suggested_roots: vec!["C:/Users/Maikel/Music".to_string()],
+            }),
+        );
+        let rejected = LibraryRootReply::RegisterLocalRoot(RegisterLocalRootReply::Rejected(
+            SourceRegistrationRejected {
+                root_class: SourceRegistrationRootClass::ProtectedRoot,
+                requested_path: "C:/Windows".to_string(),
+                canonical_path: Some("C:/Windows".to_string()),
+                rejection_reason: "protected roots cannot be registered as sources".to_string(),
+                suggested_roots: vec!["C:/Users/Maikel/Music".to_string()],
+            },
+        ));
         let scanned = LibraryRootReply::StartRootScan(StartRootScanReply { scan_run_id: 1000 });
         let read_local = LibraryRootReply::ReadLocalRoots(ReadLocalRootsReply {
             roots: vec![LocalRoot {
@@ -381,8 +491,44 @@ mod tests {
             json!({
                 "type": "registerLocalRoot",
                 "payload": {
-                    "rootId": "7",
-                    "canonicalPath": "C:/Music"
+                    "type": "registered",
+                    "payload": {
+                        "rootId": "7",
+                        "canonicalPath": "C:/Music"
+                    }
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&proposal).expect("serialize proposal reply"),
+            json!({
+                "type": "registerLocalRoot",
+                "payload": {
+                    "type": "proposalRequired",
+                    "payload": {
+                        "proposalId": "11",
+                        "rootClass": "systemVolumeRoot",
+                        "requestedPath": "C:/",
+                        "canonicalPath": "C:/",
+                        "confirmationRequiredReason": "system volume roots require scan-plan confirmation",
+                        "suggestedRoots": ["C:/Users/Maikel/Music"]
+                    }
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&rejected).expect("serialize rejected reply"),
+            json!({
+                "type": "registerLocalRoot",
+                "payload": {
+                    "type": "rejected",
+                    "payload": {
+                        "rootClass": "protectedRoot",
+                        "requestedPath": "C:/Windows",
+                        "canonicalPath": "C:/Windows",
+                        "rejectionReason": "protected roots cannot be registered as sources",
+                        "suggestedRoots": ["C:/Users/Maikel/Music"]
+                    }
                 }
             })
         );

@@ -70,8 +70,10 @@ pub use source_file_media_probe::{
 };
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
-    RootNavigationWindowEstablishment, RootNavigationWindowEstablishmentState,
-    UnregisterLocalRootInput, UnregisterLocalRootResult,
+    RegisterLocalRootResult, RootNavigationWindowEstablishment,
+    RootNavigationWindowEstablishmentState, SourceRegistrationProposal,
+    SourceRegistrationRejection, SourceRegistrationRootClass, UnregisterLocalRootInput,
+    UnregisterLocalRootResult,
 };
 pub use track_identity_candidates::{
     ProduceTrackIdentityCandidatesForSourceResult, effective_track_identity_candidate_limit,

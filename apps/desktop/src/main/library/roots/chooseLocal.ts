@@ -103,6 +103,20 @@ function mapRegistrationResult(result: LocalRootRegistrationResult): LocalRootCh
     }
   }
 
+  if (result.state === 'proposalRequired') {
+    return {
+      state: 'proposalRequired',
+      proposal: result.proposal
+    }
+  }
+
+  if (result.state === 'rejected') {
+    return {
+      state: 'rejected',
+      rejection: result.rejection
+    }
+  }
+
   if (result.state === 'hostUnavailable') {
     return {
       state: 'hostUnavailable',

@@ -174,8 +174,11 @@ describe('local root registration boundaries', () => {
             registerLocalRoot: async (request) => {
               receivedAbsolutePath = request.absolutePath
               return {
-                rootId: '7',
-                canonicalPath: 'C:/Music'
+                type: 'registered',
+                payload: {
+                  rootId: '7',
+                  canonicalPath: 'C:/Music'
+                }
               }
             }
           })
@@ -184,6 +187,69 @@ describe('local root registration boundaries', () => {
       )
     ).resolves.toEqual(registeredRoot())
     expect(receivedAbsolutePath).toBe('C:/Music')
+
+    await expect(
+      registerLocalRoot(
+        await startedHostWithClient(
+          config,
+          createFakeClient({
+            registerLocalRoot: async () => ({
+              type: 'proposalRequired',
+              payload: {
+                proposalId: '11',
+                rootClass: 'systemVolumeRoot',
+                requestedPath: 'C:/',
+                canonicalPath: 'C:/',
+                confirmationRequiredReason:
+                  'system volume roots require a later scan-plan confirmation',
+                suggestedRoots: ['C:/Users/Maikel/Music']
+              }
+            })
+          })
+        ),
+        { absolutePath: 'C:/' }
+      )
+    ).resolves.toEqual({
+      state: 'proposalRequired',
+      proposal: {
+        proposalId: '11',
+        rootClass: 'systemVolumeRoot',
+        requestedPath: 'C:/',
+        canonicalPath: 'C:/',
+        confirmationRequiredReason: 'system volume roots require a later scan-plan confirmation',
+        suggestedRoots: ['C:/Users/Maikel/Music']
+      }
+    } satisfies LocalRootRegistrationResult)
+
+    await expect(
+      registerLocalRoot(
+        await startedHostWithClient(
+          config,
+          createFakeClient({
+            registerLocalRoot: async () => ({
+              type: 'rejected',
+              payload: {
+                rootClass: 'protectedRoot',
+                requestedPath: 'C:/Windows',
+                canonicalPath: 'C:/Windows',
+                rejectionReason: 'protected roots cannot be registered as sources',
+                suggestedRoots: ['C:/Users/Maikel/Music']
+              }
+            })
+          })
+        ),
+        { absolutePath: 'C:/Windows' }
+      )
+    ).resolves.toEqual({
+      state: 'rejected',
+      rejection: {
+        rootClass: 'protectedRoot',
+        requestedPath: 'C:/Windows',
+        canonicalPath: 'C:/Windows',
+        rejectionReason: 'protected roots cannot be registered as sources',
+        suggestedRoots: ['C:/Users/Maikel/Music']
+      }
+    } satisfies LocalRootRegistrationResult)
 
     await expect(
       registerLocalRoot(

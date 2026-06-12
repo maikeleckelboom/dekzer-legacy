@@ -30,12 +30,25 @@ export async function registerLocalRoot(
       absolutePath: normalizedRequest.absolutePath
     } satisfies RegisterLocalRootRequest)
 
-    return {
-      state: 'registered',
-      root: {
-        rootId: reply.rootId,
-        canonicalPath: reply.canonicalPath
-      }
+    switch (reply.type) {
+      case 'registered':
+        return {
+          state: 'registered',
+          root: {
+            rootId: reply.payload.rootId,
+            canonicalPath: reply.payload.canonicalPath
+          }
+        }
+      case 'proposalRequired':
+        return {
+          state: 'proposalRequired',
+          proposal: reply.payload
+        }
+      case 'rejected':
+        return {
+          state: 'rejected',
+          rejection: reply.payload
+        }
     }
   } catch {
     return createLocalRootRegistrationErrorResult(

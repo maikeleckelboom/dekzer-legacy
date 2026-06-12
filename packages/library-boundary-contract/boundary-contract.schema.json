@@ -3917,6 +3917,69 @@
       ]
     },
     "RegisterLocalRootReply": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RegisteredLocalRoot"
+            },
+            "type": {
+              "type": "string",
+              "const": "registered"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SourceRegistrationProposalRequired"
+            },
+            "type": {
+              "type": "string",
+              "const": "proposalRequired"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SourceRegistrationRejected"
+            },
+            "type": {
+              "type": "string",
+              "const": "rejected"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        }
+      ]
+    },
+    "RegisterLocalRootRequest": {
+      "type": "object",
+      "properties": {
+        "absolutePath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "absolutePath"
+      ]
+    },
+    "RegisteredLocalRoot": {
       "type": "object",
       "properties": {
         "canonicalPath": {
@@ -3929,17 +3992,6 @@
       "required": [
         "rootId",
         "canonicalPath"
-      ]
-    },
-    "RegisterLocalRootRequest": {
-      "type": "object",
-      "properties": {
-        "absolutePath": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "absolutePath"
       ]
     },
     "RejectTrackIdentityCandidateRequest": {
@@ -6631,6 +6683,88 @@
         "unmounted",
         "ejectRequested",
         "ejectPending"
+      ]
+    },
+    "SourceRegistrationProposalRequired": {
+      "type": "object",
+      "properties": {
+        "canonicalPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confirmationRequiredReason": {
+          "type": "string"
+        },
+        "proposalId": {
+          "type": "string"
+        },
+        "requestedPath": {
+          "type": "string"
+        },
+        "rootClass": {
+          "$ref": "#/$defs/SourceRegistrationRootClass"
+        },
+        "suggestedRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "proposalId",
+        "rootClass",
+        "requestedPath",
+        "confirmationRequiredReason",
+        "suggestedRoots"
+      ]
+    },
+    "SourceRegistrationRejected": {
+      "type": "object",
+      "properties": {
+        "canonicalPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rejectionReason": {
+          "type": "string"
+        },
+        "requestedPath": {
+          "type": "string"
+        },
+        "rootClass": {
+          "$ref": "#/$defs/SourceRegistrationRootClass"
+        },
+        "suggestedRoots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "rootClass",
+        "requestedPath",
+        "rejectionReason",
+        "suggestedRoots"
+      ]
+    },
+    "SourceRegistrationRootClass": {
+      "type": "string",
+      "enum": [
+        "normalMusicRoot",
+        "broadDriveRoot",
+        "systemVolumeRoot",
+        "userProfileRoot",
+        "cloudBackedRoot",
+        "networkRoot",
+        "protectedRoot",
+        "indirectionRoot",
+        "unknownRoot"
       ]
     },
     "SourceScanEvent": {

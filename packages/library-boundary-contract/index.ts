@@ -17,6 +17,14 @@ export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": Regis
 
 export type RegisterLocalRootRequest = { absolutePath: string, };
 
+export type SourceRegistrationRootClass = "normalMusicRoot" | "broadDriveRoot" | "systemVolumeRoot" | "userProfileRoot" | "cloudBackedRoot" | "networkRoot" | "protectedRoot" | "indirectionRoot" | "unknownRoot";
+
+export type RegisteredLocalRoot = { rootId: string, canonicalPath: string, };
+
+export type SourceRegistrationProposalRequired = { proposalId: string, rootClass: SourceRegistrationRootClass, requestedPath: string, canonicalPath: string | null, confirmationRequiredReason: string, suggestedRoots: Array<string>, };
+
+export type SourceRegistrationRejected = { rootClass: SourceRegistrationRootClass, requestedPath: string, canonicalPath: string | null, rejectionReason: string, suggestedRoots: Array<string>, };
+
 export type StartRootScanRequest = { rootId: string, };
 
 export type CancelRootScanRequest = { scanRunId: string, };
@@ -174,7 +182,7 @@ gapDetected: boolean, };
 
 export type LibraryRootReply = { "type": "registerLocalRoot", "payload": RegisterLocalRootReply } | { "type": "startRootScan", "payload": StartRootScanReply } | { "type": "readLocalRoots", "payload": ReadLocalRootsReply } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootReply } | { "type": "cancelRootScan", "payload": CancelRootScanReply };
 
-export type RegisterLocalRootReply = { rootId: string, canonicalPath: string, };
+export type RegisterLocalRootReply = { "type": "registered", "payload": RegisteredLocalRoot } | { "type": "proposalRequired", "payload": SourceRegistrationProposalRequired } | { "type": "rejected", "payload": SourceRegistrationRejected };
 
 export type StartRootScanReply = { scanRunId: string, };
 

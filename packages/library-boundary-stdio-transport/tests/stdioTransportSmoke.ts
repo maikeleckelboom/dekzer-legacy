@@ -46,7 +46,8 @@ try {
       'registerLocalRoot',
       commandTimeoutMs
     )
-    registeredRootId = registered.rootId
+    must(registered.type === 'registered', 'temp source root registers as a normal source')
+    registeredRootId = registered.payload.rootId
     must(/^[1-9]\d*$/.test(registeredRootId), 'rootId is a positive string id')
 
     const scan = await withTimeout(

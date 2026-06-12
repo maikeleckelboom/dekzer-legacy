@@ -11,9 +11,10 @@ use library_domain::{LibraryAssetId, PlaylistId};
 use library_store_sqlite::{
     AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
     LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
-    RegisterLocalRootInput, RemoveLibraryAssetFromPlaylistInput, RenamePlaylistInput,
-    RootNavigationWindowEstablishment, RootNavigationWindowEstablishmentState, RootScanObservation,
-    SourceFileBlake3HashAdmissionScope, SqliteDurableStore, UnregisterLocalRootInput,
+    RegisterLocalRootInput, RegisterLocalRootResult, RemoveLibraryAssetFromPlaylistInput,
+    RenamePlaylistInput, RootNavigationWindowEstablishment, RootNavigationWindowEstablishmentState,
+    RootScanObservation, SourceFileBlake3HashAdmissionScope, SourceRegistrationRootClass,
+    SqliteDurableStore, UnregisterLocalRootInput,
 };
 
 use crate::search_filter_protocol::{map_search_filter_read_reply, store_search_filter_request};
@@ -199,17 +200,56 @@ impl LibraryBoundaryService {
             });
         }
 
-        let registered = self
+        let result = self
             .durable_store
             .register_local_root(RegisterLocalRootInput {
                 absolute_path: PathBuf::from(request.absolute_path),
             })
             .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::RegisterLocalRootReply {
-            root_id: registered.root_id,
-            canonical_path: registered.canonical_path.to_string_lossy().into_owned(),
-        })
+        match result {
+            RegisterLocalRootResult::Registered(registered) => {
+                self.publish_maintained_snapshot_invalidations()?;
+                Ok(protocol::RegisterLocalRootReply::Registered(
+                    protocol::RegisteredLocalRoot {
+                        root_id: registered.root_id,
+                        canonical_path: registered.canonical_path.to_string_lossy().into_owned(),
+                    },
+                ))
+            }
+            RegisterLocalRootResult::ProposalRequired(proposal) => {
+                Ok(protocol::RegisterLocalRootReply::ProposalRequired(
+                    protocol::SourceRegistrationProposalRequired {
+                        proposal_id: proposal.proposal_id,
+                        root_class: map_source_registration_root_class(proposal.root_class),
+                        requested_path: proposal.requested_path.to_string_lossy().into_owned(),
+                        canonical_path: proposal
+                            .canonical_path
+                            .map(|path| path.to_string_lossy().into_owned()),
+                        confirmation_required_reason: proposal.confirmation_required_reason,
+                        suggested_roots: proposal
+                            .suggested_roots
+                            .into_iter()
+                            .map(|path| path.to_string_lossy().into_owned())
+                            .collect(),
+                    },
+                ))
+            }
+            RegisterLocalRootResult::Rejected(rejection) => Ok(
+                protocol::RegisterLocalRootReply::Rejected(protocol::SourceRegistrationRejected {
+                    root_class: map_source_registration_root_class(rejection.root_class),
+                    requested_path: rejection.requested_path.to_string_lossy().into_owned(),
+                    canonical_path: rejection
+                        .canonical_path
+                        .map(|path| path.to_string_lossy().into_owned()),
+                    rejection_reason: rejection.rejection_reason,
+                    suggested_roots: rejection
+                        .suggested_roots
+                        .into_iter()
+                        .map(|path| path.to_string_lossy().into_owned())
+                        .collect(),
+                }),
+            ),
+        }
     }
 
     pub fn start_root_scan(
@@ -239,11 +279,18 @@ impl LibraryBoundaryService {
             let _ = handle.join();
         }
 
-        self.durable_store
-            .read_root_scan_path(root_id)
-            .map_err(|e| protocol::ProtocolError::DurableStoreFailure {
-                detail: e.to_string(),
-            })?;
+        let root_class = self
+            .durable_store
+            .root_scan_admission_class(root_id)
+            .map_err(map_store_error)?;
+        if root_class != SourceRegistrationRootClass::NormalMusicRoot {
+            return Err(protocol::ProtocolError::InvalidRequest {
+                detail: format!(
+                    "libraryRoots.startRootScan rejected rootId {root_id}: rootClass={} has not been admitted for scanning",
+                    root_class.as_str()
+                ),
+            });
+        }
 
         let scan_run_id = registry.next_scan_run_id();
 
@@ -1472,6 +1519,40 @@ pub(crate) fn map_store_error(
     }
 }
 
+fn map_source_registration_root_class(
+    root_class: SourceRegistrationRootClass,
+) -> protocol::SourceRegistrationRootClass {
+    match root_class {
+        SourceRegistrationRootClass::NormalMusicRoot => {
+            protocol::SourceRegistrationRootClass::NormalMusicRoot
+        }
+        SourceRegistrationRootClass::BroadDriveRoot => {
+            protocol::SourceRegistrationRootClass::BroadDriveRoot
+        }
+        SourceRegistrationRootClass::SystemVolumeRoot => {
+            protocol::SourceRegistrationRootClass::SystemVolumeRoot
+        }
+        SourceRegistrationRootClass::UserProfileRoot => {
+            protocol::SourceRegistrationRootClass::UserProfileRoot
+        }
+        SourceRegistrationRootClass::CloudBackedRoot => {
+            protocol::SourceRegistrationRootClass::CloudBackedRoot
+        }
+        SourceRegistrationRootClass::NetworkRoot => {
+            protocol::SourceRegistrationRootClass::NetworkRoot
+        }
+        SourceRegistrationRootClass::ProtectedRoot => {
+            protocol::SourceRegistrationRootClass::ProtectedRoot
+        }
+        SourceRegistrationRootClass::IndirectionRoot => {
+            protocol::SourceRegistrationRootClass::IndirectionRoot
+        }
+        SourceRegistrationRootClass::UnknownRoot => {
+            protocol::SourceRegistrationRootClass::UnknownRoot
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use library_boundary_protocol::{
@@ -1494,16 +1575,17 @@ mod tests {
         ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceIntegrityRequest,
         ReadSourceLifecycleReply, ReadSourceLifecycleRequest, ReadSourceMaintenanceReply,
         ReadSourceMaintenanceRequest, ReadTrackIdentityReviewCandidatesRequest,
-        RegisterLocalRootReply, RegisterLocalRootRequest, RejectTrackIdentityCandidateRequest,
-        RenamePlaylistReply, RenamePlaylistRequest, RunSourceMaintenanceReply,
-        RunSourceMaintenanceRequest, SearchFilterAuthorityLayer, SearchFilterFileClass,
-        SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
-        SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
-        SearchFilterState, SnapshotReadCommand, SnapshotReadReply, SourceFileAttachmentLinkStatus,
-        SourceFileHashCommand, SourceFileHashReply, SourceIntegrityAvailabilityState,
-        SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
-        TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
-        TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
+        RegisterLocalRootReply, RegisterLocalRootRequest, RegisteredLocalRoot,
+        RejectTrackIdentityCandidateRequest, RenamePlaylistReply, RenamePlaylistRequest,
+        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SearchFilterAuthorityLayer,
+        SearchFilterFileClass, SearchFilterReadReply, SearchFilterReadRequest,
+        SearchFilterRecursion, SearchFilterResultKind, SearchFilterScope, SearchFilterSet,
+        SearchFilterSort, SearchFilterState, SnapshotReadCommand, SnapshotReadReply,
+        SourceFileAttachmentLinkStatus, SourceFileHashCommand, SourceFileHashReply,
+        SourceIntegrityAvailabilityState, SourceMaintenanceCommand, SourceMaintenanceReply,
+        StartRootScanReply, StartRootScanRequest, TrackIdentityDecisionCommand,
+        TrackIdentityDecisionCommandFailure, TrackIdentityDecisionCommandResult,
+        TrackIdentityDecisionReply, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
         TrackIdentityReviewReadStatus, TrackIdentityReviewState,
         TrackIdentityUserBlockingDecisionState, UnregisterLocalRootReply,
@@ -1518,9 +1600,9 @@ mod tests {
     };
     use library_store_sqlite::{
         LibraryStoreContext, ReadSourceFileBlake3HashCandidatesInput,
-        RecordSourceFileObservationInput, SourceFileBlake3HashAdmissionScope, StoreEnvironment,
-        UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceScanStateInput,
-        UpsertSourceStateInput, durable_store_path,
+        RecordSourceFileObservationInput, SourceFileBlake3HashAdmissionScope, SourceLocatorInput,
+        StoreEnvironment, UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocatorInput,
+        UpsertSourceScanStateInput, UpsertSourceStateInput, durable_store_path,
     };
 
     use crate::source_maintenance::{
@@ -2047,12 +2129,15 @@ mod tests {
     fn register_local_root(
         service: &LibraryBoundaryService,
         absolute_path: String,
-    ) -> (serde_json::Value, RegisterLocalRootReply) {
+    ) -> (serde_json::Value, RegisteredLocalRoot) {
         let outcome = service.handle_command(CommandRequest::LibraryRoots(
             LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest { absolute_path }),
         ));
         let json = serde_json::to_value(&outcome).expect("serialize register outcome");
-        let reply = expect_register_local_root_reply(expect_success(outcome));
+        let reply = match expect_register_local_root_reply(expect_success(outcome)) {
+            RegisterLocalRootReply::Registered(root) => root,
+            other => panic!("expected registered local root reply, got {other:?}"),
+        };
         (json, reply)
     }
 
@@ -2503,11 +2588,11 @@ mod tests {
             register_local_root(&service, source_root.to_string_lossy().into_owned());
         assert!(registered.root_id > 0);
         assert_eq!(
-            register_json.pointer("/payload/reply/payload/payload/rootId"),
+            register_json.pointer("/payload/reply/payload/payload/payload/rootId"),
             Some(&json!(registered.root_id.to_string()))
         );
         assert_eq!(
-            register_json.pointer("/payload/reply/payload/payload/canonicalPath"),
+            register_json.pointer("/payload/reply/payload/payload/payload/canonicalPath"),
             Some(&json!(registered.canonical_path.clone()))
         );
 
@@ -4027,7 +4112,7 @@ mod tests {
     }
 
     #[test]
-    fn blocked_scan_does_not_request_source_maintenance() {
+    fn admission_rejected_scan_does_not_request_source_maintenance() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("blocked-scan-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -4036,11 +4121,34 @@ mod tests {
             register_local_root(&service, source_root.to_string_lossy().into_owned());
         std::fs::remove_dir_all(&source_root).expect("remove source root before scan");
 
-        let _scan = start_root_scan(&service, registered.root_id);
-        wait_for_scan_terminal_kind(
-            &service,
-            registered.root_id,
-            library_boundary_protocol::SourceScanEventKind::SourceScanBlocked,
+        let outcome = service.handle_command(CommandRequest::LibraryRoots(
+            LibraryRootCommand::StartRootScan(StartRootScanRequest {
+                root_id: registered.root_id,
+            }),
+        ));
+        let CommandOutcome::Error(envelope) = outcome else {
+            panic!("expected admission rejection before scan start");
+        };
+        match envelope.error {
+            ProtocolError::InvalidRequest { detail } => {
+                assert!(
+                    detail.contains("unknown_root"),
+                    "expected unknown-root admission rejection, got {detail}"
+                );
+            }
+            other => panic!("expected InvalidRequest, got {other:?}"),
+        }
+
+        let events = read_after_events(&service, None, 64);
+        assert!(
+            events.events.iter().all(|event| !matches!(
+                event,
+                LibraryBoundaryEvent::SourceScanEvent(scan_event)
+                    if scan_event.root_id == registered.root_id
+                        && scan_event.kind
+                            == library_boundary_protocol::SourceScanEventKind::SourceScanStarted
+            )),
+            "admission-rejected scans must not publish SourceScanStarted"
         );
 
         assert!(
@@ -4049,7 +4157,7 @@ mod tests {
                 .completed_runs_for_test()
                 .iter()
                 .all(|run| run.source_id != registered.root_id),
-            "blocked scans must not automatically request source maintenance"
+            "admission-rejected scans must not automatically request source maintenance"
         );
     }
 
@@ -4461,6 +4569,93 @@ mod tests {
                 panic!("expected error outcome, got {:?}", envelope.reply);
             }
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn start_root_scan_rejects_manually_inserted_system_volume_without_started_event() {
+        let (_tempdir, _context, service) = open_service_with_context();
+        let system_drive = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".to_string());
+        let system_root = format!("{}\\", system_drive.trim_end_matches(['\\', '/']));
+        let source_id = service
+            .durable_store
+            .upsert_source(UpsertSourceInput {
+                source_id: Some(88),
+                source_class: "internal".to_string(),
+                authority: "system".to_string(),
+                identity_kind: "fixture".to_string(),
+                identity_value: "manual-system-root".to_string(),
+                display_name: "Manual System Root".to_string(),
+                medium_label: None,
+                is_user_visible: true,
+                browser_order_ordinal: None,
+                changed_at: 100,
+            })
+            .expect("insert manual source");
+        service
+            .durable_store
+            .upsert_source_locator(UpsertSourceLocatorInput {
+                source_id,
+                locator: SourceLocatorInput::AbsolutePath {
+                    absolute_path: system_root.clone(),
+                },
+            })
+            .expect("insert manual locator");
+        service
+            .durable_store
+            .upsert_source_state(UpsertSourceStateInput {
+                source_id,
+                mount_status: "mounted".to_string(),
+                mount_epoch: 0,
+                access_state: SourceAccessState::Accessible,
+                access_issue_kind: None,
+                access_error_detail: None,
+                access_checked_at: Some(100),
+                mount_root: None,
+                effective_path: Some(system_root),
+                observed_volume_label: None,
+                filesystem_type: None,
+                last_seen_at: Some(100),
+                updated_at: 100,
+            })
+            .expect("insert manual source state");
+        service
+            .durable_store
+            .upsert_source_scan_state(UpsertSourceScanStateInput {
+                source_id,
+                scan_phase: SourceScanPhase::Idle,
+                last_scan_started_at: None,
+                last_scan_finished_at: None,
+                last_successful_scan_at: None,
+                scan_issue_kind: None,
+                error_detail: None,
+                updated_at: 100,
+            })
+            .expect("insert manual scan state");
+
+        let error = service
+            .try_handle_command(CommandRequest::LibraryRoots(
+                LibraryRootCommand::StartRootScan(StartRootScanRequest { root_id: source_id }),
+            ))
+            .expect_err("system volume root scan must be rejected");
+        match error {
+            ProtocolError::InvalidRequest { detail } => {
+                assert!(detail.contains("system_volume_root"));
+                assert!(detail.contains("has not been admitted"));
+            }
+            other => panic!("expected invalid request, got {other:?}"),
+        }
+
+        let events = read_after_events(&service, None, 16);
+        assert!(
+            !events.events.iter().any(|event| matches!(
+                event,
+                LibraryBoundaryEvent::SourceScanEvent(scan)
+                    if scan.kind
+                        == library_boundary_protocol::SourceScanEventKind::SourceScanStarted
+            )),
+            "rejected scan admission must not publish SourceScanStarted"
+        );
     }
 
     #[test]

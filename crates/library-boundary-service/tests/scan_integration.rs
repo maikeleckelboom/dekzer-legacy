@@ -10,9 +10,9 @@ use library_boundary_protocol::{
     NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
     ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
     ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest,
-    RegisterLocalRootReply, RegisterLocalRootRequest, ScanRunPhase, SnapshotReadCommand,
-    SnapshotReadReply, SourceScanEvent, SourceScanEventKind, StartRootScanReply,
-    StartRootScanRequest,
+    RegisterLocalRootReply, RegisterLocalRootRequest, RegisteredLocalRoot, ScanRunPhase,
+    SnapshotReadCommand, SnapshotReadReply, SourceScanEvent, SourceScanEventKind,
+    StartRootScanReply, StartRootScanRequest,
 };
 use library_boundary_service::{LibraryBoundaryService, LibraryStoreContext, StoreEnvironment};
 use library_store_sqlite::durable_store_path;
@@ -48,7 +48,7 @@ fn write_file(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("write file");
 }
 
-fn register_root(service: &LibraryBoundaryService, path: &Path) -> RegisterLocalRootReply {
+fn register_root(service: &LibraryBoundaryService, path: &Path) -> RegisteredLocalRoot {
     let outcome = service.handle_command(CommandRequest::LibraryRoots(
         LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest {
             absolute_path: path.to_string_lossy().into_owned(),
@@ -56,7 +56,9 @@ fn register_root(service: &LibraryBoundaryService, path: &Path) -> RegisterLocal
     ));
     let reply = expect_command_reply(outcome, "register local root");
     match reply {
-        CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(reply)) => reply,
+        CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(
+            RegisterLocalRootReply::Registered(root),
+        )) => root,
         other => panic!("Expected register reply, got {other:?}"),
     }
 }
@@ -478,7 +480,7 @@ fn scan_with_unknown_root_id_returns_current_store_error() {
 }
 
 #[test]
-fn blocked_scan_event_carries_started_scan_run_id() {
+fn missing_registered_root_is_rejected_before_scan_start() {
     let tempdir = TempDir::new().expect("create tempdir");
     let missing_root = tempdir.path().join("missing-after-register");
     fs::create_dir_all(&missing_root).expect("create root before registration");
@@ -487,13 +489,29 @@ fn blocked_scan_event_carries_started_scan_run_id() {
     let registered = register_root(&service, &missing_root);
     fs::remove_dir_all(&missing_root).expect("remove root after registration");
 
-    let scanned = start_scan(&service, registered.root_id);
-    let blocked = wait_for_scan_event(&service, 32, |se| {
-        se.kind == SourceScanEventKind::SourceScanBlocked && se.root_id == registered.root_id
-    })
-    .expect("SourceScanBlocked must be published for an unavailable root");
+    let error = expect_command_error(service.handle_command(CommandRequest::LibraryRoots(
+        LibraryRootCommand::StartRootScan(StartRootScanRequest {
+            root_id: registered.root_id,
+        }),
+    )));
 
-    assert_eq!(blocked.scan_run_id, scanned.scan_run_id);
+    assert_eq!(error.error.code(), "INVALID_REQUEST");
+    assert!(
+        error.error.to_string().contains("unknown_root"),
+        "expected unknown-root admission rejection, got: {}",
+        error.error,
+    );
+
+    let events = read_boundary_events_after(&service, None, 32);
+    assert!(
+        events.events.iter().all(|event| !matches!(
+            event,
+            LibraryBoundaryEvent::SourceScanEvent(scan_event)
+                if scan_event.root_id == registered.root_id
+                    && scan_event.kind == SourceScanEventKind::SourceScanStarted
+        )),
+        "admission-rejected roots must not publish SourceScanStarted"
+    );
 }
 
 #[test]

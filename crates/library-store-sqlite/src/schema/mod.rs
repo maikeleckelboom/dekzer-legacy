@@ -101,6 +101,7 @@ mod tests {
         "browser_user_order",
         "browser_user_prefs",
         "source_root_navigation_state",
+        "source_registration_proposals",
         "source_state",
         "source_scan_state",
         "source_locations",
@@ -313,6 +314,7 @@ mod tests {
             "source_locators",
             "source_state",
             "source_scan_state",
+            "source_registration_proposals",
             "source_locations",
             "source_directories",
             "source_files",
@@ -385,6 +387,24 @@ mod tests {
                 "checked_at",
                 "updated_at",
             ]
+        );
+        assert_eq!(
+            table_column_names(&connection, "source_registration_proposals"),
+            vec![
+                "source_registration_proposal_id",
+                "proposal_status",
+                "root_class",
+                "requested_path",
+                "canonical_path",
+                "confirmation_required_reason",
+                "suggested_roots_json",
+                "created_at",
+                "updated_at",
+            ]
+        );
+        assert!(
+            table_index_names(&connection, "source_registration_proposals")
+                .contains(&"source_registration_proposals_active_canonical_path".to_string())
         );
         assert!(
             table_foreign_keys(&connection, "source_root_navigation_state").contains(&(

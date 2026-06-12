@@ -43,6 +43,27 @@ The contract's product ambition remains authoritative. Implementation must not w
 the ambition. Each future implementation slice should move closer to the full contract,
 not replace it with a minimal interpretation.
 
+## Current Arc A admission law
+
+Source registration is an admission boundary, not a promise to create a source row.
+
+Broad/system/risky root selection creates a registration proposal, not a source root. This includes system-volume
+roots, broad drive roots, user-profile roots, network/cloud roots when cheaply detectable, indirection roots, and
+unknown risky roots. Source root creation happens only after admission. Arc A creates proposals but intentionally
+provides no confirmation command or conversion path from proposal to source.
+
+Protected root selection is rejected, not negotiated. Protected/system-owned locations such as Windows, Program Files,
+ProgramData, System Volume Information, Recovery, WindowsApps, and equivalent cheaply detectable locations must not be
+stored as proposals or sources.
+
+Registration proposals are distinct from sources. They are not scannable, are not returned by local-root reads, do not
+create source lifecycle/navigation/browser/scan/maintenance state, and are idempotent by canonical path while their
+status is proposed.
+
+`StartRootScan` is only for admitted source roots. It must defensively reject broad/system/risky/protected roots even if
+a legacy or manually inserted source row points at such a path. Density preflight, scan-plan confirmation, and broad
+scan execution are later arcs.
+
 ## Core law
 
 A library scan is not a forensic search of every byte on disk. It is a policy-governed source traversal that admits
