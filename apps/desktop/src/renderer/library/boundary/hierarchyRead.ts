@@ -19,6 +19,7 @@ import type {
   DirectoryTarget,
   MoreState,
   LoadedChildren,
+  RowBinding,
   SourceState,
   SourceTarget
 } from '../state'
@@ -272,68 +273,107 @@ export function createLibraryHierarchyReadController(
   async function refreshBrowserWindows(
     expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   ): Promise<boolean> {
+    let refreshedAny = false
+    let allSucceeded = true
+    const refreshedSourceNodeIds = new Set<string>()
+    const refreshedDirectoryRequestKeys = new Set<string>()
+
+    for (;;) {
+      const targets = pendingBrowserWindowRefreshTargets({
+        expandedNodeIds,
+        refreshedSourceNodeIds,
+        refreshedDirectoryRequestKeys
+      })
+
+      if (targets === undefined) {
+        return refreshedAny ? allSucceeded : false
+      }
+
+      if (targets.sourceTargets.size === 0 && targets.directoryTargets.size === 0) {
+        break
+      }
+
+      for (const [nodeId, target] of targets.sourceTargets) {
+        refreshedSourceNodeIds.add(nodeId)
+        refreshedAny = true
+        allSucceeded = (await readSource(nodeId, target)) && allSucceeded
+      }
+
+      for (const [requestKey, target] of targets.directoryTargets) {
+        refreshedDirectoryRequestKeys.add(requestKey)
+        refreshedAny = true
+        allSucceeded = (await readDirectory(target)) && allSucceeded
+      }
+    }
+
+    return refreshedAny ? allSucceeded : true
+  }
+
+  function pendingBrowserWindowRefreshTargets(options: {
+    readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
+    readonly refreshedSourceNodeIds: ReadonlySet<string>
+    readonly refreshedDirectoryRequestKeys: ReadonlySet<string>
+  }):
+    | {
+        readonly sourceTargets: ReadonlyMap<string, SourceTarget>
+        readonly directoryTargets: ReadonlyMap<string, DirectoryTarget>
+      }
+    | undefined {
     const projection = browserProjection.value
 
     if (projection?.kind !== 'tree') {
-      return false
+      return undefined
     }
 
-    let refreshedAny = false
-    let allSucceeded = true
     const sourceTargets = new Map<string, SourceTarget>()
-    const loadedDirectoryTargets = new Map<string, DirectoryTarget>()
+    const directoryTargets = new Map<string, DirectoryTarget>()
+
+    function addSourceTarget(nodeId: string, target: SourceTarget): void {
+      if (!options.refreshedSourceNodeIds.has(nodeId)) {
+        sourceTargets.set(nodeId, target)
+      }
+    }
+
+    function addDirectoryTarget(
+      binding: Extract<RowBinding, { readonly kind: 'directory' }>
+    ): void {
+      const target = {
+        entryPoint: binding.entryPoint,
+        ...(binding.label === undefined ? {} : { label: binding.label }),
+        directoryId: binding.directoryId
+      }
+      const requestKey = createDirectoryRequestKey(target.entryPoint, target.directoryId)
+
+      if (!options.refreshedDirectoryRequestKeys.has(requestKey)) {
+        directoryTargets.set(requestKey, target)
+      }
+    }
 
     for (const [nodeId, binding] of projection.bindingsById) {
       if (binding.kind === 'source') {
         const state = sourceReadStates.value.get(nodeId)
         if (state?.kind === 'loaded') {
-          sourceTargets.set(nodeId, binding.target)
+          addSourceTarget(nodeId, binding.target)
         }
       } else if (binding.kind === 'directory') {
         const state = directoryReadStates.value.get(binding.directoryId)
         if (state?.kind === 'loaded') {
-          const target = {
-            entryPoint: binding.entryPoint,
-            ...(binding.label === undefined ? {} : { label: binding.label }),
-            directoryId: binding.directoryId
-          }
-          loadedDirectoryTargets.set(
-            createDirectoryRequestKey(target.entryPoint, target.directoryId),
-            target
-          )
+          addDirectoryTarget(binding)
         }
       }
     }
 
-    for (const nodeId of expandedNodeIds) {
+    for (const nodeId of options.expandedNodeIds) {
       const binding = projection.bindingsById.get(nodeId)
 
       if (binding?.kind === 'source') {
-        sourceTargets.set(nodeId, binding.target)
+        addSourceTarget(nodeId, binding.target)
       } else if (binding?.kind === 'directory') {
-        const target = {
-          entryPoint: binding.entryPoint,
-          ...(binding.label === undefined ? {} : { label: binding.label }),
-          directoryId: binding.directoryId
-        }
-        loadedDirectoryTargets.set(
-          createDirectoryRequestKey(target.entryPoint, target.directoryId),
-          target
-        )
+        addDirectoryTarget(binding)
       }
     }
 
-    for (const [nodeId, target] of sourceTargets) {
-      refreshedAny = true
-      allSucceeded = (await readSource(nodeId, target)) && allSucceeded
-    }
-
-    for (const target of loadedDirectoryTargets.values()) {
-      refreshedAny = true
-      allSucceeded = (await readDirectory(target)) && allSucceeded
-    }
-
-    return refreshedAny ? allSucceeded : true
+    return { sourceTargets, directoryTargets }
   }
 
   async function readSource(nodeId: BrowserTreeNodeId, target: SourceTarget): Promise<boolean> {
