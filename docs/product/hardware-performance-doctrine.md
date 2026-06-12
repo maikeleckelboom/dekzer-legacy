@@ -1,6 +1,6 @@
 # Dekzer — Hardware Screen & Performance Instance Doctrine
 
-**Status:** BRIDGE DOCTRINE — Synthesis pending split
+**Status:** FUTURE COMPATIBILITY DOCTRINE — Synthesis pending split
 **Date:** June 2026
 **Origin:** Hardware UX innovation session, critique, and correction synthesis.
 
@@ -12,18 +12,22 @@ This is a bridge doctrine. It captures three distinct layers of product thinking
 developed together. They must eventually be split into separate documents. Until then, every section carries an
 authority marker:
 
-- **[ACTIONABLE]** — Buildable with currently existing substrate. Safe to pass to implementation agents.
+- **[ACTIONABLE]** — Concrete enough for a future hardware-support slice after hardware enters product scope. Not V0.
 - **[ARCHITECTURAL-DIRECTION]** — Must shape design decisions now but not fully implemented yet. Shape the data model
   even if UI ships later.
 - **[FUTURE-SCOPE]** — Valid product vision. Not implementation input. Do not implement from this document.
 
-**Do not pass this document to Codex or other agents as implementation input without first scoping it to a specific
-marked section. Agents cannot distinguish authority levels without explicit instruction.**
+Current product doctrine supersedes older hardware-first language in this document: Dekzer V0 has no hardware support,
+no audience-attended rooms, no AR/VR, no hardware room projection, and no product-backed Prepared Room UI. Hardware,
+audience, room projection, and performed-room concepts are future architectural compatibility targets only.
+
+**Do not pass this document to Codex or other agents as V0 implementation input.** Future hardware implementation must
+first receive an explicit product slice that revalidates the relevant sections against the then-current substrate.
 
 The three eventual split targets:
 
-1. `docs/product/hardware-decision-ui-doctrine.md` — Hardware screen, input model, V0 spec, row design, trust model.
-   ACTIONABLE sections.
+1. `docs/product/hardware-decision-ui-doctrine.md` — Future hardware screen, input model, first-slice spec, row design,
+   trust model. ACTIONABLE sections become active only after hardware enters product scope.
 2. `docs/product/active-performance-instance-doctrine.md` — Active Performance Instance, event log, room operations,
    performed record, lifecycle. ARCHITECTURAL-DIRECTION sections.
 3. `docs/product/audience-attended-room-doctrine.md` — Audience projection, visibility contracts,
@@ -50,7 +54,7 @@ not do this.
 ### Layer 1 — Hardware Decision UI [ACTIONABLE]
 
 Small-screen, performance-stress UX. Deterministic input rules, trust-first row design, finger-aware layout. Does not
-require audience layer or complex substrate. V0 is buildable now for fields whose substrate already exists.
+require audience layer or complex substrate. It is not part of Dekzer V0.
 
 ### Layer 2 — Performance Runtime Model [ARCHITECTURAL-DIRECTION]
 
@@ -60,8 +64,7 @@ early. Cannot be retrofitted later. UI ships later; the event container shape ca
 ### Layer 3 — Audience-Attended Room [FUTURE-SCOPE]
 
 Public presence, chat, reactions, replay, visibility contracts, social memory. Do not build the UI now. Do not let it
-contaminate V0 hardware decisions. Do preserve the event model shape now — this layer proves why the Active Performance
-Instance must be a durable event container from day one.
+contaminate current local DJ foundation work. Preserve the event model shape for future runtime design.
 
 ---
 
@@ -196,7 +199,7 @@ Audience-visible label: `"An unplanned track entered the performance."`
 
 ---
 
-## Hardware V0 Specification [ACTIONABLE]
+## Future Hardware First-Slice Specification [ACTIONABLE]
 
 Do not start with: room radar, audience rooms, Shadow Path editing on hardware, Live Path visualization, Smart Browse
 modes, reason graphs.
@@ -205,8 +208,8 @@ These require substrate that does not yet exist.
 
 ### Row Data — Tiered by Substrate Availability
 
-V0 rows render only fields whose substrate currently exists. Fields without substrate render as absent, not inferred.
-The UI must never display an estimated or invented value where the substrate is unavailable.
+Future hardware rows may render only fields whose substrate exists. Fields without substrate render as absent, not
+inferred. The UI must never display an estimated or invented value where the substrate is unavailable.
 
 **Available now — no new substrate required:**
 
@@ -316,13 +319,14 @@ visible in reference hardware.
 The inspection strip shows: title, artist, trust vector summary, armed load target, and all available analysis data for
 the candidate.
 
-### Persistent Armed Load Target — V0 Scope [ACTIONABLE]
+### Persistent Armed Load Target — Future Hardware Scope [ACTIONABLE]
 
-Always visible on screen. V0 examples: Deck A, Deck B, Preview (headphone cue monitoring, if hardware supports).
-General rule: Deck 1..N where supported, plus Preview.
+Always visible on screen when hardware support exists. Examples: Deck A, Deck B, Preview (headphone cue monitoring, if
+hardware supports). General rule: Deck 1..N where supported, plus Preview.
 
-**Hot Table and Shadow Path are not V0 load targets.** They require path and prepared-room substrate that does not yet
-exist. Including them in V0 creates a dependency on infrastructure that is not available.
+**Hot Table and Shadow Path are not first-slice hardware load targets.** They require path and prepared-room substrate
+that does not yet exist. Including them in the first hardware slice creates a dependency on infrastructure that is not
+available.
 
 A separate, explicit UI act changes the armed target. No implicit or state-dependent interpretation of the load button.
 No accidental commitment.
@@ -434,7 +438,8 @@ must be satisfied before the mode ships.
 
 ## Future: Audience-Attended Room [FUTURE-SCOPE]
 
-Do not build this UI now. Do not let it contaminate V0 hardware decisions.
+Do not build this UI now. Do not let it contaminate current local DJ foundation work or future first-slice hardware
+decisions.
 
 The architectural requirement it proves: **the Active Performance Instance must be a durable event container from day
 one.** If only "current room" is modeled today, event continuity, room movement provenance, replay indexing, and
@@ -566,6 +571,7 @@ degraded-room display states, their visual treatment, and their escalation path 
 
 ---
 
-_This document supersedes ad hoc hardware screen concepts from the brainstorm session. Hardware screen work references
-ACTIONABLE sections only. Performance runtime work references ARCHITECTURAL-DIRECTION sections. FUTURE-SCOPE sections
-require their own dedicated doctrine before any implementation._
+_This document preserves future hardware and performance compatibility constraints. It is not V0 implementation input.
+Hardware screen work requires a dedicated future product slice before ACTIONABLE sections become implementation
+authority. Performance runtime work references ARCHITECTURAL-DIRECTION sections only after the runtime slice is in
+scope. FUTURE-SCOPE sections require their own dedicated doctrine before any implementation._

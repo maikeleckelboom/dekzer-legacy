@@ -10,16 +10,40 @@ details. This document defines sequence, dependency, vetoes, and long-term owner
 
 ---
 
+## Product Phasing
+
+V0 is a minimal, reliable local DJ foundation:
+
+- local source registration;
+- local scan/indexing;
+- source and folder browsing;
+- descendant media scope by default;
+- search, filter, and sort;
+- clear missing and offline states;
+- deterministic reads;
+- stable renderer projection;
+- later basic preparation and local performance workflow.
+
+V0 has no hardware support, no streaming services, no product-backed Prepared Room UI, and no audience, social, AR, VR,
+or hardware room surfaces.
+
+Future room-based concepts are architectural compatibility targets, not V0 product scope. Current substrate work
+supports them by preserving identity, availability, provenance, source isolation, stable references, evidence versus
+decision boundaries, and future runtime diagnostic integrity. The first product bar remains a minimal, reliable local DJ
+workflow.
+
+---
+
 ## Next Executable Queue
 
 The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
 
-1. `feat(library): add collection health and source integrity read model`
+1. `feat(library): add attachment occurrence model`
 
-Media probe observations, primary-media promotion, exact-content track identity candidates, candidate decisions,
-explicit user decision commands, and the review-candidates read model are already implemented. Their accepted contracts
-are narrower than the later canonical media-candidate and canonical-track roadmap layers and do not satisfy those future
-gates by themselves.
+Media probe observations, source integrity / collection health v0, primary-media promotion, exact-content track identity
+candidates, candidate decisions, explicit user decision commands, and the review-candidates read model are already
+implemented. Their accepted contracts are narrower than the later canonical media-candidate and canonical-track roadmap
+layers and do not satisfy those future gates by themselves.
 
 ---
 
@@ -41,6 +65,8 @@ The following layers are canonical.
 8. **Exact-content track identity candidate and decision v0** — The app groups exact current evidence, records
    backend/user candidate decisions, resolves effective decision precedence, and exposes review candidates without
    claiming canonical track identity.
+9. **Source integrity / collection health v0** — The app can read source-scoped lifecycle, coverage, inventory,
+   evidence-maintenance, attachment-integrity, and runtime-maintenance facets without creating a second health authority.
 
 ### Canonical schema
 
@@ -144,12 +170,14 @@ artifact/evidence, current/stale status, user-approved vs. machine-generated, re
 
 ### Layer 7 — Workflow / Product
 
-_The record room._
+_Local DJ workflow first; room and performance memory later._
 
-Cold archive → nearby reserve → prepared room → prepared crates → hot table → live path → shadow paths. Sleeves, routes,
-performance history, RT Flight Deck.
+V0 workflow starts with local source browsing, local library correctness, search/filter/sort, missing/offline clarity,
+and stable reads. Later workflow layers add basic preparation, local performance workflow, and then the room-shaped
+model: cold archive → nearby reserve → prepared room → prepared crates → hot table → live path → shadow paths. Sleeves,
+routes, performance history, and RT Flight Deck remain future layers.
 
-> "How does the DJ prepare, select, trust, perform, recover, and evolve a collection?"
+> "How does the DJ find, prepare, trust, perform, recover, and eventually evolve a collection?"
 
 ---
 
@@ -245,12 +273,13 @@ evidence. Imported cue/loop/beatgrid/playlist data affects both track identity c
 not just prep. The import interoperability contract must land before track identity candidates and prep facets harden.
 Import data is never silently canonical; user confirmation is required for promotion.
 
-### RT Flight Deck and performance sessions are early architecture constraints
+### RT Flight Deck and performance sessions are future compatibility constraints
 
 The RT Flight Deck creates requirements for: event log shape, evidence provenance, runtime observation history, user
-decisions, performance sessions, incident reconstruction. A performance session entity (what was loaded, what played,
-what cues fired, what transitions happened, whether prep facts held, anomalies, recovery) must be sketched in a doctrine
-doc before runtime event design begins — not designed at the end.
+decisions, performance sessions, incident reconstruction. These are not V0 product surfaces and do not justify backend
+slices by themselves. A performance session entity (what was loaded, what played, what cues fired, what transitions
+happened, whether prep facts held, anomalies, recovery) must be sketched in a doctrine doc before runtime event design
+begins.
 
 ### No automatic cleanup, removal, or merge without a user decision record
 
@@ -343,14 +372,14 @@ adapter/version, stale/current status.
 
 ---
 
-**A-4 [CODE] Collection health / source integrity read model** [Planned]
+**A-4 [CODE] Collection health / source integrity read model** [Ratified]
 
 **Collection health is the first product-trust surface. The attachment identity read boundary (A-2) is a prerequisite
 substrate surface, not a user-facing product. No attachment-detail UI may be built before this slice lands.**
 
 First product-trust read model. Backend only.
 
-Summarizes per source and library-wide:
+Summarizes per source in v0. The collection-level aggregate is deferred as a pure rollup over source-scoped rows:
 
 - Sources by lifecycle/access state
 - Source files by presence state (present / missing / removed)
@@ -362,21 +391,32 @@ Summarizes per source and library-wide:
 - CUE files pending future parse
 - Attachment materialization backlog estimate
 
+Implemented as the source-scoped `readSourceIntegrity` boundary. No collection-level aggregate is introduced in v0.
+
 Must exist before any product-facing duplicate or relocation surface.
 
 `feat(library): add collection health and source integrity read model`
 
 ---
 
-**A-5 [CODE] Attachment occurrence model** [Blocked — requires A-2, A-3, A-4]
+**A-5 [CODE] Attachment occurrence model** [Next executable substrate slice]
 
-One substrate, four filter views. The internal substrate may begin after A-2, but no product-facing occurrence views may
-surface before A-3 (probe facts) and A-4 (collection health) are in force. The stricter dependency is enforced here to
-prevent accidental early surfacing.
+One substrate evidence read over existing attachment identity, source-file inventory, probe evidence, and source
+integrity. No product-facing occurrence views may surface from this slice. The implementation guide is
+`docs/library/evidence/attachment-occurrence-model-readiness.md`.
 
-Views:
+Primary motivation: local library correctness. The same audio/content may appear in multiple places because users copy
+folders, attach backup drives, rotate external drives, or temporarily lose access to known sources. A-5 must preserve
+offline occurrences, identify relocation candidates as evidence only, keep unavailable from collapsing into absent, and
+avoid unsafe claims about what content represents or what should happen to it.
 
-- Exact duplicates — one attachment, multiple current present occurrences
+Secondary motivation: future room compatibility. Prepared Room, Performed Room, and RT Flight Deck references will later
+need identity, availability, provenance, source isolation, stable references, and evidence/decision boundaries, but they
+are not the product scope of A-5.
+
+Interpretation filters over evidence:
+
+- Same-content occurrences — one attachment, multiple current present occurrences
 - Relocation continuity — same attachment, old occurrence stale/missing, new current
 - Offline occurrences — known occurrence, source unavailable
 - Backup/copy — occurrences across different source roots
@@ -384,9 +424,9 @@ Views:
 Rules:
 
 - Stale links excluded from current views by default
-- CUE duplicates are CUE duplicates, not audio duplicates
-- Language: "same content", "same bytes", "same attachment" — never "same track", "duplicate song", "safe to delete"
-- No cleanup recommendations
+- CUE same-content evidence is CUE evidence, not audio evidence
+- Language: "same content", "same bytes", "same attachment" — never product track claims
+- No action recommendations
 
 `feat(library): add attachment occurrence model`
 
@@ -633,13 +673,13 @@ alternates, user metadata, provenance, merge/split history, durable decisions.
 
 ---
 
-### D/E Gate — Prepared Room Formal Model [Doctrine gate]
+### D/E Gate — Future Prepared Room Formal Model [Doctrine gate]
 
-**Before preparation facet schemas and any track/prep UX schemas harden.**
+**Before future room/preparation workflow schemas harden.**
 
 This gate does not block substrate and probe work in Phases A–C, but it must land before Phase E implementation begins.
 The formal model defines what "prepared," "nearby reserve," "hot table," and "shadow paths" mean in the data layer —
-concepts that will silently distort the prep facet schema and track identity UX if left implicit until Phase F.
+future concepts that will silently distort the prep facet schema and track identity UX if left implicit until Phase F.
 
 Defines:
 
@@ -681,13 +721,15 @@ stale-aware, generated by backend worker, streamed/resource-backed to renderer.
 
 ### Phase F — Workflow / Product
 
-Goal: The record room.
+Goal: product workflow after the local library foundation is trustworthy.
 
 ---
 
 **F-1 [DOCTRINE] Performance session + RT Flight Deck constraints** [Doctrine gate]
 
 Before runtime event design.
+
+This is a future compatibility gate, not V0 product scope.
 
 Defines:
 
@@ -706,7 +748,7 @@ Deliverable: `docs/library/performance-session-and-flight-deck-constraints.md`
 
 ---
 
-**F-2 [CODE] Prepared Room v0** [Blocked — requires D/E gate, D-2]
+**F-2 [CODE] Prepared Room first slice** [Blocked — requires D/E gate, D-2]
 
 After the D/E gate (Prepared Room formal model) is ratified and D-2 canonical track authority exists.
 
@@ -721,7 +763,7 @@ After the D/E gate (Prepared Room formal model) is ratified and D-2 canonical tr
 
 **F-3 [CODE] Sleeves and routes** [Blocked — requires F-2]
 
-After Prepared Room v0.
+After Prepared Room first slice.
 
 - Sleeves as workflow objects
 - Routes as explainable performance paths
@@ -766,7 +808,7 @@ These substitutions are non-negotiable in product-facing surfaces, docs, and cod
 
 | Do not do                               | Until                                                                    |
 | --------------------------------------- | ------------------------------------------------------------------------ |
-| Product-facing duplicate/relocation UI  | Probe observations (A-3) + collection health (A-4) exist                 |
+| Product-facing duplicate/relocation UI  | Attachment occurrence evidence (A-5) exists; actions also require A-6    |
 | Track tables                            | Media candidate layer (C-1) is ratified                                  |
 | `primaryMedia` activation               | Media candidate / track identity layer is real                           |
 | CUE-to-audio pairing                    | CUE parse (B-3) + association evidence (B-4) exist                       |
@@ -801,9 +843,9 @@ kept.
 
 ## Strategic Principle
 
-> **Exact byte identity first. Probe facts before product duplicate claims. Collection health before duplicate UI.
-> Occurrence model before duplicate/relocation views. User decision pattern before track and prep schemas. Search/index
-> contract before browser surfaces. Import interoperability contract before track identity and prep facet hardening.
-> Prepared Room formal model before preparation and workflow implementation. RT Flight Deck and performance session
-> doctrine before runtime event design. No automatic cleanup, removal, or merge without an explicit user decision record.
-> **
+> **Local DJ foundation first. Exact byte identity first. Probe facts before product occurrence claims. Collection health
+> before occurrence UI. Occurrence model before occurrence interpretation views. User decision pattern before track and
+> prep schemas. Search/index contract before browser surfaces. Import interoperability contract before track identity and
+> prep facet hardening. Future Prepared Room formal model before room workflow implementation. RT Flight Deck and
+> performance session doctrine before runtime event design. No automatic removal or merge without an explicit user
+> decision record.**

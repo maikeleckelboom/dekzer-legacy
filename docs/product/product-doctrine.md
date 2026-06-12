@@ -1,9 +1,9 @@
 # Dekzer Product Doctrine
 
-> Dekzer is a local-first DJ operating system. Its long-term product model is spatial performance memory.
+> Dekzer V0 is a minimal, reliable, local-first DJ application foundation.
 
-_"Operating system" is product positioning, not permission to introduce generic platform abstractions before product
-surfaces require them._
+Dekzer's long-term product model includes spatial performance memory, but V0 is local DJ basics first: sources,
+indexing, browsing, search/filter/sort, clear availability states, deterministic reads, and stable renderer projection.
 
 ---
 
@@ -12,46 +12,80 @@ surfaces require them._
 | Field         | Value                                                                                                                                                     |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Status**    | Product doctrine                                                                                                                                          |
-| **Scope**     | Defines the long-term product model and the present-day substrate obligations implied by that model                                                       |
+| **Scope**     | Defines the V0 product target, long-term product model, and present-day substrate obligations implied by both                                              |
 | **Not**       | A UI specification. An implementation specification. A domain object schema. A VR/AR roadmap.                                                             |
-| **Authority** | The Prepared Room canonical foundations document owns the domain object model. This document owns the product thesis, product laws, and roadmap pressure. |
+| **Authority** | This document owns product phasing, product laws, and roadmap pressure. The Prepared Room canonical foundations document owns the future room domain model. |
 
 ---
 
-## 2. Product Thesis
+## 2. V0 Product Target
 
-**Spatial performance memory** is Dekzer's durable model of a DJ's prepared musical environment, live commitments,
-alternative paths, runtime events, and post-set interpretation. It preserves not only what was played, but where it
-lived in the prepared context, what alternatives existed, what changed during performance, and what evidence explains
-the result.
+V0 is a serious local DJ foundation, comparable in basic product shape to mature local-library DJ software, but with a
+narrower first scope.
+
+V0 must provide:
+
+- local source registration;
+- local scan/indexing;
+- source and folder browsing;
+- descendant media scope by default;
+- search, filter, and sort;
+- clear missing and offline states;
+- deterministic backend reads;
+- stable renderer projection;
+- later basic preparation and local performance workflow.
+
+V0 explicitly excludes:
+
+- hardware support;
+- streaming services;
+- product-backed Prepared Room UI;
+- audience, social, AR, VR, or hardware room surfaces.
+
+## 3. Long-Term Product Thesis
+
+**Spatial performance memory** is Dekzer's future durable model of a DJ's prepared musical environment, live
+commitments, alternative paths, runtime events, and post-set interpretation. It preserves not only what was played, but
+where it lived in the prepared context, what alternatives existed, what changed during performance, and what evidence
+explains the result.
+
+Future room-based concepts are architectural compatibility targets, not V0 product scope. Current substrate work
+supports them by preserving identity, availability, provenance, stable references, and evidence versus decision
+boundaries, but the first product bar remains a minimal, reliable local DJ workflow.
 
 ---
 
-## 3. Product Differentiation
+## 4. Future Product Direction
 
-Dekzer's long-term differentiator is spatial performance memory: the ability to prepare, perform, revisit, inspect, and
+Dekzer's long-term direction includes spatial performance memory: the ability to prepare, perform, revisit, inspect, and
 evolve a DJ set as a durable room-shaped performance artifact.
 
-- **Prepared Room** is the differentiator.
-- **Performed Room** is the moat.
-- **RT Flight Deck** is the trust layer.
-- **The local-first substrate** is what makes the model honest.
+- **Prepared Room** is a future preparation environment.
+- **Performed Room** is a future performance-history artifact.
+- **RT Flight Deck** is a future runtime diagnostic evidence domain.
+- **Audience-attended rooms, AR/VR, and hardware room projection** are future projection surfaces.
+- **The local-first substrate** is the current product foundation and the reason those later concepts can remain honest.
 
 ---
 
-## 4. Present-Day Mandate
+## 5. Present-Day Mandate
 
-Dekzer builds the correct substrate first.
+Dekzer builds local DJ basics on a correct substrate first.
 
 Library scanning. Canonical track identity. Source registration. Browse scopes. Contents reads. Media filtering. Event
 pump. Lifecycle reads. Stable references. Deterministic renderer projection.
 
-No product-backed Prepared Room UI until every substrate admission gate in §11 is satisfied. Concept mockups and
+Prepared Room, Performed Room, RT Flight Deck, audience-attended rooms, AR/VR, and hardware room projection apply
+architectural pressure now only where they preserve identity, availability, provenance, source isolation, stable
+references, evidence versus decision boundaries, or future runtime diagnostic integrity. They are not current product
+scope and must not be the primary justification for every backend slice.
+
+No product-backed Prepared Room UI until every substrate admission gate in §12 is satisfied. Concept mockups and
 research prototypes may exist only as non-authoritative exploration and must not introduce production state paths.
 
 ---
 
-## 5. Canonical Performance Stack
+## 6. Future Performance Stack
 
 ```
 Cold Archive
@@ -63,14 +97,15 @@ Cold Archive
 
 The archive is huge. The room is prepared. The table is hot. The path is live.
 
-This ordering is a product law. It does not change.
+This ordering is a future product law for room and performance features. It does not change when those features arrive,
+but it is not the V0 product entry point.
 
 _This document repeats the stack for product framing. The canonical domain definitions remain in the Prepared Room
 foundations document._
 
 ---
 
-## 6. Prepared Room Model
+## 7. Future Prepared Room Model
 
 ### Definition
 
@@ -111,7 +146,7 @@ active room context as a global mode switch.
 
 ---
 
-## 7. Spatial Mental Mapping
+## 8. Future Spatial Mental Mapping
 
 **Core product thesis:** DJs maintain a multidimensional spatial model of their prepared music. Energy, pressure, genre,
 era, key, BPM, readiness, danger, familiarity, transition shape, crowd state, and contextual availability are all active
@@ -127,7 +162,7 @@ how that spatial structure persists across time.
 
 ---
 
-## 8. Performed Room Lifecycle
+## 9. Future Performed Room Lifecycle
 
 **Central law:** Prepared Room is intention. Room Performance Instance is execution. Performed Room is evidence.
 
@@ -157,7 +192,7 @@ The preserved historical container after the performance closes. Contains:
 - Deviations from planned paths
 - Shadow Paths that were promoted
 - Material staged but not played
-- RT Flight Deck trace links (see §9)
+- RT Flight Deck trace links (see §10)
 - Post-set annotations
 
 **Hard law:** A performed room is historical evidence. Editing the next room must not mutate the performed room.
@@ -177,7 +212,7 @@ segments degrade evidence detail but must not destroy the Performed Room artifac
 
 ---
 
-## 9. RT Flight Deck Relationship
+## 10. Future RT Flight Deck Relationship
 
 The RT Flight Deck is a separate evidence domain. It provides runtime trace evidence that links into Performed Room
 artifacts. The Performed Room holds references. The RT Flight Deck owns the trace content.
@@ -196,7 +231,7 @@ post-set annotation layers interpret that evidence.
 
 ---
 
-## 10. VR/AR Projection Law
+## 11. Future VR/AR Projection Law
 
 _Market note: spatial DJ surfaces already exist. This proves the interaction category is real; it does not define
 Dekzer's product model._
@@ -219,7 +254,7 @@ state has left its lane.
 
 ---
 
-## 11. Substrate Admission Gates
+## 12. Substrate Admission Gates
 
 **Product-backed Prepared Room work is blocked by the gates applicable to the slice being built. Any slice that claims
 performed-room or performance-history behavior must also satisfy the Performance and History gates.**
@@ -256,7 +291,7 @@ If an applicable gate is unmet, a Prepared Room UI built on top of it is a facad
 
 ---
 
-## 12. Ownership Boundaries
+## 13. Ownership Boundaries
 
 | Domain                 | Owns                                                                                                                                                                                                     |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -280,11 +315,12 @@ Any component that reaches outside its owned column is a boundary violation.
 
 ---
 
-## 13. Prepared Room V0 Shape
+## 14. Future Prepared Room First Slice
 
-The first shippable Prepared Room slice. Scope is deliberately narrow.
+This is the first shippable Prepared Room slice after its gates are satisfied. It is not Dekzer V0 and must not be
+implemented before the local DJ foundation is reliable.
 
-**V0 must deliver:**
+**The future first room slice must deliver:**
 
 - Create a room.
 - Add zones to the room.
@@ -296,23 +332,23 @@ The first shippable Prepared Room slice. Scope is deliberately narrow.
 - Persist room layout and membership across app restart.
 - Show unavailable referenced items without dropping them from the room.
 
-**V0 explicitly excludes:**
+**The future first room slice explicitly excludes:**
 
-- Persisted Hot Table history. Hot Table in V0 is session-local only; no Hot Table state survives app restart beyond an
-  optional crash-recovery snapshot.
+- Persisted Hot Table history. Hot Table in this slice is session-local only; no Hot Table state survives app restart
+  beyond an optional crash-recovery snapshot.
 - Live performance mode.
 - Live Path graph.
-- VR/AR projection.
+- AR/VR projection.
 - Automatic recommendations or curation.
 - RT Flight Deck UI.
 - Performed Room artifact generation.
 - Sleeve UI.
 
-V0 is the room at rest. It must be correct before any performance concerns are layered on top.
+The first room slice is the room at rest. It must be correct before any performance concerns are layered on top.
 
 ---
 
-## 14. Non-Goals
+## 15. Non-Goals
 
 **Prepared Room:**
 
@@ -352,9 +388,9 @@ V0 is the room at rest. It must be correct before any performance concerns are l
 
 ---
 
-## 15. Product Promise
+## 16. Product Promise
 
-Dekzer is a local-first, inspectable preparation ledger for live performance.
+Dekzer is a local-first, inspectable DJ library and preparation foundation.
 
 Ledger means durable record, provenance, change history, evidence, auditability, reversibility, and accountable state.
 The product must help DJs know what they have, what is ready, what changed, and what will work tonight.
@@ -366,7 +402,7 @@ surfaces must not become the first place the system discovers whether music is s
 
 ---
 
-## 16. Identity, Claims, and Evidence
+## 17. Identity, Claims, and Evidence
 
 The word "track" must not collapse distinct identity layers. Source-file observations, byte identity, media
 attachments, recording identity, collection track identity, analysis baselines, preparation artifacts, export
@@ -389,7 +425,7 @@ verification, dry-run testing, export completion, and confirmation on the actual
 
 ---
 
-## 17. Readiness and Trust
+## 18. Readiness and Trust
 
 Readiness is a target-specific projection from current evidence, not a stored belief and not a property invented by the
 renderer.
@@ -405,7 +441,7 @@ compatibility knowledge, unsupported formats, and unresolved identity must not w
 
 ---
 
-## 18. Local Sovereignty and External Knowledge
+## 19. Local Sovereignty and External Knowledge
 
 The user's library and preparation state remain locally authoritative. Dekzer does not require remote indexing of the
 library and does not send library contents, paths, preparation state, or play history to external services without
@@ -420,7 +456,7 @@ invalidate local authority.
 
 ---
 
-## 19. Performance Mode, Recovery, and Jobs
+## 20. Performance Mode, Recovery, and Jobs
 
 Performance mode is a substrate commitment, not a cosmetic UI mode. While active, automatic catalog application,
 destructive migration, unapproved analysis rewrites, and background mutation of accepted preparation state are
@@ -436,7 +472,7 @@ artifacts, or projections. They do not silently resolve ambiguity or overwrite a
 
 ---
 
-## 20. Browse and Filter Doctrine
+## 21. Browse and Filter Doctrine
 
 The product default active workflow filter is **Audio**.
 
@@ -451,7 +487,7 @@ variants. They do not define product doctrine by themselves.
 
 ---
 
-## 21. Modeling Laws
+## 22. Modeling Laws
 
 - Do not treat files as tracks.
 - Do not treat byte identity as recording or track identity.
@@ -467,10 +503,14 @@ variants. They do not define product doctrine by themselves.
 
 ---
 
-## 22. Summary
+## 23. Summary
 
-Dekzer begins as a correct, local-first DJ library and performance foundation. That foundation enables Prepared Rooms:
-durable spatial environments for preparation, performance, alternatives, and post-set memory.
+Dekzer begins as a minimal, reliable local DJ workflow: register local sources, scan and index them, browse folders and
+descendant media, search/filter/sort, show missing and offline states clearly, read deterministically, and project stable
+renderer state.
+
+That foundation later enables Prepared Rooms: durable spatial environments for preparation, performance, alternatives,
+and post-set memory.
 
 A performed room preserves not only the played set, but the prepared context, live decisions, deviations, transition
 evidence, and runtime history. Future AR/VR surfaces project this model. They do not define a second one.

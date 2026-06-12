@@ -5,6 +5,12 @@ future layers are intentionally deferred.
 **Purpose:** Establish the domain model firmly enough that current library substrate work is built compatibly. Not a
 full product spec. Not a UI specification.
 
+**V0 scope guard:** Prepared Room is a future architectural compatibility target, not Dekzer V0 product scope. V0 is the
+minimal local DJ foundation: local source registration, scan/indexing, source/folder browsing, descendant media scope,
+search/filter/sort, clear missing/offline states, deterministic reads, and stable renderer projection. Current substrate
+work should preserve identity, availability, provenance, source isolation, stable references, and evidence/decision
+boundaries without implementing room UI.
+
 ---
 
 ## The Problem This Names
@@ -12,9 +18,9 @@ full product spec. Not a UI specification.
 All current DJ software digitizes the objects of DJing — records, crates, playlists, queues. None of them models the
 performance situation: the staged environment, the proximity layers, the temporary surfaces, the uncommitted branches.
 
-Dekzer's opportunity is to make the DJ's preparation visible, spatial, and performable. That requires a domain model
-that current software has never needed. The library substrate must be built to accommodate it from day one, even though
-most of the surface is future work.
+Dekzer's future opportunity is to make the DJ's preparation visible, spatial, and performable. That requires a domain
+model that current software has never needed. The local library substrate must remain compatible with it, even though the
+surface is future work.
 
 ---
 
