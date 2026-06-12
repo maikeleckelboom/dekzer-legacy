@@ -7,19 +7,13 @@ use crate::read_models::waveform_profile_selection::RELEVANT_WAVEFORM_TARGET_ORD
 use crate::time::unix_time_ms;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    NavigationSelector, PlaylistId, PrepPolicyId, ProjectionDomain, SourceId, SourceLocationId,
-    encode_selector,
+    NavigationSelector, ProjectionDomain, SourceId, SourceLocationId, encode_selector,
 };
 
 const ALL_MEDIA_VIEW_ROW_ID: i64 = -1;
 const ALL_AUDIO_VIEW_ROW_ID: i64 = -2;
 const ALL_VIDEOS_VIEW_ROW_ID: i64 = -3;
 const RECENTLY_ADDED_VIEW_ROW_ID: i64 = -4;
-const NEEDS_PREPARATION_VIEW_ROW_ID: i64 = -5;
-const PLAYLISTS_FAMILY_ROW_ID: i64 = -7;
-const PREP_POLICIES_FAMILY_ROW_ID: i64 = -8;
-const PLAYLIST_NAVIGATION_ROW_ID_BASE: i64 = 2_000_000_000_000;
-const PREP_POLICY_NAVIGATION_ROW_ID_BASE: i64 = 3_000_000_000_000;
 const SOURCE_LOCATION_NAVIGATION_ROW_ID_BASE: i64 = 1_000_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -465,8 +459,6 @@ fn load_next_navigation_rows(
         );
     }
 
-    insert_playlist_navigation_rows(connection, &mut rows)?;
-    insert_prep_policy_navigation_rows(connection, &mut rows)?;
     insert_source_location_navigation_rows(connection, &mut rows)?;
 
     Ok(rows)
@@ -481,11 +473,7 @@ fn load_navigation_structural_updated_at(connection: &Connection) -> LibrarySqli
              SELECT updated_at FROM source_state
              UNION ALL
              SELECT updated_at FROM source_locations
-             UNION ALL
-             SELECT updated_at FROM Playlists
-             UNION ALL
-             SELECT updated_at FROM PrepPolicies
-         )",
+          )",
         [],
         |row| row.get::<_, Option<i64>>(0),
     )?;
@@ -552,34 +540,6 @@ fn insert_structural_navigation_rows(
             updated_at,
         },
     );
-    insert_selectable_structural_navigation_row(
-        rows,
-        SelectableStructuralNavigationRow {
-            navigation_row_id: NEEDS_PREPARATION_VIEW_ROW_ID,
-            stable_key: "view:needs_preparation",
-            parent_navigation_row_id: None,
-            family: Some("Views"),
-            row_kind: "view",
-            display_name: "Needs Preparation",
-            sibling_position: 4,
-            selector: NavigationSelector::NeedsPreparation,
-            updated_at,
-        },
-    );
-    insert_selectable_structural_navigation_row(
-        rows,
-        SelectableStructuralNavigationRow {
-            navigation_row_id: PLAYLISTS_FAMILY_ROW_ID,
-            stable_key: "collection-group:playlists",
-            parent_navigation_row_id: None,
-            family: Some("Collections"),
-            row_kind: "collection-group",
-            display_name: "Playlists",
-            sibling_position: 0,
-            selector: NavigationSelector::PlaylistGroup,
-            updated_at,
-        },
-    );
 }
 
 struct SelectableStructuralNavigationRow<'a> {
@@ -615,139 +575,6 @@ fn insert_selectable_structural_navigation_row(
             updated_at: input.updated_at,
         },
     );
-}
-
-fn insert_playlist_navigation_rows(
-    connection: &Connection,
-    rows: &mut BTreeMap<String, NavigationProjectionRow>,
-) -> LibrarySqliteResult<()> {
-    let mut statement = connection.prepare(
-        "WITH ordered_playlists AS (
-             SELECT playlist_id,
-                    display_name,
-                    updated_at,
-                    ROW_NUMBER() OVER (
-                        ORDER BY lower(display_name), playlist_id ASC
-                    ) - 1 AS sibling_position
-             FROM Playlists
-         )
-         SELECT playlist_id,
-                display_name,
-                updated_at,
-                sibling_position
-         FROM ordered_playlists
-         ORDER BY sibling_position ASC, playlist_id ASC",
-    )?;
-    let mut query = statement.query([])?;
-    while let Some(row) = query.next()? {
-        let playlist_id: i64 = row.get(0)?;
-        let display_name: String = row.get(1)?;
-        let updated_at: i64 = row.get(2)?;
-        let sibling_position: i64 = row.get(3)?;
-        let selector = encode_playlist_navigation_selector(playlist_id)?;
-        let stable_key = format!("playlist:{playlist_id}");
-
-        rows.insert(
-            stable_key.clone(),
-            NavigationProjectionRow {
-                navigation_row_id: playlist_navigation_row_id(playlist_id),
-                stable_key,
-                parent_navigation_row_id: Some(PLAYLISTS_FAMILY_ROW_ID),
-                family: None,
-                row_kind: "playlist".to_string(),
-                display_name,
-                sibling_position,
-                selectable: true,
-                selector_kind: Some(selector.kind.to_string()),
-                selector_payload: Some(selector.payload),
-                updated_at,
-            },
-        );
-    }
-    Ok(())
-}
-
-fn insert_prep_policy_navigation_rows(
-    connection: &Connection,
-    rows: &mut BTreeMap<String, NavigationProjectionRow>,
-) -> LibrarySqliteResult<()> {
-    let policy_count: i64 =
-        connection.query_row("SELECT COUNT(*) FROM PrepPolicies", [], |row| row.get(0))?;
-    if policy_count == 0 {
-        return Ok(());
-    }
-
-    let group_updated_at = connection.query_row(
-        "SELECT COALESCE(MAX(updated_at), 0)
-         FROM PrepPolicies",
-        [],
-        |row| row.get(0),
-    )?;
-    rows.insert(
-        "prep-policy-group:policies".to_string(),
-        NavigationProjectionRow {
-            navigation_row_id: PREP_POLICIES_FAMILY_ROW_ID,
-            stable_key: "prep-policy-group:policies".to_string(),
-            parent_navigation_row_id: None,
-            family: Some("Preparation".to_string()),
-            row_kind: "prep-policy-group".to_string(),
-            display_name: "Policies".to_string(),
-            sibling_position: 0,
-            selectable: false,
-            selector_kind: None,
-            selector_payload: None,
-            updated_at: group_updated_at,
-        },
-    );
-
-    let mut statement = connection.prepare(
-        "WITH ordered_policies AS (
-             SELECT prep_policy_id,
-                    policy_name,
-                    updated_at,
-                    ROW_NUMBER() OVER (
-                        ORDER BY
-                            CASE is_system_policy WHEN 1 THEN 0 ELSE 1 END,
-                            lower(policy_name),
-                            prep_policy_id
-                    ) - 1 AS sibling_position
-             FROM PrepPolicies
-         )
-         SELECT prep_policy_id,
-                policy_name,
-                updated_at,
-                sibling_position
-         FROM ordered_policies
-         ORDER BY sibling_position ASC, prep_policy_id ASC",
-    )?;
-    let mut query = statement.query([])?;
-    while let Some(row) = query.next()? {
-        let prep_policy_id: i64 = row.get(0)?;
-        let policy_name: String = row.get(1)?;
-        let updated_at: i64 = row.get(2)?;
-        let sibling_position: i64 = row.get(3)?;
-        let selector = encode_prep_policy_navigation_selector(prep_policy_id)?;
-        let stable_key = format!("prep_policy_scope:{prep_policy_id}");
-
-        rows.insert(
-            stable_key.clone(),
-            NavigationProjectionRow {
-                navigation_row_id: prep_policy_navigation_row_id(prep_policy_id),
-                stable_key,
-                parent_navigation_row_id: Some(PREP_POLICIES_FAMILY_ROW_ID),
-                family: None,
-                row_kind: "prep-policy-scope".to_string(),
-                display_name: policy_name,
-                sibling_position,
-                selectable: true,
-                selector_kind: Some(selector.kind.to_string()),
-                selector_payload: Some(selector.payload),
-                updated_at,
-            },
-        );
-    }
-
-    Ok(())
 }
 
 fn insert_source_location_navigation_rows(
@@ -828,38 +655,6 @@ fn encode_source_location_navigation_selector(
     Ok(encode_selector(&NavigationSelector::SourceLocation(
         source_location_id,
     )))
-}
-
-fn encode_playlist_navigation_selector(
-    playlist_id: i64,
-) -> LibrarySqliteResult<library_domain::EncodedNavigationSelector> {
-    let playlist_id = PlaylistId::new(playlist_id).ok_or_else(|| {
-        LibrarySqliteError::MalformedSchemaState(format!(
-            "Playlists.playlist_id must be positive to encode navigation selector, found {playlist_id}"
-        ))
-    })?;
-    Ok(encode_selector(&NavigationSelector::Playlist(playlist_id)))
-}
-
-fn encode_prep_policy_navigation_selector(
-    prep_policy_id: i64,
-) -> LibrarySqliteResult<library_domain::EncodedNavigationSelector> {
-    let prep_policy_id = PrepPolicyId::new(prep_policy_id).ok_or_else(|| {
-        LibrarySqliteError::MalformedSchemaState(format!(
-            "PrepPolicies.prep_policy_id must be positive to encode navigation selector, found {prep_policy_id}"
-        ))
-    })?;
-    Ok(encode_selector(&NavigationSelector::PrepPolicyScope(
-        prep_policy_id,
-    )))
-}
-
-fn playlist_navigation_row_id(playlist_id: i64) -> i64 {
-    -(PLAYLIST_NAVIGATION_ROW_ID_BASE + playlist_id)
-}
-
-fn prep_policy_navigation_row_id(prep_policy_id: i64) -> i64 {
-    -(PREP_POLICY_NAVIGATION_ROW_ID_BASE + prep_policy_id)
 }
 
 fn source_location_navigation_row_id(source_location_id: i64) -> i64 {

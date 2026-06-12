@@ -53,28 +53,26 @@ describe('projectContents', () => {
         kind: 'file',
         label: 'track.wav',
         state: null,
-        fileClass: 'audio',
-        availabilityState: 'available'
+        fileClass: 'audio'
       },
       {
         id: 'asset-2',
         kind: 'file',
         label: 'clip.mp4',
         state: null,
-        fileClass: 'video',
-        availabilityState: 'available'
+        fileClass: 'video'
       }
     ])
   })
 
-  it('projects source-file-origin rows with distinct stable IDs', () => {
+  it('projects primary-media rows with distinct stable IDs', () => {
     const contents = projectForSelection(
       browserState({}),
       'navigation-row:7',
       readyContents({
         rows: [
-          primaryMediaRow('library-asset:1', 'Promoted Track', 'audio', 'libraryAsset'),
-          primaryMediaRow('source-file:2000', 'scanned.wav', 'audio', 'sourceFile')
+          primaryMediaRow('primary-media:1', 'Promoted Track', 'audio'),
+          primaryMediaRow('source-file:2000', 'scanned.wav', 'audio')
         ]
       })
     )
@@ -82,7 +80,7 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('ready')
     expect(contents.rows).toHaveLength(2)
     const rowIds = contents.rows.map((row) => row.id)
-    expect(rowIds).toContain('library-asset:1')
+    expect(rowIds).toContain('primary-media:1')
     expect(rowIds).toContain('source-file:2000')
   })
 
@@ -1270,8 +1268,7 @@ function contentsResult(options: {
 function primaryMediaRow(
   stableId: string,
   label: string,
-  fileClass: Exclude<ContentsFileRow['fileClass'], 'image' | 'unsupported'>,
-  origin: NonNullable<ContentsFileRow['primaryMedia']>['origin'] = 'libraryAsset'
+  fileClass: Exclude<ContentsFileRow['fileClass'], 'image' | 'unsupported'>
 ): ContentsFileRow {
   return {
     id: stableId,
@@ -1283,15 +1280,11 @@ function primaryMediaRow(
     fileClass,
     fileKind: fileClass,
     presence: 'present',
-    availabilityState: 'available',
     primaryMedia: {
-      origin,
-      primarySourceFileId: `file-${stableId}`,
-      ...(origin === 'libraryAsset' ? { libraryAssetId: stableId } : {}),
-      ...(origin === 'libraryAsset' ? { rowVersion: '1' } : {}),
-      ...(origin === 'libraryAsset' ? { artist: 'Artist' } : {}),
-      ...(origin === 'libraryAsset' ? { album: 'Album' } : {}),
-      prepReadinessSummary: origin === 'libraryAsset' ? 'notRequired' : 'underprepared'
+      primaryMediaCandidateId: stableId,
+      evidenceSourceFileId: `file-${stableId}`,
+      mediaKind: fileClass,
+      mimeType: fileClass === 'audio' ? 'audio/wav' : 'video/mp4'
     },
     updatedAtMs: 100
   }
@@ -1323,14 +1316,12 @@ function rowSummary(row: ContentRow): {
   readonly label: string
   readonly state: ContentRow['state'] | null
   readonly fileClass: ContentRow['fileClass'] | null
-  readonly availabilityState: ContentRow['availabilityState'] | null
 } {
   return {
     id: row.id,
     kind: row.kind,
     label: row.label,
     state: row.state ?? null,
-    fileClass: row.fileClass ?? null,
-    availabilityState: row.availabilityState ?? null
+    fileClass: row.fileClass ?? null
   }
 }

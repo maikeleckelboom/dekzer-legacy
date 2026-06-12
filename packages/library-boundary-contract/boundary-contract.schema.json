@@ -40,32 +40,6 @@
         "candidateId"
       ]
     },
-    "AppendLibraryAssetToPlaylistReply": {
-      "type": "object",
-      "properties": {
-        "playlistEntryId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "playlistEntryId"
-      ]
-    },
-    "AppendLibraryAssetToPlaylistRequest": {
-      "type": "object",
-      "properties": {
-        "libraryAssetId": {
-          "type": "string"
-        },
-        "playlistId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "playlistId",
-        "libraryAssetId"
-      ]
-    },
     "AttachmentIdentity": {
       "type": "object",
       "properties": {
@@ -285,22 +259,6 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/PlaylistWriteReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "playlistWrite"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
               "$ref": "#/$defs/SourceFileHashReply"
             },
             "type": {
@@ -390,22 +348,6 @@
             "type": {
               "type": "string",
               "const": "libraryRoots"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/PlaylistWriteCommand"
-            },
-            "type": {
-              "type": "string",
-              "const": "playlistWrite"
             }
           },
           "required": [
@@ -516,16 +458,6 @@
     "ContentsFileRow": {
       "type": "object",
       "properties": {
-        "availabilityState": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetAvailabilityState"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "fileClass": {
           "$ref": "#/$defs/ContentsFileClass"
         },
@@ -759,14 +691,6 @@
         "hasPolicyOmittedRows"
       ]
     },
-    "ContentsRowOrigin": {
-      "type": "string",
-      "enum": [
-        "libraryAsset",
-        "sourceFile",
-        "primaryMediaCandidate"
-      ]
-    },
     "ContentsScope": {
       "oneOf": [
         {
@@ -906,28 +830,6 @@
         "cursorInvalid"
       ]
     },
-    "CreatePlaylistReply": {
-      "type": "object",
-      "properties": {
-        "playlistId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "playlistId"
-      ]
-    },
-    "CreatePlaylistRequest": {
-      "type": "object",
-      "properties": {
-        "displayName": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "displayName"
-      ]
-    },
     "DeferTrackIdentityCandidateRequest": {
       "type": "object",
       "properties": {
@@ -943,28 +845,6 @@
       },
       "required": [
         "candidateId"
-      ]
-    },
-    "DeletePlaylistReply": {
-      "type": "object",
-      "properties": {
-        "deleted": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "deleted"
-      ]
-    },
-    "DeletePlaylistRequest": {
-      "type": "object",
-      "properties": {
-        "playlistId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "playlistId"
       ]
     },
     "DirectoryImageMediaState": {
@@ -1612,509 +1492,6 @@
         }
       }
     },
-    "LibraryAssetAvailabilityState": {
-      "type": "string",
-      "enum": [
-        "available",
-        "unavailable",
-        "degraded"
-      ]
-    },
-    "LibraryAssetBrowserRow": {
-      "type": "object",
-      "properties": {
-        "album": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "artist": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "availabilityState": {
-          "$ref": "#/$defs/LibraryAssetAvailabilityState"
-        },
-        "durationMs": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "fileName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "libraryAssetId": {
-          "type": "string"
-        },
-        "musicalKey": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "prepReadinessSummary": {
-          "$ref": "#/$defs/LibraryAssetPrepReadinessSummary"
-        },
-        "primarySourceFileId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "relativePath": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rowVersion": {
-          "type": "string"
-        },
-        "scopedSourceFileId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "sourceId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "stemsStateSummary": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetStemsStateSummary"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "tempoBpm": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "format": "double"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "updatedAtMs": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "waveformQualityCurrent": {
-          "description": "Browse-facing summaries derived by projection rebuild logic from\ncapability/artifact state; they are not canonical authority.",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "waveformQualityTarget": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        }
-      },
-      "required": [
-        "libraryAssetId",
-        "rowVersion",
-        "availabilityState",
-        "prepReadinessSummary",
-        "updatedAtMs"
-      ]
-    },
-    "LibraryAssetPrepReadinessSummary": {
-      "type": "string",
-      "enum": [
-        "notRequired",
-        "ready",
-        "preparing",
-        "underprepared",
-        "blocked",
-        "failed"
-      ]
-    },
-    "LibraryAssetPreparationArtifactCoverageState": {
-      "type": "string",
-      "enum": [
-        "none",
-        "previewReady",
-        "overviewReady",
-        "refinementAvailable",
-        "stale"
-      ]
-    },
-    "LibraryAssetPreparationCapabilityKey": {
-      "type": "string",
-      "enum": [
-        "bpm",
-        "musicalKey",
-        "beatgrid",
-        "waveform",
-        "stems"
-      ]
-    },
-    "LibraryAssetPreparationDetail": {
-      "type": "object",
-      "properties": {
-        "aggregateReadinessSummary": {
-          "$ref": "#/$defs/LibraryAssetPrepReadinessSummary"
-        },
-        "groups": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/LibraryAssetPreparationDetailGroup"
-          }
-        },
-        "libraryAssetId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "libraryAssetId",
-        "aggregateReadinessSummary",
-        "groups"
-      ]
-    },
-    "LibraryAssetPreparationDetailGroup": {
-      "type": "object",
-      "properties": {
-        "groupKey": {
-          "$ref": "#/$defs/LibraryAssetPreparationDetailGroupKey"
-        },
-        "rows": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/LibraryAssetPreparationDetailRow"
-          }
-        }
-      },
-      "required": [
-        "groupKey",
-        "rows"
-      ]
-    },
-    "LibraryAssetPreparationDetailGroupKey": {
-      "type": "string",
-      "enum": [
-        "requiredFacts",
-        "requiredStructures",
-        "requiredArtifacts",
-        "onDemandCapabilities"
-      ]
-    },
-    "LibraryAssetPreparationDetailRow": {
-      "type": "object",
-      "properties": {
-        "artifactCoverageState": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetPreparationArtifactCoverageState"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "capabilityKey": {
-          "$ref": "#/$defs/LibraryAssetPreparationCapabilityKey"
-        },
-        "displayValueSummary": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "explanationSummary": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "label": {
-          "type": "string"
-        },
-        "outcomeKind": {
-          "$ref": "#/$defs/LibraryAssetPreparationOutcomeKind"
-        },
-        "outcomeState": {
-          "$ref": "#/$defs/LibraryAssetPreparationOutcomeState"
-        },
-        "progress": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetPreparationProgress"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "requirementClass": {
-          "$ref": "#/$defs/LibraryAssetPreparationRequirementClass"
-        },
-        "satisfactionState": {
-          "$ref": "#/$defs/LibraryAssetPreparationSatisfactionState"
-        },
-        "targetSummary": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "workState": {
-          "$ref": "#/$defs/LibraryAssetPreparationWorkState"
-        }
-      },
-      "required": [
-        "capabilityKey",
-        "label",
-        "requirementClass",
-        "outcomeKind",
-        "workState",
-        "outcomeState",
-        "satisfactionState"
-      ]
-    },
-    "LibraryAssetPreparationOutcomeKind": {
-      "type": "string",
-      "enum": [
-        "fact",
-        "structure",
-        "artifact"
-      ]
-    },
-    "LibraryAssetPreparationOutcomeState": {
-      "type": "string",
-      "enum": [
-        "missing",
-        "provisional",
-        "ready",
-        "stale"
-      ]
-    },
-    "LibraryAssetPreparationProgress": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "activeStage": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "type": {
-              "type": "string",
-              "const": "indeterminate"
-            }
-          },
-          "required": [
-            "type"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "activeStage": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "completedUnits": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "fraction": {
-              "type": "number",
-              "format": "double"
-            },
-            "totalUnits": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "type": {
-              "type": "string",
-              "const": "boundedStage"
-            }
-          },
-          "required": [
-            "type",
-            "completedUnits",
-            "totalUnits",
-            "fraction"
-          ]
-        }
-      ]
-    },
-    "LibraryAssetPreparationRequirementClass": {
-      "type": "string",
-      "enum": [
-        "required",
-        "onDemand"
-      ]
-    },
-    "LibraryAssetPreparationSatisfactionState": {
-      "type": "string",
-      "enum": [
-        "satisfied",
-        "unsatisfied"
-      ]
-    },
-    "LibraryAssetPreparationWorkState": {
-      "type": "string",
-      "enum": [
-        "none",
-        "notRequested",
-        "queued",
-        "active",
-        "blocked",
-        "failed"
-      ]
-    },
-    "LibraryAssetStemsStateSummary": {
-      "type": "string",
-      "enum": [
-        "missing",
-        "queued",
-        "leased",
-        "ready",
-        "stale",
-        "blocked",
-        "failed"
-      ]
-    },
-    "LibraryAssetWaveformOverview": {
-      "type": "object",
-      "properties": {
-        "acceptedArtifactId": {
-          "type": "string"
-        },
-        "amplitudeScale": {
-          "$ref": "#/$defs/LibraryAssetWaveformOverviewAmplitudeScale"
-        },
-        "artifactCreatedAtMs": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "basisFingerprint": {
-          "type": "string"
-        },
-        "bucketCount": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "buckets": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/LibraryAssetWaveformOverviewBucket"
-          }
-        },
-        "capabilityState": {
-          "$ref": "#/$defs/LibraryAssetWaveformOverviewCapabilityState"
-        },
-        "capabilityUpdatedAtMs": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "durationMs": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "samplesPerBucket": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "sourceProfileKey": {
-          "type": "string"
-        },
-        "sourceQualityCurrent": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "sourceSampleCount": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        }
-      },
-      "required": [
-        "sourceProfileKey",
-        "capabilityState",
-        "amplitudeScale",
-        "bucketCount",
-        "buckets",
-        "acceptedArtifactId",
-        "basisFingerprint",
-        "capabilityUpdatedAtMs",
-        "artifactCreatedAtMs"
-      ]
-    },
-    "LibraryAssetWaveformOverviewAmplitudeScale": {
-      "type": "string",
-      "enum": [
-        "signedI16"
-      ]
-    },
-    "LibraryAssetWaveformOverviewBucket": {
-      "type": "object",
-      "properties": {
-        "maxAmplitudeI16": {
-          "type": "integer",
-          "format": "int16",
-          "maximum": 32767,
-          "minimum": -32768
-        },
-        "minAmplitudeI16": {
-          "type": "integer",
-          "format": "int16",
-          "maximum": 32767,
-          "minimum": -32768
-        }
-      },
-      "required": [
-        "minAmplitudeI16",
-        "maxAmplitudeI16"
-      ]
-    },
-    "LibraryAssetWaveformOverviewCapabilityState": {
-      "type": "string",
-      "enum": [
-        "ready",
-        "stale"
-      ]
-    },
     "LibraryBoundaryEvent": {
       "oneOf": [
         {
@@ -2189,38 +1566,6 @@
             "payload"
           ]
         }
-      ]
-    },
-    "LibraryBrowserWindow": {
-      "type": "object",
-      "properties": {
-        "limit": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "offset": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "rows": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/LibraryAssetBrowserRow"
-          }
-        },
-        "totalRows": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "offset",
-        "limit",
-        "totalRows",
-        "rows"
       ]
     },
     "LibraryRootCommand": {
@@ -2795,41 +2140,10 @@
           "const": "navigationRows"
         },
         {
-          "description": "Invalidates library browser snapshot reads, including search,\nnode-scoped rereads, waveform overview, and selected-asset\npreparation detail reads.",
+          "description": "Invalidates maintained source tree, source status, contents, and\ntrack identity candidate snapshot reads.",
           "type": "string",
-          "const": "libraryBrowser"
+          "const": "contents"
         }
-      ]
-    },
-    "MovePlaylistEntryReply": {
-      "type": "object",
-      "properties": {
-        "moved": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "moved"
-      ]
-    },
-    "MovePlaylistEntryRequest": {
-      "type": "object",
-      "properties": {
-        "newPosition": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "playlistEntryId": {
-          "type": "string"
-        },
-        "playlistId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "playlistId",
-        "playlistEntryId",
-        "newPosition"
       ]
     },
     "NavigableChildScopeState": {
@@ -2917,8 +2231,6 @@
       "type": "string",
       "enum": [
         "views",
-        "collections",
-        "preparation",
         "sources"
       ]
     },
@@ -2926,10 +2238,6 @@
       "type": "string",
       "enum": [
         "view",
-        "collectionGroup",
-        "playlist",
-        "prepPolicyGroup",
-        "prepPolicyScope",
         "source",
         "locationGroup",
         "location"
@@ -2942,212 +2250,8 @@
         "allAudio",
         "allVideos",
         "recentlyAdded",
-        "needsPreparation",
-        "playlistGroup",
         "source",
-        "sourceLocation",
-        "playlist",
-        "prepPolicyScope"
-      ]
-    },
-    "PlaylistWriteCommand": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/CreatePlaylistRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "createPlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/RenamePlaylistRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "renamePlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/DeletePlaylistRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "deletePlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/AppendLibraryAssetToPlaylistRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "appendLibraryAssetToPlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/RemoveLibraryAssetFromPlaylistRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "removeLibraryAssetFromPlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/MovePlaylistEntryRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "movePlaylistEntry"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        }
-      ]
-    },
-    "PlaylistWriteReply": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/CreatePlaylistReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "createPlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/RenamePlaylistReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "renamePlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/DeletePlaylistReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "deletePlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/AppendLibraryAssetToPlaylistReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "appendLibraryAssetToPlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/RemoveLibraryAssetFromPlaylistReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "removeLibraryAssetFromPlaylist"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/MovePlaylistEntryReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "movePlaylistEntry"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        }
+        "sourceLocation"
       ]
     },
     "PrimaryMediaKind": {
@@ -3160,18 +2264,6 @@
     "PrimaryMediaSummary": {
       "type": "object",
       "properties": {
-        "album": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "artist": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "attachmentId": {
           "type": [
             "string",
@@ -3223,12 +2315,6 @@
             "null"
           ]
         },
-        "libraryAssetId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "mediaKind": {
           "type": [
             "string",
@@ -3241,38 +2327,7 @@
             "null"
           ]
         },
-        "musicalKey": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "origin": {
-          "$ref": "#/$defs/ContentsRowOrigin"
-        },
-        "prepReadinessSummary": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetPrepReadinessSummary"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "primaryMediaCandidateId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "primarySourceFileId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rowVersion": {
           "type": [
             "string",
             "null"
@@ -3284,48 +2339,8 @@
             "null"
           ],
           "format": "int64"
-        },
-        "stemsStateSummary": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetStemsStateSummary"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "tempoBpm": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "format": "double"
-        },
-        "title": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "waveformQualityCurrent": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
-        },
-        "waveformQualityTarget": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "int64"
         }
-      },
-      "required": [
-        "origin"
-      ]
+      }
     },
     "ProtocolError": {
       "oneOf": [
@@ -3472,58 +2487,6 @@
         "attachmentId"
       ]
     },
-    "ReadLibraryAssetPreparationDetailReply": {
-      "type": "object",
-      "properties": {
-        "detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetPreparationDetail"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "ReadLibraryAssetPreparationDetailRequest": {
-      "type": "object",
-      "properties": {
-        "libraryAssetId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "libraryAssetId"
-      ]
-    },
-    "ReadLibraryAssetWaveformOverviewReply": {
-      "type": "object",
-      "properties": {
-        "overview": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryAssetWaveformOverview"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "ReadLibraryAssetWaveformOverviewRequest": {
-      "type": "object",
-      "properties": {
-        "libraryAssetId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "libraryAssetId"
-      ]
-    },
     "ReadLibraryBoundaryEventsAfterReply": {
       "type": "object",
       "properties": {
@@ -3640,44 +2603,6 @@
     },
     "ReadLocalRootsRequest": {
       "type": "null"
-    },
-    "ReadNavigationNodeLibraryBrowserWindowReply": {
-      "type": "object",
-      "properties": {
-        "window": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryBrowserWindow"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "ReadNavigationNodeLibraryBrowserWindowRequest": {
-      "type": "object",
-      "properties": {
-        "limit": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "navigationRowId": {
-          "type": "string"
-        },
-        "offset": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "navigationRowId",
-        "offset",
-        "limit"
-      ]
     },
     "ReadNavigationRowsReply": {
       "type": "object",
@@ -4078,58 +3003,6 @@
       },
       "required": [
         "candidateId"
-      ]
-    },
-    "RemoveLibraryAssetFromPlaylistReply": {
-      "type": "object",
-      "properties": {
-        "removed": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "removed"
-      ]
-    },
-    "RemoveLibraryAssetFromPlaylistRequest": {
-      "type": "object",
-      "properties": {
-        "libraryAssetId": {
-          "type": "string"
-        },
-        "playlistId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "playlistId",
-        "libraryAssetId"
-      ]
-    },
-    "RenamePlaylistReply": {
-      "type": "object",
-      "properties": {
-        "renamed": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "renamed"
-      ]
-    },
-    "RenamePlaylistRequest": {
-      "type": "object",
-      "properties": {
-        "displayName": {
-          "type": "string"
-        },
-        "playlistId": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "playlistId",
-        "displayName"
       ]
     },
     "RunSourceMaintenanceReply": {
@@ -4887,48 +3760,6 @@
         "unsupported"
       ]
     },
-    "SearchNavigationNodeLibraryBrowserWindowReply": {
-      "type": "object",
-      "properties": {
-        "window": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LibraryBrowserWindow"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      }
-    },
-    "SearchNavigationNodeLibraryBrowserWindowRequest": {
-      "type": "object",
-      "properties": {
-        "limit": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "navigationRowId": {
-          "type": "string"
-        },
-        "offset": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0
-        },
-        "query": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "navigationRowId",
-        "query",
-        "offset",
-        "limit"
-      ]
-    },
     "SnapshotReadCommand": {
       "oneOf": [
         {
@@ -5111,38 +3942,6 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadNavigationNodeLibraryBrowserWindowRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "readNavigationNodeLibraryBrowserWindow"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/SearchNavigationNodeLibraryBrowserWindowRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "searchNavigationNodeLibraryBrowserWindow"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
               "$ref": "#/$defs/ContentsReadRequest"
             },
             "type": {
@@ -5164,38 +3963,6 @@
             "type": {
               "type": "string",
               "const": "searchFilterRead"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/ReadLibraryAssetWaveformOverviewRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "readLibraryAssetWaveformOverview"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/ReadLibraryAssetPreparationDetailRequest"
-            },
-            "type": {
-              "type": "string",
-              "const": "readLibraryAssetPreparationDetail"
             }
           },
           "required": [
@@ -5387,38 +4154,6 @@
           "type": "object",
           "properties": {
             "payload": {
-              "$ref": "#/$defs/ReadNavigationNodeLibraryBrowserWindowReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "navigationNodeLibraryBrowserWindow"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/SearchNavigationNodeLibraryBrowserWindowReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "navigationNodeLibraryBrowserSearch"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
               "$ref": "#/$defs/ContentsReadReply"
             },
             "type": {
@@ -5440,38 +4175,6 @@
             "type": {
               "type": "string",
               "const": "searchFilter"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/ReadLibraryAssetWaveformOverviewReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "libraryAssetWaveformOverview"
-            }
-          },
-          "required": [
-            "type",
-            "payload"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "payload": {
-              "$ref": "#/$defs/ReadLibraryAssetPreparationDetailReply"
-            },
-            "type": {
-              "type": "string",
-              "const": "libraryAssetPreparationDetail"
             }
           },
           "required": [

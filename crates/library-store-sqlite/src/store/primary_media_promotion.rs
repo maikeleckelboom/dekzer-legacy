@@ -429,8 +429,8 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::read_models::contents::{
-        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRowOrigin,
-        StoreContentsScope, StoreContentsScopeDepth, StoreContentsState, StorePrimaryMediaKind,
+        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsScope,
+        StoreContentsScopeDepth, StoreContentsState, StorePrimaryMediaKind,
     };
     use crate::{PromotePrimaryMediaForSourceResult, SqliteDurableStore};
 
@@ -950,10 +950,6 @@ mod tests {
         let row = &result.rows[0];
         assert_eq!(row.source_file_id, 100);
         let summary = row.primary_media.as_ref().expect("primary media summary");
-        assert_eq!(
-            summary.origin,
-            StoreContentsRowOrigin::PrimaryMediaCandidate
-        );
         assert!(summary.primary_media_candidate_id.is_some());
         assert!(summary.attachment_id.is_some());
         assert_eq!(summary.content_hash_value.as_deref(), Some(HASH_A));

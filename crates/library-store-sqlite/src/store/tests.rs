@@ -10,27 +10,26 @@ use crate::authority::roots::{
     RootMountStatus,
 };
 use crate::{
-    AcceptSegmentationPromotionInput, ClaimMachineWorkBatchInput, CommitAcceptedSourceFactsInput,
+    ClaimMachineWorkBatchInput, CommitAcceptedSourceFactsInput,
     CommitAcceptedSourceFactsMergePolicy, CompleteMachineWorkInput, ContentHashEvidence,
     DeleteSourceLocationInput, FinishWorkRunInput, InspectSourcePromotionInput,
-    RecordArtifactInput, RecordInlineArtifactInput, ReplaceAcceptedSourceSegmentSetInput,
-    ResolveLibraryAssetPromotionInput, SourceFileClassFilter, StartWorkRunInput,
+    RecordArtifactInput, RecordInlineArtifactInput, SourceFileClassFilter, StartWorkRunInput,
     StoreContentsReadPolicy, StoreContentsScope, StoreContentsScopeCoverageState,
     StoreContentsScopeDepth, StoreContentsState, StoreLiteralHierarchyCoverageState,
-    StoreLiteralHierarchyEntryPoint, UpsertPrepPolicyInput, UpsertSourceDirectoryInput,
-    UpsertSourceInput, UpsertSourceLocationInput, UpsertSourceLocatorInput,
-    UpsertSourceScanStateInput, UpsertSourceStateInput,
+    StoreLiteralHierarchyEntryPoint, UpsertSourceDirectoryInput, UpsertSourceInput,
+    UpsertSourceLocationInput, UpsertSourceLocatorInput, UpsertSourceScanStateInput,
+    UpsertSourceStateInput,
 };
 use library_domain::{
-    ArtifactKind, ArtifactRole, NavigationSelector, PrepPolicyId, SourceAccessState, SourceFileId,
-    SourceId, SourcePresenceState, SourceScanPhase, SourceSegmentId, SourceSegmentSetId,
-    WorkItemId, WorkPriorityClass, WorkRunOutcome, encode_selector,
+    ArtifactKind, ArtifactRole, NavigationSelector, SourceAccessState, SourceFileId, SourceId,
+    SourcePresenceState, SourceScanPhase, WorkItemId, WorkPriorityClass, WorkRunOutcome,
+    encode_selector,
 };
 use rusqlite::{Connection, OptionalExtension};
 use std::fs;
 use tempfile::TempDir;
 
-const FIXED_TOP_LEVEL_NAVIGATION_ROW_COUNT: usize = 6;
+const FIXED_TOP_LEVEL_NAVIGATION_ROW_COUNT: usize = 4;
 
 const FIXED_TOP_LEVEL_NAVIGATION_ROWS: &[(&str, &str, &str, &str, i64, &str)] = &[
     (
@@ -64,22 +63,6 @@ const FIXED_TOP_LEVEL_NAVIGATION_ROWS: &[(&str, &str, &str, &str, i64, &str)] = 
         "Recently Added",
         3,
         "recently_added",
-    ),
-    (
-        "view:needs_preparation",
-        "Views",
-        "view",
-        "Needs Preparation",
-        4,
-        "needs_preparation",
-    ),
-    (
-        "collection-group:playlists",
-        "Collections",
-        "collection-group",
-        "Playlists",
-        0,
-        "playlist_group",
     ),
 ];
 
@@ -199,108 +182,6 @@ fn navigation_projection_change_count(connection: &Connection) -> i64 {
             |row| row.get(0),
         )
         .expect("count navigation projection changes")
-}
-
-fn upsert_empty_prep_policy(
-    durable_store: &SqliteDurableStore,
-    prep_policy_id: i64,
-    policy_name: &str,
-    is_system_policy: bool,
-    changed_at: i64,
-) -> PrepPolicyId {
-    durable_store
-        .upsert_prep_policy(UpsertPrepPolicyInput {
-            prep_policy_id: Some(PrepPolicyId::new(prep_policy_id).expect("positive id")),
-            policy_name: policy_name.to_string(),
-            is_system_policy,
-            is_user_editable: !is_system_policy,
-            changed_at,
-            targets: Vec::new(),
-        })
-        .expect("upsert prep policy")
-}
-
-fn insert_library_browser_asset(connection: &Connection, library_asset_id: i64, title: &str) {
-    connection
-        .execute(
-            "INSERT INTO LibraryAssets (
-                 library_asset_id,
-                 equivalence_fingerprint,
-                 retention_policy,
-                 created_at,
-                 updated_at
-             )
-             VALUES (?1, ?2, 'keep_metadata', 1, 1)",
-            rusqlite::params![library_asset_id, format!("eq:browser:{library_asset_id}")],
-        )
-        .expect("insert library asset");
-    connection
-        .execute(
-            "INSERT INTO LibraryBrowserRows (
-                 library_asset_id,
-                 row_version,
-                 primary_source_file_id,
-                 availability_state,
-                 title,
-                 prep_readiness_summary,
-                 updated_at
-             )
-             VALUES (?1, 1, NULL, 'available', ?2, 'not_required', 1)",
-            rusqlite::params![library_asset_id, title],
-        )
-        .expect("insert library browser row");
-    connection
-        .execute(
-            "INSERT INTO LibraryBrowserRows_fts (rowid, title, artist, album)
-             VALUES (?1, ?2, '', '')",
-            rusqlite::params![library_asset_id, title],
-        )
-        .expect("insert library browser search row");
-}
-
-fn set_library_browser_prep_readiness(
-    connection: &Connection,
-    library_asset_id: i64,
-    prep_readiness_summary: &str,
-) {
-    connection
-        .execute(
-            "UPDATE LibraryBrowserRows
-             SET prep_readiness_summary = ?2
-             WHERE library_asset_id = ?1",
-            rusqlite::params![library_asset_id, prep_readiness_summary],
-        )
-        .expect("set library browser prep readiness");
-}
-
-fn insert_resolved_prep_target(
-    connection: &Connection,
-    library_asset_id: i64,
-    prep_policy_id: PrepPolicyId,
-    capability_kind: &str,
-    target_profile_key: &str,
-) {
-    connection
-        .execute(
-            "INSERT INTO ResolvedLibraryAssetPrepTargets (
-                 library_asset_id,
-                 capability_kind,
-                 target_profile_key,
-                 target_quality,
-                 target_stability_class,
-                 priority_class,
-                 resolved_from_policy_id,
-                 updated_at
-             )
-             VALUES (?1, ?2, ?3, 100, 'stable', 'interactive', ?4, 1)",
-            rusqlite::params![
-                library_asset_id,
-                capability_kind,
-                target_profile_key,
-                prep_policy_id.get(),
-            ],
-        )
-        .expect("insert resolved prep target");
 }
 
 fn register_removable_root(
@@ -631,247 +512,6 @@ fn source_navigation_projection_uses_active_top_level_substrate_rows() {
             .iter()
             .any(|row| row.stable_key == format!("source:{removable_source_id}"))
     );
-}
-
-#[test]
-fn prep_policy_navigation_group_is_absent_without_prep_policies() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let db_path = tempdir.path().join("library.sqlite3");
-    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-
-    let top_level_rows = durable_store
-        .read_navigation_rows(None)
-        .expect("read top-level rows");
-
-    assert!(
-        !top_level_rows
-            .iter()
-            .any(|row| row.stable_key == "prep-policy-group:policies")
-    );
-}
-
-#[test]
-fn prep_policy_rows_are_projected_and_node_scoped_browser_reads_use_resolved_targets() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let db_path = tempdir.path().join("library.sqlite3");
-    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-
-    let user_policy = upsert_empty_prep_policy(&durable_store, 101, "alpha policy", false, 10);
-    let system_policy = upsert_empty_prep_policy(&durable_store, 102, "z system policy", true, 11);
-    let second_user_policy =
-        upsert_empty_prep_policy(&durable_store, 103, "Alpha policy", false, 12);
-    let empty_policy = upsert_empty_prep_policy(&durable_store, 104, "empty policy", false, 13);
-    let source_id = durable_store
-        .upsert_source(UpsertSourceInput {
-            source_id: None,
-            source_class: "internal".to_string(),
-            authority: "system".to_string(),
-            identity_kind: "filesystem_uuid".to_string(),
-            identity_value: "prep-policy-order-source".to_string(),
-            display_name: "Source After Preparation".to_string(),
-            medium_label: None,
-            is_user_visible: true,
-            browser_order_ordinal: Some(0),
-            changed_at: 14,
-        })
-        .expect("insert source");
-
-    let top_level_rows = durable_store
-        .read_navigation_rows(None)
-        .expect("read top-level rows");
-    let expected_source_key = format!("source:{source_id}");
-    assert_eq!(
-        top_level_rows
-            .iter()
-            .map(|row| row.stable_key.as_str())
-            .collect::<Vec<_>>(),
-        vec![
-            "view:all_media",
-            "view:all_audio",
-            "view:all_videos",
-            "view:recently_added",
-            "view:needs_preparation",
-            "collection-group:playlists",
-            "prep-policy-group:policies",
-            expected_source_key.as_str(),
-        ]
-    );
-    let group = top_level_rows
-        .iter()
-        .find(|row| row.stable_key == "prep-policy-group:policies")
-        .expect("prep policy group is projected");
-    assert_eq!(group.row_kind, "prep-policy-group");
-    assert_eq!(group.family.as_deref(), Some("Preparation"));
-    assert_eq!(group.display_name, "Policies");
-    assert!(!group.selectable);
-    assert_eq!(group.selector_kind, None);
-    assert_eq!(group.selector_payload, None);
-
-    let policy_rows = durable_store
-        .read_navigation_rows(Some(group.navigation_row_id))
-        .expect("read prep policy rows");
-    assert_eq!(
-        policy_rows
-            .iter()
-            .map(|row| row.stable_key.as_str())
-            .collect::<Vec<_>>(),
-        vec![
-            "prep_policy_scope:102",
-            "prep_policy_scope:101",
-            "prep_policy_scope:103",
-            "prep_policy_scope:104",
-        ]
-    );
-    for row in &policy_rows {
-        assert_eq!(row.row_kind, "prep-policy-scope");
-        assert_eq!(row.parent_navigation_row_id, Some(group.navigation_row_id));
-        assert!(row.selectable);
-        assert_eq!(row.selector_kind.as_deref(), Some("prep_policy_scope"));
-    }
-    assert_eq!(policy_rows[0].selector_payload.as_deref(), Some("102"));
-    assert_eq!(policy_rows[1].selector_payload.as_deref(), Some("101"));
-    assert_eq!(policy_rows[2].selector_payload.as_deref(), Some("103"));
-    assert_eq!(policy_rows[3].selector_payload.as_deref(), Some("104"));
-
-    let connection = open_mutation_connection(&db_path);
-    assert_removed_higher_bar_navigation_rows_absent(&connection);
-    insert_library_browser_asset(&connection, 1, "Alpha Track");
-    insert_library_browser_asset(&connection, 2, "Beta Track");
-    insert_library_browser_asset(&connection, 3, "Gamma Track");
-    insert_resolved_prep_target(&connection, 1, user_policy, "waveform", "warm-waveform");
-    insert_resolved_prep_target(&connection, 1, user_policy, "stems", "warm-stems");
-    insert_resolved_prep_target(
-        &connection,
-        2,
-        second_user_policy,
-        "waveform",
-        "other-waveform",
-    );
-    insert_resolved_prep_target(&connection, 3, user_policy, "waveform", "warm-video");
-
-    let user_policy_row = policy_rows
-        .iter()
-        .find(|row| row.stable_key == "prep_policy_scope:101")
-        .expect("user policy row exists");
-    let user_policy_window = durable_store
-        .read_navigation_node_library_browser_window(user_policy_row.navigation_row_id, 0, 10)
-        .expect("read prep policy navigation node")
-        .expect("prep policy row resolves to browser scope");
-    assert_eq!(user_policy_window.total_rows, 2);
-    assert_eq!(
-        user_policy_window
-            .rows
-            .iter()
-            .map(|row| row.library_asset_id)
-            .collect::<Vec<_>>(),
-        vec![1, 3]
-    );
-
-    let scoped_search = durable_store
-        .search_navigation_node_library_browser_window(
-            user_policy_row.navigation_row_id,
-            "Beta",
-            0,
-            10,
-        )
-        .expect("search prep policy navigation node")
-        .expect("prep policy row resolves to browser scope");
-    assert_eq!(scoped_search.total_rows, 0);
-    assert!(scoped_search.rows.is_empty());
-
-    let empty_policy_row = policy_rows
-        .iter()
-        .find(|row| row.stable_key == "prep_policy_scope:104")
-        .expect("empty policy row exists");
-    let empty_window = durable_store
-        .read_navigation_node_library_browser_window(empty_policy_row.navigation_row_id, 0, 10)
-        .expect("read empty prep policy navigation node")
-        .expect("empty prep policy row resolves to browser scope");
-    assert_eq!(empty_window.total_rows, 0);
-    assert!(empty_window.rows.is_empty());
-
-    assert_eq!(system_policy.get(), 102);
-    assert_eq!(empty_policy.get(), 104);
-}
-
-#[test]
-fn needs_preparation_view_is_projected_and_node_scoped_browser_reads_use_readiness_summary() {
-    let tempdir = TempDir::new().expect("create tempdir");
-    let db_path = tempdir.path().join("library.sqlite3");
-    let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
-
-    let needs_preparation_row = durable_store
-        .load_navigation_row_by_stable_key("view:needs_preparation")
-        .expect("load needs-preparation row")
-        .expect("needs-preparation row exists");
-    assert_eq!(needs_preparation_row.parent_navigation_row_id, None);
-    assert_eq!(needs_preparation_row.family.as_deref(), Some("Views"));
-    assert_eq!(needs_preparation_row.row_kind, "view");
-    assert_eq!(needs_preparation_row.display_name, "Needs Preparation");
-    assert_eq!(needs_preparation_row.sibling_position, 4);
-    assert!(needs_preparation_row.selectable);
-    assert_eq!(
-        needs_preparation_row.selector_kind.as_deref(),
-        Some("needs_preparation")
-    );
-    assert_eq!(needs_preparation_row.selector_payload.as_deref(), Some(""));
-
-    let connection = open_mutation_connection(&db_path);
-    assert_removed_higher_bar_navigation_rows_absent(&connection);
-    insert_library_browser_asset(&connection, 1, "A Preparing");
-    insert_library_browser_asset(&connection, 2, "B Underprepared");
-    insert_library_browser_asset(&connection, 3, "C Blocked");
-    insert_library_browser_asset(&connection, 4, "D Failed");
-    insert_library_browser_asset(&connection, 5, "E Ready");
-    insert_library_browser_asset(&connection, 6, "F Not Required");
-    set_library_browser_prep_readiness(&connection, 1, "preparing");
-    set_library_browser_prep_readiness(&connection, 2, "underprepared");
-    set_library_browser_prep_readiness(&connection, 3, "blocked");
-    set_library_browser_prep_readiness(&connection, 4, "failed");
-    set_library_browser_prep_readiness(&connection, 5, "ready");
-
-    let window = durable_store
-        .read_navigation_node_library_browser_window(needs_preparation_row.navigation_row_id, 0, 10)
-        .expect("read needs-preparation navigation node")
-        .expect("needs-preparation row resolves to browser scope");
-    assert_eq!(window.total_rows, 4);
-    assert_eq!(
-        window
-            .rows
-            .iter()
-            .map(|row| (row.library_asset_id, row.prep_readiness_summary.as_str()))
-            .collect::<Vec<_>>(),
-        vec![
-            (1, "preparing"),
-            (2, "underprepared"),
-            (3, "blocked"),
-            (4, "failed")
-        ]
-    );
-
-    let excluded_ready = durable_store
-        .search_navigation_node_library_browser_window(
-            needs_preparation_row.navigation_row_id,
-            "Ready",
-            0,
-            10,
-        )
-        .expect("search needs-preparation node for ready asset")
-        .expect("needs-preparation row resolves to browser scope");
-    assert_eq!(excluded_ready.total_rows, 0);
-    assert!(excluded_ready.rows.is_empty());
-
-    let included_underprepared = durable_store
-        .search_navigation_node_library_browser_window(
-            needs_preparation_row.navigation_row_id,
-            "Underprepared",
-            0,
-            10,
-        )
-        .expect("search needs-preparation node for underprepared asset")
-        .expect("needs-preparation row resolves to browser scope");
-    assert_eq!(included_underprepared.total_rows, 1);
-    assert_eq!(included_underprepared.rows[0].library_asset_id, 2);
 }
 
 #[test]
@@ -2232,7 +1872,7 @@ fn stale_scan_completion_still_rejects_old_mount_epochs() {
 }
 
 #[test]
-fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
+fn store_source_flow_drives_navigation_and_observed_facts() {
     let tempdir = TempDir::new().expect("create tempdir");
     let db_path = tempdir.path().join("library.sqlite3");
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
@@ -2372,7 +2012,7 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
                 updated_at: 24,
             },
             source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
-            rebuild_projection_domains: vec![library_domain::ProjectionDomain::LibraryBrowser],
+            rebuild_projection_domains: vec![library_domain::ProjectionDomain::Navigation],
             rebuild_priority: WorkPriorityClass::Interactive,
         })
         .expect("promote inspection");
@@ -2402,77 +2042,6 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
         })
         .expect("complete projection rebuild work item");
 
-    durable_store
-        .queue_accept_segmentation_work(crate::QueueAcceptSegmentationWorkInput {
-            source_file_id: SourceFileId::new(source_file_id).expect("positive source file id"),
-            basis_fingerprint: source_basis_fingerprint.clone(),
-            priority_class: WorkPriorityClass::Interactive,
-            queued_at: 30,
-        })
-        .expect("queue segmentation work");
-    let claimed_segmentation = claim_single_work_item(&durable_store, 31);
-    let segmentation_artifact_id = record_completed_inline_artifact(
-        &durable_store,
-        claimed_segmentation.work_item_id,
-        ArtifactKind::SegmentationResult,
-        &source_basis_fingerprint,
-        32,
-        "hash:segments:1",
-    );
-    durable_store
-        .accept_segmentation(AcceptSegmentationPromotionInput {
-            segment_set: ReplaceAcceptedSourceSegmentSetInput {
-                source_segment_set_id: Some(
-                    SourceSegmentSetId::new(400).expect("positive source segment set id"),
-                ),
-                source_file_id: SourceFileId::new(source_file_id).expect("positive source file id"),
-                segment_set_kind: "accepted_primary".to_string(),
-                basis_fingerprint: source_basis_fingerprint.clone(),
-                accepted_artifact_id: library_domain::ArtifactId::new(segmentation_artifact_id)
-                    .expect("positive artifact id"),
-                accepted_at: 33,
-                updated_at: 33,
-                segments: vec![crate::AcceptedSourceSegmentInput {
-                    source_segment_id: Some(
-                        SourceSegmentId::new(500).expect("positive source segment id"),
-                    ),
-                    segment_kind: "track_span".to_string(),
-                    ordinal: 0,
-                    start_offset_ms: 0,
-                    end_offset_ms: Some(180_000),
-                    display_title: Some("Store Track".to_string()),
-                    display_artist: Some("Store Artist".to_string()),
-                    display_album: Some("Store Album".to_string()),
-                }],
-            },
-            rebuild_projection_domains: vec![library_domain::ProjectionDomain::LibraryBrowser],
-            rebuild_priority: WorkPriorityClass::Interactive,
-        })
-        .expect("promote segmentation");
-    durable_store
-        .complete_machine_work_item(CompleteMachineWorkInput {
-            work_item_id: claimed_segmentation.work_item_id,
-            completed_at: 34,
-        })
-        .expect("complete segmentation work item");
-
-    durable_store
-        .resolve_library_asset(ResolveLibraryAssetPromotionInput {
-            equivalence_fingerprint: "eq:store-flow".to_string(),
-            retention_policy: library_domain::LibraryAssetRetentionPolicy::KeepMetadata,
-            source_segment_ids: vec![
-                SourceSegmentId::new(500).expect("positive source segment id"),
-            ],
-            accepted_at: 40,
-            updated_at: 40,
-            rebuild_projection_domains: vec![
-                library_domain::ProjectionDomain::Navigation,
-                library_domain::ProjectionDomain::LibraryBrowser,
-            ],
-            rebuild_priority: WorkPriorityClass::Interactive,
-        })
-        .expect("resolve library asset");
-
     let top_level_navigation_rows = durable_store
         .read_navigation_rows(None)
         .expect("read top-level navigation rows");
@@ -2487,9 +2056,6 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
     let source_children = durable_store
         .read_navigation_rows(Some(source_row.navigation_row_id))
         .expect("read source child rows");
-    let library_browser = durable_store
-        .read_library_browser_window(0, 10)
-        .expect("read library browser rows");
 
     assert_eq!(
         top_level_navigation_rows.len(),
@@ -2592,24 +2158,11 @@ fn store_source_and_promotion_flows_drive_navigation_and_library_browser() {
         source_children[1].selector_kind.as_deref(),
         Some("source_location")
     );
-    assert_eq!(library_browser.total_rows, 1);
-    assert_eq!(library_browser.rows.len(), 1);
-    assert_eq!(
-        library_browser.rows[0].title.as_deref(),
-        Some("Store Track")
-    );
-
     let connection = open_mutation_connection(&db_path);
     let accepted_facts_count: i64 = connection
         .query_row("SELECT COUNT(*) FROM SourceFacts", [], |row| row.get(0))
         .expect("count source facts");
-    let library_asset_row_count: i64 = connection
-        .query_row("SELECT COUNT(*) FROM LibraryBrowserRows", [], |row| {
-            row.get(0)
-        })
-        .expect("count library browser rows");
     assert_eq!(accepted_facts_count, 1);
-    assert_eq!(library_asset_row_count, 1);
     assert_eq!(
         connection
             .query_row(

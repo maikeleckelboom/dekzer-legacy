@@ -107,27 +107,9 @@ export type ContentsScopeCoverage = {
   readonly detail?: string
 }
 
-export type ContentsRowOrigin = 'libraryAsset' | 'sourceFile' | 'primaryMediaCandidate'
 export type ContentsPresence = 'present' | 'missing' | 'removed'
-export type ContentsAvailabilityState = 'available' | 'unavailable' | 'degraded'
-export type ContentsStemsStateSummary =
-  | 'missing'
-  | 'queued'
-  | 'leased'
-  | 'ready'
-  | 'stale'
-  | 'blocked'
-  | 'failed'
-export type ContentsPrepReadinessSummary =
-  | 'notRequired'
-  | 'ready'
-  | 'preparing'
-  | 'underprepared'
-  | 'blocked'
-  | 'failed'
 
 export type PrimaryMediaSummary = {
-  readonly origin: ContentsRowOrigin
   readonly primaryMediaCandidateId?: string
   readonly attachmentId?: string
   readonly contentHashAlgorithm?: string
@@ -135,23 +117,11 @@ export type PrimaryMediaSummary = {
   readonly evidenceSourceFileId?: string
   readonly mediaKind?: string
   readonly mimeType?: string
-  readonly libraryAssetId?: string
-  readonly rowVersion?: string
-  readonly primarySourceFileId?: string
-  readonly title?: string
-  readonly artist?: string
-  readonly album?: string
   readonly durationMs?: number
   readonly sampleRateHz?: number
   readonly channels?: number
   readonly bitDepth?: number
   readonly codec?: string
-  readonly musicalKey?: string
-  readonly tempoBpm?: number
-  readonly waveformQualityCurrent?: number
-  readonly waveformQualityTarget?: number
-  readonly stemsStateSummary?: ContentsStemsStateSummary
-  readonly prepReadinessSummary?: ContentsPrepReadinessSummary
 }
 
 export type ContentsFileRow = {
@@ -165,7 +135,6 @@ export type ContentsFileRow = {
   readonly fileClass: ContentsFileClass
   readonly fileKind: ContentsFileKind
   readonly presence: ContentsPresence
-  readonly availabilityState?: ContentsAvailabilityState
   readonly primaryMedia?: PrimaryMediaSummary
   readonly updatedAtMs?: number
 }

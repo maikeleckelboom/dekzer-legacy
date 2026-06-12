@@ -48,7 +48,6 @@ const iconTone = computed<IconTone>(() => {
       return 'primary'
     case 'image':
     case 'cueSheet':
-    case 'playlist':
     case 'metadata':
       return 'muted'
     case 'warning':
@@ -84,7 +83,6 @@ const labelClass = computed(() => {
       return 'text-(--color-text)'
     case 'image':
     case 'cueSheet':
-    case 'playlist':
     case 'metadata':
       return 'text-(--color-text-muted)'
     default:

@@ -102,7 +102,7 @@ Current scoped refresh behavior:
 | Input                         | Refresh planning                                                                                                                       |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `navigationRows` invalidation | Refresh navigation rows and visible source lifecycle state.                                                                            |
-| `libraryBrowser` invalidation | Refresh expanded browser windows, refresh current contents, clear contents warm snapshots, and refresh visible source lifecycle state. |
+| `contents` invalidation       | Refresh current contents, clear contents warm snapshots, and refresh visible source lifecycle state.                                   |
 | Event gap recovery            | Refresh active first-slice projections by bounded policy and clear contents warm snapshots.                                            |
 | Source scan events            | Refresh visible source lifecycle state; contents and tree rows update through maintained snapshot invalidations or explicit reads.     |
 

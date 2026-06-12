@@ -647,16 +647,6 @@ fn artifact_has_live_reference(
                         FROM SourceFacts
                         WHERE accepted_artifact_id = ?1
                     ) THEN 1
-                    WHEN EXISTS(
-                        SELECT 1
-                        FROM SourceSegmentSets
-                        WHERE accepted_artifact_id = ?1
-                    ) THEN 1
-                    WHEN EXISTS(
-                        SELECT 1
-                        FROM LibraryAssetCapabilities
-                        WHERE selected_artifact_id = ?1
-                    ) THEN 1
                     ELSE 0
                 END",
         [artifact_id],
@@ -677,16 +667,6 @@ fn load_owned_file_store_rows(
                         SELECT 1
                         FROM SourceFacts
                         WHERE accepted_artifact_id = entry.artifact_id
-                    ) THEN 1
-                    WHEN EXISTS(
-                        SELECT 1
-                        FROM SourceSegmentSets
-                        WHERE accepted_artifact_id = entry.artifact_id
-                    ) THEN 1
-                    WHEN EXISTS(
-                        SELECT 1
-                        FROM LibraryAssetCapabilities
-                        WHERE selected_artifact_id = entry.artifact_id
                     ) THEN 1
                     ELSE 0
                 END AS has_live_reference,
@@ -743,20 +723,13 @@ mod tests {
     use rusqlite::{Connection, params};
     use tempfile::TempDir;
 
-    use crate::authority::library_asset::ReplaceLibraryAssetCapabilityInput;
-    use crate::authority::promotion::{
-        ComputeCapabilityPromotionInput, ComputeCapabilityPromotionTx,
-    };
     use crate::authority::work::artifacts::{
         ArtifactsAuthorityTx, PersistArtifactPayloadInput, PersistedArtifactPayload,
         PersistedArtifactStorage, RecordArtifactInput,
     };
     use crate::authority::write_lane::admit_write;
     use crate::schema::install_baseline_schema_for_test;
-    use library_domain::{
-        ArtifactId, ArtifactKind, ArtifactRole, CapabilityKind, CapabilityStabilityClass,
-        CapabilityState, LibraryAssetId, WorkPriorityClass, WorkRunId,
-    };
+    use library_domain::{ArtifactKind, ArtifactRole, WorkRunId};
 
     use super::{
         ArtifactFileStoreHealth, ArtifactFileStoreIntegrityFinding, ArtifactFileStoreRoot,
@@ -774,28 +747,8 @@ mod tests {
         (tempdir, db_path, connection)
     }
 
-    fn insert_library_asset(write: &Connection, library_asset_id: i64) {
-        write
-            .execute(
-                "INSERT INTO LibraryAssets (
-                     library_asset_id,
-                     equivalence_fingerprint,
-                     retention_policy,
-                     created_at,
-                     updated_at
-                 )
-                 VALUES (?1, ?2, 'keep_metadata', 0, 0)",
-                params![library_asset_id, format!("eq:{library_asset_id}")],
-            )
-            .expect("insert library asset");
-    }
-
-    fn insert_open_capability_run(
+    fn insert_open_inspection_run(
         write: &Connection,
-        library_asset_id: i64,
-        capability_kind: &str,
-        profile_key: &str,
-        target_quality: i64,
         basis_fingerprint: &str,
         started_at: i64,
     ) -> WorkRunId {
@@ -820,32 +773,24 @@ mod tests {
                      updated_at
                  )
                  VALUES (
-                     'library_asset',
-                     ?1,
-                     'compute_capability',
-                     ?2,
-                     ?3,
-                     ?4,
+                     'source_file',
+                     '300',
+                     'inspect_source',
+                     NULL,
+                     NULL,
+                     NULL,
                      'interactive',
-                     ?5,
+                     ?1,
                      'leased',
-                     ?6,
+                     ?2,
                      1,
                      NULL,
                      NULL,
                      NULL,
-                     ?7,
-                     ?7
+                     ?3,
+                     ?3
                  )",
-                params![
-                    library_asset_id.to_string(),
-                    capability_kind,
-                    profile_key,
-                    target_quality,
-                    basis_fingerprint,
-                    started_at + 10_000,
-                    started_at,
-                ],
+                params![basis_fingerprint, started_at + 10_000, started_at],
             )
             .expect("insert work item");
         let work_item_id = write.last_insert_rowid();
@@ -868,7 +813,7 @@ mod tests {
         WorkRunId::new(write.last_insert_rowid()).expect("inserted work run id")
     }
 
-    fn persist_capability_artifact(
+    fn persist_inspection_artifact(
         write: &mut crate::authority::write_lane::AdmittedWrite<'_>,
         file_store_root: &ArtifactFileStoreRoot,
         work_run_id: WorkRunId,
@@ -884,7 +829,7 @@ mod tests {
                 &PersistArtifactPayloadInput {
                     artifact: RecordArtifactInput {
                         work_run_id,
-                        artifact_kind: ArtifactKind::CapabilityResult,
+                        artifact_kind: ArtifactKind::InspectionResult,
                         artifact_role: ArtifactRole::PrimaryResult,
                         media_type: "application/octet-stream".to_string(),
                         basis_fingerprint: basis_fingerprint.to_string(),
@@ -897,47 +842,14 @@ mod tests {
             .expect("persist capability artifact")
     }
 
-    fn promote_capability(
-        write: &mut crate::authority::write_lane::AdmittedWrite<'_>,
-        file_store_root: &ArtifactFileStoreRoot,
-        library_asset_id: i64,
-        quality_current: i64,
-        basis_fingerprint: &str,
-        selected_artifact_id: i64,
-        updated_at: i64,
-    ) {
-        ComputeCapabilityPromotionTx::new(write, file_store_root.clone())
-            .compute_capability(&ComputeCapabilityPromotionInput {
-                capability: ReplaceLibraryAssetCapabilityInput {
-                    library_asset_id: LibraryAssetId::new(library_asset_id)
-                        .expect("positive library asset id"),
-                    capability_kind: CapabilityKind::waveform(),
-                    profile_key: "default".to_string(),
-                    state: CapabilityState::Ready,
-                    stability_class: Some(CapabilityStabilityClass::Stable),
-                    quality_current: Some(quality_current),
-                    basis_fingerprint: Some(basis_fingerprint.to_string()),
-                    selected_artifact_id: Some(
-                        ArtifactId::new(selected_artifact_id).expect("positive artifact id"),
-                    ),
-                    updated_at,
-                },
-                rebuild_projection_domains: vec![],
-                rebuild_priority: WorkPriorityClass::Interactive,
-            })
-            .expect("promote capability");
-    }
-
     #[test]
     fn generic_inline_persistence_uses_artifact_rows_and_inline_payloads() {
         let (_tempdir, db_path, mut connection) = open_test_connection();
         let file_store_root = ArtifactFileStoreRoot::for_store_path(&db_path);
 
         admit_write(&mut connection, |write| {
-            insert_library_asset(write, 11);
-            let work_run_id =
-                insert_open_capability_run(write, 11, "waveform", "default", 90, "basis:v1", 10);
-            let persisted = persist_capability_artifact(
+            let work_run_id = insert_open_inspection_run(write, "basis:v1", 10);
+            let persisted = persist_inspection_artifact(
                 write,
                 &file_store_root,
                 work_run_id,
@@ -986,10 +898,8 @@ mod tests {
         let payload = vec![7_u8; 1_048_577];
 
         admit_write(&mut connection, |write| {
-            insert_library_asset(write, 21);
-            let work_run_id =
-                insert_open_capability_run(write, 21, "waveform", "default", 90, "basis:v1", 10);
-            let persisted = persist_capability_artifact(
+            let work_run_id = insert_open_inspection_run(write, "basis:v1", 10);
+            let persisted = persist_inspection_artifact(
                 write,
                 &file_store_root,
                 work_run_id,
@@ -1036,206 +946,6 @@ mod tests {
             std::fs::read(&absolute_path).expect("read persisted artifact file"),
             payload
         );
-    }
-
-    #[test]
-    fn capability_replacement_deletes_unclaimed_superseded_file_store_artifact() {
-        let (_tempdir, db_path, mut connection) = open_test_connection();
-        let file_store_root = ArtifactFileStoreRoot::for_store_path(&db_path);
-        let first_payload = vec![1_u8; 1_048_577];
-        let second_payload = vec![2_u8; 1_048_577];
-        let mut first_artifact_id = 0;
-        let mut first_path = String::new();
-        let mut second_artifact_id = 0;
-        let mut second_path = String::new();
-
-        admit_write(&mut connection, |write| {
-            insert_library_asset(write, 31);
-
-            let first_run_id =
-                insert_open_capability_run(write, 31, "waveform", "default", 90, "basis:v1", 10);
-            let first = persist_capability_artifact(
-                write,
-                &file_store_root,
-                first_run_id,
-                "basis:v1",
-                "hash:file:first",
-                11,
-                first_payload.clone(),
-            );
-            first_artifact_id = first.artifact.artifact_id.get();
-            first_path = match first.storage {
-                PersistedArtifactStorage::FileStore(path) => {
-                    path.relative_path.as_str().to_string()
-                }
-                other => panic!("expected file-store payload, found {other:?}"),
-            };
-            promote_capability(
-                write,
-                &file_store_root,
-                31,
-                90,
-                "basis:v1",
-                first_artifact_id,
-                12,
-            );
-
-            let second_run_id =
-                insert_open_capability_run(write, 31, "waveform", "default", 95, "basis:v2", 20);
-            let second = persist_capability_artifact(
-                write,
-                &file_store_root,
-                second_run_id,
-                "basis:v2",
-                "hash:file:second",
-                21,
-                second_payload.clone(),
-            );
-            second_artifact_id = second.artifact.artifact_id.get();
-            second_path = match second.storage {
-                PersistedArtifactStorage::FileStore(path) => {
-                    path.relative_path.as_str().to_string()
-                }
-                other => panic!("expected file-store payload, found {other:?}"),
-            };
-            promote_capability(
-                write,
-                &file_store_root,
-                31,
-                95,
-                "basis:v2",
-                second_artifact_id,
-                22,
-            );
-            Ok(())
-        })
-        .expect("replace capability artifact");
-
-        let first_exists: i64 = connection
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM Artifacts
-                 WHERE artifact_id = ?1",
-                [first_artifact_id],
-                |row| row.get(0),
-            )
-            .expect("count first artifact rows");
-        let second_exists: i64 = connection
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM Artifacts
-                 WHERE artifact_id = ?1",
-                [second_artifact_id],
-                |row| row.get(0),
-            )
-            .expect("count second artifact rows");
-
-        assert_eq!(first_exists, 0);
-        assert_eq!(second_exists, 1);
-        assert!(!file_store_root.path().join(first_path).exists());
-        assert!(file_store_root.path().join(second_path).exists());
-    }
-
-    #[test]
-    fn capability_replacement_keeps_claimed_superseded_file_store_artifact() {
-        let (_tempdir, db_path, mut connection) = open_test_connection();
-        let file_store_root = ArtifactFileStoreRoot::for_store_path(&db_path);
-        let mut first_artifact_id = 0;
-        let mut first_path = String::new();
-        let mut second_artifact_id = 0;
-
-        admit_write(&mut connection, |write| {
-            insert_library_asset(write, 41);
-
-            let first_run_id =
-                insert_open_capability_run(write, 41, "waveform", "default", 90, "basis:v1", 10);
-            let first = persist_capability_artifact(
-                write,
-                &file_store_root,
-                first_run_id,
-                "basis:v1",
-                "hash:file:first",
-                11,
-                vec![1_u8; 1_048_577],
-            );
-            first_artifact_id = first.artifact.artifact_id.get();
-            first_path = match first.storage {
-                PersistedArtifactStorage::FileStore(path) => {
-                    path.relative_path.as_str().to_string()
-                }
-                other => panic!("expected file-store payload, found {other:?}"),
-            };
-            promote_capability(
-                write,
-                &file_store_root,
-                41,
-                90,
-                "basis:v1",
-                first_artifact_id,
-                12,
-            );
-
-            write.execute(
-                "INSERT INTO ArtifactClaims (
-                     artifact_id,
-                     claimant_kind,
-                     claimant_key,
-                     release_policy,
-                     claimed_at,
-                     released_at
-                 )
-                 VALUES (?1, 'playlist_export', ?2, 'manual', 13, NULL)",
-                params![first_artifact_id, format!("claim:{first_artifact_id}")],
-            )?;
-
-            let second_run_id =
-                insert_open_capability_run(write, 41, "waveform", "default", 95, "basis:v2", 20);
-            let second = persist_capability_artifact(
-                write,
-                &file_store_root,
-                second_run_id,
-                "basis:v2",
-                "hash:file:second",
-                21,
-                vec![2_u8; 1_048_577],
-            );
-            second_artifact_id = second.artifact.artifact_id.get();
-            promote_capability(
-                write,
-                &file_store_root,
-                41,
-                95,
-                "basis:v2",
-                second_artifact_id,
-                22,
-            );
-            Ok(())
-        })
-        .expect("replace claimed capability artifact");
-
-        let first_exists: i64 = connection
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM Artifacts
-                 WHERE artifact_id = ?1",
-                [first_artifact_id],
-                |row| row.get(0),
-            )
-            .expect("count first artifact rows");
-        let active_claim_count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM ArtifactClaims
-                 WHERE artifact_id = ?1
-                   AND released_at IS NULL",
-                [first_artifact_id],
-                |row| row.get(0),
-            )
-            .expect("count active claims");
-
-        assert_eq!(first_exists, 1);
-        assert_eq!(active_claim_count, 1);
-        assert!(file_store_root.path().join(first_path).exists());
     }
 
     #[test]
@@ -1291,16 +1001,14 @@ mod tests {
     }
 
     #[test]
-    fn reconciliation_reports_missing_referenced_file_using_generic_references() {
+    fn reconciliation_reports_missing_claimed_file_using_generic_claims() {
         let (_tempdir, db_path, mut connection) = open_test_connection();
         let file_store_root = ArtifactFileStoreRoot::for_store_path(&db_path);
         let mut artifact_id = 0;
 
         admit_write(&mut connection, |write| {
-            insert_library_asset(write, 51);
-            let work_run_id =
-                insert_open_capability_run(write, 51, "waveform", "default", 90, "basis:v1", 10);
-            let persisted = persist_capability_artifact(
+            let work_run_id = insert_open_inspection_run(write, "basis:v1", 10);
+            let persisted = persist_inspection_artifact(
                 write,
                 &file_store_root,
                 work_run_id,
@@ -1310,10 +1018,21 @@ mod tests {
                 vec![5_u8; 1_048_577],
             );
             artifact_id = persisted.artifact.artifact_id.get();
-            promote_capability(write, &file_store_root, 51, 90, "basis:v1", artifact_id, 12);
+            write.execute(
+                "INSERT INTO ArtifactClaims (
+                     artifact_id,
+                     claimant_kind,
+                     claimant_key,
+                     release_policy,
+                     claimed_at,
+                     released_at
+                 )
+                 VALUES (?1, 'source_export', ?2, 'manual', 12, NULL)",
+                params![artifact_id, format!("claim:{artifact_id}")],
+            )?;
             Ok(())
         })
-        .expect("persist referenced file-store artifact");
+        .expect("persist claimed file-store artifact");
 
         let relative_path: String = connection
             .query_row(
@@ -1333,11 +1052,11 @@ mod tests {
         assert_eq!(reconciliation.health(), ArtifactFileStoreHealth::Degraded);
         assert_eq!(reconciliation.integrity_findings.len(), 1);
         match &reconciliation.integrity_findings[0] {
-            ArtifactFileStoreIntegrityFinding::MissingReferencedArtifactFile {
+            ArtifactFileStoreIntegrityFinding::MissingClaimedArtifactFile {
                 artifact_id: found_artifact_id,
                 ..
             } => assert_eq!(*found_artifact_id, artifact_id),
-            other => panic!("expected missing referenced file finding, got {other:?}"),
+            other => panic!("expected missing claimed file finding, got {other:?}"),
         }
     }
 }

@@ -7,7 +7,6 @@ export type IconRole =
   | 'media.video'
   | 'media.image'
   | 'media.cueSheet'
-  | 'media.playlist'
   | 'media.metadata'
   | 'state.loading'
   | 'state.warning'

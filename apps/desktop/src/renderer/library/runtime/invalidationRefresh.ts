@@ -6,12 +6,7 @@ import type { LibraryHierarchyReadController } from '../boundary/hierarchyRead'
 import type { SourceLifecycleReadController } from '../boundary/sourceLifecycleRead'
 import type { BrowserTreeNodeId } from '../tree/types'
 
-export type InvalidationScope =
-  | 'navigationRows'
-  | 'libraryBrowser'
-  | 'contents'
-  | 'sourceLifecycle'
-  | 'unknown'
+export type InvalidationScope = 'navigationRows' | 'contents' | 'sourceLifecycle' | 'unknown'
 
 export type RefreshPlan = {
   readonly refreshRootHierarchy: boolean
@@ -52,8 +47,8 @@ export function classifyInvalidationScope(scope: string): InvalidationScope {
   switch (scope) {
     case 'navigationRows':
       return 'navigationRows'
-    case 'libraryBrowser':
-      return 'libraryBrowser'
+    case 'contents':
+      return 'contents'
     default:
       return 'unknown'
   }
@@ -61,7 +56,7 @@ export function classifyInvalidationScope(scope: string): InvalidationScope {
 
 export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan {
   let refreshNavigationRows = false
-  let refreshExpandedBrowserWindows = false
+  const refreshExpandedBrowserWindows = false
   let refreshCurrentContents = false
   let refreshActiveSearchFilter = false
   let clearAllContentsWarmSnapshots = false
@@ -73,14 +68,12 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
         refreshNavigationRows = true
         addSourceLifecycleIds(refreshSourceLifecycleIds, input.sourceLifecycleSourceIds)
         break
-      case 'libraryBrowser':
-        refreshExpandedBrowserWindows = true
+      case 'contents':
         refreshCurrentContents = true
         refreshActiveSearchFilter = true
         clearAllContentsWarmSnapshots = true
         addSourceLifecycleIds(refreshSourceLifecycleIds, input.sourceLifecycleSourceIds)
         break
-      case 'contents':
       case 'sourceLifecycle':
       case 'unknown':
         break

@@ -1389,10 +1389,10 @@ fn is_protected_windows_location(path: &Path) -> bool {
 
 fn deterministic_suggested_music_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
-    if let Ok(user_profile) = std::env::var("USERPROFILE") {
-        if !user_profile.trim().is_empty() {
-            roots.push(Path::new(&user_profile).join("Music"));
-        }
+    if let Ok(user_profile) = std::env::var("USERPROFILE")
+        && !user_profile.trim().is_empty()
+    {
+        roots.push(Path::new(&user_profile).join("Music"));
     }
     roots
 }

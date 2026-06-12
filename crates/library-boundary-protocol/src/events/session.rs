@@ -22,10 +22,9 @@ pub enum MaintainedSnapshotScope {
     /// Invalidates navigation snapshot reads:
     /// `ReadNavigationRows`, `LoadNavigationRow`, and `LoadNavigationRowByStableKey`.
     NavigationRows,
-    /// Invalidates library browser snapshot reads, including search,
-    /// node-scoped rereads, waveform overview, and selected-asset
-    /// preparation detail reads.
-    LibraryBrowser,
+    /// Invalidates maintained source tree, source status, contents, and
+    /// track identity candidate snapshot reads.
+    Contents,
 }
 
 impl MaintainedSnapshotScope {
@@ -39,13 +38,7 @@ impl MaintainedSnapshotScope {
             | SnapshotReadCommand::ReadSourceIntegrity(_)
             | SnapshotReadCommand::ReadSourceMaintenance(_)
             | SnapshotReadCommand::ReadTrackIdentityReviewCandidates(_)
-            | SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(_)
-            | SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(_)
-            | SnapshotReadCommand::ContentsRead(_)
-            | SnapshotReadCommand::ReadLibraryAssetWaveformOverview(_)
-            | SnapshotReadCommand::ReadLibraryAssetPreparationDetail(_) => {
-                Some(Self::LibraryBrowser)
-            }
+            | SnapshotReadCommand::ContentsRead(_) => Some(Self::Contents),
             SnapshotReadCommand::ReadSourceFileAttachment(_)
             | SnapshotReadCommand::ReadAttachmentSourceFiles(_)
             | SnapshotReadCommand::ReadSourceAttachmentSummary(_)
@@ -270,12 +263,10 @@ mod tests {
     use crate::{
         ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeDepth,
         LibraryTreeEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        PrimaryMediaKind, ReadAttachmentSourceFilesRequest,
-        ReadLibraryAssetPreparationDetailRequest, ReadLibraryAssetWaveformOverviewRequest,
-        ReadLibraryTreeChildrenRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
+        PrimaryMediaKind, ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenRequest,
         ReadNavigationRowsRequest, ReadSourceAttachmentSummaryRequest,
         ReadSourceFileAttachmentRequest, ReadSourceIntegrityRequest, ReadSourceLifecycleRequest,
-        SearchNavigationNodeLibraryBrowserWindowRequest, SnapshotReadCommand,
+        SnapshotReadCommand,
     };
     use serde_json::json;
 
@@ -302,7 +293,7 @@ mod tests {
             );
         }
 
-        let library_asset_reads = [
+        let contents_reads = [
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 8 },
                 parent_source_directory_id: None,
@@ -311,21 +302,6 @@ mod tests {
             }),
             SnapshotReadCommand::ReadSourceLifecycle(ReadSourceLifecycleRequest { source_id: 8 }),
             SnapshotReadCommand::ReadSourceIntegrity(ReadSourceIntegrityRequest { source_id: 8 }),
-            SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
-                ReadNavigationNodeLibraryBrowserWindowRequest {
-                    navigation_row_id: 8,
-                    offset: 0,
-                    limit: 100,
-                },
-            ),
-            SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(
-                SearchNavigationNodeLibraryBrowserWindowRequest {
-                    navigation_row_id: 8,
-                    query: "breakbeat".to_string(),
-                    offset: 0,
-                    limit: 100,
-                },
-            ),
             SnapshotReadCommand::ContentsRead(ContentsReadRequest {
                 scope: ContentsScope::Directory {
                     source_id: 8,
@@ -338,22 +314,12 @@ mod tests {
                 limit: Some(100),
                 cursor: None,
             }),
-            SnapshotReadCommand::ReadLibraryAssetWaveformOverview(
-                ReadLibraryAssetWaveformOverviewRequest {
-                    library_asset_id: 42,
-                },
-            ),
-            SnapshotReadCommand::ReadLibraryAssetPreparationDetail(
-                ReadLibraryAssetPreparationDetailRequest {
-                    library_asset_id: 42,
-                },
-            ),
         ];
 
-        for command in &library_asset_reads {
+        for command in &contents_reads {
             assert_eq!(
                 MaintainedSnapshotScope::for_snapshot_read(command),
-                Some(MaintainedSnapshotScope::LibraryBrowser)
+                Some(MaintainedSnapshotScope::Contents)
             );
         }
 
@@ -385,7 +351,7 @@ mod tests {
             event_sequence: 1,
             occurred_at_ms: 1700000000000,
             invalidation: MaintainedSnapshotInvalidation {
-                scope: MaintainedSnapshotScope::LibraryBrowser,
+                scope: MaintainedSnapshotScope::Contents,
                 revision: Some(MaintainedSnapshotRevision::new(42)),
             },
         });
@@ -398,7 +364,7 @@ mod tests {
         assert_eq!(payload.occurred_at_ms, 1700000000000);
         assert_eq!(
             payload.invalidation.scope,
-            MaintainedSnapshotScope::LibraryBrowser
+            MaintainedSnapshotScope::Contents
         );
         assert_eq!(
             payload
@@ -415,7 +381,7 @@ mod tests {
             event_sequence: 1,
             occurred_at_ms: 1700000000000,
             invalidation: MaintainedSnapshotInvalidation {
-                scope: MaintainedSnapshotScope::LibraryBrowser,
+                scope: MaintainedSnapshotScope::Contents,
                 revision: Some(MaintainedSnapshotRevision::new(42)),
             },
         });
@@ -429,7 +395,7 @@ mod tests {
                     "eventSequence": 1,
                     "occurredAtMs": 1700000000000i64,
                     "invalidation": {
-                        "scope": "libraryBrowser",
+                        "scope": "contents",
                         "revision": "42"
                     }
                 }

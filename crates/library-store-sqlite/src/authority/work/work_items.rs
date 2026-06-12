@@ -6,8 +6,8 @@ use crate::authority::work::work_runs::{
 use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    CapabilityKind, LibraryAssetId, MachineWorkKind, ProjectionDomain, SourceFileId, WorkItemId,
-    WorkItemState, WorkPriorityClass, WorkRunOutcome, WorkSubject, WorkSubjectKind,
+    CapabilityKind, MachineWorkKind, ProjectionDomain, SourceFileId, WorkItemId, WorkItemState,
+    WorkPriorityClass, WorkRunOutcome, WorkSubject, WorkSubjectKind,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,25 +30,6 @@ pub struct QueueMachineWorkInput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueueInspectSourceWorkInput {
     pub source_file_id: SourceFileId,
-    pub basis_fingerprint: String,
-    pub priority_class: WorkPriorityClass,
-    pub queued_at: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QueueAcceptSegmentationWorkInput {
-    pub source_file_id: SourceFileId,
-    pub basis_fingerprint: String,
-    pub priority_class: WorkPriorityClass,
-    pub queued_at: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QueueComputeCapabilityWorkInput {
-    pub library_asset_id: LibraryAssetId,
-    pub capability_kind: CapabilityKind,
-    pub target_profile_key: String,
-    pub target_quality: i64,
     pub basis_fingerprint: String,
     pub priority_class: WorkPriorityClass,
     pub queued_at: i64,
@@ -223,42 +204,6 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
             key: MachineWorkKey {
                 subject: WorkSubject::SourceFile(input.source_file_id),
                 work_kind: MachineWorkKind::InspectSource,
-                capability_kind: None,
-                target_profile_key: None,
-                target_quality: None,
-                basis_fingerprint: input.basis_fingerprint.clone(),
-            },
-            priority_class: input.priority_class,
-            queued_at: input.queued_at,
-        })
-    }
-
-    pub fn queue_compute_capability_work(
-        &self,
-        input: &QueueComputeCapabilityWorkInput,
-    ) -> LibrarySqliteResult<QueueMachineWorkResult> {
-        self.queue_machine_work(&QueueMachineWorkInput {
-            key: MachineWorkKey {
-                subject: WorkSubject::LibraryAsset(input.library_asset_id),
-                work_kind: MachineWorkKind::ComputeCapability,
-                capability_kind: Some(input.capability_kind.clone()),
-                target_profile_key: Some(input.target_profile_key.clone()),
-                target_quality: Some(input.target_quality),
-                basis_fingerprint: input.basis_fingerprint.clone(),
-            },
-            priority_class: input.priority_class,
-            queued_at: input.queued_at,
-        })
-    }
-
-    pub fn queue_accept_segmentation_work(
-        &self,
-        input: &QueueAcceptSegmentationWorkInput,
-    ) -> LibrarySqliteResult<QueueMachineWorkResult> {
-        self.queue_machine_work(&QueueMachineWorkInput {
-            key: MachineWorkKey {
-                subject: WorkSubject::SourceFile(input.source_file_id),
-                work_kind: MachineWorkKind::AcceptSegmentation,
                 capability_kind: None,
                 target_profile_key: None,
                 target_quality: None,

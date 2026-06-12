@@ -2,7 +2,7 @@
 // Source of truth: crates/library-boundary-protocol
 // Do not edit by hand.
 
-export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "playlistWrite", "payload": PlaylistWriteCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "sourceMaintenance", "payload": SourceMaintenanceCommand } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
+export type CommandRequest = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamCommand } | { "type": "libraryRoots", "payload": LibraryRootCommand } | { "type": "sourceFileHash", "payload": SourceFileHashCommand } | { "type": "sourceMaintenance", "payload": SourceMaintenanceCommand } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionCommand } | { "type": "snapshotRead", "payload": SnapshotReadCommand };
 
 export type LibraryBoundaryEventStreamCommand = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterRequest };
 
@@ -39,20 +39,6 @@ export type LocalRootAvailability = "available" | "unavailable";
 
 export type LocalRoot = { rootId: string, canonicalPath: string, availability: LocalRootAvailability, };
 
-export type PlaylistWriteCommand = { "type": "createPlaylist", "payload": CreatePlaylistRequest } | { "type": "renamePlaylist", "payload": RenamePlaylistRequest } | { "type": "deletePlaylist", "payload": DeletePlaylistRequest } | { "type": "appendLibraryAssetToPlaylist", "payload": AppendLibraryAssetToPlaylistRequest } | { "type": "removeLibraryAssetFromPlaylist", "payload": RemoveLibraryAssetFromPlaylistRequest } | { "type": "movePlaylistEntry", "payload": MovePlaylistEntryRequest };
-
-export type CreatePlaylistRequest = { displayName: string, };
-
-export type RenamePlaylistRequest = { playlistId: string, displayName: string, };
-
-export type DeletePlaylistRequest = { playlistId: string, };
-
-export type AppendLibraryAssetToPlaylistRequest = { playlistId: string, libraryAssetId: string, };
-
-export type RemoveLibraryAssetFromPlaylistRequest = { playlistId: string, libraryAssetId: string, };
-
-export type MovePlaylistEntryRequest = { playlistId: string, playlistEntryId: string, newPosition: number, };
-
 export type SourceFileHashCommand = { "type": "hashSourceFilesBlake3", "payload": HashSourceFilesBlake3Request };
 
 export type HashSourceFilesBlake3Request = { sourceId: string, limit?: number, };
@@ -69,7 +55,7 @@ export type RejectTrackIdentityCandidateRequest = { candidateId: string, reason?
 
 export type DeferTrackIdentityCandidateRequest = { candidateId: string, reason?: string, };
 
-export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceIntegrity", "payload": ReadSourceIntegrityRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "readNavigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowRequest } | { "type": "searchNavigationNodeLibraryBrowserWindow", "payload": SearchNavigationNodeLibraryBrowserWindowRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest } | { "type": "readLibraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewRequest } | { "type": "readLibraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailRequest };
+export type SnapshotReadCommand = { "type": "readNavigationRows", "payload": ReadNavigationRowsRequest } | { "type": "loadNavigationRow", "payload": LoadNavigationRowRequest } | { "type": "loadNavigationRowByStableKey", "payload": LoadNavigationRowByStableKeyRequest } | { "type": "readLibraryTreeChildren", "payload": ReadLibraryTreeChildrenRequest } | { "type": "readSourceLifecycle", "payload": ReadSourceLifecycleRequest } | { "type": "readSourceIntegrity", "payload": ReadSourceIntegrityRequest } | { "type": "readSourceMaintenance", "payload": ReadSourceMaintenanceRequest } | { "type": "readSourceFileAttachment", "payload": ReadSourceFileAttachmentRequest } | { "type": "readAttachmentSourceFiles", "payload": ReadAttachmentSourceFilesRequest } | { "type": "readSourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryRequest } | { "type": "readTrackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesRequest } | { "type": "contentsRead", "payload": ContentsReadRequest } | { "type": "searchFilterRead", "payload": SearchFilterReadRequest };
 
 export type ReadNavigationRowsRequest = { parentNavigationRowId: string | null, };
 
@@ -104,10 +90,6 @@ export type ReadAttachmentSourceFilesRequest = { attachmentId: string, limit?: n
 export type ReadSourceAttachmentSummaryRequest = { sourceId: string, };
 
 export type ReadTrackIdentityReviewCandidatesRequest = { sourceId?: string, reviewState?: TrackIdentityReviewState, limit: number, };
-
-export type ReadNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, offset: number, limit: number, };
-
-export type SearchNavigationNodeLibraryBrowserWindowRequest = { navigationRowId: string, query: string, offset: number, limit: number, };
 
 export type ContentsReadRequest = { scope: ContentsScope, policy: ContentsReadPolicy, scopeDepth: ContentsScopeDepth, limit?: number, cursor?: string, };
 
@@ -151,11 +133,7 @@ export type PrimaryMediaKind = "audio" | "video";
 
 export type ContentsScopeDepth = "immediate" | "recursive";
 
-export type ReadLibraryAssetWaveformOverviewRequest = { libraryAssetId: string, };
-
-export type ReadLibraryAssetPreparationDetailRequest = { libraryAssetId: string, };
-
-export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "playlistWrite", "payload": PlaylistWriteReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "sourceMaintenance", "payload": SourceMaintenanceReply } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
+export type CommandReply = { "type": "libraryBoundaryEvents", "payload": LibraryBoundaryEventStreamReply } | { "type": "libraryRoots", "payload": LibraryRootReply } | { "type": "sourceFileHash", "payload": SourceFileHashReply } | { "type": "sourceMaintenance", "payload": SourceMaintenanceReply } | { "type": "trackIdentityDecisions", "payload": TrackIdentityDecisionReply } | { "type": "snapshotRead", "payload": SnapshotReadReply };
 
 export type LibraryBoundaryEventStreamReply = { "type": "readAfter", "payload": ReadLibraryBoundaryEventsAfterReply };
 
@@ -192,20 +170,6 @@ export type ReadLocalRootsReply = { roots: Array<LocalRoot>, };
 
 export type UnregisterLocalRootReply = { unregistered: boolean, };
 
-export type PlaylistWriteReply = { "type": "createPlaylist", "payload": CreatePlaylistReply } | { "type": "renamePlaylist", "payload": RenamePlaylistReply } | { "type": "deletePlaylist", "payload": DeletePlaylistReply } | { "type": "appendLibraryAssetToPlaylist", "payload": AppendLibraryAssetToPlaylistReply } | { "type": "removeLibraryAssetFromPlaylist", "payload": RemoveLibraryAssetFromPlaylistReply } | { "type": "movePlaylistEntry", "payload": MovePlaylistEntryReply };
-
-export type CreatePlaylistReply = { playlistId: string, };
-
-export type RenamePlaylistReply = { renamed: boolean, };
-
-export type DeletePlaylistReply = { deleted: boolean, };
-
-export type AppendLibraryAssetToPlaylistReply = { playlistEntryId: string, };
-
-export type RemoveLibraryAssetFromPlaylistReply = { removed: boolean, };
-
-export type MovePlaylistEntryReply = { moved: boolean, };
-
 export type SourceFileHashReply = { "type": "hashSourceFilesBlake3", "payload": HashSourceFilesBlake3Reply };
 
 export type HashSourceFilesBlake3Reply = { effectiveLimit: number, outcomes: Array<HashSourceFilesBlake3Outcome>, hashedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, sourceFailure?: HashSourceFilesBlake3SourceFailure, };
@@ -232,7 +196,7 @@ export type TrackIdentityEffectiveDecisionPrecedence = "user" | "system" | "none
 
 export type TrackIdentityUserBlockingDecisionState = "none" | "rejected" | "deferred";
 
-export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceIntegrity", "payload": ReadSourceIntegrityReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "navigationNodeLibraryBrowserWindow", "payload": ReadNavigationNodeLibraryBrowserWindowReply } | { "type": "navigationNodeLibraryBrowserSearch", "payload": SearchNavigationNodeLibraryBrowserWindowReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply } | { "type": "libraryAssetWaveformOverview", "payload": ReadLibraryAssetWaveformOverviewReply } | { "type": "libraryAssetPreparationDetail", "payload": ReadLibraryAssetPreparationDetailReply };
+export type SnapshotReadReply = { "type": "navigationRows", "payload": ReadNavigationRowsReply } | { "type": "navigationRow", "payload": LoadNavigationRowReply } | { "type": "navigationRowByStableKey", "payload": LoadNavigationRowByStableKeyReply } | { "type": "libraryTreeChildren", "payload": ReadLibraryTreeChildrenReply } | { "type": "sourceLifecycle", "payload": ReadSourceLifecycleReply } | { "type": "sourceIntegrity", "payload": ReadSourceIntegrityReply } | { "type": "sourceMaintenance", "payload": ReadSourceMaintenanceReply } | { "type": "sourceFileAttachment", "payload": ReadSourceFileAttachmentReply } | { "type": "attachmentSourceFiles", "payload": ReadAttachmentSourceFilesReply } | { "type": "sourceAttachmentSummary", "payload": ReadSourceAttachmentSummaryReply } | { "type": "trackIdentityReviewCandidates", "payload": ReadTrackIdentityReviewCandidatesReply } | { "type": "contents", "payload": ContentsReadReply } | { "type": "searchFilter", "payload": SearchFilterReadReply };
 
 export type ReadNavigationRowsReply = { rows: Array<NavigationRow>, };
 
@@ -272,25 +236,17 @@ export type TrackIdentityReviewSourceSample = { sourceId: string, displayName: s
 
 export type TrackIdentityReviewState = "needsUserDecision" | "systemAccepted" | "userAccepted" | "userRejected" | "userDeferred" | "staleDecision";
 
-export type ReadNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
-
-export type SearchNavigationNodeLibraryBrowserWindowReply = { window: LibraryBrowserWindow | null, };
-
 export type ContentsReadReply = { result: ContentsResult, };
 
 export type SearchFilterReadReply = { result: SearchFilterResult, };
 
-export type ReadLibraryAssetWaveformOverviewReply = { overview: LibraryAssetWaveformOverview | null, };
-
-export type ReadLibraryAssetPreparationDetailReply = { detail: LibraryAssetPreparationDetail | null, };
-
 export type NavigationRow = { navigationRowId: string, stableKey: string, parentNavigationRowId: string | null, family: NavigationRowFamily | null, rowKind: NavigationRowKind, displayName: string, siblingPosition: number, selectable: boolean, selectorKind: NavigationRowSelectorKind | null, selectorPayload: string | null, updatedAtMs: number, rowVersion: string, };
 
-export type NavigationRowFamily = "views" | "collections" | "preparation" | "sources";
+export type NavigationRowFamily = "views" | "sources";
 
-export type NavigationRowKind = "view" | "collectionGroup" | "playlist" | "prepPolicyGroup" | "prepPolicyScope" | "source" | "locationGroup" | "location";
+export type NavigationRowKind = "view" | "source" | "locationGroup" | "location";
 
-export type NavigationRowSelectorKind = "allMedia" | "allAudio" | "allVideos" | "recentlyAdded" | "needsPreparation" | "playlistGroup" | "source" | "sourceLocation" | "playlist" | "prepPolicyScope";
+export type NavigationRowSelectorKind = "allMedia" | "allAudio" | "allVideos" | "recentlyAdded" | "source" | "sourceLocation";
 
 export type LibraryTreeEntryPoint = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } };
 
@@ -370,62 +326,13 @@ export type ContentsScopeCoverage = { state: ContentsScopeCoverageState, subtree
 
 export type ContentsScopeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
 
-export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, availabilityState?: LibraryAssetAvailabilityState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
+export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
 
-export type PrimaryMediaSummary = { origin: ContentsRowOrigin, primaryMediaCandidateId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, libraryAssetId: string | null, rowVersion: string | null, primarySourceFileId: string | null, title: string | null, artist: string | null, album: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, musicalKey: string | null, tempoBpm: number | null, waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary | null, };
-
-export type ContentsRowOrigin = "libraryAsset" | "sourceFile" | "primaryMediaCandidate";
+export type PrimaryMediaSummary = { primaryMediaCandidateId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, };
 
 export type ContentsFileKind = "audio" | "video" | "image" | "cueSheet" | "logDoc" | "textDoc" | "archive" | "other" | "unknown";
 
 export type ContentsPresenceState = "present" | "missing" | "removed";
-
-export type LibraryBrowserWindow = { offset: number, limit: number, totalRows: number, rows: Array<LibraryAssetBrowserRow>, };
-
-export type LibraryAssetBrowserRow = { libraryAssetId: string, rowVersion: string, primarySourceFileId: string | null, scopedSourceFileId: string | null, sourceId: string | null, relativePath: string | null, fileName: string | null, availabilityState: LibraryAssetAvailabilityState, title: string | null, artist: string | null, album: string | null, durationMs: number | null, musicalKey: string | null, tempoBpm: number | null, 
-/**
- * Browse-facing summaries derived by projection rebuild logic from
- * capability/artifact state; they are not canonical authority.
- */
-waveformQualityCurrent: number | null, waveformQualityTarget: number | null, stemsStateSummary: LibraryAssetStemsStateSummary | null, prepReadinessSummary: LibraryAssetPrepReadinessSummary, updatedAtMs: number, };
-
-export type LibraryAssetAvailabilityState = "available" | "unavailable" | "degraded";
-
-export type LibraryAssetStemsStateSummary = "missing" | "queued" | "leased" | "ready" | "stale" | "blocked" | "failed";
-
-export type LibraryAssetPrepReadinessSummary = "notRequired" | "ready" | "preparing" | "underprepared" | "blocked" | "failed";
-
-export type LibraryAssetPreparationDetail = { libraryAssetId: string, aggregateReadinessSummary: LibraryAssetPrepReadinessSummary, groups: Array<LibraryAssetPreparationDetailGroup>, };
-
-export type LibraryAssetPreparationDetailGroup = { groupKey: LibraryAssetPreparationDetailGroupKey, rows: Array<LibraryAssetPreparationDetailRow>, };
-
-export type LibraryAssetPreparationDetailGroupKey = "requiredFacts" | "requiredStructures" | "requiredArtifacts" | "onDemandCapabilities";
-
-export type LibraryAssetPreparationDetailRow = { capabilityKey: LibraryAssetPreparationCapabilityKey, label: string, requirementClass: LibraryAssetPreparationRequirementClass, outcomeKind: LibraryAssetPreparationOutcomeKind, workState: LibraryAssetPreparationWorkState, outcomeState: LibraryAssetPreparationOutcomeState, satisfactionState: LibraryAssetPreparationSatisfactionState, displayValueSummary: string | null, targetSummary: string | null, explanationSummary: string | null, artifactCoverageState: LibraryAssetPreparationArtifactCoverageState | null, progress: LibraryAssetPreparationProgress | null, };
-
-export type LibraryAssetPreparationCapabilityKey = "bpm" | "musicalKey" | "beatgrid" | "waveform" | "stems";
-
-export type LibraryAssetPreparationRequirementClass = "required" | "onDemand";
-
-export type LibraryAssetPreparationOutcomeKind = "fact" | "structure" | "artifact";
-
-export type LibraryAssetPreparationWorkState = "none" | "notRequested" | "queued" | "active" | "blocked" | "failed";
-
-export type LibraryAssetPreparationOutcomeState = "missing" | "provisional" | "ready" | "stale";
-
-export type LibraryAssetPreparationSatisfactionState = "satisfied" | "unsatisfied";
-
-export type LibraryAssetPreparationArtifactCoverageState = "none" | "previewReady" | "overviewReady" | "refinementAvailable" | "stale";
-
-export type LibraryAssetPreparationProgress = { "type": "indeterminate", activeStage: string | null, } | { "type": "boundedStage", activeStage: string | null, completedUnits: number, totalUnits: number, fraction: number, };
-
-export type LibraryAssetWaveformOverview = { sourceProfileKey: string, sourceQualityCurrent: number | null, capabilityState: LibraryAssetWaveformOverviewCapabilityState, amplitudeScale: LibraryAssetWaveformOverviewAmplitudeScale, bucketCount: number, durationMs: number | null, sourceSampleCount: number | null, samplesPerBucket: number | null, buckets: Array<LibraryAssetWaveformOverviewBucket>, acceptedArtifactId: string, basisFingerprint: string, capabilityUpdatedAtMs: number, artifactCreatedAtMs: number, };
-
-export type LibraryAssetWaveformOverviewBucket = { minAmplitudeI16: number, maxAmplitudeI16: number, };
-
-export type LibraryAssetWaveformOverviewCapabilityState = "ready" | "stale";
-
-export type LibraryAssetWaveformOverviewAmplitudeScale = "signedI16";
 
 export type HashSourceFilesBlake3Outcome = { sourceFileId: string, sourceId: string, relativePath: string, status: HashSourceFilesBlake3OutcomeStatus, };
 
@@ -507,7 +414,7 @@ export type MaintainedSnapshotInvalidation = { scope: MaintainedSnapshotScope, r
 
 export type MaintainedSnapshotScopeRevision = { scope: MaintainedSnapshotScope, revision: MaintainedSnapshotRevision, };
 
-export type MaintainedSnapshotScope = "navigationRows" | "libraryBrowser";
+export type MaintainedSnapshotScope = "navigationRows" | "contents";
 
 export type MaintainedSnapshotRevision = string;
 

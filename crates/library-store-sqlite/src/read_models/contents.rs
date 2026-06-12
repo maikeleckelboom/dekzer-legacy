@@ -6,7 +6,7 @@ use crate::read_models::source_location_coverage::{
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 
-const CONTENTS_CURSOR_VERSION: u8 = 3;
+const CONTENTS_CURSOR_VERSION: u8 = 4;
 const CONTENTS_CURSOR_FILE_CLASS_ORDER: [StoreContentsFileClass; 4] = [
     StoreContentsFileClass::Audio,
     StoreContentsFileClass::Video,
@@ -64,10 +64,6 @@ enum ContentsCursorPosition {
         source_file_id: i64,
     },
     PrimaryMedia {
-        availability_priority: i64,
-        title_key: String,
-        artist_key: String,
-        album_key: String,
         relative_path_key: String,
         source_file_id: i64,
     },
@@ -222,47 +218,10 @@ fn compute_cursor_position(
             source_file_id: row.source_file_id,
         },
         StoreContentsReadPolicy::PrimaryMedia { .. } => ContentsCursorPosition::PrimaryMedia {
-            availability_priority: availability_priority(&row.availability_state),
-            title_key: compute_title_key(row),
-            artist_key: compute_artist_key(row),
-            album_key: compute_album_key(row),
             relative_path_key: row.relative_path.to_lowercase(),
             source_file_id: row.source_file_id,
         },
     }
-}
-
-fn availability_priority(availability_state: &Option<String>) -> i64 {
-    match availability_state.as_deref() {
-        Some("available") => 0,
-        Some("degraded") => 1,
-        Some("unavailable") => 2,
-        _ => 3,
-    }
-}
-
-fn compute_title_key(row: &StoreContentsFileRow) -> String {
-    row.primary_media
-        .as_ref()
-        .and_then(|pm| pm.title.as_ref())
-        .map(|t| t.to_lowercase())
-        .unwrap_or_else(|| row.relative_path.to_lowercase())
-}
-
-fn compute_artist_key(row: &StoreContentsFileRow) -> String {
-    row.primary_media
-        .as_ref()
-        .and_then(|pm| pm.artist.as_ref())
-        .map(|a| a.to_lowercase())
-        .unwrap_or_default()
-}
-
-fn compute_album_key(row: &StoreContentsFileRow) -> String {
-    row.primary_media
-        .as_ref()
-        .and_then(|pm| pm.album.as_ref())
-        .map(|a| a.to_lowercase())
-        .unwrap_or_default()
 }
 
 fn canonical_cursor_policy(policy: &StoreContentsReadPolicy) -> ContentsCursorPolicy {
@@ -441,16 +400,8 @@ pub enum StoreContentsReadPolicy {
     },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreContentsRowOrigin {
-    LibraryAsset,
-    SourceFile,
-    PrimaryMediaCandidate,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct StorePrimaryMediaSummary {
-    pub origin: StoreContentsRowOrigin,
     pub primary_media_candidate_id: Option<i64>,
     pub attachment_id: Option<i64>,
     pub content_hash_algorithm: Option<String>,
@@ -458,24 +409,11 @@ pub struct StorePrimaryMediaSummary {
     pub evidence_source_file_id: Option<i64>,
     pub media_kind: Option<String>,
     pub mime_type: Option<String>,
-    pub library_asset_id: Option<i64>,
-    pub row_version: Option<i64>,
-    pub primary_source_file_id: Option<i64>,
-    pub availability_state: String,
-    pub title: Option<String>,
-    pub artist: Option<String>,
-    pub album: Option<String>,
     pub duration_ms: Option<i64>,
     pub sample_rate_hz: Option<i64>,
     pub channels: Option<i64>,
     pub bit_depth: Option<i64>,
     pub codec: Option<String>,
-    pub musical_key: Option<String>,
-    pub tempo_bpm: Option<f64>,
-    pub waveform_quality_current: Option<i64>,
-    pub waveform_quality_target: Option<i64>,
-    pub stems_state_summary: Option<String>,
-    pub prep_readiness_summary: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -490,7 +428,6 @@ pub struct StoreContentsFileRow {
     pub file_class: String,
     pub file_kind: String,
     pub presence: String,
-    pub availability_state: Option<String>,
     pub primary_media: Option<StorePrimaryMediaSummary>,
     pub updated_at: i64,
     pub(crate) relative_path_browse_sort_key: Option<String>,
@@ -544,17 +481,8 @@ enum DirectoryPresence {
 }
 
 const RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL: &str = "char(48)";
-const PRIMARY_MEDIA_CONTENTS_ORDER_SQL: &str = "CASE availability_state
-        WHEN 'available' THEN 0
-        WHEN 'degraded' THEN 1
-        WHEN 'unavailable' THEN 2
-        ELSE 3
-    END ASC,
-    lower(COALESCE(title, relative_path, '')) ASC,
-    lower(COALESCE(artist, '')) ASC,
-    lower(COALESCE(album, '')) ASC,
-    lower(COALESCE(relative_path, '')) ASC,
-    source_file_id ASC";
+const PRIMARY_MEDIA_CONTENTS_ORDER_SQL: &str =
+    "lower(COALESCE(relative_path, '')) ASC, source_file_id ASC";
 
 const SOURCE_FILE_CONTENTS_ORDER_SQL: &str = "sf.relative_path_browse_sort_key ASC,
     sf.relative_path ASC,
@@ -1784,7 +1712,7 @@ fn read_rows_for_accepted_locations(
     let scope_param_count: usize = 1;
     let cursor_param_count: usize = match cursor_position {
         Some(ContentsCursorPosition::SourceFile { .. }) => 3,
-        Some(ContentsCursorPosition::PrimaryMedia { .. }) => 6,
+        Some(ContentsCursorPosition::PrimaryMedia { .. }) => 2,
         None => 0,
     };
     let cursor_start: Option<usize> = if cursor_param_count > 0 {
@@ -1841,7 +1769,7 @@ fn read_rows_with_source_predicate(
     let scope_param_count: usize = if input.relative_path.is_some() { 2 } else { 1 };
     let cursor_param_count: usize = match input.cursor_position {
         Some(ContentsCursorPosition::SourceFile { .. }) => 3,
-        Some(ContentsCursorPosition::PrimaryMedia { .. }) => 6,
+        Some(ContentsCursorPosition::PrimaryMedia { .. }) => 2,
         None => 0,
     };
     let cursor_start: Option<usize> = if cursor_param_count > 0 {
@@ -1972,20 +1900,6 @@ SELECT sf.source_file_id, \
        sf.file_class, \
        sf.file_kind, \
        sf.presence_state, \
-       NULL AS library_asset_id, \
-       NULL AS row_version, \
-       NULL AS primary_source_file_id, \
-       NULL AS availability_state, \
-       NULL AS title, \
-       NULL AS artist, \
-       NULL AS album, \
-       NULL AS duration_ms, \
-       NULL AS musical_key, \
-       NULL AS tempo_bpm, \
-       NULL AS waveform_quality_current, \
-       NULL AS waveform_quality_target, \
-       NULL AS stems_state_summary, \
-       NULL AS prep_readiness_summary, \
        sf.updated_at, \
        NULL AS primary_media_candidate_id, \
        NULL AS attachment_id, \
@@ -1994,6 +1908,7 @@ SELECT sf.source_file_id, \
        NULL AS evidence_source_file_id, \
        NULL AS candidate_media_kind, \
        NULL AS mime_type, \
+       NULL AS duration_ms, \
        NULL AS sample_rate_hz, \
        NULL AS channels, \
        NULL AS bit_depth, \
@@ -2020,64 +1935,12 @@ fn primary_media_rows_sql(
 
     let cursor_clause = match cursor_start {
         Some(base) => {
-            let ap_idx = base;
-            let tk_idx = base + 1;
-            let ak_idx = base + 2;
-            let bk_idx = base + 3;
-            let rpk_idx = base + 4;
-            let sid_idx = base + 5;
+            let rpk_idx = base;
+            let sid_idx = base + 1;
             format!(
                 "\n WHERE (\
-                    \n     CASE availability_state\
-                    \n         WHEN 'available' THEN 0\
-                    \n         WHEN 'degraded' THEN 1\
-                    \n         WHEN 'unavailable' THEN 2\
-                    \n         ELSE 3\
-                    \n     END > ?{ap_idx}\
-                    \n     OR (CASE availability_state\
-                    \n         WHEN 'available' THEN 0\
-                    \n         WHEN 'degraded' THEN 1\
-                    \n         WHEN 'unavailable' THEN 2\
-                    \n         ELSE 3\
-                    \n     END = ?{ap_idx}\
-                    \n         AND lower(COALESCE(title, relative_path, '')) > ?{tk_idx})\
-                    \n     OR (CASE availability_state\
-                    \n         WHEN 'available' THEN 0\
-                    \n         WHEN 'degraded' THEN 1\
-                    \n         WHEN 'unavailable' THEN 2\
-                    \n         ELSE 3\
-                    \n     END = ?{ap_idx}\
-                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_idx}\
-                    \n         AND lower(COALESCE(artist, '')) > ?{ak_idx})\
-                    \n     OR (CASE availability_state\
-                    \n         WHEN 'available' THEN 0\
-                    \n         WHEN 'degraded' THEN 1\
-                    \n         WHEN 'unavailable' THEN 2\
-                    \n         ELSE 3\
-                    \n     END = ?{ap_idx}\
-                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_idx}\
-                    \n         AND lower(COALESCE(artist, '')) = ?{ak_idx}\
-                    \n         AND lower(COALESCE(album, '')) > ?{bk_idx})\
-                    \n     OR (CASE availability_state\
-                    \n         WHEN 'available' THEN 0\
-                    \n         WHEN 'degraded' THEN 1\
-                    \n         WHEN 'unavailable' THEN 2\
-                    \n         ELSE 3\
-                    \n     END = ?{ap_idx}\
-                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_idx}\
-                    \n         AND lower(COALESCE(artist, '')) = ?{ak_idx}\
-                    \n         AND lower(COALESCE(album, '')) = ?{bk_idx}\
-                    \n         AND lower(COALESCE(relative_path, '')) > ?{rpk_idx})\
-                    \n     OR (CASE availability_state\
-                    \n         WHEN 'available' THEN 0\
-                    \n         WHEN 'degraded' THEN 1\
-                    \n         WHEN 'unavailable' THEN 2\
-                    \n         ELSE 3\
-                    \n     END = ?{ap_idx}\
-                    \n         AND lower(COALESCE(title, relative_path, '')) = ?{tk_idx}\
-                    \n         AND lower(COALESCE(artist, '')) = ?{ak_idx}\
-                    \n         AND lower(COALESCE(album, '')) = ?{bk_idx}\
-                    \n         AND lower(COALESCE(relative_path, '')) = ?{rpk_idx}\
+                    \n     lower(COALESCE(relative_path, '')) > ?{rpk_idx}\
+                    \n     OR (lower(COALESCE(relative_path, '')) = ?{rpk_idx}\
                     \n         AND source_file_id > ?{sid_idx})\
                     \n )"
             )
@@ -2174,25 +2037,11 @@ fn primary_media_rows_sql(
                SELECT source_file_id, \
                       source_id, \
                       parent_source_directory_id, \
-                     relative_path, \
+                      relative_path, \
                       name AS file_name, \
                       file_class, \
                       file_kind, \
                       presence_state, \
-                      NULL AS library_asset_id, \
-                      row_version, \
-                      primary_source_file_id, \
-                      availability_state, \
-                      title, \
-                     artist, \
-                     album, \
-                     duration_ms, \
-                     musical_key, \
-                     tempo_bpm, \
-                     waveform_quality_current, \
-                     waveform_quality_target, \
-                      stems_state_summary, \
-                      prep_readiness_summary, \
                       updated_at, \
                       primary_media_candidate_id, \
                       attachment_id, \
@@ -2201,47 +2050,13 @@ fn primary_media_rows_sql(
                       evidence_source_file_id, \
                       candidate_media_kind, \
                       mime_type, \
+                      duration_ms, \
                       sample_rate_hz, \
                       channels, \
                       bit_depth, \
                       codec \
-               FROM ( \
-                   SELECT source_file_id, \
-                          source_id, \
-                          parent_source_directory_id, \
-                          relative_path, \
-                          name, \
-                          file_class, \
-                          file_kind, \
-                          presence_state, \
-                          NULL AS row_version, \
-                          evidence_source_file_id AS primary_source_file_id, \
-                          'available' AS availability_state, \
-                          NULL AS title, \
-                          NULL AS artist, \
-                          NULL AS album, \
-                          duration_ms, \
-                          NULL AS musical_key, \
-                          NULL AS tempo_bpm, \
-                          NULL AS waveform_quality_current, \
-                          NULL AS waveform_quality_target, \
-                          NULL AS stems_state_summary, \
-                          'not_required' AS prep_readiness_summary, \
-                          updated_at, \
-                          primary_media_candidate_id, \
-                          attachment_id, \
-                          content_hash_algorithm, \
-                          content_hash_value, \
-                          evidence_source_file_id, \
-                          candidate_media_kind, \
-                          mime_type, \
-                          sample_rate_hz, \
-                          channels, \
-                          bit_depth, \
-                          codec \
-                   FROM candidate_scope \
-                   WHERE scoped_occurrence_rank = 1 \
-               ) \
+               FROM candidate_scope \
+               WHERE scoped_occurrence_rank = 1 \
            ) \
            SELECT source_file_id, \
                   source_id, \
@@ -2251,33 +2066,20 @@ fn primary_media_rows_sql(
                  file_class, \
                  file_kind, \
                  presence_state, \
-                 library_asset_id, \
-                 row_version, \
-                 primary_source_file_id, \
-                 availability_state, \
-                 title, \
-                 artist, \
-                 album, \
+                 updated_at, \
+                 primary_media_candidate_id, \
+                 attachment_id, \
+                 content_hash_algorithm, \
+                 content_hash_value, \
+                 evidence_source_file_id, \
+                 candidate_media_kind, \
+                 mime_type, \
                  duration_ms, \
-                 musical_key, \
-                 tempo_bpm, \
-                 waveform_quality_current, \
-                  waveform_quality_target, \
-                  stems_state_summary, \
-                  prep_readiness_summary, \
-                  updated_at, \
-                  primary_media_candidate_id, \
-                  attachment_id, \
-                  content_hash_algorithm, \
-                  content_hash_value, \
-                  evidence_source_file_id, \
-                  candidate_media_kind, \
-                  mime_type, \
-                  sample_rate_hz, \
-                  channels, \
-                  bit_depth, \
-                  codec, \
-                  NULL AS relative_path_browse_sort_key \
+                 sample_rate_hz, \
+                 channels, \
+                 bit_depth, \
+                 codec, \
+                 NULL AS relative_path_browse_sort_key \
            FROM promoted{cursor_clause} \
            ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL} \
            LIMIT ?{limit_param}"
@@ -2298,17 +2100,9 @@ fn push_cursor_params(cursor: &ContentsCursorPosition, params: &mut Vec<rusqlite
             params.push(rusqlite::types::Value::Integer(*source_file_id));
         }
         ContentsCursorPosition::PrimaryMedia {
-            availability_priority,
-            title_key,
-            artist_key,
-            album_key,
             relative_path_key,
             source_file_id,
         } => {
-            params.push(rusqlite::types::Value::Integer(*availability_priority));
-            params.push(rusqlite::types::Value::Text(title_key.clone()));
-            params.push(rusqlite::types::Value::Text(artist_key.clone()));
-            params.push(rusqlite::types::Value::Text(album_key.clone()));
             params.push(rusqlite::types::Value::Text(relative_path_key.clone()));
             params.push(rusqlite::types::Value::Integer(*source_file_id));
         }
@@ -2350,76 +2144,38 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let file_class: String = row.get(5)?;
     let file_kind: String = row.get(6)?;
     let presence: String = row.get(7)?;
-    let library_asset_id: Option<i64> = row.get(8)?;
-    let row_version: Option<i64> = row.get(9)?;
-    let primary_source_file_id: Option<i64> = row.get(10)?;
-    let availability_state: Option<String> = row.get(11)?;
-    let title: Option<String> = row.get(12)?;
-    let artist: Option<String> = row.get(13)?;
-    let album: Option<String> = row.get(14)?;
-    let duration_ms: Option<i64> = row.get(15)?;
-    let musical_key: Option<String> = row.get(16)?;
-    let tempo_bpm: Option<f64> = row.get(17)?;
-    let waveform_quality_current: Option<i64> = row.get(18)?;
-    let waveform_quality_target: Option<i64> = row.get(19)?;
-    let stems_state_summary: Option<String> = row.get(20)?;
-    let prep_readiness_summary: Option<String> = row.get(21)?;
-    let updated_at: i64 = row.get(22)?;
-    let primary_media_candidate_id: Option<i64> = row.get(23)?;
-    let attachment_id: Option<i64> = row.get(24)?;
-    let content_hash_algorithm: Option<String> = row.get(25)?;
-    let content_hash_value: Option<String> = row.get(26)?;
-    let evidence_source_file_id: Option<i64> = row.get(27)?;
-    let candidate_media_kind: Option<String> = row.get(28)?;
-    let mime_type: Option<String> = row.get(29)?;
-    let sample_rate_hz: Option<i64> = row.get(30)?;
-    let channels: Option<i64> = row.get(31)?;
-    let bit_depth: Option<i64> = row.get(32)?;
-    let codec: Option<String> = row.get(33)?;
-    let relative_path_browse_sort_key: Option<String> = row.get(34)?;
+    let updated_at: i64 = row.get(8)?;
+    let primary_media_candidate_id: Option<i64> = row.get(9)?;
+    let attachment_id: Option<i64> = row.get(10)?;
+    let content_hash_algorithm: Option<String> = row.get(11)?;
+    let content_hash_value: Option<String> = row.get(12)?;
+    let evidence_source_file_id: Option<i64> = row.get(13)?;
+    let candidate_media_kind: Option<String> = row.get(14)?;
+    let mime_type: Option<String> = row.get(15)?;
+    let duration_ms: Option<i64> = row.get(16)?;
+    let sample_rate_hz: Option<i64> = row.get(17)?;
+    let channels: Option<i64> = row.get(18)?;
+    let bit_depth: Option<i64> = row.get(19)?;
+    let codec: Option<String> = row.get(20)?;
+    let relative_path_browse_sort_key: Option<String> = row.get(21)?;
 
-    let primary_media = availability_state.as_ref().map(|availability_state| {
-        let origin = if primary_media_candidate_id.is_some() {
-            StoreContentsRowOrigin::PrimaryMediaCandidate
-        } else if library_asset_id.is_some() {
-            StoreContentsRowOrigin::LibraryAsset
-        } else {
-            StoreContentsRowOrigin::SourceFile
-        };
-
-        StorePrimaryMediaSummary {
-            origin,
-            primary_media_candidate_id,
+    let primary_media =
+        primary_media_candidate_id.map(|primary_media_candidate_id| StorePrimaryMediaSummary {
+            primary_media_candidate_id: Some(primary_media_candidate_id),
             attachment_id,
             content_hash_algorithm: content_hash_algorithm.clone(),
             content_hash_value: content_hash_value.clone(),
             evidence_source_file_id,
             media_kind: candidate_media_kind.clone(),
             mime_type: mime_type.clone(),
-            library_asset_id,
-            row_version,
-            primary_source_file_id,
-            availability_state: availability_state.clone(),
-            title: title.clone(),
-            artist: artist.clone(),
-            album: album.clone(),
             duration_ms,
             sample_rate_hz,
             channels,
             bit_depth,
             codec: codec.clone(),
-            musical_key: musical_key.clone(),
-            tempo_bpm,
-            waveform_quality_current,
-            waveform_quality_target,
-            stems_state_summary: stems_state_summary.clone(),
-            prep_readiness_summary: prep_readiness_summary
-                .clone()
-                .unwrap_or_else(|| "underprepared".to_string()),
-        }
-    });
+        });
 
-    let label = contents_label(title.as_deref(), &file_name, &relative_path);
+    let label = contents_label(&file_name, &relative_path);
 
     Ok(StoreContentsFileRow {
         id: primary_media
@@ -2428,11 +2184,6 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
                 summary
                     .primary_media_candidate_id
                     .map(|id| format!("primary-media:{id}"))
-                    .or_else(|| {
-                        summary
-                            .library_asset_id
-                            .map(|id| format!("library-asset:{id}"))
-                    })
             })
             .unwrap_or_else(|| format!("source-file:{source_file_id}")),
         source_id,
@@ -2444,32 +2195,20 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
         file_class,
         file_kind,
         presence,
-        availability_state,
         primary_media,
         updated_at,
         relative_path_browse_sort_key,
     })
 }
 
-fn contents_label(title: Option<&str>, file_name: &str, relative_path: &str) -> String {
-    title
-        .filter(|value| !value.trim().is_empty())
-        .or_else(|| {
-            if !file_name.trim().is_empty() {
-                Some(file_name)
-            } else {
-                None
-            }
-        })
-        .or_else(|| {
-            if !relative_path.trim().is_empty() {
-                Some(relative_path)
-            } else {
-                None
-            }
-        })
-        .unwrap_or("Untitled")
-        .to_string()
+fn contents_label(file_name: &str, relative_path: &str) -> String {
+    if !file_name.trim().is_empty() {
+        file_name.to_string()
+    } else if !relative_path.trim().is_empty() {
+        relative_path.to_string()
+    } else {
+        "Untitled".to_string()
+    }
 }
 
 #[cfg(test)]
@@ -2477,9 +2216,9 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsRowOrigin,
-        StoreContentsScope, StoreContentsScopeCoverageState, StoreContentsScopeDepth,
-        StoreContentsState, StorePrimaryMediaKind, canonical_cursor_policy, read_contents,
+        StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsScope,
+        StoreContentsScopeCoverageState, StoreContentsScopeDepth, StoreContentsState,
+        StorePrimaryMediaKind, canonical_cursor_policy, read_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -3028,10 +2767,13 @@ mod tests {
                 .iter()
                 .map(|row| {
                     let summary = primary_media(row);
-                    (summary.origin, summary.attachment_id.is_some())
+                    (
+                        summary.primary_media_candidate_id.is_some(),
+                        summary.attachment_id.is_some(),
+                    )
                 })
                 .collect::<Vec<_>>(),
-            vec![(StoreContentsRowOrigin::PrimaryMediaCandidate, true)]
+            vec![(true, true)]
         );
         assert_eq!(
             result.scope_coverage.state,
@@ -3133,13 +2875,13 @@ mod tests {
                 .map(|row| {
                     let summary = primary_media(row);
                     (
-                        summary.origin,
+                        summary.primary_media_candidate_id.is_some(),
                         summary.attachment_id.is_some(),
                         row.file_class.as_str(),
                     )
                 })
                 .collect::<Vec<_>>(),
-            vec![(StoreContentsRowOrigin::PrimaryMediaCandidate, true, "audio")]
+            vec![(true, true, "audio")]
         );
     }
 
@@ -3444,13 +3186,8 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         let summary = primary_media(&result.rows[0]);
-        assert_eq!(
-            summary.origin,
-            StoreContentsRowOrigin::PrimaryMediaCandidate
-        );
         assert!(summary.primary_media_candidate_id.is_some());
         assert!(summary.attachment_id.is_some());
-        assert!(summary.library_asset_id.is_none());
         assert_eq!(summary.content_hash_value.as_deref(), Some("hash:1000"));
         assert_eq!(summary.media_kind.as_deref(), Some("audio"));
         assert!(
@@ -3636,9 +3373,10 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0].source_file_id, 1000);
-        assert_eq!(
-            primary_media(&result.rows[0]).origin,
-            StoreContentsRowOrigin::PrimaryMediaCandidate
+        assert!(
+            primary_media(&result.rows[0])
+                .primary_media_candidate_id
+                .is_some()
         );
     }
 
@@ -3697,12 +3435,6 @@ mod tests {
             ]
         );
         assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
-        assert!(
-            result
-                .rows
-                .iter()
-                .all(|row| row.availability_state.is_none())
-        );
     }
 
     #[test]
@@ -3822,7 +3554,6 @@ mod tests {
 
         for row in source_descendants.rows {
             assert!(row.primary_media.is_none());
-            assert!(row.availability_state.is_none());
             assert_eq!(row.file_class, "audio");
         }
     }

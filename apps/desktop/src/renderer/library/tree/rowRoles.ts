@@ -12,13 +12,7 @@ export function browserRowRoleForNavigationRow(row: NavigationRow): BrowserTreeR
 
   switch (row.rowKind) {
     case 'view':
-    case 'collectionGroup':
       return 'collectionView'
-    case 'playlist':
-      return 'playlistSurface'
-    case 'prepPolicyGroup':
-    case 'prepPolicyScope':
-      return 'preparationSurface'
     case 'source':
     case 'location':
       return 'source'

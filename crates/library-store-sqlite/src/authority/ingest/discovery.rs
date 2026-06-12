@@ -7,10 +7,7 @@ use crate::authority::sources::{
     RecordSourceFileObservationInput, SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx,
     UpsertSourceDirectoryInput,
 };
-use crate::authority::work::{
-    QueueInspectSourceWorkInput, QueueRebindSourceWorkInput, RebindSourceWorkAuthorityTx,
-    WorkItemsAuthorityTx,
-};
+use crate::authority::work::{QueueInspectSourceWorkInput, WorkItemsAuthorityTx};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
     SourceFileClassFilter, classify_relative_path_file_kind,
@@ -872,7 +869,6 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  WHERE source_file_id = ?1",
                 params![row.source_file_id, now_ms],
             )?;
-            self.queue_rebind_work_if_needed(&row, now_ms)?;
             missing_file_ids.push(row.source_file_id);
         }
 
@@ -976,47 +972,6 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         }
 
         Ok(None)
-    }
-
-    fn queue_rebind_work_if_needed(
-        &self,
-        row: &PresentSourceFileRow,
-        queued_at: i64,
-    ) -> LibrarySqliteResult<()> {
-        let should_queue = self.tx().query_row(
-            "SELECT EXISTS(
-                     SELECT 1
-                     FROM SourceFacts
-                     WHERE source_file_id = ?1
-                 )
-                 OR EXISTS(
-                     SELECT 1
-                     FROM SourceSegmentSets
-                     WHERE source_file_id = ?1
-                 )",
-            [row.source_file_id],
-            |row| row.get::<_, i64>(0),
-        )? != 0;
-        if !should_queue {
-            return Ok(());
-        }
-
-        let result = RebindSourceWorkAuthorityTx::new(self.tx).queue_rebind_source_work(
-            &QueueRebindSourceWorkInput {
-                source_file_id: source_file_domain_id(row.source_file_id)?,
-                basis_fingerprint: observation_basis_fingerprint(
-                    row.source_file_id,
-                    &row.relative_path,
-                    row.size_bytes,
-                    row.mtime_ns,
-                    queued_at,
-                ),
-                priority_class: WorkPriorityClass::Interactive,
-                queued_at,
-            },
-        )?;
-        let _ = result;
-        Ok(())
     }
 
     fn reconcile_directory_coverage_facts(

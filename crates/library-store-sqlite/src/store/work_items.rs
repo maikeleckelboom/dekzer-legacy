@@ -1,17 +1,11 @@
+use super::SqliteDurableStore;
 use crate::LibrarySqliteResult;
 use crate::authority::work::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
-    CompleteMachineWorkInput, FailMachineWorkInput, FinishWorkRunInput, PrepAssignmentsAuthorityTx,
-    PrepPoliciesAuthorityTx, QueueAcceptSegmentationWorkInput, QueueComputeCapabilityWorkInput,
-    QueueInspectSourceWorkInput, QueueMachineWorkResult, QueueRebindSourceWorkInput,
-    QueueRebuildProjectionWorkInput, RebindSourceWorkAuthorityTx, ReplacePrepAssignmentsInput,
-    ReplaceResolvedLibraryAssetPrepTargetsInput, ResolvedTargetsAuthorityTx, StartWorkRunInput,
-    StartedWorkRun, UpsertPrepPolicyInput, WorkItemsAuthorityTx, WorkRunsAuthorityTx,
+    CompleteMachineWorkInput, FailMachineWorkInput, FinishWorkRunInput,
+    QueueInspectSourceWorkInput, QueueMachineWorkResult, QueueRebuildProjectionWorkInput,
+    StartWorkRunInput, StartedWorkRun, WorkItemsAuthorityTx, WorkRunsAuthorityTx,
 };
-use crate::publication;
-use library_domain::{PrepPolicyId, ProjectionDomain};
-
-use super::SqliteDurableStore;
 
 impl SqliteDurableStore {
     #[allow(dead_code)]
@@ -28,70 +22,11 @@ impl SqliteDurableStore {
         self.source_admission_gate.thaw_sources(root_ids.iter());
     }
 
-    pub fn upsert_prep_policy(
-        &self,
-        input: UpsertPrepPolicyInput,
-    ) -> LibrarySqliteResult<PrepPolicyId> {
-        self.with_write(|write| {
-            let prep_policy_id = PrepPoliciesAuthorityTx::new(write).upsert_prep_policy(&input)?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::Navigation])?;
-            Ok(prep_policy_id)
-        })
-    }
-
-    pub fn replace_prep_assignments(
-        &self,
-        input: ReplacePrepAssignmentsInput,
-    ) -> LibrarySqliteResult<()> {
-        self.with_write(|write| {
-            PrepAssignmentsAuthorityTx::new(write).replace_prep_assignments(&input)
-        })
-    }
-
-    pub fn replace_resolved_library_asset_prep_targets(
-        &self,
-        input: ReplaceResolvedLibraryAssetPrepTargetsInput,
-    ) -> LibrarySqliteResult<()> {
-        self.with_write(|write| {
-            ResolvedTargetsAuthorityTx::new(write)
-                .replace_resolved_library_asset_prep_targets(&input)?;
-            publication::reseed_projection_domains(write, &[ProjectionDomain::LibraryBrowser])?;
-            Ok(())
-        })
-    }
-
     pub fn queue_inspect_source_work(
         &self,
         input: QueueInspectSourceWorkInput,
     ) -> LibrarySqliteResult<QueueMachineWorkResult> {
         self.with_write(|write| WorkItemsAuthorityTx::new(write).queue_inspect_source_work(&input))
-    }
-
-    pub fn queue_compute_capability_work(
-        &self,
-        input: QueueComputeCapabilityWorkInput,
-    ) -> LibrarySqliteResult<QueueMachineWorkResult> {
-        self.with_write(|write| {
-            WorkItemsAuthorityTx::new(write).queue_compute_capability_work(&input)
-        })
-    }
-
-    pub fn queue_accept_segmentation_work(
-        &self,
-        input: QueueAcceptSegmentationWorkInput,
-    ) -> LibrarySqliteResult<QueueMachineWorkResult> {
-        self.with_write(|write| {
-            WorkItemsAuthorityTx::new(write).queue_accept_segmentation_work(&input)
-        })
-    }
-
-    pub fn queue_rebind_source_work(
-        &self,
-        input: QueueRebindSourceWorkInput,
-    ) -> LibrarySqliteResult<QueueMachineWorkResult> {
-        self.with_write(|write| {
-            RebindSourceWorkAuthorityTx::new(write).queue_rebind_source_work(&input)
-        })
     }
 
     pub fn queue_rebuild_projection_work(

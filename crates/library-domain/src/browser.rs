@@ -1,4 +1,4 @@
-use crate::ids::{PlaylistId, PrepPolicyId, SourceId, SourceLocationId};
+use crate::ids::{SourceId, SourceLocationId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LibraryBrowseScope {
@@ -6,10 +6,6 @@ pub enum LibraryBrowseScope {
     AllAudio,
     AllVideos,
     RecentlyAdded,
-    NeedsPreparation,
-    PlaylistGroup,
     Source(SourceId),
     SourceLocation(SourceLocationId),
-    Playlist(PlaylistId),
-    PrepPolicyScope(PrepPolicyId),
 }

@@ -216,22 +216,18 @@ files to audio files, or create source segments.
 Task 1 decision block:
 
 - Final table names: `content_attachments` and `source_file_attachment_links`.
-- `LibraryAssets` and `LibraryAssetAttachments` are left in place as dormant/transitional library-asset and segment
-  promotion substrate.
-- They are not adapted or renamed because `LibraryAssets` is referenced by playlists, prep targets, capabilities,
-  browser rows, waveform/prep read models, and projection rebuild code; `LibraryAssetAttachments` is segment-based and
-  depends on `SourceSegments` / `SourceSegmentSets`.
-- Reshaping them would drag playlist, prep, capability, browser projection, and segment promotion concerns into this
-  slice.
-- Surviving old columns remain as-is for old substrate behavior.
-- No old columns are dropped in this pass.
+- `LibraryAssets` and `LibraryAssetAttachments` are legacy internal schema/projection residue, not attachment identity
+  authority and not public boundary surfaces.
+- Remaining direct references are cleanup targets for the legacy schema/projection deletion pass; they must not be
+  adapted, renamed, or reused for attachment occurrence, media candidate, or track identity work.
+- This slice does not add compatibility views, aliases, or dual-write paths for old columns.
 - The smallest honest shape is a greenfield canonical bytes-identity table plus a source-file occurrence link table.
 
 ## equivalence_fingerprint After This Pass
 
-`LibraryAssets.equivalence_fingerprint` remains an opaque transitional key for old `LibraryAssets` flows. It is not
-content identity, is not read by attachment materialization, is not copied into `content_attachments`, and does not
-satisfy BLAKE3 evidence.
+`LibraryAssets.equivalence_fingerprint` remains an opaque internal legacy schema/projection key. It is not content
+identity, is not read by attachment materialization, is not copied into `content_attachments`, and does not satisfy
+BLAKE3 evidence.
 
 ## Explicitly Deferred
 

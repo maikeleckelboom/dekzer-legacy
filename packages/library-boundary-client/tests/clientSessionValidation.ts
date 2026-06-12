@@ -1150,7 +1150,7 @@ async function validatesSessionPumpFlow(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueEvents([
     event({ scope: 'navigationRows', revision: '1' }),
-    event({ scope: 'libraryBrowser', revision: '5' })
+    event({ scope: 'contents', revision: '5' })
   ])
   const session = new LibraryBoundarySession(transport)
   let listenerBatch: unknown = null
@@ -1173,19 +1173,19 @@ async function validatesSessionPumpFlow(): Promise<void> {
   )
   deepEqual(
     batch.changedScopes,
-    ['navigationRows', 'libraryBrowser'],
+    ['navigationRows', 'contents'],
     'session pump reports changed scopes'
   )
   deepEqual(
     batch.changedRevisions,
     [
       { scope: 'navigationRows', revision: '1' },
-      { scope: 'libraryBrowser', revision: '5' }
+      { scope: 'contents', revision: '5' }
     ],
     'session pump reports changed revisions'
   )
   equal(
-    batch.lastSeenRevisions.get('libraryBrowser'),
+    batch.lastSeenRevisions.get('contents'),
     '5',
     'session pump returns last-seen revisions'
   )
@@ -1207,7 +1207,7 @@ async function validatesStaleDuplicateInvalidationsAreIgnored(): Promise<void> {
   transport.enqueueEvents([
     event({ scope: 'navigationRows', revision: '3' }),
     event({ scope: 'navigationRows', revision: '1' }),
-    event({ scope: 'libraryBrowser', revision: '4' })
+    event({ scope: 'contents', revision: '4' })
   ])
   const session = new LibraryBoundarySession(transport)
 
@@ -1221,7 +1221,7 @@ async function validatesStaleDuplicateInvalidationsAreIgnored(): Promise<void> {
   )
   deepEqual(
     second.changedScopes,
-    ['libraryBrowser'],
+    ['contents'],
     'stale duplicate revisions are ignored by scope'
   )
   equal(
@@ -1290,7 +1290,7 @@ async function validatesListenerErrorsAreRetainedWithLimit(): Promise<void> {
     (_, index) => new Error(`listener failure ${index}`)
   )
   const reportedErrors: unknown[] = []
-  transport.enqueueEvents([event({ scope: 'libraryBrowser', revision: '9' })])
+  transport.enqueueEvents([event({ scope: 'contents', revision: '9' })])
   const session = new LibraryBoundarySession(transport, {
     onListenerError: (report) => {
       reportedErrors.push(report.error)

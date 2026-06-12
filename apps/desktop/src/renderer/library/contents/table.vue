@@ -43,8 +43,6 @@ function formatContentDetail(row: ContentRow): string {
         return 'Video'
       case 'cueSheet':
         return 'Cue sheet'
-      case 'playlist':
-        return 'Playlist'
       case 'metadata':
         return 'Metadata'
       default:
@@ -67,8 +65,6 @@ function resolveContentRowIcon(icon: ContentRowIcon | undefined): IconRole | und
       return 'media.image'
     case 'cueSheet':
       return 'media.cueSheet'
-    case 'playlist':
-      return 'media.playlist'
     case 'metadata':
       return 'media.metadata'
     case 'more':
@@ -93,8 +89,6 @@ function iconToneForRow(row: ContentRow): IconTone {
 
   if (row.presence === 'missing') return 'warning'
   if (row.presence === 'removed') return 'danger'
-  if (row.availabilityState === 'unavailable') return 'warning'
-  if (row.availabilityState === 'degraded') return 'warning'
 
   const icon = row.icon
   switch (icon) {
@@ -103,7 +97,6 @@ function iconToneForRow(row: ContentRow): IconTone {
     case 'image':
       return 'primary'
     case 'cueSheet':
-    case 'playlist':
     case 'metadata':
       return 'muted'
     case 'warning':
@@ -117,8 +110,6 @@ function labelClassForRow(row: ContentRow): string {
   if (row.kind === 'state') return 'text-(--color-text-muted)'
   if (row.presence === 'missing') return 'text-(--color-warning)'
   if (row.presence === 'removed') return 'text-(--color-danger)'
-  if (row.availabilityState === 'unavailable') return 'text-(--color-warning)'
-  if (row.availabilityState === 'degraded') return 'text-(--color-warning)'
 
   const icon = row.icon
   switch (icon) {
@@ -127,7 +118,6 @@ function labelClassForRow(row: ContentRow): string {
     case 'image':
       return 'text-(--color-text)'
     case 'cueSheet':
-    case 'playlist':
     case 'metadata':
       return 'text-(--color-text-muted)'
     default:

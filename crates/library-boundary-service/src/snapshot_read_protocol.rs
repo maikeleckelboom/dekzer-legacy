@@ -288,45 +288,11 @@ pub(crate) fn map_read_track_identity_review_candidates_reply(
     })
 }
 
-pub(crate) fn map_read_navigation_node_library_browser_window_reply(
-    window: Option<store::StoreLibraryBrowserWindow>,
-) -> store::LibrarySqliteResult<protocol::ReadNavigationNodeLibraryBrowserWindowReply> {
-    Ok(protocol::ReadNavigationNodeLibraryBrowserWindowReply {
-        window: window.map(map_library_browser_window).transpose()?,
-    })
-}
-
-pub(crate) fn map_search_navigation_node_library_browser_window_reply(
-    window: Option<store::StoreLibraryBrowserWindow>,
-) -> store::LibrarySqliteResult<protocol::SearchNavigationNodeLibraryBrowserWindowReply> {
-    Ok(protocol::SearchNavigationNodeLibraryBrowserWindowReply {
-        window: window.map(map_library_browser_window).transpose()?,
-    })
-}
-
 pub(crate) fn map_read_contents_reply(
     result: store::StoreContentsResult,
 ) -> store::LibrarySqliteResult<protocol::ContentsReadReply> {
     Ok(protocol::ContentsReadReply {
         result: map_contents_result(result)?,
-    })
-}
-
-pub(crate) fn map_read_library_asset_waveform_overview_reply(
-    overview: Option<store::StoreLibraryAssetWaveformOverview>,
-) -> protocol::ReadLibraryAssetWaveformOverviewReply {
-    protocol::ReadLibraryAssetWaveformOverviewReply {
-        overview: overview.map(map_library_asset_waveform_overview),
-    }
-}
-
-pub(crate) fn map_read_library_asset_preparation_detail_reply(
-    detail: Option<store::StoreLibraryAssetPreparationDetail>,
-) -> store::LibrarySqliteResult<protocol::ReadLibraryAssetPreparationDetailReply> {
-    Ok(protocol::ReadLibraryAssetPreparationDetailReply {
-        detail: detail
-            .map(map_library_asset_preparation_detail)
-            .transpose()?,
     })
 }
 
@@ -347,7 +313,7 @@ const fn map_maintained_read_model_scope(
             protocol::MaintainedSnapshotScope::NavigationRows
         }
         store::MaintainedReadModelScope::LibraryBrowser => {
-            protocol::MaintainedSnapshotScope::LibraryBrowser
+            protocol::MaintainedSnapshotScope::Contents
         }
     }
 }
@@ -391,8 +357,6 @@ fn map_navigation_row_family(
 ) -> store::LibrarySqliteResult<protocol::NavigationRowFamily> {
     match family {
         "Views" => Ok(protocol::NavigationRowFamily::Views),
-        "Collections" => Ok(protocol::NavigationRowFamily::Collections),
-        "Preparation" => Ok(protocol::NavigationRowFamily::Preparation),
         "Sources" => Ok(protocol::NavigationRowFamily::Sources),
         other => Err(malformed_store_state(format!(
             "navigation_rows row {navigation_row_id} has unsupported family {other:?}"
@@ -406,10 +370,6 @@ fn map_navigation_row_kind(
 ) -> store::LibrarySqliteResult<protocol::NavigationRowKind> {
     match row_kind {
         "view" => Ok(protocol::NavigationRowKind::View),
-        "collection-group" => Ok(protocol::NavigationRowKind::CollectionGroup),
-        "playlist" => Ok(protocol::NavigationRowKind::Playlist),
-        "prep-policy-group" => Ok(protocol::NavigationRowKind::PrepPolicyGroup),
-        "prep-policy-scope" => Ok(protocol::NavigationRowKind::PrepPolicyScope),
         "source" => Ok(protocol::NavigationRowKind::Source),
         "location-group" => Ok(protocol::NavigationRowKind::LocationGroup),
         "location" => Ok(protocol::NavigationRowKind::Location),
@@ -452,17 +412,9 @@ const fn map_navigation_row_selector_kind(
         NavigationSelector::AllAudio => protocol::NavigationRowSelectorKind::AllAudio,
         NavigationSelector::AllVideos => protocol::NavigationRowSelectorKind::AllVideos,
         NavigationSelector::RecentlyAdded => protocol::NavigationRowSelectorKind::RecentlyAdded,
-        NavigationSelector::NeedsPreparation => {
-            protocol::NavigationRowSelectorKind::NeedsPreparation
-        }
-        NavigationSelector::PlaylistGroup => protocol::NavigationRowSelectorKind::PlaylistGroup,
         NavigationSelector::Source(_) => protocol::NavigationRowSelectorKind::Source,
         NavigationSelector::SourceLocation(_) => {
             protocol::NavigationRowSelectorKind::SourceLocation
-        }
-        NavigationSelector::Playlist(_) => protocol::NavigationRowSelectorKind::Playlist,
-        NavigationSelector::PrepPolicyScope(_) => {
-            protocol::NavigationRowSelectorKind::PrepPolicyScope
         }
     }
 }
@@ -1289,74 +1241,6 @@ fn map_directory_scan_state(
     }
 }
 
-fn map_library_browser_window(
-    window: store::StoreLibraryBrowserWindow,
-) -> store::LibrarySqliteResult<protocol::LibraryBrowserWindow> {
-    Ok(protocol::LibraryBrowserWindow {
-        offset: window.offset,
-        limit: window.limit,
-        total_rows: window.total_rows,
-        rows: window
-            .rows
-            .into_iter()
-            .map(map_library_asset_browser_row)
-            .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
-    })
-}
-
-fn map_library_asset_browser_row(
-    row: store::ScopedLibraryAssetBrowserRow,
-) -> store::LibrarySqliteResult<protocol::LibraryAssetBrowserRow> {
-    let availability_state =
-        protocol::LibraryAssetAvailabilityState::from_projection_value(&row.availability_state)
-            .ok_or_else(|| {
-                invalid_library_browser_projection_value(
-                    "availability_state",
-                    &row.availability_state,
-                )
-            })?;
-    let stems_state_summary = row
-        .stems_state_summary
-        .as_deref()
-        .map(|value| {
-            protocol::LibraryAssetStemsStateSummary::from_projection_value(value).ok_or_else(|| {
-                invalid_library_browser_projection_value("stems_state_summary", value)
-            })
-        })
-        .transpose()?;
-    let prep_readiness_summary = protocol::LibraryAssetPrepReadinessSummary::from_projection_value(
-        &row.prep_readiness_summary,
-    )
-    .ok_or_else(|| {
-        invalid_library_browser_projection_value(
-            "prep_readiness_summary",
-            &row.prep_readiness_summary,
-        )
-    })?;
-
-    Ok(protocol::LibraryAssetBrowserRow {
-        library_asset_id: row.library_asset_id,
-        row_version: row.row_version,
-        primary_source_file_id: row.primary_source_file_id,
-        scoped_source_file_id: row.scoped_source_file_id,
-        source_id: row.source_id,
-        relative_path: row.relative_path,
-        file_name: row.file_name,
-        availability_state,
-        title: row.title,
-        artist: row.artist,
-        album: row.album,
-        duration_ms: row.duration_ms,
-        musical_key: row.musical_key,
-        tempo_bpm: row.tempo_bpm,
-        waveform_quality_current: row.waveform_quality_current,
-        waveform_quality_target: row.waveform_quality_target,
-        stems_state_summary,
-        prep_readiness_summary,
-        updated_at_ms: row.updated_at,
-    })
-}
-
 fn map_contents_result(
     result: store::StoreContentsResult,
 ) -> store::LibrarySqliteResult<protocol::ContentsResult> {
@@ -1508,18 +1392,7 @@ fn map_contents_row(
         .ok_or_else(|| invalid_contents_value("file_kind", &row.file_kind))?;
     let presence = protocol::ContentsPresenceState::from_projection_value(&row.presence)
         .ok_or_else(|| invalid_contents_value("presence", &row.presence))?;
-    let availability_state = row
-        .availability_state
-        .as_deref()
-        .map(|value| {
-            protocol::LibraryAssetAvailabilityState::from_projection_value(value)
-                .ok_or_else(|| invalid_contents_value("availability_state", value))
-        })
-        .transpose()?;
-    let primary_media = row
-        .primary_media
-        .map(map_primary_media_summary)
-        .transpose()?;
+    let primary_media = row.primary_media.map(map_primary_media_summary);
 
     Ok(protocol::ContentsFileRow {
         id: row.id,
@@ -1532,7 +1405,6 @@ fn map_contents_row(
         file_class,
         file_kind,
         presence,
-        availability_state,
         primary_media,
         updated_at_ms: Some(row.updated_at),
     })
@@ -1540,24 +1412,8 @@ fn map_contents_row(
 
 fn map_primary_media_summary(
     summary: store::StorePrimaryMediaSummary,
-) -> store::LibrarySqliteResult<protocol::PrimaryMediaSummary> {
-    let stems_state_summary = summary
-        .stems_state_summary
-        .as_deref()
-        .map(|value| {
-            protocol::LibraryAssetStemsStateSummary::from_projection_value(value)
-                .ok_or_else(|| invalid_contents_value("stems_state_summary", value))
-        })
-        .transpose()?;
-    let prep_readiness_summary = protocol::LibraryAssetPrepReadinessSummary::from_projection_value(
-        &summary.prep_readiness_summary,
-    )
-    .ok_or_else(|| {
-        invalid_contents_value("prep_readiness_summary", &summary.prep_readiness_summary)
-    })?;
-
-    Ok(protocol::PrimaryMediaSummary {
-        origin: map_contents_row_origin(&summary.origin),
+) -> protocol::PrimaryMediaSummary {
+    protocol::PrimaryMediaSummary {
         primary_media_candidate_id: summary.primary_media_candidate_id,
         attachment_id: summary.attachment_id,
         content_hash_algorithm: summary.content_hash_algorithm,
@@ -1565,322 +1421,17 @@ fn map_primary_media_summary(
         evidence_source_file_id: summary.evidence_source_file_id,
         media_kind: summary.media_kind,
         mime_type: summary.mime_type,
-        library_asset_id: summary.library_asset_id,
-        row_version: summary.row_version,
-        primary_source_file_id: summary.primary_source_file_id,
-        title: summary.title,
-        artist: summary.artist,
-        album: summary.album,
         duration_ms: summary.duration_ms,
         sample_rate_hz: summary.sample_rate_hz,
         channels: summary.channels,
         bit_depth: summary.bit_depth,
         codec: summary.codec,
-        musical_key: summary.musical_key,
-        tempo_bpm: summary.tempo_bpm,
-        waveform_quality_current: summary.waveform_quality_current,
-        waveform_quality_target: summary.waveform_quality_target,
-        stems_state_summary,
-        prep_readiness_summary: Some(prep_readiness_summary),
-    })
-}
-
-const fn map_contents_row_origin(
-    origin: &store::StoreContentsRowOrigin,
-) -> protocol::ContentsRowOrigin {
-    match origin {
-        store::StoreContentsRowOrigin::LibraryAsset => protocol::ContentsRowOrigin::LibraryAsset,
-        store::StoreContentsRowOrigin::SourceFile => protocol::ContentsRowOrigin::SourceFile,
-        store::StoreContentsRowOrigin::PrimaryMediaCandidate => {
-            protocol::ContentsRowOrigin::PrimaryMediaCandidate
-        }
     }
-}
-
-fn invalid_library_browser_projection_value(
-    field_name: &str,
-    value: &str,
-) -> store::LibrarySqliteError {
-    malformed_store_state(format!(
-        "library browser projection field {field_name} contains unsupported value {value:?}"
-    ))
 }
 
 fn invalid_contents_value(field_name: &str, value: &str) -> store::LibrarySqliteError {
     malformed_store_state(format!(
         "contents field {field_name} contains unsupported value {value:?}"
-    ))
-}
-
-fn map_library_asset_waveform_overview(
-    overview: store::StoreLibraryAssetWaveformOverview,
-) -> protocol::LibraryAssetWaveformOverview {
-    protocol::LibraryAssetWaveformOverview {
-        source_profile_key: overview.source_profile_key,
-        source_quality_current: overview.source_quality_current,
-        capability_state: map_library_asset_waveform_capability_state(overview.capability_state),
-        amplitude_scale: map_library_asset_waveform_amplitude_scale(overview.amplitude_scale),
-        bucket_count: overview.bucket_count,
-        duration_ms: overview.duration_ms,
-        source_sample_count: overview.source_sample_count,
-        samples_per_bucket: overview.samples_per_bucket,
-        buckets: overview
-            .buckets
-            .into_iter()
-            .map(|bucket| protocol::LibraryAssetWaveformOverviewBucket {
-                min_amplitude_i16: bucket.min_amplitude_i16,
-                max_amplitude_i16: bucket.max_amplitude_i16,
-            })
-            .collect(),
-        accepted_artifact_id: overview.accepted_artifact_id,
-        basis_fingerprint: overview.basis_fingerprint,
-        capability_updated_at_ms: overview.capability_updated_at,
-        artifact_created_at_ms: overview.artifact_created_at,
-    }
-}
-
-const fn map_library_asset_waveform_capability_state(
-    state: store::StoreLibraryAssetWaveformOverviewCapabilityState,
-) -> protocol::LibraryAssetWaveformOverviewCapabilityState {
-    match state {
-        store::StoreLibraryAssetWaveformOverviewCapabilityState::Ready => {
-            protocol::LibraryAssetWaveformOverviewCapabilityState::Ready
-        }
-        store::StoreLibraryAssetWaveformOverviewCapabilityState::Stale => {
-            protocol::LibraryAssetWaveformOverviewCapabilityState::Stale
-        }
-    }
-}
-
-const fn map_library_asset_waveform_amplitude_scale(
-    amplitude_scale: store::StoreLibraryAssetWaveformOverviewAmplitudeScale,
-) -> protocol::LibraryAssetWaveformOverviewAmplitudeScale {
-    match amplitude_scale {
-        store::StoreLibraryAssetWaveformOverviewAmplitudeScale::SignedI16 => {
-            protocol::LibraryAssetWaveformOverviewAmplitudeScale::SignedI16
-        }
-    }
-}
-
-fn map_library_asset_preparation_detail(
-    detail: store::StoreLibraryAssetPreparationDetail,
-) -> store::LibrarySqliteResult<protocol::LibraryAssetPreparationDetail> {
-    let aggregate_readiness_summary =
-        protocol::LibraryAssetPrepReadinessSummary::from_projection_value(
-            &detail.aggregate_readiness_summary,
-        )
-        .ok_or_else(|| {
-            invalid_preparation_detail_value(
-                "aggregate_readiness_summary",
-                &detail.aggregate_readiness_summary,
-            )
-        })?;
-
-    Ok(protocol::LibraryAssetPreparationDetail {
-        library_asset_id: detail.library_asset_id,
-        aggregate_readiness_summary,
-        groups: detail
-            .groups
-            .into_iter()
-            .map(map_preparation_detail_group)
-            .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
-    })
-}
-
-fn map_preparation_detail_group(
-    group: store::StoreLibraryAssetPreparationDetailGroup,
-) -> store::LibrarySqliteResult<protocol::LibraryAssetPreparationDetailGroup> {
-    let group_key = map_preparation_detail_group_key(&group.group_key)
-        .ok_or_else(|| invalid_preparation_detail_value("group_key", &group.group_key))?;
-
-    Ok(protocol::LibraryAssetPreparationDetailGroup {
-        group_key,
-        rows: group
-            .rows
-            .into_iter()
-            .map(map_preparation_detail_row)
-            .collect::<store::LibrarySqliteResult<Vec<_>>>()?,
-    })
-}
-
-fn map_preparation_detail_row(
-    row: store::StoreLibraryAssetPreparationDetailRow,
-) -> store::LibrarySqliteResult<protocol::LibraryAssetPreparationDetailRow> {
-    let capability_key = map_preparation_capability_key(&row.capability_kind)
-        .ok_or_else(|| invalid_preparation_detail_value("capability_kind", &row.capability_kind))?;
-    let requirement_class =
-        map_preparation_requirement_class(&row.requirement_class).ok_or_else(|| {
-            invalid_preparation_detail_value("requirement_class", &row.requirement_class)
-        })?;
-    let outcome_kind = map_preparation_outcome_kind(&row.outcome_kind)
-        .ok_or_else(|| invalid_preparation_detail_value("outcome_kind", &row.outcome_kind))?;
-    let work_state = map_preparation_work_state(&row.work_state)
-        .ok_or_else(|| invalid_preparation_detail_value("work_state", &row.work_state))?;
-    let outcome_state = map_preparation_outcome_state(&row.outcome_state)
-        .ok_or_else(|| invalid_preparation_detail_value("outcome_state", &row.outcome_state))?;
-    let satisfaction_state = map_preparation_satisfaction_state(&row.satisfaction_state)
-        .ok_or_else(|| {
-            invalid_preparation_detail_value("satisfaction_state", &row.satisfaction_state)
-        })?;
-    let artifact_coverage_state = row
-        .artifact_coverage_state
-        .as_deref()
-        .map(|value| {
-            map_preparation_artifact_coverage_state(value)
-                .ok_or_else(|| invalid_preparation_detail_value("artifact_coverage_state", value))
-        })
-        .transpose()?;
-
-    Ok(protocol::LibraryAssetPreparationDetailRow {
-        capability_key,
-        label: row.label,
-        requirement_class,
-        outcome_kind,
-        work_state,
-        outcome_state,
-        satisfaction_state,
-        display_value_summary: row.display_value_summary,
-        target_summary: row.target_summary,
-        explanation_summary: row.explanation_summary,
-        artifact_coverage_state,
-        progress: row.progress.map(map_preparation_progress),
-    })
-}
-
-const fn map_preparation_detail_group_key(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationDetailGroupKey> {
-    match value.as_bytes() {
-        b"required_facts" => Some(protocol::LibraryAssetPreparationDetailGroupKey::RequiredFacts),
-        b"required_structures" => {
-            Some(protocol::LibraryAssetPreparationDetailGroupKey::RequiredStructures)
-        }
-        b"required_artifacts" => {
-            Some(protocol::LibraryAssetPreparationDetailGroupKey::RequiredArtifacts)
-        }
-        b"on_demand_capabilities" => {
-            Some(protocol::LibraryAssetPreparationDetailGroupKey::OnDemandCapabilities)
-        }
-        _ => None,
-    }
-}
-
-const fn map_preparation_capability_key(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationCapabilityKey> {
-    match value.as_bytes() {
-        b"tempo" => Some(protocol::LibraryAssetPreparationCapabilityKey::Bpm),
-        b"musical_key" => Some(protocol::LibraryAssetPreparationCapabilityKey::MusicalKey),
-        b"beatgrid" => Some(protocol::LibraryAssetPreparationCapabilityKey::Beatgrid),
-        b"waveform" => Some(protocol::LibraryAssetPreparationCapabilityKey::Waveform),
-        b"stems" => Some(protocol::LibraryAssetPreparationCapabilityKey::Stems),
-        _ => None,
-    }
-}
-
-const fn map_preparation_requirement_class(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationRequirementClass> {
-    match value.as_bytes() {
-        b"required" => Some(protocol::LibraryAssetPreparationRequirementClass::Required),
-        b"on_demand" => Some(protocol::LibraryAssetPreparationRequirementClass::OnDemand),
-        _ => None,
-    }
-}
-
-const fn map_preparation_outcome_kind(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationOutcomeKind> {
-    match value.as_bytes() {
-        b"fact" => Some(protocol::LibraryAssetPreparationOutcomeKind::Fact),
-        b"structure" => Some(protocol::LibraryAssetPreparationOutcomeKind::Structure),
-        b"artifact" => Some(protocol::LibraryAssetPreparationOutcomeKind::Artifact),
-        _ => None,
-    }
-}
-
-const fn map_preparation_work_state(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationWorkState> {
-    match value.as_bytes() {
-        b"none" => Some(protocol::LibraryAssetPreparationWorkState::None),
-        b"not_requested" => Some(protocol::LibraryAssetPreparationWorkState::NotRequested),
-        b"queued" => Some(protocol::LibraryAssetPreparationWorkState::Queued),
-        b"active" => Some(protocol::LibraryAssetPreparationWorkState::Active),
-        b"blocked" => Some(protocol::LibraryAssetPreparationWorkState::Blocked),
-        b"failed" => Some(protocol::LibraryAssetPreparationWorkState::Failed),
-        _ => None,
-    }
-}
-
-const fn map_preparation_outcome_state(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationOutcomeState> {
-    match value.as_bytes() {
-        b"missing" => Some(protocol::LibraryAssetPreparationOutcomeState::Missing),
-        b"provisional" => Some(protocol::LibraryAssetPreparationOutcomeState::Provisional),
-        b"ready" => Some(protocol::LibraryAssetPreparationOutcomeState::Ready),
-        b"stale" => Some(protocol::LibraryAssetPreparationOutcomeState::Stale),
-        _ => None,
-    }
-}
-
-const fn map_preparation_satisfaction_state(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationSatisfactionState> {
-    match value.as_bytes() {
-        b"satisfied" => Some(protocol::LibraryAssetPreparationSatisfactionState::Satisfied),
-        b"unsatisfied" => Some(protocol::LibraryAssetPreparationSatisfactionState::Unsatisfied),
-        _ => None,
-    }
-}
-
-const fn map_preparation_artifact_coverage_state(
-    value: &str,
-) -> Option<protocol::LibraryAssetPreparationArtifactCoverageState> {
-    match value.as_bytes() {
-        b"none" => Some(protocol::LibraryAssetPreparationArtifactCoverageState::None),
-        b"preview_ready" => {
-            Some(protocol::LibraryAssetPreparationArtifactCoverageState::PreviewReady)
-        }
-        b"overview_ready" => {
-            Some(protocol::LibraryAssetPreparationArtifactCoverageState::OverviewReady)
-        }
-        b"refinement_available" => {
-            Some(protocol::LibraryAssetPreparationArtifactCoverageState::RefinementAvailable)
-        }
-        b"stale" => Some(protocol::LibraryAssetPreparationArtifactCoverageState::Stale),
-        _ => None,
-    }
-}
-
-fn map_preparation_progress(
-    progress: store::StoreLibraryAssetPreparationProgress,
-) -> protocol::LibraryAssetPreparationProgress {
-    match progress {
-        store::StoreLibraryAssetPreparationProgress::Indeterminate { active_stage } => {
-            protocol::LibraryAssetPreparationProgress::Indeterminate { active_stage }
-        }
-        store::StoreLibraryAssetPreparationProgress::BoundedStage {
-            active_stage,
-            completed_units,
-            total_units,
-        } => protocol::LibraryAssetPreparationProgress::BoundedStage {
-            active_stage,
-            completed_units,
-            total_units,
-            fraction: if total_units > 0 {
-                completed_units as f64 / total_units as f64
-            } else {
-                0.0
-            },
-        },
-    }
-}
-
-fn invalid_preparation_detail_value(field_name: &str, value: &str) -> store::LibrarySqliteError {
-    malformed_store_state(format!(
-        "library asset preparation detail field {field_name} contains unsupported value {value:?}"
     ))
 }
 

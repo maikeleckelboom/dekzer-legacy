@@ -353,30 +353,16 @@ mod tests {
     fn navigation_selectors_encode_and_decode_supported_variants() {
         let source_id = SourceId::new(1).unwrap();
         let source_location_id = SourceLocationId::new(2).unwrap();
-        let playlist_id = PlaylistId::new(4).unwrap();
-        let prep_policy_id = PrepPolicyId::new(5).unwrap();
 
         assert_selector_round_trip(NavigationSelector::AllMedia, "all_media", "");
         assert_selector_round_trip(NavigationSelector::AllAudio, "all_audio", "");
         assert_selector_round_trip(NavigationSelector::AllVideos, "all_videos", "");
         assert_selector_round_trip(NavigationSelector::RecentlyAdded, "recently_added", "");
-        assert_selector_round_trip(
-            NavigationSelector::NeedsPreparation,
-            "needs_preparation",
-            "",
-        );
-        assert_selector_round_trip(NavigationSelector::PlaylistGroup, "playlist_group", "");
         assert_selector_round_trip(NavigationSelector::Source(source_id), "source", "1");
         assert_selector_round_trip(
             NavigationSelector::SourceLocation(source_location_id),
             "source_location",
             "2",
-        );
-        assert_selector_round_trip(NavigationSelector::Playlist(playlist_id), "playlist", "4");
-        assert_selector_round_trip(
-            NavigationSelector::PrepPolicyScope(prep_policy_id),
-            "prep_policy_scope",
-            "5",
         );
     }
 
@@ -394,8 +380,6 @@ mod tests {
     fn navigation_selectors_compile_to_library_browse_scopes() {
         let source_id = SourceId::new(1).unwrap();
         let source_location_id = SourceLocationId::new(2).unwrap();
-        let playlist_id = PlaylistId::new(4).unwrap();
-        let prep_policy_id = PrepPolicyId::new(5).unwrap();
 
         assert_eq!(
             compile_library_browse_scope(NavigationSelector::AllMedia),
@@ -414,28 +398,12 @@ mod tests {
             Some(LibraryBrowseScope::RecentlyAdded)
         );
         assert_eq!(
-            compile_library_browse_scope(NavigationSelector::NeedsPreparation),
-            Some(LibraryBrowseScope::NeedsPreparation)
-        );
-        assert_eq!(
-            compile_library_browse_scope(NavigationSelector::PlaylistGroup),
-            Some(LibraryBrowseScope::PlaylistGroup)
-        );
-        assert_eq!(
             compile_library_browse_scope(NavigationSelector::Source(source_id)),
             Some(LibraryBrowseScope::Source(source_id))
         );
         assert_eq!(
             compile_library_browse_scope(NavigationSelector::SourceLocation(source_location_id)),
             Some(LibraryBrowseScope::SourceLocation(source_location_id))
-        );
-        assert_eq!(
-            compile_library_browse_scope(NavigationSelector::Playlist(playlist_id)),
-            Some(LibraryBrowseScope::Playlist(playlist_id))
-        );
-        assert_eq!(
-            compile_library_browse_scope(NavigationSelector::PrepPolicyScope(prep_policy_id)),
-            Some(LibraryBrowseScope::PrepPolicyScope(prep_policy_id))
         );
     }
 }

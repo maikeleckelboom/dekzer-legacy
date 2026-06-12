@@ -226,7 +226,7 @@ index, not a new occurrence representation.
 
 Do not reuse, revive, or rename these as A-5 occurrence authority:
 
-- `LibraryAssets`: live transitional substrate with opaque `equivalence_fingerprint`; not content identity.
+- `LibraryAssets`: internal legacy substrate with opaque `equivalence_fingerprint`; not content identity.
 - `LibraryAssetAttachments`, `SourceSegmentSets`, and `SourceSegments`: dormant/future segment promotion shape; not
   attachment occurrence identity.
 - `LibraryBrowserRows`: browser projection over legacy asset rows; not occurrence evidence authority.

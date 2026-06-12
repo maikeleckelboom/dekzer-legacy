@@ -15,29 +15,17 @@ export type NavigationReadRowsError = {
 
 export type NavigationReadRowsErrorState = Exclude<NavigationReadRowsState, 'ready'>
 
-export type NavigationRowFamily = 'views' | 'collections' | 'preparation' | 'sources'
+export type NavigationRowFamily = 'views' | 'sources'
 
-export type NavigationRowKind =
-  | 'view'
-  | 'collectionGroup'
-  | 'playlist'
-  | 'prepPolicyGroup'
-  | 'prepPolicyScope'
-  | 'source'
-  | 'locationGroup'
-  | 'location'
+export type NavigationRowKind = 'view' | 'source' | 'locationGroup' | 'location'
 
 export type NavigationRowSelectorKind =
   | 'allMedia'
   | 'allAudio'
   | 'allVideos'
   | 'recentlyAdded'
-  | 'needsPreparation'
-  | 'playlistGroup'
   | 'source'
   | 'sourceLocation'
-  | 'playlist'
-  | 'prepPolicyScope'
 
 export type NavigationRow = {
   readonly navigationRowId: string

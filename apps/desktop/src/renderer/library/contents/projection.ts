@@ -27,7 +27,6 @@ export type ContentRowIcon =
   | 'video'
   | 'image'
   | 'cueSheet'
-  | 'playlist'
   | 'metadata'
   | 'more'
   | 'loading'
@@ -56,7 +55,6 @@ export type ContentRow = {
   readonly icon?: ContentRowIcon
   readonly state?: 'empty' | 'notLoaded' | 'loading' | 'failed' | 'unsupported' | 'file'
   readonly fileClass?: 'audio' | 'video' | 'image' | 'unsupported'
-  readonly availabilityState?: 'available' | 'unavailable' | 'degraded'
   readonly action?: ContentRowAction
 }
 
@@ -638,8 +636,7 @@ function contentsRow(row: ContentsFileRow): ContentRow {
     presence: row.presence,
     detail,
     icon,
-    fileClass: row.fileClass,
-    ...(row.availabilityState === undefined ? {} : { availabilityState: row.availabilityState })
+    fileClass: row.fileClass
   }
 }
 
@@ -669,26 +666,12 @@ function sourceFileRowDetail(row: ContentsFileRow): string {
 }
 
 function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsFileRow): string {
-  const parts = [primaryMedia.artist, primaryMedia.album].filter(
-    (value): value is string => value !== undefined && value.trim().length > 0
-  )
-  const base =
-    parts.length > 0
-      ? parts.join(' - ')
-      : (row.relativePath ?? sourceFileClassLabel(row.fileClass, row.fileKind))
-
-  switch (row.availabilityState) {
-    case 'available':
-      return base
-    case 'degraded':
-      return `Degraded - ${base}`
-    case 'unavailable':
-      return `Unavailable - ${base}`
-    case undefined:
-      return base
-  }
-
-  return base
+  const facts = [primaryMedia.mimeType, primaryMedia.codec]
+    .filter((value): value is string => value !== undefined && value.trim().length > 0)
+    .join(' - ')
+  return facts.length > 0
+    ? facts
+    : (row.relativePath ?? sourceFileClassLabel(row.fileClass, row.fileKind))
 }
 
 function sourceFileClassLabel(

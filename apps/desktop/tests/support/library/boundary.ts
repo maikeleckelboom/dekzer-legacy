@@ -115,11 +115,6 @@ export function createFakeClient(
     readSourceFileAttachment: rejectUnexpectedClientCall,
     readAttachmentSourceFiles: rejectUnexpectedClientCall,
     readSourceAttachmentSummary: rejectUnexpectedClientCall,
-    readNavigationNodeLibraryBrowserWindow: rejectUnexpectedClientCall,
-    searchNavigationNodeLibraryBrowserWindow: rejectUnexpectedClientCall,
-    createPlaylist: rejectUnexpectedClientCall,
-    renamePlaylist: rejectUnexpectedClientCall,
-    deletePlaylist: rejectUnexpectedClientCall,
     ...overrides
   } as LibraryBoundaryHostClient
 }

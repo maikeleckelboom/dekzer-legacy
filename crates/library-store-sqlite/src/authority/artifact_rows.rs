@@ -97,68 +97,6 @@ pub(crate) fn require_source_artifact(
     Ok(artifact)
 }
 
-pub(crate) fn require_library_asset_capability_artifact(
-    tx: &AdmittedWrite<'_>,
-    artifact_id: i64,
-    library_asset_id: i64,
-    capability_kind: &str,
-    profile_key: &str,
-    expected_basis_fingerprint: &str,
-) -> LibrarySqliteResult<ArtifactRow> {
-    let artifact = load_artifact_row(tx, artifact_id)?;
-    let expected_subject_id = library_asset_id.to_string();
-    require(
-        artifact.subject_kind == "library_asset",
-        format!(
-            "artifact {artifact_id} must target subject_kind=library_asset, found {}",
-            artifact.subject_kind
-        ),
-    )?;
-    require(
-        artifact.subject_id == expected_subject_id,
-        format!(
-            "artifact {artifact_id} must target library_asset {} but points at {}",
-            library_asset_id, artifact.subject_id
-        ),
-    )?;
-    require(
-        artifact.artifact_kind == "capability_result",
-        format!(
-            "artifact {artifact_id} must have artifact_kind=capability_result, found {}",
-            artifact.artifact_kind
-        ),
-    )?;
-    require(
-        artifact.artifact_role == "primary_result",
-        format!(
-            "artifact {artifact_id} must have artifact_role=primary_result, found {}",
-            artifact.artifact_role
-        ),
-    )?;
-    require(
-        artifact.capability_kind.as_deref() == Some(capability_kind),
-        format!(
-            "artifact {artifact_id} capability_kind mismatch: expected {capability_kind}, found {:?}",
-            artifact.capability_kind
-        ),
-    )?;
-    require(
-        artifact.profile_key.as_deref() == Some(profile_key),
-        format!(
-            "artifact {artifact_id} profile_key mismatch: expected {profile_key}, found {:?}",
-            artifact.profile_key
-        ),
-    )?;
-    require(
-        artifact.basis_fingerprint == expected_basis_fingerprint,
-        format!(
-            "artifact {artifact_id} basis_fingerprint mismatch: expected {expected_basis_fingerprint}, found {}",
-            artifact.basis_fingerprint
-        ),
-    )?;
-    Ok(artifact)
-}
-
 fn require(condition: bool, message: String) -> LibrarySqliteResult<()> {
     if condition {
         Ok(())

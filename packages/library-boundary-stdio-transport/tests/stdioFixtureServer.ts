@@ -50,31 +50,31 @@ stdin.on("line", (line) => {
     return;
   }
 
-  const displayName = String(
-    envelope.request.payload.payload.displayName ?? ""
+  const absolutePath = String(
+    envelope.request.payload.payload.absolutePath ?? ""
   );
 
-  if (displayName === "transport-error") {
+  if (absolutePath === "transport-error") {
     writeTransportError(envelope.requestId, "invalidEnvelope", "fixture transport error");
     return;
   }
 
-  if (displayName === "unknown-remote-transport-code") {
+  if (absolutePath === "unknown-remote-transport-code") {
     writeTransportError(envelope.requestId, "futureRemoteCode", "fixture unknown code");
     return;
   }
 
-  if (displayName === "malformed") {
+  if (absolutePath === "malformed") {
     process.stdout.write("not-json\n");
     return;
   }
 
-  if (displayName === "duplicate-ready") {
+  if (absolutePath === "duplicate-ready") {
     writeReady();
     return;
   }
 
-  if (displayName === "unknown-response-request-id") {
+  if (absolutePath === "unknown-response-request-id") {
     writeEnvelope({
       type: "commandOutcome",
       requestId: "missing-request",
@@ -82,11 +82,15 @@ stdin.on("line", (line) => {
         type: "success",
         payload: {
           reply: {
-            type: "playlistWrite",
+            type: "libraryRoots",
             payload: {
-              type: "createPlaylist",
+              type: "registerLocalRoot",
               payload: {
-                playlistId: "13"
+                type: "registered",
+                payload: {
+                  rootId: "13",
+                  canonicalPath: "fixture"
+                }
               }
             }
           }
@@ -96,23 +100,23 @@ stdin.on("line", (line) => {
     return;
   }
 
-  if (displayName === "blank") {
+  if (absolutePath === "blank") {
     process.stdout.write("\n");
     writeSuccess(envelope, "10");
     return;
   }
 
-  if (displayName === "stderr") {
+  if (absolutePath === "stderr") {
     process.stderr.write("fixture diagnostic\n");
     writeSuccess(envelope, "11");
     return;
   }
 
-  if (displayName === "exit-pending") {
+  if (absolutePath === "exit-pending") {
     process.exit(7);
   }
 
-  if (displayName === "protocol-error") {
+  if (absolutePath === "protocol-error") {
     writeEnvelope({
       type: "commandOutcome",
       requestId: envelope.requestId,
@@ -131,16 +135,16 @@ stdin.on("line", (line) => {
     return;
   }
 
-  if (displayName === "delayed") {
+  if (absolutePath === "delayed") {
     globalThis.setTimeout(() => writeSuccess(envelope, "12"), 50);
     return;
   }
 
-  if (displayName === "never-respond") {
+  if (absolutePath === "never-respond") {
     return;
   }
 
-  if (displayName.startsWith("concurrent-")) {
+  if (absolutePath.startsWith("concurrent-")) {
     concurrentRequests.push(envelope);
     if (concurrentRequests.length === 2) {
       const [first, second] = concurrentRequests.splice(0, 2);
@@ -150,7 +154,7 @@ stdin.on("line", (line) => {
     return;
   }
 
-  const bulkMatch = /^bulk-(\d+)$/.exec(displayName);
+  const bulkMatch = /^bulk-(\d+)$/.exec(absolutePath);
   if (bulkMatch !== null) {
     writeSuccess(envelope, bulkMatch[1] ?? "99");
     return;
@@ -163,7 +167,7 @@ stdin.on("close", () => {
   process.exit(0);
 });
 
-function writeSuccess(envelope: RequestEnvelope, playlistId: string): void {
+function writeSuccess(envelope: RequestEnvelope, rootId: string): void {
   writeEnvelope({
     type: "commandOutcome",
     requestId: envelope.requestId,
@@ -171,11 +175,15 @@ function writeSuccess(envelope: RequestEnvelope, playlistId: string): void {
       type: "success",
       payload: {
         reply: {
-          type: "playlistWrite",
+          type: "libraryRoots",
           payload: {
-            type: "createPlaylist",
+            type: "registerLocalRoot",
             payload: {
-              playlistId
+              type: "registered",
+              payload: {
+                rootId,
+                canonicalPath: `fixture:${rootId}`
+              }
             }
           }
         }

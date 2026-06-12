@@ -1,12 +1,9 @@
 # Selected Contents Scope Depth Rule
 
 **Status:** CURRENT — The architectural decisions in this document remain valid (descendant-inclusive scope depth
-selection vs tree expansion, query contracts, coverage states, result shapes, forbidden patterns). Schema-specific
-references (`LibraryBrowserRows`, `library_asset_id`, `LibraryAssets`) are historical; for current v1 schema authority
-see `docs/decisions/library-preparation-substrate.md`. For current contents read boundary vocabulary (`scopeDepth`,
-`scopeCoverage`, `hasPolicyOmittedRows`, `playableMediaBrowse`) see `docs/library/contents/read-boundary-contract.md`
-and `docs/library/contents/browse-policy.md`. Do not use the legacy table/column names as current implementation
-targets.
+selection vs tree expansion, query contracts, coverage states, result shapes, forbidden patterns). For current contents
+read boundary vocabulary (`scopeDepth`, `scopeCoverage`, `hasPolicyOmittedRows`, `playableMediaBrowse`) see
+`docs/library/contents/read-boundary-contract.md` and `docs/library/contents/browse-policy.md`.
 
 ## Decision
 
@@ -231,13 +228,14 @@ Directory-level `dir_scan_state` values:
 - `failed`: scan aborted. Recursive contents are failed.
 - `complete`: directory fully scanned. Recursive contents are complete.
 
-#### `LibraryBrowserRows.availability_state`
+#### Current Row Presence And Eligibility
 
-- `available`: rendered normally and playable.
-- `degraded`: included in the default view, rendered with warning, and playable.
-- `unavailable`: excluded from the ordinary playable-media result when the selected scope is available; shown as
-  unavailable when the selected source or scope itself is unavailable and the projection has known prior rows; shown in
-  explicit issue/readiness views; never treated as empty.
+- `source_files.presence = present`: eligible for normal source-file based contents policies when class/kind filters
+  also admit it.
+- `source_files.presence = missing`: excluded from ordinary playable-media contents; source lifecycle/integrity reads
+  own missing/unavailable diagnostics.
+- `primary_media_candidates`: eligible for `primaryMedia` policy only after current attachment identity and media probe
+  evidence revalidation.
 
 #### `source_files.file_class`
 
@@ -263,13 +261,8 @@ be used as current design vocabulary.
 
 ## Query execution contract
 
-The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target, queries
-primary media, collapses duplicates, and returns projection rows that may originate from two kinds of source:
-
-- **promoted library asset rows**: when the scoped `source_files` have been promoted through segment attachment into
-  `LibraryBrowserRows`, those rows are returned as the primary contents.
-- **scanned source-file rows**: when scoped `source_files` have no corresponding promoted library asset row (yet), the
-  scanned source file itself is returned as a contents row.
+The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target and returns
+rows from the current source-file inventory and, for `primaryMedia`, evidence-backed `primary_media_candidates`.
 
 The renderer never constructs fallback rows.
 
@@ -414,48 +407,22 @@ between them and produce inconsistent UI.
 Ordering is deterministic and projection-owned. Do not rely on internal SQLite rowid ordering, current renderer order,
 expanded tree order, or incidental query result order.
 
-Default first-load ordering is `title ASC` after availability priority, with artist, album, path, and
-`scoped_source_file_id` as deterministic tie-breakers. This is the default order for the contents table unless the user
-explicitly chooses another sort.
-
-Because the result may contain both promoted library asset rows and scanned source-file rows, the tie-breaker must be
-stable across both origins. `scoped_source_file_id` is the default tie-breaker because every contents row has exactly
-one scoped source file, while `library_asset_id` is absent for source-file rows.
+Default first-load ordering is label/path based with `source_file_id` as the deterministic tie-breaker. This is the
+default order for the contents table unless the user explicitly chooses another sort.
 
 ```sql
 ORDER BY
-  CASE availability_state
-    WHEN 'available' THEN 0
-    WHEN 'degraded' THEN 1
-    WHEN 'unavailable' THEN 2
-    ELSE 3
-END ASC,
-  lower(COALESCE(title, relative_path, '')) ASC,
-  lower(COALESCE(artist, '')) ASC,
-  lower(COALESCE(album, '')) ASC,
+  lower(COALESCE(label, relative_path, file_name, '')) ASC,
   lower(COALESCE(relative_path, '')) ASC,
-  scoped_source_file_id ASC
+  source_file_id ASC
 ```
 
-Every ordered query needs a stable tie-breaker. `scoped_source_file_id` is the default tie-breaker for recursive
-contents rows.
+Every ordered query needs a stable tie-breaker. `source_file_id` is the default tie-breaker for recursive contents rows.
 
-### 9. Deduplication and asset collapse
+### 9. Deduplication
 
-If multiple scoped `source_files` map to the same `library_asset_id`, the result returns one promoted row.
-
-Promoted-library-asset deduplication rule:
-
-1. Group by `library_asset_id`.
-2. Prefer an attachment whose source file is present.
-3. If `LibraryBrowserRows.primary_source_file_id` is within the selected scope and present, use it as the scoped
-   attachment anchor.
-4. Otherwise, use the present scoped source file with the lowest `source_file_id`.
-5. If only degraded or unavailable attachments exist, choose the stable attachment that best represents the availability
-   state and surface that state.
-
-Source-file-origin rows are one row per scoped scanned source file when no promoted row exists for that source file.
-They are not collapsed against each other and are not deduplicated by `library_asset_id`.
+Browse policies return one row per scoped scanned source file admitted by the policy. The `primaryMedia` policy returns
+evidence-backed candidate rows revalidated against scoped source files and attachment identity.
 
 Do not leave duplicate collapse to the renderer.
 
@@ -511,16 +478,12 @@ Conceptual result states:
 
 Conceptual row shape requirements (not the contract shape):
 
-- Every contents row has exactly one scoped source file, identified by `scopedSourceFileId`.
-- Rows may originate from promoted library assets (`origin: 'libraryAsset'`) or scanned source files (
-  `origin: 'sourceFile'`).
-- Promoted library asset rows carry `libraryAssetId`, `rowVersion`, and metadata fields.
-- Source-file rows carry scoped source-file identity only; they must not invent track metadata.
-- `stableId` is the durable row identity: `'library-asset:' + libraryAssetId` for promoted rows,
-  `'source-file:' + scopedSourceFileId` for source-file rows.
+- Every contents row has exactly one scoped source file, identified by `sourceFileId`.
+- Rows carry source-file identity and may include a `primaryMedia` summary when current media-candidate evidence exists.
+- Source-file rows must not invent track metadata.
+- `id` is the durable row identity for the boundary row.
 - All durable SQLite row identifiers crossing the renderer boundary are encoded as strings unless the boundary contract
   explicitly proves they are safe JavaScript integers.
-- `prepReadinessSummary` is a required compact readiness summary.
 
 When a selected target is permanently deleted, active subscribers receive a tombstone/invalidated-target result, such as
 `location_missing` or `source_unavailable`, not an empty result.

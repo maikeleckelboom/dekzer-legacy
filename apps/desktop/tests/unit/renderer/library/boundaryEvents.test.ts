@@ -42,7 +42,7 @@ describe('createBoundaryEventsController', () => {
           payload: {
             eventSequence: 2,
             occurredAtMs: 1001,
-            invalidation: { scope: 'libraryBrowser', revision: '8' }
+            invalidation: { scope: 'contents', revision: '8' }
           }
         }
       ],
@@ -61,7 +61,7 @@ describe('createBoundaryEventsController', () => {
       {
         eventSequence: 2,
         occurredAtMs: 1001,
-        invalidation: { scope: 'libraryBrowser', revision: '8' }
+        invalidation: { scope: 'contents', revision: '8' }
       }
     ])
     expect(controller.consumeMaintainedSnapshotInvalidations()).toEqual([])
@@ -117,7 +117,7 @@ describe('createBoundaryEventsController', () => {
           payload: {
             eventSequence: 4,
             occurredAtMs: 1004,
-            invalidation: { scope: 'libraryBrowser', revision: '10' }
+            invalidation: { scope: 'contents', revision: '10' }
           }
         }
       ],
@@ -141,7 +141,7 @@ describe('createBoundaryEventsController', () => {
           payload: {
             eventSequence: 6,
             occurredAtMs: 1006,
-            invalidation: { scope: 'libraryBrowser', revision: '12' }
+            invalidation: { scope: 'contents', revision: '12' }
           }
         }
       ],

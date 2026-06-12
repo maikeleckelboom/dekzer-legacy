@@ -116,10 +116,10 @@ reread snapshot data authoritatively.
 
 Snapshot scopes:
 
-| Scope            | Invalidated reads                                                                                                                                                                                         |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `navigationRows` | `ReadNavigationRows`, `LoadNavigationRow`, `LoadNavigationRowByStableKey`.                                                                                                                                |
-| `libraryBrowser` | `ReadLibraryTreeChildren`, `ReadNavigationNodeLibraryBrowserWindow`, `SearchNavigationNodeLibraryBrowserWindow`, `ContentsRead`, `ReadLibraryAssetWaveformOverview`, `ReadLibraryAssetPreparationDetail`. |
+| Scope            | Invalidated reads                                                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `navigationRows` | `ReadNavigationRows`, `LoadNavigationRow`, `LoadNavigationRowByStableKey`.                                                                               |
+| `contents`       | `ReadLibraryTreeChildren`, `ReadSourceLifecycle`, `ReadSourceIntegrity`, `ReadSourceMaintenance`, `ReadTrackIdentityReviewCandidates`, `ContentsRead`. |
 
 `SourceScanEvent` and `MaintainedSnapshotInvalidated` are distinct families. They are emitted through
 the same event ring and share the same `eventSequence` space. They are not subtypes of each other.
@@ -236,9 +236,9 @@ The renderer consumes Main-delivered batches through the boundary events control
 - Does not poll `ReadAfter` and does not own an event cursor.
 
 Normal maintained snapshot invalidation is separate from gap recovery. `navigationRows` invalidation
-refreshes navigation rows. `libraryBrowser` invalidation refreshes previously loaded and expanded
-browser tree windows through authoritative reads while preserving previous visible rows during the
-pending refresh.
+refreshes navigation rows. `contents` invalidation refreshes maintained source tree/status,
+current contents, and track identity candidate snapshot reads through authoritative reads while
+preserving previous visible rows during the pending refresh.
 
 ### Renderer must not
 

@@ -1302,11 +1302,11 @@ function navigationRowWithSelectorKind(
 function navigationRowWithNullSelector(): NavigationRow {
   return {
     navigationRowId: '99',
-    stableKey: 'group:structural',
+    stableKey: 'view:structural',
     parentNavigationRowId: null,
-    family: null,
-    rowKind: 'collectionGroup',
-    displayName: 'Structural Group',
+    family: 'views',
+    rowKind: 'view',
+    displayName: 'Structural View',
     siblingPosition: 0,
     selectable: true,
     selectorKind: null,

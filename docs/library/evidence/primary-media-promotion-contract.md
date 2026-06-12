@@ -38,7 +38,8 @@ Rules:
 - The row is evidence-backed attachment promotion only. It must not write `LibraryAssets`, `LibraryAssetAttachments`,
   `SourceSegmentSets`, `SourceSegments`, `LibraryBrowserRows`, tracks, prep rows, waveforms, stems, playlists, or playlist
   entries.
-- `LibraryBrowserRows` remains a browser projection over legacy asset rows. It is not primary-media v0 authority.
+- Legacy browser projections and library-asset rows are not primary-media v0 authority and are not public contents row
+  identity.
 
 ## Eligibility
 

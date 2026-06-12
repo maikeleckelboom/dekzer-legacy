@@ -5,9 +5,7 @@ use crate::authority::sources::{
     CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, SourceFactsAuthorityTx,
 };
 use crate::authority::work::{
-    ArtifactFileStoreRoot, CapabilityInvalidationAuthorityTx, MarkCapabilitiesStaleFromBasisInput,
-    QueueMachineWorkResult, load_attached_library_asset_ids_for_source_file,
-    retire_artifact_if_unreferenced_and_unclaimed,
+    ArtifactFileStoreRoot, retire_artifact_if_unreferenced_and_unclaimed,
 };
 use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
@@ -76,23 +74,6 @@ impl<'write, 'conn> InspectSourcePromotionTx<'write, 'conn> {
             )?);
         }
 
-        if previous_source_facts
-            .as_ref()
-            .map(|(basis_fingerprint, _)| basis_fingerprint.as_str())
-            != Some(input.source_facts.basis_fingerprint.as_str())
-        {
-            let attached_library_asset_ids = load_attached_library_asset_ids_for_source_file(
-                &*self.tx,
-                input.source_facts.source_file_id.get(),
-            )?;
-            let invalidation = CapabilityInvalidationAuthorityTx::new(&*self.tx)
-                .mark_capabilities_stale_from_basis(&MarkCapabilitiesStaleFromBasisInput {
-                    library_asset_ids: attached_library_asset_ids,
-                    invalidated_at: input.source_facts.updated_at,
-                })?;
-            append_projection_rebuilds(&mut projection_rebuilds, invalidation.projection_rebuilds);
-        }
-
         Ok(InspectSourcePromotionResult {
             projection_rebuilds,
         })
@@ -127,16 +108,4 @@ fn parse_artifact_id(value: i64) -> LibrarySqliteResult<ArtifactId> {
     ArtifactId::new(value).ok_or_else(|| {
         LibrarySqliteError::WriteInvariant(format!("invalid Artifacts.artifact_id value: {value}"))
     })
-}
-
-fn append_projection_rebuilds(
-    projection_rebuilds: &mut Vec<RebuildProjectionPromotionResult>,
-    queued_results: Vec<QueueMachineWorkResult>,
-) {
-    projection_rebuilds.extend(queued_results.into_iter().map(|result| {
-        RebuildProjectionPromotionResult {
-            work_item_id: result.work_item_id,
-            created: result.created,
-        }
-    }));
 }

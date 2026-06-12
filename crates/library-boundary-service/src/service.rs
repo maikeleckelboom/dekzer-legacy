@@ -7,14 +7,12 @@ use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use library_boundary_protocol as protocol;
-use library_domain::{LibraryAssetId, PlaylistId};
 use library_store_sqlite::{
-    AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
-    LibraryStoreContext, LocalRootAvailability, MovePlaylistEntryInput, ReadLocalRootsResult,
-    RegisterLocalRootInput, RegisterLocalRootResult, RemoveLibraryAssetFromPlaylistInput,
-    RenamePlaylistInput, RootNavigationWindowEstablishment, RootNavigationWindowEstablishmentState,
-    RootScanObservation, SourceFileBlake3HashAdmissionScope, SourceRegistrationRootClass,
-    SqliteDurableStore, UnregisterLocalRootInput,
+    LibraryStoreContext, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,
+    RegisterLocalRootResult, RootNavigationWindowEstablishment,
+    RootNavigationWindowEstablishmentState, RootScanObservation,
+    SourceFileBlake3HashAdmissionScope, SourceRegistrationRootClass, SqliteDurableStore,
+    UnregisterLocalRootInput,
 };
 
 use crate::search_filter_protocol::{map_search_filter_read_reply, store_search_filter_request};
@@ -22,14 +20,11 @@ use crate::session_events::{LibraryBoundaryEventStream, ScanEventInput};
 use crate::snapshot_read_protocol::{
     map_load_navigation_row_by_stable_key_reply, map_load_navigation_row_reply,
     map_maintained_read_model_revisions, map_read_attachment_source_files_reply,
-    map_read_contents_reply, map_read_library_asset_preparation_detail_reply,
-    map_read_library_asset_waveform_overview_reply, map_read_library_tree_children_reply,
-    map_read_navigation_node_library_browser_window_reply, map_read_navigation_rows_reply,
+    map_read_contents_reply, map_read_library_tree_children_reply, map_read_navigation_rows_reply,
     map_read_source_attachment_summary_reply, map_read_source_file_attachment_reply,
     map_read_source_integrity_reply, map_read_source_lifecycle_reply,
-    map_read_track_identity_review_candidates_reply,
-    map_search_navigation_node_library_browser_window_reply, store_contents_policy,
-    store_contents_scope, store_contents_scope_depth, store_library_tree_entry_point,
+    map_read_track_identity_review_candidates_reply, store_contents_policy, store_contents_scope,
+    store_contents_scope_depth, store_library_tree_entry_point,
     store_track_identity_review_state_filter,
 };
 use crate::source_file_hash_protocol::{
@@ -144,9 +139,6 @@ impl LibraryBoundaryService {
             protocol::CommandRequest::LibraryRoots(command) => self
                 .handle_library_root_command(command)
                 .map(protocol::CommandReply::LibraryRoots),
-            protocol::CommandRequest::PlaylistWrite(command) => self
-                .handle_playlist_write_command(command)
-                .map(protocol::CommandReply::PlaylistWrite),
             protocol::CommandRequest::SourceFileHash(command) => self
                 .handle_source_file_hash_command(command)
                 .map(protocol::CommandReply::SourceFileHash),
@@ -386,122 +378,6 @@ impl LibraryBoundaryService {
         })
     }
 
-    pub fn create_playlist(
-        &self,
-        request: protocol::CreatePlaylistRequest,
-    ) -> protocol::ProtocolResult<protocol::CreatePlaylistReply> {
-        let created_at = unix_time_ms()?;
-        let playlist_id = self
-            .durable_store
-            .create_playlist(CreatePlaylistInput {
-                playlist_id: None,
-                display_name: request.display_name,
-                created_at,
-            })
-            .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::CreatePlaylistReply {
-            playlist_id: playlist_id.get(),
-        })
-    }
-
-    pub fn rename_playlist(
-        &self,
-        request: protocol::RenamePlaylistRequest,
-    ) -> protocol::ProtocolResult<protocol::RenamePlaylistReply> {
-        let playlist_id = require_playlist_id(request.playlist_id, "playlistId")?;
-        let renamed_at = unix_time_ms()?;
-        let renamed = self
-            .durable_store
-            .rename_playlist(RenamePlaylistInput {
-                playlist_id,
-                display_name: request.display_name,
-                renamed_at,
-            })
-            .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::RenamePlaylistReply { renamed })
-    }
-
-    pub fn delete_playlist(
-        &self,
-        request: protocol::DeletePlaylistRequest,
-    ) -> protocol::ProtocolResult<protocol::DeletePlaylistReply> {
-        let playlist_id = require_playlist_id(request.playlist_id, "playlistId")?;
-        let deleted = self
-            .durable_store
-            .delete_playlist(DeletePlaylistInput { playlist_id })
-            .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::DeletePlaylistReply { deleted })
-    }
-
-    pub fn append_library_asset_to_playlist(
-        &self,
-        request: protocol::AppendLibraryAssetToPlaylistRequest,
-    ) -> protocol::ProtocolResult<protocol::AppendLibraryAssetToPlaylistReply> {
-        let playlist_id = require_playlist_id(request.playlist_id, "playlistId")?;
-        let library_asset_id =
-            require_library_asset_id(request.library_asset_id, "libraryAssetId")?;
-        let appended_at = unix_time_ms()?;
-        let playlist_entry_id = self
-            .durable_store
-            .append_library_asset_to_playlist(AppendLibraryAssetToPlaylistInput {
-                playlist_id,
-                library_asset_id,
-                appended_at,
-            })
-            .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::AppendLibraryAssetToPlaylistReply { playlist_entry_id })
-    }
-
-    pub fn remove_library_asset_from_playlist(
-        &self,
-        request: protocol::RemoveLibraryAssetFromPlaylistRequest,
-    ) -> protocol::ProtocolResult<protocol::RemoveLibraryAssetFromPlaylistReply> {
-        let playlist_id = require_playlist_id(request.playlist_id, "playlistId")?;
-        let library_asset_id =
-            require_library_asset_id(request.library_asset_id, "libraryAssetId")?;
-        let removed_at = unix_time_ms()?;
-        let removed = self
-            .durable_store
-            .remove_library_asset_from_playlist(RemoveLibraryAssetFromPlaylistInput {
-                playlist_id,
-                library_asset_id,
-                removed_at,
-            })
-            .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::RemoveLibraryAssetFromPlaylistReply { removed })
-    }
-
-    pub fn move_playlist_entry(
-        &self,
-        request: protocol::MovePlaylistEntryRequest,
-    ) -> protocol::ProtocolResult<protocol::MovePlaylistEntryReply> {
-        let playlist_id = require_playlist_id(request.playlist_id, "playlistId")?;
-        let playlist_entry_id = require_positive_i64(request.playlist_entry_id, "playlistEntryId")?;
-        if request.new_position < 0 {
-            return Err(protocol::ProtocolError::InvalidRequest {
-                detail: "newPosition must be non-negative".to_string(),
-            });
-        }
-
-        let moved_at = unix_time_ms()?;
-        let moved = self
-            .durable_store
-            .move_playlist_entry(MovePlaylistEntryInput {
-                playlist_id,
-                playlist_entry_id,
-                new_position: request.new_position,
-                moved_at,
-            })
-            .map_err(map_store_error)?;
-        self.publish_maintained_snapshot_invalidations()?;
-        Ok(protocol::MovePlaylistEntryReply { moved })
-    }
-
     pub fn read_navigation_rows(
         &self,
         request: protocol::ReadNavigationRowsRequest,
@@ -663,37 +539,6 @@ impl LibraryBoundaryService {
         map_read_track_identity_review_candidates_reply(candidates).map_err(map_store_error)
     }
 
-    pub fn read_navigation_node_library_browser_window(
-        &self,
-        request: protocol::ReadNavigationNodeLibraryBrowserWindowRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadNavigationNodeLibraryBrowserWindowReply> {
-        let window = self
-            .durable_store
-            .read_navigation_node_library_browser_window(
-                request.navigation_row_id,
-                request.offset,
-                request.limit,
-            )
-            .map_err(map_store_error)?;
-        map_read_navigation_node_library_browser_window_reply(window).map_err(map_store_error)
-    }
-
-    pub fn search_navigation_node_library_browser_window(
-        &self,
-        request: protocol::SearchNavigationNodeLibraryBrowserWindowRequest,
-    ) -> protocol::ProtocolResult<protocol::SearchNavigationNodeLibraryBrowserWindowReply> {
-        let window = self
-            .durable_store
-            .search_navigation_node_library_browser_window(
-                request.navigation_row_id,
-                &request.query,
-                request.offset,
-                request.limit,
-            )
-            .map_err(map_store_error)?;
-        map_search_navigation_node_library_browser_window_reply(window).map_err(map_store_error)
-    }
-
     pub fn read_contents(
         &self,
         request: protocol::ContentsReadRequest,
@@ -739,28 +584,6 @@ impl LibraryBoundaryService {
             .read_search_filter(store_search_filter_request(request, limit))
             .map_err(map_store_error)?;
         map_search_filter_read_reply(result).map_err(map_store_error)
-    }
-
-    pub fn read_library_asset_waveform_overview(
-        &self,
-        request: protocol::ReadLibraryAssetWaveformOverviewRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadLibraryAssetWaveformOverviewReply> {
-        let overview = self
-            .durable_store
-            .read_library_asset_waveform_overview(request.library_asset_id)
-            .map_err(map_store_error)?;
-        Ok(map_read_library_asset_waveform_overview_reply(overview))
-    }
-
-    pub fn read_library_asset_preparation_detail(
-        &self,
-        request: protocol::ReadLibraryAssetPreparationDetailRequest,
-    ) -> protocol::ProtocolResult<protocol::ReadLibraryAssetPreparationDetailReply> {
-        let detail = self
-            .durable_store
-            .read_library_asset_preparation_detail(request.library_asset_id)
-            .map_err(map_store_error)?;
-        map_read_library_asset_preparation_detail_reply(detail).map_err(map_store_error)
     }
 
     pub fn hash_source_files_blake3(
@@ -950,32 +773,6 @@ impl LibraryBoundaryService {
         }
     }
 
-    fn handle_playlist_write_command(
-        &self,
-        command: protocol::PlaylistWriteCommand,
-    ) -> protocol::ProtocolResult<protocol::PlaylistWriteReply> {
-        match command {
-            protocol::PlaylistWriteCommand::CreatePlaylist(request) => self
-                .create_playlist(request)
-                .map(protocol::PlaylistWriteReply::CreatePlaylist),
-            protocol::PlaylistWriteCommand::RenamePlaylist(request) => self
-                .rename_playlist(request)
-                .map(protocol::PlaylistWriteReply::RenamePlaylist),
-            protocol::PlaylistWriteCommand::DeletePlaylist(request) => self
-                .delete_playlist(request)
-                .map(protocol::PlaylistWriteReply::DeletePlaylist),
-            protocol::PlaylistWriteCommand::AppendLibraryAssetToPlaylist(request) => self
-                .append_library_asset_to_playlist(request)
-                .map(protocol::PlaylistWriteReply::AppendLibraryAssetToPlaylist),
-            protocol::PlaylistWriteCommand::RemoveLibraryAssetFromPlaylist(request) => self
-                .remove_library_asset_from_playlist(request)
-                .map(protocol::PlaylistWriteReply::RemoveLibraryAssetFromPlaylist),
-            protocol::PlaylistWriteCommand::MovePlaylistEntry(request) => self
-                .move_playlist_entry(request)
-                .map(protocol::PlaylistWriteReply::MovePlaylistEntry),
-        }
-    }
-
     fn handle_source_file_hash_command(
         &self,
         command: protocol::SourceFileHashCommand,
@@ -1038,13 +835,6 @@ impl LibraryBoundaryService {
             protocol::SnapshotReadCommand::ReadTrackIdentityReviewCandidates(request) => self
                 .read_track_identity_review_candidates(request)
                 .map(protocol::SnapshotReadReply::TrackIdentityReviewCandidates),
-            protocol::SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(request) => self
-                .read_navigation_node_library_browser_window(request)
-                .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserWindow),
-            protocol::SnapshotReadCommand::SearchNavigationNodeLibraryBrowserWindow(request) => {
-                self.search_navigation_node_library_browser_window(request)
-                    .map(protocol::SnapshotReadReply::NavigationNodeLibraryBrowserSearch)
-            }
             protocol::SnapshotReadCommand::ContentsRead(request) => self
                 .read_contents(request)
                 .map(protocol::SnapshotReadReply::Contents),
@@ -1052,12 +842,6 @@ impl LibraryBoundaryService {
                 .read_search_filter(request)
                 .map(Box::new)
                 .map(protocol::SnapshotReadReply::SearchFilter),
-            protocol::SnapshotReadCommand::ReadLibraryAssetWaveformOverview(request) => self
-                .read_library_asset_waveform_overview(request)
-                .map(protocol::SnapshotReadReply::LibraryAssetWaveformOverview),
-            protocol::SnapshotReadCommand::ReadLibraryAssetPreparationDetail(request) => self
-                .read_library_asset_preparation_detail(request)
-                .map(protocol::SnapshotReadReply::LibraryAssetPreparationDetail),
         }
     }
 
@@ -1335,21 +1119,6 @@ fn job_scan_cancelled_event(
     }
 }
 
-fn require_playlist_id(value: i64, field_name: &str) -> protocol::ProtocolResult<PlaylistId> {
-    PlaylistId::new(value).ok_or_else(|| protocol::ProtocolError::InvalidRequest {
-        detail: format!("{field_name} must be positive"),
-    })
-}
-
-fn require_library_asset_id(
-    value: i64,
-    field_name: &str,
-) -> protocol::ProtocolResult<LibraryAssetId> {
-    LibraryAssetId::new(value).ok_or_else(|| protocol::ProtocolError::InvalidRequest {
-        detail: format!("{field_name} must be positive"),
-    })
-}
-
 pub(crate) fn require_positive_i64(value: i64, field_name: &str) -> protocol::ProtocolResult<i64> {
     if value > 0 {
         Ok(value)
@@ -1560,33 +1329,29 @@ mod tests {
         AttachmentSourceFileOccurrenceStatus, CancelRootScanReply, CancelRootScanRequest,
         CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest, ContentsFileClass,
         ContentsPresenceState, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
-        ContentsScopeCoverageState, ContentsScopeDepth, CreatePlaylistReply, CreatePlaylistRequest,
-        DeferTrackIdentityCandidateRequest, DeletePlaylistReply, DeletePlaylistRequest,
+        ContentsScopeCoverageState, ContentsScopeDepth, DeferTrackIdentityCandidateRequest,
         DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
         HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
         HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
         LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
-        LoadNavigationRowByStableKeyReply, LoadNavigationRowByStableKeyRequest,
-        MaintainedSnapshotScope, PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
-        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
-        ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
-        ReadLibraryTreeChildrenRequest, ReadSourceAttachmentSummaryReply,
-        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceIntegrityRequest,
-        ReadSourceLifecycleReply, ReadSourceLifecycleRequest, ReadSourceMaintenanceReply,
-        ReadSourceMaintenanceRequest, ReadTrackIdentityReviewCandidatesRequest,
-        RegisterLocalRootReply, RegisterLocalRootRequest, RegisteredLocalRoot,
-        RejectTrackIdentityCandidateRequest, RenamePlaylistReply, RenamePlaylistRequest,
-        RunSourceMaintenanceReply, RunSourceMaintenanceRequest, SearchFilterAuthorityLayer,
-        SearchFilterFileClass, SearchFilterReadReply, SearchFilterReadRequest,
-        SearchFilterRecursion, SearchFilterResultKind, SearchFilterScope, SearchFilterSet,
-        SearchFilterSort, SearchFilterState, SnapshotReadCommand, SnapshotReadReply,
-        SourceFileAttachmentLinkStatus, SourceFileHashCommand, SourceFileHashReply,
-        SourceIntegrityAvailabilityState, SourceMaintenanceCommand, SourceMaintenanceReply,
-        StartRootScanReply, StartRootScanRequest, TrackIdentityDecisionCommand,
-        TrackIdentityDecisionCommandFailure, TrackIdentityDecisionCommandResult,
-        TrackIdentityDecisionReply, TrackIdentityDecisionState,
+        MaintainedSnapshotScope, ProtocolError, ReadAttachmentSourceFilesReply,
+        ReadAttachmentSourceFilesRequest, ReadLibraryBoundaryEventsAfterReply,
+        ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
+        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
+        ReadSourceIntegrityRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
+        ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
+        RegisteredLocalRoot, RejectTrackIdentityCandidateRequest, RunSourceMaintenanceReply,
+        RunSourceMaintenanceRequest, SearchFilterAuthorityLayer, SearchFilterFileClass,
+        SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
+        SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
+        SearchFilterState, SnapshotReadCommand, SnapshotReadReply, SourceFileAttachmentLinkStatus,
+        SourceFileHashCommand, SourceFileHashReply, SourceIntegrityAvailabilityState,
+        SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply, StartRootScanRequest,
+        TrackIdentityDecisionCommand, TrackIdentityDecisionCommandFailure,
+        TrackIdentityDecisionCommandResult, TrackIdentityDecisionReply, TrackIdentityDecisionState,
         TrackIdentityEffectiveDecisionCurrentStatus, TrackIdentityEffectiveDecisionPrecedence,
         TrackIdentityReviewReadStatus, TrackIdentityReviewState,
         TrackIdentityUserBlockingDecisionState, UnregisterLocalRootReply,
@@ -1637,30 +1402,6 @@ mod tests {
                 row.get(0)
             })
             .unwrap_or_else(|error| panic!("count rows in {table}: {error}"))
-    }
-
-    fn count_table_if_exists(context: &LibraryStoreContext, table: &str) -> Option<i64> {
-        let connection = open_test_read_connection(context);
-        let exists: i64 = connection
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM sqlite_schema
-                 WHERE type IN ('table', 'view')
-                   AND name = ?1",
-                [table],
-                |row| row.get(0),
-            )
-            .expect("check optional table existence");
-        if exists == 0 {
-            return None;
-        }
-        Some(
-            connection
-                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                    row.get(0)
-                })
-                .unwrap_or_else(|error| panic!("count rows in optional {table}: {error}")),
-        )
     }
 
     fn clear_attachment_identity_rows(context: &LibraryStoreContext) {
@@ -2090,36 +1831,6 @@ mod tests {
         }
     }
 
-    fn expect_create_playlist_reply(reply: CommandReply) -> CreatePlaylistReply {
-        match reply {
-            CommandReply::PlaylistWrite(PlaylistWriteReply::CreatePlaylist(reply)) => reply,
-            other => panic!("expected create playlist reply, got {other:?}"),
-        }
-    }
-
-    fn expect_rename_playlist_reply(reply: CommandReply) -> RenamePlaylistReply {
-        match reply {
-            CommandReply::PlaylistWrite(PlaylistWriteReply::RenamePlaylist(reply)) => reply,
-            other => panic!("expected rename playlist reply, got {other:?}"),
-        }
-    }
-
-    fn expect_delete_playlist_reply(reply: CommandReply) -> DeletePlaylistReply {
-        match reply {
-            CommandReply::PlaylistWrite(PlaylistWriteReply::DeletePlaylist(reply)) => reply,
-            other => panic!("expected delete playlist reply, got {other:?}"),
-        }
-    }
-
-    fn expect_navigation_row_by_stable_key_reply(
-        reply: CommandReply,
-    ) -> LoadNavigationRowByStableKeyReply {
-        match reply {
-            CommandReply::SnapshotRead(SnapshotReadReply::NavigationRowByStableKey(reply)) => reply,
-            other => panic!("expected load navigation row by stable key reply, got {other:?}"),
-        }
-    }
-
     fn expect_search_filter_reply(reply: CommandReply) -> SearchFilterReadReply {
         match reply {
             CommandReply::SnapshotRead(SnapshotReadReply::SearchFilter(reply)) => *reply,
@@ -2142,41 +1853,14 @@ mod tests {
         (json, reply)
     }
 
-    fn create_playlist(
+    fn register_event_root(
         service: &LibraryBoundaryService,
-        display_name: &str,
-    ) -> (serde_json::Value, CreatePlaylistReply) {
-        let outcome = service.handle_command(CommandRequest::PlaylistWrite(
-            PlaylistWriteCommand::CreatePlaylist(CreatePlaylistRequest {
-                display_name: display_name.to_string(),
-            }),
-        ));
-        let json = serde_json::to_value(&outcome).expect("serialize create playlist outcome");
-        let reply = expect_create_playlist_reply(expect_success(outcome));
-        (json, reply)
-    }
-
-    fn rename_playlist(
-        service: &LibraryBoundaryService,
-        playlist_id: i64,
-        display_name: &str,
-    ) -> RenamePlaylistReply {
-        expect_rename_playlist_reply(expect_success(service.handle_command(
-            CommandRequest::PlaylistWrite(PlaylistWriteCommand::RenamePlaylist(
-                RenamePlaylistRequest {
-                    playlist_id,
-                    display_name: display_name.to_string(),
-                },
-            )),
-        )))
-    }
-
-    fn delete_playlist(service: &LibraryBoundaryService, playlist_id: i64) -> DeletePlaylistReply {
-        expect_delete_playlist_reply(expect_success(service.handle_command(
-            CommandRequest::PlaylistWrite(PlaylistWriteCommand::DeletePlaylist(
-                DeletePlaylistRequest { playlist_id },
-            )),
-        )))
+        parent: &std::path::Path,
+        name: &str,
+    ) -> RegisteredLocalRoot {
+        let source_root = parent.join(name);
+        std::fs::create_dir_all(&source_root).expect("create event root");
+        register_local_root(service, source_root.to_string_lossy().into_owned()).1
     }
 
     fn start_root_scan(service: &LibraryBoundaryService, root_id: i64) -> StartRootScanReply {
@@ -2442,17 +2126,6 @@ mod tests {
             })
             .expect("read hash candidates")
             .len()
-    }
-
-    fn load_navigation_row_by_stable_key(
-        service: &LibraryBoundaryService,
-        stable_key: String,
-    ) -> LoadNavigationRowByStableKeyReply {
-        expect_navigation_row_by_stable_key_reply(expect_success(service.handle_command(
-            CommandRequest::SnapshotRead(SnapshotReadCommand::LoadNavigationRowByStableKey(
-                LoadNavigationRowByStableKeyRequest { stable_key },
-            )),
-        )))
     }
 
     #[test]
@@ -2745,7 +2418,7 @@ mod tests {
                 let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(event) = e else {
                     return false;
                 };
-                event.invalidation.scope == MaintainedSnapshotScope::LibraryBrowser
+                event.invalidation.scope == MaintainedSnapshotScope::Contents
             }),
             "hash evidence changes must publish the narrow current maintained scope"
         );
@@ -2787,38 +2460,6 @@ mod tests {
             assert_eq!(
                 facts.content_hash.expect("content hash").algorithm,
                 "blake3"
-            );
-        }
-
-        for table in [
-            "LibraryAssets",
-            "LibraryAssetAttachments",
-            "LibraryBrowserRows",
-            "SourceSegmentSets",
-            "SourceSegments",
-            "PrepAssignments",
-            "ResolvedLibraryAssetPrepTargets",
-        ] {
-            assert_eq!(
-                count_rows(&context, table),
-                0,
-                "{table} must not be created by hash/attachment maintenance"
-            );
-        }
-        for absent_or_future_table in [
-            "Tracks",
-            "TrackRows",
-            "LibraryTracks",
-            "PrepRows",
-            "PreparationRows",
-            "primaryMedia",
-        ] {
-            assert!(
-                matches!(
-                    count_table_if_exists(&context, absent_or_future_table),
-                    None | Some(0)
-                ),
-                "{absent_or_future_table} must be absent or empty"
             );
         }
     }
@@ -2866,7 +2507,7 @@ mod tests {
 
     #[test]
     fn run_source_maintenance_hashes_materializes_and_probes_one_bounded_unit() {
-        let (tempdir, context, service) = open_service_with_context();
+        let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("source-maintenance-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
         let wav_bytes = tiny_wav_bytes(44_100, 2, 16, 4_410);
@@ -2957,22 +2598,6 @@ mod tests {
             snapshot.last_run.expect("last run summary exists").status,
             library_boundary_protocol::SourceMaintenanceRunStatus::Completed
         );
-
-        for table in [
-            "LibraryAssets",
-            "LibraryAssetAttachments",
-            "LibraryBrowserRows",
-            "SourceSegmentSets",
-            "SourceSegments",
-            "PrepAssignments",
-            "ResolvedLibraryAssetPrepTargets",
-        ] {
-            assert_eq!(
-                count_rows(&context, table),
-                0,
-                "{table} must not be created by source maintenance"
-            );
-        }
     }
 
     #[test]
@@ -3774,11 +3399,6 @@ mod tests {
             count_rows(&context, "SourceFacts"),
             count_rows(&context, "content_attachments"),
             count_rows(&context, "source_file_attachment_links"),
-            count_rows(&context, "LibraryAssets"),
-            count_rows(&context, "LibraryAssetAttachments"),
-            count_rows(&context, "LibraryBrowserRows"),
-            count_rows(&context, "SourceSegmentSets"),
-            count_rows(&context, "SourceSegments"),
             service.source_maintenance.completed_runs_for_test().len(),
         );
         let _ = read_source_file_attachment(&service, file_ids[0]);
@@ -3788,35 +3408,12 @@ mod tests {
             count_rows(&context, "SourceFacts"),
             count_rows(&context, "content_attachments"),
             count_rows(&context, "source_file_attachment_links"),
-            count_rows(&context, "LibraryAssets"),
-            count_rows(&context, "LibraryAssetAttachments"),
-            count_rows(&context, "LibraryBrowserRows"),
-            count_rows(&context, "SourceSegmentSets"),
-            count_rows(&context, "SourceSegments"),
             service.source_maintenance.completed_runs_for_test().len(),
         );
         assert_eq!(
             after_counts, before_counts,
-            "attachment identity reads must not trigger source maintenance, materialization, or old identity rows"
+            "attachment identity reads must not trigger source maintenance or materialization"
         );
-        for absent_or_future_table in [
-            "Tracks",
-            "TrackRows",
-            "LibraryTracks",
-            "PrepRows",
-            "PreparationRows",
-            "primaryMedia",
-            "Playlists",
-            "PlaylistEntries",
-        ] {
-            assert!(
-                matches!(
-                    count_table_if_exists(&context, absent_or_future_table),
-                    None | Some(0)
-                ),
-                "{absent_or_future_table} must be absent or empty after attachment reads"
-            );
-        }
     }
 
     #[test]
@@ -4353,7 +3950,7 @@ mod tests {
 
     #[test]
     fn protocol_commands_read_snapshot_invalidation_events_via_cursor() {
-        let (_tempdir, _context, service) = open_service_with_context();
+        let (tempdir, _context, service) = open_service_with_context();
 
         let first_read = read_after_events(&service, None, 16);
         assert!(first_read.events.is_empty());
@@ -4363,14 +3960,12 @@ mod tests {
         );
         assert!(!first_read.gap_detected);
 
-        let (_create_json, created) = create_playlist(&service, "Event Test");
-        let deleted = delete_playlist(&service, created.playlist_id);
-        assert!(deleted.deleted);
+        let _registered = register_event_root(&service, tempdir.path(), "event-test");
 
         let second_read = read_after_events(&service, first_read.latest_event_sequence, 16);
         assert!(
             !second_read.events.is_empty(),
-            "create and delete must produce invalidation events"
+            "source registration must produce invalidation events"
         );
         assert!(
             second_read.events.iter().any(|e| {
@@ -4380,15 +3975,6 @@ mod tests {
                 payload.invalidation.scope == MaintainedSnapshotScope::NavigationRows
             }),
             "events must include NavigationRows invalidation"
-        );
-        assert!(
-            second_read.events.iter().any(|e| {
-                let LibraryBoundaryEvent::MaintainedSnapshotInvalidated(payload) = e else {
-                    return false;
-                };
-                payload.invalidation.scope == MaintainedSnapshotScope::LibraryBrowser
-            }),
-            "events must include LibraryBrowser invalidation"
         );
         assert!(second_read.latest_event_sequence.is_some());
         assert!(!second_read.gap_detected);
@@ -4416,11 +4002,11 @@ mod tests {
 
     #[test]
     fn cursor_batch_truncation_does_not_skip_events() {
-        let (_tempdir, _context, service) = open_service_with_context();
+        let (tempdir, _context, service) = open_service_with_context();
 
-        let _created = create_playlist(&service, "Trunc A");
-        let _created = create_playlist(&service, "Trunc B");
-        let _created = create_playlist(&service, "Trunc C");
+        let _registered = register_event_root(&service, tempdir.path(), "trunc-a");
+        let _registered = register_event_root(&service, tempdir.path(), "trunc-b");
+        let _registered = register_event_root(&service, tempdir.path(), "trunc-c");
 
         let first = read_after_events(&service, None, 1);
         assert_eq!(first.events.len(), 1);
@@ -4443,13 +4029,13 @@ mod tests {
 
     #[test]
     fn first_empty_read_does_not_skip_future_events() {
-        let (_tempdir, _context, service) = open_service_with_context();
+        let (tempdir, _context, service) = open_service_with_context();
 
         let first = read_after_events(&service, None, 16);
         assert!(first.events.is_empty());
         assert!(first.latest_event_sequence.is_none());
 
-        let _created = create_playlist(&service, "Late event");
+        let _registered = register_event_root(&service, tempdir.path(), "late-event");
         let second = read_after_events(&service, first.latest_event_sequence, 16);
         assert!(!second.events.is_empty());
         assert!(!second.gap_detected);
@@ -4457,10 +4043,10 @@ mod tests {
 
     #[test]
     fn multiple_consumers_advance_independently() {
-        let (_tempdir, _context, service) = open_service_with_context();
+        let (tempdir, _context, service) = open_service_with_context();
 
-        let _created = create_playlist(&service, "Indy A");
-        let _created = create_playlist(&service, "Indy B");
+        let _registered = register_event_root(&service, tempdir.path(), "independent-a");
+        let _registered = register_event_root(&service, tempdir.path(), "independent-b");
 
         let consumer1_first = read_after_events(&service, None, 16);
         assert!(!consumer1_first.events.is_empty());
@@ -4470,7 +4056,7 @@ mod tests {
         assert_eq!(consumer2_first.events.len(), consumer1_first.events.len());
         assert_eq!(consumer2_first.latest_event_sequence, c1_cursor);
 
-        let _created = create_playlist(&service, "Indy C");
+        let _registered = register_event_root(&service, tempdir.path(), "independent-c");
         let consumer1_second = read_after_events(&service, c1_cursor, 16);
         assert!(!consumer1_second.events.is_empty());
 
@@ -4489,59 +4075,11 @@ mod tests {
             register_local_root(&service, source_root.to_string_lossy().into_owned());
 
         for i in 0..300 {
-            let _created = create_playlist(&service, &format!("Flood {}", i));
+            let _registered = register_event_root(&service, tempdir.path(), &format!("flood-{i}"));
         }
 
         let reply = read_after_events(&service, Some(0), 16);
         assert!(reply.gap_detected);
-    }
-
-    #[test]
-    fn protocol_playlist_write_commands_create_rename_and_delete_real_playlists() {
-        let (_tempdir, _context, service) = open_service_with_context();
-
-        let (create_json, created) = create_playlist(&service, "Warmups");
-        assert!(created.playlist_id > 0);
-        assert_eq!(
-            create_json.pointer("/payload/reply/payload/payload/playlistId"),
-            Some(&json!(created.playlist_id.to_string()))
-        );
-
-        let stable_key = format!("playlist:{}", created.playlist_id);
-        let created_row = load_navigation_row_by_stable_key(&service, stable_key.clone())
-            .row
-            .expect("created playlist has navigation row");
-        assert_eq!(created_row.display_name, "Warmups");
-
-        let renamed = rename_playlist(&service, created.playlist_id, "Peak Hour");
-        assert!(renamed.renamed);
-        let renamed_row = load_navigation_row_by_stable_key(&service, stable_key.clone())
-            .row
-            .expect("renamed playlist still has navigation row");
-        assert_eq!(renamed_row.display_name, "Peak Hour");
-
-        let deleted = delete_playlist(&service, created.playlist_id);
-        assert!(deleted.deleted);
-        assert!(
-            load_navigation_row_by_stable_key(&service, stable_key)
-                .row
-                .is_none()
-        );
-
-        let error = service
-            .try_handle_command(CommandRequest::PlaylistWrite(
-                PlaylistWriteCommand::RenamePlaylist(RenamePlaylistRequest {
-                    playlist_id: 0,
-                    display_name: "Invalid".to_string(),
-                }),
-            ))
-            .expect_err("zero playlist id is invalid");
-        match error {
-            ProtocolError::InvalidRequest { detail } => {
-                assert!(detail.contains("playlistId"));
-            }
-            other => panic!("expected InvalidRequest, got {other:?}"),
-        }
     }
 
     #[test]

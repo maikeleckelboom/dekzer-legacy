@@ -27,12 +27,12 @@ const fixtureServerPath = fileURLToPath(
   new URL("./stdioFixtureServer.js", import.meta.url)
 );
 
-function createPlaylistRequest(displayName: string): CommandRequest {
+function registerLocalRootRequest(absolutePath: string): CommandRequest {
   return {
-    type: "playlistWrite",
+    type: "libraryRoots",
     payload: {
-      type: "createPlaylist",
-      payload: { displayName }
+      type: "registerLocalRoot",
+      payload: { absolutePath }
     }
   };
 }
@@ -58,7 +58,7 @@ function sequentialRequestIdFactory(): () => string {
 }
 
 async function validatesRequestEnvelopeCreation(): Promise<void> {
-  const request = createPlaylistRequest("Envelope");
+  const request = registerLocalRootRequest("Envelope");
   const envelope = createStdioCommandEnvelope("request-1", request);
 
   deepEqual(
@@ -152,14 +152,14 @@ async function validatesReadyResolvesOnlyAfterReadyEnvelope(): Promise<void> {
 async function validatesExecuteBeforeReadyWaitsForReadiness(): Promise<void> {
   const transport = createTransport(sequentialRequestIdFactory(), "delayed-ready");
   try {
-    const outcomePromise = transport.execute(createPlaylistRequest("Success"));
+    const outcomePromise = transport.execute(registerLocalRootRequest("Success"));
 
     await sleep(15);
     await transport.ready;
     const outcome = await outcomePromise;
 
     equal(
-      successPlaylistId(outcome),
+      successRegisteredRootId(outcome),
       "1",
       "execute before ready waits and then sends the command"
     );
@@ -207,11 +207,11 @@ async function validatesMalformedStdoutBeforeReadyRejectsReady(): Promise<void> 
 async function validatesSuccessResponseResolution(): Promise<void> {
   const transport = createTransport();
   try {
-    const outcome = await transport.execute(createPlaylistRequest("Success"));
+    const outcome = await transport.execute(registerLocalRootRequest("Success"));
 
     equal(outcome.type, "success", "success response resolves execute");
     equal(
-      successPlaylistId(outcome),
+      successRegisteredRootId(outcome),
       "1",
       "success outcome payload is preserved"
     );
@@ -224,7 +224,7 @@ async function validatesProtocolErrorOutcomeIsPreserved(): Promise<void> {
   const transport = createTransport();
   try {
     const outcome = await transport.execute(
-      createPlaylistRequest("protocol-error")
+      registerLocalRootRequest("protocol-error")
     );
     const expected: ProtocolError = {
       type: "invalidRequest",
@@ -249,7 +249,7 @@ async function validatesClientTurnsProtocolErrorOutcomeIntoClientError(): Promis
   try {
     const client = createLibraryBoundaryClient(transport);
     const error = await rejects(
-      () => client.createPlaylist({ displayName: "protocol-error" }),
+      () => client.registerLocalRoot({ absolutePath: "protocol-error" }),
       LibraryBoundaryProtocolError,
       "client converts protocol error outcome into LibraryBoundaryProtocolError"
     );
@@ -324,7 +324,7 @@ async function validatesTransportErrorRejects(): Promise<void> {
   const transport = createTransport();
   try {
     const error = await rejects(
-      () => transport.execute(createPlaylistRequest("transport-error")),
+      () => transport.execute(registerLocalRootRequest("transport-error")),
       LibraryBoundaryStdioRemoteTransportError,
       "remote transportError envelope rejects execute"
     );
@@ -347,7 +347,7 @@ async function validatesUnknownRemoteTransportErrorCodeRejectsAsMalformedStdout(
   const transport = createTransport();
   try {
     const error = await rejects(
-      () => transport.execute(createPlaylistRequest("unknown-remote-transport-code")),
+      () => transport.execute(registerLocalRootRequest("unknown-remote-transport-code")),
       LibraryBoundaryStdioTransportError,
       "unknown remote code rejects as local malformed stdout"
     );
@@ -362,13 +362,13 @@ async function validatesMalformedStdoutDoesNotCrash(): Promise<void> {
   const transport = createTransport();
   try {
     const error = await rejects(
-      () => transport.execute(createPlaylistRequest("malformed")),
+      () => transport.execute(registerLocalRootRequest("malformed")),
       LibraryBoundaryStdioTransportError,
       "malformed stdout rejects the in-flight request"
     );
     equal(error.code, "malformedStdout", "malformed stdout has typed error");
 
-    const outcome = await transport.execute(createPlaylistRequest("Success"));
+    const outcome = await transport.execute(registerLocalRootRequest("Success"));
     equal(outcome.type, "success", "transport continues after malformed stdout");
   } finally {
     await transport.close();
@@ -380,7 +380,7 @@ async function validatesDuplicateReadyAfterReadyIsLifecycleFailure(): Promise<vo
   try {
     await transport.ready;
     const error = await rejects(
-      () => transport.execute(createPlaylistRequest("duplicate-ready")),
+      () => transport.execute(registerLocalRootRequest("duplicate-ready")),
       LibraryBoundaryStdioTransportError,
       "duplicate ready rejects the in-flight request"
     );
@@ -388,7 +388,7 @@ async function validatesDuplicateReadyAfterReadyIsLifecycleFailure(): Promise<vo
     equal(error.code, "malformedStdout", "duplicate ready is malformed stdout");
 
     const laterError = await rejects(
-      () => transport.execute(createPlaylistRequest("Success")),
+      () => transport.execute(registerLocalRootRequest("Success")),
       LibraryBoundaryStdioTransportError,
       "duplicate ready fails the transport for future execute calls"
     );
@@ -402,7 +402,7 @@ async function validatesUnknownResponseRequestIdRejectsPending(): Promise<void> 
   const transport = createTransport();
   try {
     const error = await rejects(
-      () => transport.execute(createPlaylistRequest("unknown-response-request-id")),
+      () => transport.execute(registerLocalRootRequest("unknown-response-request-id")),
       LibraryBoundaryStdioTransportError,
       "unknown response requestId rejects pending execute"
     );
@@ -417,9 +417,9 @@ async function validatesUnknownResponseRequestIdRejectsPending(): Promise<void> 
 async function validatesBlankStdoutLinesAreIgnored(): Promise<void> {
   const transport = createTransport();
   try {
-    const outcome = await transport.execute(createPlaylistRequest("blank"));
+    const outcome = await transport.execute(registerLocalRootRequest("blank"));
 
-    equal(successPlaylistId(outcome), "10", "blank stdout line is ignored");
+    equal(successRegisteredRootId(outcome), "10", "blank stdout line is ignored");
   } finally {
     await transport.close();
   }
@@ -441,9 +441,9 @@ async function validatesStderrDiagnosticsAreForwarded(): Promise<void> {
   });
 
   try {
-    const outcome = await transport.execute(createPlaylistRequest("stderr"));
+    const outcome = await transport.execute(registerLocalRootRequest("stderr"));
 
-    equal(successPlaylistId(outcome), "11", "stderr does not become protocol");
+    equal(successRegisteredRootId(outcome), "11", "stderr does not become protocol");
     deepEqual(
       diagnostics,
       ["fixture diagnostic"],
@@ -459,7 +459,7 @@ async function validatesCloseRejectsLaterExecute(): Promise<void> {
   await transport.close();
 
   const error = await rejects(
-    () => transport.execute(createPlaylistRequest("after-close")),
+    () => transport.execute(registerLocalRootRequest("after-close")),
     LibraryBoundaryStdioTransportError,
     "execute after close rejects"
   );
@@ -472,7 +472,7 @@ async function validatesProcessExitRejectsPending(): Promise<void> {
   const transport = createTransport();
   try {
     const error = await rejects(
-      () => transport.execute(createPlaylistRequest("exit-pending")),
+      () => transport.execute(registerLocalRootRequest("exit-pending")),
       LibraryBoundaryStdioProcessExitError,
       "unexpected process exit rejects pending execute"
     );
@@ -486,12 +486,12 @@ async function validatesProcessExitRejectsPending(): Promise<void> {
 async function validatesConcurrentResponsesRouteByRequestId(): Promise<void> {
   const transport = createTransport();
   try {
-    const first = transport.execute(createPlaylistRequest("concurrent-first"));
-    const second = transport.execute(createPlaylistRequest("concurrent-second"));
+    const first = transport.execute(registerLocalRootRequest("concurrent-first"));
+    const second = transport.execute(registerLocalRootRequest("concurrent-second"));
 
-    equal(successPlaylistId(await first), "1", "first request gets first reply");
+    equal(successRegisteredRootId(await first), "1", "first request gets first reply");
     equal(
-      successPlaylistId(await second),
+      successRegisteredRootId(await second),
       "2",
       "second request gets second reply even when response arrives first"
     );
@@ -503,15 +503,15 @@ async function validatesConcurrentResponsesRouteByRequestId(): Promise<void> {
 async function validatesDuplicateGeneratedRequestIdRejectsBeforeWrite(): Promise<void> {
   const transport = createTransport(() => "duplicate-request");
   try {
-    const delayed = transport.execute(createPlaylistRequest("delayed"));
+    const delayed = transport.execute(registerLocalRootRequest("delayed"));
     const error = await rejects(
-      () => transport.execute(createPlaylistRequest("duplicate")),
+      () => transport.execute(registerLocalRootRequest("duplicate")),
       LibraryBoundaryStdioTransportError,
       "duplicate generated requestId rejects"
     );
 
     equal(error.code, "duplicateRequestId", "duplicate requestId code is stable");
-    equal(successPlaylistId(await delayed), "12", "first request still resolves");
+    equal(successRegisteredRootId(await delayed), "12", "first request still resolves");
   } finally {
     await transport.close();
   }
@@ -522,12 +522,12 @@ async function validatesConcurrentWritesUseCompleteJsonLines(): Promise<void> {
   try {
     const outcomes = await Promise.all(
       Array.from({ length: 12 }, (_, index) =>
-        transport.execute(createPlaylistRequest(`bulk-${index + 1}`))
+        transport.execute(registerLocalRootRequest(`bulk-${index + 1}`))
       )
     );
 
     deepEqual(
-      outcomes.map(successPlaylistId),
+      outcomes.map(successRegisteredRootId),
       Array.from({ length: 12 }, (_, index) => String(index + 1)),
       "concurrent writes arrive as complete routed JSON lines"
     );
@@ -540,7 +540,7 @@ async function validatesCloseTimeoutRejectsPendingAndAwaitsChildExit(): Promise<
   const transport = createTransport(sequentialRequestIdFactory(), "ready", 50);
   await transport.ready;
 
-  const pending = transport.execute(createPlaylistRequest("never-respond"));
+  const pending = transport.execute(registerLocalRootRequest("never-respond"));
   void pending.catch(() => undefined);
   await sleep(15);
 
@@ -559,12 +559,14 @@ async function validatesCloseTimeoutRejectsPendingAndAwaitsChildExit(): Promise<
   equal(pendingError.code, "closeTimeout", "pending request sees close timeout");
 }
 
-function successPlaylistId(outcome: CommandOutcome): string {
+function successRegisteredRootId(outcome: CommandOutcome): string {
   must(outcome.type === "success", "expected success outcome");
   const reply = outcome.payload.reply;
-  must(reply.type === "playlistWrite", "expected playlistWrite reply");
-  must(reply.payload.type === "createPlaylist", "expected createPlaylist reply");
-  return reply.payload.payload.playlistId;
+  must(reply.type === "libraryRoots", "expected libraryRoots reply");
+  must(reply.payload.type === "registerLocalRoot", "expected registerLocalRoot reply");
+  const payload = reply.payload.payload;
+  must(payload.type === "registered", "expected registered root reply");
+  return payload.payload.rootId;
 }
 
 function must(condition: unknown, message: string): asserts condition {

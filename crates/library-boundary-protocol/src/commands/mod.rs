@@ -1,5 +1,4 @@
 pub mod library_roots;
-pub mod playlist_writes;
 pub mod search_filter;
 pub mod session_events;
 pub mod snapshot_reads;
@@ -8,7 +7,6 @@ pub mod source_maintenance;
 pub mod track_identity_decisions;
 
 pub use library_roots::*;
-pub use playlist_writes::*;
 pub use search_filter::*;
 pub use session_events::*;
 pub use snapshot_reads::*;
@@ -26,7 +24,6 @@ use crate::ProtocolError;
 pub enum CommandRequest {
     LibraryBoundaryEvents(LibraryBoundaryEventStreamCommand),
     LibraryRoots(LibraryRootCommand),
-    PlaylistWrite(PlaylistWriteCommand),
     SourceFileHash(SourceFileHashCommand),
     SourceMaintenance(SourceMaintenanceCommand),
     TrackIdentityDecisions(TrackIdentityDecisionCommand),
@@ -41,7 +38,6 @@ pub enum CommandRequest {
 pub enum CommandReply {
     LibraryBoundaryEvents(LibraryBoundaryEventStreamReply),
     LibraryRoots(LibraryRootReply),
-    PlaylistWrite(PlaylistWriteReply),
     SourceFileHash(SourceFileHashReply),
     SourceMaintenance(Box<SourceMaintenanceReply>),
     TrackIdentityDecisions(TrackIdentityDecisionReply),
@@ -88,10 +84,8 @@ pub struct CommandErrorEnvelope {
 mod tests {
     use super::{
         CommandErrorEnvelope, CommandOutcome, CommandReply, CommandRequest, CommandSuccessEnvelope,
-        CreatePlaylistReply, CreatePlaylistRequest, LibraryBoundaryEventStreamCommand,
-        LibraryBoundaryEventStreamReply, LibraryRootCommand, LibraryRootReply,
-        PlaylistWriteCommand, PlaylistWriteReply, ProtocolError,
-        ReadLibraryBoundaryEventsAfterRequest, ReadNavigationNodeLibraryBrowserWindowRequest,
+        LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
+        LibraryRootReply, ProtocolError, ReadLibraryBoundaryEventsAfterRequest,
         ReadNavigationRowsReply, SnapshotReadCommand, SnapshotReadReply, SourceFileHashCommand,
         SourceFileHashReply, SourceMaintenanceCommand, SourceMaintenanceReply, StartRootScanReply,
         StartRootScanRequest, TrackIdentityDecisionCommand, TrackIdentityDecisionCommandResult,
@@ -103,31 +97,22 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn command_center_routes_maintained_and_playlist_command_families() {
+    fn command_center_routes_current_command_families() {
         let session_events = CommandRequest::LibraryBoundaryEvents(
             LibraryBoundaryEventStreamCommand::ReadAfter(ReadLibraryBoundaryEventsAfterRequest {
                 last_seen_event_sequence: None,
                 max_events: 32,
             }),
         );
-        let playlist_write = CommandRequest::PlaylistWrite(PlaylistWriteCommand::CreatePlaylist(
-            CreatePlaylistRequest {
-                display_name: "Set".to_string(),
-            },
-        ));
         let library_roots =
             CommandRequest::LibraryRoots(LibraryRootCommand::StartRootScan(StartRootScanRequest {
                 root_id: 9,
             }));
-        let snapshot = CommandRequest::SnapshotRead(
-            SnapshotReadCommand::ReadNavigationNodeLibraryBrowserWindow(
-                ReadNavigationNodeLibraryBrowserWindowRequest {
-                    navigation_row_id: 7,
-                    offset: 0,
-                    limit: 100,
-                },
-            ),
-        );
+        let snapshot = CommandRequest::SnapshotRead(SnapshotReadCommand::ReadNavigationRows(
+            super::ReadNavigationRowsRequest {
+                parent_navigation_row_id: None,
+            },
+        ));
         let hash = CommandRequest::SourceFileHash(SourceFileHashCommand::HashSourceFilesBlake3(
             super::HashSourceFilesBlake3Request {
                 source_id: 7,
@@ -156,7 +141,6 @@ mod tests {
 
         for command in [
             session_events,
-            playlist_write,
             library_roots,
             snapshot,
             hash,
@@ -166,7 +150,6 @@ mod tests {
             match command {
                 CommandRequest::LibraryBoundaryEvents(_) => {}
                 CommandRequest::LibraryRoots(_) => {}
-                CommandRequest::PlaylistWrite(_) => {}
                 CommandRequest::SourceFileHash(_) => {}
                 CommandRequest::SourceMaintenance(_) => {}
                 CommandRequest::TrackIdentityDecisions(_) => {}
@@ -490,8 +473,8 @@ mod tests {
     #[test]
     fn command_outcome_uses_one_explicit_success_error_envelope() {
         let success = CommandOutcome::Success(CommandSuccessEnvelope {
-            reply: CommandReply::PlaylistWrite(PlaylistWriteReply::CreatePlaylist(
-                CreatePlaylistReply { playlist_id: 9 },
+            reply: CommandReply::LibraryRoots(LibraryRootReply::StartRootScan(
+                StartRootScanReply { scan_run_id: 9 },
             )),
         });
         let error = CommandOutcome::Error(CommandErrorEnvelope {
@@ -506,14 +489,14 @@ mod tests {
                 "type": "success",
                 "payload": {
                     "reply": {
-                        "type": "playlistWrite",
+                    "type": "libraryRoots",
+                    "payload": {
+                        "type": "startRootScan",
                         "payload": {
-                            "type": "createPlaylist",
-                            "payload": {
-                                "playlistId": "9"
-                            }
+                            "scanRunId": "9"
                         }
                     }
+                }
                 }
             })
         );

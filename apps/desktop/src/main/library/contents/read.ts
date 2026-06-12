@@ -502,7 +502,6 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
     fileClass: row.fileClass,
     fileKind: row.fileKind,
     presence: row.presence,
-    ...(row.availabilityState === undefined ? {} : { availabilityState: row.availabilityState }),
     ...(row.primaryMedia === undefined ? {} : { primaryMedia: mapPrimaryMedia(row.primaryMedia) }),
     ...(row.updatedAtMs === undefined ? {} : { updatedAtMs: row.updatedAtMs })
   }
@@ -510,7 +509,6 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
 
 function mapPrimaryMedia(summary: ContractPrimaryMediaSummary): PrimaryMediaSummary {
   return {
-    origin: summary.origin,
     ...(summary.primaryMediaCandidateId === null
       ? {}
       : { primaryMediaCandidateId: summary.primaryMediaCandidateId }),
@@ -524,31 +522,11 @@ function mapPrimaryMedia(summary: ContractPrimaryMediaSummary): PrimaryMediaSumm
       : { evidenceSourceFileId: summary.evidenceSourceFileId }),
     ...(summary.mediaKind === null ? {} : { mediaKind: summary.mediaKind }),
     ...(summary.mimeType === null ? {} : { mimeType: summary.mimeType }),
-    ...(summary.libraryAssetId === null ? {} : { libraryAssetId: summary.libraryAssetId }),
-    ...(summary.rowVersion === null ? {} : { rowVersion: summary.rowVersion }),
-    ...(summary.primarySourceFileId === null
-      ? {}
-      : { primarySourceFileId: summary.primarySourceFileId }),
-    ...(summary.title === null ? {} : { title: summary.title }),
-    ...(summary.artist === null ? {} : { artist: summary.artist }),
-    ...(summary.album === null ? {} : { album: summary.album }),
     ...(summary.durationMs === null ? {} : { durationMs: summary.durationMs }),
     ...(summary.sampleRateHz === null ? {} : { sampleRateHz: summary.sampleRateHz }),
     ...(summary.channels === null ? {} : { channels: summary.channels }),
     ...(summary.bitDepth === null ? {} : { bitDepth: summary.bitDepth }),
-    ...(summary.codec === null ? {} : { codec: summary.codec }),
-    ...(summary.musicalKey === null ? {} : { musicalKey: summary.musicalKey }),
-    ...(summary.tempoBpm === null ? {} : { tempoBpm: summary.tempoBpm }),
-    ...(summary.waveformQualityCurrent === null
-      ? {}
-      : { waveformQualityCurrent: summary.waveformQualityCurrent }),
-    ...(summary.waveformQualityTarget === null
-      ? {}
-      : { waveformQualityTarget: summary.waveformQualityTarget }),
-    ...(summary.stemsStateSummary === null ? {} : { stemsStateSummary: summary.stemsStateSummary }),
-    ...(summary.prepReadinessSummary === null
-      ? {}
-      : { prepReadinessSummary: summary.prepReadinessSummary })
+    ...(summary.codec === null ? {} : { codec: summary.codec })
   }
 }
 

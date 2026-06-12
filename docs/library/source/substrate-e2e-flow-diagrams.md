@@ -537,8 +537,8 @@ Invalidation scopes route targeted rereads. Unknown or broad invalidation refres
 flowchart TD
   A["Main forwards MaintainedSnapshotInvalidated"] --> B{"Scope kind"}
   B -->|" navigationRows "| C["Renderer requests navigation rows through Main"]
-  B -->|" libraryBrowser "| D["Renderer refreshes loaded and expanded browser tree windows"]
-  B -->|" libraryBrowser "| F["Renderer refreshes active contents for the current selection"]
+  B -->|" contents "| D["Renderer refreshes maintained source tree/status reads"]
+  B -->|" contents "| F["Renderer refreshes active contents for the current selection"]
   B -->|" Broad or unknown library refresh "| G["Renderer refreshes active first-slice projections by bounded policy"]
   C --> H["Authoritative reread through Main"]
   D --> H
@@ -556,12 +556,12 @@ Governing law:
 Snapshot invalidation carries boundary-defined scope identity. It does not carry replacement rows. Renderer uses
 invalidation to request fresh authoritative snapshots through Main.
 
-Current-schema `MaintainedSnapshotScope` values are `navigationRows` and `libraryBrowser`.
+Current-schema `MaintainedSnapshotScope` values are `navigationRows` and `contents`.
 
 Desktop Main now pumps the service event stream and the renderer treats `MaintainedSnapshotInvalidated`
-as normal refresh input. `navigationRows` refreshes navigation rows. `libraryBrowser` refreshes
-previously loaded browser windows and expanded source/directory windows through authoritative reads,
-keeping previous rows visible while those reads are pending.
+as normal refresh input. `navigationRows` refreshes navigation rows. `contents` refreshes current
+contents, maintained source tree/status reads, and track identity candidate snapshots through
+authoritative reads, keeping previous rows visible while those reads are pending.
 
 The finer scopes shown in the invalidation diagrams (source visible state, library tree children by parent directory,
 contents scope identity) are target scope expansion. They are not current wire values.

@@ -243,7 +243,7 @@ fn request_id_from_value(value: &serde_json::Value) -> Option<String> {
 mod tests {
     use library_boundary_protocol::{
         CommandOutcome, CommandReply, CommandRequest, CommandSuccessEnvelope, LibraryRootCommand,
-        LibraryRootReply, RegisterLocalRootReply, RegisterLocalRootRequest,
+        LibraryRootReply, RegisterLocalRootReply, RegisterLocalRootRequest, RegisteredLocalRoot,
     };
     use serde_json::json;
 
@@ -305,10 +305,10 @@ mod tests {
             "request-1".to_string(),
             CommandOutcome::Success(CommandSuccessEnvelope {
                 reply: CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(
-                    RegisterLocalRootReply {
+                    RegisterLocalRootReply::Registered(RegisteredLocalRoot {
                         root_id: 7,
                         canonical_path: "C:/Music".to_string(),
-                    },
+                    }),
                 )),
             }),
         );
@@ -329,8 +329,11 @@ mod tests {
                             "payload": {
                                 "type": "registerLocalRoot",
                                 "payload": {
-                                    "rootId": "7",
-                                    "canonicalPath": "C:/Music"
+                                    "type": "registered",
+                                    "payload": {
+                                        "rootId": "7",
+                                        "canonicalPath": "C:/Music"
+                                    }
                                 }
                             }
                         }

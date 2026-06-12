@@ -17,22 +17,9 @@ pub fn canonical_baseline_generation() -> &'static str {
     schema::canonical_baseline_generation()
 }
 
-pub use authority::library_asset::{
-    AcceptedSourceSegmentInput, ApplyLibraryAssetMetadataCorrectionInput,
-    MintOrReuseLibraryAssetResult, ReplaceAcceptedSourceSegmentSetInput,
-    ReplaceLibraryAssetCapabilityInput, RetractLibraryAssetMetadataCorrectionInput,
-};
-pub use authority::playlists::{
-    AppendLibraryAssetToPlaylistInput, CreatePlaylistInput, DeletePlaylistInput,
-    MovePlaylistEntryInput, PlaylistsAuthorityTx, RemoveLibraryAssetFromPlaylistInput,
-    RenamePlaylistInput,
-};
 pub use authority::promotion::{
-    AcceptSegmentationPromotionInput, AcceptSegmentationPromotionResult,
-    ComputeCapabilityPromotionInput, ComputeCapabilityPromotionResult, InspectSourcePromotionInput,
-    InspectSourcePromotionResult, RebindSourcePromotionInput, RebindSourcePromotionResult,
-    RebuildProjectionPromotionInput, RebuildProjectionPromotionResult,
-    ResolveLibraryAssetPromotionInput, ResolveLibraryAssetPromotionResult,
+    InspectSourcePromotionInput, InspectSourcePromotionResult, RebuildProjectionPromotionInput,
+    RebuildProjectionPromotionResult,
 };
 pub use authority::sources::{
     CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
@@ -44,14 +31,9 @@ pub use authority::sources::{
 pub use authority::work::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
     CompleteMachineWorkInput, FailMachineWorkInput, FinishWorkRunInput, MachineWorkKey,
-    MarkCapabilitiesStaleFromBasisInput, MarkCapabilitiesStaleResult,
-    MarkCapabilityStaleFromDependencyInput, PrepAssignmentInput, PrepPolicyTargetInput,
-    QueueAcceptSegmentationWorkInput, QueueComputeCapabilityWorkInput, QueueInspectSourceWorkInput,
-    QueueMachineWorkInput, QueueMachineWorkResult, QueueRebindSourceWorkInput,
+    QueueInspectSourceWorkInput, QueueMachineWorkInput, QueueMachineWorkResult,
     QueueRebuildProjectionWorkInput, RecordArtifactInput, RecordFileStoreArtifactInput,
-    RecordInlineArtifactInput, RecordedArtifact, ReplacePrepAssignmentsInput,
-    ReplaceResolvedLibraryAssetPrepTargetsInput, ResolvedLibraryAssetPrepTargetInput,
-    StaleCapabilityChange, StartWorkRunInput, StartedWorkRun, UpsertPrepPolicyInput,
+    RecordInlineArtifactInput, RecordedArtifact, StartWorkRunInput, StartedWorkRun,
 };
 pub use browse_media::SourceFileClassFilter;
 pub use error::{
@@ -67,19 +49,9 @@ pub use read_models::attachment_identity::{
 };
 pub use read_models::contents::{
     StoreContentsFileClass, StoreContentsFileRow, StoreContentsReadPolicy, StoreContentsResult,
-    StoreContentsRowOrigin, StoreContentsScope, StoreContentsScopeCoverage,
-    StoreContentsScopeCoverageState, StoreContentsScopeDepth, StoreContentsState,
-    StorePrimaryMediaKind, StorePrimaryMediaSummary,
+    StoreContentsScope, StoreContentsScopeCoverage, StoreContentsScopeCoverageState,
+    StoreContentsScopeDepth, StoreContentsState, StorePrimaryMediaKind, StorePrimaryMediaSummary,
 };
-pub use read_models::library_asset_preparation_detail::{
-    StoreLibraryAssetPreparationDetail, StoreLibraryAssetPreparationDetailGroup,
-    StoreLibraryAssetPreparationDetailRow, StoreLibraryAssetPreparationProgress,
-};
-pub use read_models::library_asset_waveform_overview::{
-    StoreLibraryAssetWaveformOverview, StoreLibraryAssetWaveformOverviewAmplitudeScale,
-    StoreLibraryAssetWaveformOverviewBucket, StoreLibraryAssetWaveformOverviewCapabilityState,
-};
-pub use read_models::library_browser::{ScopedLibraryAssetBrowserRow, StoreLibraryBrowserWindow};
 pub use read_models::literal_hierarchy::{
     StoreLiteralHierarchyCoverage, StoreLiteralHierarchyCoverageState,
     StoreLiteralHierarchyEntryPoint, StoreLiteralHierarchyNode, StoreLiteralHierarchyWindow,

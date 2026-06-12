@@ -10,10 +10,6 @@ export function resolveBrowserTreeRowIcon(node: BrowserTreeNode): IconRole | und
     case 'sourceLocation':
     case 'literalDirectory':
       return 'folder.plain'
-    case 'preparationSurface':
-      return 'state.unknown'
-    case 'playlistSurface':
-      return 'media.playlist'
     case 'smartView':
       return 'navigation.view'
     case 'state':

@@ -8,7 +8,6 @@ import musicNote220Regular from './vendor/music_note_2_20_regular.svg?raw'
 import video20Regular from './vendor/video_20_regular.svg?raw'
 import image20Regular from './vendor/image_20_regular.svg?raw'
 import documentText20Regular from './vendor/document_text_20_regular.svg?raw'
-import listBar20Regular from './vendor/list_bar_20_regular.svg?raw'
 import spinnerIos20Regular from './vendor/spinner_ios_20_regular.svg?raw'
 import warning20Regular from './vendor/warning_20_regular.svg?raw'
 import info20Regular from './vendor/info_20_regular.svg?raw'
@@ -37,7 +36,6 @@ const iconRegistry = {
   'media.video': iconAsset(video20Regular),
   'media.image': iconAsset(image20Regular),
   'media.cueSheet': iconAsset(documentText20Regular),
-  'media.playlist': iconAsset(listBar20Regular),
   'media.metadata': iconAsset(documentText20Regular),
   'state.loading': iconAsset(spinnerIos20Regular),
   'state.warning': iconAsset(warning20Regular),

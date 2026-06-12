@@ -316,7 +316,7 @@ describe('parseBoundaryEvent', () => {
         type: 'maintainedSnapshotInvalidated',
         payload: {
           occurredAtMs: 1000,
-          invalidation: { scope: 'libraryBrowser', revision: '1' }
+          invalidation: { scope: 'contents', revision: '1' }
         }
       })
     ).toMatchObject({ type: 'unsupported' })
@@ -354,7 +354,7 @@ describe('parseBoundaryEvent', () => {
       payload: {
         eventSequence: 5,
         occurredAtMs: 1700000000000,
-        invalidation: { scope: 'libraryBrowser', revision: null }
+        invalidation: { scope: 'contents', revision: null }
       }
     })
 
@@ -363,7 +363,7 @@ describe('parseBoundaryEvent', () => {
       payload: {
         eventSequence: 5,
         occurredAtMs: 1700000000000,
-        invalidation: { scope: 'libraryBrowser', revision: null }
+        invalidation: { scope: 'contents', revision: null }
       }
     })
   })
@@ -547,7 +547,7 @@ describe('parseBoundaryEvent', () => {
         payload: {
           eventSequence: 0,
           occurredAtMs: 1700000000000.5,
-          invalidation: { scope: 'libraryBrowser', revision: null }
+          invalidation: { scope: 'contents', revision: null }
         }
       })
     ).toMatchObject({ type: 'unsupported' })

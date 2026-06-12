@@ -25,9 +25,7 @@ import type {
 describe('classify', () => {
   it('maps known scopes and rejects unknown scopes', () => {
     expect(classifyInvalidationScope('navigationRows')).toBe('navigationRows')
-    expect(classifyInvalidationScope('libraryBrowser')).toBe('libraryBrowser')
-    expect(classifyInvalidationScope('LibraryBrowser')).toBe('unknown')
-    expect(classifyInvalidationScope('contents')).toBe('unknown')
+    expect(classifyInvalidationScope('contents')).toBe('contents')
     expect(classifyInvalidationScope('sourceLifecycle')).toBe('unknown')
     expect(classifyInvalidationScope('searchFilter')).toBe('unknown')
   })
@@ -38,8 +36,8 @@ describe('buildInvalidationPlan', () => {
     const input = {
       invalidations: [
         invalidation('navigationRows', '1'),
-        invalidation('libraryBrowser', '2'),
-        invalidation('libraryBrowser', '3'),
+        invalidation('contents', '2'),
+        invalidation('contents', '3'),
         invalidation('unsupportedScope', '4')
       ],
       sourceLifecycleSourceIds: ['7', '7', '9']
@@ -52,7 +50,7 @@ describe('buildInvalidationPlan', () => {
     expect(planSnapshot(first)).toEqual({
       refreshRootHierarchy: false,
       refreshNavigationRows: true,
-      refreshExpandedBrowserWindows: true,
+      refreshExpandedBrowserWindows: false,
       refreshCurrentContents: true,
       refreshActiveSearchFilter: true,
       clearAllContentsWarmSnapshots: true,
@@ -81,9 +79,9 @@ describe('buildInvalidationPlan', () => {
     })
   })
 
-  it('refreshes active search/filter for library browser invalidation', () => {
+  it('refreshes active search/filter for contents invalidation', () => {
     const plan = buildInvalidationPlan({
-      invalidations: [invalidation('libraryBrowser', '1')],
+      invalidations: [invalidation('contents', '1')],
       sourceLifecycleSourceIds: []
     })
 
@@ -182,8 +180,8 @@ describe('executeRefreshPlan', () => {
       invalidations: [
         invalidation('navigationRows', '1'),
         invalidation('navigationRows', '2'),
-        invalidation('libraryBrowser', '3'),
-        invalidation('libraryBrowser', '4')
+        invalidation('contents', '3'),
+        invalidation('contents', '4')
       ],
       ...(sourceLifecycleSourceIds === undefined ? {} : { sourceLifecycleSourceIds })
     })
@@ -191,10 +189,7 @@ describe('executeRefreshPlan', () => {
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
 
     expect(deps.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
-    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
-    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(
-      new Set(['navigation-row:7', 'source-directory:12'])
-    )
+    expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(
       new Set(['7', '9'])
@@ -217,14 +212,14 @@ describe('executeRefreshPlan', () => {
     )
     const sourceLifecycleSourceIds = deps.sourceLifecycleSourceIds
     const plan = buildInvalidationPlan({
-      invalidations: [invalidation('navigationRows', '1'), invalidation('libraryBrowser', '2')],
+      invalidations: [invalidation('navigationRows', '1'), invalidation('contents', '2')],
       ...(sourceLifecycleSourceIds === undefined ? {} : { sourceLifecycleSourceIds })
     })
 
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
 
     expect(deps.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
-    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
     expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
@@ -279,13 +274,13 @@ describe('executeRefreshPlan', () => {
       })
     })
     const plan = buildInvalidationPlan({
-      invalidations: [invalidation('libraryBrowser', '1')],
+      invalidations: [invalidation('contents', '1')],
       sourceLifecycleSourceIds: ['7']
     })
 
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
 
-    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
     expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
@@ -321,7 +316,7 @@ describe('executeRefreshPlan', () => {
       refreshContentsForCurrentSelection
     })
     const plan = buildInvalidationPlan({
-      invalidations: [invalidation('libraryBrowser', '1')],
+      invalidations: [invalidation('contents', '1')],
       sourceLifecycleSourceIds: []
     })
 
@@ -387,7 +382,7 @@ describe('executeRefreshPlan', () => {
     })
 
     const plan = buildInvalidationPlan({
-      invalidations: [invalidation('libraryBrowser', '1')],
+      invalidations: [invalidation('contents', '1')],
       sourceLifecycleSourceIds: ['7']
     })
     await expect(

@@ -183,7 +183,7 @@ mod tests {
         );
         assert!(
             response
-                .pointer("/outcome/payload/reply/payload/payload/rootId")
+                .pointer("/outcome/payload/reply/payload/payload/payload/rootId")
                 .and_then(serde_json::Value::as_str)
                 .is_some()
         );

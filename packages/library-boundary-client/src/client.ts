@@ -4,11 +4,7 @@ import type {
   CancelRootScanRequest,
   CommandReply,
   CommandRequest,
-  CreatePlaylistReply,
-  CreatePlaylistRequest,
   DeferTrackIdentityCandidateRequest,
-  DeletePlaylistReply,
-  DeletePlaylistRequest,
   HashSourceFilesBlake3Reply,
   HashSourceFilesBlake3Request,
   LoadNavigationRowByStableKeyReply,
@@ -37,8 +33,6 @@ import type {
   SearchFilterReadRequest,
   ReadLocalRootsReply,
   ReadLocalRootsRequest,
-  ReadNavigationNodeLibraryBrowserWindowReply,
-  ReadNavigationNodeLibraryBrowserWindowRequest,
   ReadNavigationRowsReply,
   ReadNavigationRowsRequest,
   ContentsReadReply,
@@ -46,14 +40,10 @@ import type {
   RegisterLocalRootReply,
   RegisterLocalRootRequest,
   RejectTrackIdentityCandidateRequest,
-  RenamePlaylistReply,
-  RenamePlaylistRequest,
   RunSourceMaintenanceReply,
   RunSourceMaintenanceRequest,
   StartRootScanReply,
   StartRootScanRequest,
-  SearchNavigationNodeLibraryBrowserWindowReply,
-  SearchNavigationNodeLibraryBrowserWindowRequest,
   TrackIdentityDecisionCommandResult,
   UnregisterLocalRootReply,
   UnregisterLocalRootRequest
@@ -355,38 +345,6 @@ export class LibraryBoundaryClient {
     )
   }
 
-  readNavigationNodeLibraryBrowserWindow(
-    request: ReadNavigationNodeLibraryBrowserWindowRequest
-  ): Promise<ReadNavigationNodeLibraryBrowserWindowReply> {
-    return this.sendAndExpect(
-      {
-        type: 'snapshotRead',
-        payload: {
-          type: 'readNavigationNodeLibraryBrowserWindow',
-          payload: request
-        }
-      },
-      'snapshotRead',
-      'navigationNodeLibraryBrowserWindow'
-    )
-  }
-
-  searchNavigationNodeLibraryBrowserWindow(
-    request: SearchNavigationNodeLibraryBrowserWindowRequest
-  ): Promise<SearchNavigationNodeLibraryBrowserWindowReply> {
-    return this.sendAndExpect(
-      {
-        type: 'snapshotRead',
-        payload: {
-          type: 'searchNavigationNodeLibraryBrowserWindow',
-          payload: request
-        }
-      },
-      'snapshotRead',
-      'navigationNodeLibraryBrowserSearch'
-    )
-  }
-
   readContents(request: ContentsReadRequest): Promise<ContentsReadReply> {
     return this.sendAndExpect(
       {
@@ -412,39 +370,6 @@ export class LibraryBoundaryClient {
       },
       'snapshotRead',
       'searchFilter'
-    )
-  }
-
-  createPlaylist(request: CreatePlaylistRequest): Promise<CreatePlaylistReply> {
-    return this.sendAndExpect(
-      {
-        type: 'playlistWrite',
-        payload: { type: 'createPlaylist', payload: request }
-      },
-      'playlistWrite',
-      'createPlaylist'
-    )
-  }
-
-  renamePlaylist(request: RenamePlaylistRequest): Promise<RenamePlaylistReply> {
-    return this.sendAndExpect(
-      {
-        type: 'playlistWrite',
-        payload: { type: 'renamePlaylist', payload: request }
-      },
-      'playlistWrite',
-      'renamePlaylist'
-    )
-  }
-
-  deletePlaylist(request: DeletePlaylistRequest): Promise<DeletePlaylistReply> {
-    return this.sendAndExpect(
-      {
-        type: 'playlistWrite',
-        payload: { type: 'deletePlaylist', payload: request }
-      },
-      'playlistWrite',
-      'deletePlaylist'
     )
   }
 

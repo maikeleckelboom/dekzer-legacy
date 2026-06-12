@@ -891,14 +891,6 @@ function formatNavigationRowKind(rowKind: NavigationRow['rowKind']): string {
   switch (rowKind) {
     case 'view':
       return 'View'
-    case 'collectionGroup':
-      return 'Collection group'
-    case 'playlist':
-      return 'Playlist'
-    case 'prepPolicyGroup':
-      return 'Preparation group'
-    case 'prepPolicyScope':
-      return 'Preparation scope'
     case 'source':
       return 'Source'
     case 'location':
