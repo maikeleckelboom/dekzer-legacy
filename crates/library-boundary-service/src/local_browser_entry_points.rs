@@ -3,10 +3,39 @@ use std::sync::Arc;
 
 use library_boundary_protocol as protocol;
 
+#[cfg(windows)]
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
+
 pub(crate) trait LocalBrowserEntryPointResolver: Send + Sync {
     fn resolve_entry_points(
         &self,
     ) -> Result<LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure>;
+}
+
+pub(crate) trait LocalBrowserPathStatusResolver: Send + Sync {
+    fn resolve_status(&self, path: &Path) -> LocalBrowserPathStatusProbe;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LocalBrowserPathStatusProbe {
+    Directory,
+    NonDirectory,
+    NotFound,
+    PermissionBlocked,
+    Unavailable,
+}
+
+impl LocalBrowserPathStatusProbe {
+    fn status(self) -> protocol::LocalBrowserEntryPointStatus {
+        match self {
+            Self::Directory => protocol::LocalBrowserEntryPointStatus::Available,
+            Self::NonDirectory | Self::Unavailable => {
+                protocol::LocalBrowserEntryPointStatus::Unavailable
+            }
+            Self::NotFound => protocol::LocalBrowserEntryPointStatus::Missing,
+            Self::PermissionBlocked => protocol::LocalBrowserEntryPointStatus::PermissionBlocked,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +63,14 @@ pub(crate) struct LocalBrowserEntryPointResolveFailure {
 pub(crate) fn production_local_browser_entry_point_resolver()
 -> Arc<dyn LocalBrowserEntryPointResolver> {
     Arc::new(PlatformLocalBrowserEntryPointResolver)
+}
+
+pub(crate) struct PlatformLocalBrowserPathStatusResolver;
+
+impl LocalBrowserPathStatusResolver for PlatformLocalBrowserPathStatusResolver {
+    fn resolve_status(&self, path: &Path) -> LocalBrowserPathStatusProbe {
+        resolve_platform_path_status(path)
+    }
 }
 
 pub(crate) fn local_browser_entry_point_platform() -> protocol::LocalBrowserEntryPointPlatform {
@@ -93,16 +130,76 @@ fn entry(
 }
 
 pub(crate) fn status_for_path(path: &Path) -> protocol::LocalBrowserEntryPointStatus {
+    status_for_path_with_resolver(&PlatformLocalBrowserPathStatusResolver, path)
+}
+
+pub(crate) fn status_for_path_with_resolver(
+    resolver: &dyn LocalBrowserPathStatusResolver,
+    path: &Path,
+) -> protocol::LocalBrowserEntryPointStatus {
+    resolver.resolve_status(path).status()
+}
+
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn resolve_platform_path_status(path: &Path) -> LocalBrowserPathStatusProbe {
+    use windows_sys::Win32::Foundation::GetLastError;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_ATTRIBUTE_DIRECTORY, GetFileAttributesW, INVALID_FILE_ATTRIBUTES,
+    };
+
+    let attributes = unsafe { GetFileAttributesW(nul_terminated_wide(path).as_ptr()) };
+    if attributes != INVALID_FILE_ATTRIBUTES {
+        if attributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
+            return LocalBrowserPathStatusProbe::Directory;
+        }
+        return LocalBrowserPathStatusProbe::NonDirectory;
+    }
+
+    windows_path_status_probe_from_error(unsafe { GetLastError() })
+}
+
+#[cfg(windows)]
+pub(crate) fn windows_path_status_probe_from_error(error: u32) -> LocalBrowserPathStatusProbe {
+    use windows_sys::Win32::Foundation::{
+        ERROR_ACCESS_DENIED, ERROR_ACCESS_DENIED_APPDATA, ERROR_BAD_NETPATH,
+        ERROR_CLOUD_FILE_ACCESS_DENIED, ERROR_CLOUD_FILE_AUTHENTICATION_FAILED,
+        ERROR_CLOUD_FILE_NETWORK_UNAVAILABLE, ERROR_CLOUD_FILE_PROVIDER_NOT_RUNNING,
+        ERROR_CLOUD_FILE_PROVIDER_TERMINATED, ERROR_CLOUD_FILE_REQUEST_TIMEOUT,
+        ERROR_CLOUD_FILE_UNSUCCESSFUL, ERROR_FILE_NOT_FOUND, ERROR_NETWORK_UNREACHABLE,
+        ERROR_NOT_READY, ERROR_PATH_NOT_FOUND,
+    };
+
+    match error {
+        ERROR_FILE_NOT_FOUND | ERROR_PATH_NOT_FOUND => LocalBrowserPathStatusProbe::NotFound,
+        ERROR_ACCESS_DENIED
+        | ERROR_ACCESS_DENIED_APPDATA
+        | ERROR_CLOUD_FILE_ACCESS_DENIED
+        | ERROR_CLOUD_FILE_AUTHENTICATION_FAILED => LocalBrowserPathStatusProbe::PermissionBlocked,
+        ERROR_NOT_READY
+        | ERROR_BAD_NETPATH
+        | ERROR_NETWORK_UNREACHABLE
+        | ERROR_CLOUD_FILE_NETWORK_UNAVAILABLE
+        | ERROR_CLOUD_FILE_PROVIDER_NOT_RUNNING
+        | ERROR_CLOUD_FILE_PROVIDER_TERMINATED
+        | ERROR_CLOUD_FILE_REQUEST_TIMEOUT
+        | ERROR_CLOUD_FILE_UNSUCCESSFUL => LocalBrowserPathStatusProbe::Unavailable,
+        _ => LocalBrowserPathStatusProbe::Unavailable,
+    }
+}
+
+#[cfg(not(windows))]
+fn resolve_platform_path_status(path: &Path) -> LocalBrowserPathStatusProbe {
     match std::fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.is_dir() => protocol::LocalBrowserEntryPointStatus::Available,
-        Ok(_) => protocol::LocalBrowserEntryPointStatus::Unavailable,
+        Ok(metadata) if metadata.is_dir() => LocalBrowserPathStatusProbe::Directory,
+        Ok(_) => LocalBrowserPathStatusProbe::NonDirectory,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            protocol::LocalBrowserEntryPointStatus::Missing
+            LocalBrowserPathStatusProbe::NotFound
         }
         Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
-            protocol::LocalBrowserEntryPointStatus::PermissionBlocked
+            LocalBrowserPathStatusProbe::PermissionBlocked
         }
-        Err(_) => protocol::LocalBrowserEntryPointStatus::Unavailable,
+        Err(_) => LocalBrowserPathStatusProbe::Unavailable,
     }
 }
 
@@ -111,7 +208,6 @@ pub(crate) fn status_for_path(path: &Path) -> protocol::LocalBrowserEntryPointSt
 fn resolve_platform_entry_points()
 -> Result<LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure> {
     use std::ffi::OsString;
-    use std::os::windows::ffi::{OsStrExt, OsStringExt};
     use std::ptr;
 
     use windows_sys::Win32::Foundation::HANDLE;
@@ -350,10 +446,6 @@ fn resolve_platform_entry_points()
         Ok(roots)
     }
 
-    fn nul_terminated_wide(path: &Path) -> Vec<u16> {
-        path.as_os_str().encode_wide().chain(Some(0)).collect()
-    }
-
     unsafe fn wide_ptr_to_path_buf(ptr: PCWSTR) -> Option<PathBuf> {
         if ptr.is_null() {
             return None;
@@ -376,6 +468,11 @@ fn resolve_platform_entry_points()
         }
         Some(PathBuf::from(OsString::from_wide(&buffer[..length])))
     }
+}
+
+#[cfg(windows)]
+fn nul_terminated_wide(path: &Path) -> Vec<u16> {
+    path.as_os_str().encode_wide().chain(Some(0)).collect()
 }
 
 #[cfg(not(windows))]

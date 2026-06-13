@@ -1522,19 +1522,15 @@ mod tests {
         HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
         LibraryRootReply, LibraryTreeEntryPoint, LibraryTreeNodeKind, LibraryTreePresenceState,
-        LocalBrowserEntryPointAdmissionHint, LocalBrowserEntryPointFailureCode,
-        LocalBrowserEntryPointKind, LocalBrowserEntryPointPlatform, LocalBrowserEntryPointStatus,
-        LocalBrowserEntryPointsReadStatus, MaintainedSnapshotScope, ProtocolError,
-        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
-        ReadLibraryBoundaryEventsAfterReply, ReadLibraryBoundaryEventsAfterRequest,
-        ReadLibraryTreeChildrenRequest, ReadLocalBrowserEntryPointsReply,
-        ReadLocalBrowserEntryPointsRequest, ReadSourceAttachmentSummaryReply,
-        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceIntegrityRequest,
-        ReadSourceLifecycleReply, ReadSourceLifecycleRequest, ReadSourceMaintenanceReply,
-        ReadSourceMaintenanceRequest, ReadTrackIdentityReviewCandidatesRequest,
-        RegisterLocalRootReply, RegisterLocalRootRequest, RegisteredLocalRoot,
-        RejectTrackIdentityCandidateRequest, RunSourceMaintenanceReply,
+        MaintainedSnapshotScope, ProtocolError, ReadAttachmentSourceFilesReply,
+        ReadAttachmentSourceFilesRequest, ReadLibraryBoundaryEventsAfterReply,
+        ReadLibraryBoundaryEventsAfterRequest, ReadLibraryTreeChildrenRequest,
+        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
+        ReadSourceIntegrityRequest, ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadSourceMaintenanceReply, ReadSourceMaintenanceRequest,
+        ReadTrackIdentityReviewCandidatesRequest, RegisterLocalRootReply, RegisterLocalRootRequest,
+        RegisteredLocalRoot, RejectTrackIdentityCandidateRequest, RunSourceMaintenanceReply,
         RunSourceMaintenanceRequest, SearchFilterAuthorityLayer, SearchFilterFileClass,
         SearchFilterReadReply, SearchFilterReadRequest, SearchFilterRecursion,
         SearchFilterResultKind, SearchFilterScope, SearchFilterSet, SearchFilterSort,
@@ -1552,10 +1548,6 @@ mod tests {
     use serde_json::json;
     use tempfile::TempDir;
 
-    use crate::local_browser_entry_points::{
-        LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure,
-        LocalBrowserEntryPointResolver, ResolvedLocalBrowserEntryPoint,
-    };
     use library_domain::{
         SourceAccessIssueKind, SourceAccessState, SourcePresenceState, SourceScanPhase,
     };
@@ -1583,86 +1575,6 @@ mod tests {
         (tempdir, context, service)
     }
 
-    fn open_service_with_fake_local_browser_entries(
-        resolution: LocalBrowserEntryPointResolution,
-    ) -> (TempDir, LibraryStoreContext, LibraryBoundaryService) {
-        let tempdir = TempDir::new().expect("create tempdir");
-        let context = LibraryStoreContext {
-            user_data_path: tempdir.path().to_string_lossy().into_owned(),
-            environment: StoreEnvironment::Development,
-        };
-        let db_path = durable_store_path(&context.user_data_path, context.environment);
-        std::fs::create_dir_all(db_path.parent().expect("database parent"))
-            .expect("create durable store parent");
-        let durable_store =
-            library_store_sqlite::SqliteDurableStore::open(&db_path).expect("open durable store");
-        let service = LibraryBoundaryService::from_store_with_local_browser_entry_point_resolver(
-            durable_store,
-            std::sync::Arc::new(FakeLocalBrowserEntryPointResolver { resolution }),
-        )
-        .expect("open service with fake resolver");
-
-        (tempdir, context, service)
-    }
-
-    #[derive(Clone)]
-    struct FakeLocalBrowserEntryPointResolver {
-        resolution: LocalBrowserEntryPointResolution,
-    }
-
-    impl LocalBrowserEntryPointResolver for FakeLocalBrowserEntryPointResolver {
-        fn resolve_entry_points(
-            &self,
-        ) -> Result<LocalBrowserEntryPointResolution, LocalBrowserEntryPointResolveFailure>
-        {
-            Ok(self.resolution.clone())
-        }
-    }
-
-    fn fake_local_browser_resolution(
-        entries: Vec<ResolvedLocalBrowserEntryPoint>,
-    ) -> LocalBrowserEntryPointResolution {
-        LocalBrowserEntryPointResolution {
-            entries,
-            failure: None,
-        }
-    }
-
-    fn fake_local_browser_entry(
-        entry_point_kind: LocalBrowserEntryPointKind,
-        canonical_path: impl Into<std::path::PathBuf>,
-        display_name: &str,
-        status: LocalBrowserEntryPointStatus,
-    ) -> ResolvedLocalBrowserEntryPoint {
-        ResolvedLocalBrowserEntryPoint {
-            entry_point_kind,
-            canonical_path: Some(canonical_path.into()),
-            display_name: display_name.to_string(),
-            status,
-            platform: LocalBrowserEntryPointPlatform::Windows,
-            failure: None,
-        }
-    }
-
-    fn fake_unresolved_local_browser_entry(
-        entry_point_kind: LocalBrowserEntryPointKind,
-        display_name: &str,
-        status: LocalBrowserEntryPointStatus,
-        failure_code: LocalBrowserEntryPointFailureCode,
-    ) -> ResolvedLocalBrowserEntryPoint {
-        ResolvedLocalBrowserEntryPoint {
-            entry_point_kind,
-            canonical_path: None,
-            display_name: display_name.to_string(),
-            status,
-            platform: LocalBrowserEntryPointPlatform::Windows,
-            failure: Some(LocalBrowserEntryPointResolveFailure {
-                code: failure_code,
-                detail: "fixture failure".to_string(),
-            }),
-        }
-    }
-
     fn open_test_read_connection(context: &LibraryStoreContext) -> Connection {
         Connection::open(durable_store_path(
             &context.user_data_path,
@@ -1677,30 +1589,6 @@ mod tests {
                 row.get(0)
             })
             .unwrap_or_else(|error| panic!("count rows in {table}: {error}"))
-    }
-
-    fn guarded_local_browser_read_table_counts(
-        context: &LibraryStoreContext,
-    ) -> Vec<(&'static str, i64)> {
-        [
-            "sources",
-            "source_locators",
-            "source_locations",
-            "source_state",
-            "source_scan_state",
-            "source_root_navigation_state",
-            "source_directories",
-            "source_files",
-            "SourceFacts",
-            "search_filter_index_rows",
-            "navigation_rows",
-            "WorkItems",
-            "content_attachments",
-            "source_file_attachment_links",
-        ]
-        .into_iter()
-        .map(|table| (table, count_rows(context, table)))
-        .collect()
     }
 
     fn clear_attachment_identity_rows(context: &LibraryStoreContext) {
@@ -2135,25 +2023,6 @@ mod tests {
             CommandReply::SnapshotRead(SnapshotReadReply::SearchFilter(reply)) => *reply,
             other => panic!("expected search filter reply, got {other:?}"),
         }
-    }
-
-    fn expect_local_browser_entry_points_reply(
-        reply: CommandReply,
-    ) -> ReadLocalBrowserEntryPointsReply {
-        match reply {
-            CommandReply::SnapshotRead(SnapshotReadReply::LocalBrowserEntryPoints(reply)) => reply,
-            other => panic!("expected local browser entry points reply, got {other:?}"),
-        }
-    }
-
-    fn read_local_browser_entry_points(
-        service: &LibraryBoundaryService,
-    ) -> ReadLocalBrowserEntryPointsReply {
-        expect_local_browser_entry_points_reply(expect_success(service.handle_command(
-            CommandRequest::SnapshotRead(SnapshotReadCommand::ReadLocalBrowserEntryPoints(
-                ReadLocalBrowserEntryPointsRequest,
-            )),
-        )))
     }
 
     fn register_local_root(
@@ -4522,197 +4391,6 @@ mod tests {
                         == library_boundary_protocol::SourceScanEventKind::SourceScanStarted
             )),
             "rejected scan admission must not publish SourceScanStarted"
-        );
-    }
-
-    #[test]
-    fn local_browser_entry_points_read_returns_candidates_without_source_rows() {
-        let fixture_tempdir = TempDir::new().expect("create fixture paths");
-        let system_root = fixture_tempdir.path().join("system-root");
-        let music_root = fixture_tempdir.path().join("Music");
-        std::fs::create_dir_all(&system_root).expect("create system root fixture");
-        std::fs::create_dir_all(&music_root).expect("create music root fixture");
-
-        let (_tempdir, context, service) =
-            open_service_with_fake_local_browser_entries(fake_local_browser_resolution(vec![
-                fake_local_browser_entry(
-                    LocalBrowserEntryPointKind::SystemDriveRoot,
-                    system_root,
-                    "C:\\",
-                    LocalBrowserEntryPointStatus::Available,
-                ),
-                fake_local_browser_entry(
-                    LocalBrowserEntryPointKind::Music,
-                    music_root,
-                    "Music",
-                    LocalBrowserEntryPointStatus::Available,
-                ),
-            ]));
-        let before_counts = guarded_local_browser_read_table_counts(&context);
-
-        let reply = read_local_browser_entry_points(&service);
-
-        assert_eq!(reply.status, LocalBrowserEntryPointsReadStatus::Complete);
-        assert_eq!(reply.entries.len(), 2);
-        assert_eq!(
-            reply.entries[0].identity.entry_point_kind,
-            LocalBrowserEntryPointKind::SystemDriveRoot
-        );
-        assert_eq!(
-            reply.entries[0].admission_hint,
-            LocalBrowserEntryPointAdmissionHint::NotDirectlyAdmissible
-        );
-        assert!(reply.entries[0].affordances.can_browse);
-        assert!(!reply.entries[0].affordances.can_request_admission);
-        assert_eq!(
-            reply.entries[1].identity.entry_point_kind,
-            LocalBrowserEntryPointKind::Music
-        );
-        assert_eq!(
-            reply.entries[1].admission_hint,
-            LocalBrowserEntryPointAdmissionHint::DefaultMusicFolder
-        );
-        assert!(reply.entries[1].affordances.can_request_admission);
-        assert!(!reply.entries[1].affordances.requires_confirmation);
-        assert_eq!(
-            guarded_local_browser_read_table_counts(&context),
-            before_counts,
-            "local browser entry point read must not create source, scan, navigation, search, fact, or work rows"
-        );
-    }
-
-    #[test]
-    fn local_browser_entry_points_exact_admitted_source_match_is_duplicate_candidate() {
-        let fixture_tempdir = TempDir::new().expect("create fixture paths");
-        let source_root = fixture_tempdir.path().join("Music");
-        std::fs::create_dir_all(&source_root).expect("create source root");
-
-        let (_tempdir, context, service) =
-            open_service_with_fake_local_browser_entries(fake_local_browser_resolution(vec![
-                fake_local_browser_entry(
-                    LocalBrowserEntryPointKind::Music,
-                    source_root.clone(),
-                    "Music",
-                    LocalBrowserEntryPointStatus::Available,
-                ),
-            ]));
-        let (_json, _registered) =
-            register_local_root(&service, source_root.to_string_lossy().into_owned());
-        let before_counts = guarded_local_browser_read_table_counts(&context);
-
-        let reply = read_local_browser_entry_points(&service);
-
-        assert_eq!(reply.entries.len(), 1);
-        assert_eq!(
-            reply.entries[0].status,
-            LocalBrowserEntryPointStatus::DuplicateOfAdmittedSource
-        );
-        assert_eq!(
-            reply.entries[0].admission_hint,
-            LocalBrowserEntryPointAdmissionHint::DuplicateOfAdmittedSource
-        );
-        assert!(!reply.entries[0].affordances.can_request_admission);
-        assert_eq!(
-            guarded_local_browser_read_table_counts(&context),
-            before_counts,
-            "duplicate candidate read must not mutate admitted source rows"
-        );
-    }
-
-    #[test]
-    fn local_browser_entry_points_statuses_do_not_create_lifecycle_state() {
-        let missing_path = std::path::PathBuf::from("Z:\\Missing-Music");
-        let (_tempdir, context, service) =
-            open_service_with_fake_local_browser_entries(fake_local_browser_resolution(vec![
-                fake_local_browser_entry(
-                    LocalBrowserEntryPointKind::Downloads,
-                    missing_path,
-                    "Downloads",
-                    LocalBrowserEntryPointStatus::Missing,
-                ),
-                fake_unresolved_local_browser_entry(
-                    LocalBrowserEntryPointKind::Desktop,
-                    "Desktop",
-                    LocalBrowserEntryPointStatus::PermissionBlocked,
-                    LocalBrowserEntryPointFailureCode::MetadataUnavailable,
-                ),
-                fake_unresolved_local_browser_entry(
-                    LocalBrowserEntryPointKind::RemovableVolumeRoot,
-                    "USB",
-                    LocalBrowserEntryPointStatus::Unavailable,
-                    LocalBrowserEntryPointFailureCode::VolumeEnumerationUnavailable,
-                ),
-            ]));
-        let before_counts = guarded_local_browser_read_table_counts(&context);
-
-        let reply = read_local_browser_entry_points(&service);
-
-        assert_eq!(reply.status, LocalBrowserEntryPointsReadStatus::Complete);
-        assert_eq!(
-            reply
-                .entries
-                .iter()
-                .map(|entry| entry.status)
-                .collect::<Vec<_>>(),
-            vec![
-                LocalBrowserEntryPointStatus::Missing,
-                LocalBrowserEntryPointStatus::PermissionBlocked,
-                LocalBrowserEntryPointStatus::Unavailable
-            ]
-        );
-        assert!(
-            reply
-                .entries
-                .iter()
-                .all(|entry| entry.admission_hint
-                    == LocalBrowserEntryPointAdmissionHint::Unavailable)
-        );
-        assert!(
-            reply
-                .entries
-                .iter()
-                .all(|entry| !entry.affordances.can_request_admission)
-        );
-        assert_eq!(count_rows(&context, "source_state"), 0);
-        assert_eq!(count_rows(&context, "source_scan_state"), 0);
-        assert_eq!(
-            guarded_local_browser_read_table_counts(&context),
-            before_counts,
-            "permission, missing, and unavailable candidate statuses are not source lifecycle state"
-        );
-    }
-
-    #[test]
-    fn local_browser_entry_points_read_reports_platform_failure_without_writes() {
-        let (_tempdir, context, service) =
-            open_service_with_fake_local_browser_entries(LocalBrowserEntryPointResolution {
-                entries: vec![fake_local_browser_entry(
-                    LocalBrowserEntryPointKind::UserHome,
-                    "C:\\Users\\DJ",
-                    "Home",
-                    LocalBrowserEntryPointStatus::Available,
-                )],
-                failure: Some(LocalBrowserEntryPointResolveFailure {
-                    code: LocalBrowserEntryPointFailureCode::VolumeEnumerationUnavailable,
-                    detail: "volume enumeration failed".to_string(),
-                }),
-            });
-        let before_counts = guarded_local_browser_read_table_counts(&context);
-
-        let reply = read_local_browser_entry_points(&service);
-
-        assert_eq!(
-            reply.status,
-            LocalBrowserEntryPointsReadStatus::PartialFailure
-        );
-        assert_eq!(
-            reply.failure.as_ref().map(|failure| failure.code),
-            Some(LocalBrowserEntryPointFailureCode::VolumeEnumerationUnavailable)
-        );
-        assert_eq!(
-            guarded_local_browser_read_table_counts(&context),
-            before_counts,
-            "platform resolver failures must not be converted into source lifecycle or scan work"
         );
     }
 

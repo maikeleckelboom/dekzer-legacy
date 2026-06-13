@@ -1,6 +1,8 @@
 #![deny(unsafe_code)]
 
 mod local_browser_entry_points;
+#[cfg(test)]
+mod local_browser_entry_points_tests;
 mod search_filter_protocol;
 mod service;
 mod session_events;

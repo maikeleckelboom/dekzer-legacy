@@ -42,13 +42,15 @@ the `music` local browser entry point with the `defaultMusicFolder` admission hi
 resolved. It remains a candidate until the user acts and admission succeeds.
 
 Discovery runs as a bounded, non-scanning read. It must not block first shell render. It may complete shortly after the
-library surface mounts. Even a cheap stat can hang on cloud-redirected, network-backed, or broken shell-folder paths, so
-discovery must be async with a hard timeout (suggested: 2s). It is a stat check, not a scan.
+library surface mounts. Even a cheap status check can be slow on cloud-redirected, network-backed, or broken shell-folder
+paths, so production status resolution must prefer platform attribute/status APIs that avoid content reads and directory
+enumeration. Do not add thread-per-path timeout behavior unless the service has a safe cancellation pattern for that
+exact operation. It is a shallow status check, not a scan.
 
 Steps:
 
 1. Resolve the platform Music folder path using the platform API.
-2. Stat the resolved path for existence and directory type only.
+2. Resolve shallow path status for existence and directory type only.
 3. Produce a Music local browser entry point candidate when resolution succeeds.
 
 If the path exists and is a directory, the candidate status is `available`. No scan starts automatically.
@@ -91,10 +93,15 @@ The platform Music folder is classified as `defaultMusicFolder` by the source ro
 without warning or confirmation only when platform resolution and admission classification agree. See
 [`root-admission-policy.md`](root-admission-policy.md).
 
-Discovery does not pre-admit or pre-persist the source. The source is admitted and persisted only when the user acts.
+Discovery does not pre-admit or pre-persist the source. The `defaultMusicFolder` admission hint is display/action
+guidance only; it is not an admission result and does not bypass source root admission. The source is admitted and
+persisted only when the user acts and the service admission path accepts registration.
 
 Renderer code must not treat the candidate as a half-source, pass it to source lifecycle reads, create source-location
 state for it, or attach source IPC subscriptions to it before admission.
+
+The implemented `readLocalBrowserEntryPoints` boundary returns this candidate and its status only. It does not implement
+local child browsing, renderer filesystem crawling, source registration, or scan start.
 
 ## Deduplication
 

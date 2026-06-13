@@ -62,10 +62,12 @@ V0 is Windows-first. These entry point classes are the canonical V0 classes.
 | `userHome`              | Current user's home directory.                                           | Requires admission confirmation.                             |
 | `desktop`               | Current user's Desktop directory.                                        | Requires admission confirmation.                             |
 | `downloads`             | Current user's Downloads directory.                                      | Requires admission confirmation.                             |
-| `music`                 | Platform-resolved Music directory.                                       | May be accepted directly only as `defaultMusicFolder`.       |
+| `music`                 | Platform-resolved Music directory.                                       | Admission hint only; may be accepted directly only if source root admission returns `defaultMusicFolder`. |
 
 The `music` class is the only class whose platform default path may be admitted directly without confirmation, and only
-when the path is resolved by platform APIs and source root admission classifies it as `defaultMusicFolder`.
+when the path is resolved by platform APIs and source root admission classifies it as `defaultMusicFolder`. The
+`defaultMusicFolder` value on a local browser entry point is display/action guidance only. It is not an admission result
+and does not bypass root admission.
 
 ### Cross-Platform Navigation Aid
 
@@ -114,6 +116,12 @@ Entry point status describes local browser candidate availability. It is not a s
 These statuses must not be projected as `mounted`, `blocked`, `partial`, `scanning`, `completed`, or any other admitted
 source lifecycle state.
 
+Entry point status resolution is a local-browser read concern. It must use shallow path status checks only: no recursive
+traversal, no directory enumeration, no source inventory materialization, and no child-row production. On Windows V0,
+Known Folder resolution, system-drive root detection, fixed/removable volume discovery, and path status checks use
+platform APIs. The path status check prefers attribute/status APIs that do not open files for content and maps missing,
+permission-blocked, unavailable, and non-directory paths into local browser candidate statuses deterministically.
+
 ## Allowed and Disabled Actions
 
 Allowed actions on a local browser entry point or local candidate row:
@@ -132,6 +140,10 @@ Disabled or warning actions:
 - `music` can be admitted directly only through platform resolution plus admission classification as `defaultMusicFolder`.
 - `removableVolumeRoot` and `localDataVolumeRoot` require admission confirmation.
 - Cloud and network roots require warning policy when detected by admission.
+
+Admission hints on entry points are not admission results. `requiresConfirmation` does not persist anything by itself,
+`defaultMusicFolder` does not skip the admission command, and `notDirectlyAdmissible` still allows browsing where this
+contract permits browsing. The only path to persistence remains source root admission followed by source registration.
 
 A rejected admission result from a non-admissible entry point must surface a clear rejection reason. It must not produce
 an empty state, a silent no-op, or a partial lifecycle row.
@@ -196,6 +208,8 @@ Implemented V0 backend read:
   navigation rows, start scans, or materialize inventory/facts/work.
 - Exact admitted source canonical path matches are marked as `duplicateOfAdmittedSource` while preserving the candidate
   versus source distinction.
+- The implemented read resolves only entry point candidates. It does not implement local child browsing, local browser
+  UI, source admission, source registration, or scan start.
 
 Future backend reads should satisfy these constraints:
 
