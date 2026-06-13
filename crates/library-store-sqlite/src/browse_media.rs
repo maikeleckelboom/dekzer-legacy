@@ -26,9 +26,12 @@ impl SourceFileClass {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceFileClassFilter {
     Audio,
+    AudioDirectories,
     NavigationOnly,
     PlayableMedia,
+    PlayableMediaDirectories,
     PlayableMediaAndImages,
+    AllSourceFiles,
 }
 
 pub(crate) fn is_playable_media_file_class(file_class: &str) -> bool {
@@ -43,11 +46,18 @@ pub(crate) fn source_file_class_filter_predicate_sql(
     source_file_class_filter: SourceFileClassFilter,
 ) -> &'static str {
     match source_file_class_filter {
-        SourceFileClassFilter::Audio => "file_class = 'audio'",
+        SourceFileClassFilter::Audio | SourceFileClassFilter::AudioDirectories => {
+            "file_class = 'audio'"
+        }
         SourceFileClassFilter::NavigationOnly => "0 = 1",
-        SourceFileClassFilter::PlayableMedia => "file_class IN ('audio', 'video')",
+        SourceFileClassFilter::PlayableMedia | SourceFileClassFilter::PlayableMediaDirectories => {
+            "file_class IN ('audio', 'video')"
+        }
         SourceFileClassFilter::PlayableMediaAndImages => {
             "file_class IN ('audio', 'video', 'image')"
+        }
+        SourceFileClassFilter::AllSourceFiles => {
+            "file_class IN ('audio', 'video', 'image', 'unsupported')"
         }
     }
 }
@@ -57,13 +67,18 @@ pub(crate) fn source_file_class_filter_predicate_sql_for_column(
     column_sql: &str,
 ) -> String {
     match source_file_class_filter {
-        SourceFileClassFilter::Audio => format!("{column_sql} = 'audio'"),
+        SourceFileClassFilter::Audio | SourceFileClassFilter::AudioDirectories => {
+            format!("{column_sql} = 'audio'")
+        }
         SourceFileClassFilter::NavigationOnly => "0 = 1".to_string(),
-        SourceFileClassFilter::PlayableMedia => {
+        SourceFileClassFilter::PlayableMedia | SourceFileClassFilter::PlayableMediaDirectories => {
             format!("{column_sql} IN ('audio', 'video')")
         }
         SourceFileClassFilter::PlayableMediaAndImages => {
             format!("{column_sql} IN ('audio', 'video', 'image')")
+        }
+        SourceFileClassFilter::AllSourceFiles => {
+            format!("{column_sql} IN ('audio', 'video', 'image', 'unsupported')")
         }
     }
 }

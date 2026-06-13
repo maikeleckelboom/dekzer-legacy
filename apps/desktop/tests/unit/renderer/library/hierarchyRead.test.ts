@@ -142,7 +142,9 @@ describe('createLibraryHierarchyReadController', () => {
     })
 
     await expect(controller.requestNodeChildren('more:source-directory:12:1')).resolves.toBe(true)
-    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([])
+    expect(firstLoadedChildIds(treeNodes(controller), 'source-directory:12')).toEqual([
+      'read-state:source-directory:12'
+    ])
   })
 
   it('rejects unexpected continuation windows without replacing loaded rows', async () => {

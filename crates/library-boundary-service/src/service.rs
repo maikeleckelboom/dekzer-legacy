@@ -961,13 +961,13 @@ fn library_tree_row_policy_filter(
 ) -> library_store_sqlite::SourceFileClassFilter {
     match row_policy.unwrap_or(protocol::LibraryTreeRowPolicy::PlayableMediaBrowse) {
         protocol::LibraryTreeRowPolicy::AudioBrowse => {
-            library_store_sqlite::SourceFileClassFilter::Audio
+            library_store_sqlite::SourceFileClassFilter::AudioDirectories
         }
         protocol::LibraryTreeRowPolicy::PlayableMediaBrowse => {
-            library_store_sqlite::SourceFileClassFilter::PlayableMedia
+            library_store_sqlite::SourceFileClassFilter::PlayableMediaDirectories
         }
         protocol::LibraryTreeRowPolicy::SourceFileInventory => {
-            library_store_sqlite::SourceFileClassFilter::PlayableMediaAndImages
+            library_store_sqlite::SourceFileClassFilter::AllSourceFiles
         }
     }
 }
@@ -2666,7 +2666,7 @@ mod tests {
         wait_for_scan_completed(&service, registered.root_id);
 
         let file_ids = read_source_contents_file_ids(&service, registered.root_id);
-        assert_eq!(file_ids.len(), candidate_count);
+        assert_eq!(file_ids.len(), candidate_count + 1);
         assert_eq!(read_hash_candidate_count(&service, registered.root_id), 1);
 
         let hashed_after_scan = file_ids
@@ -2724,17 +2724,25 @@ mod tests {
             "manual source maintenance must also trigger one bounded attachment materialization unit"
         );
 
-        for source_file_id in &file_ids {
-            let observations = service
-                .durable_store
-                .read_source_file_observation(*source_file_id)
-                .expect("read source-file observations")
-                .expect("scan-triggered and manual maintenance write source-file observations");
-            assert_eq!(
-                observations.content_hash.expect("content hash").algorithm,
-                "blake3"
-            );
-        }
+        let observed_hash_count = file_ids
+            .iter()
+            .filter_map(|source_file_id| {
+                service
+                    .durable_store
+                    .read_source_file_observation(*source_file_id)
+                    .expect("read source-file observations")
+            })
+            .map(|observations| {
+                assert_eq!(
+                    observations.content_hash.expect("content hash").algorithm,
+                    "blake3"
+                );
+            })
+            .count();
+        assert_eq!(
+            observed_hash_count, candidate_count,
+            "scan-triggered and manual maintenance hash the media candidates, not every inventory row"
+        );
     }
 
     #[test]

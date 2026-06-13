@@ -737,15 +737,12 @@ fn canonicalize_playable_media_kinds(
 
 fn file_classes_predicate_sql(
     file_class_column_sql: &str,
-    file_kind_column_sql: &str,
+    _file_kind_column_sql: &str,
     file_classes: &[StoreContentsFileClass],
 ) -> String {
     let predicates = file_classes
         .iter()
         .map(|file_class| match file_class {
-            StoreContentsFileClass::Unsupported => format!(
-                "({file_class_column_sql} = 'unsupported' AND {file_kind_column_sql} = 'cue_sheet')"
-            ),
             _ => format!("{file_class_column_sql} = '{}'", file_class.as_str()),
         })
         .collect::<Vec<_>>()
@@ -3409,7 +3406,7 @@ mod tests {
     }
 
     #[test]
-    fn source_file_profile_returns_media_relevant_inventory_without_playable_media() {
+    fn source_file_profile_returns_source_inventory_without_playable_media() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
@@ -3457,8 +3454,11 @@ mod tests {
             rows,
             vec![
                 ("Media/album.cue", "unsupported", "cue_sheet"),
+                ("Media/archive.zip", "unsupported", "archive"),
+                ("Media/blob.bin", "unsupported", "other"),
                 ("Media/clip.mp4", "video", "video"),
                 ("Media/cover.jpg", "image", "image"),
+                ("Media/readme.txt", "unsupported", "text_doc"),
                 ("Media/track.wav", "audio", "audio"),
             ]
         );
@@ -3981,7 +3981,7 @@ mod tests {
     }
 
     #[test]
-    fn source_file_profile_unsupported_policy_admits_only_cue_sheets() {
+    fn source_file_profile_unsupported_policy_admits_all_unsupported_source_files() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
@@ -4005,11 +4005,25 @@ mod tests {
         .expect("read unsupported source-file contents");
 
         assert_eq!(result.state, StoreContentsState::Ready);
-        assert_eq!(result.rows.len(), 1);
-        assert_eq!(result.rows[0].relative_path, "Media/album.cue");
-        assert_eq!(result.rows[0].file_class, "unsupported");
-        assert_eq!(result.rows[0].file_kind, "cue_sheet");
-        assert!(result.rows[0].playable_media.is_none());
+        assert_eq!(
+            result
+                .rows
+                .iter()
+                .map(|row| (
+                    row.relative_path.as_str(),
+                    row.file_class.as_str(),
+                    row.file_kind.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("Media/album.cue", "unsupported", "cue_sheet"),
+                ("Media/archive.zip", "unsupported", "archive"),
+                ("Media/blob.bin", "unsupported", "other"),
+                ("Media/log.pdf", "unsupported", "log_doc"),
+                ("Media/readme.txt", "unsupported", "text_doc"),
+            ]
+        );
+        assert!(result.rows.iter().all(|row| row.playable_media.is_none()));
     }
 
     #[test]

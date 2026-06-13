@@ -83,21 +83,16 @@ describe('projectState', () => {
           navigationRowWithSelectorKind('allAudio', '100'),
           navigationRowWithNullSelector()
         ],
-        sourceChildren: loadedChildren([
-          fileNode('11', 'track.wav'),
-          fileNode('99', 'clip.mp4', { fileClass: 'video' })
-        ])
+        sourceChildren: loadedChildren([])
       })
     )
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
 
     expect(projection.nodes.map((node) => node.id)).toEqual(['navigation-row:7'])
-    expect(loadedChildIds(sourceNode)).toEqual([])
+    expect(loadedChildIds(sourceNode)).toEqual(['read-state:navigation-row:7'])
     expect(projection.bindingsById.has('navigation-row:100')).toBe(false)
     expect(projection.bindingsById.has('navigation-row:99')).toBe(false)
-    expect(projection.bindingsById.has('source-file:11')).toBe(false)
-    expect(projection.bindingsById.has('source-file:99')).toBe(false)
 
     const unsupportedOnly = projectTree(
       browserState({
@@ -123,11 +118,80 @@ describe('projectState', () => {
 
     const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
 
-    expect(loadedChildIds(sourceNode)).toEqual([])
+    expect(loadedChildIds(sourceNode)).toEqual(['read-state:navigation-row:7'])
     for (const fileId of ['11', '12', '13', '14', '15']) {
       expect(findNode(projection.nodes, `source-file:${fileId}`)).toBeUndefined()
       expect(projection.bindingsById.has(`source-file:${fileId}`)).toBe(false)
     }
+    expect(requiredNode(projection.nodes, 'read-state:navigation-row:7')).toMatchObject({
+      role: 'state',
+      label: 'No child folders in this view'
+    })
+  })
+
+  it('projects literal file rows in the all-files tree projection', () => {
+    const projection = projectTree(
+      browserState({
+        profile: 'allFiles',
+        sourceChildren: loadedChildren([
+          fileNode('11', 'track.wav', { fileClass: 'audio' }),
+          fileNode('12', 'clip.mp4', { fileClass: 'video' }),
+          fileNode('13', 'cover.jpg', { fileClass: 'image' }),
+          fileNode('14', 'notes.txt', { fileClass: 'unsupported' })
+        ])
+      })
+    )
+
+    const sourceNode = requiredNode(projection.nodes, 'navigation-row:7')
+
+    expect(loadedChildIds(sourceNode)).toEqual([
+      'source-file:11',
+      'source-file:12',
+      'source-file:13',
+      'source-file:14'
+    ])
+    expect(requiredNode(projection.nodes, 'source-file:11')).toMatchObject({
+      role: 'literalFile',
+      icon: 'music',
+      children: { kind: 'none' }
+    })
+    expect(requiredNode(projection.nodes, 'source-file:14')).toMatchObject({
+      role: 'literalFile',
+      icon: 'metadata'
+    })
+    expect(projection.bindingsById.get('source-file:14')).toMatchObject({
+      kind: 'file',
+      sourceId: '7',
+      fileId: '14'
+    })
+  })
+
+  it('resolves file-only musical child windows to a terminal state', () => {
+    const projection = projectTree(
+      browserState({
+        sourceChildren: loadedChildren([directoryNode('12', 'Album')]),
+        directoryStates: new Map([
+          [
+            '12',
+            {
+              kind: 'loaded',
+              children: loadedChildren([fileNode('15', 'track.flac', { fileClass: 'audio' })], {
+                parentDirectoryId: '12'
+              })
+            }
+          ]
+        ])
+      })
+    )
+
+    const albumNode = requiredNode(projection.nodes, 'source-directory:12')
+
+    expect(albumNode.children.kind).toBe('loaded')
+    expect(loadedChildIds(albumNode)).toEqual(['read-state:source-directory:12'])
+    expect(requiredNode(projection.nodes, 'read-state:source-directory:12')).toMatchObject({
+      role: 'state',
+      label: 'No child folders in this view'
+    })
   })
 
   it('projects host status instead of stale navigation rows', () => {
@@ -1230,12 +1294,14 @@ function childItemsFor(
 function browserState(
   options: {
     readonly rows?: readonly NavigationRow[]
+    readonly profile?: BrowserState['profile']
     readonly sourceChildren?: LoadedChildren
     readonly sourceStates?: BrowserState['sourceReadStates']
     readonly directoryStates?: BrowserState['directoryReadStates']
   } = {}
 ): BrowserState {
   return {
+    ...(options.profile === undefined ? {} : { profile: options.profile }),
     navigationReadResult: readyNavigation(options.rows ?? [sourceNavigationRow()]),
     sourceReadStates:
       options.sourceStates ??
@@ -1396,6 +1462,7 @@ function fileNode(
   label: string,
   options: {
     readonly fileClass?: Extract<ChildRow, { readonly kind: 'file' }>['fileClass']
+    readonly parentDirectoryId?: string
   } = {}
 ): Extract<ChildRow, { readonly kind: 'file' }> {
   return {
@@ -1404,6 +1471,9 @@ function fileNode(
     label,
     sourceId: '7',
     fileId,
+    ...(options.parentDirectoryId === undefined
+      ? {}
+      : { parentDirectoryId: options.parentDirectoryId }),
     fileClass: options.fileClass ?? 'audio',
     presence: 'present',
     updatedAtMs: 100

@@ -54,6 +54,7 @@ export type BrowserTreeRowRole =
   | 'source'
   | 'sourceLocation'
   | 'literalDirectory'
+  | 'literalFile'
   | 'localBrowseRoot'
   | 'localBrowseDirectory'
   | 'localBrowseFile'

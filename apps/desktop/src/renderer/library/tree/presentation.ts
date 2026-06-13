@@ -12,6 +12,7 @@ export function resolveBrowserTreeRowIcon(node: BrowserTreeNode): IconRole | und
     case 'localBrowseRoot':
     case 'localBrowseDirectory':
       return 'folder.plain'
+    case 'literalFile':
     case 'localBrowseFile':
       return resolveFileIcon(node.icon)
     case 'smartView':

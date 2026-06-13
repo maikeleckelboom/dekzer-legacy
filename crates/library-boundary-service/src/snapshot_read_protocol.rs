@@ -1087,12 +1087,20 @@ fn map_library_tree_node(
         node.has_child_directories,
         "has_child_directories",
     )?;
+    let has_navigable_child_directories = map_directory_only_field(
+        &node.node_kind,
+        node.has_navigable_child_directories,
+        "has_navigable_child_directories",
+    )?;
     let directory_playable_media_state = map_directory_playable_media_state(&node)?;
     let directory_image_media_state = map_directory_image_media_state(&node)?;
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
     let file_class = map_library_tree_file_class(&node)?;
     let navigable_child_scope_state = match node.node_kind.as_str() {
-        "directory" => match (has_child_directories, directory_scan_state.as_ref()) {
+        "directory" => match (
+            has_navigable_child_directories,
+            directory_scan_state.as_ref(),
+        ) {
             (Some(true), _) => Some(protocol::NavigableChildScopeState::HasNavigableChildScopes),
             (Some(false), Some(protocol::DirectoryScanState::Complete)) => {
                 Some(protocol::NavigableChildScopeState::NoNavigableChildScopes)
@@ -1478,9 +1486,26 @@ mod tests {
             modified_at_ns: None,
             updated_at: 100,
             has_child_directories: Some(has_child_directories),
+            has_navigable_child_directories: Some(has_child_directories),
             has_playable_media_descendant: Some(has_playable_media_descendant),
             has_image_media_descendant: Some(has_image_media_descendant),
             dir_scan_state: Some(dir_scan_state.to_string()),
+        }
+    }
+
+    fn directory_node_with_navigable_child_directories(
+        has_child_directories: bool,
+        has_navigable_child_directories: Option<bool>,
+        dir_scan_state: &str,
+    ) -> store::StoreLiteralHierarchyNode {
+        store::StoreLiteralHierarchyNode {
+            has_navigable_child_directories,
+            ..directory_node_with_child_directories(
+                has_child_directories,
+                true,
+                false,
+                dir_scan_state,
+            )
         }
     }
 
@@ -1499,6 +1524,7 @@ mod tests {
             modified_at_ns: Some(20),
             updated_at: 100,
             has_child_directories: None,
+            has_navigable_child_directories: None,
             has_playable_media_descendant: None,
             has_image_media_descendant: None,
             dir_scan_state: None,
@@ -1555,6 +1581,32 @@ mod tests {
         assert_eq!(file.directory_image_media_state, None);
         assert_eq!(file.directory_scan_state, None);
         assert_eq!(file.navigable_child_scope_state, None);
+    }
+
+    #[test]
+    fn library_tree_mapping_uses_profile_visible_child_scope_state_for_disclosure() {
+        let directory = map_library_tree_node(directory_node_with_navigable_child_directories(
+            true,
+            Some(false),
+            "complete",
+        ))
+        .expect("map directory node");
+
+        assert_eq!(directory.has_child_directories, Some(true));
+        assert_eq!(
+            directory.navigable_child_scope_state,
+            Some(protocol::NavigableChildScopeState::NoNavigableChildScopes)
+        );
+
+        let unknown = map_library_tree_node(directory_node_with_navigable_child_directories(
+            true, None, "scanning",
+        ))
+        .expect("map unknown directory node");
+
+        assert_eq!(
+            unknown.navigable_child_scope_state,
+            Some(protocol::NavigableChildScopeState::Unknown)
+        );
     }
 
     #[test]

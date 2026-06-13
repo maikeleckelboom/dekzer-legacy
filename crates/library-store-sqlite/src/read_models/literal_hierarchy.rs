@@ -57,6 +57,7 @@ pub struct StoreLiteralHierarchyNode {
     pub modified_at_ns: Option<i64>,
     pub updated_at: i64,
     pub has_child_directories: Option<bool>,
+    pub has_navigable_child_directories: Option<bool>,
     pub has_playable_media_descendant: Option<bool>,
     pub has_image_media_descendant: Option<bool>,
     pub dir_scan_state: Option<String>,
@@ -678,8 +679,9 @@ fn read_child_count(
     parent_source_directory_id: Option<i64>,
     row_admission: SourceFileClassFilter,
 ) -> LibrarySqliteResult<usize> {
-    let directory_visibility_predicate = directory_visibility_predicate_sql(row_admission);
-    let file_visibility_predicate = source_file_class_filter_predicate_sql(row_admission);
+    let directory_visibility_predicate =
+        directory_visibility_predicate_sql(row_admission, "source_directories");
+    let file_visibility_predicate = hierarchy_file_visibility_predicate_sql(row_admission);
     let count = connection.query_row(
         &format!(
             "SELECT (
@@ -728,8 +730,11 @@ fn read_child_rows(
     let limit = i64::try_from(limit).map_err(|_| {
         LibrarySqliteError::WriteInvariant("literal hierarchy limit does not fit i64".to_string())
     })?;
-    let directory_visibility_predicate = directory_visibility_predicate_sql(row_admission);
-    let file_visibility_predicate = source_file_class_filter_predicate_sql(row_admission);
+    let directory_visibility_predicate =
+        directory_visibility_predicate_sql(row_admission, "source_directories");
+    let navigable_child_directories_sql =
+        navigable_child_directories_sql(row_admission, "source_directories");
+    let file_visibility_predicate = hierarchy_file_visibility_predicate_sql(row_admission);
     let mut statement = connection.prepare(&format!(
         "SELECT node_kind,
                 source_id,
@@ -744,6 +749,7 @@ fn read_child_rows(
                 modified_at_ns,
                 updated_at,
                 has_child_directories,
+                has_navigable_child_directories,
                 has_playable_media_descendant,
                 has_image_media_descendant,
                 dir_scan_state
@@ -762,6 +768,7 @@ fn read_child_rows(
                     NULL AS modified_at_ns,
                     updated_at,
                     has_child_directories,
+                    {navigable_child_directories_sql} AS has_navigable_child_directories,
                     has_playable_media_descendant,
                     has_image_media_descendant,
                     dir_scan_state,
@@ -789,6 +796,7 @@ fn read_child_rows(
                     mtime_ns AS modified_at_ns,
                     updated_at,
                     NULL AS has_child_directories,
+                    NULL AS has_navigable_child_directories,
                     NULL AS has_playable_media_descendant,
                     NULL AS has_image_media_descendant,
                     NULL AS dir_scan_state,
@@ -827,9 +835,10 @@ fn read_child_rows(
                     modified_at_ns: row.get(10)?,
                     updated_at: row.get(11)?,
                     has_child_directories: row.get(12)?,
-                    has_playable_media_descendant: row.get(13)?,
-                    has_image_media_descendant: row.get(14)?,
-                    dir_scan_state: row.get(15)?,
+                    has_navigable_child_directories: row.get(13)?,
+                    has_playable_media_descendant: row.get(14)?,
+                    has_image_media_descendant: row.get(15)?,
+                    dir_scan_state: row.get(16)?,
                 })
             },
         )?
@@ -837,39 +846,101 @@ fn read_child_rows(
     Ok(rows)
 }
 
-fn directory_visibility_predicate_sql(row_admission: SourceFileClassFilter) -> String {
+fn hierarchy_file_visibility_predicate_sql(row_admission: SourceFileClassFilter) -> &'static str {
+    match row_admission {
+        SourceFileClassFilter::AudioDirectories
+        | SourceFileClassFilter::NavigationOnly
+        | SourceFileClassFilter::PlayableMediaDirectories => "0 = 1",
+        SourceFileClassFilter::Audio
+        | SourceFileClassFilter::PlayableMedia
+        | SourceFileClassFilter::PlayableMediaAndImages => {
+            source_file_class_filter_predicate_sql(row_admission)
+        }
+        SourceFileClassFilter::AllSourceFiles => {
+            source_file_class_filter_predicate_sql(row_admission)
+        }
+    }
+}
+
+fn directory_visibility_predicate_sql(row_admission: SourceFileClassFilter, alias: &str) -> String {
     let revealable_descendant_predicate = match row_admission {
-        SourceFileClassFilter::Audio => {
-            "EXISTS (
+        SourceFileClassFilter::Audio | SourceFileClassFilter::AudioDirectories => {
+            format!("EXISTS (
                 SELECT 1
                 FROM source_files descendant_file
-                WHERE descendant_file.source_id = source_directories.source_id
+                WHERE descendant_file.source_id = {alias}.source_id
                   AND descendant_file.presence_state = 'present'
                   AND descendant_file.file_class = 'audio'
-                  AND descendant_file.relative_path COLLATE BINARY >= source_directories.relative_path || '/'
-                  AND descendant_file.relative_path COLLATE BINARY < source_directories.relative_path || char(48)
-            )"
+                  AND descendant_file.relative_path COLLATE BINARY >= {alias}.relative_path || '/'
+                  AND descendant_file.relative_path COLLATE BINARY < {alias}.relative_path || char(48)
+            )")
         }
-        SourceFileClassFilter::NavigationOnly | SourceFileClassFilter::PlayableMedia => {
-            "has_playable_media_descendant = 1"
+        SourceFileClassFilter::NavigationOnly
+        | SourceFileClassFilter::PlayableMedia
+        | SourceFileClassFilter::PlayableMediaDirectories => {
+            format!("{alias}.has_playable_media_descendant = 1")
         }
         SourceFileClassFilter::PlayableMediaAndImages => {
-            "(has_playable_media_descendant = 1 OR has_image_media_descendant = 1)"
+            format!(
+                "({alias}.has_playable_media_descendant = 1 OR {alias}.has_image_media_descendant = 1)"
+            )
+        }
+        SourceFileClassFilter::AllSourceFiles => {
+            return "1 = 1".to_string();
         }
     };
 
     format!(
-        "(dir_scan_state <> 'complete'
+        "({alias}.dir_scan_state <> 'complete'
           OR {revealable_descendant_predicate}
           OR EXISTS (
               SELECT 1
               FROM source_directories descendant
-              WHERE descendant.source_id = source_directories.source_id
+              WHERE descendant.source_id = {alias}.source_id
                 AND descendant.presence_state = 'present'
-                AND descendant.relative_path COLLATE BINARY >= source_directories.relative_path || '/'
-                AND descendant.relative_path COLLATE BINARY < source_directories.relative_path || {RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL}
+                AND descendant.relative_path COLLATE BINARY >= {alias}.relative_path || '/'
+                AND descendant.relative_path COLLATE BINARY < {alias}.relative_path || {RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL}
                 AND descendant.dir_scan_state <> 'complete'
           ))"
+    )
+}
+
+fn navigable_child_directories_sql(row_admission: SourceFileClassFilter, alias: &str) -> String {
+    if matches!(row_admission, SourceFileClassFilter::AllSourceFiles) {
+        return format!(
+            "CASE
+                 WHEN {alias}.has_child_directories = 1 THEN 1
+                 WHEN {alias}.dir_scan_state = 'complete' THEN 0
+                 ELSE NULL
+             END"
+        );
+    }
+
+    let child_visibility_predicate =
+        directory_visibility_predicate_sql(row_admission, "child_directory");
+
+    format!(
+        "CASE
+             WHEN {alias}.dir_scan_state <> 'complete' THEN NULL
+             WHEN EXISTS (
+                 SELECT 1
+                 FROM source_directories child_directory
+                 WHERE child_directory.source_id = {alias}.source_id
+                   AND child_directory.presence_state = 'present'
+                   AND child_directory.parent_source_directory_id = {alias}.source_directory_id
+                   AND child_directory.dir_scan_state <> 'complete'
+             ) THEN NULL
+             WHEN EXISTS (
+                 SELECT 1
+                 FROM source_directories child_directory
+                 WHERE child_directory.source_id = {alias}.source_id
+                   AND child_directory.presence_state = 'present'
+                   AND child_directory.parent_source_directory_id = {alias}.source_directory_id
+                   AND child_directory.dir_scan_state = 'complete'
+                   AND {child_visibility_predicate}
+             ) THEN 1
+             ELSE 0
+         END"
     )
 }
 
@@ -1395,6 +1466,190 @@ mod tests {
 
         assert_eq!(window.total_rows, 3);
         assert_eq!(window.rows.len(), 3);
+    }
+
+    #[test]
+    fn audio_hierarchy_hides_complete_video_only_child_folders() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryObservations {
+                has_child_directories: true,
+                has_playable_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            21,
+            Some(20),
+            "Music/Audio",
+            DirectoryObservations {
+                has_child_directories: false,
+                has_playable_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            22,
+            Some(20),
+            "Music/Videos",
+            DirectoryObservations {
+                has_child_directories: false,
+                has_playable_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file_in_directory(&connection, 31, Some(21), "Music/Audio/track.flac", "audio");
+        insert_file_in_directory(&connection, 32, Some(22), "Music/Videos/clip.mp4", "video");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            Some(20),
+            0,
+            10,
+            SourceFileClassFilter::Audio,
+        )
+        .expect("read audio hierarchy")
+        .expect("Music window");
+
+        assert_eq!(window.total_rows, 1);
+        assert_display_names(&window.rows, &["Music/Audio"]);
+    }
+
+    #[test]
+    fn direct_audio_directory_without_visible_child_folders_is_terminal_scope() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Album",
+            DirectoryObservations {
+                has_child_directories: false,
+                has_playable_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file_in_directory(&connection, 31, Some(20), "Album/track.flac", "audio");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileClassFilter::Audio,
+        )
+        .expect("read audio hierarchy")
+        .expect("source window");
+
+        assert_eq!(window.total_rows, 1);
+        assert_eq!(window.rows[0].display_name, "Album");
+        assert_eq!(window.rows[0].has_child_directories, Some(false));
+        assert_eq!(window.rows[0].has_navigable_child_directories, Some(false));
+    }
+
+    #[test]
+    fn audio_hierarchy_keeps_incomplete_child_readiness_unknown() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Music",
+            DirectoryObservations {
+                has_child_directories: true,
+                has_playable_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_directory(
+            &connection,
+            21,
+            Some(20),
+            "Music/Pending",
+            DirectoryObservations {
+                has_child_directories: false,
+                has_playable_media_descendant: false,
+                has_image_media_descendant: false,
+            },
+            "scanning",
+            None,
+        );
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileClassFilter::Audio,
+        )
+        .expect("read audio hierarchy")
+        .expect("source window");
+
+        assert_eq!(window.total_rows, 1);
+        assert_eq!(window.rows[0].display_name, "Music");
+        assert_eq!(window.rows[0].has_child_directories, Some(true));
+        assert_eq!(window.rows[0].has_navigable_child_directories, None);
+    }
+
+    #[test]
+    fn source_inventory_includes_all_source_file_classes() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_file(&connection, 11, "track.flac", "audio");
+        insert_file(&connection, 12, "clip.mp4", "video");
+        insert_file(&connection, 13, "cover.jpg", "image");
+        insert_file(&connection, 14, "notes.txt", "unsupported");
+        insert_file(&connection, 15, "archive.zip", "unsupported");
+        insert_file(&connection, 16, "mystery", "none");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileClassFilter::AllSourceFiles,
+        )
+        .expect("read source inventory hierarchy")
+        .expect("source window");
+
+        assert_eq!(window.total_rows, 5);
+        assert_eq!(
+            window
+                .rows
+                .iter()
+                .map(|row| (row.display_name.as_str(), row.file_class.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("archive.zip", Some("unsupported")),
+                ("clip.mp4", Some("video")),
+                ("cover.jpg", Some("image")),
+                ("notes.txt", Some("unsupported")),
+                ("track.flac", Some("audio")),
+            ]
+        );
     }
 
     #[test]
