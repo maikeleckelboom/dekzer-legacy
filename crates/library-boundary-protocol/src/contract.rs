@@ -66,6 +66,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LocalBrowseItemMediaRelevance>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseItemFailureCode>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::LibraryTreeRowPolicy>(&cfg, &mut output);
     push_ts_decl::<crate::NavigableChildScopeState>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleRequest>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceIntegrityRequest>(&cfg, &mut output);
@@ -292,6 +293,8 @@ mod tests {
         assert!(ts.contains("readSourceLifecycle"));
         assert!(ts.contains("SourceLifecycle"));
         assert!(ts.contains("readLibraryTreeChildren"));
+        assert!(ts.contains("export type LibraryTreeRowPolicy"));
+        assert!(ts.contains("rowPolicy?: LibraryTreeRowPolicy"));
         assert!(ts.contains("LibraryTreeNode"));
         assert!(ts.contains("LibraryTreeFileClass"));
         assert!(ts.contains("fileClass: ContentsFileClass"));

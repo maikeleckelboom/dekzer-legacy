@@ -91,6 +91,8 @@ export type LocalBrowseItemFailureCode = "unsupportedPlatform" | "rootIdentityMi
 
 export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, rowPolicy?: LibraryTreeRowPolicy, offset: number, limit: number, };
 
+export type LibraryTreeRowPolicy = "audioBrowse" | "playableMediaBrowse" | "sourceFileInventory";
+
 export type NavigableChildScopeState = "unknown" | "hasNavigableChildScopes" | "noNavigableChildScopes";
 
 export type ReadSourceLifecycleRequest = { sourceId: string, };
