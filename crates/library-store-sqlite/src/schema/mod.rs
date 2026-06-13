@@ -97,7 +97,6 @@ mod tests {
         "Artifacts",
         "LibraryMetadata",
         "browser_user_order",
-        "browser_user_prefs",
         "source_root_navigation_state",
         "source_registration_proposals",
         "source_state",
@@ -269,7 +268,6 @@ mod tests {
             "source_directories",
             "source_files",
             "browser_user_order",
-            "browser_user_prefs",
             "navigation_rows",
         ] {
             assert!(

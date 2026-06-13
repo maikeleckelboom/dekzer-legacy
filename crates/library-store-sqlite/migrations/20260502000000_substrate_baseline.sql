@@ -285,17 +285,6 @@ CREATE UNIQUE INDEX browser_user_order_source_location_node
 CREATE INDEX browser_user_order_domain_parent_ordinal
     ON browser_user_order (node_domain, parent_scope, ordinal);
 
-CREATE TABLE browser_user_prefs
-(
-    prefs_id                   INTEGER PRIMARY KEY,
-    user_scope_key             TEXT    NOT NULL UNIQUE CHECK (length(trim(user_scope_key)) > 0),
-    expanded_node_keys_json    TEXT,
-    hidden_optional_nodes_json TEXT,
-    created_at                 INTEGER NOT NULL,
-    updated_at                 INTEGER NOT NULL,
-    CHECK (updated_at >= created_at)
-) STRICT;
-
 CREATE TABLE source_directories
 (
     source_directory_id                INTEGER PRIMARY KEY,
