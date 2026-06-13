@@ -47,7 +47,7 @@ pub(crate) struct LocalBrowseEntryPointResolution {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ResolvedLocalBrowseEntryPoint {
     pub(crate) entry_point_kind: protocol::LocalBrowseEntryPointKind,
-    pub(crate) canonical_path: Option<PathBuf>,
+    pub(crate) resolved_path: Option<PathBuf>,
     pub(crate) display_name: String,
     pub(crate) status: protocol::LocalBrowseEntryPointStatus,
     pub(crate) platform: protocol::LocalBrowsePlatform,
@@ -114,14 +114,14 @@ fn entry_failure(
 
 fn entry(
     entry_point_kind: protocol::LocalBrowseEntryPointKind,
-    canonical_path: Option<PathBuf>,
+    resolved_path: Option<PathBuf>,
     display_name: impl Into<String>,
     status: protocol::LocalBrowseEntryPointStatus,
     failure: Option<LocalBrowseEntryPointResolveFailure>,
 ) -> ResolvedLocalBrowseEntryPoint {
     ResolvedLocalBrowseEntryPoint {
         entry_point_kind,
-        canonical_path,
+        resolved_path,
         display_name: display_name.into(),
         status,
         platform: local_browse_entry_point_platform(),
@@ -489,7 +489,7 @@ fn resolve_platform_entry_points()
     .into_iter()
     .map(|kind| ResolvedLocalBrowseEntryPoint {
         entry_point_kind: kind,
-        canonical_path: None,
+        resolved_path: None,
         display_name: default_display_name(kind).to_string(),
         status: protocol::LocalBrowseEntryPointStatus::UnsupportedPlatform,
         platform,

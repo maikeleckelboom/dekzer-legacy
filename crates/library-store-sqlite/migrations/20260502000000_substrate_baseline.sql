@@ -201,7 +201,7 @@ CREATE TABLE root_admission_proposals
             'unknown_root'
         )),
     requested_path                  TEXT    NOT NULL CHECK (length(trim(requested_path)) > 0),
-    canonical_path                  TEXT CHECK (canonical_path IS NULL OR length(trim(canonical_path)) > 0),
+    resolved_path                   TEXT CHECK (resolved_path IS NULL OR length(trim(resolved_path)) > 0),
     confirmation_required_reason    TEXT    NOT NULL CHECK (length(trim(confirmation_required_reason)) > 0),
     suggested_roots_json            TEXT    NOT NULL CHECK (json_valid(suggested_roots_json)),
     created_at                      INTEGER NOT NULL,
@@ -211,8 +211,8 @@ CREATE TABLE root_admission_proposals
     CHECK (proposal_status != 'proposed' OR root_class != 'protected_root')
 ) STRICT;
 
-CREATE UNIQUE INDEX root_admission_proposals_active_canonical_path
-    ON root_admission_proposals (COALESCE(canonical_path, requested_path))
+CREATE UNIQUE INDEX root_admission_proposals_active_resolved_path
+    ON root_admission_proposals (COALESCE(resolved_path, requested_path))
     WHERE proposal_status = 'proposed';
 
 CREATE TABLE source_locations

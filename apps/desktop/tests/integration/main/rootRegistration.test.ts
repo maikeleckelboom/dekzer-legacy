@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe('local root registration boundaries', () => {
   it('registers the path selected by the main-process folder picker', async () => {
-    let receivedAbsolutePath = ''
+    let receivedRequestedPath = ''
     let pickerArguments: readonly unknown[] = []
 
     const result = await chooseAndRegisterLocalRoot(unusedHost(), {
@@ -48,12 +48,12 @@ describe('local root registration boundaries', () => {
         pickerArguments = args
       }),
       registerLocalRoot: async (_host, request) => {
-        receivedAbsolutePath = request.absolutePath
+        receivedRequestedPath = request.requestedPath
         return registeredRoot()
       }
     })
 
-    expect(receivedAbsolutePath).toBe('C:/Music')
+    expect(receivedRequestedPath).toBe('C:/Music')
     expect(result).toEqual(registeredChoice())
     expect(readPickerProperties(pickerArguments)).toContain('openDirectory')
   })
@@ -101,7 +101,7 @@ describe('local root registration boundaries', () => {
   })
 
   it('ignores renderer-provided paths at the choice IPC boundary', async () => {
-    let receivedAbsolutePath = ''
+    let receivedRequestedPath = ''
     const host = unusedHost()
     const registrations = new Map<
       string,
@@ -120,10 +120,10 @@ describe('local root registration boundaries', () => {
       localRootChoiceDependencies: {
         dialog: fakeDialog({ canceled: false, filePaths: ['C:/MainSelectedMusic'] }),
         registerLocalRoot: async (_host, request) => {
-          receivedAbsolutePath = request.absolutePath
+          receivedRequestedPath = request.requestedPath
           return registeredRoot({
             rootId: 'main-selected-root',
-            canonicalPath: request.absolutePath
+            admittedRootPath: request.requestedPath
           })
         }
       }
@@ -132,14 +132,14 @@ describe('local root registration boundaries', () => {
     const handler = registrations.get(libraryControlChannels.roots.chooseLocal)
     expect(typeof handler).toBe('function')
 
-    const result = await handler?.({}, { absolutePath: 'C:/RendererProvidedPath' })
+    const result = await handler?.({}, { requestedPath: 'C:/RendererProvidedPath' })
 
-    expect(receivedAbsolutePath).toBe('C:/MainSelectedMusic')
+    expect(receivedRequestedPath).toBe('C:/MainSelectedMusic')
     expect(result).toEqual({
       state: 'registered',
       root: {
         rootId: 'main-selected-root',
-        canonicalPath: 'C:/MainSelectedMusic'
+        admittedRootPath: 'C:/MainSelectedMusic'
       }
     } satisfies LocalRootChoiceResult)
   })
@@ -148,45 +148,47 @@ describe('local root registration boundaries', () => {
     const config = hostConfig()
     const idleHost = new LibraryBoundaryHost(config, silentLogger())
 
-    await expect(registerLocalRoot(idleHost, { absolutePath: 'C:/Music' })).resolves.toMatchObject({
-      state: 'hostUnavailable',
-      error: {
-        code: 'hostNotStarted',
-        message: 'The library boundary host has not started yet.'
+    await expect(registerLocalRoot(idleHost, { requestedPath: 'C:/Music' })).resolves.toMatchObject(
+      {
+        state: 'hostUnavailable',
+        error: {
+          code: 'hostNotStarted',
+          message: 'The library boundary host has not started yet.'
+        }
       }
-    })
+    )
 
     await expect(
       registerLocalRoot(await startedHostWithClient(config, createFakeClient()), {
-        absolutePath: '   '
+        requestedPath: '   '
       })
     ).resolves.toMatchObject({
       state: 'invalidRequest',
       error: { code: 'invalidRequest' }
     })
 
-    let receivedAbsolutePath = ''
+    let receivedRequestedPath = ''
     await expect(
       registerLocalRoot(
         await startedHostWithClient(
           config,
           createFakeClient({
             registerLocalRoot: async (request) => {
-              receivedAbsolutePath = request.absolutePath
+              receivedRequestedPath = request.requestedPath
               return {
                 type: 'registered',
                 payload: {
                   rootId: '7',
-                  canonicalPath: 'C:/Music'
+                  admittedRootPath: 'C:/Music'
                 }
               }
             }
           })
         ),
-        { absolutePath: 'C:/Music' }
+        { requestedPath: 'C:/Music' }
       )
     ).resolves.toEqual(registeredRoot())
-    expect(receivedAbsolutePath).toBe('C:/Music')
+    expect(receivedRequestedPath).toBe('C:/Music')
 
     await expect(
       registerLocalRoot(
@@ -199,15 +201,15 @@ describe('local root registration boundaries', () => {
                 proposalId: '11',
                 rootClass: 'systemVolumeRoot',
                 requestedPath: 'C:/',
-                canonicalPath: 'C:/',
+                resolvedPath: 'C:/',
                 confirmationRequiredReason:
                   'system volume roots require a later scan-plan confirmation',
-                suggestedRoots: ['C:/Users/Maikel/Music']
+                suggestedRootPaths: ['C:/Users/Maikel/Music']
               }
             })
           })
         ),
-        { absolutePath: 'C:/' }
+        { requestedPath: 'C:/' }
       )
     ).resolves.toEqual({
       state: 'proposalRequired',
@@ -215,9 +217,9 @@ describe('local root registration boundaries', () => {
         proposalId: '11',
         rootClass: 'systemVolumeRoot',
         requestedPath: 'C:/',
-        canonicalPath: 'C:/',
+        resolvedPath: 'C:/',
         confirmationRequiredReason: 'system volume roots require a later scan-plan confirmation',
-        suggestedRoots: ['C:/Users/Maikel/Music']
+        suggestedRootPaths: ['C:/Users/Maikel/Music']
       }
     } satisfies LocalRootRegistrationResult)
 
@@ -231,23 +233,23 @@ describe('local root registration boundaries', () => {
               payload: {
                 rootClass: 'protectedRoot',
                 requestedPath: 'C:/Windows',
-                canonicalPath: 'C:/Windows',
+                resolvedPath: 'C:/Windows',
                 rejectionReason: 'protected roots cannot be registered as sources',
-                suggestedRoots: ['C:/Users/Maikel/Music']
+                suggestedRootPaths: ['C:/Users/Maikel/Music']
               }
             })
           })
         ),
-        { absolutePath: 'C:/Windows' }
+        { requestedPath: 'C:/Windows' }
       )
     ).resolves.toEqual({
       state: 'rejected',
       rejection: {
         rootClass: 'protectedRoot',
         requestedPath: 'C:/Windows',
-        canonicalPath: 'C:/Windows',
+        resolvedPath: 'C:/Windows',
         rejectionReason: 'protected roots cannot be registered as sources',
-        suggestedRoots: ['C:/Users/Maikel/Music']
+        suggestedRootPaths: ['C:/Users/Maikel/Music']
       }
     } satisfies LocalRootRegistrationResult)
 
@@ -261,7 +263,7 @@ describe('local root registration boundaries', () => {
             }
           })
         ),
-        { absolutePath: 'C:/Missing' }
+        { requestedPath: 'C:/Missing' }
       )
     ).resolves.toMatchObject({
       state: 'registrationFailed',
@@ -315,10 +317,10 @@ function failingDialog(): LocalRootChoiceDialog {
 function registeredRoot(
   root: {
     readonly rootId: string
-    readonly canonicalPath: string
+    readonly admittedRootPath: string
   } = {
     rootId: '7',
-    canonicalPath: 'C:/Music'
+    admittedRootPath: 'C:/Music'
   }
 ): LocalRootRegistrationResult {
   return {
@@ -332,7 +334,7 @@ function registeredChoice(): LocalRootChoiceResult {
     state: 'registered',
     root: {
       rootId: '7',
-      canonicalPath: 'C:/Music'
+      admittedRootPath: 'C:/Music'
     }
   }
 }

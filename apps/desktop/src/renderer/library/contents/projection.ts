@@ -6,6 +6,15 @@ import type {
   PlayableMedia
 } from '../../../shared/library/contents/read'
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
+import type { LocalBrowseOperation } from '../../../shared/library/localBrowse/entryPoints'
+import type { LocalBrowseItem } from '../../../shared/library/localBrowse/items'
+import { sourceAdmissionOperation } from '../localBrowse/projection'
+import {
+  localBrowseRootTarget,
+  localBrowseWindowKey,
+  type LoadedLocalBrowseItems,
+  type LocalBrowseItemState
+} from '../localBrowse/types'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
@@ -44,6 +53,25 @@ export type ContentRowAction =
       readonly nodeId: BrowserTreeNodeId
       readonly label: string
       readonly cursor: string
+    }
+  | {
+      readonly kind: 'loadLocalBrowseChildren'
+      readonly nodeId: BrowserTreeNodeId
+      readonly label: string
+    }
+  | {
+      readonly kind: 'loadLocalBrowseMore'
+      readonly nodeId: BrowserTreeNodeId
+      readonly label: string
+    }
+  | {
+      readonly kind: 'requestLocalBrowseAdmission'
+      readonly resolvedPath: string
+      readonly requestKind: Extract<
+        LocalBrowseOperation,
+        { readonly kind: 'requestSourceAdmission' }
+      >['requestKind']
+      readonly label: string
     }
 
 export type ContentRow = {
@@ -169,26 +197,31 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         detail: 'Select a registered source or folder to see indexed contents.'
       })
     case 'localBrowseEntryPoint':
-      return stateProjection({
-        kind: 'unsupported',
+      return projectLocalBrowseFolderContents({
         ownerId: selectedNodeId,
         title: binding.entry.displayName,
-        state: 'unsupported',
-        label: 'Local folder selected',
-        detail: binding.entry.identity.canonicalPath ?? binding.entry.displayName
+        targetNodeId: selectedNodeId,
+        folderOperations: binding.entry.availableOperations,
+        folderDetail: binding.entry.identity.resolvedPath ?? binding.entry.displayName,
+        windowState: options.state.localBrowseItemStates?.get(
+          localBrowseWindowKey(localBrowseRootTarget(binding.target))
+        )
       })
     case 'localBrowseItem':
-      return stateProjection({
-        kind: 'unsupported',
-        ownerId: selectedNodeId,
-        title: binding.item.displayName,
-        state: 'unsupported',
-        label:
-          binding.item.itemKind === 'mediaFile'
-            ? 'Local media file selected'
-            : 'Local item selected',
-        detail: localBrowseItemDetail(binding.item)
-      })
+      if (binding.target !== undefined) {
+        return projectLocalBrowseFolderContents({
+          ownerId: selectedNodeId,
+          title: binding.item.displayName,
+          targetNodeId: selectedNodeId,
+          folderOperations: binding.item.availableOperations,
+          folderDetail: localBrowseItemDetail(binding.item),
+          windowState: options.state.localBrowseItemStates?.get(
+            localBrowseWindowKey(binding.target)
+          )
+        })
+      }
+
+      return projectLocalBrowseFileContents(selectedNodeId, binding.item)
     case 'localBrowseMore':
       return {
         kind: 'ready',
@@ -660,6 +693,342 @@ function projectFileContents(options: {
   })
 }
 
+function projectLocalBrowseFolderContents(options: {
+  readonly ownerId: BrowserTreeNodeId
+  readonly title: string
+  readonly targetNodeId: BrowserTreeNodeId
+  readonly folderOperations: readonly LocalBrowseOperation[]
+  readonly folderDetail: string
+  readonly windowState: LocalBrowseItemState | undefined
+}): ContentProjection {
+  const admissionRow = localBrowseAdmissionRow(
+    `local-browse-admission:${options.ownerId}`,
+    options.folderOperations,
+    'Add this folder'
+  )
+  const state = options.windowState
+
+  if (state === undefined) {
+    return {
+      kind: 'notLoaded',
+      title: options.title,
+      detail: options.folderDetail,
+      rows: [
+        ...(admissionRow === undefined ? [] : [admissionRow]),
+        stateRow({
+          ownerId: options.ownerId,
+          state: 'notLoaded',
+          label: 'Local folder contents not loaded',
+          detail: 'Local folder contents have not been loaded.',
+          action: {
+            kind: 'loadLocalBrowseChildren',
+            nodeId: options.targetNodeId,
+            label: 'Load contents'
+          }
+        })
+      ]
+    }
+  }
+
+  if (state.kind === 'loading') {
+    return {
+      kind: 'loading',
+      title: options.title,
+      detail: options.folderDetail,
+      rows: [
+        ...(admissionRow === undefined ? [] : [admissionRow]),
+        stateRow({
+          ownerId: options.ownerId,
+          state: 'loading',
+          label: 'Loading local folder contents',
+          detail: state.detail ?? 'Loading local folder contents.'
+        })
+      ]
+    }
+  }
+
+  if (state.kind === 'failed') {
+    return {
+      kind: 'failed',
+      title: options.title,
+      detail: options.folderDetail,
+      rows: [
+        ...(admissionRow === undefined ? [] : [admissionRow]),
+        stateRow({
+          ownerId: options.ownerId,
+          state: 'failed',
+          label: 'Local folder unavailable',
+          detail: state.detail,
+          action: {
+            kind: 'loadLocalBrowseChildren',
+            nodeId: options.targetNodeId,
+            label: 'Retry'
+          }
+        })
+      ]
+    }
+  }
+
+  const window = state.window
+  const contentRows = window.items.map(localBrowseItemRow)
+  const moreRow =
+    window.nextOffset === undefined ? undefined : localBrowseMoreContentRow(options.ownerId, window)
+  const rows = [
+    ...(admissionRow === undefined ? [] : [admissionRow]),
+    ...contentRows,
+    ...(moreRow === undefined ? [] : [moreRow])
+  ]
+
+  if (rows.length > 0) {
+    return {
+      kind: 'ready',
+      title: options.title,
+      detail:
+        state.kind === 'refreshing'
+          ? (state.detail ?? 'Refreshing local folder contents.')
+          : localBrowseWindowDetail(window),
+      rows
+    }
+  }
+
+  return {
+    kind: 'ready',
+    title: options.title,
+    detail: localBrowseWindowDetail(window),
+    rows: [
+      stateRow({
+        ownerId: options.ownerId,
+        state: localBrowseWindowState(window),
+        label: localBrowseWindowStateLabel(window),
+        detail: window.failure?.detail ?? localBrowseWindowDetail(window)
+      })
+    ]
+  }
+}
+
+function projectLocalBrowseFileContents(
+  ownerId: BrowserTreeNodeId,
+  item: LocalBrowseItem
+): ContentProjection {
+  const admissionRow = localBrowseAdmissionRow(
+    `local-browse-admission:${ownerId}`,
+    item.availableOperations,
+    'Add parent folder'
+  )
+  const selectedRow = localBrowseItemRow(item)
+
+  return {
+    kind: 'ready',
+    title: item.displayName,
+    detail: localBrowseItemDetail(item),
+    rows: admissionRow === undefined ? [selectedRow] : [selectedRow, admissionRow]
+  }
+}
+
+function localBrowseItemRow(item: LocalBrowseItem): ContentRow {
+  const admission = sourceAdmissionOperation(item.availableOperations)
+  const fileClass = localBrowseFileClass(item)
+
+  return {
+    id: `local-browse-content:${item.identity.entryPointKind}:${encodeURIComponent(
+      item.identity.resolvedRootPath
+    )}:${encodeURIComponent(item.identity.resolvedItemPath)}`,
+    kind: item.itemKind === 'directory' || item.itemKind === 'rejectedRoot' ? 'directory' : 'file',
+    label: item.displayName,
+    detail: localBrowseItemDetail(item),
+    icon: localBrowseItemIcon(item),
+    ...(fileClass === undefined ? {} : { fileClass }),
+    ...(admission === undefined
+      ? {}
+      : {
+          action: {
+            kind: 'requestLocalBrowseAdmission',
+            requestKind: admission.requestKind,
+            resolvedPath: admission.resolvedPath,
+            label: sourceAdmissionLabel(admission)
+          }
+        })
+  }
+}
+
+function localBrowseAdmissionRow(
+  rowId: string,
+  operations: readonly LocalBrowseOperation[],
+  fallbackLabel: string
+): ContentRow | undefined {
+  const admission = sourceAdmissionOperation(operations)
+
+  if (admission === undefined) {
+    return undefined
+  }
+
+  return {
+    id: rowId,
+    kind: 'state',
+    label: sourceAdmissionLabel(admission) ?? fallbackLabel,
+    detail: admission.resolvedPath,
+    icon: 'folder',
+    action: {
+      kind: 'requestLocalBrowseAdmission',
+      requestKind: admission.requestKind,
+      resolvedPath: admission.resolvedPath,
+      label: sourceAdmissionLabel(admission) ?? fallbackLabel
+    }
+  }
+}
+
+function localBrowseMoreContentRow(
+  ownerId: BrowserTreeNodeId,
+  window: LoadedLocalBrowseItems
+): ContentRow | undefined {
+  const offset = window.nextOffset
+
+  if (offset === undefined) {
+    return undefined
+  }
+
+  return {
+    id: `contents-local-browse-load-more:${ownerId}:${offset}`,
+    kind: 'more',
+    label:
+      window.more?.kind === 'failed'
+        ? 'Retry loading more'
+        : window.more?.kind === 'loading'
+          ? 'Loading more'
+          : 'Load more',
+    detail:
+      window.more?.kind === 'failed'
+        ? window.more.detail
+        : `Items ${offset + 1}-${Math.min(offset + window.limit, window.totalItems)} of ${window.totalItems} are available.`,
+    icon:
+      window.more?.kind === 'loading'
+        ? 'loading'
+        : window.more?.kind === 'failed'
+          ? 'warning'
+          : 'more',
+    ...(window.more?.kind === 'loading'
+      ? {}
+      : {
+          action: {
+            kind: 'loadLocalBrowseMore',
+            nodeId: ownerId,
+            label: window.more?.kind === 'failed' ? 'Retry' : 'Load more'
+          }
+        })
+  }
+}
+
+function sourceAdmissionLabel(
+  operation: Extract<LocalBrowseOperation, { readonly kind: 'requestSourceAdmission' }>
+): string {
+  switch (operation.requestKind) {
+    case 'defaultMusicFolder':
+    case 'selectedDirectory':
+      return 'Add this folder'
+    case 'parentDirectory':
+      return 'Add parent folder'
+  }
+}
+
+function localBrowseWindowDetail(window: LoadedLocalBrowseItems): string {
+  if (window.failure !== null) {
+    return window.failure.detail
+  }
+
+  if (window.totalItems === 0) {
+    return 'No local items are available in this folder.'
+  }
+
+  return `${window.items.length} of ${window.totalItems} local items loaded.`
+}
+
+function localBrowseWindowState(
+  window: LoadedLocalBrowseItems
+): Exclude<ContentRow['state'], undefined> {
+  switch (window.status) {
+    case 'complete':
+      return 'empty'
+    case 'permissionBlocked':
+    case 'unsupportedPlatform':
+      return 'unsupported'
+    case 'partialFailure':
+    case 'failed':
+    case 'missing':
+    case 'unavailable':
+      return 'failed'
+  }
+}
+
+function localBrowseWindowStateLabel(window: LoadedLocalBrowseItems): string {
+  switch (window.status) {
+    case 'complete':
+      return 'No local items'
+    case 'partialFailure':
+      return 'Local items partially unavailable'
+    case 'failed':
+      return 'Local folder read failed'
+    case 'unsupportedPlatform':
+      return 'Local browse unsupported'
+    case 'missing':
+      return 'Local folder missing'
+    case 'permissionBlocked':
+      return 'Local folder access blocked'
+    case 'unavailable':
+      return 'Local folder unavailable'
+  }
+}
+
+function localBrowseItemIcon(item: LocalBrowseItem): ContentRowIcon {
+  if (item.status !== 'available' && item.status !== 'duplicateOfAdmittedSource') {
+    return 'warning'
+  }
+
+  switch (item.itemKind) {
+    case 'directory':
+    case 'rejectedRoot':
+      return 'folder'
+    case 'mediaFile':
+      switch (item.fileKind) {
+        case 'audio':
+          return 'music'
+        case 'video':
+          return 'video'
+        case 'image':
+          return 'image'
+        case 'cueSheet':
+          return 'cueSheet'
+        default:
+          return 'metadata'
+      }
+    case 'unsupportedFile':
+      return item.fileKind === 'cueSheet' ? 'cueSheet' : 'metadata'
+    case 'inaccessible':
+      return 'warning'
+    case 'unknown':
+      return 'state'
+  }
+}
+
+function localBrowseFileClass(item: LocalBrowseItem): ContentRow['fileClass'] | undefined {
+  switch (item.fileKind) {
+    case 'audio':
+      return 'audio'
+    case 'video':
+      return 'video'
+    case 'image':
+      return 'image'
+    case 'cueSheet':
+    case 'logDoc':
+    case 'textDoc':
+    case 'archive':
+    case 'other':
+    case 'unknown':
+      return 'unsupported'
+    case null:
+      return undefined
+  }
+}
+
 function contentsRow(row: ContentsFileRow): ContentRow {
   const icon = contentsRowIcon(row)
   const detail =
@@ -984,7 +1353,16 @@ function contentMoreRow(
           ? 'Loading more'
           : 'Load more',
     detail: binding.detail,
-    icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more'
+    icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more',
+    ...(binding.state === 'loading'
+      ? {}
+      : {
+          action: {
+            kind: 'loadLocalBrowseMore',
+            nodeId,
+            label: binding.state === 'error' ? 'Retry' : 'Load more'
+          }
+        })
   }
 }
 
@@ -1013,7 +1391,7 @@ function localBrowseItemDetail(
     return item.failure.detail
   }
 
-  return item.identity.itemCanonicalPath
+  return item.identity.resolvedItemPath
 }
 
 function stateProjection(options: {

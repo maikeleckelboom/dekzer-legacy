@@ -30,7 +30,7 @@ export async function readLocalRootsThroughHost(
       roots: reply.roots.map(
         (root): LocalRoot => ({
           rootId: root.rootId,
-          canonicalPath: root.canonicalPath,
+          admittedRootPath: root.admittedRootPath,
           availability: mapContractAvailability(root.availability)
         })
       )

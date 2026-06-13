@@ -15,15 +15,15 @@ lastSeenEventSequence: number | null, maxEvents: number, };
 
 export type LibraryRootCommand = { "type": "registerLocalRoot", "payload": RegisterLocalRootRequest } | { "type": "startRootScan", "payload": StartRootScanRequest } | { "type": "readLocalRoots", "payload": ReadLocalRootsRequest } | { "type": "unregisterLocalRoot", "payload": UnregisterLocalRootRequest } | { "type": "cancelRootScan", "payload": CancelRootScanRequest };
 
-export type RegisterLocalRootRequest = { absolutePath: string, };
+export type RegisterLocalRootRequest = { requestedPath: string, };
 
 export type SourceRegistrationRootClass = "normalMusicRoot" | "broadDriveRoot" | "systemVolumeRoot" | "userProfileRoot" | "cloudBackedRoot" | "networkRoot" | "protectedRoot" | "indirectionRoot" | "unknownRoot";
 
-export type RegisteredLocalRoot = { rootId: string, canonicalPath: string, };
+export type RegisteredLocalRoot = { rootId: string, admittedRootPath: string, };
 
-export type SourceRegistrationProposalRequired = { proposalId: string, rootClass: SourceRegistrationRootClass, requestedPath: string, canonicalPath: string | null, confirmationRequiredReason: string, suggestedRoots: Array<string>, };
+export type SourceRegistrationProposalRequired = { proposalId: string, rootClass: SourceRegistrationRootClass, requestedPath: string, resolvedPath: string | null, confirmationRequiredReason: string, suggestedRootPaths: Array<string>, };
 
-export type SourceRegistrationRejected = { rootClass: SourceRegistrationRootClass, requestedPath: string, canonicalPath: string | null, rejectionReason: string, suggestedRoots: Array<string>, };
+export type SourceRegistrationRejected = { rootClass: SourceRegistrationRootClass, requestedPath: string, resolvedPath: string | null, rejectionReason: string, suggestedRootPaths: Array<string>, };
 
 export type StartRootScanRequest = { rootId: string, };
 
@@ -37,7 +37,7 @@ export type UnregisterLocalRootRequest = { rootId: string, };
 
 export type LocalRootAvailability = "available" | "unavailable";
 
-export type LocalRoot = { rootId: string, canonicalPath: string, availability: LocalRootAvailability, };
+export type LocalRoot = { rootId: string, admittedRootPath: string, availability: LocalRootAvailability, };
 
 export type SourceFileHashCommand = { "type": "hashSourceFilesBlake3", "payload": HashSourceFilesBlake3Request };
 
@@ -71,11 +71,15 @@ export type LocalBrowseEntryPointStatus = "resolving" | "available" | "unavailab
 
 export type LocalBrowsePlatform = "windows" | "macos" | "linux" | "unsupported";
 
-export type LocalBrowseAdmissionAction = "requestAdmission" | "requestDefaultMusicFolderAdmission" | "requestParentAdmission";
+export type LocalBrowseOperation = { "kind": "browseChildren" } | { "kind": "chooseDescendant" } | { "kind": "requestSourceAdmission", requestKind: LocalBrowseSourceAdmissionRequestKind, resolvedPath: string, };
+
+export type LocalBrowseSourceAdmissionRequestKind = "defaultMusicFolder" | "selectedDirectory" | "parentDirectory";
+
+export type LocalBrowseProfile = "audioBrowse" | "mediaBrowse" | "allFiles";
 
 export type LocalBrowseEntryPointFailureCode = "unsupportedPlatform" | "knownFolderUnavailable" | "systemDriveUnavailable" | "volumeEnumerationUnavailable" | "metadataUnavailable";
 
-export type ReadLocalBrowseItemsRequest = { entryPointKind: LocalBrowseEntryPointKind, rootCanonicalPath: string, parentCanonicalPath: string, offset: number, limit: number, };
+export type ReadLocalBrowseItemsRequest = { entryPointKind: LocalBrowseEntryPointKind, resolvedRootPath: string, resolvedParentPath: string, profile: LocalBrowseProfile, offset: number, limit: number, };
 
 export type LocalBrowseItemKind = "directory" | "mediaFile" | "unsupportedFile" | "rejectedRoot" | "inaccessible" | "unknown";
 
@@ -230,11 +234,9 @@ export type ReadLocalBrowseEntryPointsReply = { status: LocalBrowseEntryPointsRe
 
 export type LocalBrowseEntryPointsReadStatus = "complete" | "partialFailure" | "failed" | "unsupportedPlatform";
 
-export type LocalBrowseEntryPoint = { identity: LocalBrowseEntryPointIdentity, displayName: string, status: LocalBrowseEntryPointStatus, platform: LocalBrowsePlatform, admissionAction: LocalBrowseAdmissionAction | null, availableActions: LocalBrowseAvailableActions, failure: LocalBrowseEntryPointFailure | null, };
+export type LocalBrowseEntryPoint = { identity: LocalBrowseEntryPointIdentity, displayName: string, status: LocalBrowseEntryPointStatus, platform: LocalBrowsePlatform, availableOperations: Array<LocalBrowseOperation>, failure: LocalBrowseEntryPointFailure | null, };
 
-export type LocalBrowseEntryPointIdentity = { entryPointKind: LocalBrowseEntryPointKind, canonicalPath: string | null, };
-
-export type LocalBrowseAvailableActions = { canBrowse: boolean, canRequestAdmission: boolean, canChooseDescendant: boolean, canRequestParentAdmission: boolean, };
+export type LocalBrowseEntryPointIdentity = { entryPointKind: LocalBrowseEntryPointKind, resolvedPath: string | null, };
 
 export type LocalBrowseEntryPointFailure = { code: LocalBrowseEntryPointFailureCode, detail: string, };
 
@@ -242,11 +244,11 @@ export type ReadLocalBrowseItemsReply = { status: LocalBrowseItemsReadStatus, wi
 
 export type LocalBrowseItemsReadStatus = "complete" | "partialFailure" | "failed" | "unsupportedPlatform" | "missing" | "permissionBlocked" | "unavailable";
 
-export type LocalBrowseWindowIdentity = { entryPointKind: LocalBrowseEntryPointKind, rootCanonicalPath: string, parentCanonicalPath: string, };
+export type LocalBrowseWindowIdentity = { entryPointKind: LocalBrowseEntryPointKind, resolvedRootPath: string, resolvedParentPath: string, };
 
-export type LocalBrowseItem = { identity: LocalBrowseItemIdentity, itemKind: LocalBrowseItemKind, displayName: string, status: LocalBrowseItemStatus, platform: LocalBrowsePlatform, fileKind: ContentsFileKind | null, mediaRelevance: LocalBrowseItemMediaRelevance | null, admissionAction: LocalBrowseAdmissionAction | null, availableActions: LocalBrowseAvailableActions, failure: LocalBrowseItemFailure | null, };
+export type LocalBrowseItem = { identity: LocalBrowseItemIdentity, itemKind: LocalBrowseItemKind, displayName: string, status: LocalBrowseItemStatus, platform: LocalBrowsePlatform, fileKind: ContentsFileKind | null, mediaRelevance: LocalBrowseItemMediaRelevance | null, availableOperations: Array<LocalBrowseOperation>, failure: LocalBrowseItemFailure | null, };
 
-export type LocalBrowseItemIdentity = { entryPointKind: LocalBrowseEntryPointKind, rootCanonicalPath: string, itemCanonicalPath: string, };
+export type LocalBrowseItemIdentity = { entryPointKind: LocalBrowseEntryPointKind, resolvedRootPath: string, resolvedItemPath: string, };
 
 export type LocalBrowseItemFailure = { code: LocalBrowseItemFailureCode, detail: string, };
 

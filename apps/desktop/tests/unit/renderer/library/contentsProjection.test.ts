@@ -31,6 +31,16 @@ import type {
   NavigationReadRowsResult,
   NavigationRow
 } from '../../../../src/shared/library/navigation/read'
+import type { LocalBrowseEntryPoint } from '../../../../src/shared/library/localBrowse/entryPoints'
+import type {
+  LocalBrowseItem,
+  LocalBrowseItemKind
+} from '../../../../src/shared/library/localBrowse/items'
+import {
+  localBrowseWindowKey,
+  type LoadedLocalBrowseItems,
+  type LocalBrowseItemState
+} from '../../../../src/renderer/library/localBrowse/types'
 
 describe('projectContents', () => {
   it('projects selected source contents from contents state', () => {
@@ -168,6 +178,130 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('ready')
     expect(contents.rows.map((row) => row.label)).toEqual(['B.wav', 'A.jpg'])
     expect(contents.rows.every((row) => row.kind === 'file')).toBe(true)
+  })
+
+  it('projects selected loaded local browse folders from local browse item windows', () => {
+    const rootWindow = localBrowseWindow({
+      label: 'Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      items: [
+        localBrowseItem('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
+        localBrowseItem('mediaFile', 'loose.flac', 'C:\\Users\\Maikel\\Music\\loose.flac', {
+          fileKind: 'audio',
+          mediaRelevance: 'mediaRelevant'
+        })
+      ]
+    })
+    const albumWindow = localBrowseWindow({
+      label: 'Albums',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+      items: [
+        localBrowseItem('mediaFile', 'track.flac', 'C:\\Users\\Maikel\\Music\\Albums\\track.flac', {
+          fileKind: 'audio',
+          mediaRelevance: 'mediaRelevant'
+        })
+      ]
+    })
+    const state = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()],
+      localBrowseItemStates: new Map([
+        [localBrowseWindowStateKey(rootWindow), { kind: 'loaded', window: rootWindow }],
+        [localBrowseWindowStateKey(albumWindow), { kind: 'loaded', window: albumWindow }]
+      ])
+    })
+    const projection = browserProjection(state)
+    const entryNode = firstLocalBrowseEntryNode(projection)
+    const rootContents = projectContents({
+      state,
+      selectedNodeId: entryNode.id,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(rootContents.kind).toBe('ready')
+    expect(rootContents.title).toBe('Music')
+    expect(rootContents.rows.map((row) => row.label)).toEqual([
+      'Add this folder',
+      'Albums',
+      'loose.flac'
+    ])
+    expect(rootContents.rows.some((row) => row.label === 'Contents unavailable')).toBe(false)
+
+    const albumNode = entryNode.children.kind === 'loaded' ? entryNode.children.nodes[0] : undefined
+    if (albumNode === undefined) {
+      throw new Error('Expected loaded album node.')
+    }
+    const albumContents = projectContents({
+      state,
+      selectedNodeId: albumNode.id,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(albumContents.kind).toBe('ready')
+    expect(albumContents.title).toBe('Albums')
+    expect(albumContents.rows.map((row) => row.label)).toEqual(['Add this folder', 'track.flac'])
+  })
+
+  it('projects selected unloaded local browse folders as loadable instead of unsupported', () => {
+    const state = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()]
+    })
+    const projection = browserProjection(state)
+    const entryNode = firstLocalBrowseEntryNode(projection)
+    const contents = projectContents({
+      state,
+      selectedNodeId: entryNode.id,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(contents.kind).toBe('notLoaded')
+    expect(contents.rows.map((row) => row.label)).toEqual([
+      'Add this folder',
+      'Local folder contents not loaded'
+    ])
+    expect(contents.rows[1]).toMatchObject({
+      state: 'notLoaded',
+      action: {
+        kind: 'loadLocalBrowseChildren',
+        nodeId: entryNode.id
+      }
+    })
+  })
+
+  it('projects local browse load-more from contents without switching to durable rows', () => {
+    const rootWindow = localBrowseWindow({
+      label: 'Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      items: [localBrowseItem('directory', 'A', 'C:\\Users\\Maikel\\Music\\A')],
+      totalItems: 3,
+      nextOffset: 1
+    })
+    const state = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()],
+      localBrowseItemStates: new Map([
+        [localBrowseWindowStateKey(rootWindow), { kind: 'loaded', window: rootWindow }]
+      ])
+    })
+    const projection = browserProjection(state)
+    const entryNode = firstLocalBrowseEntryNode(projection)
+    const contents = projectContents({
+      state,
+      selectedNodeId: entryNode.id,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.rows.map((row) => row.kind)).toEqual(['state', 'directory', 'more'])
+    expect(contents.rows[2]).toMatchObject({
+      label: 'Load more',
+      action: {
+        kind: 'loadLocalBrowseMore',
+        nodeId: entryNode.id
+      }
+    })
+    expect(contents.rows.some((row) => row.id.startsWith('source-'))).toBe(false)
   })
 
   it('projects MP4 source rows as video under playable-media browse', () => {
@@ -1059,6 +1193,8 @@ function browserState(options: {
   readonly navigationReadResult?: NavigationReadRowsResult
   readonly sourceState?: SourceState
   readonly directoryStates?: ReadonlyMap<string, DirectoryState>
+  readonly entries?: readonly LocalBrowseEntryPoint[]
+  readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
 }): BrowserState {
   const sourceStates = new Map<string, SourceState>()
 
@@ -1072,7 +1208,23 @@ function browserState(options: {
       rows: [sourceNavigationRow()]
     },
     sourceReadStates: sourceStates,
-    directoryReadStates: options.directoryStates ?? new Map()
+    directoryReadStates: options.directoryStates ?? new Map(),
+    ...(options.entries === undefined
+      ? {}
+      : {
+          localBrowseEntryPointsState: {
+            kind: 'ready',
+            result: {
+              state: 'read',
+              status: 'complete',
+              entries: options.entries,
+              failure: null
+            }
+          } as const
+        }),
+    ...(options.localBrowseItemStates === undefined
+      ? {}
+      : { localBrowseItemStates: options.localBrowseItemStates })
   }
 }
 
@@ -1118,6 +1270,13 @@ function sourceNavigationRow(): NavigationRow {
     selectorPayload: '7',
     updatedAtMs: 100,
     rowVersion: '1'
+  }
+}
+
+function emptyNavigation(): NavigationReadRowsResult {
+  return {
+    state: 'ready',
+    rows: []
   }
 }
 
@@ -1187,6 +1346,108 @@ function sourceEntryPoint(): EntryPoint {
     kind: 'source',
     sourceId: '7'
   }
+}
+
+function localBrowseEntryPoint(): LocalBrowseEntryPoint {
+  return {
+    identity: {
+      entryPointKind: 'music',
+      resolvedPath: 'C:\\Users\\Maikel\\Music'
+    },
+    displayName: 'Music',
+    status: 'available',
+    platform: 'windows',
+    availableOperations: [
+      { kind: 'browseChildren' },
+      { kind: 'chooseDescendant' },
+      {
+        kind: 'requestSourceAdmission',
+        requestKind: 'defaultMusicFolder',
+        resolvedPath: 'C:\\Users\\Maikel\\Music'
+      }
+    ],
+    failure: null
+  }
+}
+
+function localBrowseItem(
+  itemKind: LocalBrowseItemKind,
+  displayName: string,
+  resolvedItemPath: string,
+  overrides: Partial<LocalBrowseItem> = {}
+): LocalBrowseItem {
+  return {
+    identity: {
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedItemPath
+    },
+    itemKind,
+    displayName,
+    status: 'available',
+    platform: 'windows',
+    fileKind: null,
+    mediaRelevance: null,
+    availableOperations:
+      itemKind === 'directory'
+        ? [
+            { kind: 'browseChildren' },
+            { kind: 'chooseDescendant' },
+            {
+              kind: 'requestSourceAdmission',
+              requestKind: 'selectedDirectory',
+              resolvedPath: resolvedItemPath
+            }
+          ]
+        : [],
+    failure: null,
+    ...overrides
+  }
+}
+
+function localBrowseWindow(options: {
+  readonly label: string
+  readonly resolvedParentPath: string
+  readonly items: readonly LocalBrowseItem[]
+  readonly totalItems?: number
+  readonly nextOffset?: number
+}): LoadedLocalBrowseItems {
+  return {
+    identity: {
+      entryPointKind: 'music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: options.resolvedParentPath
+    },
+    label: options.label,
+    items: options.items,
+    totalItems: options.totalItems ?? options.items.length,
+    status: 'complete',
+    failure: null,
+    limit: 50,
+    ...(options.nextOffset === undefined ? {} : { nextOffset: options.nextOffset })
+  }
+}
+
+function localBrowseWindowStateKey(window: LoadedLocalBrowseItems): string {
+  return localBrowseWindowKey({
+    entryPointKind: window.identity.entryPointKind,
+    resolvedRootPath: window.identity.resolvedRootPath,
+    resolvedParentPath: window.identity.resolvedParentPath,
+    label: window.label
+  })
+}
+
+function firstLocalBrowseEntryNode(
+  projection: BrowserProjection
+): BrowserProjection['nodes'][number] {
+  const section = projection.nodes.find((node) => node.id === 'local-browse:section')
+  const node = section?.children.kind === 'loaded' ? section.children.nodes[0] : undefined
+
+  if (node === undefined) {
+    throw new Error('Expected a projected local browse entry point.')
+  }
+
+  return node
 }
 
 function readyContents(options: {

@@ -35,7 +35,7 @@ describe('local root scan lifecycle', () => {
         chooseAndRegisterLocal: async () =>
           registeredChoice({
             rootId: 'root-from-main',
-            canonicalPath: 'C:/Music/root-from-main-is-not-parsed'
+            admittedRootPath: 'C:/Music/root-from-main-is-not-parsed'
           }),
         runScan
       })
@@ -59,9 +59,9 @@ describe('local root scan lifecycle', () => {
             proposalId: 'proposal-1',
             rootClass: 'systemVolumeRoot',
             requestedPath: 'C:/',
-            canonicalPath: 'C:/',
+            resolvedPath: 'C:/',
             confirmationRequiredReason: 'system volume roots require scan-plan confirmation',
-            suggestedRoots: ['C:/Users/Maikel/Music']
+            suggestedRootPaths: ['C:/Users/Maikel/Music']
           }
         }),
         runScan: proposalScan
@@ -83,9 +83,9 @@ describe('local root scan lifecycle', () => {
           rejection: {
             rootClass: 'protectedRoot',
             requestedPath: 'C:/Windows',
-            canonicalPath: 'C:/Windows',
+            resolvedPath: 'C:/Windows',
             rejectionReason: 'protected roots cannot be registered as sources',
-            suggestedRoots: ['C:/Users/Maikel/Music']
+            suggestedRootPaths: ['C:/Users/Maikel/Music']
           }
         })
       })
@@ -111,7 +111,7 @@ describe('local root scan lifecycle', () => {
           events.push('choose')
           return registeredChoice({
             rootId: 'root-from-main',
-            canonicalPath: 'C:/Music/root-from-main-is-not-parsed'
+            admittedRootPath: 'C:/Music/root-from-main-is-not-parsed'
           })
         },
         runScan
@@ -134,7 +134,7 @@ describe('local root scan lifecycle', () => {
     const rootActions = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }),
+          registeredChoice({ rootId: 'root-2', admittedRootPath: 'C:/Music/Two' }),
         runScan: async () => {
           events.push('scan')
           return startedRootResult()
@@ -165,7 +165,7 @@ describe('local root scan lifecycle', () => {
     const rootActions = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }),
+          registeredChoice({ rootId: 'root-2', admittedRootPath: 'C:/Music/Two' }),
         runScan: async () => {
           events.push('scan')
           return startedRootResult()
@@ -194,6 +194,74 @@ describe('local root scan lifecycle', () => {
     expect(events).toEqual(['durableNavigation', 'localBrowseEntryPoints', 'scan'])
   })
 
+  it('registers a local browse admission path through the root registration flow', async () => {
+    const events: string[] = []
+    const registerLocalPath = vi.fn(async (request: { readonly requestedPath: string }) => {
+      events.push(`register:${request.requestedPath}`)
+      return {
+        state: 'registered' as const,
+        root: {
+          rootId: 'root-from-local-browse',
+          admittedRootPath: request.requestedPath
+        }
+      }
+    })
+    const runScan = vi.fn(async (request: { readonly rootId: string }) => {
+      events.push(`scan:${request.rootId}`)
+      return startedRootResult('scan-local')
+    })
+    const readLocalRoots = vi.fn(async (): Promise<ReadLocalRootsOutcome> => {
+      events.push('localRoots')
+      return {
+        state: 'read',
+        roots: [
+          {
+            rootId: 'root-from-local-browse',
+            admittedRootPath: 'C:/Music/Album',
+            availability: 'available'
+          }
+        ]
+      }
+    })
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        registerLocalPath,
+        runScan,
+        readLocalRoots
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: {
+        refresh: async () => {
+          events.push('durableNavigation')
+          return true
+        }
+      },
+      localBrowseRead: {
+        refreshEntryPoints: async () => {
+          events.push('localBrowseEntryPoints')
+          return true
+        }
+      },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false
+    })
+
+    await expect(lifecycle.addLocalPath('C:/Music/Album')).resolves.toBe(true)
+
+    expect(registerLocalPath).toHaveBeenCalledWith({ requestedPath: 'C:/Music/Album' })
+    expect(runScan).toHaveBeenCalledWith({ rootId: 'root-from-local-browse' })
+    expect(readLocalRoots).toHaveBeenCalledOnce()
+    expect(events).toEqual([
+      'register:C:/Music/Album',
+      'localRoots',
+      'durableNavigation',
+      'localBrowseEntryPoints',
+      'scan:root-from-local-browse'
+    ])
+  })
+
   it('evaluates source activation when the registration response arrives, not at request start', async () => {
     const choice = deferred<LocalRootChoiceResult>()
     const selection = { nodeId: undefined as string | undefined }
@@ -216,7 +284,7 @@ describe('local root scan lifecycle', () => {
 
     const registration = lifecycle.addMusicFolder()
     selection.nodeId = 'navigation-row:root-1'
-    choice.resolve(registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }))
+    choice.resolve(registeredChoice({ rootId: 'root-2', admittedRootPath: 'C:/Music/Two' }))
 
     await expect(registration).resolves.toBe(true)
     expect(intent).toEqual({
@@ -293,7 +361,7 @@ describe('local root scan lifecycle', () => {
   it('preserves existing scan state when a replacement registration is canceled or fails', async () => {
     const secondChoice = deferred<LocalRootChoiceResult>()
     const choices: Array<LocalRootChoiceResult | Promise<LocalRootChoiceResult>> = [
-      registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music/One' }),
+      registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music/One' }),
       secondChoice.promise
     ]
     const controller = createLocalRootActionsController(
@@ -328,8 +396,8 @@ describe('local root scan lifecycle', () => {
     const secondScan = deferred<LocalRootScanResult>()
     const secondScanStarted = deferred<void>()
     const choices: LocalRootChoiceResult[] = [
-      registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music/One' }),
-      registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' })
+      registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music/One' }),
+      registeredChoice({ rootId: 'root-2', admittedRootPath: 'C:/Music/Two' })
     ]
     const scanRequests: unknown[] = []
     const { rootActions, lifecycle } = testRootLifecycle(
@@ -370,8 +438,8 @@ describe('local root scan lifecycle', () => {
         readLocalRoots: async () => ({
           state: 'read',
           roots: [
-            { rootId: 'root-1', canonicalPath: 'C:/Music/One', availability: 'available' },
-            { rootId: 'root-2', canonicalPath: 'C:/Music/Two', availability: 'available' }
+            { rootId: 'root-1', admittedRootPath: 'C:/Music/One', availability: 'available' },
+            { rootId: 'root-2', admittedRootPath: 'C:/Music/Two', availability: 'available' }
           ]
         })
       })
@@ -388,7 +456,7 @@ describe('local root scan lifecycle', () => {
       testRootApi({
         readLocalRoots: async () => ({
           state: 'read',
-          roots: [{ rootId: 'root-7', canonicalPath: 'C:/Music', availability: 'available' }]
+          roots: [{ rootId: 'root-7', admittedRootPath: 'C:/Music', availability: 'available' }]
         })
       })
     )
@@ -401,7 +469,7 @@ describe('local root scan lifecycle', () => {
       testRootApi({
         readLocalRoots: async () => ({
           state: 'read',
-          roots: [{ rootId: 'root-8', canonicalPath: 'Z:/Missing', availability: 'unavailable' }]
+          roots: [{ rootId: 'root-8', admittedRootPath: 'Z:/Missing', availability: 'unavailable' }]
         })
       })
     )
@@ -417,7 +485,7 @@ describe('local root scan failure detail preservation', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => ({
           state: 'scanFailed',
           error: {
@@ -440,7 +508,7 @@ describe('local root scan failure detail preservation', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => ({
           state: 'scanFailed',
           error: {
@@ -464,7 +532,7 @@ describe('local root scan failure detail preservation', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => {
           throw new Error('unexpected renderer failure')
         }
@@ -482,7 +550,7 @@ describe('local root scan failure detail preservation', () => {
     const hostUnavailableController = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => ({
           state: 'hostUnavailable',
           error: { code: 'hostFailed', message: 'Library boundary host is unavailable.' }
@@ -504,7 +572,7 @@ describe('local root scan failure detail preservation', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => {
           scanCallCount++
           if (scanCallCount === 1) {
@@ -544,7 +612,7 @@ describe('local root remove lifecycle', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-from-backend', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-from-backend', admittedRootPath: 'C:/Music' }),
         unregisterLocalRoot
       })
     )
@@ -564,8 +632,8 @@ describe('local root remove lifecycle', () => {
         readLocalRoots: async () => ({
           state: 'read',
           roots: [
-            { rootId: 'root-1', canonicalPath: 'C:/Music/One', availability: 'available' },
-            { rootId: 'root-2', canonicalPath: 'C:/Music/Two', availability: 'available' }
+            { rootId: 'root-1', admittedRootPath: 'C:/Music/One', availability: 'available' },
+            { rootId: 'root-2', admittedRootPath: 'C:/Music/Two', availability: 'available' }
           ]
         }),
         unregisterLocalRoot
@@ -593,7 +661,7 @@ describe('local root remove lifecycle', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => startedRootResult('scan-1')
       })
     )
@@ -620,7 +688,7 @@ describe('local root remove lifecycle', () => {
     const controller = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => ({
           state: 'hostUnavailable',
@@ -643,7 +711,7 @@ describe('local root remove lifecycle', () => {
     const alreadyRemoved = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         unregisterLocalRoot: async () => ({
           state: 'unregistered',
           unregistered: false
@@ -663,7 +731,7 @@ describe('local root remove lifecycle', () => {
       testRootApi({
         chooseAndRegisterLocal: async () => {
           events.push('choose')
-          return registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' })
+          return registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' })
         },
         runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => {
@@ -694,7 +762,7 @@ describe('local root remove lifecycle', () => {
     const rootActions = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => {
           events.push('unregister')
@@ -733,7 +801,7 @@ describe('local root remove lifecycle', () => {
     const rootActions = createLocalRootActionsController(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => ({ state: 'unregistered', unregistered: true })
       })
@@ -763,7 +831,7 @@ describe('local root remove lifecycle', () => {
     const blocked = testRootLifecycle(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+          registeredChoice({ rootId: 'root-1', admittedRootPath: 'C:/Music' }),
         runScan: async () => startedRootResult(),
         unregisterLocalRoot
       }),
@@ -779,7 +847,7 @@ describe('local root remove lifecycle', () => {
     const visibleAfterRefresh = testRootLifecycle(
       testRootApi({
         chooseAndRegisterLocal: async () =>
-          registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }),
+          registeredChoice({ rootId: 'root-2', admittedRootPath: 'C:/Music/Two' }),
         runScan: async () => startedRootResult(),
         unregisterLocalRoot: async () => ({ state: 'unregistered', unregistered: true })
       }),
@@ -802,6 +870,13 @@ describe('local root remove lifecycle', () => {
 function testRootApi(overrides: Partial<LibraryRootActionsApi> = {}): LibraryRootActionsApi {
   return {
     chooseAndRegisterLocal: async () => ({ state: 'canceled' }),
+    registerLocalPath: async () => ({
+      state: 'registrationFailed',
+      error: {
+        code: 'registrationFailed',
+        message: 'Local root registration should not be called by this test.'
+      }
+    }),
     runScan: async () => ({
       state: 'scanFailed',
       error: {
@@ -854,10 +929,10 @@ function testRootLifecycle(
 function registeredChoice(
   root: {
     readonly rootId: string
-    readonly canonicalPath: string
+    readonly admittedRootPath: string
   } = {
     rootId: 'root-1',
-    canonicalPath: 'C:/Music'
+    admittedRootPath: 'C:/Music'
   }
 ): LocalRootChoiceResult {
   return {

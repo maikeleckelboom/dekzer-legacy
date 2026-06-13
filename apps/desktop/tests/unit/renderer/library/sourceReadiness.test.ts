@@ -393,7 +393,7 @@ function readyNavigation(rows: readonly NavigationRow[]): NavigationReadRowsResu
 function readyRoots(availability: 'available' | 'unavailable'): LocalRootsReadState {
   return {
     kind: 'ready',
-    roots: [{ rootId: '7', canonicalPath: 'C:/Music', availability }]
+    roots: [{ rootId: '7', admittedRootPath: 'C:/Music', availability }]
   }
 }
 

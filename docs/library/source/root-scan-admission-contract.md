@@ -62,7 +62,7 @@ create a source row, and must not create a proposed proposal row. Arc A does not
 Arc A does not implement limited protected-root scanning.
 
 Registration proposals are distinct from sources. They are not scannable, are not returned by local-root reads, do not
-create source lifecycle/navigation/browser/scan/maintenance state, and are idempotent by canonical path while their
+create source lifecycle/navigation/browser/scan/maintenance state, and are idempotent by normalized requested/resolved path while their
 status is proposed.
 
 `StartRootScan` is only for admitted source roots. It must defensively reject broad/system/risky/protected roots even if

@@ -15,7 +15,7 @@ const ERROR_DETAIL_SCAN_FAILED: &str = "scan_failed";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedRoot {
     pub root_id: i64,
-    pub canonical_path: PathBuf,
+    pub admitted_root_path: PathBuf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,19 +26,21 @@ pub(crate) struct CanonicalSourcePath {
 
 impl CanonicalSourcePath {
     pub(crate) fn resolve(path: &Path) -> LibrarySqliteResult<Self> {
-        let canonical_path = std::fs::canonicalize(path).map_err(|source| {
+        let admitted_root_path = std::fs::canonicalize(path).map_err(|source| {
             LibrarySqliteError::RootPathCanonicalization {
                 path: path.to_path_buf(),
                 source,
             }
         })?;
-        let path_text = canonical_path
+        let path_text = admitted_root_path
             .to_str()
-            .ok_or_else(|| LibrarySqliteError::NonUtf8CanonicalRootPath(canonical_path.clone()))?
+            .ok_or_else(|| {
+                LibrarySqliteError::NonUtf8CanonicalRootPath(admitted_root_path.clone())
+            })?
             .to_owned();
 
         Ok(Self {
-            path: canonical_path,
+            path: admitted_root_path,
             path_text,
         })
     }
@@ -58,7 +60,7 @@ impl CanonicalSourcePath {
     fn resolved_root(&self, root_id: i64) -> ResolvedRoot {
         ResolvedRoot {
             root_id,
-            canonical_path: self.path.clone(),
+            admitted_root_path: self.path.clone(),
         }
     }
 }
@@ -282,23 +284,23 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
 
     pub(crate) fn bootstrap_root(
         &mut self,
-        canonical_path: &CanonicalSourcePath,
+        source_path: &CanonicalSourcePath,
     ) -> LibrarySqliteResult<ResolvedRoot> {
         let root_id = self.upsert_source(
-            canonical_path.identity_kind(),
-            canonical_path.identity_value(),
+            source_path.identity_kind(),
+            source_path.identity_value(),
             None,
             "internal",
             "system",
         )?;
-        self.upsert_absolute_path_locator(root_id, canonical_path.as_text())?;
+        self.upsert_absolute_path_locator(root_id, source_path.as_text())?;
         self.initialize_source_state_if_missing(
             root_id,
             SourceLocatorKind::AbsolutePath,
-            canonical_path.as_text(),
+            source_path.as_text(),
         )?;
         self.refresh_absolute_path_root(root_id, unix_time_ms()?)?;
-        Ok(canonical_path.resolved_root(root_id))
+        Ok(source_path.resolved_root(root_id))
     }
 
     pub(crate) fn register_removable_root(

@@ -35,7 +35,7 @@ use super::{SqliteDurableStore, bootstrap::open_connection};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegisterLocalRootInput {
-    pub absolute_path: PathBuf,
+    pub requested_path: PathBuf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,18 +89,18 @@ pub struct SourceRegistrationProposal {
     pub proposal_id: i64,
     pub root_class: SourceRegistrationRootClass,
     pub requested_path: PathBuf,
-    pub canonical_path: Option<PathBuf>,
+    pub resolved_path: Option<PathBuf>,
     pub confirmation_required_reason: String,
-    pub suggested_roots: Vec<PathBuf>,
+    pub suggested_root_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceRegistrationRejection {
     pub root_class: SourceRegistrationRootClass,
     pub requested_path: PathBuf,
-    pub canonical_path: Option<PathBuf>,
+    pub resolved_path: Option<PathBuf>,
     pub rejection_reason: String,
-    pub suggested_roots: Vec<PathBuf>,
+    pub suggested_root_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,7 +113,7 @@ pub enum RegisterLocalRootResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalRoot {
     pub root_id: i64,
-    pub canonical_path: PathBuf,
+    pub admitted_root_path: PathBuf,
     pub availability: LocalRootAvailability,
 }
 
@@ -253,27 +253,27 @@ impl SqliteDurableStore {
         &self,
         input: RegisterLocalRootInput,
     ) -> LibrarySqliteResult<RegisterLocalRootResult> {
-        match classify_source_registration_root(&input.absolute_path) {
-            SourceRegistrationAdmission::AdmitNormal { canonical_path } => {
-                let resolved_root = self.bootstrap_root(&canonical_path)?;
+        match classify_source_registration_root(&input.requested_path) {
+            SourceRegistrationAdmission::AdmitNormal { resolved_path } => {
+                let resolved_root = self.bootstrap_root(&resolved_path)?;
                 let _ = self.establish_root_navigation_window(resolved_root.root_id)?;
                 Ok(RegisterLocalRootResult::Registered(LocalRoot {
                     root_id: resolved_root.root_id,
-                    canonical_path: resolved_root.canonical_path,
+                    admitted_root_path: resolved_root.admitted_root_path,
                     availability: LocalRootAvailability::Available,
                 }))
             }
             SourceRegistrationAdmission::RequireProposal {
                 root_class,
                 requested_path,
-                canonical_path,
+                resolved_path,
                 confirmation_required_reason,
                 suggested_roots,
             } => self
                 .record_or_read_source_registration_proposal(
                     root_class,
                     requested_path,
-                    canonical_path,
+                    resolved_path,
                     confirmation_required_reason,
                     suggested_roots,
                 )
@@ -281,16 +281,16 @@ impl SqliteDurableStore {
             SourceRegistrationAdmission::Reject {
                 root_class,
                 requested_path,
-                canonical_path,
+                resolved_path,
                 rejection_reason,
                 suggested_roots,
             } => Ok(RegisterLocalRootResult::Rejected(
                 SourceRegistrationRejection {
                     root_class,
                     requested_path,
-                    canonical_path,
+                    resolved_path,
                     rejection_reason,
-                    suggested_roots,
+                    suggested_root_paths: suggested_roots,
                 },
             )),
         }
@@ -317,7 +317,7 @@ impl SqliteDurableStore {
                 };
                 Ok(LocalRoot {
                     root_id: row.get(0)?,
-                    canonical_path: PathBuf::from(row.get::<_, String>(1)?),
+                    admitted_root_path: PathBuf::from(row.get::<_, String>(1)?),
                     availability,
                 })
             })?
@@ -366,13 +366,13 @@ impl SqliteDurableStore {
         &self,
         root_class: SourceRegistrationRootClass,
         requested_path: PathBuf,
-        canonical_path: Option<PathBuf>,
+        resolved_path: Option<PathBuf>,
         confirmation_required_reason: String,
         suggested_roots: Vec<PathBuf>,
     ) -> LibrarySqliteResult<SourceRegistrationProposal> {
-        let canonical_key = proposal_canonical_key(&requested_path, canonical_path.as_deref());
+        let resolved_key = proposal_resolved_key(&requested_path, resolved_path.as_deref());
         let requested_path_text = path_to_text(&requested_path);
-        let canonical_path_text = canonical_path.as_ref().map(|path| path_to_text(path));
+        let resolved_path_text = resolved_path.as_ref().map(|path| path_to_text(path));
         let suggested_roots_json = serde_json::to_string(
             &suggested_roots
                 .iter()
@@ -387,7 +387,7 @@ impl SqliteDurableStore {
 
         self.with_write(|write| {
             if let Some(existing) =
-                read_proposed_source_registration_proposal(write, &canonical_key)?
+                read_proposed_source_registration_proposal(write, &resolved_key)?
             {
                 return Ok(existing);
             }
@@ -398,7 +398,7 @@ impl SqliteDurableStore {
                      proposal_status,
                      root_class,
                      requested_path,
-                     canonical_path,
+                     resolved_path,
                      confirmation_required_reason,
                      suggested_roots_json,
                      created_at,
@@ -408,7 +408,7 @@ impl SqliteDurableStore {
                 rusqlite::params![
                     root_class.as_str(),
                     requested_path_text,
-                    canonical_path_text.as_deref(),
+                    resolved_path_text.as_deref(),
                     confirmation_required_reason,
                     suggested_roots_json,
                     now_ms,
@@ -419,9 +419,9 @@ impl SqliteDurableStore {
                 proposal_id,
                 root_class,
                 requested_path,
-                canonical_path,
+                resolved_path,
                 confirmation_required_reason,
-                suggested_roots,
+                suggested_root_paths: suggested_roots,
             })
         })
     }
@@ -451,9 +451,9 @@ impl SqliteDurableStore {
         &self,
         path: impl AsRef<Path>,
     ) -> LibrarySqliteResult<ResolvedRoot> {
-        let canonical_path = CanonicalSourcePath::resolve(path.as_ref())?;
+        let resolved_path = CanonicalSourcePath::resolve(path.as_ref())?;
         let resolved_root =
-            self.with_source_lifecycle_tx(|tx| tx.bootstrap_root(&canonical_path))?;
+            self.with_source_lifecycle_tx(|tx| tx.bootstrap_root(&resolved_path))?;
         self.sync_root_projection_state(&[resolved_root.root_id])?;
         Ok(resolved_root)
     }
@@ -1045,19 +1045,19 @@ pub(super) fn source_observation_basis_fingerprint(
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum SourceRegistrationAdmission {
     AdmitNormal {
-        canonical_path: PathBuf,
+        resolved_path: PathBuf,
     },
     RequireProposal {
         root_class: SourceRegistrationRootClass,
         requested_path: PathBuf,
-        canonical_path: Option<PathBuf>,
+        resolved_path: Option<PathBuf>,
         confirmation_required_reason: String,
         suggested_roots: Vec<PathBuf>,
     },
     Reject {
         root_class: SourceRegistrationRootClass,
         requested_path: PathBuf,
-        canonical_path: Option<PathBuf>,
+        resolved_path: Option<PathBuf>,
         rejection_reason: String,
         suggested_roots: Vec<PathBuf>,
     },
@@ -1065,19 +1065,19 @@ enum SourceRegistrationAdmission {
 
 fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission {
     let requested_path = path.to_path_buf();
-    let canonical_path = std::fs::canonicalize(path).ok();
-    let classification_path = canonical_path.as_deref().unwrap_or(path);
+    let resolved_path = std::fs::canonicalize(path).ok();
+    let classification_path = resolved_path.as_deref().unwrap_or(path);
     let suggested_roots = deterministic_suggested_music_roots();
 
     if is_indirection_root(path) {
-        if canonical_path
+        if resolved_path
             .as_deref()
             .is_some_and(is_protected_windows_location)
         {
             return SourceRegistrationAdmission::Reject {
                 root_class: SourceRegistrationRootClass::ProtectedRoot,
                 requested_path,
-                canonical_path,
+                resolved_path,
                 rejection_reason:
                     "indirection roots that resolve to protected locations cannot be registered"
                         .to_string(),
@@ -1088,7 +1088,7 @@ fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission
         return SourceRegistrationAdmission::RequireProposal {
             root_class: SourceRegistrationRootClass::IndirectionRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             confirmation_required_reason:
                 "indirection roots require a later scan-plan confirmation before admission"
                     .to_string(),
@@ -1100,7 +1100,7 @@ fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission
         return SourceRegistrationAdmission::Reject {
             root_class: SourceRegistrationRootClass::ProtectedRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             rejection_reason: "protected roots cannot be registered as sources".to_string(),
             suggested_roots,
         };
@@ -1110,7 +1110,7 @@ fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission
         return proposal_required(
             SourceRegistrationRootClass::NetworkRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             "network roots require a later latency-aware scan-plan confirmation",
             suggested_roots,
         );
@@ -1120,7 +1120,7 @@ fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission
         return proposal_required(
             SourceRegistrationRootClass::CloudBackedRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             "cloud-backed roots require a later provider-aware scan-plan confirmation",
             suggested_roots,
         );
@@ -1130,29 +1130,29 @@ fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission
         return proposal_required(
             SourceRegistrationRootClass::UserProfileRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             "user profile roots require a later scan-plan confirmation",
             suggested_roots,
         );
     }
 
     if is_system_drive_root(classification_path) {
-        let canonical_path = canonical_path.or_else(|| normalized_windows_drive_root(path));
+        let resolved_path = resolved_path.or_else(|| normalized_windows_drive_root(path));
         return proposal_required(
             SourceRegistrationRootClass::SystemVolumeRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             "system volume roots require a later scan-plan confirmation",
             suggested_roots,
         );
     }
 
     if is_windows_drive_root(classification_path) {
-        let canonical_path = canonical_path.or_else(|| normalized_windows_drive_root(path));
+        let resolved_path = resolved_path.or_else(|| normalized_windows_drive_root(path));
         return proposal_required(
             SourceRegistrationRootClass::BroadDriveRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             "drive roots require a later broad-root scan-plan confirmation",
             suggested_roots,
         );
@@ -1162,18 +1162,18 @@ fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission
         return proposal_required(
             SourceRegistrationRootClass::UnknownRoot,
             requested_path,
-            canonical_path,
+            resolved_path,
             "unknown root selections require a later scan-plan confirmation",
             suggested_roots,
         );
     }
 
-    match canonical_path {
-        Some(canonical_path) => SourceRegistrationAdmission::AdmitNormal { canonical_path },
+    match resolved_path {
+        Some(resolved_path) => SourceRegistrationAdmission::AdmitNormal { resolved_path },
         None => SourceRegistrationAdmission::Reject {
             root_class: SourceRegistrationRootClass::UnknownRoot,
             requested_path,
-            canonical_path: None,
+            resolved_path: None,
             rejection_reason: "root path could not be safely canonicalized for registration"
                 .to_string(),
             suggested_roots,
@@ -1184,14 +1184,14 @@ fn classify_source_registration_root(path: &Path) -> SourceRegistrationAdmission
 fn proposal_required(
     root_class: SourceRegistrationRootClass,
     requested_path: PathBuf,
-    canonical_path: Option<PathBuf>,
+    resolved_path: Option<PathBuf>,
     confirmation_required_reason: &str,
     suggested_roots: Vec<PathBuf>,
 ) -> SourceRegistrationAdmission {
     SourceRegistrationAdmission::RequireProposal {
         root_class,
         requested_path,
-        canonical_path,
+        resolved_path,
         confirmation_required_reason: confirmation_required_reason.to_string(),
         suggested_roots,
     }
@@ -1199,24 +1199,24 @@ fn proposal_required(
 
 fn read_proposed_source_registration_proposal(
     connection: &rusqlite::Connection,
-    canonical_key: &str,
+    resolved_key: &str,
 ) -> LibrarySqliteResult<Option<SourceRegistrationProposal>> {
     connection
         .query_row(
             "SELECT root_admission_proposal_id,
                     root_class,
                     requested_path,
-                    canonical_path,
+                    resolved_path,
                     confirmation_required_reason,
                     suggested_roots_json
              FROM root_admission_proposals
              WHERE proposal_status = 'proposed'
-               AND COALESCE(canonical_path, requested_path) = ?1",
-            [canonical_key],
+               AND COALESCE(resolved_path, requested_path) = ?1",
+            [resolved_key],
             |row| {
                 let root_class_text: String = row.get(1)?;
                 let requested_path: String = row.get(2)?;
-                let canonical_path: Option<String> = row.get(3)?;
+                let resolved_path: Option<String> = row.get(3)?;
                 let suggested_roots_json: String = row.get(5)?;
                 let suggested_roots = serde_json::from_str::<Vec<String>>(&suggested_roots_json)
                     .map_err(|error| {
@@ -1243,9 +1243,9 @@ fn read_proposed_source_registration_proposal(
                     proposal_id: row.get(0)?,
                     root_class,
                     requested_path: PathBuf::from(requested_path),
-                    canonical_path: canonical_path.map(PathBuf::from),
+                    resolved_path: resolved_path.map(PathBuf::from),
                     confirmation_required_reason: row.get(4)?,
-                    suggested_roots,
+                    suggested_root_paths: suggested_roots,
                 })
             },
         )
@@ -1253,8 +1253,8 @@ fn read_proposed_source_registration_proposal(
         .map_err(Into::into)
 }
 
-fn proposal_canonical_key(requested_path: &Path, canonical_path: Option<&Path>) -> String {
-    path_to_text(canonical_path.unwrap_or(requested_path))
+fn proposal_resolved_key(requested_path: &Path, resolved_path: Option<&Path>) -> String {
+    path_to_text(resolved_path.unwrap_or(requested_path))
 }
 
 fn is_indirection_root(path: &Path) -> bool {

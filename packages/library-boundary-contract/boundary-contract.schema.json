@@ -2068,52 +2068,14 @@
         "navigationRowId"
       ]
     },
-    "LocalBrowseAdmissionAction": {
-      "type": "string",
-      "enum": [
-        "requestAdmission",
-        "requestDefaultMusicFolderAdmission",
-        "requestParentAdmission"
-      ]
-    },
-    "LocalBrowseAvailableActions": {
-      "type": "object",
-      "properties": {
-        "canBrowse": {
-          "type": "boolean"
-        },
-        "canChooseDescendant": {
-          "type": "boolean"
-        },
-        "canRequestAdmission": {
-          "type": "boolean"
-        },
-        "canRequestParentAdmission": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "canBrowse",
-        "canRequestAdmission",
-        "canChooseDescendant",
-        "canRequestParentAdmission"
-      ]
-    },
     "LocalBrowseEntryPoint": {
       "type": "object",
       "properties": {
-        "admissionAction": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LocalBrowseAdmissionAction"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "availableActions": {
-          "$ref": "#/$defs/LocalBrowseAvailableActions"
+        "availableOperations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LocalBrowseOperation"
+          }
         },
         "displayName": {
           "type": "string"
@@ -2143,7 +2105,7 @@
         "displayName",
         "status",
         "platform",
-        "availableActions"
+        "availableOperations"
       ]
     },
     "LocalBrowseEntryPointFailure": {
@@ -2174,14 +2136,14 @@
     "LocalBrowseEntryPointIdentity": {
       "type": "object",
       "properties": {
-        "canonicalPath": {
+        "entryPointKind": {
+          "$ref": "#/$defs/LocalBrowseEntryPointKind"
+        },
+        "resolvedPath": {
           "type": [
             "string",
             "null"
           ]
-        },
-        "entryPointKind": {
-          "$ref": "#/$defs/LocalBrowseEntryPointKind"
         }
       },
       "required": [
@@ -2224,18 +2186,11 @@
     "LocalBrowseItem": {
       "type": "object",
       "properties": {
-        "admissionAction": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/LocalBrowseAdmissionAction"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "availableActions": {
-          "$ref": "#/$defs/LocalBrowseAvailableActions"
+        "availableOperations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LocalBrowseOperation"
+          }
         },
         "displayName": {
           "type": "string"
@@ -2289,7 +2244,7 @@
         "displayName",
         "status",
         "platform",
-        "availableActions"
+        "availableOperations"
       ]
     },
     "LocalBrowseItemFailure": {
@@ -2331,17 +2286,17 @@
         "entryPointKind": {
           "$ref": "#/$defs/LocalBrowseEntryPointKind"
         },
-        "itemCanonicalPath": {
+        "resolvedItemPath": {
           "type": "string"
         },
-        "rootCanonicalPath": {
+        "resolvedRootPath": {
           "type": "string"
         }
       },
       "required": [
         "entryPointKind",
-        "rootCanonicalPath",
-        "itemCanonicalPath"
+        "resolvedRootPath",
+        "resolvedItemPath"
       ]
     },
     "LocalBrowseItemKind": {
@@ -2389,6 +2344,54 @@
         "unavailable"
       ]
     },
+    "LocalBrowseOperation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "browseChildren"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "chooseDescendant"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "requestSourceAdmission"
+            },
+            "requestKind": {
+              "$ref": "#/$defs/LocalBrowseSourceAdmissionRequestKind"
+            },
+            "resolvedPath": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "requestKind",
+            "resolvedPath"
+          ]
+        }
+      ]
+    },
     "LocalBrowsePlatform": {
       "type": "string",
       "enum": [
@@ -2398,33 +2401,49 @@
         "unsupported"
       ]
     },
+    "LocalBrowseProfile": {
+      "type": "string",
+      "enum": [
+        "audioBrowse",
+        "mediaBrowse",
+        "allFiles"
+      ]
+    },
+    "LocalBrowseSourceAdmissionRequestKind": {
+      "type": "string",
+      "enum": [
+        "defaultMusicFolder",
+        "selectedDirectory",
+        "parentDirectory"
+      ]
+    },
     "LocalBrowseWindowIdentity": {
       "type": "object",
       "properties": {
         "entryPointKind": {
           "$ref": "#/$defs/LocalBrowseEntryPointKind"
         },
-        "parentCanonicalPath": {
+        "resolvedParentPath": {
           "type": "string"
         },
-        "rootCanonicalPath": {
+        "resolvedRootPath": {
           "type": "string"
         }
       },
       "required": [
         "entryPointKind",
-        "rootCanonicalPath",
-        "parentCanonicalPath"
+        "resolvedRootPath",
+        "resolvedParentPath"
       ]
     },
     "LocalRoot": {
       "type": "object",
       "properties": {
+        "admittedRootPath": {
+          "type": "string"
+        },
         "availability": {
           "$ref": "#/$defs/LocalRootAvailability"
-        },
-        "canonicalPath": {
-          "type": "string"
         },
         "rootId": {
           "type": "string"
@@ -2432,7 +2451,7 @@
       },
       "required": [
         "rootId",
-        "canonicalPath",
+        "admittedRootPath",
         "availability"
       ]
     },
@@ -3023,17 +3042,21 @@
           "format": "uint",
           "minimum": 0
         },
-        "parentCanonicalPath": {
+        "profile": {
+          "$ref": "#/$defs/LocalBrowseProfile"
+        },
+        "resolvedParentPath": {
           "type": "string"
         },
-        "rootCanonicalPath": {
+        "resolvedRootPath": {
           "type": "string"
         }
       },
       "required": [
         "entryPointKind",
-        "rootCanonicalPath",
-        "parentCanonicalPath",
+        "resolvedRootPath",
+        "resolvedParentPath",
+        "profile",
         "offset",
         "limit"
       ]
@@ -3416,18 +3439,18 @@
     "RegisterLocalRootRequest": {
       "type": "object",
       "properties": {
-        "absolutePath": {
+        "requestedPath": {
           "type": "string"
         }
       },
       "required": [
-        "absolutePath"
+        "requestedPath"
       ]
     },
     "RegisteredLocalRoot": {
       "type": "object",
       "properties": {
-        "canonicalPath": {
+        "admittedRootPath": {
           "type": "string"
         },
         "rootId": {
@@ -3436,7 +3459,7 @@
       },
       "required": [
         "rootId",
-        "canonicalPath"
+        "admittedRootPath"
       ]
     },
     "RejectTrackIdentityCandidateRequest": {
@@ -6062,12 +6085,6 @@
     "SourceRegistrationProposalRequired": {
       "type": "object",
       "properties": {
-        "canonicalPath": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "confirmationRequiredReason": {
           "type": "string"
         },
@@ -6077,10 +6094,16 @@
         "requestedPath": {
           "type": "string"
         },
+        "resolvedPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "rootClass": {
           "$ref": "#/$defs/SourceRegistrationRootClass"
         },
-        "suggestedRoots": {
+        "suggestedRootPaths": {
           "type": "array",
           "items": {
             "type": "string"
@@ -6092,28 +6115,28 @@
         "rootClass",
         "requestedPath",
         "confirmationRequiredReason",
-        "suggestedRoots"
+        "suggestedRootPaths"
       ]
     },
     "SourceRegistrationRejected": {
       "type": "object",
       "properties": {
-        "canonicalPath": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "rejectionReason": {
           "type": "string"
         },
         "requestedPath": {
           "type": "string"
         },
+        "resolvedPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "rootClass": {
           "$ref": "#/$defs/SourceRegistrationRootClass"
         },
-        "suggestedRoots": {
+        "suggestedRootPaths": {
           "type": "array",
           "items": {
             "type": "string"
@@ -6124,7 +6147,7 @@
         "rootClass",
         "requestedPath",
         "rejectionReason",
-        "suggestedRoots"
+        "suggestedRootPaths"
       ]
     },
     "SourceRegistrationRootClass": {

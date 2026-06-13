@@ -37,6 +37,10 @@ export type LocalBrowseController = {
     nodeId: BrowserTreeNodeId,
     projection: BrowserProjection | undefined
   ) => Promise<boolean>
+  readonly requestNodeMore: (
+    nodeId: BrowserTreeNodeId,
+    projection: BrowserProjection | undefined
+  ) => Promise<boolean>
   readonly start: () => void
   readonly stop: () => void
 }
@@ -168,6 +172,35 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
       default:
         return false
     }
+  }
+
+  async function requestNodeMore(
+    nodeId: BrowserTreeNodeId,
+    projection: BrowserProjection | undefined
+  ): Promise<boolean> {
+    if (projection?.kind !== 'tree') {
+      return false
+    }
+
+    const binding = projection.bindingsById.get(nodeId)
+    const target = binding === undefined ? undefined : windowTargetFromBinding(binding)
+
+    if (target === undefined) {
+      return false
+    }
+
+    const state = itemStates.value.get(localBrowseWindowKey(target))
+
+    if (state?.kind !== 'loaded' || state.window.nextOffset === undefined) {
+      return false
+    }
+
+    return readMore({
+      ...target,
+      ownerNodeId: nodeId,
+      offset: state.window.nextOffset,
+      limit: state.window.limit
+    })
   }
 
   async function refreshBrowserWindows(
@@ -459,6 +492,7 @@ export function createLocalBrowseController(libraryApi: LocalBrowseReadApi): Loc
     refreshEntryPoints,
     refreshBrowserWindows,
     requestNodeChildren,
+    requestNodeMore,
     start,
     stop
   }
@@ -484,8 +518,9 @@ function readItemsRequest(
 ): ReadLocalBrowseItemsRequest {
   return {
     entryPointKind: target.entryPointKind,
-    rootCanonicalPath: target.rootCanonicalPath,
-    parentCanonicalPath: target.parentCanonicalPath,
+    resolvedRootPath: target.resolvedRootPath,
+    resolvedParentPath: target.resolvedParentPath,
+    profile: 'audioBrowse',
     offset,
     limit: readLimit
   }
@@ -551,8 +586,8 @@ function isExpectedWindow(
   return (
     result.offset === expectedOffset &&
     result.windowIdentity.entryPointKind === target.entryPointKind &&
-    result.windowIdentity.rootCanonicalPath === target.rootCanonicalPath &&
-    result.windowIdentity.parentCanonicalPath === target.parentCanonicalPath
+    result.windowIdentity.resolvedRootPath === target.resolvedRootPath &&
+    result.windowIdentity.resolvedParentPath === target.resolvedParentPath
   )
 }
 

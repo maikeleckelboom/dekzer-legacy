@@ -40,11 +40,11 @@ admitted-source tree rows. Admitted-source trees remain source, source-location,
 `LocalBrowseItemIdentity` is:
 
 ```text
-(entryPointKind, rootCanonicalPath, itemCanonicalPath)
+(entryPointKind, resolvedRootPath, resolvedItemPath)
 ```
 
-`entryPointKind` identifies the entry point kind. `rootCanonicalPath` identifies the validated local browse root that
-bounds the read. `itemCanonicalPath` identifies the immediate item path resolved for this read.
+`entryPointKind` identifies the entry point kind. `resolvedRootPath` identifies the validated local browse root that
+bounds the read. `resolvedItemPath` identifies the immediate item path resolved for this read.
 
 Labels are not identity. Relative display paths are not identity. Item identity is resolved at read time and is not
 persisted as source identity before admission.
@@ -54,14 +54,14 @@ persisted as source identity before admission.
 `LocalBrowseWindowIdentity` is:
 
 ```text
-(entryPointKind, rootCanonicalPath, parentCanonicalPath)
+(entryPointKind, resolvedRootPath, resolvedParentPath)
 ```
 
-The item read validates `entryPointKind` and `rootCanonicalPath` against the current resolved entry points using the same
-canonical normalization used for entry point deduplication. A mismatched pair fails the read with
+The item read validates `entryPointKind` and `resolvedRootPath` against the current resolved entry points using the same
+path normalization used for entry point deduplication. A mismatched pair fails the read with
 `rootIdentityMismatch` and must not browse the requested parent.
 
-After the root is validated, `parentCanonicalPath` may target the root or a descendant directory. The parent path must
+After the root is validated, `resolvedParentPath` may target the root or a descendant directory. The parent path must
 remain inside the validated root boundary. Local browse root validation does not register a source, does not create
 source lifecycle state, and does not start scan work.
 
@@ -103,7 +103,7 @@ Registration and scan remain explicit later actions after source-root admission.
 
 The V0 item read reply includes:
 
-- `windowIdentity`: `entryPointKind`, `rootCanonicalPath`, and `parentCanonicalPath`;
+- `windowIdentity`: `entryPointKind`, `resolvedRootPath`, and `resolvedParentPath`;
 - `offset`;
 - `limit`;
 - `totalItems`;
@@ -111,6 +111,7 @@ The V0 item read reply includes:
 - read `status`;
 - optional read `failure`;
 - optional item `failure`.
+- `profile`, such as `audioBrowse`, `mediaBrowse`, or `allFiles`.
 
 V0 keeps offset/limit and exact `totalItems`. The implementation may enumerate immediate directory entries into
 lightweight ordering keys, sort those keys, and materialize only the requested window of protocol items. It must not
@@ -139,16 +140,15 @@ Media relevance follows the current policy and classification vocabulary in
 Audio, video, image, and companion metadata extensions are local browse item display signals before admission.
 Classification before admission is provisional and must not create durable file classification state.
 
-## Available Actions
+## Available Operations
 
-`availableActions` is backend-declared action availability. It is not renderer visual state.
+`availableOperations` is backend-declared row operation availability. It is not renderer visual state.
 
-Item actions are:
+Item operations are:
 
-- `canBrowse`;
-- `canRequestAdmission`;
-- `canChooseDescendant`;
-- `canRequestParentAdmission`.
+- `browseChildren`;
+- `chooseDescendant`;
+- `requestSourceAdmission` with request kind `selectedDirectory` or `parentDirectory`.
 
 Rules:
 
@@ -157,18 +157,17 @@ Rules:
 - A media file item may request parent admission.
 - Unsupported, inaccessible, and unknown file items are not directly admissible.
 - `systemDriveRoot` may be browseable as an entry point while rejected system-owned descendants are rejected items.
-- `duplicateOfAdmittedSource` remains a status, not an action.
+- `duplicateOfAdmittedSource` remains a status, not a source admission operation.
 
-## Admission Action
+## Admission Operation
 
-`admissionAction` is a display/action recommendation for the later source-root admission flow. It is not an admission
-result, does not persist anything, does not start scan, and cannot bypass root admission.
+`requestSourceAdmission` is a row operation for the later source-root admission flow. It is not an admission result,
+does not persist anything, does not start scan, and cannot bypass root admission.
 
-Item actions:
+Item source admission request kinds:
 
-- `requestAdmission`: the UI may ask source-root admission to evaluate this directory item path.
-- `requestParentAdmission`: the UI may ask source-root admission to evaluate the parent directory of this media file.
-- `null`: no item admission action is available.
+- `selectedDirectory`: the UI may ask source-root admission to evaluate this directory item path.
+- `parentDirectory`: the UI may ask source-root admission to evaluate the parent directory of this media file.
 
 `requiresConfirmation` is not a local browse action. Confirmation belongs to source-root admission results.
 
@@ -183,8 +182,8 @@ Future renderer projection must keep these concepts distinct:
 - source directory rows;
 - contents/media rows.
 
-Do not collapse them into one generic library row type. The same canonical path can appear as a local browse item and as
-an admitted source representation, but those are different objects with different authority and actions.
+Do not collapse them into one generic library row type. The same filesystem path can appear as a local browse item and
+as an admitted source representation, but those are different objects with different authority and operations.
 
 The next implementation step after this cleanup is renderer projection/UI, not more substrate naming churn.
 
@@ -199,7 +198,7 @@ may be marked as `duplicateOfAdmittedSource` during local browse reads without m
 Backend read acceptance:
 
 - `readLocalBrowseItems` validates root identity, parent path, offset, and limit.
-- A mismatched `entryPointKind`/`rootCanonicalPath` pair fails the read before parent browsing.
+- A mismatched `entryPointKind`/`resolvedRootPath` pair fails the read before parent browsing.
 - Reads enumerate immediate items only.
 - The implementation bounds protocol item materialization to the requested window.
 - Windows V0 avoids following symlink or junction escapes and maps missing, permission, unavailable, and unsupported
@@ -212,10 +211,10 @@ Backend read acceptance:
 Protocol acceptance:
 
 - The snapshot command is `readLocalBrowseItems`.
-- Request identity includes `entryPointKind`, `rootCanonicalPath`, `parentCanonicalPath`, `offset`, and `limit`.
+- Request identity includes `entryPointKind`, `resolvedRootPath`, `resolvedParentPath`, `offset`, `limit`, and `profile`.
 - Reply identity includes read status, window identity, offset, limit, `totalItems`, `items`, and failure.
 - Items include item identity, finite item kind, display name, item status, platform, optional file kind, optional media
-  relevance, optional admission action, available actions, and optional failure.
+  relevance, available operations, and optional failure.
 - The item type is separate from `NavigationRow`, `LibraryTreeNode`, `ContentsRow`, and search/filter results.
 
 Test acceptance:

@@ -41,7 +41,7 @@ try {
   await withClient('initial stdio smoke process', async (first) => {
     const registered = await withTimeout(
       first.client.registerLocalRoot({
-        absolutePath: sourceRoot
+        requestedPath: sourceRoot
       }),
       'registerLocalRoot',
       commandTimeoutMs

@@ -77,7 +77,7 @@ pub struct CancelRootScanReply {
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
 pub struct RegisterLocalRootRequest {
-    pub absolute_path: String,
+    pub requested_path: String,
 }
 
 #[derive(
@@ -97,7 +97,7 @@ pub struct RegisteredLocalRoot {
     #[schemars(with = "String")]
     #[ts(as = "String")]
     pub root_id: i64,
-    pub canonical_path: String,
+    pub admitted_root_path: String,
 }
 
 #[derive(
@@ -144,9 +144,9 @@ pub struct SourceRegistrationProposalRequired {
     pub proposal_id: i64,
     pub root_class: SourceRegistrationRootClass,
     pub requested_path: String,
-    pub canonical_path: Option<String>,
+    pub resolved_path: Option<String>,
     pub confirmation_required_reason: String,
-    pub suggested_roots: Vec<String>,
+    pub suggested_root_paths: Vec<String>,
 }
 
 #[derive(
@@ -164,9 +164,9 @@ pub struct SourceRegistrationProposalRequired {
 pub struct SourceRegistrationRejected {
     pub root_class: SourceRegistrationRootClass,
     pub requested_path: String,
-    pub canonical_path: Option<String>,
+    pub resolved_path: Option<String>,
     pub rejection_reason: String,
-    pub suggested_roots: Vec<String>,
+    pub suggested_root_paths: Vec<String>,
 }
 
 #[derive(
@@ -331,7 +331,7 @@ pub struct LocalRoot {
     #[schemars(with = "String")]
     #[ts(as = "String")]
     pub root_id: i64,
-    pub canonical_path: String,
+    pub admitted_root_path: String,
     pub availability: LocalRootAvailability,
 }
 
@@ -390,7 +390,7 @@ mod tests {
     #[test]
     fn library_root_commands_are_explicit_tagged_boundary_operations() {
         let register = LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest {
-            absolute_path: "C:/Music".to_string(),
+            requested_path: "C:/Music".to_string(),
         });
         let scan = LibraryRootCommand::StartRootScan(StartRootScanRequest { root_id: 7 });
         let read_local = LibraryRootCommand::ReadLocalRoots(ReadLocalRootsRequest);
@@ -402,7 +402,7 @@ mod tests {
             json!({
                 "type": "registerLocalRoot",
                 "payload": {
-                    "absolutePath": "C:/Music"
+                    "requestedPath": "C:/Music"
                 }
             })
         );
@@ -452,7 +452,7 @@ mod tests {
         let registered = LibraryRootReply::RegisterLocalRoot(RegisterLocalRootReply::Registered(
             RegisteredLocalRoot {
                 root_id: 7,
-                canonical_path: "C:/Music".to_string(),
+                admitted_root_path: "C:/Music".to_string(),
             },
         ));
         let proposal = LibraryRootReply::RegisterLocalRoot(
@@ -460,26 +460,26 @@ mod tests {
                 proposal_id: 11,
                 root_class: SourceRegistrationRootClass::SystemVolumeRoot,
                 requested_path: "C:/".to_string(),
-                canonical_path: Some("C:/".to_string()),
+                resolved_path: Some("C:/".to_string()),
                 confirmation_required_reason: "system volume roots require scan-plan confirmation"
                     .to_string(),
-                suggested_roots: vec!["C:/Users/Maikel/Music".to_string()],
+                suggested_root_paths: vec!["C:/Users/Maikel/Music".to_string()],
             }),
         );
         let rejected = LibraryRootReply::RegisterLocalRoot(RegisterLocalRootReply::Rejected(
             SourceRegistrationRejected {
                 root_class: SourceRegistrationRootClass::ProtectedRoot,
                 requested_path: "C:/Windows".to_string(),
-                canonical_path: Some("C:/Windows".to_string()),
+                resolved_path: Some("C:/Windows".to_string()),
                 rejection_reason: "protected roots cannot be registered as sources".to_string(),
-                suggested_roots: vec!["C:/Users/Maikel/Music".to_string()],
+                suggested_root_paths: vec!["C:/Users/Maikel/Music".to_string()],
             },
         ));
         let scanned = LibraryRootReply::StartRootScan(StartRootScanReply { scan_run_id: 1000 });
         let read_local = LibraryRootReply::ReadLocalRoots(ReadLocalRootsReply {
             roots: vec![LocalRoot {
                 root_id: 3,
-                canonical_path: "C:/Music".to_string(),
+                admitted_root_path: "C:/Music".to_string(),
                 availability: LocalRootAvailability::Available,
             }],
         });
@@ -494,7 +494,7 @@ mod tests {
                     "type": "registered",
                     "payload": {
                         "rootId": "7",
-                        "canonicalPath": "C:/Music"
+                        "admittedRootPath": "C:/Music"
                     }
                 }
             })
@@ -509,9 +509,9 @@ mod tests {
                         "proposalId": "11",
                         "rootClass": "systemVolumeRoot",
                         "requestedPath": "C:/",
-                        "canonicalPath": "C:/",
+                        "resolvedPath": "C:/",
                         "confirmationRequiredReason": "system volume roots require scan-plan confirmation",
-                        "suggestedRoots": ["C:/Users/Maikel/Music"]
+                        "suggestedRootPaths": ["C:/Users/Maikel/Music"]
                     }
                 }
             })
@@ -525,9 +525,9 @@ mod tests {
                     "payload": {
                         "rootClass": "protectedRoot",
                         "requestedPath": "C:/Windows",
-                        "canonicalPath": "C:/Windows",
+                        "resolvedPath": "C:/Windows",
                         "rejectionReason": "protected roots cannot be registered as sources",
-                        "suggestedRoots": ["C:/Users/Maikel/Music"]
+                        "suggestedRootPaths": ["C:/Users/Maikel/Music"]
                     }
                 }
             })
@@ -548,7 +548,7 @@ mod tests {
                 "payload": {
                     "roots": [{
                         "rootId": "3",
-                        "canonicalPath": "C:/Music",
+                        "admittedRootPath": "C:/Music",
                         "availability": "available"
                     }]
                 }

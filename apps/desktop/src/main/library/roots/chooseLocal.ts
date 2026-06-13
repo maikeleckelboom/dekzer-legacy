@@ -55,7 +55,7 @@ export async function chooseAndRegisterLocalRoot(
   try {
     return mapRegistrationResult(
       await (dependencies.registerLocalRoot ?? registerLocalRoot)(host, {
-        absolutePath: selectedPath
+        requestedPath: selectedPath
       })
     )
   } catch {

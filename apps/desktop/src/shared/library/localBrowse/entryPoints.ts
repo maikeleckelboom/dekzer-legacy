@@ -18,10 +18,23 @@ export type LocalBrowseEntryPointStatus =
 
 export type LocalBrowsePlatform = 'windows' | 'macos' | 'linux' | 'unsupported'
 
-export type LocalBrowseAdmissionAction =
-  | 'requestAdmission'
-  | 'requestDefaultMusicFolderAdmission'
-  | 'requestParentAdmission'
+export type LocalBrowseSourceAdmissionRequestKind =
+  | 'defaultMusicFolder'
+  | 'selectedDirectory'
+  | 'parentDirectory'
+
+export type LocalBrowseOperation =
+  | {
+      readonly kind: 'browseChildren'
+    }
+  | {
+      readonly kind: 'chooseDescendant'
+    }
+  | {
+      readonly kind: 'requestSourceAdmission'
+      readonly requestKind: LocalBrowseSourceAdmissionRequestKind
+      readonly resolvedPath: string
+    }
 
 export type LocalBrowseEntryPointFailureCode =
   | 'unsupportedPlatform'
@@ -38,14 +51,7 @@ export type LocalBrowseEntryPointsReadStatus =
 
 export type LocalBrowseEntryPointIdentity = {
   readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly canonicalPath: string | null
-}
-
-export type LocalBrowseAvailableActions = {
-  readonly canBrowse: boolean
-  readonly canRequestAdmission: boolean
-  readonly canChooseDescendant: boolean
-  readonly canRequestParentAdmission: boolean
+  readonly resolvedPath: string | null
 }
 
 export type LocalBrowseEntryPointFailure = {
@@ -58,8 +64,7 @@ export type LocalBrowseEntryPoint = {
   readonly displayName: string
   readonly status: LocalBrowseEntryPointStatus
   readonly platform: LocalBrowsePlatform
-  readonly admissionAction: LocalBrowseAdmissionAction | null
-  readonly availableActions: LocalBrowseAvailableActions
+  readonly availableOperations: readonly LocalBrowseOperation[]
   readonly failure: LocalBrowseEntryPointFailure | null
 }
 

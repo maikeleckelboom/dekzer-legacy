@@ -951,7 +951,7 @@ fn commit_discovery_syncs_source_rows_and_queues_inspection_work() {
             root_id: root.root_id,
             scan_started_at_ms: 990,
             files: vec![DiscoveredFileInput {
-                canonical_path: "artist/track.wav".to_string(),
+                relative_path: "artist/track.wav".to_string(),
                 file_size_bytes: Some(4_200_000),
                 modified_at_ns: Some(1_000_000),
                 observed_at_ms: 1_000,
@@ -1013,7 +1013,7 @@ fn register_local_root_initializes_lifecycle_side_rows() {
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path.clone(),
+                requested_path: root_path.clone(),
             })
             .expect("register local root"),
     );
@@ -1072,7 +1072,7 @@ fn normal_music_folder_registers_as_source_root() {
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
     let result = durable_store
         .register_local_root(RegisterLocalRootInput {
-            absolute_path: music_root,
+            requested_path: music_root,
         })
         .expect("register local root");
 
@@ -1101,12 +1101,12 @@ fn windows_system_drive_root_registration_returns_proposal_without_source_rows()
 
     let first = durable_store
         .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path.clone(),
+            requested_path: root_path.clone(),
         })
         .expect("register system root");
     let second = durable_store
         .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path,
+            requested_path: root_path,
         })
         .expect("register system root again");
 
@@ -1155,7 +1155,7 @@ fn broad_non_system_drive_root_registration_returns_proposal_without_source_rows
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
     let result = durable_store
         .register_local_root(RegisterLocalRootInput {
-            absolute_path: root_path,
+            requested_path: root_path,
         })
         .expect("register broad drive root");
 
@@ -1187,7 +1187,7 @@ fn user_profile_root_registration_returns_proposal_when_detectable() {
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
     let result = durable_store
         .register_local_root(RegisterLocalRootInput {
-            absolute_path: std::path::PathBuf::from(user_profile),
+            requested_path: std::path::PathBuf::from(user_profile),
         })
         .expect("register user profile root");
 
@@ -1218,7 +1218,7 @@ fn protected_root_registration_is_rejected_without_source_or_proposal_rows() {
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
     let result = durable_store
         .register_local_root(RegisterLocalRootInput {
-            absolute_path: windows_path,
+            requested_path: windows_path,
         })
         .expect("register protected root");
 
@@ -1253,7 +1253,7 @@ fn indirection_root_registration_returns_proposal_when_detectable() {
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
     let result = durable_store
         .register_local_root(RegisterLocalRootInput {
-            absolute_path: link_path,
+            requested_path: link_path,
         })
         .expect("register indirection root");
 
@@ -1283,7 +1283,7 @@ fn register_local_root_establishes_immediate_root_child_directories_before_scan(
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path.clone(),
+                requested_path: root_path.clone(),
             })
             .expect("register local root"),
     );
@@ -1350,7 +1350,7 @@ fn empty_registration_writes_empty_root_navigation_state_without_marker_rows() {
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path.clone(),
+                requested_path: root_path.clone(),
             })
             .expect("register local root"),
     );
@@ -1398,7 +1398,7 @@ fn empty_root_navigation_state_is_not_contents_empty_before_scan_coverage() {
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path.clone(),
+                requested_path: root_path.clone(),
             })
             .expect("register local root"),
     );
@@ -1442,7 +1442,7 @@ fn newly_registered_source_with_loose_unscanned_files_is_not_contents_empty() {
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path.clone(),
+                requested_path: root_path.clone(),
             })
             .expect("register local root"),
     );
@@ -1484,7 +1484,7 @@ fn established_non_empty_root_navigation_window_is_not_reestablished_while_idle(
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path.clone(),
+                requested_path: root_path.clone(),
             })
             .expect("register local root"),
     );
@@ -1535,7 +1535,7 @@ fn established_empty_root_navigation_window_is_not_reestablished_while_idle() {
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path.clone(),
+                requested_path: root_path.clone(),
             })
             .expect("register local root"),
     );

@@ -116,8 +116,7 @@ function mapEntryPoint(entry: ContractLocalBrowseEntryPoint): LocalBrowseEntryPo
     displayName: entry.displayName,
     status: entry.status,
     platform: entry.platform,
-    admissionAction: entry.admissionAction,
-    availableActions: entry.availableActions,
+    availableOperations: entry.availableOperations,
     failure: entry.failure
   }
 }

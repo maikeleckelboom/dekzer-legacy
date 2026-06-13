@@ -145,8 +145,8 @@ pub enum LibrarySqliteError {
     SystemTime(#[from] std::time::SystemTimeError),
     #[error("discovery batch must contain at least one file")]
     EmptyDiscoveryBatch,
-    #[error("discovery batch contains duplicate canonical_path: {0}")]
-    DuplicateDiscoveryCanonicalPath(String),
+    #[error("discovery batch contains duplicate relative_path: {0}")]
+    DuplicateDiscoveryRelativePath(String),
     #[error("root {0} does not exist")]
     MissingRoot(i64),
     #[error("file {0} does not exist")]

@@ -89,13 +89,13 @@ fn fake_local_browse_resolution(
 
 fn fake_local_browse_entry(
     entry_point_kind: protocol::LocalBrowseEntryPointKind,
-    canonical_path: impl Into<PathBuf>,
+    resolved_path: impl Into<PathBuf>,
     display_name: &str,
     status: protocol::LocalBrowseEntryPointStatus,
 ) -> ResolvedLocalBrowseEntryPoint {
     ResolvedLocalBrowseEntryPoint {
         entry_point_kind,
-        canonical_path: Some(canonical_path.into()),
+        resolved_path: Some(resolved_path.into()),
         display_name: display_name.to_string(),
         status,
         platform: protocol::LocalBrowsePlatform::Windows,
@@ -111,7 +111,7 @@ fn fake_unresolved_local_browse_entry(
 ) -> ResolvedLocalBrowseEntryPoint {
     ResolvedLocalBrowseEntryPoint {
         entry_point_kind,
-        canonical_path: None,
+        resolved_path: None,
         display_name: display_name.to_string(),
         status,
         platform: protocol::LocalBrowsePlatform::Windows,
@@ -221,16 +221,44 @@ fn read_local_browse_entry_points(
 
 fn register_local_root(
     service: &LibraryBoundaryService,
-    absolute_path: String,
+    requested_path: String,
 ) -> protocol::RegisteredLocalRoot {
     match expect_register_local_root_reply(expect_success(service.handle_command(
         protocol::CommandRequest::LibraryRoots(protocol::LibraryRootCommand::RegisterLocalRoot(
-            protocol::RegisterLocalRootRequest { absolute_path },
+            protocol::RegisterLocalRootRequest { requested_path },
         )),
     ))) {
         protocol::RegisterLocalRootReply::Registered(root) => root,
         other => panic!("expected registered local root reply, got {other:?}"),
     }
+}
+
+fn has_browse_children_operation(operations: &[protocol::LocalBrowseOperation]) -> bool {
+    operations
+        .iter()
+        .any(|operation| matches!(operation, protocol::LocalBrowseOperation::BrowseChildren))
+}
+
+fn has_source_admission_operation(operations: &[protocol::LocalBrowseOperation]) -> bool {
+    operations.iter().any(|operation| {
+        matches!(
+            operation,
+            protocol::LocalBrowseOperation::RequestSourceAdmission { .. }
+        )
+    })
+}
+
+fn has_source_admission_request_kind(
+    operations: &[protocol::LocalBrowseOperation],
+    expected: protocol::LocalBrowseSourceAdmissionRequestKind,
+) -> bool {
+    operations.iter().any(|operation| {
+        matches!(
+            operation,
+            protocol::LocalBrowseOperation::RequestSourceAdmission { request_kind, .. }
+                if *request_kind == expected
+        )
+    })
 }
 
 #[test]
@@ -361,23 +389,24 @@ fn local_browse_entry_points_read_returns_entries_without_source_rows() {
         reply.entries[0].identity.entry_point_kind,
         protocol::LocalBrowseEntryPointKind::SystemDriveRoot
     );
-    assert_eq!(reply.entries[0].admission_action, None);
-    assert!(reply.entries[0].available_actions.can_browse);
-    assert!(!reply.entries[0].available_actions.can_request_admission);
+    assert!(has_browse_children_operation(
+        &reply.entries[0].available_operations
+    ));
+    assert!(!has_source_admission_operation(
+        &reply.entries[0].available_operations
+    ));
     assert_eq!(
         reply.entries[1].identity.entry_point_kind,
         protocol::LocalBrowseEntryPointKind::Music
     );
-    assert_eq!(
-        reply.entries[1].admission_action,
-        Some(protocol::LocalBrowseAdmissionAction::RequestDefaultMusicFolderAdmission)
-    );
-    assert!(reply.entries[1].available_actions.can_request_admission);
-    assert_eq!(
-        reply.entries[2].admission_action,
-        Some(protocol::LocalBrowseAdmissionAction::RequestAdmission)
-    );
-    assert!(reply.entries[2].available_actions.can_request_admission);
+    assert!(has_source_admission_request_kind(
+        &reply.entries[1].available_operations,
+        protocol::LocalBrowseSourceAdmissionRequestKind::DefaultMusicFolder
+    ));
+    assert!(has_source_admission_request_kind(
+        &reply.entries[2].available_operations,
+        protocol::LocalBrowseSourceAdmissionRequestKind::SelectedDirectory
+    ));
     assert_eq!(count_rows(&context, "sources"), 0);
     assert_eq!(
         application_table_row_counts(&context),
@@ -411,8 +440,9 @@ fn local_browse_entry_points_exact_admitted_source_match_is_duplicate_entry() {
         reply.entries[0].status,
         protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
     );
-    assert_eq!(reply.entries[0].admission_action, None);
-    assert!(!reply.entries[0].available_actions.can_request_admission);
+    assert!(!has_source_admission_operation(
+        &reply.entries[0].available_operations
+    ));
     assert_eq!(count_rows(&context, "sources"), 1);
     assert_eq!(
         application_table_row_counts(&context),
@@ -469,13 +499,13 @@ fn local_browse_entry_points_statuses_do_not_create_lifecycle_state() {
         reply
             .entries
             .iter()
-            .all(|entry| entry.admission_action.is_none())
+            .all(|entry| !has_source_admission_operation(&entry.available_operations))
     );
     assert!(
         reply
             .entries
             .iter()
-            .all(|entry| !entry.available_actions.can_request_admission)
+            .all(|entry| !has_browse_children_operation(&entry.available_operations))
     );
     assert_eq!(count_rows(&context, "source_state"), 0);
     assert_eq!(count_rows(&context, "source_scan_state"), 0);

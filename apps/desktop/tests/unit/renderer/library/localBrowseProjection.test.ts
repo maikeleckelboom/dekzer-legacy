@@ -47,12 +47,12 @@ describe('local browse tree projection', () => {
     ).toBe(true)
   })
 
-  it('preserves the default music admission action from the boundary', () => {
+  it('preserves the default music admission operation from the boundary', () => {
     const projection = projectTree(
       browserState({
         entries: [
           musicEntryPoint({
-            admissionAction: 'requestDefaultMusicFolderAdmission'
+            availableOperations: defaultMusicEntryOperations()
           })
         ]
       })
@@ -64,8 +64,8 @@ describe('local browse tree projection', () => {
     expect(binding).toMatchObject({
       kind: 'localBrowseEntryPoint',
       entry: {
-        identity: { entryPointKind: 'music', canonicalPath: 'C:\\Users\\Maikel\\Music' },
-        admissionAction: 'requestDefaultMusicFolderAdmission'
+        identity: { entryPointKind: 'music', resolvedPath: 'C:\\Users\\Maikel\\Music' },
+        availableOperations: defaultMusicEntryOperations()
       }
     })
   })
@@ -76,13 +76,7 @@ describe('local browse tree projection', () => {
         entries: [
           musicEntryPoint({
             status: 'duplicateOfAdmittedSource',
-            admissionAction: null,
-            availableActions: {
-              canBrowse: true,
-              canRequestAdmission: false,
-              canChooseDescendant: true,
-              canRequestParentAdmission: false
-            }
+            availableOperations: [{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }]
           })
         ]
       })
@@ -95,10 +89,7 @@ describe('local browse tree projection', () => {
       kind: 'localBrowseEntryPoint',
       entry: {
         status: 'duplicateOfAdmittedSource',
-        admissionAction: null,
-        availableActions: {
-          canRequestAdmission: false
-        }
+        availableOperations: [{ kind: 'browseChildren' }, { kind: 'chooseDescendant' }]
       }
     })
     expect(findNodeDetail(projection, 'Music')).toBe('Already added as a library source.')
@@ -107,8 +98,8 @@ describe('local browse tree projection', () => {
   it('projects local browse child row kinds without source bindings', () => {
     const rootTarget = {
       entryPointKind: 'music' as const,
-      rootCanonicalPath: 'C:\\Users\\Maikel\\Music',
-      parentCanonicalPath: 'C:\\Users\\Maikel\\Music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
       label: 'Music'
     }
     const projection = projectTree({
@@ -121,8 +112,8 @@ describe('local browse tree projection', () => {
             window: {
               identity: {
                 entryPointKind: rootTarget.entryPointKind,
-                rootCanonicalPath: rootTarget.rootCanonicalPath,
-                parentCanonicalPath: rootTarget.parentCanonicalPath
+                resolvedRootPath: rootTarget.resolvedRootPath,
+                resolvedParentPath: rootTarget.resolvedParentPath
               },
               label: rootTarget.label,
               items: [
@@ -130,13 +121,13 @@ describe('local browse tree projection', () => {
                 item('mediaFile', 'track.flac', 'C:\\Users\\Maikel\\Music\\track.flac', {
                   fileKind: 'audio',
                   mediaRelevance: 'mediaRelevant',
-                  admissionAction: 'requestParentAdmission',
-                  availableActions: {
-                    canBrowse: false,
-                    canRequestAdmission: false,
-                    canChooseDescendant: false,
-                    canRequestParentAdmission: true
-                  }
+                  availableOperations: [
+                    {
+                      kind: 'requestSourceAdmission',
+                      requestKind: 'parentDirectory',
+                      resolvedPath: 'C:\\Users\\Maikel\\Music'
+                    }
+                  ]
                 }),
                 item('unsupportedFile', 'notes.txt', 'C:\\Users\\Maikel\\Music\\notes.txt', {
                   fileKind: 'textDoc',
@@ -213,18 +204,12 @@ function musicEntryPoint(overrides: Partial<LocalBrowseEntryPoint> = {}): LocalB
   return {
     identity: {
       entryPointKind: 'music',
-      canonicalPath: 'C:\\Users\\Maikel\\Music'
+      resolvedPath: 'C:\\Users\\Maikel\\Music'
     },
     displayName: 'Music',
     status: 'available',
     platform: 'windows',
-    admissionAction: 'requestDefaultMusicFolderAdmission',
-    availableActions: {
-      canBrowse: true,
-      canRequestAdmission: true,
-      canChooseDescendant: true,
-      canRequestParentAdmission: false
-    },
+    availableOperations: defaultMusicEntryOperations(),
     failure: null,
     ...overrides
   }
@@ -233,14 +218,14 @@ function musicEntryPoint(overrides: Partial<LocalBrowseEntryPoint> = {}): LocalB
 function item(
   itemKind: LocalBrowseItemKind,
   displayName: string,
-  itemCanonicalPath: string,
+  resolvedItemPath: string,
   overrides: Partial<LocalBrowseItem> = {}
 ): LocalBrowseItem {
   return {
     identity: {
       entryPointKind: 'music',
-      rootCanonicalPath: 'C:\\Users\\Maikel\\Music',
-      itemCanonicalPath
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedItemPath
     },
     itemKind,
     displayName,
@@ -248,16 +233,33 @@ function item(
     platform: 'windows',
     fileKind: null,
     mediaRelevance: null,
-    admissionAction: itemKind === 'directory' ? 'requestAdmission' : null,
-    availableActions: {
-      canBrowse: itemKind === 'directory',
-      canRequestAdmission: itemKind === 'directory',
-      canChooseDescendant: itemKind === 'directory',
-      canRequestParentAdmission: false
-    },
+    availableOperations:
+      itemKind === 'directory'
+        ? [
+            { kind: 'browseChildren' },
+            { kind: 'chooseDescendant' },
+            {
+              kind: 'requestSourceAdmission',
+              requestKind: 'selectedDirectory',
+              resolvedPath: resolvedItemPath
+            }
+          ]
+        : [],
     failure: null,
     ...overrides
   }
+}
+
+function defaultMusicEntryOperations(): LocalBrowseEntryPoint['availableOperations'] {
+  return [
+    { kind: 'browseChildren' },
+    { kind: 'chooseDescendant' },
+    {
+      kind: 'requestSourceAdmission',
+      requestKind: 'defaultMusicFolder',
+      resolvedPath: 'C:\\Users\\Maikel\\Music'
+    }
+  ]
 }
 
 function firstLoadedChildLabels(

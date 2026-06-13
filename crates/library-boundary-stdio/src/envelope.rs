@@ -256,7 +256,7 @@ mod tests {
     fn register_root_request() -> CommandRequest {
         CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
             RegisterLocalRootRequest {
-                absolute_path: "C:/Music".to_string(),
+                requested_path: "C:/Music".to_string(),
             },
         ))
     }
@@ -286,7 +286,7 @@ mod tests {
                 "payload": {
                     "type": "registerLocalRoot",
                     "payload": {
-                        "absolutePath": "C:/Music"
+                        "requestedPath": "C:/Music"
                     }
                 }
             }
@@ -307,7 +307,7 @@ mod tests {
                 reply: CommandReply::LibraryRoots(LibraryRootReply::RegisterLocalRoot(
                     RegisterLocalRootReply::Registered(RegisteredLocalRoot {
                         root_id: 7,
-                        canonical_path: "C:/Music".to_string(),
+                        admitted_root_path: "C:/Music".to_string(),
                     }),
                 )),
             }),
@@ -332,7 +332,7 @@ mod tests {
                                     "type": "registered",
                                     "payload": {
                                         "rootId": "7",
-                                        "canonicalPath": "C:/Music"
+                                        "admittedRootPath": "C:/Music"
                                     }
                                 }
                             }
@@ -448,7 +448,7 @@ mod tests {
                 "payload": {
                     "type": "registerLocalRoot",
                     "payload": {
-                        "absolutePath": "C:/Music"
+                        "requestedPath": "C:/Music"
                     }
                 }
             }
@@ -476,7 +476,7 @@ mod tests {
                 "payload": {
                     "type": "registerLocalRoot",
                     "payload": {
-                        "absolutePath": "C:/Music"
+                        "requestedPath": "C:/Music"
                     }
                 }
             }

@@ -1,7 +1,7 @@
 import type {
-  LocalBrowseAdmissionAction,
   LocalBrowseEntryPoint,
-  LocalBrowseEntryPointStatus
+  LocalBrowseEntryPointStatus,
+  LocalBrowseOperation
 } from '../../../shared/library/localBrowse/entryPoints'
 import type {
   LocalBrowseItem,
@@ -163,7 +163,10 @@ function projectEntryPointChildren(options: {
 }): { readonly children: BrowserTreeChildren; readonly action?: BrowserTreeAction } {
   const target = options.target
 
-  if (target === undefined || !options.entry.availableActions.canBrowse) {
+  if (
+    target === undefined ||
+    !hasLocalBrowseOperation(options.entry.availableOperations, 'browseChildren')
+  ) {
     return { children: { kind: 'none' } }
   }
 
@@ -183,7 +186,9 @@ function projectLocalBrowseItem(options: {
 }): BrowserTreeNode {
   const item = options.item
   const nodeId = localBrowseItemNodeId(item)
-  const target = item.availableActions.canBrowse ? directoryTargetForItem(item) : undefined
+  const target = hasLocalBrowseOperation(item.availableOperations, 'browseChildren')
+    ? directoryTargetForItem(item)
+    : undefined
 
   options.bindingsById.set(nodeId, {
     kind: 'localBrowseItem',
@@ -488,8 +493,8 @@ function trackedMoreNode(
   const target: LocalBrowseMoreTarget = {
     ownerNodeId: options.ownerId,
     entryPointKind: options.window.identity.entryPointKind,
-    rootCanonicalPath: options.window.identity.rootCanonicalPath,
-    parentCanonicalPath: options.window.identity.parentCanonicalPath,
+    resolvedRootPath: options.window.identity.resolvedRootPath,
+    resolvedParentPath: options.window.identity.resolvedParentPath,
     label: options.window.label,
     offset,
     limit: options.window.limit
@@ -548,28 +553,28 @@ function displayableEntryPoints(
 }
 
 function directoryTargetForItem(item: LocalBrowseItem): LocalBrowseDirectoryTarget | undefined {
-  if (!item.availableActions.canBrowse) {
+  if (!hasLocalBrowseOperation(item.availableOperations, 'browseChildren')) {
     return undefined
   }
 
   return {
     entryPointKind: item.identity.entryPointKind,
-    rootCanonicalPath: item.identity.rootCanonicalPath,
-    parentCanonicalPath: item.identity.itemCanonicalPath,
+    resolvedRootPath: item.identity.resolvedRootPath,
+    resolvedParentPath: item.identity.resolvedItemPath,
     label: item.displayName
   }
 }
 
 function localBrowseEntryPointNodeId(entry: LocalBrowseEntryPoint): BrowserTreeNodeId {
   return `local-browse-entry:${entry.identity.entryPointKind}:${encodeURIComponent(
-    entry.identity.canonicalPath ?? entry.displayName
+    entry.identity.resolvedPath ?? entry.displayName
   )}`
 }
 
 function localBrowseItemNodeId(item: LocalBrowseItem): BrowserTreeNodeId {
   return `local-browse-item:${item.identity.entryPointKind}:${encodeURIComponent(
-    item.identity.rootCanonicalPath
-  )}:${encodeURIComponent(item.identity.itemCanonicalPath)}`
+    item.identity.resolvedRootPath
+  )}:${encodeURIComponent(item.identity.resolvedItemPath)}`
 }
 
 function entryPointIcon(entry: LocalBrowseEntryPoint): BrowserTreeIcon {
@@ -644,7 +649,7 @@ function formatEntryPointDetail(entry: LocalBrowseEntryPoint): string {
     return entryPointStatusLabel(entry.status)
   }
 
-  return admissionActionDetail(entry.admissionAction) ?? 'Local folder.'
+  return sourceAdmissionOperationDetail(entry.availableOperations) ?? 'Local folder.'
 }
 
 function formatItemDetail(item: LocalBrowseItem): string {
@@ -660,20 +665,44 @@ function formatItemDetail(item: LocalBrowseItem): string {
     return itemStatusLabel(item.status)
   }
 
-  return admissionActionDetail(item.admissionAction) ?? itemKindLabel(item.itemKind)
+  return sourceAdmissionOperationDetail(item.availableOperations) ?? itemKindLabel(item.itemKind)
 }
 
-function admissionActionDetail(action: LocalBrowseAdmissionAction | null): string | undefined {
-  switch (action) {
-    case 'requestDefaultMusicFolderAdmission':
-      return 'Default music folder admission candidate.'
-    case 'requestAdmission':
-      return 'Folder admission candidate.'
-    case 'requestParentAdmission':
-      return 'Parent folder admission candidate.'
-    case null:
-      return undefined
+function sourceAdmissionOperationDetail(
+  operations: readonly LocalBrowseOperation[]
+): string | undefined {
+  const operation = sourceAdmissionOperation(operations)
+
+  if (operation === undefined) {
+    return undefined
   }
+
+  switch (operation.requestKind) {
+    case 'defaultMusicFolder':
+      return 'Default music folder admission candidate.'
+    case 'selectedDirectory':
+      return 'Folder admission candidate.'
+    case 'parentDirectory':
+      return 'Parent folder admission candidate.'
+  }
+}
+
+export function hasLocalBrowseOperation(
+  operations: readonly LocalBrowseOperation[],
+  kind: LocalBrowseOperation['kind']
+): boolean {
+  return operations.some((operation) => operation.kind === kind)
+}
+
+export function sourceAdmissionOperation(
+  operations: readonly LocalBrowseOperation[]
+): Extract<LocalBrowseOperation, { readonly kind: 'requestSourceAdmission' }> | undefined {
+  return operations.find(
+    (
+      operation
+    ): operation is Extract<LocalBrowseOperation, { readonly kind: 'requestSourceAdmission' }> =>
+      operation.kind === 'requestSourceAdmission'
+  )
 }
 
 function itemKindLabel(kind: LocalBrowseItemKind): string {

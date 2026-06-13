@@ -27,7 +27,7 @@ export async function registerLocalRoot(
 
   try {
     const reply = await client.registerLocalRoot({
-      absolutePath: normalizedRequest.absolutePath
+      requestedPath: normalizedRequest.requestedPath
     } satisfies RegisterLocalRootRequest)
 
     switch (reply.type) {
@@ -36,7 +36,7 @@ export async function registerLocalRoot(
           state: 'registered',
           root: {
             rootId: reply.payload.rootId,
-            canonicalPath: reply.payload.canonicalPath
+            admittedRootPath: reply.payload.admittedRootPath
           }
         }
       case 'proposalRequired':
@@ -70,16 +70,16 @@ function normalizeLocalRootRegistrationRequest(
     )
   }
 
-  if (typeof request.absolutePath !== 'string' || request.absolutePath.trim().length === 0) {
+  if (typeof request.requestedPath !== 'string' || request.requestedPath.trim().length === 0) {
     return createLocalRootRegistrationErrorResult(
       'invalidRequest',
       'invalidRequest',
-      'Local root registration absolutePath is invalid.'
+      'Local root registration requestedPath is invalid.'
     )
   }
 
   return {
-    absolutePath: request.absolutePath
+    requestedPath: request.requestedPath
   }
 }
 

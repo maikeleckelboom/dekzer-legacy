@@ -393,7 +393,7 @@ describe('preload renderer API', () => {
       state: 'registered',
       root: {
         rootId: '7',
-        canonicalPath: 'C:/Music'
+        admittedRootPath: 'C:/Music'
       }
     }
     const scanResult: LocalRootScanResult = {
@@ -409,7 +409,7 @@ describe('preload renderer API', () => {
       roots: [
         {
           rootId: '7',
-          canonicalPath: 'C:/Music',
+          admittedRootPath: 'C:/Music',
           availability: 'available'
         }
       ]
@@ -602,7 +602,7 @@ describe('preload renderer API', () => {
         api.library.roots.chooseAndRegisterLocal as (
           request?: unknown
         ) => Promise<LocalRootChoiceResult>
-      )({ absolutePath: 'C:/RendererMustNotControlThis' })
+      )({ requestedPath: 'C:/RendererMustNotControlThis' })
     ).resolves.toBe(choiceResult)
     expect(receivedChoiceArgs).toEqual([])
     await expect(api.library.roots.runScan(scanRequest)).resolves.toBe(scanResult)

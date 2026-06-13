@@ -5,10 +5,11 @@
 This document is scoped to the `music` entry point class under
 [`local-browse-entry-points-contract.md`](local-browse-entry-points-contract.md). The local browse entry points contract
 is the canonical owner for the general local filesystem entry point model, entry point identity, status,
-browse-versus-scan boundary, available actions, and admission action.
+browse-versus-scan boundary, available operations, and admission operation.
 
 This document owns the Music-specific implementation companion behavior: platform Music path resolution, Music entry
-point production, Music-specific deduplication application, and the `requestDefaultMusicFolderAdmission` handoff.
+point production, Music-specific deduplication application, and the `defaultMusicFolder` source admission request
+handoff.
 
 ## Purpose
 
@@ -21,7 +22,7 @@ acts and source root admission succeeds.
 
 ## Platform Music Folder Resolution
 
-| Platform | Canonical path        | Resolution method                                               |
+| Platform | Default resolved path | Resolution method                                               |
 | -------- | --------------------- | --------------------------------------------------------------- |
 | Windows  | `%USERPROFILE%\Music` | `SHGetKnownFolderPath(FOLDERID_Music)`; not string construction |
 | macOS    | `~/Music`             | `FileManager.default.urls(for: .musicDirectory, ...)`           |
@@ -38,8 +39,8 @@ If the platform API fails to return a path, discovery produces no entry point. D
 ## Discovery Behavior
 
 The implemented V0 read path is `readLocalBrowseEntryPoints`. The Music row returned by that read is the `music`
-`LocalBrowseEntryPoint` with `admissionAction: requestDefaultMusicFolderAdmission` when the platform Music folder is
-resolved. It remains a local browse entry point until the user acts and admission succeeds.
+`LocalBrowseEntryPoint` with a `requestSourceAdmission` operation whose request kind is `defaultMusicFolder` when the
+platform Music folder is resolved. It remains a local browse entry point until the user acts and admission succeeds.
 
 Discovery runs as a bounded, non-scanning read. It must not block first shell render. It may complete shortly after the
 library surface mounts. Even a cheap status check can be slow on cloud-redirected, network-backed, or broken shell-folder
@@ -93,9 +94,9 @@ The platform Music folder is classified as `defaultMusicFolder` by the source ro
 without warning or confirmation only when platform resolution and admission classification agree. See
 [`root-admission-policy.md`](root-admission-policy.md).
 
-Discovery does not pre-admit or pre-persist the source. `requestDefaultMusicFolderAdmission` is a display/action
-recommendation only; it is not an admission result and does not bypass source root admission. The source is admitted and
-persisted only when the user acts and the service admission path accepts registration.
+Discovery does not pre-admit or pre-persist the source. The `defaultMusicFolder` local browse source admission operation
+is a request affordance only; it is not an admission result and does not bypass source root admission. The source is
+admitted and persisted only when the user acts and the service admission path accepts registration.
 
 Renderer code must not treat the entry point as a half-source, pass it to source lifecycle reads, create source-location
 state for it, or attach source IPC subscriptions to it before admission.
@@ -112,8 +113,8 @@ application.
 If the user has already manually registered the platform Music folder path, the Music entry point is suppressed or marked
 as `duplicateOfAdmittedSource` according to the active surface's projection rules. It must not appear as a second source.
 
-Deduplication rule: if the normalized canonical form of the discovered path matches the normalized canonical form of
-any existing admitted source path, discovery does not produce a second source row.
+Deduplication rule: if the normalized discovered path matches the normalized admitted root path of any existing source,
+discovery does not produce a second source row.
 
 On Windows, path comparison is case-insensitive and normalized by stripping trailing separators and normalizing slashes.
 

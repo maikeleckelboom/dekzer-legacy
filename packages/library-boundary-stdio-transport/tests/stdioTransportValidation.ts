@@ -27,12 +27,12 @@ const fixtureServerPath = fileURLToPath(
   new URL("./stdioFixtureServer.js", import.meta.url)
 );
 
-function registerLocalRootRequest(absolutePath: string): CommandRequest {
+function registerLocalRootRequest(requestedPath: string): CommandRequest {
   return {
     type: "libraryRoots",
     payload: {
       type: "registerLocalRoot",
-      payload: { absolutePath }
+      payload: { requestedPath }
     }
   };
 }
@@ -243,10 +243,11 @@ async function validatesLocalBrowseItemSnapshotResponse(): Promise<void> {
     const client = createLibraryBoundaryClient(transport);
     const reply = await client.readLocalBrowseItems({
       entryPointKind: "music",
-      rootCanonicalPath: "C:\\Users\\DJ\\Music",
-      parentCanonicalPath: "C:\\Users\\DJ\\Music",
+      resolvedRootPath: "C:\\Users\\DJ\\Music",
+      resolvedParentPath: "C:\\Users\\DJ\\Music",
       offset: 0,
-      limit: 50
+      limit: 50,
+      profile: "audioBrowse"
     });
 
     equal(reply.status, "complete", "local browse item read status is preserved");
@@ -255,10 +256,16 @@ async function validatesLocalBrowseItemSnapshotResponse(): Promise<void> {
       "mediaFile",
       "local browse item fixture routes through stdio transport"
     );
-    equal(
-      reply.items[0]?.admissionAction,
-      "requestParentAdmission",
-      "local browse item admission action is preserved"
+    deepEqual(
+      reply.items[0]?.availableOperations,
+      [
+        {
+          kind: "requestSourceAdmission",
+          requestKind: "parentDirectory",
+          resolvedPath: "C:\\Users\\DJ\\Music"
+        }
+      ],
+      "local browse item admission operation is preserved"
     );
   } finally {
     await transport.close();
@@ -294,7 +301,7 @@ async function validatesClientTurnsProtocolErrorOutcomeIntoClientError(): Promis
   try {
     const client = createLibraryBoundaryClient(transport);
     const error = await rejects(
-      () => client.registerLocalRoot({ absolutePath: "protocol-error" }),
+      () => client.registerLocalRoot({ requestedPath: "protocol-error" }),
       LibraryBoundaryProtocolError,
       "client converts protocol error outcome into LibraryBoundaryProtocolError"
     );

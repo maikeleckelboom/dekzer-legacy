@@ -220,16 +220,17 @@ impl LibraryBoundaryService {
         &self,
         request: protocol::RegisterLocalRootRequest,
     ) -> protocol::ProtocolResult<protocol::RegisterLocalRootReply> {
-        if request.absolute_path.trim().is_empty() {
+        if request.requested_path.trim().is_empty() {
             return Err(protocol::ProtocolError::InvalidRequest {
-                detail: "libraryRoots.registerLocalRoot absolutePath must not be empty".to_string(),
+                detail: "libraryRoots.registerLocalRoot requestedPath must not be empty"
+                    .to_string(),
             });
         }
 
         let result = self
             .durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: PathBuf::from(request.absolute_path),
+                requested_path: PathBuf::from(request.requested_path),
             })
             .map_err(map_store_error)?;
         match result {
@@ -238,7 +239,10 @@ impl LibraryBoundaryService {
                 Ok(protocol::RegisterLocalRootReply::Registered(
                     protocol::RegisteredLocalRoot {
                         root_id: registered.root_id,
-                        canonical_path: registered.canonical_path.to_string_lossy().into_owned(),
+                        admitted_root_path: registered
+                            .admitted_root_path
+                            .to_string_lossy()
+                            .into_owned(),
                     },
                 ))
             }
@@ -248,12 +252,12 @@ impl LibraryBoundaryService {
                         proposal_id: proposal.proposal_id,
                         root_class: map_source_registration_root_class(proposal.root_class),
                         requested_path: proposal.requested_path.to_string_lossy().into_owned(),
-                        canonical_path: proposal
-                            .canonical_path
+                        resolved_path: proposal
+                            .resolved_path
                             .map(|path| path.to_string_lossy().into_owned()),
                         confirmation_required_reason: proposal.confirmation_required_reason,
-                        suggested_roots: proposal
-                            .suggested_roots
+                        suggested_root_paths: proposal
+                            .suggested_root_paths
                             .into_iter()
                             .map(|path| path.to_string_lossy().into_owned())
                             .collect(),
@@ -264,12 +268,12 @@ impl LibraryBoundaryService {
                 protocol::RegisterLocalRootReply::Rejected(protocol::SourceRegistrationRejected {
                     root_class: map_source_registration_root_class(rejection.root_class),
                     requested_path: rejection.requested_path.to_string_lossy().into_owned(),
-                    canonical_path: rejection
-                        .canonical_path
+                    resolved_path: rejection
+                        .resolved_path
                         .map(|path| path.to_string_lossy().into_owned()),
                     rejection_reason: rejection.rejection_reason,
-                    suggested_roots: rejection
-                        .suggested_roots
+                    suggested_root_paths: rejection
+                        .suggested_root_paths
                         .into_iter()
                         .map(|path| path.to_string_lossy().into_owned())
                         .collect(),
@@ -422,7 +426,7 @@ impl LibraryBoundaryService {
             .map_err(map_store_error)?
             .roots
             .into_iter()
-            .map(|root| normalize_local_browse_path_key(&root.canonical_path))
+            .map(|root| normalize_local_browse_path_key(&root.admitted_root_path))
             .collect::<HashSet<_>>();
 
         let resolution = self
@@ -448,7 +452,7 @@ impl LibraryBoundaryService {
             .map_err(map_store_error)?
             .roots
             .into_iter()
-            .map(|root| normalize_local_browse_path_key(&root.canonical_path))
+            .map(|root| normalize_local_browse_path_key(&root.admitted_root_path))
             .collect::<HashSet<_>>();
 
         let resolution = self
@@ -811,7 +815,7 @@ impl LibraryBoundaryService {
                 .into_iter()
                 .map(|root| protocol::LocalRoot {
                     root_id: root.root_id,
-                    canonical_path: root.canonical_path.to_string_lossy().into_owned(),
+                    admitted_root_path: root.admitted_root_path.to_string_lossy().into_owned(),
                     availability: match root.availability {
                         LocalRootAvailability::Available => {
                             protocol::LocalRootAvailability::Available
@@ -997,7 +1001,7 @@ fn map_local_browse_entry_point(
     admitted_source_path_keys: &HashSet<String>,
 ) -> protocol::LocalBrowseEntryPoint {
     let duplicate_of_admitted_source = entry
-        .canonical_path
+        .resolved_path
         .as_deref()
         .map(normalize_local_browse_path_key)
         .is_some_and(|key| admitted_source_path_keys.contains(&key));
@@ -1006,72 +1010,64 @@ fn map_local_browse_entry_point(
     } else {
         entry.status
     };
-    let admission_action =
-        local_browse_entry_point_admission_action(entry.entry_point_kind, status);
-    let available_actions =
-        local_browse_entry_point_available_actions(entry.entry_point_kind, status);
+    let available_operations = local_browse_entry_point_available_operations(
+        entry.entry_point_kind,
+        status,
+        entry.resolved_path.as_deref(),
+    );
 
     protocol::LocalBrowseEntryPoint {
         identity: protocol::LocalBrowseEntryPointIdentity {
             entry_point_kind: entry.entry_point_kind,
-            canonical_path: entry
-                .canonical_path
+            resolved_path: entry
+                .resolved_path
                 .map(|path| path.to_string_lossy().into_owned()),
         },
         display_name: entry.display_name,
         status,
         platform: entry.platform,
-        admission_action,
-        available_actions,
+        available_operations,
         failure: entry.failure.map(map_local_browse_entry_point_failure),
     }
 }
 
-fn local_browse_entry_point_admission_action(
+fn local_browse_entry_point_available_operations(
     kind: protocol::LocalBrowseEntryPointKind,
     status: protocol::LocalBrowseEntryPointStatus,
-) -> Option<protocol::LocalBrowseAdmissionAction> {
-    match status {
-        protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
-        | protocol::LocalBrowseEntryPointStatus::UnsupportedPlatform => None,
-        protocol::LocalBrowseEntryPointStatus::Available
-        | protocol::LocalBrowseEntryPointStatus::Resolving => match kind {
-            protocol::LocalBrowseEntryPointKind::SystemDriveRoot => None,
-            protocol::LocalBrowseEntryPointKind::Music => {
-                Some(protocol::LocalBrowseAdmissionAction::RequestDefaultMusicFolderAdmission)
-            }
-            protocol::LocalBrowseEntryPointKind::LocalDataVolumeRoot
-            | protocol::LocalBrowseEntryPointKind::RemovableVolumeRoot
-            | protocol::LocalBrowseEntryPointKind::UserHome
-            | protocol::LocalBrowseEntryPointKind::Desktop
-            | protocol::LocalBrowseEntryPointKind::Downloads => {
-                Some(protocol::LocalBrowseAdmissionAction::RequestAdmission)
-            }
-        },
-        protocol::LocalBrowseEntryPointStatus::Unavailable
-        | protocol::LocalBrowseEntryPointStatus::PermissionBlocked
-        | protocol::LocalBrowseEntryPointStatus::Missing => None,
-    }
-}
-
-fn local_browse_entry_point_available_actions(
-    kind: protocol::LocalBrowseEntryPointKind,
-    status: protocol::LocalBrowseEntryPointStatus,
-) -> protocol::LocalBrowseAvailableActions {
-    let can_browse = matches!(
+    resolved_path: Option<&Path>,
+) -> Vec<protocol::LocalBrowseOperation> {
+    if !matches!(
         status,
         protocol::LocalBrowseEntryPointStatus::Available
             | protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
-    );
-    let can_request_admission = matches!(status, protocol::LocalBrowseEntryPointStatus::Available)
-        && kind != protocol::LocalBrowseEntryPointKind::SystemDriveRoot;
-
-    protocol::LocalBrowseAvailableActions {
-        can_browse,
-        can_request_admission,
-        can_choose_descendant: can_browse,
-        can_request_parent_admission: false,
+    ) {
+        return Vec::new();
     }
+
+    let mut operations = vec![
+        protocol::LocalBrowseOperation::BrowseChildren,
+        protocol::LocalBrowseOperation::ChooseDescendant,
+    ];
+
+    if status != protocol::LocalBrowseEntryPointStatus::Available
+        || kind == protocol::LocalBrowseEntryPointKind::SystemDriveRoot
+    {
+        return operations;
+    }
+
+    let Some(resolved_path) = resolved_path else {
+        return operations;
+    };
+    let request_kind = if kind == protocol::LocalBrowseEntryPointKind::Music {
+        protocol::LocalBrowseSourceAdmissionRequestKind::DefaultMusicFolder
+    } else {
+        protocol::LocalBrowseSourceAdmissionRequestKind::SelectedDirectory
+    };
+    operations.push(protocol::LocalBrowseOperation::RequestSourceAdmission {
+        request_kind,
+        resolved_path: resolved_path.to_string_lossy().into_owned(),
+    });
+    operations
 }
 
 fn local_browse_platform_unsupported(entries: &[ResolvedLocalBrowseEntryPoint]) -> bool {
@@ -1086,11 +1082,11 @@ fn local_browse_root_identity_matches(
     request: &protocol::ReadLocalBrowseItemsRequest,
 ) -> bool {
     let requested_root_key =
-        normalize_local_browse_path_key(Path::new(&request.root_canonical_path));
+        normalize_local_browse_path_key(Path::new(&request.resolved_root_path));
     entries.iter().any(|entry| {
         entry.entry_point_kind == request.entry_point_kind
             && entry
-                .canonical_path
+                .resolved_path
                 .as_deref()
                 .map(normalize_local_browse_path_key)
                 .is_some_and(|entry_root_key| entry_root_key == requested_root_key)
@@ -1104,8 +1100,8 @@ fn local_browse_root_identity_failure_reply(
         status: protocol::LocalBrowseItemsReadStatus::Failed,
         window_identity: protocol::LocalBrowseWindowIdentity {
             entry_point_kind: request.entry_point_kind,
-            root_canonical_path: request.root_canonical_path.clone(),
-            parent_canonical_path: request.parent_canonical_path.clone(),
+            resolved_root_path: request.resolved_root_path.clone(),
+            resolved_parent_path: request.resolved_parent_path.clone(),
         },
         offset: request.offset,
         limit: request.limit,
@@ -1113,7 +1109,7 @@ fn local_browse_root_identity_failure_reply(
         items: Vec::new(),
         failure: Some(protocol::LocalBrowseItemFailure {
             code: protocol::LocalBrowseItemFailureCode::RootIdentityMismatch,
-            detail: "entryPointKind and rootCanonicalPath do not match a current local browse entry point".to_string(),
+            detail: "entryPointKind and resolvedRootPath do not match a current local browse entry point".to_string(),
         }),
     }
 }
@@ -2111,10 +2107,10 @@ mod tests {
 
     fn register_local_root(
         service: &LibraryBoundaryService,
-        absolute_path: String,
+        requested_path: String,
     ) -> (serde_json::Value, RegisteredLocalRoot) {
         let outcome = service.handle_command(CommandRequest::LibraryRoots(
-            LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest { absolute_path }),
+            LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest { requested_path }),
         ));
         let json = serde_json::to_value(&outcome).expect("serialize register outcome");
         let reply = match expect_register_local_root_reply(expect_success(outcome)) {
@@ -2537,8 +2533,8 @@ mod tests {
             Some(&json!(registered.root_id.to_string()))
         );
         assert_eq!(
-            register_json.pointer("/payload/reply/payload/payload/payload/canonicalPath"),
-            Some(&json!(registered.canonical_path.clone()))
+            register_json.pointer("/payload/reply/payload/payload/payload/admittedRootPath"),
+            Some(&json!(registered.admitted_root_path.clone()))
         );
 
         let scan = start_root_scan(&service, registered.root_id);
@@ -4518,7 +4514,10 @@ mod tests {
         )));
         assert_eq!(reply.roots.len(), 1);
         assert_eq!(reply.roots[0].root_id, registered.root_id);
-        assert_eq!(reply.roots[0].canonical_path, registered.canonical_path);
+        assert_eq!(
+            reply.roots[0].admitted_root_path,
+            registered.admitted_root_path
+        );
         assert!(
             matches!(
                 reply.roots[0].availability,

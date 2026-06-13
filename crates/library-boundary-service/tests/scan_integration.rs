@@ -51,7 +51,7 @@ fn write_file(path: &Path, bytes: &[u8]) {
 fn register_root(service: &LibraryBoundaryService, path: &Path) -> RegisteredLocalRoot {
     let outcome = service.handle_command(CommandRequest::LibraryRoots(
         LibraryRootCommand::RegisterLocalRoot(RegisterLocalRootRequest {
-            absolute_path: path.to_string_lossy().into_owned(),
+            requested_path: path.to_string_lossy().into_owned(),
         }),
     ));
     let reply = expect_command_reply(outcome, "register local root");

@@ -90,13 +90,13 @@ fn open_test_service_with_local_browse_entries(
 
 fn fake_local_browse_entry(
     entry_point_kind: protocol::LocalBrowseEntryPointKind,
-    canonical_path: impl Into<PathBuf>,
+    resolved_path: impl Into<PathBuf>,
     display_name: &str,
     status: protocol::LocalBrowseEntryPointStatus,
 ) -> ResolvedLocalBrowseEntryPoint {
     ResolvedLocalBrowseEntryPoint {
         entry_point_kind,
-        canonical_path: Some(canonical_path.into()),
+        resolved_path: Some(resolved_path.into()),
         display_name: display_name.to_string(),
         status,
         platform: protocol::LocalBrowsePlatform::Windows,
@@ -197,13 +197,34 @@ fn read_local_browse_items(
     offset: usize,
     limit: usize,
 ) -> protocol::ReadLocalBrowseItemsReply {
+    read_local_browse_items_with_profile(
+        service,
+        entry_point_kind,
+        root,
+        parent,
+        protocol::LocalBrowseProfile::AudioBrowse,
+        offset,
+        limit,
+    )
+}
+
+fn read_local_browse_items_with_profile(
+    service: &LibraryBoundaryService,
+    entry_point_kind: protocol::LocalBrowseEntryPointKind,
+    root: &Path,
+    parent: &Path,
+    profile: protocol::LocalBrowseProfile,
+    offset: usize,
+    limit: usize,
+) -> protocol::ReadLocalBrowseItemsReply {
     expect_local_browse_items_reply(expect_success(service.handle_command(
         protocol::CommandRequest::SnapshotRead(
             protocol::SnapshotReadCommand::ReadLocalBrowseItems(
                 protocol::ReadLocalBrowseItemsRequest {
                     entry_point_kind,
-                    root_canonical_path: root.to_string_lossy().into_owned(),
-                    parent_canonical_path: parent.to_string_lossy().into_owned(),
+                    resolved_root_path: root.to_string_lossy().into_owned(),
+                    resolved_parent_path: parent.to_string_lossy().into_owned(),
+                    profile,
                     offset,
                     limit,
                 },
@@ -214,11 +235,11 @@ fn read_local_browse_items(
 
 fn register_local_root(
     service: &LibraryBoundaryService,
-    absolute_path: String,
+    requested_path: String,
 ) -> protocol::RegisteredLocalRoot {
     match expect_register_local_root_reply(expect_success(service.handle_command(
         protocol::CommandRequest::LibraryRoots(protocol::LibraryRootCommand::RegisterLocalRoot(
-            protocol::RegisterLocalRootRequest { absolute_path },
+            protocol::RegisterLocalRootRequest { requested_path },
         )),
     ))) {
         protocol::RegisterLocalRootReply::Registered(root) => root,
@@ -232,6 +253,34 @@ fn item_names(reply: &protocol::ReadLocalBrowseItemsReply) -> Vec<String> {
         .iter()
         .map(|item| item.display_name.clone())
         .collect()
+}
+
+fn has_browse_children_operation(operations: &[protocol::LocalBrowseOperation]) -> bool {
+    operations
+        .iter()
+        .any(|operation| matches!(operation, protocol::LocalBrowseOperation::BrowseChildren))
+}
+
+fn has_source_admission_operation(operations: &[protocol::LocalBrowseOperation]) -> bool {
+    operations.iter().any(|operation| {
+        matches!(
+            operation,
+            protocol::LocalBrowseOperation::RequestSourceAdmission { .. }
+        )
+    })
+}
+
+fn has_source_admission_request_kind(
+    operations: &[protocol::LocalBrowseOperation],
+    expected: protocol::LocalBrowseSourceAdmissionRequestKind,
+) -> bool {
+    operations.iter().any(|operation| {
+        matches!(
+            operation,
+            protocol::LocalBrowseOperation::RequestSourceAdmission { request_kind, .. }
+                if *request_kind == expected
+        )
+    })
 }
 
 #[cfg(windows)]
@@ -346,7 +395,7 @@ fn local_browse_items_limit_offset_and_sort_directories_before_files() {
     );
 
     assert_eq!(reply.status, protocol::LocalBrowseItemsReadStatus::Complete);
-    assert_eq!(reply.total_items, 5);
+    assert_eq!(reply.total_items, 4);
     assert_eq!(item_names(&reply), vec!["B", "A.mp3", "z.flac"]);
     assert_eq!(reply.offset, 1);
     assert_eq!(reply.limit, 3);
@@ -383,12 +432,10 @@ fn media_file_items_are_not_source_files_and_request_parent_admission_only() {
         item.media_relevance,
         Some(protocol::LocalBrowseItemMediaRelevance::MediaRelevant)
     );
-    assert_eq!(
-        item.admission_action,
-        Some(protocol::LocalBrowseAdmissionAction::RequestParentAdmission)
-    );
-    assert!(!item.available_actions.can_request_admission);
-    assert!(item.available_actions.can_request_parent_admission);
+    assert!(has_source_admission_request_kind(
+        &item.available_operations,
+        protocol::LocalBrowseSourceAdmissionRequestKind::ParentDirectory
+    ));
     assert_eq!(count_rows(&context, "source_files"), 0);
     assert_eq!(application_table_row_counts(&context), before);
 }
@@ -403,11 +450,12 @@ fn unsupported_files_are_marked_unsupported_items() {
         root.path(),
     );
 
-    let reply = read_local_browse_items(
+    let reply = read_local_browse_items_with_profile(
         &service,
         protocol::LocalBrowseEntryPointKind::Music,
         root.path(),
         root.path(),
+        protocol::LocalBrowseProfile::AllFiles,
         0,
         20,
     );
@@ -426,7 +474,65 @@ fn unsupported_files_are_marked_unsupported_items() {
         item.media_relevance,
         Some(protocol::LocalBrowseItemMediaRelevance::Unsupported)
     );
-    assert_eq!(item.admission_action, None);
+    assert!(!has_source_admission_operation(&item.available_operations));
+}
+
+#[cfg(windows)]
+#[test]
+fn default_audio_browse_profile_keeps_musical_rows_and_hides_noise() {
+    let root = TempDir::new().expect("create local root");
+    std::fs::create_dir(root.path().join("Album")).expect("create album");
+    std::fs::write(root.path().join("Track.flac"), []).expect("write track");
+    std::fs::write(root.path().join("Album.cue"), []).expect("write cue");
+    std::fs::write(root.path().join("cover.png"), []).expect("write image");
+    std::fs::write(root.path().join("desktop.ini"), []).expect("write desktop ini");
+    std::fs::write(root.path().join("clip.mp4"), []).expect("write video");
+    let (_tempdir, _context, service) = open_test_service_with_local_browse_root(
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+    );
+
+    let reply = read_local_browse_items(
+        &service,
+        protocol::LocalBrowseEntryPointKind::Music,
+        root.path(),
+        root.path(),
+        0,
+        20,
+    );
+
+    assert_eq!(reply.status, protocol::LocalBrowseItemsReadStatus::Complete);
+    assert_eq!(item_names(&reply), vec!["Album", "Album.cue", "Track.flac"]);
+
+    let album = reply
+        .items
+        .iter()
+        .find(|item| item.display_name == "Album")
+        .expect("album row");
+    assert_eq!(album.item_kind, protocol::LocalBrowseItemKind::Directory);
+    assert!(has_browse_children_operation(&album.available_operations));
+    assert!(has_source_admission_request_kind(
+        &album.available_operations,
+        protocol::LocalBrowseSourceAdmissionRequestKind::SelectedDirectory
+    ));
+
+    let track = reply
+        .items
+        .iter()
+        .find(|item| item.display_name == "Track.flac")
+        .expect("track row");
+    assert_eq!(track.file_kind, Some(protocol::ContentsFileKind::Audio));
+
+    let cue = reply
+        .items
+        .iter()
+        .find(|item| item.display_name == "Album.cue")
+        .expect("cue row");
+    assert_eq!(cue.file_kind, Some(protocol::ContentsFileKind::CueSheet));
+    assert_eq!(
+        cue.media_relevance,
+        Some(protocol::LocalBrowseItemMediaRelevance::CompanionMetadata)
+    );
 }
 
 #[cfg(windows)]
@@ -484,9 +590,8 @@ fn exact_admitted_source_path_marks_duplicate_without_mutation() {
         item.status,
         protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource
     );
-    assert_eq!(item.admission_action, None);
-    assert!(!item.available_actions.can_request_admission);
-    assert!(item.available_actions.can_browse);
+    assert!(!has_source_admission_operation(&item.available_operations));
+    assert!(has_browse_children_operation(&item.available_operations));
     assert_eq!(application_table_row_counts(&context), before);
 }
 
@@ -518,8 +623,7 @@ fn system_drive_item_browsing_remains_read_only_and_rejects_system_roots() {
     assert_eq!(reply.status, protocol::LocalBrowseItemsReadStatus::Complete);
     assert_eq!(item.item_kind, protocol::LocalBrowseItemKind::RejectedRoot);
     assert_eq!(item.status, protocol::LocalBrowseItemStatus::Rejected);
-    assert_eq!(item.admission_action, None);
-    assert!(!item.available_actions.can_request_admission);
+    assert!(!has_source_admission_operation(&item.available_operations));
     assert_eq!(
         item.failure.as_ref().map(|failure| failure.code),
         Some(protocol::LocalBrowseItemFailureCode::RejectedRoot)
@@ -626,33 +730,47 @@ fn non_windows_child_read_returns_unsupported_consistently() {
 
 #[test]
 fn local_browse_item_file_classification_is_provisional_display_state() {
+    let (item_kind, file_kind, media_relevance, operations) =
+        classify_item_file_for_test(Path::new("Track.flac"));
     assert_eq!(
-        classify_item_file_for_test(Path::new("Track.flac")),
+        (item_kind, file_kind, media_relevance),
         (
             protocol::LocalBrowseItemKind::MediaFile,
             protocol::ContentsFileKind::Audio,
             protocol::LocalBrowseItemMediaRelevance::MediaRelevant,
-            Some(protocol::LocalBrowseAdmissionAction::RequestParentAdmission),
         )
     );
+    assert!(has_source_admission_request_kind(
+        &operations,
+        protocol::LocalBrowseSourceAdmissionRequestKind::ParentDirectory
+    ));
+
+    let (item_kind, file_kind, media_relevance, operations) =
+        classify_item_file_for_test(Path::new("Album.cue"));
     assert_eq!(
-        classify_item_file_for_test(Path::new("Album.cue")),
+        (item_kind, file_kind, media_relevance),
         (
             protocol::LocalBrowseItemKind::MediaFile,
             protocol::ContentsFileKind::CueSheet,
             protocol::LocalBrowseItemMediaRelevance::CompanionMetadata,
-            Some(protocol::LocalBrowseAdmissionAction::RequestParentAdmission),
         )
     );
+    assert!(has_source_admission_request_kind(
+        &operations,
+        protocol::LocalBrowseSourceAdmissionRequestKind::ParentDirectory
+    ));
+
+    let (item_kind, file_kind, media_relevance, operations) =
+        classify_item_file_for_test(Path::new("notes.txt"));
     assert_eq!(
-        classify_item_file_for_test(Path::new("notes.txt")),
+        (item_kind, file_kind, media_relevance),
         (
             protocol::LocalBrowseItemKind::UnsupportedFile,
             protocol::ContentsFileKind::TextDoc,
             protocol::LocalBrowseItemMediaRelevance::Unsupported,
-            None,
         )
     );
+    assert!(operations.is_empty());
 }
 
 #[test]

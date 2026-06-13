@@ -13,6 +13,7 @@ import { readSearchFilterThroughHost } from '../searchFilter/read'
 import { cancelRootScanThroughHost, type CancelScanLogger } from '../roots/cancel'
 import { chooseAndRegisterLocalRoot, type LocalRootChoiceDependencies } from '../roots/chooseLocal'
 import { readLocalRootsThroughHost } from '../roots/read'
+import { registerLocalRoot } from '../roots/register'
 import { runLocalRootScanThroughHost, type ScanLogger } from '../roots/scan'
 import { unregisterLocalRootThroughHost } from '../roots/unregister'
 import {
@@ -40,6 +41,7 @@ import {
 import type { LibraryBoundaryHost } from './host'
 import type { HostStatusController } from './status'
 import type { ReadLocalBrowseItemsRequest } from '../../../shared/library/localBrowse/items'
+import type { LocalRootRegistrationRequest } from '../../../shared/library/roots/register'
 import type { UnregisterLocalRootRequest } from '../../../shared/library/roots/unregister'
 
 export type LibraryControlPlaneIpcMain = {
@@ -144,6 +146,9 @@ export function registerLibraryIpcCommands(options: RegisterLibraryIpcCommandsOp
   )
   ipcMain.handle(libraryControlChannels.roots.chooseLocal, () =>
     chooseAndRegisterLocalRoot(host, localRootChoiceDependencies)
+  )
+  ipcMain.handle(libraryControlChannels.roots.registerLocalPath, (_event, request) =>
+    registerLocalRoot(host, request as LocalRootRegistrationRequest)
   )
   ipcMain.handle(libraryControlChannels.roots.scan, (_event, request) =>
     runLocalRootScanThroughHost(host, request, localRootScanLogger)

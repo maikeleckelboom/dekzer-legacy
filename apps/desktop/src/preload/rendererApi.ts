@@ -61,6 +61,10 @@ import type {
 } from '../shared/library/boundary/events'
 import type { LocalRootChoiceResult } from '../shared/library/roots/chooseLocal'
 import type { ReadLocalRootsOutcome } from '../shared/library/roots/read'
+import type {
+  LocalRootRegistrationRequest,
+  LocalRootRegistrationResult
+} from '../shared/library/roots/register'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../shared/library/roots/scan'
 import type { CancelRootScanRequest, CancelRootScanResult } from '../shared/library/roots/cancel'
 import type {
@@ -261,6 +265,14 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           return (await ipcRenderer.invoke(
             libraryControlChannels.roots.chooseLocal
           )) as LocalRootChoiceResult
+        },
+        async registerLocalPath(
+          request: LocalRootRegistrationRequest
+        ): Promise<LocalRootRegistrationResult> {
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.roots.registerLocalPath,
+            request
+          )) as LocalRootRegistrationResult
         },
         async runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult> {
           return (await ipcRenderer.invoke(

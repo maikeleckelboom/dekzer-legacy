@@ -55,14 +55,14 @@ impl LocalBrowseItemReader for PlatformLocalBrowseItemReader {
 fn validate_common_request(
     request: &protocol::ReadLocalBrowseItemsRequest,
 ) -> protocol::ProtocolResult<()> {
-    if request.root_canonical_path.trim().is_empty() {
+    if request.resolved_root_path.trim().is_empty() {
         return Err(protocol::ProtocolError::InvalidRequest {
-            detail: "readLocalBrowseItems rootCanonicalPath must not be empty".to_string(),
+            detail: "readLocalBrowseItems resolvedRootPath must not be empty".to_string(),
         });
     }
-    if request.parent_canonical_path.trim().is_empty() {
+    if request.resolved_parent_path.trim().is_empty() {
         return Err(protocol::ProtocolError::InvalidRequest {
-            detail: "readLocalBrowseItems parentCanonicalPath must not be empty".to_string(),
+            detail: "readLocalBrowseItems resolvedParentPath must not be empty".to_string(),
         });
     }
     if request.limit == 0 || request.limit > LOCAL_BROWSE_ITEM_LIMIT_MAX {
@@ -80,10 +80,10 @@ fn read_windows_items(
     request: protocol::ReadLocalBrowseItemsRequest,
     admitted_source_path_keys: &HashSet<String>,
 ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
-    let root_path = PathBuf::from(&request.root_canonical_path);
-    let parent_path = PathBuf::from(&request.parent_canonical_path);
-    validate_windows_path(&root_path, "rootCanonicalPath")?;
-    validate_windows_path(&parent_path, "parentCanonicalPath")?;
+    let root_path = PathBuf::from(&request.resolved_root_path);
+    let parent_path = PathBuf::from(&request.resolved_parent_path);
+    validate_windows_path(&root_path, "resolvedRootPath")?;
+    validate_windows_path(&parent_path, "resolvedParentPath")?;
 
     let root_key = normalize_local_browse_path_key(&root_path);
     let parent_key = normalize_local_browse_path_key(&parent_path);
@@ -92,7 +92,7 @@ fn read_windows_items(
             &request,
             protocol::LocalBrowseItemsReadStatus::Failed,
             protocol::LocalBrowseItemFailureCode::ParentOutsideRoot,
-            "parentCanonicalPath is outside rootCanonicalPath",
+            "resolvedParentPath is outside resolvedRootPath",
         ));
     }
 
@@ -112,7 +112,7 @@ fn read_windows_items(
             &request,
             protocol::LocalBrowseItemsReadStatus::Unavailable,
             protocol::LocalBrowseItemFailureCode::ReparsePointSkipped,
-            "rootCanonicalPath is a reparse point and was not followed",
+            "resolvedRootPath is a reparse point and was not followed",
         ));
     }
     if !root_metadata.is_dir() {
@@ -120,7 +120,7 @@ fn read_windows_items(
             &request,
             protocol::LocalBrowseItemsReadStatus::Unavailable,
             protocol::LocalBrowseItemFailureCode::RootPathUnavailable,
-            "rootCanonicalPath is not a directory",
+            "resolvedRootPath is not a directory",
         ));
     }
 
@@ -140,7 +140,7 @@ fn read_windows_items(
             &request,
             protocol::LocalBrowseItemsReadStatus::Unavailable,
             protocol::LocalBrowseItemFailureCode::ReparsePointSkipped,
-            "parentCanonicalPath is a reparse point and was not followed",
+            "resolvedParentPath is a reparse point and was not followed",
         ));
     }
     if !parent_metadata.is_dir() {
@@ -148,7 +148,7 @@ fn read_windows_items(
             &request,
             protocol::LocalBrowseItemsReadStatus::Failed,
             protocol::LocalBrowseItemFailureCode::ParentNotDirectory,
-            "parentCanonicalPath is not a directory",
+            "resolvedParentPath is not a directory",
         ));
     }
 
@@ -182,6 +182,7 @@ fn read_windows_items(
         ));
     }
 
+    item_keys.retain(|key| item_visible_for_profile(key, request.profile));
     sort_item_keys(&mut item_keys);
 
     let total_items = item_keys.len();
@@ -268,7 +269,7 @@ fn item_key_for_directory_entry(
             display_name,
             protocol::LocalBrowseItemStatus::Rejected,
             protocol::LocalBrowseItemFailureCode::ParentOutsideRoot,
-            "child item resolved outside rootCanonicalPath",
+            "child item resolved outside resolvedRootPath",
         );
     }
 
@@ -396,8 +397,7 @@ fn item_for_key(
     } else {
         key.status
     };
-    let admission_action = admission_action_for_item(&key, status);
-    let available_actions = available_actions_for_item(&key, status);
+    let available_operations = available_operations_for_item(request, &key, status);
 
     protocol::LocalBrowseItem {
         identity: item_identity(request, &key.path),
@@ -407,52 +407,79 @@ fn item_for_key(
         platform: local_browse_entry_point_platform(),
         file_kind: key.file_kind,
         media_relevance: key.media_relevance,
-        admission_action,
-        available_actions,
+        available_operations,
         failure: key.failure,
     }
 }
 
-fn admission_action_for_item(
+fn available_operations_for_item(
+    request: &protocol::ReadLocalBrowseItemsRequest,
     key: &LocalBrowseItemKey,
     status: protocol::LocalBrowseItemStatus,
-) -> Option<protocol::LocalBrowseAdmissionAction> {
-    if status != protocol::LocalBrowseItemStatus::Available {
-        return None;
-    }
-
-    match key.item_kind {
-        protocol::LocalBrowseItemKind::Directory => {
-            Some(protocol::LocalBrowseAdmissionAction::RequestAdmission)
+) -> Vec<protocol::LocalBrowseOperation> {
+    match (key.item_kind, status) {
+        (protocol::LocalBrowseItemKind::Directory, protocol::LocalBrowseItemStatus::Available) => {
+            vec![
+                protocol::LocalBrowseOperation::BrowseChildren,
+                protocol::LocalBrowseOperation::ChooseDescendant,
+                protocol::LocalBrowseOperation::RequestSourceAdmission {
+                    request_kind:
+                        protocol::LocalBrowseSourceAdmissionRequestKind::SelectedDirectory,
+                    resolved_path: key.path.to_string_lossy().into_owned(),
+                },
+            ]
         }
-        protocol::LocalBrowseItemKind::MediaFile if key.parent_admission_available => {
-            Some(protocol::LocalBrowseAdmissionAction::RequestParentAdmission)
+        (
+            protocol::LocalBrowseItemKind::Directory,
+            protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource,
+        ) => vec![
+            protocol::LocalBrowseOperation::BrowseChildren,
+            protocol::LocalBrowseOperation::ChooseDescendant,
+        ],
+        (protocol::LocalBrowseItemKind::MediaFile, protocol::LocalBrowseItemStatus::Available)
+            if key.parent_admission_available =>
+        {
+            vec![protocol::LocalBrowseOperation::RequestSourceAdmission {
+                request_kind: protocol::LocalBrowseSourceAdmissionRequestKind::ParentDirectory,
+                resolved_path: request.resolved_parent_path.clone(),
+            }]
         }
-        _ => None,
+        _ => Vec::new(),
     }
 }
 
-fn available_actions_for_item(
+fn item_visible_for_profile(
     key: &LocalBrowseItemKey,
-    status: protocol::LocalBrowseItemStatus,
-) -> protocol::LocalBrowseAvailableActions {
-    let can_browse = matches!(
-        key.item_kind,
-        protocol::LocalBrowseItemKind::Directory
-            if status == protocol::LocalBrowseItemStatus::Available
-                || status == protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource
-    );
-    let can_request_admission = key.item_kind == protocol::LocalBrowseItemKind::Directory
-        && status == protocol::LocalBrowseItemStatus::Available;
-    let can_request_parent_admission = key.item_kind == protocol::LocalBrowseItemKind::MediaFile
-        && status == protocol::LocalBrowseItemStatus::Available
-        && key.parent_admission_available;
-
-    protocol::LocalBrowseAvailableActions {
-        can_browse,
-        can_request_admission,
-        can_choose_descendant: can_browse,
-        can_request_parent_admission,
+    profile: protocol::LocalBrowseProfile,
+) -> bool {
+    match profile {
+        protocol::LocalBrowseProfile::AllFiles => true,
+        protocol::LocalBrowseProfile::MediaBrowse => match key.item_kind {
+            protocol::LocalBrowseItemKind::Directory
+            | protocol::LocalBrowseItemKind::RejectedRoot
+            | protocol::LocalBrowseItemKind::Inaccessible => true,
+            protocol::LocalBrowseItemKind::MediaFile => matches!(
+                key.file_kind,
+                Some(
+                    protocol::ContentsFileKind::Audio
+                        | protocol::ContentsFileKind::Video
+                        | protocol::ContentsFileKind::CueSheet
+                )
+            ),
+            protocol::LocalBrowseItemKind::UnsupportedFile
+            | protocol::LocalBrowseItemKind::Unknown => false,
+        },
+        protocol::LocalBrowseProfile::AudioBrowse => match key.item_kind {
+            protocol::LocalBrowseItemKind::Directory
+            | protocol::LocalBrowseItemKind::RejectedRoot
+            | protocol::LocalBrowseItemKind::Inaccessible => true,
+            protocol::LocalBrowseItemKind::MediaFile => matches!(
+                key.file_kind,
+                Some(protocol::ContentsFileKind::Audio | protocol::ContentsFileKind::CueSheet)
+            ),
+            protocol::LocalBrowseItemKind::UnsupportedFile
+            | protocol::LocalBrowseItemKind::Unknown => false,
+        },
     }
 }
 
@@ -591,8 +618,8 @@ fn item_identity(
 ) -> protocol::LocalBrowseItemIdentity {
     protocol::LocalBrowseItemIdentity {
         entry_point_kind: request.entry_point_kind,
-        root_canonical_path: request.root_canonical_path.clone(),
-        item_canonical_path: item_path.to_string_lossy().into_owned(),
+        resolved_root_path: request.resolved_root_path.clone(),
+        resolved_item_path: item_path.to_string_lossy().into_owned(),
     }
 }
 
@@ -601,8 +628,8 @@ fn window_identity(
 ) -> protocol::LocalBrowseWindowIdentity {
     protocol::LocalBrowseWindowIdentity {
         entry_point_kind: request.entry_point_kind,
-        root_canonical_path: request.root_canonical_path.clone(),
-        parent_canonical_path: request.parent_canonical_path.clone(),
+        resolved_root_path: request.resolved_root_path.clone(),
+        resolved_parent_path: request.resolved_parent_path.clone(),
     }
 }
 
@@ -680,7 +707,7 @@ pub(crate) fn classify_item_file_for_test(
     protocol::LocalBrowseItemKind,
     protocol::ContentsFileKind,
     protocol::LocalBrowseItemMediaRelevance,
-    Option<protocol::LocalBrowseAdmissionAction>,
+    Vec<protocol::LocalBrowseOperation>,
 ) {
     let classification = classify_item_file(path);
     let key = LocalBrowseItemKey {
@@ -698,7 +725,22 @@ pub(crate) fn classify_item_file_for_test(
         classification.item_kind,
         classification.file_kind,
         classification.media_relevance,
-        admission_action_for_item(&key, classification.status),
+        available_operations_for_item(
+            &protocol::ReadLocalBrowseItemsRequest {
+                entry_point_kind: protocol::LocalBrowseEntryPointKind::Music,
+                resolved_root_path: path.to_string_lossy().into_owned(),
+                resolved_parent_path: path
+                    .parent()
+                    .unwrap_or_else(|| Path::new(""))
+                    .to_string_lossy()
+                    .into_owned(),
+                profile: protocol::LocalBrowseProfile::AudioBrowse,
+                offset: 0,
+                limit: 1,
+            },
+            &key,
+            classification.status,
+        ),
     )
 }
 

@@ -446,11 +446,11 @@ mod tests {
     #[test]
     fn canonicalize_source_location_relative_path_normalizes_lawful_paths() {
         assert_eq!(
-            canonicalize_source_location_relative_path(" Music/DJ Pool ").expect("canonical path"),
+            canonicalize_source_location_relative_path(" Music/DJ Pool ").expect("normalized path"),
             "Music/DJ Pool"
         );
         assert_eq!(
-            canonicalize_source_location_relative_path("Music/Tracks").expect("canonical path"),
+            canonicalize_source_location_relative_path("Music/Tracks").expect("normalized path"),
             "Music/Tracks"
         );
     }

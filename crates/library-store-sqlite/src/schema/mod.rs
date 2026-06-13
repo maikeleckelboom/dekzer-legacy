@@ -346,7 +346,7 @@ mod tests {
             "source_file_observations_media_kind",
             "projection_change_log_domain_sequence",
             "projection_subscribers_expires_at",
-            "root_admission_proposals_active_canonical_path",
+            "root_admission_proposals_active_resolved_path",
             "source_directories_parent_order",
             "source_files_path_order",
             "source_files_parent_order",
@@ -384,7 +384,7 @@ mod tests {
             concat!("Artifact", "Claims_active_claim"),
             concat!("Projection", "ChangeLog_domain_sequence"),
             concat!("Projection", "Subscribers_expires_at"),
-            concat!("source_registration", "_proposals_active_canonical_path"),
+            concat!("source_registration", "_proposals_active_resolved_path"),
             concat!("source_directories_parent_", "browse"),
             concat!("source_files_source_", "browse_order"),
             concat!("source_files_parent_", "browse"),
@@ -511,7 +511,7 @@ mod tests {
                 "proposal_status",
                 "root_class",
                 "requested_path",
-                "canonical_path",
+                "resolved_path",
                 "confirmation_required_reason",
                 "suggested_roots_json",
                 "created_at",
@@ -520,7 +520,7 @@ mod tests {
         );
         assert!(
             table_index_names(&connection, "root_admission_proposals")
-                .contains(&"root_admission_proposals_active_canonical_path".to_string())
+                .contains(&"root_admission_proposals_active_resolved_path".to_string())
         );
         assert!(
             table_foreign_keys(&connection, "source_root_navigation_state").contains(&(

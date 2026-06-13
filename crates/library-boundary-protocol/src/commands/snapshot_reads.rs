@@ -177,8 +177,7 @@ pub struct LocalBrowseEntryPoint {
     pub display_name: String,
     pub status: LocalBrowseEntryPointStatus,
     pub platform: LocalBrowsePlatform,
-    pub admission_action: Option<LocalBrowseAdmissionAction>,
-    pub available_actions: LocalBrowseAvailableActions,
+    pub available_operations: Vec<LocalBrowseOperation>,
     pub failure: Option<LocalBrowseEntryPointFailure>,
 }
 
@@ -196,7 +195,7 @@ pub struct LocalBrowseEntryPoint {
 #[ts(rename_all = "camelCase")]
 pub struct LocalBrowseEntryPointIdentity {
     pub entry_point_kind: LocalBrowseEntryPointKind,
-    pub canonical_path: Option<String>,
+    pub resolved_path: Option<String>,
 }
 
 #[derive(
@@ -271,6 +270,32 @@ pub enum LocalBrowsePlatform {
 #[derive(
     Debug,
     Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind", rename_all = "camelCase")]
+pub enum LocalBrowseOperation {
+    BrowseChildren,
+    ChooseDescendant,
+    RequestSourceAdmission {
+        #[serde(rename = "requestKind")]
+        #[ts(rename = "requestKind")]
+        request_kind: LocalBrowseSourceAdmissionRequestKind,
+        #[serde(rename = "resolvedPath")]
+        #[ts(rename = "resolvedPath")]
+        resolved_path: String,
+    },
+}
+
+#[derive(
+    Debug,
+    Clone,
     Copy,
     PartialEq,
     Eq,
@@ -282,10 +307,10 @@ pub enum LocalBrowsePlatform {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowseAdmissionAction {
-    RequestAdmission,
-    RequestDefaultMusicFolderAdmission,
-    RequestParentAdmission,
+pub enum LocalBrowseSourceAdmissionRequestKind {
+    DefaultMusicFolder,
+    SelectedDirectory,
+    ParentDirectory,
 }
 
 #[derive(
@@ -294,6 +319,7 @@ pub enum LocalBrowseAdmissionAction {
     Copy,
     PartialEq,
     Eq,
+    Hash,
     serde::Serialize,
     serde::Deserialize,
     schemars::JsonSchema,
@@ -301,11 +327,10 @@ pub enum LocalBrowseAdmissionAction {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct LocalBrowseAvailableActions {
-    pub can_browse: bool,
-    pub can_request_admission: bool,
-    pub can_choose_descendant: bool,
-    pub can_request_parent_admission: bool,
+pub enum LocalBrowseProfile {
+    AudioBrowse,
+    MediaBrowse,
+    AllFiles,
 }
 
 #[derive(
@@ -361,8 +386,9 @@ pub enum LocalBrowseEntryPointFailureCode {
 #[ts(rename_all = "camelCase")]
 pub struct ReadLocalBrowseItemsRequest {
     pub entry_point_kind: LocalBrowseEntryPointKind,
-    pub root_canonical_path: String,
-    pub parent_canonical_path: String,
+    pub resolved_root_path: String,
+    pub resolved_parent_path: String,
+    pub profile: LocalBrowseProfile,
     pub offset: usize,
     pub limit: usize,
 }
@@ -427,8 +453,8 @@ pub enum LocalBrowseItemsReadStatus {
 #[ts(rename_all = "camelCase")]
 pub struct LocalBrowseWindowIdentity {
     pub entry_point_kind: LocalBrowseEntryPointKind,
-    pub root_canonical_path: String,
-    pub parent_canonical_path: String,
+    pub resolved_root_path: String,
+    pub resolved_parent_path: String,
 }
 
 #[derive(
@@ -451,8 +477,7 @@ pub struct LocalBrowseItem {
     pub platform: LocalBrowsePlatform,
     pub file_kind: Option<ContentsFileKind>,
     pub media_relevance: Option<LocalBrowseItemMediaRelevance>,
-    pub admission_action: Option<LocalBrowseAdmissionAction>,
-    pub available_actions: LocalBrowseAvailableActions,
+    pub available_operations: Vec<LocalBrowseOperation>,
     pub failure: Option<LocalBrowseItemFailure>,
 }
 
@@ -470,8 +495,8 @@ pub struct LocalBrowseItem {
 #[ts(rename_all = "camelCase")]
 pub struct LocalBrowseItemIdentity {
     pub entry_point_kind: LocalBrowseEntryPointKind,
-    pub root_canonical_path: String,
-    pub item_canonical_path: String,
+    pub resolved_root_path: String,
+    pub resolved_item_path: String,
 }
 
 #[derive(
@@ -2484,25 +2509,25 @@ mod tests {
         DirectoryScanState, LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint,
         LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
         LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        LocalBrowseAdmissionAction, LocalBrowseAvailableActions, LocalBrowseEntryPoint,
-        LocalBrowseEntryPointFailure, LocalBrowseEntryPointFailureCode,
+        LocalBrowseEntryPoint, LocalBrowseEntryPointFailure, LocalBrowseEntryPointFailureCode,
         LocalBrowseEntryPointIdentity, LocalBrowseEntryPointKind, LocalBrowseEntryPointStatus,
         LocalBrowseEntryPointsReadStatus, LocalBrowseItem, LocalBrowseItemFailure,
         LocalBrowseItemFailureCode, LocalBrowseItemIdentity, LocalBrowseItemKind,
         LocalBrowseItemMediaRelevance, LocalBrowseItemStatus, LocalBrowseItemsReadStatus,
-        LocalBrowsePlatform, LocalBrowseWindowIdentity, NavigableChildScopeState, NavigationRow,
-        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PlayableMedia,
-        PlayableMediaKind, ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
-        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
-        ReadLocalBrowseEntryPointsReply, ReadLocalBrowseEntryPointsRequest,
-        ReadLocalBrowseItemsReply, ReadLocalBrowseItemsRequest, ReadNavigationRowsRequest,
-        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
-        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
-        ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
-        SearchFilterFileClass, SnapshotReadCommand, SnapshotReadReply, SourceAccessState,
-        SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
-        SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
+        LocalBrowseOperation, LocalBrowsePlatform, LocalBrowseProfile,
+        LocalBrowseSourceAdmissionRequestKind, LocalBrowseWindowIdentity, NavigableChildScopeState,
+        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
+        PlayableMedia, PlayableMediaKind, ReadAttachmentSourceFilesReply,
+        ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenReply,
+        ReadLibraryTreeChildrenRequest, ReadLocalBrowseEntryPointsReply,
+        ReadLocalBrowseEntryPointsRequest, ReadLocalBrowseItemsReply, ReadLocalBrowseItemsRequest,
+        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
+        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceLifecycleReply,
+        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
+        ReadTrackIdentityReviewCandidatesRequest, SearchFilterFileClass, SnapshotReadCommand,
+        SnapshotReadReply, SourceAccessState, SourceAttachmentSummary, SourceClass,
+        SourceFileAttachmentLink, SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
         SourceIntegrityAvailabilityState, SourceIntegrityCoverage,
         SourceIntegrityEvidenceAndMaintenance, SourceIntegrityRuntimeMaintenance,
         SourceIntegrityRuntimeMaintenanceState, SourceLifecycle, SourceLifecycleIssueKind,
@@ -2524,8 +2549,9 @@ mod tests {
             SnapshotReadCommand::ReadLocalBrowseEntryPoints(ReadLocalBrowseEntryPointsRequest);
         let local_items = SnapshotReadCommand::ReadLocalBrowseItems(ReadLocalBrowseItemsRequest {
             entry_point_kind: LocalBrowseEntryPointKind::Music,
-            root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-            parent_canonical_path: "C:\\Users\\DJ\\Music\\Albums".to_string(),
+            resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
+            resolved_parent_path: "C:\\Users\\DJ\\Music\\Albums".to_string(),
+            profile: LocalBrowseProfile::AudioBrowse,
             offset: 5,
             limit: 25,
         });
@@ -2551,12 +2577,13 @@ mod tests {
             local_items,
             SnapshotReadCommand::ReadLocalBrowseItems(ReadLocalBrowseItemsRequest {
                 entry_point_kind: LocalBrowseEntryPointKind::Music,
-                ref root_canonical_path,
-                ref parent_canonical_path,
+                ref resolved_root_path,
+                ref resolved_parent_path,
+                profile: LocalBrowseProfile::AudioBrowse,
                 offset: 5,
                 limit: 25,
-            }) if root_canonical_path == "C:\\Users\\DJ\\Music"
-                && parent_canonical_path == "C:\\Users\\DJ\\Music\\Albums"
+            }) if resolved_root_path == "C:\\Users\\DJ\\Music"
+                && resolved_parent_path == "C:\\Users\\DJ\\Music\\Albums"
         ));
         assert!(matches!(
             library_tree,
@@ -2592,20 +2619,19 @@ mod tests {
             entries: vec![LocalBrowseEntryPoint {
                 identity: LocalBrowseEntryPointIdentity {
                     entry_point_kind: LocalBrowseEntryPointKind::Music,
-                    canonical_path: Some("C:\\Users\\DJ\\Music".to_string()),
+                    resolved_path: Some("C:\\Users\\DJ\\Music".to_string()),
                 },
                 display_name: "Music".to_string(),
                 status: LocalBrowseEntryPointStatus::Available,
                 platform: LocalBrowsePlatform::Windows,
-                admission_action: Some(
-                    LocalBrowseAdmissionAction::RequestDefaultMusicFolderAdmission,
-                ),
-                available_actions: LocalBrowseAvailableActions {
-                    can_browse: true,
-                    can_request_admission: true,
-                    can_choose_descendant: true,
-                    can_request_parent_admission: false,
-                },
+                available_operations: vec![
+                    LocalBrowseOperation::BrowseChildren,
+                    LocalBrowseOperation::ChooseDescendant,
+                    LocalBrowseOperation::RequestSourceAdmission {
+                        request_kind: LocalBrowseSourceAdmissionRequestKind::DefaultMusicFolder,
+                        resolved_path: "C:\\Users\\DJ\\Music".to_string(),
+                    },
+                ],
                 failure: None,
             }],
             failure: Some(LocalBrowseEntryPointFailure {
@@ -2623,18 +2649,20 @@ mod tests {
                     "entries": [{
                         "identity": {
                             "entryPointKind": "music",
-                            "canonicalPath": "C:\\Users\\DJ\\Music"
+                            "resolvedPath": "C:\\Users\\DJ\\Music"
                         },
                         "displayName": "Music",
                         "status": "available",
                         "platform": "windows",
-                        "admissionAction": "requestDefaultMusicFolderAdmission",
-                        "availableActions": {
-                            "canBrowse": true,
-                            "canRequestAdmission": true,
-                            "canChooseDescendant": true,
-                            "canRequestParentAdmission": false
-                        },
+                        "availableOperations": [
+                            { "kind": "browseChildren" },
+                            { "kind": "chooseDescendant" },
+                            {
+                                "kind": "requestSourceAdmission",
+                                "requestKind": "defaultMusicFolder",
+                                "resolvedPath": "C:\\Users\\DJ\\Music"
+                            }
+                        ],
                         "failure": null
                     }],
                     "failure": {
@@ -2654,8 +2682,9 @@ mod tests {
     fn local_browse_items_serialize_boundary_shape() {
         let command = SnapshotReadCommand::ReadLocalBrowseItems(ReadLocalBrowseItemsRequest {
             entry_point_kind: LocalBrowseEntryPointKind::Music,
-            root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-            parent_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+            resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
+            resolved_parent_path: "C:\\Users\\DJ\\Music".to_string(),
+            profile: LocalBrowseProfile::AudioBrowse,
             offset: 0,
             limit: 50,
         });
@@ -2664,13 +2693,14 @@ mod tests {
             command_json,
             json!({
                 "type": "readLocalBrowseItems",
-                "payload": {
-                    "entryPointKind": "music",
-                    "rootCanonicalPath": "C:\\Users\\DJ\\Music",
-                    "parentCanonicalPath": "C:\\Users\\DJ\\Music",
-                    "offset": 0,
-                    "limit": 50
-                }
+                    "payload": {
+                        "entryPointKind": "music",
+                        "resolvedRootPath": "C:\\Users\\DJ\\Music",
+                        "resolvedParentPath": "C:\\Users\\DJ\\Music",
+                        "profile": "audioBrowse",
+                        "offset": 0,
+                        "limit": 50
+                    }
             })
         );
         assert_eq!(
@@ -2683,8 +2713,8 @@ mod tests {
             status: LocalBrowseItemsReadStatus::Complete,
             window_identity: LocalBrowseWindowIdentity {
                 entry_point_kind: LocalBrowseEntryPointKind::Music,
-                root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-                parent_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
+                resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
+                resolved_parent_path: "C:\\Users\\DJ\\Music".to_string(),
             },
             offset: 0,
             limit: 50,
@@ -2692,8 +2722,8 @@ mod tests {
             items: vec![LocalBrowseItem {
                 identity: LocalBrowseItemIdentity {
                     entry_point_kind: LocalBrowseEntryPointKind::Music,
-                    root_canonical_path: "C:\\Users\\DJ\\Music".to_string(),
-                    item_canonical_path: "C:\\Users\\DJ\\Music\\Track.flac".to_string(),
+                    resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
+                    resolved_item_path: "C:\\Users\\DJ\\Music\\Track.flac".to_string(),
                 },
                 item_kind: LocalBrowseItemKind::MediaFile,
                 display_name: "Track.flac".to_string(),
@@ -2701,13 +2731,10 @@ mod tests {
                 platform: LocalBrowsePlatform::Windows,
                 file_kind: Some(ContentsFileKind::Audio),
                 media_relevance: Some(LocalBrowseItemMediaRelevance::MediaRelevant),
-                admission_action: Some(LocalBrowseAdmissionAction::RequestParentAdmission),
-                available_actions: LocalBrowseAvailableActions {
-                    can_browse: false,
-                    can_request_admission: false,
-                    can_choose_descendant: false,
-                    can_request_parent_admission: true,
-                },
+                available_operations: vec![LocalBrowseOperation::RequestSourceAdmission {
+                    request_kind: LocalBrowseSourceAdmissionRequestKind::ParentDirectory,
+                    resolved_path: "C:\\Users\\DJ\\Music".to_string(),
+                }],
                 failure: None,
             }],
             failure: Some(LocalBrowseItemFailure {
@@ -2724,8 +2751,8 @@ mod tests {
                     "status": "complete",
                     "windowIdentity": {
                         "entryPointKind": "music",
-                        "rootCanonicalPath": "C:\\Users\\DJ\\Music",
-                        "parentCanonicalPath": "C:\\Users\\DJ\\Music"
+                        "resolvedRootPath": "C:\\Users\\DJ\\Music",
+                        "resolvedParentPath": "C:\\Users\\DJ\\Music"
                     },
                     "offset": 0,
                     "limit": 50,
@@ -2733,8 +2760,8 @@ mod tests {
                     "items": [{
                         "identity": {
                             "entryPointKind": "music",
-                            "rootCanonicalPath": "C:\\Users\\DJ\\Music",
-                            "itemCanonicalPath": "C:\\Users\\DJ\\Music\\Track.flac"
+                            "resolvedRootPath": "C:\\Users\\DJ\\Music",
+                            "resolvedItemPath": "C:\\Users\\DJ\\Music\\Track.flac"
                         },
                         "itemKind": "mediaFile",
                         "displayName": "Track.flac",
@@ -2742,13 +2769,11 @@ mod tests {
                         "platform": "windows",
                         "fileKind": "audio",
                         "mediaRelevance": "mediaRelevant",
-                        "admissionAction": "requestParentAdmission",
-                        "availableActions": {
-                            "canBrowse": false,
-                            "canRequestAdmission": false,
-                            "canChooseDescendant": false,
-                            "canRequestParentAdmission": true
-                        },
+                        "availableOperations": [{
+                            "kind": "requestSourceAdmission",
+                            "requestKind": "parentDirectory",
+                            "resolvedPath": "C:\\Users\\DJ\\Music"
+                        }],
                         "failure": null
                     }],
                     "failure": {

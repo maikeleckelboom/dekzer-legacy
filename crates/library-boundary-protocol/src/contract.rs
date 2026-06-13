@@ -56,7 +56,9 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LocalBrowseEntryPointKind>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseEntryPointStatus>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowsePlatform>(&cfg, &mut output);
-    push_ts_decl::<crate::LocalBrowseAdmissionAction>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowseOperation>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowseSourceAdmissionRequestKind>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowseProfile>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseEntryPointFailureCode>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalBrowseItemsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseItemKind>(&cfg, &mut output);
@@ -128,7 +130,6 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LocalBrowseEntryPointsReadStatus>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseEntryPoint>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseEntryPointIdentity>(&cfg, &mut output);
-    push_ts_decl::<crate::LocalBrowseAvailableActions>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseEntryPointFailure>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalBrowseItemsReply>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseItemsReadStatus>(&cfg, &mut output);

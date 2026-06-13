@@ -25,12 +25,12 @@ export type LocalRootRegistrationErrorState = Exclude<
 >
 
 export type LocalRootRegistrationRequest = {
-  readonly absolutePath: string
+  readonly requestedPath: string
 }
 
 export type LocalRootRegistrationRoot = {
   readonly rootId: string
-  readonly canonicalPath: string
+  readonly admittedRootPath: string
 }
 
 export type SourceRegistrationRootClass =
@@ -48,17 +48,17 @@ export type LocalRootRegistrationProposal = {
   readonly proposalId: string
   readonly rootClass: SourceRegistrationRootClass
   readonly requestedPath: string
-  readonly canonicalPath: string | null
+  readonly resolvedPath: string | null
   readonly confirmationRequiredReason: string
-  readonly suggestedRoots: readonly string[]
+  readonly suggestedRootPaths: readonly string[]
 }
 
 export type LocalRootRegistrationRejection = {
   readonly rootClass: SourceRegistrationRootClass
   readonly requestedPath: string
-  readonly canonicalPath: string | null
+  readonly resolvedPath: string | null
   readonly rejectionReason: string
-  readonly suggestedRoots: readonly string[]
+  readonly suggestedRootPaths: readonly string[]
 }
 
 export type LocalRootRegistrationResult =

@@ -266,7 +266,7 @@ async function validatesRegisterLocalRootRequestAndReply(): Promise<void> {
           type: 'registered',
           payload: {
             rootId: 'root-1',
-            canonicalPath: 'C:/Music'
+            admittedRootPath: 'C:/Music'
           }
         }
       }
@@ -275,7 +275,7 @@ async function validatesRegisterLocalRootRequestAndReply(): Promise<void> {
   const client = new LibraryBoundaryClient(transport)
 
   const reply = await client.registerLocalRoot({
-    absolutePath: 'C:/Music'
+    requestedPath: 'C:/Music'
   })
 
   deepEqual(
@@ -284,7 +284,7 @@ async function validatesRegisterLocalRootRequestAndReply(): Promise<void> {
       type: 'libraryRoots',
       payload: {
         type: 'registerLocalRoot',
-        payload: { absolutePath: 'C:/Music' }
+        payload: { requestedPath: 'C:/Music' }
       }
     } satisfies CommandRequest,
     'registerLocalRoot sends the generated boundary command'
@@ -684,18 +684,20 @@ async function validatesLocalBrowseEntryPointReadRequestAndReply(): Promise<void
             {
               identity: {
                 entryPointKind: 'music',
-                canonicalPath: 'C:\\Users\\DJ\\Music'
+                resolvedPath: 'C:\\Users\\DJ\\Music'
               },
               displayName: 'Music',
               status: 'available',
               platform: 'windows',
-              admissionAction: 'requestDefaultMusicFolderAdmission',
-              availableActions: {
-                canBrowse: true,
-                canRequestAdmission: true,
-                canChooseDescendant: true,
-                canRequestParentAdmission: false
-              },
+              availableOperations: [
+                { kind: 'browseChildren' },
+                { kind: 'chooseDescendant' },
+                {
+                  kind: 'requestSourceAdmission',
+                  requestKind: 'defaultMusicFolder',
+                  resolvedPath: 'C:\\Users\\DJ\\Music'
+                }
+              ],
               failure: null
             }
           ],
@@ -720,10 +722,18 @@ async function validatesLocalBrowseEntryPointReadRequestAndReply(): Promise<void
     'readLocalBrowseEntryPoints sends the generated snapshot command'
   )
   equal(reply.entries[0]?.identity.entryPointKind, 'music', 'entry point kind is preserved')
-  equal(
-    reply.entries[0]?.admissionAction,
-    'requestDefaultMusicFolderAdmission',
-    'admission action is preserved'
+  deepEqual(
+    reply.entries[0]?.availableOperations,
+    [
+      { kind: 'browseChildren' },
+      { kind: 'chooseDescendant' },
+      {
+        kind: 'requestSourceAdmission',
+        requestKind: 'defaultMusicFolder',
+        resolvedPath: 'C:\\Users\\DJ\\Music'
+      }
+    ],
+    'entry point operations are preserved'
   )
 }
 
@@ -738,8 +748,8 @@ async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
           status: 'complete',
           windowIdentity: {
             entryPointKind: 'music',
-            rootCanonicalPath: 'C:\\Users\\DJ\\Music',
-            parentCanonicalPath: 'C:\\Users\\DJ\\Music'
+            resolvedRootPath: 'C:\\Users\\DJ\\Music',
+            resolvedParentPath: 'C:\\Users\\DJ\\Music'
           },
           offset: 0,
           limit: 50,
@@ -748,8 +758,8 @@ async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
             {
               identity: {
                 entryPointKind: 'music',
-                rootCanonicalPath: 'C:\\Users\\DJ\\Music',
-                itemCanonicalPath: 'C:\\Users\\DJ\\Music\\Track.flac'
+                resolvedRootPath: 'C:\\Users\\DJ\\Music',
+                resolvedItemPath: 'C:\\Users\\DJ\\Music\\Track.flac'
               },
               itemKind: 'mediaFile',
               displayName: 'Track.flac',
@@ -757,13 +767,13 @@ async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
               platform: 'windows',
               fileKind: 'audio',
               mediaRelevance: 'mediaRelevant',
-              admissionAction: 'requestParentAdmission',
-              availableActions: {
-                canBrowse: false,
-                canRequestAdmission: false,
-                canChooseDescendant: false,
-                canRequestParentAdmission: true
-              },
+              availableOperations: [
+                {
+                  kind: 'requestSourceAdmission',
+                  requestKind: 'parentDirectory',
+                  resolvedPath: 'C:\\Users\\DJ\\Music'
+                }
+              ],
               failure: null
             }
           ],
@@ -776,10 +786,11 @@ async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
 
   const request = {
     entryPointKind: 'music',
-    rootCanonicalPath: 'C:\\Users\\DJ\\Music',
-    parentCanonicalPath: 'C:\\Users\\DJ\\Music',
+    resolvedRootPath: 'C:\\Users\\DJ\\Music',
+    resolvedParentPath: 'C:\\Users\\DJ\\Music',
     offset: 0,
-    limit: 50
+    limit: 50,
+    profile: 'audioBrowse'
   } as const
   const reply = await client.readLocalBrowseItems(request)
 
@@ -795,10 +806,16 @@ async function validatesLocalBrowseItemReadRequestAndReply(): Promise<void> {
     'readLocalBrowseItems sends the generated snapshot command'
   )
   equal(reply.items[0]?.itemKind, 'mediaFile', 'item kind is preserved')
-  equal(
-    reply.items[0]?.admissionAction,
-    'requestParentAdmission',
-    'media file admission action is preserved'
+  deepEqual(
+    reply.items[0]?.availableOperations,
+    [
+      {
+        kind: 'requestSourceAdmission',
+        requestKind: 'parentDirectory',
+        resolvedPath: 'C:\\Users\\DJ\\Music'
+      }
+    ],
+    'media file admission operation is preserved'
   )
 }
 
@@ -1237,7 +1254,7 @@ async function validatesProtocolErrorsArePreserved(): Promise<void> {
   const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: '' }),
+    () => client.registerLocalRoot({ requestedPath: '' }),
     LibraryBoundaryProtocolError,
     'protocol error outcomes reject with a typed client error'
   )
@@ -1251,7 +1268,7 @@ async function validatesReplyFamilyMismatch(): Promise<void> {
   const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: 'C:/Music' }),
+    () => client.registerLocalRoot({ requestedPath: 'C:/Music' }),
     LibraryBoundaryReplyMismatchError,
     'unexpected reply family is rejected'
   )
@@ -1276,7 +1293,7 @@ async function validatesReplyVariantMismatch(): Promise<void> {
   const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: 'C:/Music' }),
+    () => client.registerLocalRoot({ requestedPath: 'C:/Music' }),
     LibraryBoundaryReplyMismatchError,
     'unexpected reply variant is rejected'
   )
@@ -1292,7 +1309,7 @@ async function validatesExecutorRejectionBecomesTransportFailure(): Promise<void
   const client = new LibraryBoundaryClient(transport)
 
   const error = await rejects(
-    () => client.registerLocalRoot({ absolutePath: 'C:/Music' }),
+    () => client.registerLocalRoot({ requestedPath: 'C:/Music' }),
     LibraryBoundaryTransportError,
     'executor rejection is surfaced as transport failure'
   )

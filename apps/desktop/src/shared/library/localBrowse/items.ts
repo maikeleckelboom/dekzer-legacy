@@ -1,5 +1,9 @@
 import type { ContentsFileKind } from '../contents/read'
-import type { LocalBrowseEntryPointKind, LocalBrowsePlatform } from './entryPoints'
+import type {
+  LocalBrowseEntryPointKind,
+  LocalBrowseOperation,
+  LocalBrowsePlatform
+} from './entryPoints'
 
 export type LocalBrowseItemsReadStatus =
   | 'complete'
@@ -34,10 +38,7 @@ export type LocalBrowseItemMediaRelevance =
   | 'unsupported'
   | 'unknown'
 
-export type LocalBrowseAdmissionAction =
-  | 'requestAdmission'
-  | 'requestDefaultMusicFolderAdmission'
-  | 'requestParentAdmission'
+export type LocalBrowseProfile = 'audioBrowse' | 'mediaBrowse' | 'allFiles'
 
 export type LocalBrowseItemFailureCode =
   | 'unsupportedPlatform'
@@ -56,29 +57,23 @@ export type LocalBrowseItemFailureCode =
 
 export type ReadLocalBrowseItemsRequest = {
   readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly rootCanonicalPath: string
-  readonly parentCanonicalPath: string
+  readonly resolvedRootPath: string
+  readonly resolvedParentPath: string
+  readonly profile: LocalBrowseProfile
   readonly offset: number
   readonly limit: number
 }
 
 export type LocalBrowseWindowIdentity = {
   readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly rootCanonicalPath: string
-  readonly parentCanonicalPath: string
+  readonly resolvedRootPath: string
+  readonly resolvedParentPath: string
 }
 
 export type LocalBrowseItemIdentity = {
   readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly rootCanonicalPath: string
-  readonly itemCanonicalPath: string
-}
-
-export type LocalBrowseAvailableActions = {
-  readonly canBrowse: boolean
-  readonly canRequestAdmission: boolean
-  readonly canChooseDescendant: boolean
-  readonly canRequestParentAdmission: boolean
+  readonly resolvedRootPath: string
+  readonly resolvedItemPath: string
 }
 
 export type LocalBrowseItemFailure = {
@@ -94,8 +89,7 @@ export type LocalBrowseItem = {
   readonly platform: LocalBrowsePlatform
   readonly fileKind: ContentsFileKind | null
   readonly mediaRelevance: LocalBrowseItemMediaRelevance | null
-  readonly admissionAction: LocalBrowseAdmissionAction | null
-  readonly availableActions: LocalBrowseAvailableActions
+  readonly availableOperations: readonly LocalBrowseOperation[]
   readonly failure: LocalBrowseItemFailure | null
 }
 

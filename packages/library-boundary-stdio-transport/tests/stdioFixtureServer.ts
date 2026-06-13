@@ -63,31 +63,31 @@ stdin.on("line", (line) => {
     return;
   }
 
-  const absolutePath = String(
-    envelope.request.payload.payload.absolutePath ?? ""
+  const requestedPath = String(
+    envelope.request.payload.payload.requestedPath ?? ""
   );
 
-  if (absolutePath === "transport-error") {
+  if (requestedPath === "transport-error") {
     writeTransportError(envelope.requestId, "invalidEnvelope", "fixture transport error");
     return;
   }
 
-  if (absolutePath === "unknown-remote-transport-code") {
+  if (requestedPath === "unknown-remote-transport-code") {
     writeTransportError(envelope.requestId, "futureRemoteCode", "fixture unknown code");
     return;
   }
 
-  if (absolutePath === "malformed") {
+  if (requestedPath === "malformed") {
     process.stdout.write("not-json\n");
     return;
   }
 
-  if (absolutePath === "duplicate-ready") {
+  if (requestedPath === "duplicate-ready") {
     writeReady();
     return;
   }
 
-  if (absolutePath === "unknown-response-request-id") {
+  if (requestedPath === "unknown-response-request-id") {
     writeEnvelope({
       type: "commandOutcome",
       requestId: "missing-request",
@@ -102,7 +102,7 @@ stdin.on("line", (line) => {
                 type: "registered",
                 payload: {
                   rootId: "13",
-                  canonicalPath: "fixture"
+                  admittedRootPath: "fixture"
                 }
               }
             }
@@ -113,23 +113,23 @@ stdin.on("line", (line) => {
     return;
   }
 
-  if (absolutePath === "blank") {
+  if (requestedPath === "blank") {
     process.stdout.write("\n");
     writeSuccess(envelope, "10");
     return;
   }
 
-  if (absolutePath === "stderr") {
+  if (requestedPath === "stderr") {
     process.stderr.write("fixture diagnostic\n");
     writeSuccess(envelope, "11");
     return;
   }
 
-  if (absolutePath === "exit-pending") {
+  if (requestedPath === "exit-pending") {
     process.exit(7);
   }
 
-  if (absolutePath === "protocol-error") {
+  if (requestedPath === "protocol-error") {
     writeEnvelope({
       type: "commandOutcome",
       requestId: envelope.requestId,
@@ -148,16 +148,16 @@ stdin.on("line", (line) => {
     return;
   }
 
-  if (absolutePath === "delayed") {
+  if (requestedPath === "delayed") {
     globalThis.setTimeout(() => writeSuccess(envelope, "12"), 50);
     return;
   }
 
-  if (absolutePath === "never-respond") {
+  if (requestedPath === "never-respond") {
     return;
   }
 
-  if (absolutePath.startsWith("concurrent-")) {
+  if (requestedPath.startsWith("concurrent-")) {
     concurrentRequests.push(envelope);
     if (concurrentRequests.length === 2) {
       const [first, second] = concurrentRequests.splice(0, 2);
@@ -167,7 +167,7 @@ stdin.on("line", (line) => {
     return;
   }
 
-  const bulkMatch = /^bulk-(\d+)$/.exec(absolutePath);
+  const bulkMatch = /^bulk-(\d+)$/.exec(requestedPath);
   if (bulkMatch !== null) {
     writeSuccess(envelope, bulkMatch[1] ?? "99");
     return;
@@ -195,7 +195,7 @@ function writeSuccess(envelope: RequestEnvelope, rootId: string): void {
               type: "registered",
               payload: {
                 rootId,
-                canonicalPath: `fixture:${rootId}`
+                admittedRootPath: `fixture:${rootId}`
               }
             }
           }
@@ -222,18 +222,20 @@ function writeLocalBrowseEntryPointsSuccess(envelope: RequestEnvelope): void {
                 {
                   identity: {
                     entryPointKind: "music",
-                    canonicalPath: "C:\\Users\\DJ\\Music"
+                    resolvedPath: "C:\\Users\\DJ\\Music"
                   },
                   displayName: "Music",
                   status: "available",
                   platform: "windows",
-                  admissionAction: "requestDefaultMusicFolderAdmission",
-                  availableActions: {
-                    canBrowse: true,
-                    canRequestAdmission: true,
-                    canChooseDescendant: true,
-                    canRequestParentAdmission: false
-                  },
+                  availableOperations: [
+                    { kind: "browseChildren" },
+                    { kind: "chooseDescendant" },
+                    {
+                      kind: "requestSourceAdmission",
+                      requestKind: "defaultMusicFolder",
+                      resolvedPath: "C:\\Users\\DJ\\Music"
+                    }
+                  ],
                   failure: null
                 }
               ],
@@ -261,8 +263,8 @@ function writeLocalBrowseItemsSuccess(envelope: RequestEnvelope): void {
               status: "complete",
               windowIdentity: {
                 entryPointKind: "music",
-                rootCanonicalPath: "C:\\Users\\DJ\\Music",
-                parentCanonicalPath: "C:\\Users\\DJ\\Music"
+                resolvedRootPath: "C:\\Users\\DJ\\Music",
+                resolvedParentPath: "C:\\Users\\DJ\\Music"
               },
               offset: 0,
               limit: 50,
@@ -271,8 +273,8 @@ function writeLocalBrowseItemsSuccess(envelope: RequestEnvelope): void {
                 {
                   identity: {
                     entryPointKind: "music",
-                    rootCanonicalPath: "C:\\Users\\DJ\\Music",
-                    itemCanonicalPath: "C:\\Users\\DJ\\Music\\Track.flac"
+                    resolvedRootPath: "C:\\Users\\DJ\\Music",
+                    resolvedItemPath: "C:\\Users\\DJ\\Music\\Track.flac"
                   },
                   itemKind: "mediaFile",
                   displayName: "Track.flac",
@@ -280,13 +282,13 @@ function writeLocalBrowseItemsSuccess(envelope: RequestEnvelope): void {
                   platform: "windows",
                   fileKind: "audio",
                   mediaRelevance: "mediaRelevant",
-                  admissionAction: "requestParentAdmission",
-                  availableActions: {
-                    canBrowse: false,
-                    canRequestAdmission: false,
-                    canChooseDescendant: false,
-                    canRequestParentAdmission: true
-                  },
+                  availableOperations: [
+                    {
+                      kind: "requestSourceAdmission",
+                      requestKind: "parentDirectory",
+                      resolvedPath: "C:\\Users\\DJ\\Music"
+                    }
+                  ],
                   failure: null
                 }
               ],

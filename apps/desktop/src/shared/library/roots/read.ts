@@ -1,6 +1,6 @@
 export type LocalRoot = {
   readonly rootId: string
-  readonly canonicalPath: string
+  readonly admittedRootPath: string
   readonly availability: LocalRootAvailability
 }
 

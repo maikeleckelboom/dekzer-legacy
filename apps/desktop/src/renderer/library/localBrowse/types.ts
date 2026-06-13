@@ -37,14 +37,14 @@ export type LocalBrowseEntryPointsState =
 
 export type LocalBrowseEntryPointTarget = {
   readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly rootCanonicalPath: string
+  readonly resolvedRootPath: string
   readonly label: string
 }
 
 export type LocalBrowseDirectoryTarget = {
   readonly entryPointKind: LocalBrowseEntryPointKind
-  readonly rootCanonicalPath: string
-  readonly parentCanonicalPath: string
+  readonly resolvedRootPath: string
+  readonly resolvedParentPath: string
   readonly label: string
 }
 
@@ -105,15 +105,15 @@ export type LocalBrowseItemState =
 export function targetForEntryPoint(
   entry: LocalBrowseEntryPoint
 ): LocalBrowseEntryPointTarget | undefined {
-  const canonicalPath = entry.identity.canonicalPath
+  const resolvedPath = entry.identity.resolvedPath
 
-  if (canonicalPath === null || canonicalPath.trim().length === 0) {
+  if (resolvedPath === null || resolvedPath.trim().length === 0) {
     return undefined
   }
 
   return {
     entryPointKind: entry.identity.entryPointKind,
-    rootCanonicalPath: canonicalPath,
+    resolvedRootPath: resolvedPath,
     label: entry.displayName
   }
 }
@@ -123,8 +123,8 @@ export function localBrowseRootTarget(
 ): LocalBrowseDirectoryTarget {
   return {
     entryPointKind: target.entryPointKind,
-    rootCanonicalPath: target.rootCanonicalPath,
-    parentCanonicalPath: target.rootCanonicalPath,
+    resolvedRootPath: target.resolvedRootPath,
+    resolvedParentPath: target.resolvedRootPath,
     label: target.label
   }
 }
@@ -132,16 +132,16 @@ export function localBrowseRootTarget(
 export function localBrowseWindowKey(target: LocalBrowseDirectoryTarget): string {
   return [
     target.entryPointKind,
-    encodeURIComponent(target.rootCanonicalPath),
-    encodeURIComponent(target.parentCanonicalPath)
+    encodeURIComponent(target.resolvedRootPath),
+    encodeURIComponent(target.resolvedParentPath)
   ].join(':')
 }
 
 export function localBrowseWindowKeyFromIdentity(identity: LocalBrowseWindowIdentity): string {
   return localBrowseWindowKey({
     entryPointKind: identity.entryPointKind,
-    rootCanonicalPath: identity.rootCanonicalPath,
-    parentCanonicalPath: identity.parentCanonicalPath,
+    resolvedRootPath: identity.resolvedRootPath,
+    resolvedParentPath: identity.resolvedParentPath,
     label: ''
   })
 }

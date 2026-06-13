@@ -21,14 +21,14 @@ describe('createLocalBrowseController', () => {
     const readItems = vi.fn(async (request: ReadLocalBrowseItemsRequest) => {
       itemRequests.push(structuredClone(request))
 
-      if (request.parentCanonicalPath.endsWith('Albums')) {
+      if (request.resolvedParentPath.endsWith('Albums')) {
         return {
           state: 'read' as const,
           status: 'complete' as const,
           windowIdentity: {
             entryPointKind: request.entryPointKind,
-            rootCanonicalPath: request.rootCanonicalPath,
-            parentCanonicalPath: request.parentCanonicalPath
+            resolvedRootPath: request.resolvedRootPath,
+            resolvedParentPath: request.resolvedParentPath
           },
           offset: request.offset,
           limit: request.limit,
@@ -43,8 +43,8 @@ describe('createLocalBrowseController', () => {
         status: 'complete' as const,
         windowIdentity: {
           entryPointKind: request.entryPointKind,
-          rootCanonicalPath: request.rootCanonicalPath,
-          parentCanonicalPath: request.parentCanonicalPath
+          resolvedRootPath: request.resolvedRootPath,
+          resolvedParentPath: request.resolvedParentPath
         },
         offset: request.offset,
         limit: request.limit,
@@ -73,8 +73,9 @@ describe('createLocalBrowseController', () => {
     await expect(controller.requestNodeChildren(musicNodeId, projection)).resolves.toBe(true)
     expect(itemRequests[0]).toEqual({
       entryPointKind: 'music',
-      rootCanonicalPath: 'C:\\Users\\Maikel\\Music',
-      parentCanonicalPath: 'C:\\Users\\Maikel\\Music',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      profile: 'audioBrowse',
       offset: 0,
       limit: 50
     })
@@ -90,8 +91,9 @@ describe('createLocalBrowseController', () => {
     await expect(controller.requestNodeChildren(albumsNodeId, projection)).resolves.toBe(true)
     expect(itemRequests[1]).toEqual({
       entryPointKind: 'music',
-      rootCanonicalPath: 'C:\\Users\\Maikel\\Music',
-      parentCanonicalPath: 'C:\\Users\\Maikel\\Music\\Albums',
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
+      profile: 'audioBrowse',
       offset: 0,
       limit: 50
     })
@@ -114,8 +116,8 @@ function testLocalBrowseApi(
         status: 'complete',
         windowIdentity: {
           entryPointKind: 'music',
-          rootCanonicalPath: 'C:\\Users\\Maikel\\Music',
-          parentCanonicalPath: 'C:\\Users\\Maikel\\Music'
+          resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+          resolvedParentPath: 'C:\\Users\\Maikel\\Music'
         },
         offset: 0,
         limit: 50,
@@ -132,18 +134,20 @@ function musicEntryPoint(): LocalBrowseEntryPoint {
   return {
     identity: {
       entryPointKind: 'music',
-      canonicalPath: 'C:\\Users\\Maikel\\Music'
+      resolvedPath: 'C:\\Users\\Maikel\\Music'
     },
     displayName: 'Music',
     status: 'available',
     platform: 'windows',
-    admissionAction: 'requestDefaultMusicFolderAdmission',
-    availableActions: {
-      canBrowse: true,
-      canRequestAdmission: true,
-      canChooseDescendant: true,
-      canRequestParentAdmission: false
-    },
+    availableOperations: [
+      { kind: 'browseChildren' },
+      { kind: 'chooseDescendant' },
+      {
+        kind: 'requestSourceAdmission',
+        requestKind: 'defaultMusicFolder',
+        resolvedPath: 'C:\\Users\\Maikel\\Music'
+      }
+    ],
     failure: null
   }
 }
@@ -152,8 +156,8 @@ function directoryItem(): LocalBrowseItem {
   return {
     identity: {
       entryPointKind: 'music',
-      rootCanonicalPath: 'C:\\Users\\Maikel\\Music',
-      itemCanonicalPath: 'C:\\Users\\Maikel\\Music\\Albums'
+      resolvedRootPath: 'C:\\Users\\Maikel\\Music',
+      resolvedItemPath: 'C:\\Users\\Maikel\\Music\\Albums'
     },
     itemKind: 'directory',
     displayName: 'Albums',
@@ -161,13 +165,15 @@ function directoryItem(): LocalBrowseItem {
     platform: 'windows',
     fileKind: null,
     mediaRelevance: null,
-    admissionAction: 'requestAdmission',
-    availableActions: {
-      canBrowse: true,
-      canRequestAdmission: true,
-      canChooseDescendant: true,
-      canRequestParentAdmission: false
-    },
+    availableOperations: [
+      { kind: 'browseChildren' },
+      { kind: 'chooseDescendant' },
+      {
+        kind: 'requestSourceAdmission',
+        requestKind: 'selectedDirectory',
+        resolvedPath: 'C:\\Users\\Maikel\\Music\\Albums'
+      }
+    ],
     failure: null
   }
 }

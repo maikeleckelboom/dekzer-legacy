@@ -18,7 +18,7 @@ const FILESYSTEM_DISCOVERY_SOURCE_MEDIA_WRITE_POLICY: SourceMediaWritePolicy =
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FilesystemWalkEntry {
-    pub canonical_path: String,
+    pub relative_path: String,
     pub display_name: String,
     pub kind: DiscoveredLocationKind,
     pub file_size_bytes: Option<i64>,
@@ -29,7 +29,7 @@ pub struct FilesystemWalkEntry {
 impl FilesystemWalkEntry {
     fn into_location_input(self) -> DiscoveredLocationInput {
         DiscoveredLocationInput {
-            canonical_path: self.canonical_path,
+            relative_path: self.relative_path,
             display_name: self.display_name,
             kind: self.kind,
             file_size_bytes: self.file_size_bytes,
@@ -130,8 +130,7 @@ impl Iterator for FilesystemWalkEntries {
                     }
 
                     let entry_path = entry.path();
-                    let canonical_path = match normalize_relative_path(&self.root_path, entry_path)
-                    {
+                    let relative_path = match normalize_relative_path(&self.root_path, entry_path) {
                         Ok(path) => path,
                         Err(error) => {
                             return Some(Err(walk_error_from_io(
@@ -185,7 +184,7 @@ impl Iterator for FilesystemWalkEntries {
                     };
 
                     return Some(Ok(FilesystemWalkEntry {
-                        canonical_path,
+                        relative_path,
                         display_name,
                         kind: if file_type.is_dir() {
                             DiscoveredLocationKind::Folder
@@ -218,7 +217,7 @@ pub fn collect_discovered_file_inputs(
         }
 
         discovered.push(DiscoveredFileInput {
-            canonical_path: entry.canonical_path,
+            relative_path: entry.relative_path,
             file_size_bytes: entry.file_size_bytes,
             modified_at_ns: entry.modified_at_ns,
             observed_at_ms: entry.observed_at_ms,
@@ -422,7 +421,7 @@ mod tests {
         assert_eq!(
             walked
                 .iter()
-                .map(|entry| (entry.canonical_path.clone(), entry.kind.clone()))
+                .map(|entry| (entry.relative_path.clone(), entry.kind.clone()))
                 .collect::<Vec<_>>(),
             vec![
                 ("".to_string(), DiscoveredLocationKind::Folder),
@@ -447,12 +446,12 @@ mod tests {
             .expect("write nested file");
 
         let mut discovered = collect_discovered_file_inputs(&root_path).expect("collect files");
-        discovered.sort_by(|left, right| left.canonical_path.cmp(&right.canonical_path));
+        discovered.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
 
         assert_eq!(
             discovered
                 .iter()
-                .map(|file| file.canonical_path.clone())
+                .map(|file| file.relative_path.clone())
                 .collect::<Vec<_>>(),
             vec!["loose.flac".to_string(), "nested/track.mp3".to_string()]
         );

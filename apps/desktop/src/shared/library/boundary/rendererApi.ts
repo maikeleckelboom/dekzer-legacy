@@ -37,6 +37,7 @@ import type {
 import type { ReadCandidatesRequest, ReadCandidatesResult } from '../trackIdentity/candidates'
 import type { LocalRootChoiceResult } from '../roots/chooseLocal'
 import type { ReadLocalRootsOutcome } from '../roots/read'
+import type { LocalRootRegistrationRequest, LocalRootRegistrationResult } from '../roots/register'
 import type { LocalRootScanRequest, LocalRootScanResult } from '../roots/scan'
 import type { CancelRootScanRequest, CancelRootScanResult } from '../roots/cancel'
 import type { UnregisterLocalRootRequest, UnregisterLocalRootResult } from '../roots/unregister'
@@ -134,6 +135,7 @@ export type TrackIdentityReviewApi = {
 
 export type LibraryRootsApi = {
   chooseAndRegisterLocal(): Promise<LocalRootChoiceResult>
+  registerLocalPath(request: LocalRootRegistrationRequest): Promise<LocalRootRegistrationResult>
   runScan(request: LocalRootScanRequest): Promise<LocalRootScanResult>
   cancelScan(request: CancelRootScanRequest): Promise<CancelRootScanResult>
   readLocalRoots(): Promise<ReadLocalRootsOutcome>

@@ -607,6 +607,19 @@ function activateContentRowAction(row: ContentRow): void {
     saveViewState()
     disclosureReconciler.clearFailedForNode(action.nodeId)
     void hierarchyRead.requestNodeChildren(action.nodeId)
+  } else if (action.kind === 'loadLocalBrowseChildren') {
+    expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
+    saveViewState()
+    disclosureReconciler.clearFailedForNode(action.nodeId)
+    void localBrowse.requestNodeChildren(action.nodeId, browserProjection.value)
+  } else if (action.kind === 'loadLocalBrowseMore') {
+    void localBrowse.requestNodeMore(action.nodeId, browserProjection.value)
+  } else if (action.kind === 'requestLocalBrowseAdmission') {
+    void rootLifecycle.addLocalPath(action.resolvedPath).then(async (registered) => {
+      if (registered) {
+        await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
+      }
+    })
   } else if (action.kind === 'loadContentsPage') {
     void contentsRead.readForBinding(browserProjection.value?.bindingsById.get(action.nodeId), {
       cursor: action.cursor

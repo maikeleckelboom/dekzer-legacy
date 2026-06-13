@@ -15,6 +15,7 @@ export type RootLifecycleController = {
   readonly canRemoveSource: ComputedRef<boolean>
   readonly canRemoveSourceRoot: (rootId: string | undefined) => boolean
   readonly addMusicFolder: () => Promise<boolean>
+  readonly addLocalPath: (requestedPath: string) => Promise<boolean>
   readonly scanRoot: () => Promise<boolean>
   readonly removeSource: (rootId?: string) => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
@@ -67,6 +68,20 @@ export function createRootLifecycleController(
 
     const registered = await dependencies.rootActions.chooseAndRegisterLocalRoot()
 
+    return finishRegistration(registered)
+  }
+
+  async function addLocalPath(requestedPath: string): Promise<boolean> {
+    if (!canAddMusicFolder.value) {
+      return false
+    }
+
+    const registered = await dependencies.rootActions.registerLocalPath(requestedPath)
+
+    return finishRegistration(registered)
+  }
+
+  async function finishRegistration(registered: boolean): Promise<boolean> {
     if (!registered) {
       return false
     }
@@ -186,6 +201,7 @@ export function createRootLifecycleController(
     canRemoveSource,
     canRemoveSourceRoot,
     addMusicFolder,
+    addLocalPath,
     scanRoot,
     removeSource,
     hydrateLocalRoots: dependencies.rootActions.hydrateLocalRoots

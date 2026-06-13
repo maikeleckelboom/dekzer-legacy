@@ -16,8 +16,8 @@ This contract owns:
 
 - entry point kinds and identity;
 - entry point status;
-- entry point available backend actions;
-- entry point admission action guidance for the later source-root admission flow;
+- entry point available backend operations;
+- entry point admission operation guidance for the later source-root admission flow;
 - the entry-point side of the browse-versus-scan boundary.
 
 [`local-browse-items-contract.md`](local-browse-items-contract.md) owns `LocalBrowseItem`, immediate item
@@ -69,22 +69,23 @@ V0 is Windows-first. These entry point kinds are the canonical V0 kinds.
 | `userHome`            | Current user's home directory.                                           | May request admission; admission policy decides confirmation.         |
 | `desktop`             | Current user's Desktop directory.                                        | May request admission.                                                |
 | `downloads`           | Current user's Downloads directory.                                      | May request admission.                                                |
-| `music`               | Platform-resolved Music directory.                                       | May request default Music admission action.                           |
+| `music`               | Platform-resolved Music directory.                                       | May request default Music admission.                                  |
 
-`music` is the only entry point whose local browse action can be `requestDefaultMusicFolderAdmission`. That action is a
-display/action recommendation only. It is not an admission result and cannot bypass root admission.
+`music` is the only entry point whose local browse operations can include source admission with request kind
+`defaultMusicFolder`. That operation is a request affordance only. It is not an admission result and cannot bypass root
+admission.
 
 ## Identity
 
 A `LocalBrowseEntryPoint` is identified by:
 
 ```text
-(entryPointKind, canonicalPath)
+(entryPointKind, resolvedPath)
 ```
 
-`entryPointKind` is the platform/default entry point class. `canonicalPath` is the platform-resolved absolute path at
-read time. The tuple is suitable for local browse deduplication and action targeting, but it is never persisted as source
-identity before admission.
+`entryPointKind` is the platform/default entry point class. `resolvedPath` is the host-resolved current filesystem path
+at read time. The tuple is suitable for local browse deduplication and action targeting, but it is never persisted as
+source identity before admission.
 
 Labels are not identity. Display names, drive labels, localized names, and user-visible aliases may change without
 changing the entry point identity.
@@ -109,35 +110,33 @@ source lifecycle state.
 Entry point status resolution is a local-browse read concern. It must use shallow path status checks only: no recursive
 traversal, no directory enumeration, no source inventory materialization, and no item production.
 
-## Available Actions
+## Available Operations
 
-`availableActions` is backend-declared action availability. It is not renderer visual state.
+`availableOperations` is backend-declared row operation availability. It is not renderer visual state.
 
-Entry point actions are:
+Entry point operations are:
 
-- `canBrowse`;
-- `canRequestAdmission`;
-- `canChooseDescendant`;
-- `canRequestParentAdmission`.
+- `browseChildren`;
+- `chooseDescendant`;
+- `requestSourceAdmission` with request kind `defaultMusicFolder` or `selectedDirectory`.
 
 Rules:
 
 - An available entry point can be browsed.
 - `systemDriveRoot` can be browseable while not directly admissible.
 - An available non-system entry point may request admission for its path.
-- `duplicateOfAdmittedSource` remains a status, not an action.
+- `duplicateOfAdmittedSource` remains a status, not a source admission operation.
 - Entry points never request parent admission.
 
-## Admission Action
+## Admission Operation
 
-`admissionAction` is a display/action recommendation for the later source-root admission flow. It is not an admission
-result, does not persist anything, does not start scan, and cannot bypass root admission.
+`requestSourceAdmission` is a row operation for the later source-root admission flow. It is not an admission result, does
+not persist anything, does not start scan, and cannot bypass root admission.
 
-Entry point actions:
+Entry point source admission request kinds:
 
-- `requestAdmission`: the UI may ask source-root admission to evaluate this entry point path.
-- `requestDefaultMusicFolderAdmission`: the UI may route the platform Music path into the default Music admission flow.
-- `null`: no direct entry point admission action is available.
+- `defaultMusicFolder`: the UI may route the platform Music path into the default Music admission flow.
+- `selectedDirectory`: the UI may ask source-root admission to evaluate this entry point path.
 
 Confirmation remains owned by source-root admission results, not by local browse.
 
@@ -189,13 +188,11 @@ directory. They do not operate on local browse entry point identity.
 Implemented V0 backend read:
 
 - `readLocalBrowseEntryPoints` returns the current platform's displayable local browse entry points.
-- The read returns identity, display name, status, platform, `admissionAction`, `availableActions`, and platform failure
+- The read returns identity, display name, status, platform, `availableOperations`, and platform failure
   detail when resolution partially fails.
 - The read is a snapshot read boundary only.
-- Exact admitted source canonical path matches are marked as `duplicateOfAdmittedSource` while preserving the entry point
+- Exact admitted source path matches are marked as `duplicateOfAdmittedSource` while preserving the entry point
   versus source distinction.
-- The next implementation step is renderer projection/UI. The substrate vocabulary is not expected to churn again before
-  that projection work.
 
 Handwritten adapter names use folder context. In `localBrowse/entryPoints`, helpers may be named `readEntryPoints`,
 `mapEntryPoint`, `errorResult`, and `isOutcome`; they must not repeat the full local-browse boundary name or carry a

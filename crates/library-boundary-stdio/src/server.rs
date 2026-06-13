@@ -145,7 +145,7 @@ mod tests {
         std::fs::create_dir_all(&source_root).expect("create source root");
         let request = CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
             RegisterLocalRootRequest {
-                absolute_path: source_root.to_string_lossy().into_owned(),
+                requested_path: source_root.to_string_lossy().into_owned(),
             },
         ));
         let input = format!(
@@ -227,7 +227,7 @@ mod tests {
         std::fs::create_dir_all(&source_root).expect("create source root");
         let request = CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
             RegisterLocalRootRequest {
-                absolute_path: source_root.to_string_lossy().into_owned(),
+                requested_path: source_root.to_string_lossy().into_owned(),
             },
         ));
         let input = format!(
@@ -259,7 +259,7 @@ mod tests {
         std::fs::create_dir_all(&source_root).expect("create source root");
         let request = CommandRequest::LibraryRoots(LibraryRootCommand::RegisterLocalRoot(
             RegisterLocalRootRequest {
-                absolute_path: source_root.to_string_lossy().into_owned(),
+                requested_path: source_root.to_string_lossy().into_owned(),
             },
         ));
         let input = format!(

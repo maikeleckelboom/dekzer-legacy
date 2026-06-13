@@ -33,7 +33,7 @@ pub struct DiscoveryBatch {
 impl DiscoveryBatch {
     pub(crate) fn validate(&self) -> LibrarySqliteResult<()> {
         self.require_non_empty()?;
-        self.require_unique_canonical_paths()
+        self.require_unique_relative_paths()
     }
 
     pub(crate) fn require_non_empty(&self) -> LibrarySqliteResult<()> {
@@ -44,13 +44,13 @@ impl DiscoveryBatch {
         }
     }
 
-    fn require_unique_canonical_paths(&self) -> LibrarySqliteResult<()> {
+    fn require_unique_relative_paths(&self) -> LibrarySqliteResult<()> {
         let mut seen_paths = HashSet::with_capacity(self.files.len());
 
         for file in &self.files {
-            if !seen_paths.insert(file.canonical_path.as_str()) {
-                return Err(LibrarySqliteError::DuplicateDiscoveryCanonicalPath(
-                    file.canonical_path.clone(),
+            if !seen_paths.insert(file.relative_path.as_str()) {
+                return Err(LibrarySqliteError::DuplicateDiscoveryRelativePath(
+                    file.relative_path.clone(),
                 ));
             }
         }
@@ -61,7 +61,7 @@ impl DiscoveryBatch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveredFileInput {
-    pub canonical_path: String,
+    pub relative_path: String,
     pub file_size_bytes: Option<i64>,
     pub modified_at_ns: Option<i64>,
     pub observed_at_ms: i64,
@@ -69,7 +69,7 @@ pub struct DiscoveredFileInput {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveredLocationInput {
-    pub canonical_path: String,
+    pub relative_path: String,
     pub display_name: String,
     pub kind: DiscoveredLocationKind,
     pub file_size_bytes: Option<i64>,
@@ -96,12 +96,12 @@ pub enum DirectoryEnumerationOutcomeKind {
 
 impl DiscoveredLocationInput {
     pub(crate) fn folder(
-        canonical_path: impl Into<String>,
+        relative_path: impl Into<String>,
         display_name: impl Into<String>,
         observed_at_ms: i64,
     ) -> Self {
         Self {
-            canonical_path: canonical_path.into(),
+            relative_path: relative_path.into(),
             display_name: display_name.into(),
             kind: DiscoveredLocationKind::Folder,
             file_size_bytes: None,
@@ -111,14 +111,14 @@ impl DiscoveredLocationInput {
     }
 
     pub(crate) fn file(
-        canonical_path: impl Into<String>,
+        relative_path: impl Into<String>,
         display_name: impl Into<String>,
         file_size_bytes: Option<i64>,
         modified_at_ns: Option<i64>,
         observed_at_ms: i64,
     ) -> Self {
         Self {
-            canonical_path: canonical_path.into(),
+            relative_path: relative_path.into(),
             display_name: display_name.into(),
             kind: DiscoveredLocationKind::File,
             file_size_bytes,
@@ -138,7 +138,7 @@ pub struct DiscoveryCommitResult {
 pub struct DiscoveredFileCommitResult {
     pub file_id: i64,
     pub track_id: Option<i64>,
-    pub canonical_path: String,
+    pub relative_path: String,
     pub needs_probe: bool,
 }
 
@@ -327,22 +327,22 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         for location in &ordered_locations {
             match location.kind {
                 DiscoveredLocationKind::Folder => {
-                    if location.canonical_path.is_empty() {
+                    if location.relative_path.is_empty() {
                         continue;
                     }
                     self.upsert_directory_presence(
                         root_id,
-                        &location.canonical_path,
+                        &location.relative_path,
                         location.modified_at_ns,
                         location.observed_at_ms,
                         directory_scan_state,
                     )?;
-                    observed_directory_paths.push(location.canonical_path.clone());
+                    observed_directory_paths.push(location.relative_path.clone());
                 }
                 DiscoveredLocationKind::File => {
                     let processed =
                         self.process_discovered_file(root_id, location, directory_scan_state)?;
-                    observed_file_paths.push(location.canonical_path.clone());
+                    observed_file_paths.push(location.relative_path.clone());
                     if processed.is_new_file {
                         files_new += 1;
                     }
@@ -350,7 +350,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                     committed_files.push(DiscoveredFileCommitResult {
                         file_id: processed.source_file_id,
                         track_id: None,
-                        canonical_path: location.canonical_path.clone(),
+                        relative_path: location.relative_path.clone(),
                         needs_probe: processed.needs_probe,
                     });
                 }
@@ -544,17 +544,17 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         location: &DiscoveredLocationInput,
         directory_scan_state: Option<&str>,
     ) -> LibrarySqliteResult<ProcessedFile> {
-        let existing = self.lookup_source_file(root_id, &location.canonical_path)?;
+        let existing = self.lookup_source_file(root_id, &location.relative_path)?;
         let parent_source_directory_id = self.ensure_source_directory_chain(
             root_id,
-            parent_relative_path(&location.canonical_path),
+            parent_relative_path(&location.relative_path),
             None,
             location.observed_at_ms,
             directory_scan_state,
         )?;
         let needs_probe = self.file_needs_inspection(
             existing.as_ref(),
-            &location.canonical_path,
+            &location.relative_path,
             location.file_size_bytes,
             location.modified_at_ns,
         )?;
@@ -565,7 +565,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                 source_id: root_id,
                 parent_source_directory_id,
                 name: location.display_name.clone(),
-                relative_path: location.canonical_path.clone(),
+                relative_path: location.relative_path.clone(),
                 size_bytes: location.file_size_bytes,
                 mtime_ns: location.modified_at_ns,
                 presence_state: SourcePresenceState::Present,
@@ -582,7 +582,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                     source_file_id: source_file_domain_id(source_file_id)?,
                     basis_fingerprint: observation_basis_fingerprint(
                         source_file_id,
-                        &location.canonical_path,
+                        &location.relative_path,
                         location.file_size_bytes,
                         location.modified_at_ns,
                         location.observed_at_ms,
@@ -1119,7 +1119,7 @@ pub(crate) fn build_discovered_locations_from_files(
     for file in files {
         let mut parent_path = String::new();
         let segments = file
-            .canonical_path
+            .relative_path
             .split('/')
             .filter(|segment| !segment.is_empty())
             .collect::<Vec<_>>();
@@ -1145,12 +1145,12 @@ pub(crate) fn build_discovered_locations_from_files(
         let display_name = segments
             .last()
             .copied()
-            .unwrap_or(file.canonical_path.as_str())
+            .unwrap_or(file.relative_path.as_str())
             .to_string();
         locations.insert(
-            file.canonical_path.clone(),
+            file.relative_path.clone(),
             DiscoveredLocationInput::file(
-                file.canonical_path.clone(),
+                file.relative_path.clone(),
                 display_name,
                 file.file_size_bytes,
                 file.modified_at_ns,
@@ -1167,17 +1167,17 @@ fn order_chunk_locations(
 ) -> LibrarySqliteResult<Vec<DiscoveredLocationInput>> {
     let mut ordered = locations.to_vec();
     ordered.sort_by(|left, right| {
-        location_depth(&left.canonical_path)
-            .cmp(&location_depth(&right.canonical_path))
+        location_depth(&left.relative_path)
+            .cmp(&location_depth(&right.relative_path))
             .then_with(|| kind_order(&left.kind).cmp(&kind_order(&right.kind)))
-            .then_with(|| left.canonical_path.cmp(&right.canonical_path))
+            .then_with(|| left.relative_path.cmp(&right.relative_path))
     });
 
     let mut seen_paths = HashSet::with_capacity(ordered.len());
     for location in &ordered {
-        if !seen_paths.insert(location.canonical_path.as_str()) {
-            return Err(LibrarySqliteError::DuplicateDiscoveryCanonicalPath(
-                location.canonical_path.clone(),
+        if !seen_paths.insert(location.relative_path.as_str()) {
+            return Err(LibrarySqliteError::DuplicateDiscoveryRelativePath(
+                location.relative_path.clone(),
             ));
         }
     }
@@ -1192,11 +1192,11 @@ fn kind_order(kind: &DiscoveredLocationKind) -> u8 {
     }
 }
 
-fn location_depth(canonical_path: &str) -> usize {
-    if canonical_path.is_empty() {
+fn location_depth(relative_path: &str) -> usize {
+    if relative_path.is_empty() {
         0
     } else {
-        canonical_path.bytes().filter(|byte| *byte == b'/').count() + 1
+        relative_path.bytes().filter(|byte| *byte == b'/').count() + 1
     }
 }
 

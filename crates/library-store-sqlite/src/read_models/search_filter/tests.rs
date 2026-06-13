@@ -418,7 +418,7 @@ fn unregister_local_root_hides_rows_purges_rebuild_and_invalidates_old_cursor() 
     let root = expect_registered_root(
         durable_store
             .register_local_root(RegisterLocalRootInput {
-                absolute_path: root_path,
+                requested_path: root_path,
             })
             .expect("register local root"),
     );

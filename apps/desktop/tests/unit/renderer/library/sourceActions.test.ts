@@ -233,7 +233,7 @@ function readyRoots(rootIds: readonly string[]): LocalRootsReadState {
     kind: 'ready',
     roots: rootIds.map((rootId) => ({
       rootId,
-      canonicalPath: `C:/Music/${rootId}`,
+      admittedRootPath: `C:/Music/${rootId}`,
       availability: 'available'
     }))
   }

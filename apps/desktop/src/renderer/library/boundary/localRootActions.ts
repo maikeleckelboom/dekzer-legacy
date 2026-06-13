@@ -5,6 +5,7 @@ import type { LocalRootChoiceResult } from '../../../shared/library/roots/choose
 import type {
   LocalRootRegistrationProposal,
   LocalRootRegistrationRejection,
+  LocalRootRegistrationResult,
   LocalRootRegistrationRoot
 } from '../../../shared/library/roots/register'
 import type { LocalRoot, ReadLocalRootsOutcome } from '../../../shared/library/roots/read'
@@ -70,6 +71,7 @@ export type LocalRootActionsController = {
   readonly isKnownLocalRootId: (rootId: string | undefined) => rootId is string
   readonly canUnregisterLocalRootId: (rootId: string | undefined) => rootId is string
   readonly chooseAndRegisterLocalRoot: () => Promise<boolean>
+  readonly registerLocalPath: (requestedPath: string) => Promise<boolean>
   readonly runRegisteredRootScan: () => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
   readonly unregisterLocalRoot: (rootId?: string) => Promise<boolean>
@@ -105,7 +107,7 @@ export function createLocalRootActionsController(
   let localRootsReadSequence = 0
   let scanSequence = 0
 
-  const registeredRootPath = computed(() => registeredRoot.value?.canonicalPath)
+  const registeredRootPath = computed(() => registeredRoot.value?.admittedRootPath)
   const canChooseLocalRoot = computed(
     () => rootChoiceStatus.value !== 'choosing' && scanStatus.value !== 'scanning'
   )
@@ -165,48 +167,86 @@ export function createLocalRootActionsController(
     try {
       const result = await rootApi.chooseAndRegisterLocal()
 
-      if (result.state === 'registered') {
-        rootChoiceStatus.value = 'registered'
-        registeredRoot.value = result.root
-        registrationProposal.value = undefined
-        registrationRejection.value = undefined
-        localRootsReadState.value = { kind: 'unread' }
-        resetRemoveState()
-        resetScanState()
-        return true
-      }
-
-      if (result.state === 'proposalRequired') {
-        rootChoiceStatus.value = 'proposalRequired'
-        registeredRoot.value = undefined
-        registrationProposal.value = result.proposal
-        registrationRejection.value = undefined
-        resetScanState()
-        return false
-      }
-
-      if (result.state === 'rejected') {
-        rootChoiceStatus.value = 'rejected'
-        registeredRoot.value = undefined
-        registrationProposal.value = undefined
-        registrationRejection.value = result.rejection
-        resetScanState()
-        return false
-      }
-
       if (result.state === 'canceled') {
         rootChoiceStatus.value = 'canceled'
         return false
       }
 
-      rootChoiceStatus.value = 'failed'
-      rootChoiceFailureMessage.value = rootChoiceFailureFor(result.state)
-      return false
+      if (
+        result.state !== 'registered' &&
+        result.state !== 'proposalRequired' &&
+        result.state !== 'rejected'
+      ) {
+        rootChoiceStatus.value = 'failed'
+        rootChoiceFailureMessage.value = rootChoiceFailureFor(result.state)
+        return false
+      }
+
+      return applyRegistrationResult(result)
     } catch {
       rootChoiceStatus.value = 'failed'
       rootChoiceFailureMessage.value = safeRootChoiceFailure
       return false
     }
+  }
+
+  async function registerLocalPath(requestedPath: string): Promise<boolean> {
+    if (!canChooseLocalRoot.value) {
+      return false
+    }
+
+    rootChoiceStatus.value = 'choosing'
+    rootChoiceFailureMessage.value = undefined
+
+    try {
+      const result = await rootApi.registerLocalPath({ requestedPath })
+      return applyRegistrationResult(result)
+    } catch {
+      rootChoiceStatus.value = 'failed'
+      rootChoiceFailureMessage.value = safeRootChoiceFailure
+      return false
+    }
+  }
+
+  function applyRegistrationResult(result: LocalRootRegistrationResult): boolean {
+    if (result.state === 'registered') {
+      rootChoiceStatus.value = 'registered'
+      registeredRoot.value = result.root
+      registrationProposal.value = undefined
+      registrationRejection.value = undefined
+      localRootsReadState.value = { kind: 'unread' }
+      resetRemoveState()
+      resetScanState()
+      return true
+    }
+
+    if (result.state === 'proposalRequired') {
+      rootChoiceStatus.value = 'proposalRequired'
+      registeredRoot.value = undefined
+      registrationProposal.value = result.proposal
+      registrationRejection.value = undefined
+      resetScanState()
+      return false
+    }
+
+    if (result.state === 'rejected') {
+      rootChoiceStatus.value = 'rejected'
+      registeredRoot.value = undefined
+      registrationProposal.value = undefined
+      registrationRejection.value = result.rejection
+      resetScanState()
+      return false
+    }
+
+    if (result.state === 'hostUnavailable' || result.state === 'registrationFailed') {
+      rootChoiceStatus.value = 'failed'
+      rootChoiceFailureMessage.value = rootChoiceFailureFor(result.state)
+      return false
+    }
+
+    rootChoiceStatus.value = 'failed'
+    rootChoiceFailureMessage.value = safeRootChoiceFailure
+    return false
   }
 
   async function runRegisteredRootScan(): Promise<boolean> {
@@ -458,6 +498,7 @@ export function createLocalRootActionsController(
     isKnownLocalRootId,
     canUnregisterLocalRootId,
     chooseAndRegisterLocalRoot,
+    registerLocalPath,
     runRegisteredRootScan,
     hydrateLocalRoots,
     unregisterLocalRoot,
@@ -469,7 +510,7 @@ export function createLocalRootActionsController(
 function registeredRootFromRecord(record: LocalRoot): LocalRootRegistrationRoot {
   return {
     rootId: record.rootId,
-    canonicalPath: record.canonicalPath
+    admittedRootPath: record.admittedRootPath
   }
 }
 

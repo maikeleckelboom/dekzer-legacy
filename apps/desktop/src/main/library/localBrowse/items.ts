@@ -125,8 +125,7 @@ function mapItem(item: ContractLocalBrowseItem): LocalBrowseItem {
     platform: item.platform,
     fileKind: item.fileKind,
     mediaRelevance: item.mediaRelevance,
-    admissionAction: item.admissionAction,
-    availableActions: item.availableActions,
+    availableOperations: item.availableOperations,
     failure: item.failure
   }
 }

@@ -303,7 +303,7 @@ The admission and scan system must remain safe when Dekzer is used in a performa
 
 Windows drive letters for removable and external drives are assigned dynamically. `E:\` today may be a different physical device than `E:\` tomorrow.
 
-**V0:** source identity is the canonical path string (case-insensitive on Windows). No volume UUID pairing.
+**V0:** source identity is the admitted root path string (case-insensitive on Windows). No volume UUID pairing.
 
 **Source lifecycle contract:** if a source path becomes inaccessible between sessions (drive not connected, letter changed), the source transitions to `unavailable`, not `removed`. The source record is preserved. The user can rescan when the drive is reconnected, or relink if the letter changed.
 
@@ -311,7 +311,7 @@ Windows drive letters for removable and external drives are assigned dynamically
 
 ---
 
-## Canonical path identity and deduplication
+## Admitted Root Path Identity and Deduplication
 
 On Windows, path comparison for duplicate detection must be case-insensitive and normalized.
 

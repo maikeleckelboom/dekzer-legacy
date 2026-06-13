@@ -35,6 +35,7 @@ export const libraryControlChannels = {
   roots: {
     cancel: 'desktop:library-roots:cancel-scan',
     chooseLocal: 'desktop:library-roots:choose-and-register-local',
+    registerLocalPath: 'desktop:library-roots:register-local-path',
     read: 'desktop:library-roots:read-local-roots',
     scan: 'desktop:library-roots:run-scan',
     unregister: 'desktop:library-roots:unregister-local-root'

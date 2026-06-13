@@ -100,7 +100,7 @@ describeOrSkip('real root scan cancellation through desktop boundary', () => {
       const sourceRoot = join(tempRootDir, 'large-root')
 
       const registration = (await registerLocalRoot(host, {
-        absolutePath: sourceRoot
+        requestedPath: sourceRoot
       })) as LocalRootRegistrationResult
       expect(registration.state).toBe('registered')
       if (registration.state !== 'registered') {
