@@ -26,7 +26,7 @@ const builtInContentsFilters = {
   video: {
     id: 'video',
     label: 'Video',
-    policy: { kind: 'primaryMedia', mediaKinds: ['video'] },
+    policy: { kind: 'playableMedia', mediaKinds: ['video'] },
     scopeDepth: 'recursive'
   },
   media: {

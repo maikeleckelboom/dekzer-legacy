@@ -20,7 +20,7 @@ unsupported raw files, diagnostics-only files, generic metadata companions, and 
 
 `audioBrowse` remains a separate audio-only policy. It includes `audio` and excludes `video`, including extension-only
 `.mp4` files. Extension classification treats `.m4a` as audio and `.mp4` as video until media-probe authority establishes
-stronger facts for a specific file.
+stronger observations for a specific file.
 
 **All Files** is raw source inventory. It is not interpreted content and not a problems view. The exact admitted
 inventory classes remain owned by `sourceFileInventory`.
@@ -33,7 +33,7 @@ workflow filter. This implementation companion must not be read as dropping eith
 Video must use distinct read policy/filter identity and must not reuse Audio or Media rows, cursors, retained snapshots,
 or verified-empty state.
 
-The renderer requests a policy and presents returned facts. It does not supply `['audio', 'video']` as a default
+The renderer requests a policy and presents returned observations. It does not supply `['audio', 'video']` as a default
 `sourceFileInventory` filter, inspect raw source inventory, filter rows, sort rows, or infer hidden content.
 
 Active filter selection participates in contents identity. Switching filter must schedule a re-keyed contents read for
@@ -51,7 +51,7 @@ current page:
 - `audioBrowse` reports browse-relevant video and image rows as omitted.
 - `sourceFileInventory` reports requestable browse classes omitted by its explicit class filter.
 - unsupported raw junk, diagnostics-only files, and unrequested internal classifications do not trigger the value.
-- `primaryMedia` returns `false` in this slice; it does not use raw `source_files` as a proxy for the primary-media row
+- `playableMedia` returns `false` in this slice; it does not use raw `source_files` as a proxy for the playable-media row
   universe.
 
 Non-browsable and unavailable result states return `false` and let result state drive presentation.
@@ -77,7 +77,7 @@ A folder containing only MP4 files returns video rows under `playableMediaBrowse
 `video`, `image`, and admitted `unsupported` companion rows; the admitted unsupported subset is currently CUE sheets.
 Persisted `none` and diagnostics-only unsupported kinds remain non-requestable.
 
-`primaryMedia.mediaKinds` remains separate primary-media vocabulary and authority.
+`playableMedia.mediaKinds` remains separate playable-media vocabulary and authority.
 
 ## Product Boundaries
 

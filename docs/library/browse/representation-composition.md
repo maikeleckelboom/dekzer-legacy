@@ -425,7 +425,7 @@ It is a realization of the same representation and hierarchy contracts. It is no
 For Local Files, a browse column projection uses the same source readiness, child-readiness, hierarchy coverage,
 child-window, retained-pending, blocked, failed, incomplete, and empty-state contracts as the tree realization.
 
-Each column projects an accepted read result for one path segment. A column must not infer durable hierarchy facts from
+Each column projects an accepted read result for one path segment. A column must not infer durable hierarchy observations from
 an empty child array, a stale cache, a visible row count, or another panel’s projected rows.
 
 Selecting a row in one column may open the next column and update the active contents scope for that panel instance.

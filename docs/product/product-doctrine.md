@@ -84,8 +84,8 @@ browser candidates are not sources.
 Library scanning. Canonical track identity. Source registration. Browse scopes. Contents reads. Media filtering. Event
 pump. Lifecycle reads. Stable references. Deterministic renderer projection.
 
-Current implementation authority is narrower than the long-term product model: source files, source_file_facts, content
-attachments, source-file attachment links, primary-media facts, track-identity candidates, track-identity
+Current implementation authority is narrower than the long-term product model: source files, source_file_observations, content
+attachments, source-file attachment links, playable-media observations, track-identity candidates, track-identity
 decisions, source lifecycle/integrity, contents/search/filter, and navigation. Future product surfaces consume this
 substrate when their contracts exist; they do not own it.
 
@@ -425,10 +425,10 @@ projections, and runtime use are separate owners.
 **Hard law:** A claim belongs to one identity layer and one evidence basis. Moving a claim between layers requires an
 explicit interpretation or decision record.
 
-Many important values are claims rather than plain facts. Observed, inferred, imported, suggested, edited, accepted,
+Many important values are claims rather than plain observations. Observed, inferred, imported, suggested, edited, accepted,
 verified, invalidated, rejected, superseded, and exported states are not interchangeable.
 
-- Imported facts do not silently become native authority.
+- Imported observations do not silently become native authority.
 - Machine recomputation does not overwrite accepted user decisions.
 - Conflicts remain inspectable evidence until explicitly resolved.
 - User acceptance chooses product-facing authority without erasing competing history.
@@ -507,7 +507,7 @@ variants. They do not define product doctrine by themselves.
 - Do not treat byte identity as recording or track identity.
 - Do not treat imported metadata as native authority.
 - Do not store important preparation values without provenance.
-- Do not flatten candidates, accepted facts, rejected facts, stale facts, and exported facts into one state.
+- Do not flatten candidates, accepted observations, rejected observations, stale observations, and exported observations into one state.
 - Do not treat compatibility as a boolean.
 - Do not hide drift.
 - Do not let runtime surfaces own durable product meaning.

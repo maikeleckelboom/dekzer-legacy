@@ -48,7 +48,7 @@ describe('preload renderer API', () => {
         sourceId: '7'
       },
       policy: {
-        kind: 'primaryMedia' as const,
+        kind: 'playableMedia' as const,
         mediaKinds: ['audio', 'video'] as const
       },
       scopeDepth: 'recursive' as const,
@@ -159,7 +159,7 @@ describe('preload renderer API', () => {
           fileKind: 'audio',
           fileClass: 'audio',
           presenceState: 'present',
-          hasCurrentBlake3Fact: true,
+          hasCurrentBlake3Observation: true,
           linkStatus: 'current',
           sourceMountStatus: 'mounted',
           sourceAccessState: 'accessible',
@@ -189,10 +189,10 @@ describe('preload renderer API', () => {
           sourceId: '7',
           currentLinksCount: 1,
           staleLinksCount: 0,
-          sourceFilesWithCurrentBlake3FactsCount: 1,
+          sourceFilesWithCurrentBlake3ObservationsCount: 1,
           sourceFilesWithAttachmentLinksCount: 1,
           sourceFilesMissingAttachmentLinksCount: 0,
-          unmaterializedBlake3FactsCount: 0
+          unmaterializedBlake3ObservationsCount: 0
         }
       }
     }
@@ -234,9 +234,9 @@ describe('preload renderer API', () => {
           linksCreated: 1,
           linksReplaced: 0,
           linksRefreshed: 0,
-          skippedStaleFacts: 0,
+          skippedStaleObservations: 0,
           skippedNoBlake3: 0,
-          skippedNoFacts: 0,
+          skippedNoObservations: 0,
           remainingCandidates: 0
         },
         probe: {
@@ -246,16 +246,16 @@ describe('preload renderer API', () => {
           failedCount: 0,
           remainingCandidates: 0
         },
-        primaryMediaPromotion: {
+        playableMediaPromotion: {
           effectiveLimit: 5,
           promotedCount: 1,
           refreshedCount: 0,
           skippedUnusableSource: 0,
           skippedUnsupportedMediaKind: 0,
-          skippedNoFacts: 0,
-          skippedStaleFacts: 0,
+          skippedNoObservations: 0,
+          skippedStaleObservations: 0,
           skippedNoBlake3: 0,
-          skippedNoProbeFacts: 0,
+          skippedNoProbeObservations: 0,
           skippedMissingAttachmentLink: 0,
           skippedStaleAttachmentLink: 0,
           remainingCandidates: 0
@@ -269,7 +269,7 @@ describe('preload renderer API', () => {
           evidenceCreated: 1,
           evidenceRefreshed: 0,
           candidatesMarkedStale: 0,
-          skippedStalePrimaryMediaFacts: 0,
+          skippedStalePlayableMedia: 0,
           remainingCandidates: 0
         },
         trackIdentityDecisions: {
@@ -283,7 +283,7 @@ describe('preload renderer API', () => {
         },
         remainingHashCandidates: 0,
         remainingProbeCandidates: 0,
-        remainingPrimaryMediaPromotionCandidates: 0,
+        remainingPlayableMediaPromotionCandidates: 0,
         remainingTrackIdentityCandidateProductionCandidates: 0,
         remainingTrackIdentityDecisionProductionCandidates: 0
       }
@@ -346,8 +346,8 @@ describe('preload renderer API', () => {
         candidates: [
           {
             candidateId: '11',
-            candidateKind: 'exact_primary_media_content',
-            candidateEvidenceBasis: 'current_primary_media_exact_blake3',
+            candidateKind: 'exact_playable_media_content',
+            candidateEvidenceBasis: 'current_playable_media_exact_blake3',
             candidateStatus: 'active',
             evidenceKeyAlgorithm: 'blake3',
             evidenceKeyValue: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -384,7 +384,7 @@ describe('preload renderer API', () => {
         status: 'idle',
         remainingHashCandidates: 0,
         remainingProbeCandidates: 0,
-        remainingPrimaryMediaPromotionCandidates: 0,
+        remainingPlayableMediaPromotionCandidates: 0,
         remainingTrackIdentityCandidateProductionCandidates: 0,
         remainingTrackIdentityDecisionProductionCandidates: 0
       }

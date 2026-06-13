@@ -17,17 +17,17 @@ scope:
 ## Decision
 
 The scanner and durable store may retain raw source-file observations for every regular file they observe. The product
-contents inventory must be hardened at the read-model policy boundary, not by deleting or refusing raw substrate facts.
+contents inventory must be hardened at the read-model policy boundary, not by deleting or refusing raw substrate observations.
 
 This preserves diagnostic and future migration room while making the contents pane answer the product question:
 
 > Which media-relevant files are known under this selected source or directory?
 
-## Durable Facts
+## Durable Observations
 
-`source_files` owns durable file facts. The required inventory facts are:
+`source_files` owns durable file observations. The required inventory observations are:
 
-| Fact                         | Meaning                                                                                                   |
+| Observation                         | Meaning                                                                                                   |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `source_file_id`             | Stable durable file row identity inside the store.                                                        |
 | `source_id`                  | Owning source root.                                                                                       |
@@ -39,7 +39,7 @@ This preserves diagnostic and future migration room while making the contents pa
 | `presence_state`             | present, missing, or removed.                                                                             |
 | timestamps                   | First discovery, last observation, presence change, creation, update.                                     |
 
-`file_kind` and `file_class` are provisional path-derived facts. They are not proof of playability, readiness, track
+`file_kind` and `file_class` are provisional path-derived observations. They are not proof of playability, readiness, track
 identity, or artwork role.
 
 ## Workflow Filter Mapping
@@ -82,7 +82,7 @@ or indexing is incomplete.
 
 Explicit non-default source-file inventory reads may include:
 
-| Stored facts                                                                    | Explicit inventory admission                                 |
+| Stored observations                                                                    | Explicit inventory admission                                 |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `file_class = audio`                                                            | Include.                                                     |
 | `file_class = video`                                                            | Include when policy requests video.                          |
@@ -97,7 +97,7 @@ requires a separate decision.
 
 This contract intentionally does not admit every `unsupported` row. `unsupported` is too broad for product inventory
 because it can include notes, PDFs, archives, binary data, and other unrelated files. CUE sheets are admitted because
-they are media-adjacent companion metadata. They remain source-file rows and never become primary media rows.
+they are media-adjacent companion metadata. They remain source-file rows and never become playable media rows.
 
 Changing the unsupported admission scope (for example, admitting `log_doc` or `text_doc` unsupported rows, or removing
 the cue-sheet filter) requires a separate decision. The current behavior is preserved.
@@ -110,7 +110,7 @@ include image, unsupported, CUE, text, or metadata companion files. **All Files*
 CUE sheets are represented only as `sourceFileInventory` rows with `fileClass = unsupported` and
 `fileKind = cueSheet`.
 The inventory does not pair CUE sheets with FLAC files, does not parse track splits, and does not infer a playable
-primary-media item from a CUE file.
+playable-media item from a CUE file.
 
 Image rows are represented only as image files. The inventory does not decide whether an image is cover art, label art,
 folder art, or unrelated imagery.
@@ -119,10 +119,10 @@ folder art, or unrelated imagery.
 
 `sourceFileInventory` contents rows may include present, missing, and removed media-relevant files. The presence state
 must be
-shown honestly. A missing or removed row is still a durable inventory fact.
+shown honestly. A missing or removed row is still a durable inventory observation.
 
-`primaryMedia` rows are playable/performance projection rows and remain present-file scoped. They may include audio and
-video only. A policy that asks `primaryMedia` for image or unsupported rows must return `policyConflict`.
+`playableMedia` rows are playable/performance projection rows and remain present-file scoped. They may include audio and
+video only. A policy that asks `playableMedia` for image or unsupported rows must return `policyConflict`.
 
 ## Ordering And Cursor
 
@@ -138,12 +138,12 @@ The cursor must page the same backend query. It must not switch to renderer-loca
 
 ## Projection Boundary
 
-Rust and SQLite own durable facts and read-model admission. Boundary protocol exposes `fileClass`, `fileKind`,
+Rust and SQLite own durable observations and read-model admission. Boundary protocol exposes `fileClass`, `fileKind`,
 `presence`, and stable source-file identifiers.
 
 The renderer may project icons and labels:
 
-| Row facts              | Renderer projection |
+| Row observations              | Renderer projection |
 | ---------------------- | ------------------- |
 | audio                  | music/file row      |
 | video                  | video/file row      |
@@ -158,5 +158,5 @@ based refresh logic.
 A future diagnostic or developer view may expose all raw source-file observations. That must be a distinct policy or
 surface. It must not weaken the default media-relevant inventory admission defined here.
 
-A future media probing layer may promote additional unsupported files into richer media facts. That must be based on
+A future media probing layer may promote additional unsupported files into richer media observations. That must be based on
 durable evidence and must not overload the current path-derived `unsupported` class.

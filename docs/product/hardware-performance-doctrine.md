@@ -91,7 +91,7 @@ Active Performance Instance is what continues unbroken when the DJ moves. It is 
 
 ### Performance Event Log [ARCHITECTURAL-DIRECTION]
 
-The durable fact store for a performance. Every room operation, track commitment, source incident, deck snapshot, and
+The durable observation store for a performance. Every room operation, track commitment, source incident, deck snapshot, and
 visibility change produces an event appended to this log. Append-only. Never mutated.
 
 The Performance Event Log is the canonical source of truth for:
@@ -216,10 +216,10 @@ inferred. The UI must never display an estimated or invented value where the sub
 - Title (if extractable from file metadata)
 - Artist (if extractable from file metadata)
 - Duration (if extractable)
-- Source availability state (file present vs. missing — from cached source facts)
+- Source availability state (file present vs. missing — from cached source observations)
 - Currently-loaded indicator (which deck this track is loaded on, if any)
 
-Row rendering consumes cached source facts. It must not perform blocking filesystem checks on the hot browse path.
+Row rendering consumes cached source observations. It must not perform blocking filesystem checks on the hot browse path.
 The renderer does not stat files during scroll.
 
 **Available after analysis pipeline exists:**

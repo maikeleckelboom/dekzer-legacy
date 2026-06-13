@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn read_source_lifecycle_returns_only_substrate_scan_facts_without_children() {
+    fn read_source_lifecycle_returns_only_substrate_scan_state_without_children() {
         let connection = test_connection();
         insert_source(&connection, 7);
         connection
@@ -275,7 +275,7 @@ name,
                   relative_path,
                   presence_state,
                   has_child_directories,
-                  has_primary_media_descendant,
+                  has_playable_media_descendant,
                   dir_scan_state,
                   dir_scan_updated_at,
                   created_at,

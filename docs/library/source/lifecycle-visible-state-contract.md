@@ -189,8 +189,8 @@ in their last-known state. They are not reset to `unknown`.
 ## Backend Lifecycle Read Boundary
 
 `readSourceLifecycle({ sourceId })` is the backend-owned per-source lifecycle read. It returns durable source identity
-and typed mount, access, scan, issue, and timestamp facts. Missing lifecycle side rows produce typed unknown/default
-facts for a known source; `notFound` is reserved for an absent source row.
+and typed mount, access, scan, issue, and timestamp observations. Missing lifecycle side rows produce typed unknown/default
+observations for a known source; `notFound` is reserved for an absent source row.
 
 This read does not own presentation labels, hierarchy children, branch coverage, contents windows, or locator/path
 exposure. Renderer lifecycle state is a projection over this durable read plus transient scan progress.

@@ -82,9 +82,9 @@ mod tests {
         ) {
             self.insert_source(source_id, &format!("Source {source_id}"));
             self.insert_source_file(source_id, source_file_id);
-            self.insert_current_facts(source_id, source_file_id, hash);
+            self.insert_current_observations(source_id, source_file_id, hash);
             self.insert_attachment(source_file_id, hash);
-            self.insert_primary_media_fact(source_file_id);
+            self.insert_playable_media(source_file_id);
             self.insert_candidate(candidate_id, hash, "active");
             self.insert_member(candidate_id, source_file_id, hash);
             self.insert_evidence(candidate_id, source_id, source_file_id, hash);
@@ -99,7 +99,7 @@ mod tests {
         ) {
             self.insert_source(source_id, &format!("Source {source_id}"));
             self.insert_source_file(source_id, source_file_id);
-            self.insert_current_facts(source_id, source_file_id, hash);
+            self.insert_current_observations(source_id, source_file_id, hash);
             self.insert_attachment(source_file_id, hash);
             self.insert_evidence(candidate_id, source_id, source_file_id, hash);
         }
@@ -167,13 +167,13 @@ mod tests {
                 .expect("insert source file");
         }
 
-        fn insert_current_facts(&self, source_id: i64, source_file_id: i64, hash: &str) {
+        fn insert_current_observations(&self, source_id: i64, source_file_id: i64, hash: &str) {
             self.insert_artifact(source_file_id);
             let relative_path = format!("Album/track-{source_file_id}.wav");
             self.store
                 .with_write(|write| {
                     write.execute(
-                        "INSERT INTO source_file_facts (
+                        "INSERT INTO source_file_observations (
                              source_file_id, basis_fingerprint,
                              basis_source_id, basis_relative_path, basis_size_bytes,
                              basis_mtime_ns, basis_presence_state, observed_at_ms,
@@ -213,7 +213,7 @@ mod tests {
                     )?;
                     Ok(())
                 })
-                .expect("insert current facts");
+                .expect("insert current observations");
         }
 
         fn insert_artifact(&self, source_file_id: i64) {
@@ -243,12 +243,12 @@ mod tests {
                     write.execute(
                         "INSERT OR IGNORE INTO work_artifacts (
                              artifact_id, work_run_id, subject_kind, subject_id,
-                             artifact_kind, artifact_role, adapter_key, adapter_version,
+                             artifact_kind, adapter_key, adapter_version,
                              basis_fingerprint, media_type, storage_kind, payload_hash,
                              created_at
                          )
                          VALUES (?1, ?2, 'source_file', ?3, 'inspection_result',
-                                 'primary_result', 'test.review', '1', ?4,
+                                 'test.review', '1', ?4,
                                  'application/json', 'inline_payload', ?5, 1)",
                         params![
                             artifact_id(source_file_id),
@@ -305,20 +305,20 @@ mod tests {
                 .expect("insert attachment");
         }
 
-        fn insert_primary_media_fact(&self, source_file_id: i64) {
+        fn insert_playable_media(&self, source_file_id: i64) {
             self.store
                 .with_write(|write| {
                     let attachment_id = attachment_id_for_source_file(write, source_file_id)?;
                     write.execute(
-                        "INSERT OR IGNORE INTO primary_media_facts (
-                             primary_media_fact_id, attachment_id, evidence_source_file_id,
+                        "INSERT OR IGNORE INTO playable_media (
+                             playable_media_id, attachment_id, evidence_source_file_id,
                              evidence_basis_fingerprint, media_kind, mime_type, duration_ms,
                              sample_rate_hz, channels, bit_depth, codec, created_at, updated_at
                         )
                          VALUES (?1, ?2, ?3, ?4, 'audio', 'audio/wav', 100,
                                  44100, 2, 16, 'pcm', 1, 1)",
                         params![
-                            primary_media_id(source_file_id),
+                            playable_media_id(source_file_id),
                             attachment_id,
                             source_file_id,
                             basis(source_file_id)
@@ -326,7 +326,7 @@ mod tests {
                     )?;
                     Ok(())
                 })
-                .expect("insert primary media fact");
+                .expect("insert playable media observation");
         }
 
         fn insert_candidate(&self, candidate_id: i64, hash: &str, status: &str) {
@@ -338,8 +338,8 @@ mod tests {
                              evidence_key_algorithm, evidence_key_value, status,
                              created_at, updated_at
                          )
-                         VALUES (?1, 'exact_primary_media_content',
-                                 'current_primary_media_exact_blake3', 'blake3',
+                         VALUES (?1, 'exact_playable_media_content',
+                                 'current_playable_media_exact_blake3', 'blake3',
                                  ?2, ?3, ?4, ?4)",
                         params![candidate_id, hash, status, candidate_id * 10],
                     )?;
@@ -355,7 +355,7 @@ mod tests {
                     write.execute(
                         "INSERT OR IGNORE INTO track_identity_candidate_members (
                              track_identity_candidate_member_id, track_identity_candidate_id,
-                             primary_media_fact_id, attachment_id, evidence_source_file_id,
+                             playable_media_id, attachment_id, evidence_source_file_id,
                              evidence_basis_fingerprint, content_hash_algorithm,
                              content_hash_value, created_at, updated_at
                          )
@@ -363,7 +363,7 @@ mod tests {
                         params![
                             member_id(source_file_id),
                             candidate_id,
-                            primary_media_id(source_file_id),
+                            playable_media_id(source_file_id),
                             attachment_id,
                             source_file_id,
                             basis(source_file_id),
@@ -385,12 +385,11 @@ mod tests {
             self.store
                 .with_write(|write| {
                     let attachment_id = attachment_id_for_source_file(write, source_file_id)?;
-                    let primary_media_fact_id =
-                        primary_media_id_for_candidate(write, candidate_id)?;
+                    let playable_media_id = playable_media_id_for_candidate(write, candidate_id)?;
                     write.execute(
                         "INSERT OR IGNORE INTO track_identity_candidate_evidence (
                              track_identity_candidate_evidence_id, track_identity_candidate_id,
-                             primary_media_fact_id, attachment_id,
+                             playable_media_id, attachment_id,
                              source_file_attachment_link_id, source_file_id, source_id,
                              evidence_basis_fingerprint, content_hash_algorithm,
                              content_hash_value, probe_accepted_artifact_id,
@@ -401,7 +400,7 @@ mod tests {
                         params![
                             evidence_id(source_file_id),
                             candidate_id,
-                            primary_media_fact_id,
+                            playable_media_id,
                             attachment_id,
                             link_id(source_file_id),
                             source_file_id,
@@ -521,12 +520,12 @@ mod tests {
         )
     }
 
-    fn primary_media_id_for_candidate(
+    fn playable_media_id_for_candidate(
         connection: &rusqlite::Connection,
         candidate_id: i64,
     ) -> rusqlite::Result<i64> {
         connection.query_row(
-            "SELECT primary_media_fact_id
+            "SELECT playable_media_id
              FROM track_identity_candidate_members
              WHERE track_identity_candidate_id = ?1
              ORDER BY track_identity_candidate_member_id ASC
@@ -540,7 +539,7 @@ mod tests {
         30_000 + source_file_id
     }
 
-    fn primary_media_id(source_file_id: i64) -> i64 {
+    fn playable_media_id(source_file_id: i64) -> i64 {
         40_000 + source_file_id
     }
 

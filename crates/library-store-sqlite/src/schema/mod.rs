@@ -113,10 +113,10 @@ mod tests {
         "projection_retention_watermarks",
         "projection_subscribers",
         "content_attachments",
-        "primary_media_facts",
+        "playable_media",
         "source_directories",
         "source_file_attachment_links",
-        "source_file_facts",
+        "source_file_observations",
         "source_files",
         "source_locators",
         "track_identity_candidate_evidence",
@@ -320,13 +320,13 @@ mod tests {
             "work_artifact_inline_payloads",
             "work_artifact_file_store_entries",
             "work_artifact_claims",
-            "source_file_facts",
+            "source_file_observations",
             "projection_change_log",
             "projection_subscribers",
             "projection_cursors",
             "projection_retention_watermarks",
             "root_admission_proposals",
-            "primary_media_facts",
+            "playable_media",
         ] {
             assert!(
                 tables.iter().any(|table| table == table_name),
@@ -340,10 +340,10 @@ mod tests {
             "work_runs_work_item_started_at",
             "work_artifacts_work_run",
             "work_artifacts_subject_created_at",
-            "work_artifacts_kind_role_lookup",
+            "work_artifacts_kind_lookup",
             "work_artifact_claims_active_claim",
-            "source_file_facts_source_basis",
-            "source_file_facts_media_kind",
+            "source_file_observations_source_basis",
+            "source_file_observations_media_kind",
             "projection_change_log_domain_sequence",
             "projection_subscribers_expires_at",
             "root_admission_proposals_active_canonical_path",
@@ -364,26 +364,24 @@ mod tests {
             concat!("Library", "Metadata"),
             concat!("Work", "Items"),
             concat!("Work", "Runs"),
-            concat!("Arti", "facts"),
+            "Artifacts",
             concat!("Artifact", "InlinePayloads"),
             concat!("Artifact", "FileStoreEntries"),
             concat!("Artifact", "Claims"),
-            concat!("Source", "Facts"),
+            concat!("Source", "Observations"),
             concat!("Projection", "ChangeLog"),
             concat!("Projection", "Subscribers"),
             concat!("Projection", "Cursors"),
             concat!("Projection", "RetentionWatermarks"),
             concat!("source_registration", "_proposals"),
-            concat!("primary_media_", "candidates"),
+            concat!("playable_media_", "candidates"),
             concat!("Work", "Items_subject_state"),
             concat!("Work", "Items_active_work"),
             concat!("Work", "Runs_work_item_started_at"),
-            concat!("Arti", "facts_work_run"),
-            concat!("Arti", "facts_subject_created_at"),
-            concat!("Arti", "facts_kind_role_lookup"),
+            "Artifacts_work_run",
+            "Artifacts_subject_created_at",
+            "Artifacts_kind_lookup",
             concat!("Artifact", "Claims_active_claim"),
-            concat!("Source", "Facts_source_basis"),
-            concat!("Source", "Facts_media_kind"),
             concat!("Projection", "ChangeLog_domain_sequence"),
             concat!("Projection", "Subscribers_expires_at"),
             concat!("source_registration", "_proposals_active_canonical_path"),
@@ -412,7 +410,7 @@ mod tests {
             ("source_navigation_user_order", concat!("node", "_domain")),
             ("source_navigation_user_order", concat!("node", "_id")),
             ("source_navigation_user_order", concat!("parent", "_scope")),
-            ("source_file_facts", concat!("fact", "_kind")),
+            ("source_file_observations", concat!("observation", "_kind")),
         ] {
             assert!(
                 !table_column_names(&connection, table_name)
@@ -470,7 +468,7 @@ mod tests {
                 "relative_path",
                 "presence_state",
                 "has_child_directories",
-                "has_primary_media_descendant",
+                "has_playable_media_descendant",
                 "has_image_media_descendant",
                 "dir_scan_state",
                 "dir_scan_issue_kind",
@@ -566,7 +564,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            table_column_names(&connection, "source_file_facts"),
+            table_column_names(&connection, "source_file_observations"),
             vec![
                 "source_file_id",
                 "basis_fingerprint",
@@ -590,8 +588,8 @@ mod tests {
             ]
         );
         assert!(
-            table_index_names(&connection, "source_file_facts")
-                .contains(&"source_file_facts_source_basis".to_string())
+            table_index_names(&connection, "source_file_observations")
+                .contains(&"source_file_observations_source_basis".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "content_attachments"),
@@ -686,9 +684,9 @@ mod tests {
                 .contains(&"search_filter_index_rows_source".to_string())
         );
         assert_eq!(
-            table_column_names(&connection, "primary_media_facts"),
+            table_column_names(&connection, "playable_media"),
             vec![
-                "primary_media_fact_id",
+                "playable_media_id",
                 "attachment_id",
                 "evidence_source_file_id",
                 "evidence_basis_fingerprint",
@@ -704,8 +702,8 @@ mod tests {
             ]
         );
         assert!(
-            table_index_names(&connection, "primary_media_facts")
-                .contains(&"primary_media_facts_evidence_source_file".to_string())
+            table_index_names(&connection, "playable_media")
+                .contains(&"playable_media_evidence_source_file".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "track_identity_candidates"),
@@ -725,7 +723,7 @@ mod tests {
             vec![
                 "track_identity_candidate_member_id",
                 "track_identity_candidate_id",
-                "primary_media_fact_id",
+                "playable_media_id",
                 "attachment_id",
                 "evidence_source_file_id",
                 "evidence_basis_fingerprint",
@@ -740,7 +738,7 @@ mod tests {
             vec![
                 "track_identity_candidate_evidence_id",
                 "track_identity_candidate_id",
-                "primary_media_fact_id",
+                "playable_media_id",
                 "attachment_id",
                 "source_file_attachment_link_id",
                 "source_file_id",
@@ -788,7 +786,7 @@ mod tests {
                 "track_identity_candidate_id",
                 "track_identity_candidate_member_id",
                 "track_identity_candidate_evidence_id",
-                "primary_media_fact_id",
+                "playable_media_id",
                 "attachment_id",
                 "source_file_attachment_link_id",
                 "source_file_id",
@@ -876,7 +874,8 @@ mod tests {
     }
 
     #[test]
-    fn source_directory_coverage_facts_accept_pending_positive_and_confirmed_negative_states() {
+    fn source_directory_coverage_observations_accept_pending_positive_and_confirmed_negative_states()
+     {
         let connection = install_test_baseline();
         insert_schema_test_source(&connection);
 
@@ -891,7 +890,7 @@ mod tests {
                      relative_path,
                      presence_state,
                      has_child_directories,
-                     has_primary_media_descendant,
+                     has_playable_media_descendant,
                      has_image_media_descendant,
                      dir_scan_state,
                      dir_scan_updated_at,
@@ -903,7 +902,7 @@ mod tests {
                   VALUES (10, 1, NULL, 'pending', 'v1|tptetntdtitntg', 'pending', 'present', 0, 0, 0, 'pending', 100, NULL, NULL, 100, 100)",
                 [],
             )
-            .expect("pending directory coverage facts are accepted");
+            .expect("pending directory coverage observations are accepted");
 
         connection
             .execute(
@@ -915,7 +914,7 @@ mod tests {
                      name_sort_key,
                      relative_path,
                      presence_state,
-                     has_primary_media_descendant,
+                     has_playable_media_descendant,
                      dir_scan_state,
                      dir_scan_updated_at,
                      created_at,
@@ -936,7 +935,7 @@ mod tests {
                      name_sort_key,
                      relative_path,
                      presence_state,
-                     has_primary_media_descendant,
+                     has_playable_media_descendant,
                      has_image_media_descendant,
                      dir_scan_state,
                      dir_scan_updated_at,
@@ -947,7 +946,7 @@ mod tests {
                   VALUES (12, 1, NULL, 'complete-empty', 'v1|tctomtptletettet-tetmtpttty', 'complete-empty', 'present', 0, 0, 'complete', 102, 102, 102, 102)",
                 [],
             )
-            .expect("confirmed no-media directory coverage facts are accepted");
+            .expect("confirmed no-media directory coverage observations are accepted");
     }
 
     #[test]

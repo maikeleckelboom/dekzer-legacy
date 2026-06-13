@@ -147,11 +147,11 @@ export type SearchFilterMatchReason = "filter" | "exactLabel" | "labelPrefix" | 
 
 export type ContentsScope = { "type": "source", "payload": { sourceId: string, } } | { "type": "sourceLocation", "payload": { sourceLocationId: string, } } | { "type": "directory", "payload": { sourceId: string, sourceDirectoryId: string, } };
 
-export type ContentsReadPolicy = { "kind": "playableMediaBrowse" } | { "kind": "audioBrowse" } | { "kind": "sourceFileInventory", fileClasses: Array<ContentsFileClass>, } | { "kind": "primaryMedia", mediaKinds: Array<PrimaryMediaKind>, };
+export type ContentsReadPolicy = { "kind": "playableMediaBrowse" } | { "kind": "audioBrowse" } | { "kind": "sourceFileInventory", fileClasses: Array<ContentsFileClass>, } | { "kind": "playableMedia", mediaKinds: Array<PlayableMediaKind>, };
 
 export type ContentsFileClass = "audio" | "video" | "image" | "unsupported";
 
-export type PrimaryMediaKind = "audio" | "video";
+export type PlayableMediaKind = "audio" | "video";
 
 export type ContentsScopeDepth = "immediate" | "recursive";
 
@@ -198,7 +198,7 @@ export type HashSourceFilesBlake3Reply = { effectiveLimit: number, outcomes: Arr
 
 export type SourceMaintenanceReply = { "type": "runSourceMaintenance", "payload": RunSourceMaintenanceReply };
 
-export type RunSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceRunStatus, effectiveLimits: SourceMaintenanceEffectiveLimits, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, primaryMediaPromotion: SourceMaintenancePrimaryMediaPromotionSummary, trackIdentityCandidates: SourceMaintenanceTrackIdentityCandidateSummary, trackIdentityDecisions: SourceMaintenanceTrackIdentityDecisionSummary, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, };
+export type RunSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceRunStatus, effectiveLimits: SourceMaintenanceEffectiveLimits, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, playableMediaPromotion: SourceMaintenancePlayableMediaPromotionSummary, trackIdentityCandidates: SourceMaintenanceTrackIdentityCandidateSummary, trackIdentityDecisions: SourceMaintenanceTrackIdentityDecisionSummary, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPlayableMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, };
 
 export type TrackIdentityDecisionReply = { "type": "acceptTrackIdentityCandidate", "payload": TrackIdentityDecisionCommandResult } | { "type": "rejectTrackIdentityCandidate", "payload": TrackIdentityDecisionCommandResult } | { "type": "deferTrackIdentityCandidate", "payload": TrackIdentityDecisionCommandResult };
 
@@ -256,7 +256,7 @@ export type ReadSourceLifecycleReply = { lifecycle: SourceLifecycle | null, };
 
 export type ReadSourceIntegrityReply = { sourceId: string, sourceAvailability: SourceIntegrityAvailability, coverageIntegrity: SourceIntegrityCoverage, inventory?: SourceIntegrityInventory, evidenceAndMaintenance: SourceIntegrityEvidenceAndMaintenance, attachmentIntegrity?: SourceIntegrityAttachmentIntegrity, runtimeMaintenance: SourceIntegrityRuntimeMaintenance, };
 
-export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
+export type ReadSourceMaintenanceReply = { sourceId: string, status: SourceMaintenanceSnapshotStatus, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPlayableMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, attachmentLinks?: SourceMaintenanceAttachmentLinkSummary, sourceFailure?: SourceMaintenanceSourceFailure, lastRun?: SourceMaintenanceLastRunSummary, };
 
 export type ReadSourceFileAttachmentReply = { status: AttachmentIdentityReadStatus, attachmentLink?: SourceFileAttachmentLink, };
 
@@ -302,7 +302,7 @@ export type LibraryTreeCoverage = { state: LibraryTreeCoverageState, subtreeCove
 
 export type LibraryTreeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing";
 
-export type LibraryTreeNode = { nodeKind: LibraryTreeNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, fileClass?: LibraryTreeFileClass, presenceState: LibraryTreePresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPrimaryMediaState?: DirectoryPrimaryMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, navigableChildScopeState?: NavigableChildScopeState, };
+export type LibraryTreeNode = { nodeKind: LibraryTreeNodeKind, sourceId: string, sourceDirectoryId: string | null, sourceFileId: string | null, parentSourceDirectoryId: string | null, relativePath: string, displayName: string, fileClass?: LibraryTreeFileClass, presenceState: LibraryTreePresenceState, sizeBytes: number | null, modifiedAtNs: number | null, updatedAtMs: number, hasChildDirectories?: boolean, directoryPlayableMediaState?: DirectoryPlayableMediaState, directoryImageMediaState?: DirectoryImageMediaState, directoryScanState?: DirectoryScanState, navigableChildScopeState?: NavigableChildScopeState, };
 
 export type LibraryTreeNodeKind = "directory" | "file";
 
@@ -310,7 +310,7 @@ export type LibraryTreeFileClass = "audio" | "video" | "image" | "unsupported" |
 
 export type LibraryTreePresenceState = "present" | "missing" | "removed";
 
-export type DirectoryPrimaryMediaState = { "kind": "unknown" } | { "kind": "hasPrimaryMediaDescendants" } | { "kind": "noPrimaryMediaDescendants" };
+export type DirectoryPlayableMediaState = { "kind": "unknown" } | { "kind": "hasPlayableMediaDescendants" } | { "kind": "noPlayableMediaDescendants" };
 
 export type DirectoryImageMediaState = { "kind": "unknown" } | { "kind": "hasImageMediaDescendants" } | { "kind": "noImageMediaDescendants" };
 
@@ -334,9 +334,9 @@ export type SourceIntegrityFileClassCount = { fileClass: SourceIntegrityFileClas
 
 export type SourceIntegrityFileKindCount = { fileKind: ContentsFileKind, count: number, };
 
-export type SourceIntegrityEvidenceAndMaintenance = { remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
+export type SourceIntegrityEvidenceAndMaintenance = { remainingHashCandidates: number, remainingProbeCandidates: number, remainingPlayableMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
 
-export type SourceIntegrityAttachmentIntegrity = { currentLinksCount: number, staleLinksCount: number, missingLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
+export type SourceIntegrityAttachmentIntegrity = { currentLinksCount: number, staleLinksCount: number, missingLinksCount: number, sourceFilesWithCurrentBlake3ObservationsCount: number, sourceFilesWithAttachmentLinksCount: number, unmaterializedBlake3ObservationsCount: number, };
 
 export type SourceIntegrityRuntimeMaintenance = { state: SourceIntegrityRuntimeMaintenanceState, lastRun?: SourceMaintenanceLastRunSummary, };
 
@@ -348,13 +348,13 @@ export type AttachmentIdentity = { attachmentId: string, contentHashAlgorithm: s
 
 export type AttachmentSourceFileOccurrenceStatus = "available" | "sourceUnavailable" | "sourceMissing" | "sourceBlocked" | "fileMissing" | "fileRemoved" | "unknown";
 
-export type SourceFileAttachmentLink = { sourceFileAttachmentLinkId: string, attachmentId: string, sourceFileId: string, sourceId: string, contentHashAlgorithm: string, contentHashValue: string, sourceDisplayName: string, sourceClass: SourceClass, parentSourceDirectoryId?: string, name: string, relativePath: string, sizeBytes?: number, mtimeNs?: number, fileKind: ContentsFileKind, fileClass: SearchFilterFileClass, presenceState: ContentsPresenceState, hasCurrentBlake3Fact: boolean, linkStatus: SourceFileAttachmentLinkStatus, sourceMountStatus: SourceMountStatus, sourceAccessState: SourceAccessState, sourceAccessIssueKind?: SourceLifecycleIssueKind, sourceScanPhase: SourceScanPhase, sourceAvailabilityState: SourceIntegrityAvailabilityState, occurrenceStatus: AttachmentSourceFileOccurrenceStatus, createdAtMs: number, updatedAtMs: number, sourceFileUpdatedAtMs: number, };
+export type SourceFileAttachmentLink = { sourceFileAttachmentLinkId: string, attachmentId: string, sourceFileId: string, sourceId: string, contentHashAlgorithm: string, contentHashValue: string, sourceDisplayName: string, sourceClass: SourceClass, parentSourceDirectoryId?: string, name: string, relativePath: string, sizeBytes?: number, mtimeNs?: number, fileKind: ContentsFileKind, fileClass: SearchFilterFileClass, presenceState: ContentsPresenceState, hasCurrentBlake3Observation: boolean, linkStatus: SourceFileAttachmentLinkStatus, sourceMountStatus: SourceMountStatus, sourceAccessState: SourceAccessState, sourceAccessIssueKind?: SourceLifecycleIssueKind, sourceScanPhase: SourceScanPhase, sourceAvailabilityState: SourceIntegrityAvailabilityState, occurrenceStatus: AttachmentSourceFileOccurrenceStatus, createdAtMs: number, updatedAtMs: number, sourceFileUpdatedAtMs: number, };
 
 export type SourceFileAttachmentLinkStatus = "current" | "stale";
 
 export type AttachmentSourceFilesSummary = { totalOccurrenceCount: number, availableOccurrenceCount: number, unavailableOccurrenceCount: number, currentLinkOccurrenceCount: number, staleLinkOccurrenceCount: number, distinctSourceCount: number, hasMultipleOccurrences: boolean, };
 
-export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
+export type SourceAttachmentSummary = { sourceId: string, currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3ObservationsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3ObservationsCount: number, };
 
 export type ContentsResult = { state: ContentsState, scope: ContentsScope, policy: ContentsReadPolicy, scopeDepth: ContentsScopeDepth, rows: Array<ContentsFileRow>, scopeCoverage: ContentsScopeCoverage, hasPolicyOmittedRows: boolean, nextCursor?: string, detail?: string, };
 
@@ -372,9 +372,9 @@ export type ContentsScopeCoverage = { state: ContentsScopeCoverageState, subtree
 
 export type ContentsScopeCoverageState = "complete" | "pending" | "scanning" | "blocked" | "failed" | "sourceUnavailable" | "locationMissing" | "incomplete";
 
-export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
+export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, playableMedia?: PlayableMedia, updatedAtMs?: number, };
 
-export type PrimaryMediaSummary = { primaryMediaFactId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, };
+export type PlayableMedia = { playableMediaId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, };
 
 export type ContentsFileKind = "audio" | "video" | "image" | "cueSheet" | "logDoc" | "textDoc" | "archive" | "other" | "unknown";
 
@@ -412,19 +412,19 @@ export type SourceMaintenanceEffectiveLimits = { hashLimit: number, attachmentLi
 
 export type SourceMaintenanceHashSummary = { effectiveLimit: number, hashedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, };
 
-export type SourceMaintenanceAttachmentMaterializationSummary = { effectiveLimit: number, attachmentsCreated: number, attachmentsRefreshed: number, linksCreated: number, linksReplaced: number, linksRefreshed: number, skippedStaleFacts: number, skippedNoBlake3: number, skippedNoFacts: number, remainingCandidates: number, };
+export type SourceMaintenanceAttachmentMaterializationSummary = { effectiveLimit: number, attachmentsCreated: number, attachmentsRefreshed: number, linksCreated: number, linksReplaced: number, linksRefreshed: number, skippedStaleObservations: number, skippedNoBlake3: number, skippedNoObservations: number, remainingCandidates: number, };
 
 export type SourceMaintenanceProbeSummary = { effectiveLimit: number, probedCount: number, skippedCount: number, failedCount: number, remainingCandidates: number, };
 
-export type SourceMaintenancePrimaryMediaPromotionSummary = { effectiveLimit: number, promotedCount: number, refreshedCount: number, skippedUnusableSource: number, skippedUnsupportedMediaKind: number, skippedNoFacts: number, skippedStaleFacts: number, skippedNoBlake3: number, skippedNoProbeFacts: number, skippedMissingAttachmentLink: number, skippedStaleAttachmentLink: number, remainingCandidates: number, };
+export type SourceMaintenancePlayableMediaPromotionSummary = { effectiveLimit: number, promotedCount: number, refreshedCount: number, skippedUnusableSource: number, skippedUnsupportedMediaKind: number, skippedNoObservations: number, skippedStaleObservations: number, skippedNoBlake3: number, skippedNoProbeObservations: number, skippedMissingAttachmentLink: number, skippedStaleAttachmentLink: number, remainingCandidates: number, };
 
-export type SourceMaintenanceTrackIdentityCandidateSummary = { effectiveLimit: number, candidatesCreated: number, candidatesRefreshed: number, membersCreated: number, membersRefreshed: number, evidenceCreated: number, evidenceRefreshed: number, candidatesMarkedStale: number, skippedStalePrimaryMediaFacts: number, remainingCandidates: number, };
+export type SourceMaintenanceTrackIdentityCandidateSummary = { effectiveLimit: number, candidatesCreated: number, candidatesRefreshed: number, membersCreated: number, membersRefreshed: number, evidenceCreated: number, evidenceRefreshed: number, candidatesMarkedStale: number, skippedStalePlayableMedia: number, remainingCandidates: number, };
 
 export type SourceMaintenanceTrackIdentityDecisionSummary = { effectiveLimit: number, decisionsCreated: number, decisionEvidenceCreated: number, skippedStaleCandidates: number, skippedExistingCurrentDecisions: number, skippedUserBlockedCandidates: number, remainingCandidates: number, };
 
-export type SourceMaintenanceAttachmentLinkSummary = { currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3FactsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3FactsCount: number, };
+export type SourceMaintenanceAttachmentLinkSummary = { currentLinksCount: number, staleLinksCount: number, sourceFilesWithCurrentBlake3ObservationsCount: number, sourceFilesWithAttachmentLinksCount: number, sourceFilesMissingAttachmentLinksCount: number, unmaterializedBlake3ObservationsCount: number, };
 
-export type SourceMaintenanceLastRunSummary = { status: SourceMaintenanceRunStatus, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, primaryMediaPromotion: SourceMaintenancePrimaryMediaPromotionSummary, trackIdentityCandidates: SourceMaintenanceTrackIdentityCandidateSummary, trackIdentityDecisions: SourceMaintenanceTrackIdentityDecisionSummary, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPrimaryMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
+export type SourceMaintenanceLastRunSummary = { status: SourceMaintenanceRunStatus, hash: SourceMaintenanceHashSummary, attachmentMaterialization: SourceMaintenanceAttachmentMaterializationSummary, probe: SourceMaintenanceProbeSummary, playableMediaPromotion: SourceMaintenancePlayableMediaPromotionSummary, trackIdentityCandidates: SourceMaintenanceTrackIdentityCandidateSummary, trackIdentityDecisions: SourceMaintenanceTrackIdentityDecisionSummary, remainingHashCandidates: number, remainingProbeCandidates: number, remainingPlayableMediaPromotionCandidates: number, remainingTrackIdentityCandidateProductionCandidates: number, remainingTrackIdentityDecisionProductionCandidates: number, sourceFailure?: SourceMaintenanceSourceFailure, };
 
 export type SourceMaintenanceRunStatus = "completed" | "partial" | "skipped" | "failed";
 

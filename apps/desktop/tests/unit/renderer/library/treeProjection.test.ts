@@ -156,7 +156,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: true,
-            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryPlayableMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'scanning',
             navigableChildScopeState: 'hasNavigableChildScopes'
@@ -181,7 +181,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: true,
-            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryPlayableMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'scanning',
             navigableChildScopeState: 'hasNavigableChildScopes'
@@ -205,7 +205,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: true,
-            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryPlayableMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'scanning',
             navigableChildScopeState: 'hasNavigableChildScopes'
@@ -301,7 +301,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'noPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -322,7 +322,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Singles', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -387,7 +387,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Album', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'noPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -636,7 +636,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Videos', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -668,7 +668,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Mixed Media', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -704,7 +704,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Pending Scan', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryPlayableMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'pending',
             navigableChildScopeState: 'unknown'
@@ -789,7 +789,7 @@ describe('projectState', () => {
           sourceChildren: loadedChildren([
             directoryNode('12', 'Unknown Folder', {
               hasChildDirectories: false,
-              directoryPrimaryMediaState: { kind: 'unknown' },
+              directoryPlayableMediaState: { kind: 'unknown' },
               directoryImageMediaState: { kind: 'unknown' },
               directoryScanState: scanState,
               navigableChildScopeState: 'unknown'
@@ -833,7 +833,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Music Folder', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryPlayableMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'pending',
             navigableChildScopeState: 'unknown'
@@ -880,7 +880,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Scanned Leaf', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -913,7 +913,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Parent Album', {
             hasChildDirectories: true,
-            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'hasNavigableChildScopes'
@@ -928,8 +928,8 @@ describe('projectState', () => {
                 [
                   directoryNode('20', 'Sub-Album', {
                     hasChildDirectories: false,
-                    directoryPrimaryMediaState: {
-                      kind: 'noPrimaryMediaDescendants'
+                    directoryPlayableMediaState: {
+                      kind: 'noPlayableMediaDescendants'
                     },
                     directoryImageMediaState: {
                       kind: 'noImageMediaDescendants'
@@ -1039,7 +1039,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Media Only', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -1060,7 +1060,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Videos', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'noPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'noImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -1081,7 +1081,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Mixed', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -1102,7 +1102,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Transition Folder', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryPlayableMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'pending',
             navigableChildScopeState: 'unknown'
@@ -1121,7 +1121,7 @@ describe('projectState', () => {
         sourceChildren: loadedChildren([
           directoryNode('12', 'Transition Folder', {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'unknown' },
+            directoryPlayableMediaState: { kind: 'unknown' },
             directoryImageMediaState: { kind: 'unknown' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'hasNavigableChildScopes'
@@ -1321,10 +1321,10 @@ function directoryNode(
   label: string,
   options: {
     readonly hasChildDirectories?: boolean
-    readonly directoryPrimaryMediaState?: Extract<
+    readonly directoryPlayableMediaState?: Extract<
       ChildRow,
       { readonly kind: 'directory' }
-    >['directoryPrimaryMediaState']
+    >['directoryPlayableMediaState']
     readonly directoryImageMediaState?: Extract<
       ChildRow,
       { readonly kind: 'directory' }
@@ -1344,8 +1344,8 @@ function directoryNode(
     directoryId,
     presence: 'present',
     hasChildDirectories: options.hasChildDirectories ?? true,
-    directoryPrimaryMediaState: options.directoryPrimaryMediaState ?? {
-      kind: 'hasPrimaryMediaDescendants'
+    directoryPlayableMediaState: options.directoryPlayableMediaState ?? {
+      kind: 'hasPlayableMediaDescendants'
     },
     directoryImageMediaState: options.directoryImageMediaState ?? {
       kind: 'noImageMediaDescendants'

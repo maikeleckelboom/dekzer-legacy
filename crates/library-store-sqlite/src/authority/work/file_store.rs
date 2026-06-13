@@ -644,7 +644,7 @@ fn artifact_has_live_reference(
         "SELECT CASE
                     WHEN EXISTS(
                         SELECT 1
-                        FROM source_file_facts
+                        FROM source_file_observations
                         WHERE accepted_artifact_id = ?1
                     ) THEN 1
                     ELSE 0
@@ -665,7 +665,7 @@ fn load_owned_file_store_rows(
                 CASE
                     WHEN EXISTS(
                         SELECT 1
-                        FROM source_file_facts
+                        FROM source_file_observations
                         WHERE accepted_artifact_id = entry.artifact_id
                     ) THEN 1
                     ELSE 0
@@ -729,7 +729,7 @@ mod tests {
     };
     use crate::authority::write_lane::admit_write;
     use crate::schema::install_baseline_schema_for_test;
-    use library_domain::{ArtifactKind, ArtifactRole, WorkRunId};
+    use library_domain::{ArtifactKind, WorkRunId};
 
     use super::{
         ArtifactFileStoreHealth, ArtifactFileStoreIntegrityFinding, ArtifactFileStoreRoot,
@@ -824,7 +824,6 @@ mod tests {
                     artifact: RecordArtifactInput {
                         work_run_id,
                         artifact_kind: ArtifactKind::InspectionResult,
-                        artifact_role: ArtifactRole::PrimaryResult,
                         media_type: "application/octet-stream".to_string(),
                         basis_fingerprint: basis_fingerprint.to_string(),
                         payload_hash: payload_hash.to_string(),

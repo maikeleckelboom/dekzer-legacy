@@ -376,11 +376,11 @@ non-folder-open role. `FolderOpenIcon` is removed from the registry with no equi
 
 ### Facet differentiation
 
-The `ChildRow` type (from `shared/library/hierarchy/read.ts`) already carries `directoryPrimaryMediaState`,
+The `ChildRow` type (from `shared/library/hierarchy/read.ts`) already carries `directoryPlayableMediaState`,
 `directoryImageMediaState`, and `directoryScanState`. These fields can drive facet selection on directory nodes in
 a future pass:
 
-- `directoryPrimaryMediaState` → `folder.audioFacet` / `folder.videoFacet` / `folder.mixedFacet`
+- `directoryPlayableMediaState` → `folder.audioFacet` / `folder.videoFacet` / `folder.mixedFacet`
 
 This is **not implemented** in this pass — it is called out here as the designated data binding for folder facet
 icons.

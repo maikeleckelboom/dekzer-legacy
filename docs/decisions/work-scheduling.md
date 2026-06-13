@@ -75,7 +75,7 @@ Discovery is a scan session, not a per-file work item. Scan sessions produce
 source file observations; downstream work items follow from those observations.
 
 The scheduler owns selection, leasing, priority computation, budget enforcement,
-and cancellation flow. It does not own media facts, role assignments, readiness
+and cancellation flow. It does not own media observations, role assignments, readiness
 rows, analysis artifacts, or source observations. Workers write only through
 the authority that owns each output table.
 
@@ -90,7 +90,7 @@ is session-scoped, not durable product state.
 
 **Browse-ready**
 
-A library item is browse-ready when Dekzer has enough substrate facts to project
+A library item is browse-ready when Dekzer has enough substrate observations to project
 an honest row in the relevant browser context. Browse-ready does not mean
 deck-ready. It does not mean fully analyzed. It does not mean identity-resolved.
 An item may be browse-ready with a visible `pending` state marker if the row is
@@ -107,7 +107,7 @@ artifact.
 
 **Analysis**
 
-Analysis answers: what derived artifact or fact improves preparation or
+Analysis answers: what derived artifact or observation improves preparation or
 playback?
 
 Analysis work (waveform, BPM, key, beatgrid, loudness, stems) is expensive,
@@ -338,7 +338,7 @@ interactive
 
   Valid triggers for interactive-lane enqueue or promotion:
     user explicitly requests probe or analysis on a file
-    user selects a file and the detail panel requires readiness facts not
+    user selects a file and the detail panel requires readiness observations not
       yet available
     deck load path requests readiness work via the control plane
 
@@ -352,10 +352,10 @@ interactive
   Interactive-lane abuse directly harms UI responsiveness.
 
 browse-readiness
-  Minimum facts to make the library tree useful during active scan.
+  Minimum observations to make the library tree useful during active scan.
   Work in this lane may produce:
-    directory revealability facts (folder chevron state)
-    provisional source file recognition facts (extension + sniff)
+    directory revealability observations (folder chevron state)
+    provisional source file recognition observations (extension + sniff)
     readiness summary placeholders (pending | unknown | blocked)
   Work in this lane may cause the classifier authority to produce provisional
     role claims needed for honest contents rows. The lane itself does not own
@@ -469,7 +469,7 @@ Sniffer:
   Queues probe work when signature_family indicates media.
 
 Probe Worker:
-  Queues classify work when probe produces new stream facts.
+  Queues classify work when probe produces new stream observations.
   Queues readiness evaluation work for affected (item, target) pairs.
 
 Classifier:
@@ -517,22 +517,22 @@ policy_version  = classifier_policy:v{N}
 ```
 
 Library item creation and role assignment are the **outputs** of classify work,
-not the subjects. The subject is the source file whose probe facts triggered
+not the subjects. The subject is the source file whose probe observations triggered
 reclassification.
 
 ---
 
 ## Work Basis and Checkpoint Staleness
 
-Every work item records the input facts it depends on. This is the work basis.
-A checkpoint or live work item is stale when current substrate facts no longer
+Every work item records the input observations it depends on. This is the work basis.
+A checkpoint or live work item is stale when current substrate observations no longer
 match the recorded basis.
 
 **Work basis kinds:**
 
 ```
 source_observation
-  The work depends on path observation facts, not content identity.
+  The work depends on path observation observations, not content identity.
   Used for hash work, which runs before file_identity_id exists.
 
   basis_fingerprint components:
@@ -571,7 +571,7 @@ policy_epoch
 **Staleness rule:**
 
 ```
-A work item is stale when current substrate facts for its basis_kind no
+A work item is stale when current substrate observations for its basis_kind no
 longer match its recorded basis_fingerprint.
 
 A checkpoint is valid only when its recorded basis_fingerprint still matches
@@ -781,7 +781,7 @@ work_items (
   target_key                  TEXT NOT NULL DEFAULT 'none',
     -- 'audio_deck_load' for readiness, 'waveform_overview:v1' for analysis, 'none' otherwise
 
-  -- Basis: input facts this work depends on. Used for staleness and deduplication.
+  -- Basis: input observations this work depends on. Used for staleness and deduplication.
   basis_kind                  TEXT NOT NULL,
     -- CHECK (basis_kind IN (
     --   'source_observation', 'file_identity', 'probe_result',
@@ -884,7 +884,7 @@ work_item_progress (
 Pending
   work_items row inserted with status = pending.
   created_by identifies the creating authority.
-  basis_fingerprint computed from current input facts.
+  basis_fingerprint computed from current input observations.
 
 Scheduled
   Scheduler selects item based on priority computation.
@@ -901,7 +901,7 @@ Completed
   Worker validates lease ownership and current basis before committing outputs.
   A worker whose lease has expired must not write outputs; it must abort and
   allow lease recovery to re-queue the item if retries remain.
-  A worker whose basis is stale (current substrate facts no longer match
+  A worker whose basis is stale (current substrate observations no longer match
   basis_fingerprint) must not write outputs; it must mark the item stale
   and stop.
   status → complete, completed_at written. Lease fields cleared.
@@ -938,7 +938,7 @@ Cancelled — running item (cooperative)
   Lease fields cleared. Progress checkpoint discarded.
 
 Stale
-  At execution time, current substrate facts for basis_kind no longer match
+  At execution time, current substrate observations for basis_kind no longer match
   basis_fingerprint.
   status → stale. updated_at written.
   A new work item with the updated basis may be enqueued by the owning authority.
@@ -954,7 +954,7 @@ Lease Recovery
   must not commit outputs if it completes. Workers must validate lease
   ownership before any output write. A write from a lease-expired worker
   is silently dropped or causes an integrity error; it must not produce
-  duplicate or stale substrate facts.
+  duplicate or stale substrate observations.
 ```
 
 ---
@@ -1020,7 +1020,7 @@ The implementation is correct only when all of the following hold:
 - Removing a source cancels pending and scheduled items immediately; running
   items receive cancellation_requested_at and stop cooperatively at the next
   yield boundary
-- A work item whose basis_fingerprint does not match current substrate facts
+- A work item whose basis_fingerprint does not match current substrate observations
   is treated as stale and not executed
 - Chunkable work can be resumed from a checkpoint without re-processing
   completed bytes or frames

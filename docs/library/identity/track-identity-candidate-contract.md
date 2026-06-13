@@ -3,15 +3,15 @@ status: accepted
 last-reviewed: 2026-06-02
 owner: library-store-sqlite
 canonical-context:
-  - observed-file-facts-contract
+  - observed-file-observations-contract
   - attachment-identity-contract
   - media-probe-observations-contract
-  - primary-media-promotion-contract
+  - playable-media-promotion-contract
   - maintenance-orchestration-contract
   - track-identity-decision-contract
 scope:
   - track-identity-candidates
-  - exact-primary-media-content-evidence
+  - exact-playable-media-content-evidence
   - candidate-group-provenance
 ---
 
@@ -20,7 +20,7 @@ scope:
 ## Purpose
 
 Track identity candidates are the first durable backend-owned foundation for saying that current evidence-backed
-`primaryMedia` candidates appear to represent the same exact playable item candidate.
+`playableMedia` candidates appear to represent the same exact playable item candidate.
 
 They are not canonical tracks. They are not user-facing track identity. They do not make a semantic recording decision.
 They preserve reversible evidence and provenance so the track identity decision layer and later identity layers can
@@ -35,17 +35,17 @@ The durable tables are:
 - `track_identity_candidate_members`
 - `track_identity_candidate_evidence`
 
-The internal candidate kind for v0 is `exact_primary_media_content`.
+The internal candidate kind for v0 is `exact_playable_media_content`.
 
-The v0 evidence basis is `current_primary_media_exact_blake3`. It means the candidate was produced from a current
-`primary_media_facts` row, current attachment identity, current BLAKE3 observed-file facts, and current audio probe
+The v0 evidence basis is `current_playable_media_exact_blake3`. It means the candidate was produced from a current
+`playable_media` row, current attachment identity, current BLAKE3 source-file observations, and current audio probe
 evidence. It does not mean "same song" beyond exact current content evidence.
 
 ## Status
 
 `track_identity_candidates.status` is:
 
-- `active`: at least one current member still validates against current primary-media, attachment, source-file, hash, and
+- `active`: at least one current member still validates against current playable-media, attachment, source-file, hash, and
   probe evidence.
 - `stale`: the durable candidate remains as historical evidence, but no current member validates. Stale candidates must
   not be used as current identity output.
@@ -53,7 +53,7 @@ evidence. It does not mean "same song" beyond exact current content evidence.
 
 Evidence rows also have computed read status:
 
-- `current`: the evidence source file, attachment link, attachment hash, BLAKE3 facts, and probe facts still validate.
+- `current`: the evidence source file, attachment link, attachment hash, BLAKE3 observations, and probe observations still validate.
 - `stale`: one or more of those inputs no longer validates.
 
 ## Relation To Existing Layers
@@ -61,33 +61,33 @@ Evidence rows also have computed read status:
 `source_files` remain the default contents surface. Candidate production never removes source-file inventory rows and
 never changes default `readContents` behavior.
 
-`source_file_facts` remain observed evidence. Candidate production consumes only current BLAKE3 and audio probe facts; stale
-facts cannot create or refresh candidates.
+`source_file_observations` remain observed evidence. Candidate production consumes only current BLAKE3 and audio probe observations; stale
+observations cannot create or refresh candidates.
 
 `content_attachments` and `source_file_attachment_links` remain attachment identity. Candidate production consumes
 current links and attachment hash equality but does not re-read files or own hash authority.
 
-`primary_media_facts` remain the playable-media input. Candidate production consumes only current promoted audio
-primary-media facts and revalidates them before producing or refreshing candidate rows.
+`playable_media` remain the playable-media input. Candidate production consumes only current promoted audio
+playable-media observations and revalidates them before producing or refreshing candidate rows.
 
 ## Sufficient Evidence
 
 V0 production may create or refresh a candidate only when all of these are true:
 
-- The input `primary_media_facts` row is current.
+- The input `playable_media` row is current.
 - The evidence source file is present audio source-file inventory.
-- `source_file_facts` is current for the exact source-file basis.
-- `source_file_facts.content_hash_algorithm = blake3` and the hash value is non-empty.
+- `source_file_observations` is current for the exact source-file basis.
+- `source_file_observations.content_hash_algorithm = blake3` and the hash value is non-empty.
 - A current `source_file_attachment_links` row connects the source file to a `content_attachments` row with the same
   BLAKE3 value.
-- `source_file_facts.media_kind = audio`.
+- `source_file_observations.media_kind = audio`.
 - At least one audio probe field is present.
 
 ## Insufficient Evidence
 
 The following never create or refresh track identity candidates by themselves:
 
-- BLAKE3 hash evidence without current primary-media promotion.
+- BLAKE3 hash evidence without current playable-media promotion.
 - Path, title, filename, directory, or metadata similarity.
 - CUE file path proximity, CUE parsing, or inferred CUE-to-audio pairing.
 - Renderer requests or renderer-side grouping.
@@ -96,14 +96,14 @@ The following never create or refresh track identity candidates by themselves:
 
 ## Grouping Rules
 
-One candidate group may contain multiple evidence rows when current primary-media facts share the same exact BLAKE3
+One candidate group may contain multiple evidence rows when current playable-media observations share the same exact BLAKE3
 content evidence. This is exact content evidence grouping only. It is not a semantic track decision.
 
-The current substrate promotes one `primary_media_facts` row per attachment, so duplicate source files with the same
-BLAKE3 attachment are represented as one member with multiple source-file evidence rows. A primary-media fact may
+The current substrate promotes one `playable_media` row per attachment, so duplicate source files with the same
+BLAKE3 attachment are represented as one member with multiple source-file evidence rows. A playable-media observation may
 belong to only one active v0 candidate.
 
-Different hashes do not group merely because paths, titles, filenames, or probe facts look similar. Different encodes of
+Different hashes do not group merely because paths, titles, filenames, or probe observations look similar. Different encodes of
 the same musical recording are not solved by v0 unless future evidence explicitly supports that conclusion.
 
 CUE sheets are not members and are not evidence rows in v0. They remain independent `source_files` rows because CUE parse

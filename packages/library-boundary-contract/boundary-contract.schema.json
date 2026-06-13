@@ -479,18 +479,18 @@
             "null"
           ]
         },
-        "presence": {
-          "$ref": "#/$defs/ContentsPresenceState"
-        },
-        "primaryMedia": {
+        "playableMedia": {
           "anyOf": [
             {
-              "$ref": "#/$defs/PrimaryMediaSummary"
+              "$ref": "#/$defs/PlayableMedia"
             },
             {
               "type": "null"
             }
           ]
+        },
+        "presence": {
+          "$ref": "#/$defs/ContentsPresenceState"
         },
         "relativePath": {
           "type": [
@@ -581,12 +581,12 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "primaryMedia"
+              "const": "playableMedia"
             },
             "mediaKinds": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/PrimaryMediaKind"
+                "$ref": "#/$defs/PlayableMediaKind"
               }
             }
           },
@@ -887,7 +887,7 @@
         }
       ]
     },
-    "DirectoryPrimaryMediaState": {
+    "DirectoryPlayableMediaState": {
       "oneOf": [
         {
           "type": "object",
@@ -906,7 +906,7 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "hasPrimaryMediaDescendants"
+              "const": "hasPlayableMediaDescendants"
             }
           },
           "required": [
@@ -918,7 +918,7 @@
           "properties": {
             "kind": {
               "type": "string",
-              "const": "noPrimaryMediaDescendants"
+              "const": "noPlayableMediaDescendants"
             }
           },
           "required": [
@@ -1848,10 +1848,10 @@
             }
           ]
         },
-        "directoryPrimaryMediaState": {
+        "directoryPlayableMediaState": {
           "anyOf": [
             {
-              "$ref": "#/$defs/DirectoryPrimaryMediaState"
+              "$ref": "#/$defs/DirectoryPlayableMediaState"
             },
             {
               "type": "null"
@@ -2603,14 +2603,7 @@
         "sourceLocation"
       ]
     },
-    "PrimaryMediaKind": {
-      "type": "string",
-      "enum": [
-        "audio",
-        "video"
-      ]
-    },
-    "PrimaryMediaSummary": {
+    "PlayableMedia": {
       "type": "object",
       "properties": {
         "attachmentId": {
@@ -2676,7 +2669,7 @@
             "null"
           ]
         },
-        "primaryMediaFactId": {
+        "playableMediaId": {
           "type": [
             "string",
             "null"
@@ -2690,6 +2683,13 @@
           "format": "int64"
         }
       }
+    },
+    "PlayableMediaKind": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "video"
+      ]
     },
     "ProtocolError": {
       "oneOf": [
@@ -3266,7 +3266,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "remainingPrimaryMediaPromotionCandidates": {
+        "remainingPlayableMediaPromotionCandidates": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -3308,7 +3308,7 @@
         "status",
         "remainingHashCandidates",
         "remainingProbeCandidates",
-        "remainingPrimaryMediaPromotionCandidates",
+        "remainingPlayableMediaPromotionCandidates",
         "remainingTrackIdentityCandidateProductionCandidates",
         "remainingTrackIdentityDecisionProductionCandidates"
       ]
@@ -3488,8 +3488,8 @@
         "hash": {
           "$ref": "#/$defs/SourceMaintenanceHashSummary"
         },
-        "primaryMediaPromotion": {
-          "$ref": "#/$defs/SourceMaintenancePrimaryMediaPromotionSummary"
+        "playableMediaPromotion": {
+          "$ref": "#/$defs/SourceMaintenancePlayableMediaPromotionSummary"
         },
         "probe": {
           "$ref": "#/$defs/SourceMaintenanceProbeSummary"
@@ -3499,7 +3499,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "remainingPrimaryMediaPromotionCandidates": {
+        "remainingPlayableMediaPromotionCandidates": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -3549,12 +3549,12 @@
         "hash",
         "attachmentMaterialization",
         "probe",
-        "primaryMediaPromotion",
+        "playableMediaPromotion",
         "trackIdentityCandidates",
         "trackIdentityDecisions",
         "remainingHashCandidates",
         "remainingProbeCandidates",
-        "remainingPrimaryMediaPromotionCandidates",
+        "remainingPlayableMediaPromotionCandidates",
         "remainingTrackIdentityCandidateProductionCandidates",
         "remainingTrackIdentityDecisionProductionCandidates"
       ]
@@ -4736,7 +4736,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "sourceFilesWithCurrentBlake3FactsCount": {
+        "sourceFilesWithCurrentBlake3ObservationsCount": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -4749,7 +4749,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "unmaterializedBlake3FactsCount": {
+        "unmaterializedBlake3ObservationsCount": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -4759,10 +4759,10 @@
         "sourceId",
         "currentLinksCount",
         "staleLinksCount",
-        "sourceFilesWithCurrentBlake3FactsCount",
+        "sourceFilesWithCurrentBlake3ObservationsCount",
         "sourceFilesWithAttachmentLinksCount",
         "sourceFilesMissingAttachmentLinksCount",
-        "unmaterializedBlake3FactsCount"
+        "unmaterializedBlake3ObservationsCount"
       ]
     },
     "SourceClass": {
@@ -4795,7 +4795,7 @@
         "fileKind": {
           "$ref": "#/$defs/ContentsFileKind"
         },
-        "hasCurrentBlake3Fact": {
+        "hasCurrentBlake3Observation": {
           "type": "boolean"
         },
         "linkStatus": {
@@ -4893,7 +4893,7 @@
         "fileKind",
         "fileClass",
         "presenceState",
-        "hasCurrentBlake3Fact",
+        "hasCurrentBlake3Observation",
         "linkStatus",
         "sourceMountStatus",
         "sourceAccessState",
@@ -4970,7 +4970,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "sourceFilesWithCurrentBlake3FactsCount": {
+        "sourceFilesWithCurrentBlake3ObservationsCount": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -4980,7 +4980,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "unmaterializedBlake3FactsCount": {
+        "unmaterializedBlake3ObservationsCount": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -4990,9 +4990,9 @@
         "currentLinksCount",
         "staleLinksCount",
         "missingLinksCount",
-        "sourceFilesWithCurrentBlake3FactsCount",
+        "sourceFilesWithCurrentBlake3ObservationsCount",
         "sourceFilesWithAttachmentLinksCount",
-        "unmaterializedBlake3FactsCount"
+        "unmaterializedBlake3ObservationsCount"
       ]
     },
     "SourceIntegrityAvailability": {
@@ -5101,7 +5101,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "remainingPrimaryMediaPromotionCandidates": {
+        "remainingPlayableMediaPromotionCandidates": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -5135,7 +5135,7 @@
       "required": [
         "remainingHashCandidates",
         "remainingProbeCandidates",
-        "remainingPrimaryMediaPromotionCandidates",
+        "remainingPlayableMediaPromotionCandidates",
         "remainingTrackIdentityCandidateProductionCandidates",
         "remainingTrackIdentityDecisionProductionCandidates"
       ]
@@ -5390,7 +5390,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "sourceFilesWithCurrentBlake3FactsCount": {
+        "sourceFilesWithCurrentBlake3ObservationsCount": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -5400,7 +5400,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "unmaterializedBlake3FactsCount": {
+        "unmaterializedBlake3ObservationsCount": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -5409,10 +5409,10 @@
       "required": [
         "currentLinksCount",
         "staleLinksCount",
-        "sourceFilesWithCurrentBlake3FactsCount",
+        "sourceFilesWithCurrentBlake3ObservationsCount",
         "sourceFilesWithAttachmentLinksCount",
         "sourceFilesMissingAttachmentLinksCount",
-        "unmaterializedBlake3FactsCount"
+        "unmaterializedBlake3ObservationsCount"
       ]
     },
     "SourceMaintenanceAttachmentMaterializationSummary": {
@@ -5458,12 +5458,12 @@
           "format": "uint",
           "minimum": 0
         },
-        "skippedNoFacts": {
+        "skippedNoObservations": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
         },
-        "skippedStaleFacts": {
+        "skippedStaleObservations": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -5476,9 +5476,9 @@
         "linksCreated",
         "linksReplaced",
         "linksRefreshed",
-        "skippedStaleFacts",
+        "skippedStaleObservations",
         "skippedNoBlake3",
-        "skippedNoFacts",
+        "skippedNoObservations",
         "remainingCandidates"
       ]
     },
@@ -5591,8 +5591,8 @@
         "hash": {
           "$ref": "#/$defs/SourceMaintenanceHashSummary"
         },
-        "primaryMediaPromotion": {
-          "$ref": "#/$defs/SourceMaintenancePrimaryMediaPromotionSummary"
+        "playableMediaPromotion": {
+          "$ref": "#/$defs/SourceMaintenancePlayableMediaPromotionSummary"
         },
         "probe": {
           "$ref": "#/$defs/SourceMaintenanceProbeSummary"
@@ -5602,7 +5602,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "remainingPrimaryMediaPromotionCandidates": {
+        "remainingPlayableMediaPromotionCandidates": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -5647,17 +5647,17 @@
         "hash",
         "attachmentMaterialization",
         "probe",
-        "primaryMediaPromotion",
+        "playableMediaPromotion",
         "trackIdentityCandidates",
         "trackIdentityDecisions",
         "remainingHashCandidates",
         "remainingProbeCandidates",
-        "remainingPrimaryMediaPromotionCandidates",
+        "remainingPlayableMediaPromotionCandidates",
         "remainingTrackIdentityCandidateProductionCandidates",
         "remainingTrackIdentityDecisionProductionCandidates"
       ]
     },
-    "SourceMaintenancePrimaryMediaPromotionSummary": {
+    "SourceMaintenancePlayableMediaPromotionSummary": {
       "type": "object",
       "properties": {
         "effectiveLimit": {
@@ -5690,12 +5690,12 @@
           "format": "uint",
           "minimum": 0
         },
-        "skippedNoFacts": {
+        "skippedNoObservations": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
         },
-        "skippedNoProbeFacts": {
+        "skippedNoProbeObservations": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -5705,7 +5705,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "skippedStaleFacts": {
+        "skippedStaleObservations": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -5727,10 +5727,10 @@
         "refreshedCount",
         "skippedUnusableSource",
         "skippedUnsupportedMediaKind",
-        "skippedNoFacts",
-        "skippedStaleFacts",
+        "skippedNoObservations",
+        "skippedStaleObservations",
         "skippedNoBlake3",
-        "skippedNoProbeFacts",
+        "skippedNoProbeObservations",
         "skippedMissingAttachmentLink",
         "skippedStaleAttachmentLink",
         "remainingCandidates"
@@ -5991,7 +5991,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "skippedStalePrimaryMediaFacts": {
+        "skippedStalePlayableMedia": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -6006,7 +6006,7 @@
         "evidenceCreated",
         "evidenceRefreshed",
         "candidatesMarkedStale",
-        "skippedStalePrimaryMediaFacts",
+        "skippedStalePlayableMedia",
         "remainingCandidates"
       ]
     },

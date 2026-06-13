@@ -20,8 +20,8 @@ type ContentsReadPolicy =
       readonly fileClasses: readonly ContentsFileClass[]
     }
   | {
-      readonly kind: 'primaryMedia'
-      readonly mediaKinds: readonly PrimaryMediaKind[]
+      readonly kind: 'playableMedia'
+      readonly mediaKinds: readonly PlayableMediaKind[]
     }
 ```
 
@@ -30,7 +30,7 @@ Each policy variant owns its admissible filter space:
 - `playableMediaBrowse` implies audio and video and accepts no caller-supplied class filter.
 - `audioBrowse` implies audio and accepts no caller-supplied class filter.
 - `sourceFileInventory` owns explicit source-file `fileClasses` filtering.
-- `primaryMedia` owns `mediaKinds`, which is primary-media vocabulary rather than source-file inventory vocabulary.
+- `playableMedia` owns `mediaKinds`, which is playable-media vocabulary rather than source-file inventory vocabulary.
 - Cursor identity binds the complete policy discriminant and canonicalized variant state.
 - Renderer code does not filter, sort, or derive authoritative browse policy.
 
@@ -68,12 +68,12 @@ predicates, directory rollups, and fast contents queries:
 The values and classification semantics are unchanged. `unsupported` and `none` are valid persisted inventory
 classifications, which is why the durable concept is named `file_class`.
 
-Boundary row facts use `fileClass`. Rust store and protocol types use `FileClass` vocabulary. The active implementation
-does not expose a source-file row fact named with media-class vocabulary.
+Boundary row observations use `fileClass`. Rust store and protocol types use `FileClass` vocabulary. The active implementation
+does not expose a source-file row observation named with media-class vocabulary.
 
 ### Source-File Inventory Policy
 
-`sourceFileInventory.fileClasses` filters coarse source-file inventory facts. The active contents policy domain exposes
+`sourceFileInventory.fileClasses` filters coarse source-file inventory observations. The active contents policy domain exposes
 `audio`, `video`, `image`, and `unsupported` as requestable browse classes.
 
 `none` is a persisted/internal classification for files that could not be assigned a more specific class. It is not a
@@ -119,33 +119,33 @@ count. The store applies the same scope, scopeDepth, presence, and policy univer
 - `audioBrowse` omission candidates are browse-relevant video and image rows.
 - `sourceFileInventory` omission candidates are requestable browse classes not selected by `fileClasses`; unsupported
   candidates remain limited to admitted CUE rows.
-- `primaryMedia` returns `false` in this slice and does not consult raw `source_files` as a proxy.
+- `playableMedia` returns `false` in this slice and does not consult raw `source_files` as a proxy.
 
 Incomplete coverage with zero rows is not authoritative empty. Complete zero-row results with omissions are empty only
 for the active policy.
 
 ### Primary-Media Policy
 
-`primaryMedia` remains separate:
+`playableMedia` remains separate:
 
 - its filter is `mediaKinds`;
-- primary-media summaries and evidence fields keep `mediaKind` vocabulary;
+- playable-media summaries and evidence fields keep `mediaKind` vocabulary;
 - it is not a source-file inventory class rename target;
 - it does not become a canonical-track surface.
 
-The names `primaryMedia`, `PrimaryMediaKind`, `mediaKind`, and `mediaKinds` remain valid where they describe
-primary-media policy, assets, analysis, or evidence.
+The names `playableMedia`, `PlayableMediaKind`, `mediaKind`, and `mediaKinds` remain valid where they describe
+playable-media policy, assets, analysis, or evidence.
 
 ## Directory Rollups
 
-The directory facts remain:
+The directory observations remain:
 
-- `source_directories.has_primary_media_descendant`
+- `source_directories.has_playable_media_descendant`
 - `source_directories.has_image_media_descendant`
 
 These are directory-level media-descendant rollups. Their names and semantics are unchanged.
 
-Tree navigation remains navigation-only. Renaming source-file classification facts does not add source-file or audio
+Tree navigation remains navigation-only. Renaming source-file classification observations does not add source-file or audio
 rows to tree navigation.
 
 ## Cursor Identity
@@ -154,7 +154,7 @@ Contents cursor identity binds:
 
 - scope;
 - the complete policy discriminant;
-- canonicalized `sourceFileInventory.fileClasses` or `primaryMedia.mediaKinds`;
+- canonicalized `sourceFileInventory.fileClasses` or `playableMedia.mediaKinds`;
 - scopeDepth;
 - request generation/key at the renderer contents boundary;
 - the policy-specific ordering position.
@@ -163,9 +163,9 @@ Required invariants:
 
 - `playableMediaBrowse` cursors cannot be reused by any other policy;
 - `audioBrowse` cursors cannot be reused by `sourceFileInventory`;
-- `audioBrowse` cursors cannot be reused by `primaryMedia`;
+- `audioBrowse` cursors cannot be reused by `playableMedia`;
 - `sourceFileInventory` cursors reject changed `fileClasses`;
-- `primaryMedia` cursors reject changed `mediaKinds`;
+- `playableMedia` cursors reject changed `mediaKinds`;
 - `immediate` and `recursive` scopeDepth values reject each other's cursors;
 - source, source-location, and directory scopes reject each other's cursors even when their current filesystem ranges
   overlap;
@@ -180,7 +180,7 @@ The schema and row-field rename does not alter cursor policy identity.
 - Do not keep dual `file_class` and legacy source-file class columns.
 - Do not change persisted classification values or semantics.
 - Do not rename `file_kind`.
-- Do not rename primary-media policy or `mediaKind` fields.
+- Do not rename playable-media policy or `mediaKind` fields.
 - Do not rename directory media-descendant rollups.
 - Do not add a new endpoint, row payload type, or row union.
 - Do not change source hierarchy or tree behavior.
@@ -198,7 +198,7 @@ The current implementation proves:
 - `audioBrowse` backs the initial **Audio** workflow filter;
 - `audioBrowse` behavior remains equivalent to source-file audio reads;
 - `sourceFileInventory.fileClasses` filtering remains intact;
-- `primaryMedia.mediaKinds` behavior remains intact;
+- `playableMedia.mediaKinds` behavior remains intact;
 - cursor identity remains policy-specific;
 - renderer and tree authority boundaries remain unchanged.
 

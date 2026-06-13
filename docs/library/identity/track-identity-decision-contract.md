@@ -3,10 +3,10 @@ status: accepted
 last-reviewed: 2026-06-09
 owner: library-store-sqlite
 canonical-context:
-  - observed-file-facts-contract
+  - observed-file-observations-contract
   - attachment-identity-contract
   - media-probe-observations-contract
-  - primary-media-promotion-contract
+  - playable-media-promotion-contract
   - track-identity-candidate-contract
   - track-identity-decision-authority-contract
   - source-maintenance-orchestration-contract
@@ -43,13 +43,13 @@ canonical track must mean more than an accepted exact-content candidate.
 A decision is over one `track_identity_candidate_id`.
 
 The candidate remains the evidence group. The decision records how that candidate was classified by a decision source.
-The decision does not own source-file inventory, attachment identity, primary-media promotion, CUE association, metadata
+The decision does not own source-file inventory, attachment identity, playable-media promotion, CUE association, metadata
 reconciliation, preparation state, playlist membership, contents rows, waveform state, stem state, or artwork state.
 
 V0 automatic production creates `accepted` decisions with `decision_source = system_exact_content_v0`. Explicit local
 user commands create `accepted`, `rejected`, or `deferred` decisions with `decision_source = user_local_v0`.
 
-`system_exact_content_v0` means the backend accepted an active exact-primary-media-content candidate under the v0
+`system_exact_content_v0` means the backend accepted an active exact-playable-media-content candidate under the v0
 exact-content decision basis. It does not mean a user accepted the candidate and does not claim semantic identity beyond
 exact current content evidence.
 
@@ -93,9 +93,9 @@ Source maintenance may run one bounded source-scoped decision production batch a
 V0 production may create an automatic accepted decision only when all of these are true:
 
 - the candidate is `active`;
-- the candidate kind is `exact_primary_media_content`;
-- the candidate evidence basis is `current_primary_media_exact_blake3`;
-- at least one source-scoped candidate evidence row validates as current against source-file, attachment, BLAKE3 facts,
+- the candidate kind is `exact_playable_media_content`;
+- the candidate evidence basis is `current_playable_media_exact_blake3`;
+- at least one source-scoped candidate evidence row validates as current against source-file, attachment, BLAKE3 observations,
   audio probe fields, and probe artifact evidence;
 - the candidate does not already have a current `system_exact_content_v0` decision.
 - the candidate does not have a current blocking `user_local_v0` rejected/deferred decision.
@@ -131,7 +131,7 @@ Decision evidence snapshots must preserve:
 - candidate id;
 - candidate member id;
 - candidate evidence id;
-- primary-media fact id;
+- playable-media observation id;
 - attachment id;
 - source-file attachment link id;
 - source file id and source id;
@@ -152,7 +152,7 @@ The snapshot is provenance, not a new content identity authority. BLAKE3 evidenc
 caller-supplied opaque identity key may be used as content identity.
 
 `track_identity_decision_evidence` is a copied-provenance snapshot. Its candidate, member, candidate-evidence,
-primary-media, attachment, source-file attachment link, source-file, source, and probe artifact ids are retained as
+playable-media, attachment, source-file attachment link, source-file, source, and probe artifact ids are retained as
 historical provenance ids, not live cascade authority. The snapshot may cascade only when the owning
 `track_identity_decisions` row is deleted as the explicit retention boundary.
 

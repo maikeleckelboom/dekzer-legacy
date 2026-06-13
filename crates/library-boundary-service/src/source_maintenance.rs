@@ -6,7 +6,7 @@ use library_boundary_protocol as protocol;
 use library_store_sqlite::{
     HashSourceFileBlake3BatchInput, MaterializeAttachmentsForSourceResult,
     ProbeSourceFileMediaBatchInput, ProduceTrackIdentityCandidatesForSourceResult,
-    ProduceTrackIdentityDecisionsForSourceResult, PromotePrimaryMediaForSourceResult,
+    ProduceTrackIdentityDecisionsForSourceResult, PromotePlayableMediaForSourceResult,
     SourceFileBlake3HashAdmissionScope, SourceFileMediaProbeAdmissionScope, SqliteDurableStore,
 };
 
@@ -18,7 +18,7 @@ pub(crate) const SOURCE_HASH_MAINTENANCE_BATCH_LIMIT: usize = 8;
 pub(crate) const SOURCE_PROBE_MAINTENANCE_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_ATTACHMENT_MATERIALIZATION_MAX_LIMIT: usize = 128;
-pub(crate) const SOURCE_PRIMARY_MEDIA_PROMOTION_BATCH_LIMIT: usize = 4;
+pub(crate) const SOURCE_PLAYABLE_MEDIA_PROMOTION_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_TRACK_IDENTITY_CANDIDATE_BATCH_LIMIT: usize = 4;
 pub(crate) const SOURCE_TRACK_IDENTITY_DECISION_BATCH_LIMIT: usize = 4;
 
@@ -48,12 +48,12 @@ pub(crate) struct SourceMaintenanceRun {
     pub(crate) attachment_materialization:
         protocol::SourceMaintenanceAttachmentMaterializationSummary,
     pub(crate) probe: protocol::SourceMaintenanceProbeSummary,
-    pub(crate) primary_media_promotion: protocol::SourceMaintenancePrimaryMediaPromotionSummary,
+    pub(crate) playable_media_promotion: protocol::SourceMaintenancePlayableMediaPromotionSummary,
     pub(crate) track_identity_candidates: protocol::SourceMaintenanceTrackIdentityCandidateSummary,
     pub(crate) track_identity_decisions: protocol::SourceMaintenanceTrackIdentityDecisionSummary,
     pub(crate) remaining_hash_candidates: usize,
     pub(crate) remaining_probe_candidates: usize,
-    pub(crate) remaining_primary_media_promotion_candidates: usize,
+    pub(crate) remaining_playable_media_promotion_candidates: usize,
     pub(crate) remaining_track_identity_candidate_production_candidates: usize,
     pub(crate) remaining_track_identity_decision_production_candidates: usize,
     pub(crate) attachment_links: Option<protocol::SourceMaintenanceAttachmentLinkSummary>,
@@ -67,7 +67,7 @@ pub(crate) struct SourceMaintenanceSnapshot {
     pub(crate) status: protocol::SourceMaintenanceSnapshotStatus,
     pub(crate) remaining_hash_candidates: usize,
     pub(crate) remaining_probe_candidates: usize,
-    pub(crate) remaining_primary_media_promotion_candidates: usize,
+    pub(crate) remaining_playable_media_promotion_candidates: usize,
     pub(crate) remaining_track_identity_candidate_production_candidates: usize,
     pub(crate) remaining_track_identity_decision_production_candidates: usize,
     pub(crate) attachment_links: Option<protocol::SourceMaintenanceAttachmentLinkSummary>,
@@ -118,7 +118,7 @@ impl SourceMaintenanceController {
                     hash_limit: Some(SOURCE_HASH_MAINTENANCE_BATCH_LIMIT),
                     attachment_limit: Some(SOURCE_ATTACHMENT_MATERIALIZATION_BATCH_LIMIT),
                     probe_limit: Some(SOURCE_PROBE_MAINTENANCE_BATCH_LIMIT),
-                    promotion_limit: Some(SOURCE_PRIMARY_MEDIA_PROMOTION_BATCH_LIMIT),
+                    promotion_limit: Some(SOURCE_PLAYABLE_MEDIA_PROMOTION_BATCH_LIMIT),
                     identity_candidate_limit: Some(SOURCE_TRACK_IDENTITY_CANDIDATE_BATCH_LIMIT),
                     identity_decision_limit: Some(SOURCE_TRACK_IDENTITY_DECISION_BATCH_LIMIT),
                 },
@@ -182,8 +182,8 @@ impl SourceMaintenanceController {
             count_hash_candidates(store, source_id, source_failure.as_ref())?;
         let remaining_probe_candidates =
             count_probe_candidates(store, source_id, source_failure.as_ref())?;
-        let remaining_primary_media_promotion_candidates =
-            count_primary_media_promotion_candidates(store, source_id, source_failure.as_ref())?;
+        let remaining_playable_media_promotion_candidates =
+            count_playable_media_promotion_candidates(store, source_id, source_failure.as_ref())?;
         let remaining_track_identity_candidate_production_candidates =
             count_track_identity_candidate_production_candidates(
                 store,
@@ -211,7 +211,7 @@ impl SourceMaintenanceController {
             status,
             remaining_hash_candidates,
             remaining_probe_candidates,
-            remaining_primary_media_promotion_candidates,
+            remaining_playable_media_promotion_candidates,
             remaining_track_identity_candidate_production_candidates,
             remaining_track_identity_decision_production_candidates,
             attachment_links,
@@ -419,12 +419,14 @@ impl SourceMaintenanceController {
         }
 
         let promotion_result = store
-            .promote_primary_media_for_source(input.source_id, effective_limits.promotion_limit)
+            .promote_playable_media_for_source(input.source_id, effective_limits.promotion_limit)
             .map_err(crate::service::map_store_error)?;
-        run.primary_media_promotion =
-            map_primary_media_promotion_summary(effective_limits.promotion_limit, promotion_result);
-        run.remaining_primary_media_promotion_candidates =
-            run.primary_media_promotion.remaining_candidates;
+        run.playable_media_promotion = map_playable_media_promotion_summary(
+            effective_limits.promotion_limit,
+            promotion_result,
+        );
+        run.remaining_playable_media_promotion_candidates =
+            run.playable_media_promotion.remaining_candidates;
         publish_maintained_snapshot_invalidations(store, events)?;
 
         if self.stop_requested.load(Ordering::Acquire) {
@@ -490,7 +492,7 @@ fn effective_limits_for_input(
         hash_limit: library_store_sqlite::effective_hash_batch_limit(input.hash_limit),
         attachment_limit: effective_attachment_materialization_limit(input.attachment_limit),
         probe_limit: library_store_sqlite::effective_media_probe_batch_limit(input.probe_limit),
-        promotion_limit: library_store_sqlite::effective_primary_media_promotion_limit(
+        promotion_limit: library_store_sqlite::effective_playable_media_promotion_limit(
             input.promotion_limit,
         ),
         identity_candidate_limit: library_store_sqlite::effective_track_identity_candidate_limit(
@@ -530,9 +532,9 @@ fn empty_run(
             links_created: 0,
             links_replaced: 0,
             links_refreshed: 0,
-            skipped_stale_facts: 0,
+            skipped_stale_observations: 0,
             skipped_no_blake3: 0,
-            skipped_no_facts: 0,
+            skipped_no_observations: 0,
             remaining_candidates: 0,
         },
         probe: protocol::SourceMaintenanceProbeSummary {
@@ -542,16 +544,16 @@ fn empty_run(
             failed_count: 0,
             remaining_candidates: 0,
         },
-        primary_media_promotion: protocol::SourceMaintenancePrimaryMediaPromotionSummary {
+        playable_media_promotion: protocol::SourceMaintenancePlayableMediaPromotionSummary {
             effective_limit: effective_limits.promotion_limit,
             promoted_count: 0,
             refreshed_count: 0,
             skipped_unusable_source: 0,
             skipped_unsupported_media_kind: 0,
-            skipped_no_facts: 0,
-            skipped_stale_facts: 0,
+            skipped_no_observations: 0,
+            skipped_stale_observations: 0,
             skipped_no_blake3: 0,
-            skipped_no_probe_facts: 0,
+            skipped_no_probe_observations: 0,
             skipped_missing_attachment_link: 0,
             skipped_stale_attachment_link: 0,
             remaining_candidates: 0,
@@ -565,7 +567,7 @@ fn empty_run(
             evidence_created: 0,
             evidence_refreshed: 0,
             candidates_marked_stale: 0,
-            skipped_stale_primary_media_facts: 0,
+            skipped_stale_playable_media: 0,
             remaining_candidates: 0,
         },
         track_identity_decisions: protocol::SourceMaintenanceTrackIdentityDecisionSummary {
@@ -579,7 +581,7 @@ fn empty_run(
         },
         remaining_hash_candidates: 0,
         remaining_probe_candidates: 0,
-        remaining_primary_media_promotion_candidates: 0,
+        remaining_playable_media_promotion_candidates: 0,
         remaining_track_identity_candidate_production_candidates: 0,
         remaining_track_identity_decision_production_candidates: 0,
         attachment_links: None,
@@ -595,7 +597,7 @@ fn run_status(run: &SourceMaintenanceRun) -> protocol::SourceMaintenanceRunStatu
     if run.remaining_hash_candidates > 0
         || run.remaining_probe_candidates > 0
         || run.attachment_materialization.remaining_candidates > 0
-        || run.remaining_primary_media_promotion_candidates > 0
+        || run.remaining_playable_media_promotion_candidates > 0
         || run.remaining_track_identity_candidate_production_candidates > 0
         || run.remaining_track_identity_decision_production_candidates > 0
     {
@@ -610,13 +612,13 @@ fn last_run_summary(run: &SourceMaintenanceRun) -> protocol::SourceMaintenanceLa
         hash: run.hash,
         attachment_materialization: run.attachment_materialization,
         probe: run.probe,
-        primary_media_promotion: run.primary_media_promotion,
+        playable_media_promotion: run.playable_media_promotion,
         track_identity_candidates: run.track_identity_candidates,
         track_identity_decisions: run.track_identity_decisions,
         remaining_hash_candidates: run.remaining_hash_candidates,
         remaining_probe_candidates: run.remaining_probe_candidates,
-        remaining_primary_media_promotion_candidates: run
-            .remaining_primary_media_promotion_candidates,
+        remaining_playable_media_promotion_candidates: run
+            .remaining_playable_media_promotion_candidates,
         remaining_track_identity_candidate_production_candidates: run
             .remaining_track_identity_candidate_production_candidates,
         remaining_track_identity_decision_production_candidates: run
@@ -625,20 +627,20 @@ fn last_run_summary(run: &SourceMaintenanceRun) -> protocol::SourceMaintenanceLa
     }
 }
 
-fn map_primary_media_promotion_summary(
+fn map_playable_media_promotion_summary(
     effective_limit: usize,
-    result: PromotePrimaryMediaForSourceResult,
-) -> protocol::SourceMaintenancePrimaryMediaPromotionSummary {
-    protocol::SourceMaintenancePrimaryMediaPromotionSummary {
+    result: PromotePlayableMediaForSourceResult,
+) -> protocol::SourceMaintenancePlayableMediaPromotionSummary {
+    protocol::SourceMaintenancePlayableMediaPromotionSummary {
         effective_limit,
         promoted_count: result.promoted_count,
         refreshed_count: result.refreshed_count,
         skipped_unusable_source: result.skipped_unusable_source,
         skipped_unsupported_media_kind: result.skipped_unsupported_media_kind,
-        skipped_no_facts: result.skipped_no_facts,
-        skipped_stale_facts: result.skipped_stale_facts,
+        skipped_no_observations: result.skipped_no_observations,
+        skipped_stale_observations: result.skipped_stale_observations,
         skipped_no_blake3: result.skipped_no_blake3,
-        skipped_no_probe_facts: result.skipped_no_probe_facts,
+        skipped_no_probe_observations: result.skipped_no_probe_observations,
         skipped_missing_attachment_link: result.skipped_missing_attachment_link,
         skipped_stale_attachment_link: result.skipped_stale_attachment_link,
         remaining_candidates: result.remaining_candidates,
@@ -656,9 +658,9 @@ fn map_attachment_materialization_summary(
         links_created: result.links_created,
         links_replaced: result.links_replaced,
         links_refreshed: result.links_refreshed,
-        skipped_stale_facts: result.skipped_stale_facts,
+        skipped_stale_observations: result.skipped_stale_observations,
         skipped_no_blake3: result.skipped_no_blake3,
-        skipped_no_facts: result.skipped_no_facts,
+        skipped_no_observations: result.skipped_no_observations,
         remaining_candidates: result.remaining_candidates,
     }
 }
@@ -676,7 +678,7 @@ fn map_track_identity_candidate_summary(
         evidence_created: result.evidence_created,
         evidence_refreshed: result.evidence_refreshed,
         candidates_marked_stale: result.candidates_marked_stale,
-        skipped_stale_primary_media_facts: result.skipped_stale_primary_media_facts,
+        skipped_stale_playable_media: result.skipped_stale_playable_media,
         remaining_candidates: result.remaining_candidates,
     }
 }
@@ -786,7 +788,7 @@ fn count_probe_candidates(
         .map_err(crate::service::map_store_error)
 }
 
-fn count_primary_media_promotion_candidates(
+fn count_playable_media_promotion_candidates(
     store: &SqliteDurableStore,
     source_id: i64,
     source_failure: Option<&protocol::SourceMaintenanceSourceFailure>,
@@ -795,7 +797,7 @@ fn count_primary_media_promotion_candidates(
         return Ok(0);
     }
     store
-        .count_primary_media_promotion_candidates(source_id)
+        .count_playable_media_promotion_candidates(source_id)
         .map_err(crate::service::map_store_error)
 }
 
@@ -836,13 +838,14 @@ fn read_attachment_link_summary(
         .map(|summary| protocol::SourceMaintenanceAttachmentLinkSummary {
             current_links_count: summary.current_links_count,
             stale_links_count: summary.stale_links_count,
-            source_files_with_current_blake3_facts_count: summary
-                .source_files_with_current_blake3_facts_count,
+            source_files_with_current_blake3_observations_count: summary
+                .source_files_with_current_blake3_observations_count,
             source_files_with_attachment_links_count: summary
                 .source_files_with_attachment_links_count,
             source_files_missing_attachment_links_count: summary
                 .source_files_missing_attachment_links_count,
-            unmaterialized_blake3_facts_count: summary.source_files_missing_attachment_links_count,
+            unmaterialized_blake3_observations_count: summary
+                .source_files_missing_attachment_links_count,
         }))
 }
 

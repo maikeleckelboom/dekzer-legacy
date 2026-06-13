@@ -4,7 +4,7 @@ use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
     SourceFileClassFilter, file_class_str_from_path, file_kind_str_from_path, is_image_file_class,
-    is_primary_file_class, source_file_class_filter_predicate_sql_for_column,
+    is_playable_media_file_class, source_file_class_filter_predicate_sql_for_column,
 };
 use crate::browse_sort_key::{compute_name_sort_key, compute_path_sort_key};
 use library_domain::SourcePresenceState;
@@ -90,7 +90,10 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                     file_kind,
                 ],
             )?;
-            self.propagate_source_file_descendant_facts(existing.source_file_id, input.updated_at)?;
+            self.propagate_source_file_descendant_observations(
+                existing.source_file_id,
+                input.updated_at,
+            )?;
             return Ok(existing.source_file_id);
         }
 
@@ -182,7 +185,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                 self.tx.last_insert_rowid()
             }
         };
-        self.propagate_source_file_descendant_facts(source_file_id, input.updated_at)?;
+        self.propagate_source_file_descendant_observations(source_file_id, input.updated_at)?;
         Ok(source_file_id)
     }
 
@@ -226,13 +229,13 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
         Ok(query)
     }
 
-    fn propagate_source_file_descendant_facts(
+    fn propagate_source_file_descendant_observations(
         &self,
         source_file_id: i64,
         updated_at: i64,
     ) -> LibrarySqliteResult<()> {
         let known_media_predicate = source_file_class_filter_predicate_sql_for_column(
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
             "file_class",
         );
         let source_file = self
@@ -259,56 +262,62 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
             return Ok(());
         };
 
-        if is_primary_file_class(&file_class) {
-            self.propagate_primary_media_descendant_fact(parent_source_directory_id, updated_at)?;
+        if is_playable_media_file_class(&file_class) {
+            self.propagate_playable_media_descendant_observation(
+                parent_source_directory_id,
+                updated_at,
+            )?;
         }
 
         if is_image_file_class(&file_class) {
-            self.propagate_image_media_descendant_fact(parent_source_directory_id, updated_at)?;
+            self.propagate_image_media_descendant_observation(
+                parent_source_directory_id,
+                updated_at,
+            )?;
         }
 
         Ok(())
     }
 
-    fn propagate_primary_media_descendant_fact(
+    fn propagate_playable_media_descendant_observation(
         &self,
         parent_source_directory_id: i64,
         updated_at: i64,
     ) -> LibrarySqliteResult<()> {
-        self.propagate_descendant_fact(
+        self.propagate_descendant_observation(
             parent_source_directory_id,
             updated_at,
-            "has_primary_media_descendant",
+            "has_playable_media_descendant",
         )
     }
 
-    fn propagate_image_media_descendant_fact(
+    fn propagate_image_media_descendant_observation(
         &self,
         parent_source_directory_id: i64,
         updated_at: i64,
     ) -> LibrarySqliteResult<()> {
-        self.propagate_descendant_fact(
+        self.propagate_descendant_observation(
             parent_source_directory_id,
             updated_at,
             "has_image_media_descendant",
         )
     }
 
-    fn propagate_descendant_fact(
+    fn propagate_descendant_observation(
         &self,
         parent_source_directory_id: i64,
         updated_at: i64,
-        fact_column: &'static str,
+        observation_column: &'static str,
     ) -> LibrarySqliteResult<()> {
-        let sql = match fact_column {
-            "has_primary_media_descendant" => {
+        let sql = match observation_column {
+            "has_playable_media_descendant" => {
                 "WITH RECURSIVE media_up(source_directory_id) AS (
                  SELECT ?1
                  WHERE EXISTS (
                      SELECT 1
                      FROM source_directories
                      WHERE source_directory_id = ?1
-                       AND has_primary_media_descendant = 0
+                       AND has_playable_media_descendant = 0
                  )
                  UNION ALL
                  SELECT parent.source_directory_id
@@ -318,10 +327,10 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                  JOIN source_directories parent
                    ON parent.source_directory_id = child.parent_source_directory_id
                  WHERE child.parent_source_directory_id IS NOT NULL
-                   AND parent.has_primary_media_descendant = 0
+                   AND parent.has_playable_media_descendant = 0
              )
              UPDATE source_directories
-             SET has_primary_media_descendant = 1,
+             SET has_playable_media_descendant = 1,
                  dir_scan_updated_at = ?2,
                  updated_at = ?2
              WHERE source_directory_id IN (
@@ -357,7 +366,7 @@ impl<'write, 'conn> SourceFilesAuthorityTx<'write, 'conn> {
                  FROM media_up
              )"
             }
-            _ => unreachable!("descendant fact column is an internal static value"),
+            _ => unreachable!("descendant observation column is an internal static value"),
         };
 
         self.tx

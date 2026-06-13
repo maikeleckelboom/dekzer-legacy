@@ -3,7 +3,7 @@ use rusqlite::{Connection, OptionalExtension};
 use crate::LibrarySqliteResult;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StoreObservedFileFacts {
+pub struct StoreSourceFileObservation {
     pub source_file_id: i64,
     pub basis_fingerprint: String,
     pub basis_source_id: i64,
@@ -22,7 +22,7 @@ pub struct StoreObservedFileFacts {
     pub codec: Option<String>,
     pub accepted_artifact_id: i64,
     pub updated_at_ms: i64,
-    pub status: StoreObservedFileFactStatus,
+    pub status: StoreSourceFileObservationStatus,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,54 +32,54 @@ pub struct StoreContentHashEvidence {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StoreObservedFileFactStatus {
+pub enum StoreSourceFileObservationStatus {
     Current,
     Stale,
 }
 
-pub fn read_observed_file_facts_for_source_file(
+pub fn read_source_file_observation(
     connection: &Connection,
     source_file_id: i64,
-) -> LibrarySqliteResult<Option<StoreObservedFileFacts>> {
+) -> LibrarySqliteResult<Option<StoreSourceFileObservation>> {
     connection
         .query_row(
-            "SELECT facts.source_file_id,
-                    facts.basis_fingerprint,
-                    facts.basis_source_id,
-                    facts.basis_relative_path,
-                    facts.basis_size_bytes,
-                    facts.basis_mtime_ns,
-                    facts.basis_presence_state,
-                    facts.observed_at_ms,
-                    facts.content_hash_algorithm,
-                    facts.content_hash_value,
-                    facts.media_kind,
-                    facts.mime_type,
-                    facts.duration_ms,
-                    facts.sample_rate_hz,
-                    facts.channels,
-                    facts.bit_depth,
-                    facts.codec,
-                    facts.accepted_artifact_id,
-                    facts.updated_at,
+            "SELECT observations.source_file_id,
+                    observations.basis_fingerprint,
+                    observations.basis_source_id,
+                    observations.basis_relative_path,
+                    observations.basis_size_bytes,
+                    observations.basis_mtime_ns,
+                    observations.basis_presence_state,
+                    observations.observed_at_ms,
+                    observations.content_hash_algorithm,
+                    observations.content_hash_value,
+                    observations.media_kind,
+                    observations.mime_type,
+                    observations.duration_ms,
+                    observations.sample_rate_hz,
+                    observations.channels,
+                    observations.bit_depth,
+                    observations.codec,
+                    observations.accepted_artifact_id,
+                    observations.updated_at,
                     CASE
-                        WHEN file.source_id = facts.basis_source_id
-                         AND file.relative_path = facts.basis_relative_path
-                         AND file.size_bytes IS facts.basis_size_bytes
-                         AND file.mtime_ns IS facts.basis_mtime_ns
-                         AND file.presence_state = facts.basis_presence_state
+                        WHEN file.source_id = observations.basis_source_id
+                         AND file.relative_path = observations.basis_relative_path
+                         AND file.size_bytes IS observations.basis_size_bytes
+                         AND file.mtime_ns IS observations.basis_mtime_ns
+                         AND file.presence_state = observations.basis_presence_state
                         THEN 'current'
                         ELSE 'stale'
-                    END AS fact_status
-             FROM source_file_facts facts
+                    END AS observation_status
+             FROM source_file_observations observations
              JOIN source_files file
-               ON file.source_file_id = facts.source_file_id
-             WHERE facts.source_file_id = ?1",
+               ON file.source_file_id = observations.source_file_id
+             WHERE observations.source_file_id = ?1",
             [source_file_id],
             |row| {
                 let content_hash_algorithm = row.get::<_, Option<String>>(8)?;
                 let content_hash_value = row.get::<_, Option<String>>(9)?;
-                Ok(StoreObservedFileFacts {
+                Ok(StoreSourceFileObservation {
                     source_file_id: row.get(0)?,
                     basis_fingerprint: row.get(1)?,
                     basis_source_id: row.get(2)?,
@@ -101,8 +101,8 @@ pub fn read_observed_file_facts_for_source_file(
                     accepted_artifact_id: row.get(17)?,
                     updated_at_ms: row.get(18)?,
                     status: match row.get::<_, String>(19)?.as_str() {
-                        "current" => StoreObservedFileFactStatus::Current,
-                        _ => StoreObservedFileFactStatus::Stale,
+                        "current" => StoreSourceFileObservationStatus::Current,
+                        _ => StoreSourceFileObservationStatus::Stale,
                     },
                 })
             },

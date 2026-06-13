@@ -248,7 +248,7 @@ mod tests {
                      relative_path,
                      presence_state,
                      has_child_directories,
-                     has_primary_media_descendant,
+                     has_playable_media_descendant,
                      has_image_media_descendant,
                      dir_scan_state,
                      dir_scan_issue_kind,

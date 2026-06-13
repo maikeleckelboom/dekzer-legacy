@@ -47,7 +47,7 @@ pub struct StoreSourceFileAttachmentLink {
     pub file_kind: String,
     pub file_class: String,
     pub presence_state: String,
-    pub has_current_blake3_fact: bool,
+    pub has_current_blake3_observation: bool,
     pub link_status: StoreSourceFileAttachmentLinkStatus,
     pub source_mount_status: String,
     pub source_access_state: String,
@@ -81,7 +81,7 @@ pub struct StoreSourceAttachmentSummary {
     pub source_id: i64,
     pub current_links_count: usize,
     pub stale_links_count: usize,
-    pub source_files_with_current_blake3_facts_count: usize,
+    pub source_files_with_current_blake3_observations_count: usize,
     pub source_files_with_attachment_links_count: usize,
     pub source_files_missing_attachment_links_count: usize,
 }
@@ -224,33 +224,33 @@ pub fn get_source_attachment_summary(
             "WITH source_file_current_blake3 AS (
                  SELECT file.source_file_id,
                         CASE
-                            WHEN facts.source_file_id IS NOT NULL
-                             AND facts.content_hash_algorithm = 'blake3'
-                             AND facts.content_hash_value IS NOT NULL
-                             AND file.source_id = facts.basis_source_id
-                             AND file.relative_path = facts.basis_relative_path
-                             AND file.size_bytes IS facts.basis_size_bytes
-                             AND file.mtime_ns IS facts.basis_mtime_ns
-                             AND file.presence_state = facts.basis_presence_state
+                            WHEN observations.source_file_id IS NOT NULL
+                             AND observations.content_hash_algorithm = 'blake3'
+                             AND observations.content_hash_value IS NOT NULL
+                             AND file.source_id = observations.basis_source_id
+                             AND file.relative_path = observations.basis_relative_path
+                             AND file.size_bytes IS observations.basis_size_bytes
+                             AND file.mtime_ns IS observations.basis_mtime_ns
+                             AND file.presence_state = observations.basis_presence_state
                             THEN 1
                             ELSE 0
                         END AS has_current_blake3
                  FROM source_files file
-                 LEFT JOIN source_file_facts facts
-                   ON facts.source_file_id = file.source_file_id
+                 LEFT JOIN source_file_observations observations
+                   ON observations.source_file_id = file.source_file_id
                  WHERE file.source_id = ?1
              ),
              link_status AS (
                  SELECT link.source_file_id,
                         CASE
-                            WHEN facts.source_file_id IS NOT NULL
-                             AND facts.content_hash_algorithm = attachment.content_hash_algorithm
-                             AND facts.content_hash_value = attachment.content_hash_value
-                             AND file.source_id = facts.basis_source_id
-                             AND file.relative_path = facts.basis_relative_path
-                             AND file.size_bytes IS facts.basis_size_bytes
-                             AND file.mtime_ns IS facts.basis_mtime_ns
-                             AND file.presence_state = facts.basis_presence_state
+                            WHEN observations.source_file_id IS NOT NULL
+                             AND observations.content_hash_algorithm = attachment.content_hash_algorithm
+                             AND observations.content_hash_value = attachment.content_hash_value
+                             AND file.source_id = observations.basis_source_id
+                             AND file.relative_path = observations.basis_relative_path
+                             AND file.size_bytes IS observations.basis_size_bytes
+                             AND file.mtime_ns IS observations.basis_mtime_ns
+                             AND file.presence_state = observations.basis_presence_state
                             THEN 1
                             ELSE 0
                         END AS is_current
@@ -259,8 +259,8 @@ pub fn get_source_attachment_summary(
                    ON attachment.attachment_id = link.attachment_id
                  JOIN source_files file
                    ON file.source_file_id = link.source_file_id
-                 LEFT JOIN source_file_facts facts
-                   ON facts.source_file_id = link.source_file_id
+                 LEFT JOIN source_file_observations observations
+                   ON observations.source_file_id = link.source_file_id
                  WHERE link.source_id = ?1
              )
              SELECT source.source_id,
@@ -273,10 +273,10 @@ pub fn get_source_attachment_summary(
                      FROM source_file_attachment_links link
                      WHERE link.source_id = ?1),
                     (SELECT COUNT(*)
-                     FROM source_file_current_blake3 facts
+                     FROM source_file_current_blake3 observations
                      LEFT JOIN source_file_attachment_links link
-                       ON link.source_file_id = facts.source_file_id
-                     WHERE facts.has_current_blake3 = 1
+                       ON link.source_file_id = observations.source_file_id
+                     WHERE observations.has_current_blake3 = 1
                        AND link.source_file_id IS NULL)
              FROM sources source
              WHERE source.source_id = ?1",
@@ -286,7 +286,7 @@ pub fn get_source_attachment_summary(
                     source_id: row.get(0)?,
                     current_links_count: read_count(row, 1)?,
                     stale_links_count: read_count(row, 2)?,
-                    source_files_with_current_blake3_facts_count: read_count(row, 3)?,
+                    source_files_with_current_blake3_observations_count: read_count(row, 3)?,
                     source_files_with_attachment_links_count: read_count(row, 4)?,
                     source_files_missing_attachment_links_count: read_count(row, 5)?,
                 })
@@ -297,7 +297,7 @@ pub fn get_source_attachment_summary(
 }
 
 // Occurrence status is a derived source/path availability status over persisted
-// source lifecycle and source-file inventory facts. It intentionally stays
+// source lifecycle and source-file inventory observations. It intentionally stays
 // separate from link_status, which reports content-evidence freshness, and this
 // read never probes the filesystem or decides relocation/cleanup semantics.
 const ATTACHMENT_LINK_SELECT_SQL: &str = "SELECT link.source_file_attachment_link_id,
@@ -317,26 +317,26 @@ const ATTACHMENT_LINK_SELECT_SQL: &str = "SELECT link.source_file_attachment_lin
        file.file_class,
        file.presence_state,
        CASE
-           WHEN facts.source_file_id IS NOT NULL
-            AND facts.content_hash_algorithm = 'blake3'
-            AND facts.content_hash_value IS NOT NULL
-            AND file.source_id = facts.basis_source_id
-            AND file.relative_path = facts.basis_relative_path
-            AND file.size_bytes IS facts.basis_size_bytes
-            AND file.mtime_ns IS facts.basis_mtime_ns
-            AND file.presence_state = facts.basis_presence_state
+           WHEN observations.source_file_id IS NOT NULL
+            AND observations.content_hash_algorithm = 'blake3'
+            AND observations.content_hash_value IS NOT NULL
+            AND file.source_id = observations.basis_source_id
+            AND file.relative_path = observations.basis_relative_path
+            AND file.size_bytes IS observations.basis_size_bytes
+            AND file.mtime_ns IS observations.basis_mtime_ns
+            AND file.presence_state = observations.basis_presence_state
            THEN 1
            ELSE 0
-       END AS has_current_blake3_fact,
+       END AS has_current_blake3_observation,
        CASE
-           WHEN facts.source_file_id IS NOT NULL
-            AND facts.content_hash_algorithm = attachment.content_hash_algorithm
-            AND facts.content_hash_value = attachment.content_hash_value
-            AND file.source_id = facts.basis_source_id
-            AND file.relative_path = facts.basis_relative_path
-            AND file.size_bytes IS facts.basis_size_bytes
-            AND file.mtime_ns IS facts.basis_mtime_ns
-            AND file.presence_state = facts.basis_presence_state
+           WHEN observations.source_file_id IS NOT NULL
+            AND observations.content_hash_algorithm = attachment.content_hash_algorithm
+            AND observations.content_hash_value = attachment.content_hash_value
+            AND file.source_id = observations.basis_source_id
+            AND file.relative_path = observations.basis_relative_path
+            AND file.size_bytes IS observations.basis_size_bytes
+            AND file.mtime_ns IS observations.basis_mtime_ns
+            AND file.presence_state = observations.basis_presence_state
            THEN 'current'
            ELSE 'stale'
        END AS link_status,
@@ -370,8 +370,8 @@ LEFT JOIN source_state state
   ON state.source_id = file.source_id
 LEFT JOIN source_scan_state scan_state
   ON scan_state.source_id = file.source_id
-LEFT JOIN source_file_facts facts
-  ON facts.source_file_id = link.source_file_id";
+LEFT JOIN source_file_observations observations
+  ON observations.source_file_id = link.source_file_id";
 
 fn map_attachment_identity_row(row: &Row<'_>) -> rusqlite::Result<StoreAttachmentIdentity> {
     Ok(StoreAttachmentIdentity {
@@ -404,7 +404,7 @@ fn map_attachment_link_row(row: &Row<'_>) -> rusqlite::Result<StoreSourceFileAtt
         file_kind: row.get(13)?,
         file_class: row.get(14)?,
         presence_state: row.get(15)?,
-        has_current_blake3_fact: row.get::<_, i64>(16)? != 0,
+        has_current_blake3_observation: row.get::<_, i64>(16)? != 0,
         link_status: match row.get::<_, String>(17)?.as_str() {
             "current" => StoreSourceFileAttachmentLinkStatus::Current,
             _ => StoreSourceFileAttachmentLinkStatus::Stale,

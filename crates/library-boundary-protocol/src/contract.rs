@@ -96,7 +96,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ContentsScope>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsReadPolicy>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileClass>(&cfg, &mut output);
-    push_ts_decl::<crate::PrimaryMediaKind>(&cfg, &mut output);
+    push_ts_decl::<crate::PlayableMediaKind>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsScopeDepth>(&cfg, &mut output);
     push_ts_decl::<crate::CommandReply>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryBoundaryEventStreamReply>(&cfg, &mut output);
@@ -166,7 +166,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LibraryTreeNodeKind>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryTreeFileClass>(&cfg, &mut output);
     push_ts_decl::<crate::LibraryTreePresenceState>(&cfg, &mut output);
-    push_ts_decl::<crate::DirectoryPrimaryMediaState>(&cfg, &mut output);
+    push_ts_decl::<crate::DirectoryPlayableMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryImageMediaState>(&cfg, &mut output);
     push_ts_decl::<crate::DirectoryScanState>(&cfg, &mut output);
     push_ts_decl::<crate::SourceLifecycle>(&cfg, &mut output);
@@ -198,7 +198,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ContentsScopeCoverage>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsScopeCoverageState>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileRow>(&cfg, &mut output);
-    push_ts_decl::<crate::PrimaryMediaSummary>(&cfg, &mut output);
+    push_ts_decl::<crate::PlayableMedia>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsFileKind>(&cfg, &mut output);
     push_ts_decl::<crate::ContentsPresenceState>(&cfg, &mut output);
     push_ts_decl::<crate::HashSourceFilesBlake3Outcome>(&cfg, &mut output);
@@ -219,7 +219,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::SourceMaintenanceHashSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceAttachmentMaterializationSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceProbeSummary>(&cfg, &mut output);
-    push_ts_decl::<crate::SourceMaintenancePrimaryMediaPromotionSummary>(&cfg, &mut output);
+    push_ts_decl::<crate::SourceMaintenancePlayableMediaPromotionSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceTrackIdentityCandidateSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceTrackIdentityDecisionSummary>(&cfg, &mut output);
     push_ts_decl::<crate::SourceMaintenanceAttachmentLinkSummary>(&cfg, &mut output);
@@ -298,7 +298,7 @@ mod tests {
         assert!(ts.contains("hasPolicyOmittedRows: boolean"));
         assert!(!ts.contains(&["media", "Class"].concat()));
         assert!(!ts.contains(&["Contents", "Media", "Class"].concat()));
-        assert!(ts.contains("DirectoryPrimaryMediaState"));
+        assert!(ts.contains("DirectoryPlayableMediaState"));
         assert!(ts.contains("DirectoryImageMediaState"));
         assert!(ts.contains("DirectoryScanState"));
         assert!(ts.contains("acceptTrackIdentityCandidate"));

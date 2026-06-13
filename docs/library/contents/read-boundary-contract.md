@@ -25,8 +25,8 @@ code does not branch on UI mode names.
 
 ## Motivation
 
-The removed selected-contents path was primary-media-only. It could not represent image rows because its policy domain
-was audio/video only and its rows carried primary-media/readiness/prep-shaped fields.
+The removed selected-contents path was playable-media-only. It could not represent image rows because its policy domain
+was audio/video only and its rows carried playable-media/readiness/prep-shaped fields.
 
 The temporary renderer visible-files proof demonstrated desired UI behavior, but renderer hierarchy cache is not the
 final owner of selected scope contents.
@@ -35,7 +35,7 @@ final owner of selected scope contents.
 
 ## Inventory Findings
 
-The following facts are established by the Phase 0 inventory:
+The following observations are established by the Phase 0 inventory:
 
 1. **selectedContentsRead has zero non-pane consumers.**
 
@@ -56,7 +56,7 @@ The following facts are established by the Phase 0 inventory:
 
    Cursor identity is encoded as base64url JSON and validated. Cursor binds to scope, the complete profile-specific
    policy discriminant, scopeDepth, and ordering; it carries a last-row position tuple specific to each policy
-   (`audioBrowse`/`sourceFileInventory`: persisted browse sort key + relative path + source-file id; `primaryMedia`:
+   (`audioBrowse`/`sourceFileInventory`: persisted browse sort key + relative path + source-file id; `playableMedia`:
    `availability_priority`,
    `title_key`, `artist_key`, `album_key`, `relative_path_key`, `source_file_id`). The store validates cursor
    identity against the current request. Mismatched or un-decodable cursors return `CursorInvalid` with no
@@ -67,7 +67,7 @@ The following facts are established by the Phase 0 inventory:
 5. **Hierarchy read is not the final owner for selected scope contents.**
 
    It provides immediate children admitted by the product/boundary surface. It does not own descendant-scope selected
-   contents, aggregated contents scopeCoverage, or primary-media summary joins.
+   contents, aggregated contents scopeCoverage, or playable-media summary joins.
 
    **Historical note:** `sourceFileVisibility` was implementation debt that has been removed from renderer-facing
    contracts. Library tree row admission is now a product/boundary surface concern, not a renderer-facing parameter.
@@ -85,16 +85,16 @@ type ContentsReadPolicy =
       readonly fileClasses: readonly ContentsFileClass[]
     }
   | {
-      readonly kind: 'primaryMedia'
-      readonly mediaKinds: readonly PrimaryMediaKind[]
+      readonly kind: 'playableMedia'
+      readonly mediaKinds: readonly PlayableMediaKind[]
     }
 ```
 
 **sourceFileInventory:**
 
-- literal source-file facts
+- literal source-file observations
 - audio, video, image allowed
-- no primaryMedia summary
+- no playableMedia summary
 - no prep, readiness, waveform, or stems joins
 - used by explicit inventory browsing
 
@@ -106,10 +106,10 @@ type ContentsReadPolicy =
 - excludes images, unsupported raw files, diagnostics-only rows, metadata companions, and CUE sheets
 - cursor identity is distinct from every other policy
 
-**primaryMedia:**
+**playableMedia:**
 
 - audio and video only
-- may carry primary-media, library-asset, readiness, prep, waveform, and stems summary
+- may carry playable-media, library-asset, readiness, prep, waveform, and stems summary
 - replaces the old selectedContentsRead behavior
 
 **audioBrowse:**
@@ -118,7 +118,7 @@ type ContentsReadPolicy =
 - accepts no caller-supplied class filter
 - reuses the current contents file-row payload shape
 - returns V0 rows with source-file audio parity for equivalent scope, scopeDepth, limit, and cursor
-- cursor identity is distinct from `sourceFileInventory` and `primaryMedia`
+- cursor identity is distinct from `sourceFileInventory` and `playableMedia`
 
 The following terms are not used as shared or backend contract concepts:
 
@@ -152,7 +152,7 @@ type ContentsScope =
 type ContentsScopeDepth = 'immediate' | 'recursive'
 
 type ContentsFileClass = 'audio' | 'video' | 'image' | 'unsupported'
-type PrimaryMediaKind = 'audio' | 'video'
+type PlayableMediaKind = 'audio' | 'video'
 type ContentsFileKind =
   | 'audio'
   | 'video'
@@ -168,7 +168,7 @@ type ContentsReadPolicy =
   | { readonly kind: 'playableMediaBrowse' }
   | { readonly kind: 'audioBrowse' }
   | { readonly kind: 'sourceFileInventory'; readonly fileClasses: readonly ContentsFileClass[] }
-  | { readonly kind: 'primaryMedia'; readonly mediaKinds: readonly PrimaryMediaKind[] }
+  | { readonly kind: 'playableMedia'; readonly mediaKinds: readonly PlayableMediaKind[] }
 
 type ContentsResult = {
   readonly state: ContentsState
@@ -230,12 +230,12 @@ currently resolve to overlapping filesystem prefixes.
 - `playableMediaBrowse` backs the separate **Media** filter and may include audio and video only.
 - `playableMediaBrowse` has no caller-supplied file class filter.
 - sourceFileInventory may include audio, video, image, and admitted unsupported companion rows.
-- sourceFileInventory never carries primaryMedia summary.
-- primaryMedia profile may include audio and video only.
+- sourceFileInventory never carries playableMedia summary.
+- playableMedia profile may include audio and video only.
 - audioBrowse profile may include audio only.
 - audioBrowse has no caller-supplied file class filter.
 - audioBrowse reuses the contents file-row payload shape and does not introduce a dedicated row type.
-- Image rows never carry primaryMedia summary.
+- Image rows never carry playableMedia summary.
 - `fileClasses` and `mediaKinds` are deterministic arrays, not Set.
 - `fileClasses` canonicalize as audio, video, image, unsupported; `mediaKinds` canonicalize as audio, video.
 - Normal media-relevant source-file inventory admits unsupported rows only when `fileKind = cueSheet`.
@@ -243,7 +243,7 @@ currently resolve to overlapping filesystem prefixes.
 - `.m4a` classifies as audio and `.mp4` classifies as video until stronger media-probe authority exists.
 - Incomplete zero-row scopeCoverage is not authoritative empty.
 - Complete zero-row results with `hasPolicyOmittedRows: true` are empty only for the active policy.
-- `primaryMedia` omission metadata is `false` in this slice and never uses raw `source_files` as a proxy.
+- `playableMedia` omission metadata is `false` in this slice and never uses raw `source_files` as a proxy.
 - See `docs/library/evidence/media-relevant-file-inventory-contract.md` for durable inventory classification.
 - Cursor pagination is implemented; `nextCursor` is produced when more rows exist.
 - Provided cursor must not be silently ignored or treated as page one.

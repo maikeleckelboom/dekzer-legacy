@@ -115,7 +115,7 @@ Does not own:
 - Roles
 - Deck readiness
 - Deck runtime
-- Scan inventory facts
+- Scan inventory observations
 - Runtime resource grants or handle issuance (those belong to Resource / Media Authority)
 
 Note: Navigation and browser projection may consume `source_locations` for
@@ -130,10 +130,10 @@ Owns:
 - `source_directories` rows
 - `source_scan_state` rows, scan phase
 - `presence_state`
-- Directory scan state, directory affordance facts
+- Directory scan state, directory affordance observations
 - Source-file provisional `file_class` used only as inventory evidence and browse
   visibility input
-- Discovery timestamps and observation facts
+- Discovery timestamps and observation observations
 
 Does not own:
 
@@ -169,7 +169,7 @@ Owns:
 Does not own:
 
 - Source access state or mount state
-- Scan phase or discovery facts
+- Scan phase or discovery observations
 - Deck runtime
 - Performance events
 
@@ -208,7 +208,7 @@ Owns:
 Reads:
 
 - Library evidence (roles, origins, source availability, media streams)
-- Probe facts, analysis artifacts
+- Probe observations, analysis artifacts
 - Target policy
 
 Does not own:
@@ -434,9 +434,9 @@ Rules:
   must not be used as durable event identity.
 - Performance events may capture event-time display or metadata snapshots, or
   projection-version references. Such snapshots are historical evidence and are not
-  library authority. Library metadata changing after the fact must not alter historical
+  library authority. Library metadata changing after the observation must not alter historical
   event records.
-- Events are durable or replayable facts about what happened at runtime.
+- Events are durable or replayable observations about what happened at runtime.
 - Performance session does not own the runtime state that produced the events.
 - A load event records that a deck load occurred; it does not perform the load.
 - A performance load event records a committed deck runtime binding. Rejected, pending,
@@ -459,7 +459,7 @@ Rules:
 Owns:
 
 - Publishable external/session projection
-- Policy for what facts are published externally
+- Policy for what observations are published externally
 
 Consumes:
 
@@ -588,7 +588,7 @@ Rules:
 - `deck_load_committed` is the event that a binding was created; `deck_load_requested`
   is the event that an intent was received. These are separate and must not be conflated.
 - `performance_session_event` records what happened.
-- `broadcast_projection` publishes selected facts externally.
+- `broadcast_projection` publishes selected observations externally.
 
 ### Rules
 
@@ -729,7 +729,7 @@ evidence, but readiness still requires an explicit readiness evaluation step.
 - Global `deckReady` is rejected. Deck loading needs an explicit target such as
   `audio_deck_load` or `video_deck_load`. Do not overload `audio_deck`,
   `audioDeckLoad`, and `deckReady` as competing concepts.
-- Readiness may depend on role, probe facts, source availability, resource availability,
+- Readiness may depend on role, probe observations, source availability, resource availability,
   analysis artifacts, and target policy.
 - Readiness answers must be bounded. Expensive work is enqueued, not performed inline.
 - Readiness must not create loaded deck items.
@@ -786,8 +786,8 @@ Rules:
   the appropriate response depends on the target and whether the resource is buffered.
 - Deck runtime detects resource loss through its own handles. It does not poll
   `source_files.availability`.
-- Historical performance events remain historical facts. A source that disappears does not
-  erase the fact that it was loaded and played.
+- Historical performance events remain historical observations. A source that disappears does not
+  erase the observation that it was loaded and played.
 - Broadcast projection must surface degraded/unavailable state when relevant, but must not
   rewrite the past. Broadcast does not publish raw source mutation as performance
   authority.
@@ -833,7 +833,7 @@ Rules:
 ## Broadcast Projection Boundary
 
 Broadcast is projection, not authority. It consumes performance/session/deck/library
-projections and publishes selected external facts.
+projections and publishes selected external observations.
 
 Rules:
 
@@ -882,7 +882,7 @@ broadcast projection writes to library_items or item_readiness
 renderer creates a loaded_deck_item by calling a library mutation
 performance_session_event references source_files.source_file_id as primary identity
 source access state, mount state, or source availability is owned by Library Item Authority
-scan inventory facts or presence_state are owned by Source Access Authority
+scan inventory observations or presence_state are owned by Source Access Authority
 role decisions are owned by Scanner/Inventory Authority or Library Item Authority
 deck runtime owns source access policy or becomes file access authority through handle
   binding
@@ -945,7 +945,7 @@ This document extends, not replaces, the following:
   answers according to target policy rather than always fully invalidating.
 
 - `selected-contents-scope-depth-rule.md`: defines how tree selection projects descendant-inclusive
-  primary media. This document adds the rule that contents projection does not load decks
+  playable media. This document adds the rule that contents projection does not load decks
   and does not own performance session scope.
 
 - `source-locations-lifecycle-contract.md`: defines source location lifecycle. This

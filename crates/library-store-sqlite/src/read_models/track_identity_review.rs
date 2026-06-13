@@ -72,7 +72,7 @@ pub enum ReviewState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct FactualCandidate {
+struct ReviewCandidateRow {
     candidate_id: i64,
     candidate_kind: String,
     candidate_evidence_basis: String,
@@ -102,7 +102,7 @@ pub fn read_track_identity_review_candidates(
 
     // TODO(track-identity-review-cursor): add a V1 cursor with version,
     // scope/filter identity, and the last candidate_id position.
-    let candidates = read_factual_candidates(connection, source_id, review_state_filter, limit)?;
+    let candidates = read_review_candidates(connection, source_id, review_state_filter, limit)?;
     let mut review_candidates = Vec::with_capacity(candidates.len());
 
     for candidate in candidates {
@@ -113,12 +113,12 @@ pub fn read_track_identity_review_candidates(
     Ok(review_candidates)
 }
 
-fn read_factual_candidates(
+fn read_review_candidates(
     connection: &Connection,
     source_id: Option<i64>,
     review_state_filter: Option<ReviewState>,
     limit: usize,
-) -> LibrarySqliteResult<Vec<FactualCandidate>> {
+) -> LibrarySqliteResult<Vec<ReviewCandidateRow>> {
     let limit_i64 =
         i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
     let current_evidence_predicate = current_track_identity_candidate_evidence_predicate("?2");
@@ -126,7 +126,7 @@ fn read_factual_candidates(
         .map(review_state_filter_predicate)
         .unwrap_or("1");
     let mut statement = connection.prepare(&format!(
-        "WITH decision_facts AS (
+        "WITH decision_state AS (
              SELECT candidate.track_identity_candidate_id,
                     user_decision.track_identity_decision_id AS user_decision_id,
                     user_decision.decision_state AS user_decision_state,
@@ -139,8 +139,8 @@ fn read_factual_candidates(
                             FROM track_identity_candidate_evidence evidence
                             JOIN source_files file
                               ON file.source_file_id = evidence.source_file_id
-                            LEFT JOIN source_file_facts facts
-                              ON facts.source_file_id = evidence.source_file_id
+                            LEFT JOIN source_file_observations observations
+                              ON observations.source_file_id = evidence.source_file_id
                             LEFT JOIN source_file_attachment_links link
                               ON link.source_file_attachment_link_id =
                                  evidence.source_file_attachment_link_id
@@ -195,8 +195,8 @@ fn read_factual_candidates(
                     FROM track_identity_candidate_evidence evidence
                     JOIN source_files file
                       ON file.source_file_id = evidence.source_file_id
-                    LEFT JOIN source_file_facts facts
-                      ON facts.source_file_id = evidence.source_file_id
+                    LEFT JOIN source_file_observations observations
+                      ON observations.source_file_id = evidence.source_file_id
                     LEFT JOIN source_file_attachment_links link
                       ON link.source_file_attachment_link_id =
                          evidence.source_file_attachment_link_id
@@ -209,8 +209,8 @@ fn read_factual_candidates(
                 candidate.created_at,
                 candidate.updated_at
          FROM track_identity_candidates candidate
-         JOIN decision_facts
-           ON decision_facts.track_identity_candidate_id =
+         JOIN decision_state
+           ON decision_state.track_identity_candidate_id =
               candidate.track_identity_candidate_id
          WHERE (?1 IS NULL
             OR EXISTS (
@@ -236,7 +236,7 @@ fn read_factual_candidates(
     let mut candidates = Vec::new();
 
     while let Some(row) = rows.next()? {
-        candidates.push(map_factual_candidate_row(row)?);
+        candidates.push(map_review_candidate_row(row)?);
     }
 
     Ok(candidates)
@@ -245,41 +245,41 @@ fn read_factual_candidates(
 fn review_state_filter_predicate(review_state: ReviewState) -> &'static str {
     match review_state {
         ReviewState::NeedsUserDecision => {
-            "decision_facts.user_decision_id IS NULL
-             AND decision_facts.system_decision_id IS NULL"
+            "decision_state.user_decision_id IS NULL
+             AND decision_state.system_decision_id IS NULL"
         }
         ReviewState::SystemAccepted => {
-            "decision_facts.user_decision_id IS NULL
-             AND decision_facts.system_decision_id IS NOT NULL
-             AND decision_facts.system_decision_state = 'accepted'
-             AND decision_facts.has_current_effective_evidence = 1"
+            "decision_state.user_decision_id IS NULL
+             AND decision_state.system_decision_id IS NOT NULL
+             AND decision_state.system_decision_state = 'accepted'
+             AND decision_state.has_current_effective_evidence = 1"
         }
         ReviewState::UserAccepted => {
-            "decision_facts.user_decision_id IS NOT NULL
-             AND decision_facts.user_decision_state = 'accepted'
-             AND decision_facts.has_current_effective_evidence = 1"
+            "decision_state.user_decision_id IS NOT NULL
+             AND decision_state.user_decision_state = 'accepted'
+             AND decision_state.has_current_effective_evidence = 1"
         }
         ReviewState::UserRejected => {
-            "decision_facts.user_decision_id IS NOT NULL
-             AND decision_facts.user_decision_state = 'rejected'
-             AND decision_facts.has_current_effective_evidence = 1"
+            "decision_state.user_decision_id IS NOT NULL
+             AND decision_state.user_decision_state = 'rejected'
+             AND decision_state.has_current_effective_evidence = 1"
         }
         ReviewState::UserDeferred => {
-            "decision_facts.user_decision_id IS NOT NULL
-             AND decision_facts.user_decision_state = 'deferred'
-             AND decision_facts.has_current_effective_evidence = 1"
+            "decision_state.user_decision_id IS NOT NULL
+             AND decision_state.user_decision_state = 'deferred'
+             AND decision_state.has_current_effective_evidence = 1"
         }
         ReviewState::StaleDecision => {
-            "(decision_facts.user_decision_id IS NOT NULL
-              OR decision_facts.system_decision_id IS NOT NULL)
-             AND decision_facts.has_current_effective_evidence = 0"
+            "(decision_state.user_decision_id IS NOT NULL
+              OR decision_state.system_decision_id IS NOT NULL)
+             AND decision_state.has_current_effective_evidence = 0"
         }
     }
 }
 
 fn hydrate_review_candidate(
     connection: &Connection,
-    candidate: FactualCandidate,
+    candidate: ReviewCandidateRow,
 ) -> LibrarySqliteResult<ReviewCandidate> {
     let effective =
         read_effective_track_identity_decision_for_candidate(connection, candidate.candidate_id)?;
@@ -429,8 +429,8 @@ fn read_source_samples(
         .map_err(Into::into)
 }
 
-fn map_factual_candidate_row(row: &Row<'_>) -> LibrarySqliteResult<FactualCandidate> {
-    Ok(FactualCandidate {
+fn map_review_candidate_row(row: &Row<'_>) -> LibrarySqliteResult<ReviewCandidateRow> {
+    Ok(ReviewCandidateRow {
         candidate_id: row.get(0)?,
         candidate_kind: row.get(1)?,
         candidate_evidence_basis: row.get(2)?,

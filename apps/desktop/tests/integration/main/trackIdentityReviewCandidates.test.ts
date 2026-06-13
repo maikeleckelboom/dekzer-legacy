@@ -125,8 +125,8 @@ function reviewReply(): ContractReadTrackIdentityReviewCandidatesReply {
     candidates: [
       {
         candidateId: '11',
-        candidateKind: 'exact_primary_media_content',
-        candidateEvidenceBasis: 'current_primary_media_exact_blake3',
+        candidateKind: 'exact_playable_media_content',
+        candidateEvidenceBasis: 'current_playable_media_exact_blake3',
         candidateStatus: 'active',
         evidenceKeyAlgorithm: 'blake3',
         evidenceKeyValue: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',

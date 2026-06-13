@@ -75,7 +75,7 @@ describe('attachment identity reads through the host', () => {
               fileKind: 'audio',
               fileClass: 'audio',
               presenceState: 'present',
-              hasCurrentBlake3Fact: true,
+              hasCurrentBlake3Observation: true,
               linkStatus: 'current',
               sourceMountStatus: 'mounted',
               sourceAccessState: 'accessible',
@@ -105,10 +105,10 @@ describe('attachment identity reads through the host', () => {
               sourceId: '3',
               currentLinksCount: 1,
               staleLinksCount: 0,
-              sourceFilesWithCurrentBlake3FactsCount: 1,
+              sourceFilesWithCurrentBlake3ObservationsCount: 1,
               sourceFilesWithAttachmentLinksCount: 1,
               sourceFilesMissingAttachmentLinksCount: 0,
-              unmaterializedBlake3FactsCount: 0
+              unmaterializedBlake3ObservationsCount: 0
             }
           }
         }

@@ -11,14 +11,14 @@ use so evidence, derived candidates, user decisions, and read projections do not
 
 ### Evidence
 
-Evidence is a persisted observed or derived fact from the substrate, scanner, probes, source inventory, attachment
+Evidence is a persisted observed or derived observation from the substrate, scanner, probes, source inventory, attachment
 identity, source integrity, or occurrence reads.
 
 Evidence records what the system observed or derived under a basis. Evidence does not say what the user chose, which
 copy is preferred, whether two items are the same musical track, whether cleanup is safe, or whether a relocation was
 accepted.
 
-Current examples include `source_files`, `source_file_facts`, `content_attachments`, `source_file_attachment_links`, source
+Current examples include `source_files`, `source_file_observations`, `content_attachments`, `source_file_attachment_links`, source
 lifecycle rows, attachment occurrence status projected from those rows, and track identity candidate evidence snapshots.
 
 ### Candidate
@@ -29,7 +29,7 @@ A candidate is not a user decision. A candidate may appear, disappear, change st
 changes. Candidate generation owns proposals only; it must not mutate evidence into acceptance, cleanup, merge, or
 preference.
 
-Current examples include source-file hash candidates, media-probe candidates, `primary_media_facts`, and exact
+Current examples include source-file hash candidates, media-probe candidates, `playable_media`, and exact
 content `track_identity_candidates`.
 
 ### Decision
@@ -38,7 +38,7 @@ A decision is an explicit user-authored or system-authored durable record with p
 policy meaning, timestamp, and recomputation behavior.
 
 A decision may resolve, suppress, rank, preserve, override, merge, or split a target only according to its declared verb
-and feature contract. Decisions never rewrite evidence. Decisions never hide the fact that evidence changed underneath
+and feature contract. Decisions never rewrite evidence. Decisions never hide the observation that evidence changed underneath
 them.
 
 Current implemented decision records are the narrow exact-content track identity decisions in
@@ -92,8 +92,8 @@ Allowed target classes:
 | Content attachment | Implemented as `content_attachments.attachment_id`. | Target exact-byte attachment identity, not a path or title. |
 | Source-file attachment link | Implemented as `source_file_attachment_links.source_file_attachment_link_id`. | Target the durable link when the decision concerns one source-file occurrence of an attachment. |
 | Occurrence evidence row/context | A-5 is read-projected from durable link/source/source-file evidence; no separate occurrence table exists. | Target the durable link/source-file/attachment tuple plus evidence basis/status snapshot. If a later occurrence table is added, target its stable row id. |
-| Candidate identity | Implemented for primary-media and exact-content track identity candidates. | Target the candidate id and candidate kind/basis/key. Do not target display text for the candidate. |
-| Track identity candidate | Implemented as `track_identity_candidates.track_identity_candidate_id` for exact primary-media content only. | Current accept/reject/defer commands target candidate id and snapshot candidate/evidence basis. Future track identity candidates must preserve the same rule. |
+| Candidate identity | Implemented for playable-media and exact-content track identity candidates. | Target the candidate id and candidate kind/basis/key. Do not target display text for the candidate. |
+| Track identity candidate | Implemented as `track_identity_candidates.track_identity_candidate_id` for exact playable-media content only. | Current accept/reject/defer commands target candidate id and snapshot candidate/evidence basis. Future track identity candidates must preserve the same rule. |
 | Future prep facet target | Future-only. | Must define stable subject kind, subject id, facet key, policy/version, and recompute basis before product exposure. |
 
 Future stable item references must be declared before use. If a feature needs decisions over canonical tracks, CUE
@@ -182,7 +182,7 @@ provenance. A read model may choose the effective winner only as a projection; i
 
 - SQLite/Rust durable substrate owns decision records when implemented.
 - Candidate generation owns proposals only.
-- Evidence authorities own observed and derived facts only.
+- Evidence authorities own observed and derived observations only.
 - Read models project resolved decision state, conflict state, stale state, and summaries.
 - Renderer surfaces may display evidence/candidates/decisions and request commands, but never own durable decision
   truth.
@@ -257,13 +257,13 @@ classifies current and legacy decision-like concepts against A-6. It is not a mi
 | Source-location proposal suppression | `docs/decisions/source-locations-lifecycle-contract.md` | Future source-location authority | Source id plus relative path plus heuristic key/version | Future decision/suppression | Conforming but future-only. Must not overload hidden source locations. |
 | Source navigation user order | `source_navigation_user_order`; `crates/library-store-sqlite/src/authority/sources/source_records.rs`; `source_locations.rs` | Source/navigation ordering authority | Source or source location | Durable ordering preference | Unrelated to A-6 `prefer`/`pin` unless a future feature explicitly reclassifies it. |
 | Source file inventory | `source_files`; `crates/library-store-sqlite/src/authority/sources/source_files.rs`; `authority/ingest/discovery.rs` | Scanner/source inventory authority | `source_files.source_file_id` | Evidence | Already conforming. |
-| Accepted source-file facts and accepted artifacts | `source_file_facts`; `crates/library-store-sqlite/src/authority/sources/source_file_facts.rs`; `authority/promotion/inspect_source_file.rs` | Source inspection/hash/probe authority | Source file plus basis/artifact | Evidence | Conforming but narrow. "Accepted" means accepted inspection artifact, not a user decision. |
+| Accepted source-file observations and accepted artifacts | `source_file_observations`; `crates/library-store-sqlite/src/authority/sources/source_file_observations.rs`; `authority/promotion/inspect_source_file.rs` | Source inspection/hash/probe authority | Source file plus basis/artifact | Evidence | Conforming but narrow. "Accepted" means accepted inspection artifact, not a user decision. |
 | Source-file hash candidates | `crates/library-store-sqlite/src/store/source_file_hash.rs`; boundary source-file hash commands | Maintenance/hash authority | Source file | Candidate/work proposal | Conforming but narrow. Not durable user decision. |
 | Source-file media-probe candidates | `crates/library-store-sqlite/src/store/source_file_media_probe.rs` | Maintenance/probe authority | Source file | Candidate/work proposal | Conforming but narrow. Not durable user decision. |
 | Attachment identity and links | `content_attachments`; `source_file_attachment_links`; `crates/library-store-sqlite/src/store/attachment_identity.rs` | Attachment identity store | Content attachment; source-file attachment link | Evidence | Already conforming. |
 | Attachment occurrence read | `crates/library-store-sqlite/src/read_models/attachment_identity.rs`; `docs/library/evidence/attachment-occurrence-model-readiness.md` | Attachment identity read model | Attachment/link/source-file/source status | Projection | Already conforming. Evidence/status only; no duplicate/relocation/cleanup meaning. |
-| Primary media candidates | `primary_media_facts`; `crates/library-store-sqlite/src/store/primary_media_promotion.rs` | Primary-media promotion authority | Content attachment plus source-file evidence | Candidate | Conforming but narrow. Audio evidence candidate only; not canonical track identity. |
-| Exact-content track identity candidates | `track_identity_candidates`, members, evidence; `crates/library-store-sqlite/src/store/track_identity_candidates.rs` | Track identity candidate authority | Track identity candidate id plus BLAKE3 evidence key | Candidate | Conforming but narrow. Exact current primary-media content only. |
+| Playable media candidates | `playable_media`; `crates/library-store-sqlite/src/store/playable_media_promotion.rs` | Primary-media promotion authority | Content attachment plus source-file evidence | Candidate | Conforming but narrow. Audio evidence candidate only; not canonical track identity. |
+| Exact-content track identity candidates | `track_identity_candidates`, members, evidence; `crates/library-store-sqlite/src/store/track_identity_candidates.rs` | Track identity candidate authority | Track identity candidate id plus BLAKE3 evidence key | Candidate | Conforming but narrow. Exact current playable-media content only. |
 | Track identity decisions | `track_identity_decisions`, decision evidence, decision source scope; `crates/library-store-sqlite/src/store/track_identity_decisions.rs` | Track identity decision authority | Exact-content track identity candidate | Decision | Already conforming but narrow. Supports accept/reject/defer only and no canonical track. |
 | System exact-content decisions | `produce_track_identity_decisions_for_source`; `system_exact_content_v0` | Track identity decision maintenance | Exact-content track identity candidate | System-authored decision | Conforming but narrow. User reject/defer blocks system; future system decisions need explicit provenance. |
 | Track identity review candidates | `crates/library-store-sqlite/src/read_models/track_identity_review.rs`; protocol snapshot reads | Track identity review read model | Candidate plus effective decision | Projection | Already conforming. Backend-derived read state only. |

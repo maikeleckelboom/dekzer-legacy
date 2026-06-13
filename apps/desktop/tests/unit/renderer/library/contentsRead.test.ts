@@ -92,12 +92,12 @@ describe('createContentsReadController', () => {
       contentsRequestKey(
         scope,
         {
-          kind: 'primaryMedia',
+          kind: 'playableMedia',
           mediaKinds: ['audio', 'video']
         },
         'recursive'
       )
-    ).toBe('directory:7:11:primaryMedia:audio,video:recursive')
+    ).toBe('directory:7:11:playableMedia:audio,video:recursive')
   })
 
   it('maps all activated built-in filters to distinct contents identities', async () => {
@@ -124,7 +124,7 @@ describe('createContentsReadController', () => {
 
     expect(requests.map((request) => request.policy)).toEqual([
       { kind: 'audioBrowse' },
-      { kind: 'primaryMedia', mediaKinds: ['video'] },
+      { kind: 'playableMedia', mediaKinds: ['video'] },
       { kind: 'playableMediaBrowse' },
       { kind: 'sourceFileInventory', fileClasses: ['unsupported'] },
       { kind: 'sourceFileInventory', fileClasses: ['audio', 'video', 'image', 'unsupported'] }
@@ -135,7 +135,7 @@ describe('createContentsReadController', () => {
       )
     ).toEqual([
       'directory:7:11:audioBrowse:recursive',
-      'directory:7:11:primaryMedia:video:recursive',
+      'directory:7:11:playableMedia:video:recursive',
       'directory:7:11:playableMediaBrowse:recursive',
       'directory:7:11:sourceFileInventory:unsupported:recursive',
       'directory:7:11:sourceFileInventory:audio,video,image,unsupported:recursive'

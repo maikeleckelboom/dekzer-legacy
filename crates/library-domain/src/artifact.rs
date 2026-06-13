@@ -22,26 +22,6 @@ impl ArtifactKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ArtifactRole {
-    PrimaryResult,
-}
-
-impl ArtifactRole {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::PrimaryResult => "primary_result",
-        }
-    }
-
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "primary_result" => Some(Self::PrimaryResult),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArtifactStorageKind {
     InlinePayload,
     FileStore,

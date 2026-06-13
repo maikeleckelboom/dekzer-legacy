@@ -46,7 +46,7 @@ and first implementation constraints for local-source iconography.
 This doctrine depends on the source root scan admission contract for root classification, registration proposal state,
 source identity, relocation observations, cloud-backed classification, and scan-state vocabulary.
 
-The icon doctrine does not redefine those substrate facts. It defines how renderer rows project those facts into
+The icon doctrine does not redefine those substrate observations. It defines how renderer rows project those observations into
 Dekzer-owned icon roles, badges, and row treatments.
 
 ## Core principle
@@ -439,7 +439,7 @@ Dekzer resolves these through the same icon role system.
 The Rust/library substrate owns:
 
 - Durable source identity
-- Root path and platform location facts
+- Root path and platform location observations
 - Root classification
 - File and folder hierarchy
 - Media-relevant observations
@@ -461,7 +461,7 @@ The renderer projection owns:
 - Muted, selected, disabled, pending, and active visual state
 - Whether the current browse mode may hide non-media territory
 
-It does not invent durable source facts.
+It does not invent durable source observations.
 
 ### Icon registry responsibilities
 
@@ -481,7 +481,7 @@ An implementation satisfies this doctrine when:
 
 1. Normal source browsing does not use raw operating-system icon assets.
 2. Product objects never use file-association icons.
-3. The durable substrate stores icon roles and source facts, not rendered icon blobs.
+3. The durable substrate stores icon roles and source observations, not rendered icon blobs.
 4. Source row states are composed from root-class base icon, source row state, selected badge, and visual state.
 5. Badge composition is deterministic and follows the priority table.
 6. Proposed source roots use the required pending treatment with no badge.

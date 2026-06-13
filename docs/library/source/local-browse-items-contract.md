@@ -85,7 +85,7 @@ They must not:
 - recurse by default;
 - hash files;
 - run media probes;
-- create `source_file_facts`;
+- create `source_file_observations`;
 - create `source_files`;
 - create `source_directories`;
 - create `source_locations`;
@@ -94,7 +94,7 @@ They must not:
 - publish source lifecycle events;
 - start scan work;
 - materialize attachments;
-- promote primary media;
+- promote playable media;
 - produce track identity work.
 
 Registration and scan remain explicit later actions after source-root admission.
@@ -207,7 +207,7 @@ Backend read acceptance:
 - Non-Windows V0 returns `unsupportedPlatform` consistently.
 - Exact admitted source path matches are marked with duplicate status without mutating sources.
 - Local browse item reads do not create source lifecycle rows, source locations, source directories, source files,
-  `source_file_facts`, navigation rows, search/filter rows, attachment rows, scan jobs, or source events.
+  `source_file_observations`, navigation rows, search/filter rows, attachment rows, scan jobs, or source events.
 
 Protocol acceptance:
 

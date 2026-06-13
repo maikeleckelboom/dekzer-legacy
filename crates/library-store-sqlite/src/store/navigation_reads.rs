@@ -149,10 +149,10 @@ impl SqliteDurableStore {
                           AND lower(sd.relative_path) = lower(candidate_paths.relative_path)
                     ) AS has_source_directory,
                     (
-                        SELECT sfacts.media_kind
+                        SELECT observations.media_kind
                         FROM source_files sf
-                        JOIN source_file_facts sfacts
-                          ON sfacts.source_file_id = sf.source_file_id
+                        JOIN source_file_observations observations
+                          ON observations.source_file_id = sf.source_file_id
                         WHERE sf.source_id = candidate_paths.root_id
                           AND sf.presence_state = 'present'
                           AND lower(sf.relative_path) = lower(candidate_paths.relative_path)

@@ -54,7 +54,7 @@ A fifth invariant governs the tree specifically:
 
 > **Tree containment is filter-agnostic. Tree content facets and the content pane are filter-aware.**
 
-Disclosure state, `hasChildren`, and `leaf` are structural facts. They do not change when the active filter changes.
+Disclosure state, `hasChildren`, and `leaf` are structural observations. They do not change when the active filter changes.
 Folder facets and content pane rows do change.
 
 ---
@@ -82,19 +82,19 @@ Source structure does **not** answer:
 - What media kinds are present?
 - What interpreted content can be produced?
 
-**The navigation readiness probe produces early source-structure facts for newly admitted local filesystem sources.**
-Background scan may later extend or refresh those facts. Source structure does not depend on classification,
+**The navigation readiness probe produces early source-structure observations for newly admitted local filesystem sources.**
+Background scan may later extend or refresh those observations. Source structure does not depend on classification,
 interpretation, browse policy, or facet projection.
 
 **The first visible source-structure window must be committed without waiting for classification or interpretation.**
 Classification and interpretation may run concurrently after source admission, but they must not block the first
 hierarchy window. See §11 for the full probe relationship.
 
-### 3.2 Source-file facts
+### 3.2 Source-file observations
 
 **Owner:** Scan / source indexer.
 
-Source-file facts are filesystem-level observations about a file as it exists on disk. They are the shared foundation
+Source-file observations are filesystem-level observations about a file as it exists on disk. They are the shared foundation
 that classification, identity, and interpretation all reference by `sourceFileId`. None of those authorities owns these
 fields.
 
@@ -107,8 +107,8 @@ fields.
 | `volumeFileId`  | Volume-level inode or file ID, if available, for fast change detection |
 | `accessibility` | `accessible` / `permissionDenied` / `unavailable`                      |
 
-Source-file facts are recorded at discovery time and updated when the scanner detects a change. Classification, identity
-hashing, and interpretation read these facts by reference; they do not duplicate them.
+Source-file observations are recorded at discovery time and updated when the scanner detects a change. Classification, identity
+hashing, and interpretation read these observations by reference; they do not duplicate them.
 
 ### 3.3 Source-file classification
 
@@ -123,36 +123,36 @@ For every source file discovered, the classifier produces a classification recor
 | `companionRole`       | Whether the file is a companion to another file, if directly inferable                           |
 | `classificationState` | `pending` / `classified` / `failed` / `blocked`                                                  |
 
-Classification references source-file facts (§3.2) by `sourceFileId` and may later reference identity facts (§3.4), but
+Classification references source-file observations (§3.2) by `sourceFileId` and may later reference identity observations (§3.4), but
 owns neither. **BLAKE3 hash completion does not gate classification.** A file may be classified before hashing is
 complete. The classifier reads extension, MIME type, and light content probing only.
 
-Classification is performed once per observed source-file version and persisted until invalidated by source-file fact
+Classification is performed once per observed source-file version and persisted until invalidated by source-file observation
 changes or classifier-version changes. It is not recomputed on each browse query. Switching the active filter does not
 trigger reclassification.
 
-### 3.4 Identity and evidence facts
+### 3.4 Identity and evidence observations
 
 **Owner:** Scan / identity worker.
 
-Identity facts support duplicate detection, change detection, and interpretation validation. They are computed
+Identity observations support duplicate detection, change detection, and interpretation validation. They are computed
 independently of and asynchronously from classification.
 
 | Field             | Description                                                |
 | ----------------- | ---------------------------------------------------------- |
-| `sourceFileId`    | Foreign key to source-file facts (§3.2)                    |
+| `sourceFileId`    | Foreign key to source-file observations (§3.2)                    |
 | `hashState`       | `pending` / `computing` / `complete` / `failed`            |
 | `blake3Hash`      | BLAKE3 content hash, populated once `hashState = complete` |
 | `hashGeneratedAt` | Timestamp when the hash was last successfully computed     |
 
-Identity facts update without blocking or invalidating existing classification records.
+Identity observations update without blocking or invalidating existing classification records.
 
 ### 3.5 Interpretation links
 
 **Owner:** Scan / interpreter.
 
 The interpreter reads classification records and persists relationships between source files and between source files
-and interpreted content assets. These relationships are **not** computed at query time. They are persisted facts with
+and interpreted content assets. These relationships are **not** computed at query time. They are persisted observations with
 their own lifecycle.
 
 Examples of interpretation links:
@@ -175,8 +175,8 @@ Examples of interpretation links:
 | `stale`      | Previously resolved; source file has changed since last resolution |
 | `ignored`    | Link explicitly ignored by policy or user action                   |
 
-The interpreter must not create content rows visible to the renderer. It persists link facts. The content projection
-authority reads those facts and decides which rows to emit.
+The interpreter must not create content rows visible to the renderer. It persists link observations. The content projection
+authority reads those observations and decides which rows to emit.
 
 ### 3.6 Content row projection
 
@@ -186,7 +186,7 @@ The content projection reads classification records and interpretation links and
 the content pane renders. The row universe and the row types produced depend on the active browse policy (§3.7).
 
 Content rows are projection outputs. They may be computed on read or materialized by a read model, but their authority
-derives from source-file facts, classification records, and interpretation links. A materialized read model is a valid
+derives from source-file observations, classification records, and interpretation links. A materialized read model is a valid
 performance optimization; it does not change the architectural owner or alter the truth of which layer is authoritative.
 
 ### 3.7 Browse policy / filter registry
@@ -259,7 +259,7 @@ describes the file as it exists on disk, independent of any interpretation.
 | `textDocument` | Plain text, log, or metadata text | `.txt` `.nfo` `.log` `.md`                                |
 | `unknownFile`  | Unrecognised or unclassifiable    | —                                                         |
 
-`FileClass` is stable for the current observed source-file version/epoch. If source-file facts change (file replaced in
+`FileClass` is stable for the current observed source-file version/epoch. If source-file observations change (file replaced in
 place, extension changed, cloud placeholder hydrated), classification may be invalidated and recomputed. `FileClass`
 does not change when the active browse policy changes.
 
@@ -562,7 +562,7 @@ linked by the interpreter but are **not visible in any default browse filter exc
 **Rationale:** Cover art files sitting beside audio files are a storage implementation detail, not a DJ browse target.
 Including them in `companionFiles` would make that filter noisy for the primary use case. Classification and
 interpretation still proceed: the `artworkImage` file class is assigned, and the artwork link to its associated track or
-album candidate is persisted. A future artwork or metadata inspection surface can read those facts. The browse filter
+album candidate is persisted. A future artwork or metadata inspection surface can read those observations. The browse filter
 layer simply does not surface artwork in any default filter other than raw inventory.
 
 Custom filters (V2+) may include `artworkImage` in their predicate if a user explicitly constructs one.
@@ -578,7 +578,7 @@ singleton. V0 has one library browse session shared across all tree and content 
 V0 is identical to a global. The architecture must not encode it as a global.
 
 **V0 behaviour:** One active browse policy applies to all content pane reads. The tree is never affected by this
-parameter (structural facts are filter-agnostic).
+parameter (structural observations are filter-agnostic).
 
 **Future behaviour:** Multiple browse panes (e.g., deck-locked browsing) each carry their own browse session context
 with an independent active policy. No refactor is required if the session parameter model is implemented correctly in
@@ -898,7 +898,7 @@ These criteria must be satisfied before any implementation against this document
     the browse policy registry does not exist.
 
 24. The navigation readiness probe must not produce classification records, interpretation links, content row
-    projections, identity facts, or facet values.
+    projections, identity observations, or facet values.
 
 ### 12.7 Row identity
 
@@ -931,7 +931,7 @@ These criteria must be satisfied before any implementation against this document
     appearance alone. These must be supplied as explicit projection fields on each content row when applicable.
 
 34. The renderer must consume and display the projection state it is supplied. It must not derive or override structural
-    or classification facts from any other source.
+    or classification observations from any other source.
 
 ### 12.9 Source guards
 

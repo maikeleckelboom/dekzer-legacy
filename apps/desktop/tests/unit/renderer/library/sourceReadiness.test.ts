@@ -212,7 +212,7 @@ describe('source readiness', () => {
     expect(readiness?.kind).toBe('scanning')
   })
 
-  it('backend scan facts beat stale terminal events', () => {
+  it('backend scan observations beat stale terminal events', () => {
     const readiness = readinessFor(browserState(), {
       lifecycle: sourceLifecycle({
         accessState: 'accessible',
@@ -448,7 +448,7 @@ function directoryNode(
     directoryId,
     presence: 'present',
     hasChildDirectories: true,
-    directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+    directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
     directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'complete',
     navigableChildScopeState: 'hasNavigableChildScopes',

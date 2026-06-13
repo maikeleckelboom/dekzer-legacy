@@ -26,11 +26,11 @@ impl SourceFileClass {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceFileClassFilter {
     NavigationOnly,
-    PrimaryMedia,
-    PrimaryMediaAndImages,
+    PlayableMedia,
+    PlayableMediaAndImages,
 }
 
-pub(crate) fn is_primary_file_class(file_class: &str) -> bool {
+pub(crate) fn is_playable_media_file_class(file_class: &str) -> bool {
     matches!(file_class, "audio" | "video")
 }
 
@@ -43,8 +43,10 @@ pub(crate) fn source_file_class_filter_predicate_sql(
 ) -> &'static str {
     match source_file_class_filter {
         SourceFileClassFilter::NavigationOnly => "0 = 1",
-        SourceFileClassFilter::PrimaryMedia => "file_class IN ('audio', 'video')",
-        SourceFileClassFilter::PrimaryMediaAndImages => "file_class IN ('audio', 'video', 'image')",
+        SourceFileClassFilter::PlayableMedia => "file_class IN ('audio', 'video')",
+        SourceFileClassFilter::PlayableMediaAndImages => {
+            "file_class IN ('audio', 'video', 'image')"
+        }
     }
 }
 
@@ -54,10 +56,10 @@ pub(crate) fn source_file_class_filter_predicate_sql_for_column(
 ) -> String {
     match source_file_class_filter {
         SourceFileClassFilter::NavigationOnly => "0 = 1".to_string(),
-        SourceFileClassFilter::PrimaryMedia => {
+        SourceFileClassFilter::PlayableMedia => {
             format!("{column_sql} IN ('audio', 'video')")
         }
-        SourceFileClassFilter::PrimaryMediaAndImages => {
+        SourceFileClassFilter::PlayableMediaAndImages => {
             format!("{column_sql} IN ('audio', 'video', 'image')")
         }
     }

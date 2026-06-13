@@ -87,11 +87,11 @@ pub(crate) fn store_contents_policy(
                     .collect(),
             }
         }
-        protocol::ContentsReadPolicy::PrimaryMedia { media_kinds } => {
-            store::StoreContentsReadPolicy::PrimaryMedia {
+        protocol::ContentsReadPolicy::PlayableMedia { media_kinds } => {
+            store::StoreContentsReadPolicy::PlayableMedia {
                 media_kinds: media_kinds
                     .into_iter()
-                    .map(store_primary_media_kind)
+                    .map(store_playable_media_kind)
                     .collect(),
             }
         }
@@ -118,12 +118,12 @@ const fn store_contents_file_class(
     }
 }
 
-const fn store_primary_media_kind(
-    media_kind: protocol::PrimaryMediaKind,
-) -> store::StorePrimaryMediaKind {
+const fn store_playable_media_kind(
+    media_kind: protocol::PlayableMediaKind,
+) -> store::StorePlayableMediaKind {
     match media_kind {
-        protocol::PrimaryMediaKind::Audio => store::StorePrimaryMediaKind::Audio,
-        protocol::PrimaryMediaKind::Video => store::StorePrimaryMediaKind::Video,
+        protocol::PlayableMediaKind::Audio => store::StorePlayableMediaKind::Audio,
+        protocol::PlayableMediaKind::Video => store::StorePlayableMediaKind::Video,
     }
 }
 
@@ -172,8 +172,8 @@ pub(crate) fn map_read_source_integrity_reply(
         evidence_and_maintenance: protocol::SourceIntegrityEvidenceAndMaintenance {
             remaining_hash_candidates: maintenance.remaining_hash_candidates,
             remaining_probe_candidates: maintenance.remaining_probe_candidates,
-            remaining_primary_media_promotion_candidates: maintenance
-                .remaining_primary_media_promotion_candidates,
+            remaining_playable_media_promotion_candidates: maintenance
+                .remaining_playable_media_promotion_candidates,
             remaining_track_identity_candidate_production_candidates: maintenance
                 .remaining_track_identity_candidate_production_candidates,
             remaining_track_identity_decision_production_candidates: maintenance
@@ -621,11 +621,12 @@ fn map_source_integrity_attachment_integrity(
         current_links_count: attachment_links.current_links_count,
         stale_links_count: attachment_links.stale_links_count,
         missing_links_count: attachment_links.source_files_missing_attachment_links_count,
-        source_files_with_current_blake3_facts_count: attachment_links
-            .source_files_with_current_blake3_facts_count,
+        source_files_with_current_blake3_observations_count: attachment_links
+            .source_files_with_current_blake3_observations_count,
         source_files_with_attachment_links_count: attachment_links
             .source_files_with_attachment_links_count,
-        unmaterialized_blake3_facts_count: attachment_links.unmaterialized_blake3_facts_count,
+        unmaterialized_blake3_observations_count: attachment_links
+            .unmaterialized_blake3_observations_count,
     }
 }
 
@@ -682,7 +683,7 @@ fn map_source_file_attachment_link(
         file_kind,
         file_class,
         presence_state,
-        has_current_blake3_fact: link.has_current_blake3_fact,
+        has_current_blake3_observation: link.has_current_blake3_observation,
         link_status: map_source_file_attachment_link_status(link.link_status),
         source_mount_status,
         source_access_state,
@@ -801,12 +802,13 @@ fn map_source_attachment_summary(
         source_id: summary.source_id,
         current_links_count: summary.current_links_count,
         stale_links_count: summary.stale_links_count,
-        source_files_with_current_blake3_facts_count: summary
-            .source_files_with_current_blake3_facts_count,
+        source_files_with_current_blake3_observations_count: summary
+            .source_files_with_current_blake3_observations_count,
         source_files_with_attachment_links_count: summary.source_files_with_attachment_links_count,
         source_files_missing_attachment_links_count: summary
             .source_files_missing_attachment_links_count,
-        unmaterialized_blake3_facts_count: summary.source_files_missing_attachment_links_count,
+        unmaterialized_blake3_observations_count: summary
+            .source_files_missing_attachment_links_count,
     }
 }
 
@@ -1085,7 +1087,7 @@ fn map_library_tree_node(
         node.has_child_directories,
         "has_child_directories",
     )?;
-    let directory_primary_media_state = map_directory_primary_media_state(&node)?;
+    let directory_playable_media_state = map_directory_playable_media_state(&node)?;
     let directory_image_media_state = map_directory_image_media_state(&node)?;
     let directory_scan_state = map_directory_scan_state_for_node(&node)?;
     let file_class = map_library_tree_file_class(&node)?;
@@ -1115,7 +1117,7 @@ fn map_library_tree_node(
         modified_at_ns: node.modified_at_ns,
         updated_at_ms: node.updated_at,
         has_child_directories,
-        directory_primary_media_state,
+        directory_playable_media_state,
         directory_image_media_state,
         directory_scan_state,
         navigable_child_scope_state,
@@ -1172,23 +1174,23 @@ fn map_directory_only_field<T>(
     }
 }
 
-fn map_directory_primary_media_state(
+fn map_directory_playable_media_state(
     node: &store::StoreLiteralHierarchyNode,
-) -> store::LibrarySqliteResult<Option<protocol::DirectoryPrimaryMediaState>> {
+) -> store::LibrarySqliteResult<Option<protocol::DirectoryPlayableMediaState>> {
     if node.node_kind != "directory" {
         return Ok(None);
     }
 
-    let has_primary_media_descendant = node.has_primary_media_descendant.unwrap_or(false);
+    let has_playable_media_descendant = node.has_playable_media_descendant.unwrap_or(false);
     let dir_scan_state = node.dir_scan_state.as_deref().unwrap_or("pending");
     let directory_scan_state = map_directory_scan_state(dir_scan_state)?;
 
-    Ok(Some(if has_primary_media_descendant {
-        protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants
+    Ok(Some(if has_playable_media_descendant {
+        protocol::DirectoryPlayableMediaState::HasPlayableMediaDescendants
     } else if directory_scan_state == protocol::DirectoryScanState::Complete {
-        protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants
+        protocol::DirectoryPlayableMediaState::NoPlayableMediaDescendants
     } else {
-        protocol::DirectoryPrimaryMediaState::Unknown
+        protocol::DirectoryPlayableMediaState::Unknown
     }))
 }
 
@@ -1277,11 +1279,11 @@ fn map_contents_policy(policy: store::StoreContentsReadPolicy) -> protocol::Cont
                     .collect(),
             }
         }
-        store::StoreContentsReadPolicy::PrimaryMedia { media_kinds } => {
-            protocol::ContentsReadPolicy::PrimaryMedia {
+        store::StoreContentsReadPolicy::PlayableMedia { media_kinds } => {
+            protocol::ContentsReadPolicy::PlayableMedia {
                 media_kinds: media_kinds
                     .into_iter()
-                    .map(map_primary_media_kind)
+                    .map(map_playable_media_kind)
                     .collect(),
             }
         }
@@ -1308,12 +1310,12 @@ const fn map_contents_file_class(
     }
 }
 
-const fn map_primary_media_kind(
-    media_kind: store::StorePrimaryMediaKind,
-) -> protocol::PrimaryMediaKind {
+const fn map_playable_media_kind(
+    media_kind: store::StorePlayableMediaKind,
+) -> protocol::PlayableMediaKind {
     match media_kind {
-        store::StorePrimaryMediaKind::Audio => protocol::PrimaryMediaKind::Audio,
-        store::StorePrimaryMediaKind::Video => protocol::PrimaryMediaKind::Video,
+        store::StorePlayableMediaKind::Audio => protocol::PlayableMediaKind::Audio,
+        store::StorePlayableMediaKind::Video => protocol::PlayableMediaKind::Video,
     }
 }
 
@@ -1389,7 +1391,7 @@ fn map_contents_row(
         .ok_or_else(|| invalid_contents_value("file_kind", &row.file_kind))?;
     let presence = protocol::ContentsPresenceState::from_projection_value(&row.presence)
         .ok_or_else(|| invalid_contents_value("presence", &row.presence))?;
-    let primary_media = row.primary_media.map(map_primary_media_summary);
+    let playable_media = row.playable_media.map(map_playable_media_summary);
 
     Ok(protocol::ContentsFileRow {
         id: row.id,
@@ -1402,16 +1404,14 @@ fn map_contents_row(
         file_class,
         file_kind,
         presence,
-        primary_media,
+        playable_media,
         updated_at_ms: Some(row.updated_at),
     })
 }
 
-fn map_primary_media_summary(
-    summary: store::StorePrimaryMediaSummary,
-) -> protocol::PrimaryMediaSummary {
-    protocol::PrimaryMediaSummary {
-        primary_media_fact_id: summary.primary_media_fact_id,
+fn map_playable_media_summary(summary: store::StorePlayableMedia) -> protocol::PlayableMedia {
+    protocol::PlayableMedia {
+        playable_media_id: summary.playable_media_id,
         attachment_id: summary.attachment_id,
         content_hash_algorithm: summary.content_hash_algorithm,
         content_hash_value: summary.content_hash_value,
@@ -1446,13 +1446,13 @@ mod tests {
     use library_store_sqlite as store;
 
     fn directory_node(
-        has_primary_media_descendant: bool,
+        has_playable_media_descendant: bool,
         has_image_media_descendant: bool,
         dir_scan_state: &str,
     ) -> store::StoreLiteralHierarchyNode {
         directory_node_with_child_directories(
             true,
-            has_primary_media_descendant,
+            has_playable_media_descendant,
             has_image_media_descendant,
             dir_scan_state,
         )
@@ -1460,7 +1460,7 @@ mod tests {
 
     fn directory_node_with_child_directories(
         has_child_directories: bool,
-        has_primary_media_descendant: bool,
+        has_playable_media_descendant: bool,
         has_image_media_descendant: bool,
         dir_scan_state: &str,
     ) -> store::StoreLiteralHierarchyNode {
@@ -1478,7 +1478,7 @@ mod tests {
             modified_at_ns: None,
             updated_at: 100,
             has_child_directories: Some(has_child_directories),
-            has_primary_media_descendant: Some(has_primary_media_descendant),
+            has_playable_media_descendant: Some(has_playable_media_descendant),
             has_image_media_descendant: Some(has_image_media_descendant),
             dir_scan_state: Some(dir_scan_state.to_string()),
         }
@@ -1499,14 +1499,14 @@ mod tests {
             modified_at_ns: Some(20),
             updated_at: 100,
             has_child_directories: None,
-            has_primary_media_descendant: None,
+            has_playable_media_descendant: None,
             has_image_media_descendant: None,
             dir_scan_state: None,
         }
     }
 
     #[test]
-    fn library_tree_mapping_returns_directory_coverage_facts_and_omits_them_for_files() {
+    fn library_tree_mapping_returns_directory_coverage_state_and_omits_it_for_files() {
         let reply =
             map_read_library_tree_children_reply(Some(store::StoreLiteralHierarchyWindow {
                 entry_point: store::StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
@@ -1532,8 +1532,8 @@ mod tests {
         let directory = &window.rows[0];
         assert_eq!(directory.has_child_directories, Some(true));
         assert_eq!(
-            directory.directory_primary_media_state,
-            Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants)
+            directory.directory_playable_media_state,
+            Some(protocol::DirectoryPlayableMediaState::HasPlayableMediaDescendants)
         );
         assert_eq!(
             directory.directory_image_media_state,
@@ -1551,7 +1551,7 @@ mod tests {
         let file = &window.rows[1];
         assert_eq!(file.file_class, Some(protocol::LibraryTreeFileClass::Audio));
         assert_eq!(file.has_child_directories, None);
-        assert_eq!(file.directory_primary_media_state, None);
+        assert_eq!(file.directory_playable_media_state, None);
         assert_eq!(file.directory_image_media_state, None);
         assert_eq!(file.directory_scan_state, None);
         assert_eq!(file.navigable_child_scope_state, None);
@@ -1583,8 +1583,8 @@ mod tests {
         ))
         .expect("map complete directory");
         assert_eq!(
-            complete.directory_primary_media_state,
-            Some(protocol::DirectoryPrimaryMediaState::NoPrimaryMediaDescendants)
+            complete.directory_playable_media_state,
+            Some(protocol::DirectoryPlayableMediaState::NoPlayableMediaDescendants)
         );
         assert_eq!(
             complete.directory_image_media_state,
@@ -1601,9 +1601,9 @@ mod tests {
             ))
             .expect("map incomplete directory");
             assert_eq!(
-                mapped.directory_primary_media_state,
-                Some(protocol::DirectoryPrimaryMediaState::Unknown),
-                "{scan_state} must not map to confirmed no-primary-media"
+                mapped.directory_playable_media_state,
+                Some(protocol::DirectoryPlayableMediaState::Unknown),
+                "{scan_state} must not map to confirmed no-playable-media"
             );
             assert_eq!(
                 mapped.directory_image_media_state,
@@ -1625,8 +1625,8 @@ mod tests {
         ))
         .expect("map media leaf directory");
         assert_eq!(
-            media_leaf.directory_primary_media_state,
-            Some(protocol::DirectoryPrimaryMediaState::HasPrimaryMediaDescendants)
+            media_leaf.directory_playable_media_state,
+            Some(protocol::DirectoryPlayableMediaState::HasPlayableMediaDescendants)
         );
         assert_eq!(
             media_leaf.navigable_child_scope_state,

@@ -13,10 +13,10 @@ schema, current table names, generated contracts, Rust types, TypeScript types, 
 The post-deletion baseline is authoritative through the accepted current substrate docs:
 
 - source files and source lifecycle/integrity;
-- `source_file_facts` observed evidence;
+- `source_file_observations` observed evidence;
 - `content_attachments`;
 - `source_file_attachment_links`;
-- primary-media facts;
+- playable-media observations;
 - exact-content track-identity candidates;
 - track-identity decisions and review projections;
 - contents/search/filter and navigation contracts.
@@ -56,7 +56,7 @@ authority to old vocabulary.
 This document does not own:
 
 - current schema authority;
-- current file, attachment, primary-media, or track-identity table names;
+- current file, attachment, playable-media, or track-identity table names;
 - preparation facet table names;
 - waveform, analysis, artifact, work-run, or work-item table names;
 - browser projection tables;
@@ -74,10 +74,10 @@ decision behavior, read projection, invalidation rules, and implementation bound
 
 ### Files Are Not Tracks
 
-A source file is an observed inventory fact. It can have path, size, mtime, presence, and observed evidence. It is not a
+A source file is an observed inventory observation. It can have path, size, mtime, presence, and observed evidence. It is not a
 track and must not be promoted into musical identity by path, filename, or hash alone.
 
-Current authority for this separation lives in the source-file, observed-facts, attachment identity, primary-media, and
+Current authority for this separation lives in the source-file, observed-observations, attachment identity, playable-media, and
 track-identity candidate/decision contracts.
 
 ### Content Identity Is Not Musical Identity
@@ -103,7 +103,7 @@ Waveform and analysis work should eventually be artifact-backed, basis-bound, st
 versions. Renderer-generated throwaway state is not durable preparation authority.
 
 Detailed waveform and analysis contracts are intentionally absent here. They come after this authority cleanup and must
-project the current attachment, primary-media, candidate, and decision substrate.
+project the current attachment, playable-media, candidate, and decision substrate.
 
 ### Work Outputs Need Provenance
 

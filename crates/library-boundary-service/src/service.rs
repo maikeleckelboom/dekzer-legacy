@@ -778,8 +778,8 @@ impl LibraryBoundaryService {
             status: snapshot.status,
             remaining_hash_candidates: snapshot.remaining_hash_candidates,
             remaining_probe_candidates: snapshot.remaining_probe_candidates,
-            remaining_primary_media_promotion_candidates: snapshot
-                .remaining_primary_media_promotion_candidates,
+            remaining_playable_media_promotion_candidates: snapshot
+                .remaining_playable_media_promotion_candidates,
             remaining_track_identity_candidate_production_candidates: snapshot
                 .remaining_track_identity_candidate_production_candidates,
             remaining_track_identity_decision_production_candidates: snapshot
@@ -1423,13 +1423,13 @@ fn map_run_source_maintenance_reply(
         hash: run.hash,
         attachment_materialization: run.attachment_materialization,
         probe: run.probe,
-        primary_media_promotion: run.primary_media_promotion,
+        playable_media_promotion: run.playable_media_promotion,
         track_identity_candidates: run.track_identity_candidates,
         track_identity_decisions: run.track_identity_decisions,
         remaining_hash_candidates: run.remaining_hash_candidates,
         remaining_probe_candidates: run.remaining_probe_candidates,
-        remaining_primary_media_promotion_candidates: run
-            .remaining_primary_media_promotion_candidates,
+        remaining_playable_media_promotion_candidates: run
+            .remaining_playable_media_promotion_candidates,
         remaining_track_identity_candidate_production_candidates: run
             .remaining_track_identity_candidate_production_candidates,
         remaining_track_identity_decision_production_candidates: run
@@ -1466,7 +1466,7 @@ fn validate_contents_policy(policy: &protocol::ContentsReadPolicy) -> protocol::
         protocol::ContentsReadPolicy::SourceFileInventory { file_classes } => {
             file_classes.is_empty()
         }
-        protocol::ContentsReadPolicy::PrimaryMedia { media_kinds } => media_kinds.is_empty(),
+        protocol::ContentsReadPolicy::PlayableMedia { media_kinds } => media_kinds.is_empty(),
     };
     if empty_filter {
         return Err(protocol::ProtocolError::InvalidRequest {
@@ -1601,7 +1601,7 @@ mod tests {
         CancelRootScanStatus, CommandOutcome, CommandReply, CommandRequest, ContentsFileClass,
         ContentsPresenceState, ContentsReadPolicy, ContentsReadRequest, ContentsScope,
         ContentsScopeCoverageState, ContentsScopeDepth, DeferTrackIdentityCandidateRequest,
-        DirectoryImageMediaState, DirectoryPrimaryMediaState, DirectoryScanState,
+        DirectoryImageMediaState, DirectoryPlayableMediaState, DirectoryScanState,
         HashSourceFilesBlake3Reply, HashSourceFilesBlake3Request,
         HashSourceFilesBlake3SourceFailure, LibraryBoundaryEvent,
         LibraryBoundaryEventStreamCommand, LibraryBoundaryEventStreamReply, LibraryRootCommand,
@@ -2400,7 +2400,7 @@ mod tests {
     }
 
     #[test]
-    fn source_lifecycle_read_returns_authoritative_source_level_facts() {
+    fn source_lifecycle_read_returns_authoritative_source_level_state() {
         let (tempdir, _context, service) = open_service_with_context();
         let source_root = tempdir.path().join("source-lifecycle-root");
         std::fs::create_dir_all(&source_root).expect("create source root");
@@ -2581,8 +2581,8 @@ mod tests {
         assert_eq!(crate_row.presence_state, LibraryTreePresenceState::Present);
         assert_eq!(crate_row.has_child_directories, Some(false));
         assert_eq!(
-            crate_row.directory_primary_media_state,
-            Some(DirectoryPrimaryMediaState::HasPrimaryMediaDescendants)
+            crate_row.directory_playable_media_state,
+            Some(DirectoryPlayableMediaState::HasPlayableMediaDescendants)
         );
         assert_eq!(
             crate_row.directory_image_media_state,
@@ -2661,8 +2661,8 @@ mod tests {
             .filter(|source_file_id| {
                 service
                     .durable_store
-                    .read_observed_file_facts_for_source_file(**source_file_id)
-                    .expect("read observed facts")
+                    .read_source_file_observation(**source_file_id)
+                    .expect("read source-file observations")
                     .is_some()
             })
             .count();
@@ -2712,13 +2712,13 @@ mod tests {
         );
 
         for source_file_id in &file_ids {
-            let facts = service
+            let observations = service
                 .durable_store
-                .read_observed_file_facts_for_source_file(*source_file_id)
-                .expect("read observed facts")
-                .expect("scan-triggered and manual maintenance write observed facts");
+                .read_source_file_observation(*source_file_id)
+                .expect("read source-file observations")
+                .expect("scan-triggered and manual maintenance write source-file observations");
             assert_eq!(
-                facts.content_hash.expect("content hash").algorithm,
+                observations.content_hash.expect("content hash").algorithm,
                 "blake3"
             );
         }
@@ -2812,40 +2812,46 @@ mod tests {
         assert_eq!(links.stale_links_count, 0);
         assert_eq!(links.source_files_missing_attachment_links_count, 0);
 
-        let audio_facts = service
+        let audio_observations = service
             .durable_store
-            .read_observed_file_facts_for_source_file(100)
-            .expect("read audio facts")
-            .expect("audio facts exist");
+            .read_source_file_observation(100)
+            .expect("read audio observations")
+            .expect("audio observations exist");
         assert_eq!(
-            audio_facts.content_hash.expect("audio hash").algorithm,
+            audio_observations
+                .content_hash
+                .expect("audio hash")
+                .algorithm,
             "blake3"
         );
-        assert_eq!(audio_facts.duration_ms, Some(100));
-        assert_eq!(audio_facts.sample_rate_hz, Some(44_100));
+        assert_eq!(audio_observations.duration_ms, Some(100));
+        assert_eq!(audio_observations.sample_rate_hz, Some(44_100));
 
-        let video_facts = service
+        let video_observations = service
             .durable_store
-            .read_observed_file_facts_for_source_file(101)
-            .expect("read video facts")
-            .expect("video facts exist");
+            .read_source_file_observation(101)
+            .expect("read video observations")
+            .expect("video observations exist");
         assert_eq!(
-            video_facts.content_hash.expect("video hash").algorithm,
+            video_observations
+                .content_hash
+                .expect("video hash")
+                .algorithm,
             "blake3"
         );
-        assert_eq!(video_facts.duration_ms, None);
+        assert_eq!(video_observations.duration_ms, None);
 
-        let cue_facts = service
+        let cue_observation = service
             .durable_store
-            .read_observed_file_facts_for_source_file(102)
-            .expect("read cue facts")
-            .expect("cue facts exist");
-        assert_eq!(cue_facts.media_kind, "cue_sheet");
+            .read_source_file_observation(102)
+            .expect("read cue observations")
+            .expect("cue observations exist");
+        assert_eq!(cue_observation.media_kind, "cue_sheet");
         assert_eq!(
-            cue_facts.content_hash.expect("cue hash").algorithm,
+            cue_observation.content_hash.expect("cue hash").algorithm,
             "blake3"
         );
-        assert_eq!(cue_facts.duration_ms, None);
+        assert_eq!(cue_observation.duration_ms, None);
 
         let snapshot = read_source_maintenance(&service, registered.root_id);
         assert_eq!(
@@ -3565,10 +3571,13 @@ mod tests {
         assert_eq!(summary.source_id, registered.root_id);
         assert_eq!(summary.current_links_count, 2);
         assert_eq!(summary.stale_links_count, 0);
-        assert_eq!(summary.source_files_with_current_blake3_facts_count, 2);
+        assert_eq!(
+            summary.source_files_with_current_blake3_observations_count,
+            2
+        );
         assert_eq!(summary.source_files_with_attachment_links_count, 2);
         assert_eq!(summary.source_files_missing_attachment_links_count, 0);
-        assert_eq!(summary.unmaterialized_blake3_facts_count, 0);
+        assert_eq!(summary.unmaterialized_blake3_observations_count, 0);
 
         service
             .durable_store
@@ -3615,7 +3624,10 @@ mod tests {
             .expect("source summary exists after stale basis");
         assert_eq!(summary.current_links_count, 1);
         assert_eq!(summary.stale_links_count, 1);
-        assert_eq!(summary.source_files_with_current_blake3_facts_count, 1);
+        assert_eq!(
+            summary.source_files_with_current_blake3_observations_count,
+            1
+        );
         assert_eq!(summary.source_files_with_attachment_links_count, 2);
         assert_eq!(summary.source_files_missing_attachment_links_count, 0);
 
@@ -3656,7 +3668,7 @@ mod tests {
         assert!(missing_source.summary.is_none());
 
         let before_counts = (
-            count_rows(&context, "source_file_facts"),
+            count_rows(&context, "source_file_observations"),
             count_rows(&context, "content_attachments"),
             count_rows(&context, "source_file_attachment_links"),
             service.source_maintenance.completed_runs_for_test().len(),
@@ -3665,7 +3677,7 @@ mod tests {
         let _ = read_attachment_source_files(&service, first_link.attachment_id, Some(10));
         let _ = read_source_attachment_summary(&service, registered.root_id);
         let after_counts = (
-            count_rows(&context, "source_file_facts"),
+            count_rows(&context, "source_file_observations"),
             count_rows(&context, "content_attachments"),
             count_rows(&context, "source_file_attachment_links"),
             service.source_maintenance.completed_runs_for_test().len(),
@@ -3802,7 +3814,7 @@ mod tests {
         assert_eq!(run.hash.hashed_count, 0);
         assert_eq!(run.attachment_materialization.links_created, 0);
         assert_eq!(run.probe.probed_count, 0);
-        assert_eq!(count_rows(&context, "source_file_facts"), 0);
+        assert_eq!(count_rows(&context, "source_file_observations"), 0);
         assert_eq!(count_rows(&context, "content_attachments"), 0);
         assert_eq!(
             service.source_maintenance.completed_runs_for_test().len(),
@@ -3985,7 +3997,7 @@ mod tests {
             runs[0].attachment_materialization.links_created == 0,
             "stop must be observed before starting the attachment materialization unit"
         );
-        assert_eq!(count_rows(&context, "source_file_facts"), 1);
+        assert_eq!(count_rows(&context, "source_file_observations"), 1);
         assert_eq!(count_rows(&context, "source_file_attachment_links"), 0);
         assert_eq!(count_rows(&context, "content_attachments"), 0);
     }

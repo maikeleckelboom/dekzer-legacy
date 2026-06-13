@@ -66,9 +66,9 @@ rebuilt from authoritative tables and read models:
 | Source locations                                                  | `source_locations`                                                                           |
 | Directory identity, path, presence, scan coverage                 | `source_directories`                                                                         |
 | Source-file identity, path, name, file class, file kind, presence | `source_files`                                                                               |
-| Current BLAKE3 evidence availability                              | current `source_file_facts` basis and `content_hash_algorithm = 'blake3'`                          |
+| Current BLAKE3 evidence availability                              | current `source_file_observations` basis and `content_hash_algorithm = 'blake3'`                          |
 | Attachment identity summary                                       | `content_attachments` plus `source_file_attachment_links`, with link status computed by join |
-| Media probe summary                                               | current-basis `source_file_facts` probe fields                                                     |
+| Media probe summary                                               | current-basis `source_file_observations` probe fields                                                     |
 | CUE/companion classification                                      | current source-file `file_kind`/`file_class` only                                            |
 
 The renderer may:
@@ -117,7 +117,7 @@ Indexed material:
   - probe summary present or missing;
   - probe-supported evidence when current fields exist;
   - unsupported or failed status only when current implementation has an explicit basis for that result;
-  - container/audio summary fields already stored in `source_file_facts`;
+  - container/audio summary fields already stored in `source_file_observations`;
 - CUE/source companion classification that is already available from `file_kind = 'cue_sheet'` or existing companion
   file classification.
 
@@ -126,7 +126,7 @@ Explicitly deferred:
 - canonical tracks;
 - canonical track metadata;
 - media candidates;
-- primary-media activation as the default browser/search population;
+- playable-media activation as the default browser/search population;
 - preparation/readiness facets;
 - tags as canonical metadata;
 - crates, playlists, smart lists, sleeves, Prepared Room objects, and authored membership;
@@ -154,7 +154,7 @@ V0 target kinds:
 | `directory`                 | `source_directory_id` plus `source_id`                                   | source hierarchy authority               |
 | `sourceFile`                | `source_file_id` plus `source_id`                                        | source-file inventory authority          |
 | `attachmentEvidenceSummary` | attachment id plus source-file link id when link-scoped                  | attachment identity read authority       |
-| `mediaProbeEvidenceSummary` | `source_file_id` plus accepted probe artifact/fact basis where available | observed-facts/media-probe authority     |
+| `mediaProbeEvidenceSummary` | `source_file_id` plus accepted probe artifact/observation basis where available | observed-observations/media-probe authority     |
 
 The backend may choose to return evidence summaries as separate results or as attached summaries on `sourceFile`
 results. Either shape is valid only when the response states the result kind and authority layer explicitly.
@@ -328,14 +328,14 @@ Staleness triggers:
 - source-directory insert/update/removal, path/name changes, presence changes, scan state changes, or parent changes;
 - source-file insert/update/removal, path/name changes, file class/kind changes, presence changes, parent changes, size
   changes, or mtime changes;
-- `source_file_facts` basis change, insertion, removal, hash change, probe-field change, or current/stale basis transition;
+- `source_file_observations` basis change, insertion, removal, hash change, probe-field change, or current/stale basis transition;
 - `content_attachments` insertion or hash summary change;
 - `source_file_attachment_links` insertion, replacement, deletion, or computed link-status transition;
 - classifier or indexer version changes that alter tokenization, indexed field selection, normalized sort fields, or
   filter columns.
 
 Index rows may have their own rebuild state because the search index owns that derived state. That does not authorize
-stored stale booleans on observed-fact or attachment-link authorities. Evidence/link validity remains computed by the
+stored stale booleans on observed-observation or attachment-link authorities. Evidence/link validity remains computed by the
 authority read model; the search index may cache a derived status for its own row generation and must repair it from
 authority on rebuild.
 
@@ -353,7 +353,7 @@ Rebuild model:
 Repair model:
 
 - Source scan changes enqueue or run rebuild for affected source, source locations, directories, and source files.
-- Observed fact changes rebuild affected source-file and evidence-summary rows.
+- Observed observation changes rebuild affected source-file and evidence-summary rows.
 - Probe changes rebuild affected source-file/probe-summary rows.
 - Attachment changes rebuild affected source-file and attachment-summary rows.
 - Gap recovery or unknown invalidation may request a conservative visible-scope or library-wide rebuild check.
@@ -448,7 +448,7 @@ A-8 must not add:
 - tag ledger tables;
 - occurrence/product duplicate/relocation tables;
 - renderer cache tables as search authority;
-- stored stale booleans on `source_file_facts` or `source_file_attachment_links`.
+- stored stale booleans on `source_file_observations` or `source_file_attachment_links`.
 
 ### Backend read boundary shape
 

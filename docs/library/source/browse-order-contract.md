@@ -14,7 +14,7 @@ This contract applies to:
 - **Contents source-file** ordering, which is fixed and uses
   `path_sort_key`
 
-Contents primary-media remains metadata-first, and its `relative_path` fallback
+Contents playable-media remains metadata-first, and its `relative_path` fallback
 is not converted yet. Library browser remains metadata-first and is not fully
 converted. The renderer must not reorder backend windows.
 
@@ -98,7 +98,7 @@ ORDER BY sf.path_sort_key ASC,  -- path-level natural order
          sf.source_file_id ASC                    -- stable id
 ```
 
-### Contents primary-media
+### Contents playable-media
 
 Metadata-first ordering (availability, title, artist, album). The final
 `relative_path` tie-break uses `lower(COALESCE(relative_path, ''))`.
@@ -136,7 +136,7 @@ The following surfaces have not yet been migrated to natural browse sort keys:
 
 | Surface                         | File                                                | Current ordering                          | Backend paginated        | Requires cursor change |
 | ------------------------------- | --------------------------------------------------- | ----------------------------------------- | ------------------------ | ---------------------- |
-| **Contents primary-media** | `contents.rs` `PRIMARY_MEDIA_CONTENTS_ORDER_SQL` | `lower(title/artist/album/relative_path)` | Yes | Yes |
+| **Contents playable-media** | `contents.rs` `PLAYABLE_MEDIA_CONTENTS_ORDER_SQL` | `lower(title/artist/album/relative_path)` | Yes | Yes |
 | **Navigation** | `navigation.rs` (projections) | `sibling_position` | No | N/A |
 
 ### Rationale for deferral

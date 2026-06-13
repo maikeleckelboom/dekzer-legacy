@@ -34,10 +34,10 @@ Local browse entry point reads must not create, own, or imply any of the followi
 - `source_locations`;
 - `source_files`;
 - `source_directories`;
-- `source_file_facts`;
+- `source_file_observations`;
 - `navigation_rows`;
 - search/filter rows;
-- hash, probe, attachment, primary-media, or track-identity work;
+- hash, probe, attachment, playable-media, or track-identity work;
 - renderer-owned filesystem crawling.
 
 A rejected or confirmation-required path must not become a partial source object while waiting for user action.
@@ -145,9 +145,9 @@ Confirmation remains owned by source-root admission results, not by local browse
 
 Local browse reads are pre-admission snapshot reads. They may expose entry points and bounded immediate item windows.
 
-They must not create or own `source_files`, `source_directories`, `source_file_facts`, `source_locations`, or
+They must not create or own `source_files`, `source_directories`, `source_file_observations`, `source_locations`, or
 `navigation_rows` before admission. They must not populate search/filter rows, publish source scan lifecycle events,
-start hashing, run media probes, materialize attachments, promote primary media, produce track identity, trigger cloud
+start hashing, run media probes, materialize attachments, promote playable media, produce track identity, trigger cloud
 downloads, or follow symlink/junction escapes.
 
 ## Admission Handoff

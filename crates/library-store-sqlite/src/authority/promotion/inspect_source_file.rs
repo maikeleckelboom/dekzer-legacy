@@ -2,8 +2,8 @@ use crate::authority::promotion::{
     RebuildProjectionPromotionInput, RebuildProjectionPromotionResult, RebuildProjectionPromotionTx,
 };
 use crate::authority::sources::{
-    CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
-    SourceFileFactsAuthorityTx,
+    CommitAcceptedSourceFileObservationInput, CommitAcceptedSourceFileObservationMergePolicy,
+    SourceFileObservationAuthorityTx,
 };
 use crate::authority::work::{
     ArtifactFileStoreRoot, retire_artifact_if_unreferenced_and_unclaimed,
@@ -14,8 +14,8 @@ use library_domain::{ArtifactId, ProjectionDomain, SourceFileId, WorkPriorityCla
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InspectSourceFilePromotionInput {
-    pub source_file_facts: CommitAcceptedSourceFileFactsInput,
-    pub source_file_facts_merge_policy: CommitAcceptedSourceFileFactsMergePolicy,
+    pub source_file_observations: CommitAcceptedSourceFileObservationInput,
+    pub source_file_observation_merge_policy: CommitAcceptedSourceFileObservationMergePolicy,
     pub rebuild_projection_domains: Vec<ProjectionDomain>,
     pub rebuild_priority: WorkPriorityClass,
 }
@@ -45,15 +45,18 @@ impl<'write, 'conn> InspectSourceFilePromotionTx<'write, 'conn> {
         &mut self,
         input: &InspectSourceFilePromotionInput,
     ) -> LibrarySqliteResult<InspectSourceFilePromotionResult> {
-        let previous_source_file_facts =
-            load_source_file_facts_state(&*self.tx, input.source_file_facts.source_file_id)?;
-        SourceFileFactsAuthorityTx::new(&*self.tx).commit_accepted_source_file_facts_with_merge(
-            &input.source_file_facts,
-            input.source_file_facts_merge_policy,
+        let previous_source_file_observations = load_source_file_observations_state(
+            &*self.tx,
+            input.source_file_observations.source_file_id,
         )?;
+        SourceFileObservationAuthorityTx::new(&*self.tx)
+            .commit_accepted_source_file_observation_with_merge(
+                &input.source_file_observations,
+                input.source_file_observation_merge_policy,
+            )?;
 
-        if let Some((_, previous_accepted_artifact_id)) = previous_source_file_facts.as_ref()
-            && *previous_accepted_artifact_id != input.source_file_facts.accepted_artifact_id
+        if let Some((_, previous_accepted_artifact_id)) = previous_source_file_observations.as_ref()
+            && *previous_accepted_artifact_id != input.source_file_observations.accepted_artifact_id
         {
             retire_artifact_if_unreferenced_and_unclaimed(
                 self.tx,
@@ -68,9 +71,9 @@ impl<'write, 'conn> InspectSourceFilePromotionTx<'write, 'conn> {
             projection_rebuilds.push(rebuild_projection.rebuild_projection(
                 &RebuildProjectionPromotionInput {
                     projection_domain: *projection_domain,
-                    basis_fingerprint: input.source_file_facts.basis_fingerprint.clone(),
+                    basis_fingerprint: input.source_file_observations.basis_fingerprint.clone(),
                     priority_class: input.rebuild_priority,
-                    queued_at: input.source_file_facts.updated_at,
+                    queued_at: input.source_file_observations.updated_at,
                 },
             )?);
         }
@@ -81,7 +84,7 @@ impl<'write, 'conn> InspectSourceFilePromotionTx<'write, 'conn> {
     }
 }
 
-fn load_source_file_facts_state(
+fn load_source_file_observations_state(
     tx: &AdmittedWrite<'_>,
     source_file_id: SourceFileId,
 ) -> LibrarySqliteResult<Option<(String, ArtifactId)>> {
@@ -91,7 +94,7 @@ fn load_source_file_facts_state(
         .query_row(
             "SELECT basis_fingerprint,
                 accepted_artifact_id
-         FROM source_file_facts
+         FROM source_file_observations
          WHERE source_file_id = ?1",
             [source_file_id.get()],
             |row| Ok((row.get(0)?, row.get(1)?)),

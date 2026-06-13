@@ -85,7 +85,7 @@ pub struct StoreTrackIdentityDecisionEvidence {
     pub track_identity_candidate_id: i64,
     pub track_identity_candidate_member_id: i64,
     pub track_identity_candidate_evidence_id: i64,
-    pub primary_media_fact_id: i64,
+    pub playable_media_id: i64,
     pub attachment_id: i64,
     pub source_file_attachment_link_id: i64,
     pub source_file_id: i64,
@@ -130,8 +130,8 @@ pub fn read_track_identity_decisions_for_source(
                              FROM track_identity_candidate_evidence evidence
                              JOIN source_files file
                                ON file.source_file_id = evidence.source_file_id
-                             LEFT JOIN source_file_facts facts
-                               ON facts.source_file_id = evidence.source_file_id
+                             LEFT JOIN source_file_observations observations
+                               ON observations.source_file_id = evidence.source_file_id
                              LEFT JOIN source_file_attachment_links link
                                ON link.source_file_attachment_link_id =
                                   evidence.source_file_attachment_link_id
@@ -202,8 +202,8 @@ pub fn read_track_identity_decisions_for_candidate(
                              FROM track_identity_candidate_evidence evidence
                              JOIN source_files file
                                ON file.source_file_id = evidence.source_file_id
-                             LEFT JOIN source_file_facts facts
-                               ON facts.source_file_id = evidence.source_file_id
+                             LEFT JOIN source_file_observations observations
+                               ON observations.source_file_id = evidence.source_file_id
                              LEFT JOIN source_file_attachment_links link
                                ON link.source_file_attachment_link_id =
                                   evidence.source_file_attachment_link_id
@@ -403,8 +403,8 @@ fn read_effective_decision_current_status(
                          FROM track_identity_candidate_evidence evidence
                          JOIN source_files file
                            ON file.source_file_id = evidence.source_file_id
-                         LEFT JOIN source_file_facts facts
-                           ON facts.source_file_id = evidence.source_file_id
+                         LEFT JOIN source_file_observations observations
+                           ON observations.source_file_id = evidence.source_file_id
                          LEFT JOIN source_file_attachment_links link
                            ON link.source_file_attachment_link_id =
                               evidence.source_file_attachment_link_id
@@ -460,7 +460,7 @@ fn read_track_identity_decision_evidence(
                     track_identity_candidate_id,
                     track_identity_candidate_member_id,
                     track_identity_candidate_evidence_id,
-                    primary_media_fact_id,
+                    playable_media_id,
                     attachment_id,
                     source_file_attachment_link_id,
                     source_file_id,
@@ -489,7 +489,7 @@ fn map_evidence_row(row: &Row<'_>) -> rusqlite::Result<StoreTrackIdentityDecisio
         track_identity_candidate_id: row.get(2)?,
         track_identity_candidate_member_id: row.get(3)?,
         track_identity_candidate_evidence_id: row.get(4)?,
-        primary_media_fact_id: row.get(5)?,
+        playable_media_id: row.get(5)?,
         attachment_id: row.get(6)?,
         source_file_attachment_link_id: row.get(7)?,
         source_file_id: row.get(8)?,

@@ -18,14 +18,14 @@ mod context;
 mod discovery;
 mod literal_hierarchy_reads;
 mod navigation_reads;
-mod observed_file_facts_reads;
-mod primary_media_promotion;
+mod playable_media_promotion;
 mod projections;
 mod promotion;
 mod revisions;
 mod search_filter_reads;
 mod source_file_hash;
 mod source_file_media_probe;
+mod source_file_observations_reads;
 mod source_integrity_reads;
 mod source_lifecycle_reads;
 mod sources;
@@ -45,8 +45,8 @@ pub use context::{
 pub use discovery::{
     RootScanHierarchyObservationReason, RootScanMaterializationResult, RootScanObservation,
 };
-pub use primary_media_promotion::{
-    PromotePrimaryMediaForSourceResult, effective_primary_media_promotion_limit,
+pub use playable_media_promotion::{
+    PromotePlayableMediaForSourceResult, effective_playable_media_promotion_limit,
 };
 pub use revisions::{MaintainedReadModelRevision, MaintainedReadModelScope};
 pub use source_file_hash::{
@@ -61,8 +61,9 @@ pub use source_file_media_probe::{
     ProbeSourceFileMediaBatchInput, ProbeSourceFileMediaBatchOutcome,
     ProbeSourceFileMediaBatchOutcomeStatus, ProbeSourceFileMediaBatchResult,
     ReadSourceFileMediaProbeCandidatesInput, SourceFileMediaProbeAdmissionScope,
-    SourceFileMediaProbeCandidate, SourceFileMediaProbeCandidateReason, SourceFileMediaProbeFacts,
-    SourceFileMediaProbeFailure, SourceFileMediaProbeSkipReason, effective_media_probe_batch_limit,
+    SourceFileMediaProbeCandidate, SourceFileMediaProbeCandidateReason,
+    SourceFileMediaProbeFailure, SourceFileMediaProbeObservations, SourceFileMediaProbeSkipReason,
+    effective_media_probe_batch_limit,
 };
 pub use sources::{
     LocalRoot, LocalRootAvailability, ReadLocalRootsResult, RegisterLocalRootInput,

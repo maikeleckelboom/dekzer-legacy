@@ -8,8 +8,8 @@ use crate::authority::work::work_runs::{PersistedWorkRun, WorkRunAuthorityTx};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    ArtifactId, ArtifactKind, ArtifactRole, ArtifactStorageKind, MachineWorkKind, WorkItemId,
-    WorkRunId, WorkSubject,
+    ArtifactId, ArtifactKind, ArtifactStorageKind, MachineWorkKind, WorkItemId, WorkRunId,
+    WorkSubject,
 };
 
 #[allow(dead_code)]
@@ -19,7 +19,6 @@ const INLINE_PAYLOAD_MAX_BYTES: usize = 1_048_576;
 pub struct RecordArtifactInput {
     pub work_run_id: WorkRunId,
     pub artifact_kind: ArtifactKind,
-    pub artifact_role: ArtifactRole,
     pub media_type: String,
     pub basis_fingerprint: String,
     pub payload_hash: String,
@@ -67,7 +66,6 @@ pub struct RecordedArtifact {
     pub work_run_id: WorkRunId,
     pub subject: WorkSubject,
     pub artifact_kind: ArtifactKind,
-    pub artifact_role: ArtifactRole,
     pub basis_fingerprint: String,
     pub storage_kind: ArtifactStorageKind,
     pub created_at: i64,
@@ -252,7 +250,6 @@ impl<'write, 'conn> WorkArtifactAuthorityTx<'write, 'conn> {
                  subject_kind,
                  subject_id,
                  artifact_kind,
-                 artifact_role,
                  adapter_key,
                  adapter_version,
                  basis_fingerprint,
@@ -261,13 +258,12 @@ impl<'write, 'conn> WorkArtifactAuthorityTx<'write, 'conn> {
                  payload_hash,
                  created_at
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 context.run.work_run_id,
                 context.work_item.subject.kind().as_str(),
                 subject_id.as_str(),
                 input.artifact_kind.as_str(),
-                input.artifact_role.as_str(),
                 context.run.adapter_key.as_str(),
                 context.run.adapter_version.as_str(),
                 input.basis_fingerprint.as_str(),
@@ -283,7 +279,6 @@ impl<'write, 'conn> WorkArtifactAuthorityTx<'write, 'conn> {
             work_run_id: input.work_run_id,
             subject: context.work_item.subject,
             artifact_kind: input.artifact_kind,
-            artifact_role: input.artifact_role,
             basis_fingerprint: input.basis_fingerprint.clone(),
             storage_kind,
             created_at: input.created_at,
@@ -314,16 +309,14 @@ fn validate_artifact_input(
         )));
     }
 
-    if input.artifact_role == ArtifactRole::PrimaryResult {
-        let expected_kind = expected_primary_artifact_kind(context.work_item.work_kind);
-        if input.artifact_kind != expected_kind {
-            return Err(LibrarySqliteError::WriteInvariant(format!(
-                "primary {} artifacts must use artifact_kind={}, found {}",
-                context.work_item.work_kind.as_str(),
-                expected_kind.as_str(),
-                input.artifact_kind.as_str()
-            )));
-        }
+    let expected_kind = expected_artifact_kind(context.work_item.work_kind);
+    if input.artifact_kind != expected_kind {
+        return Err(LibrarySqliteError::WriteInvariant(format!(
+            "{} artifacts must use artifact_kind={}, found {}",
+            context.work_item.work_kind.as_str(),
+            expected_kind.as_str(),
+            input.artifact_kind.as_str()
+        )));
     }
 
     Ok(())
@@ -337,7 +330,7 @@ fn parse_artifact_id(value: i64) -> LibrarySqliteResult<ArtifactId> {
     })
 }
 
-fn expected_primary_artifact_kind(work_kind: MachineWorkKind) -> ArtifactKind {
+fn expected_artifact_kind(work_kind: MachineWorkKind) -> ArtifactKind {
     match work_kind {
         MachineWorkKind::InspectSourceFile => ArtifactKind::InspectionResult,
         MachineWorkKind::RebuildProjection => ArtifactKind::ProjectionSnapshot,

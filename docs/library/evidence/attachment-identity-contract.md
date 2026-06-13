@@ -3,7 +3,7 @@ status: accepted
 last-reviewed: 2026-06-01
 owner: library-substrate-boundary
 canonical-context:
-  - observed-file-facts-contract
+  - observed-file-observations-contract
   - media-identity-schema-authority
 scope:
   - attachment-identity
@@ -27,7 +27,7 @@ Attachment identity answers a narrow bytes-evidence question:
 - which durable attachment/content row represents that evidence;
 - which source-file rows currently link to that attachment as observed source-file occurrences.
 
-It does not create tracks, playlist items, playable primary media, preparation targets, CUE associations, product
+It does not create tracks, playlist items, playable playable media, preparation targets, CUE associations, product
 contents projections, or user-facing readiness.
 
 ## Relation To Source Files
@@ -48,21 +48,21 @@ belongs on the link, not on the attachment/content row, because it is source-fil
 `source_file_attachment_links.source_id` does not match the linked `source_files.source_id`, and rejects source-file
 source moves that would drift an existing link.
 
-## Relation To Observed File Facts / source_file_facts
+## Relation To Observed File Observations / source_file_observations
 
-`source_file_facts` remains evidence. Attachment materialization consumes only current observed facts. A source-file link is
-current only when the current observed-facts read for that `source_file_id` has:
+`source_file_observations` remains evidence. Attachment materialization consumes only current source-file observations. A source-file link is
+current only when the current observed-observations read for that `source_file_id` has:
 
 - `content_hash_algorithm = 'blake3'`;
 - `content_hash_value` equal to the linked `content_attachments.content_hash_value`;
-- current observed-fact status according to the observed-file-facts basis comparison.
+- current observed-observation status according to the observed-file-observations basis comparison.
 
-Facts with stale basis, missing facts, or non-BLAKE3 facts do not materialize current links.
+Observations with stale basis, missing observations, or non-BLAKE3 observations do not materialize current links.
 
 ## Relation To BLAKE3 Evidence
 
 BLAKE3 evidence is bytes evidence produced before this layer. Attachment materialization does not hash files, resolve
-filesystem paths, scan roots, or repair missing facts. It reads accepted `source_file_facts` rows and source-file basis only.
+filesystem paths, scan roots, or repair missing observations. It reads accepted `source_file_observations` rows and source-file basis only.
 
 ## Service-Owned Maintenance
 
@@ -118,13 +118,13 @@ Read statuses are:
 `readAttachmentSourceFiles` is bounded by an optional `limit`. The reply reports `effectiveLimit` and
 `remainingSourceFileLinks`; pagination remains future work.
 
-`readSourceAttachmentSummary` reports current links, stale links, source files with current BLAKE3 facts, source files
-with attachment links, source files missing attachment links, and `unmaterializedBlake3FactsCount`. In this v0,
-`unmaterializedBlake3FactsCount` is equal to `sourceFilesMissingAttachmentLinksCount`; broader backlog estimation
+`readSourceAttachmentSummary` reports current links, stale links, source files with current BLAKE3 observations, source files
+with attachment links, source files missing attachment links, and `unmaterializedBlake3ObservationsCount`. In this v0,
+`unmaterializedBlake3ObservationsCount` is equal to `sourceFilesMissingAttachmentLinksCount`; broader backlog estimation
 belongs to collection health / source integrity work.
 
 The boundary deliberately does not expose duplicate, relocation, product UI, track identity, CUE association,
-`primaryMedia`, preparation, playlist, waveform, or product-contents projection behavior.
+`playableMedia`, preparation, playlist, waveform, or product-contents projection behavior.
 
 ## Attachment/Content Record Authority
 
@@ -139,7 +139,7 @@ Columns:
 - `updated_at INTEGER NOT NULL`
 - `UNIQUE (content_hash_algorithm, content_hash_value)`
 
-It deliberately has no `file_kind`, title, artist, `primaryMedia`, track, playlist, preparation, or capability columns.
+It deliberately has no `file_kind`, title, artist, `playableMedia`, track, playlist, preparation, or capability columns.
 
 ## Source-File Attachment Link Authority
 
@@ -162,7 +162,7 @@ occurrence for a `source_file_id` in this v0. It deliberately has no link histor
 
 ## Staleness Model
 
-Staleness is computed by read-model join against current `source_file_facts`, `source_files` basis, and the linked
+Staleness is computed by read-model join against current `source_file_observations`, `source_files` basis, and the linked
 `content_attachments` hash. It is not stored as a boolean or cached status column. The read model exposes
 `link_status = Current | Stale`, and any protocol-level link `content_hash_value` is derived from
 `content_attachments`.
@@ -197,7 +197,7 @@ the current source-file link.
 - `links_created` increments when a source file receives its first current attachment link;
 - `links_replaced` increments when a source file's old link is deleted and a new hash link is inserted;
 - `links_refreshed` increments when an existing same-hash source-file link is touched;
-- skipped counters report stale facts, non-BLAKE3 facts, and missing facts;
+- skipped counters report stale observations, non-BLAKE3 observations, and missing observations;
 - `remaining_candidates` reports materializable rows outside the bounded admission window for that run.
 
 Two source files with the same new BLAKE3 value in one run create one attachment and two links. A later run against the
@@ -210,7 +210,7 @@ This is duplicate content evidence only. It is not track identity.
 
 ## CUE File Behavior
 
-CUE source files may materialize as their own attachments from their own current BLAKE3 facts. Adjacent audio source
+CUE source files may materialize as their own attachments from their own current BLAKE3 observations. Adjacent audio source
 files may materialize as their own attachments. Materialization does not parse CUE sheets, infer adjacency, pair CUE
 files to audio files, or create split/association rows.
 
@@ -224,7 +224,7 @@ files to audio files, or create split/association rows.
 - attachment-detail UI;
 - track identity;
 - CUE-to-audio association;
-- `primaryMedia` activation;
+- `playableMedia` activation;
 - media probing and format metadata;
 - artwork intelligence;
 - waveform and preparation;

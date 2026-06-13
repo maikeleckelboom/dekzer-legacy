@@ -726,7 +726,7 @@ function contentsPolicyKey(policy: ContentsReadPolicy): string {
       return policy.kind
     case 'sourceFileInventory':
       return `${policy.kind}:${policy.fileClasses.join(',')}`
-    case 'primaryMedia':
+    case 'playableMedia':
       return `${policy.kind}:${policy.mediaKinds.join(',')}`
   }
 }

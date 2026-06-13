@@ -67,10 +67,10 @@ fn seed_source(connection: &Connection) {
              ) VALUES (1, 1, 'test', '1', 1, 1, 'completed');
              INSERT INTO work_artifacts (
                  artifact_id, work_run_id, subject_kind, subject_id, artifact_kind,
-                 artifact_role, adapter_key, adapter_version, basis_fingerprint,
+                 adapter_key, adapter_version, basis_fingerprint,
                  media_type, storage_kind, payload_hash, created_at
-             ) VALUES (1, 1, 'source_file', '1000', 'inspection_result', 'primary_result', 'test', '1', 'basis:1000', 'application/json', 'inline_payload', 'hash', 1);
-             INSERT INTO source_file_facts (
+             ) VALUES (1, 1, 'source_file', '1000', 'inspection_result', 'test', '1', 'basis:1000', 'application/json', 'inline_payload', 'hash', 1);
+             INSERT INTO source_file_observations (
                  source_file_id, basis_fingerprint, basis_source_id,
                  basis_relative_path, basis_size_bytes, basis_mtime_ns,
                  basis_presence_state, observed_at_ms, content_hash_algorithm,

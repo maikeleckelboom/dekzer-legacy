@@ -7,9 +7,9 @@ canonical-context:
   - lifecycle-visible-state-contract
   - maintenance-orchestration-contract
   - media-relevant-file-inventory-contract
-  - observed-file-facts-contract
+  - observed-file-observations-contract
   - attachment-identity-contract
-  - primary-media-promotion-contract
+  - playable-media-promotion-contract
   - track-identity-candidate-contract
   - track-identity-decision-contract
 scope:
@@ -24,7 +24,7 @@ scope:
 
 The source integrity read model is the V0 backend-owned collection health row. It is source-scoped first and composes
 existing source lifecycle, scan coverage, source-file inventory, attachment identity, and source maintenance snapshot
-facts. It does not create a new authority model.
+observations. It does not create a new authority model.
 
 The read answers whether a source and its substrate evidence can be trusted without collapsing separate concerns into a
 single healthy/unhealthy boolean.
@@ -39,7 +39,7 @@ The public read is:
 | Generated TS contract   | `readSourceIntegrity`                                       |
 | Boundary client         | `client.readSourceIntegrity({ sourceId })`                  |
 
-The read is read-only. It must not hash files, probe files, materialize attachments, promote primary media, produce
+The read is read-only. It must not hash files, probe files, materialize attachments, promote playable media, produce
 track identity candidates, create decisions, mutate maintenance runtime state, publish invalidations, or request a
 scheduler run.
 
@@ -53,7 +53,7 @@ The reply is source-scoped and facet-separated:
   is authoritative only when coverage proves the source was accessible and fully scanned.
 - `inventory`: source-file counts by presence state, file class, file kind, plus media-relevant inventory counts. These
   counts do not claim playability, artwork role, preparation readiness, or track identity.
-- `evidenceAndMaintenance`: remaining BLAKE3, media probe, primary-media promotion, track identity candidate production,
+- `evidenceAndMaintenance`: remaining BLAKE3, media probe, playable-media promotion, track identity candidate production,
   and track identity decision production candidates from source maintenance snapshot logic.
 - `attachmentIntegrity`: current, stale, and missing attachment-link counts from exact-byte/source-occurrence evidence.
 - `runtimeMaintenance`: in-memory idle/running state and last bounded run summary from the current service instance.
@@ -64,7 +64,7 @@ Source lifecycle remains owned by `readSourceLifecycle` and source lifecycle sto
 directory state. Inventory remains `source_files`. Attachment integrity remains the attachment identity read model.
 Evidence backlog and runtime maintenance state remain source maintenance snapshot behavior.
 
-This read may aggregate these facts, but must not duplicate their semantics or make a second durable state model.
+This read may aggregate these observations, but must not duplicate their semantics or make a second durable state model.
 
 ## Coverage Count Semantics
 

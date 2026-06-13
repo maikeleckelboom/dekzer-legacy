@@ -100,7 +100,7 @@ describe('contents reads through the host', () => {
             rows: [],
             scopeCoverage: completeCoverage(),
             hasPolicyOmittedRows: false,
-            detail: 'primaryMedia rows do not support image media kinds.'
+            detail: 'playableMedia rows do not support image media kinds.'
           }
         })
       })
@@ -110,7 +110,7 @@ describe('contents reads through the host', () => {
       readContentsThroughHost(conflictHost, {
         scope: { kind: 'source', sourceId: '7' },
         policy: {
-          kind: 'primaryMedia',
+          kind: 'playableMedia',
           mediaKinds: ['audio']
         },
         scopeDepth: 'recursive'
@@ -119,7 +119,7 @@ describe('contents reads through the host', () => {
       state: 'policyConflict',
       error: {
         code: 'policyConflict',
-        message: 'primaryMedia rows do not support image media kinds.'
+        message: 'playableMedia rows do not support image media kinds.'
       }
     })
 

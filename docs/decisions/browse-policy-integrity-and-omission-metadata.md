@@ -38,7 +38,7 @@ change meaning.
 At extension-classification level: `.m4a` is audio-class. `.mp4` is video/container-class.
 
 An MP4 container may carry audio streams, but extension alone cannot honestly classify it as an audio file. Until a
-media probe authority establishes stream-level facts for a specific file, `.mp4` does not enter `audioBrowse`.
+media probe authority establishes stream-level observations for a specific file, `.mp4` does not enter `audioBrowse`.
 
 ### Rule 3 — Authoritative empty requires both complete coverage and no browse-relevant inventory
 
@@ -240,4 +240,4 @@ Incomplete scan coverage must not produce authoritative empty copy.
 
 Companion metadata class assignment must be explicit, not defaulted.
 
-The renderer presents returned facts only.
+The renderer presents returned observations only.

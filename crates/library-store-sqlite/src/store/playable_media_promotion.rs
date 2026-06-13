@@ -7,26 +7,26 @@ use crate::time::unix_time_ms;
 
 use super::SqliteDurableStore;
 
-pub const DEFAULT_PRIMARY_MEDIA_PROMOTION_LIMIT: usize = 4;
-pub const MAX_PRIMARY_MEDIA_PROMOTION_LIMIT: usize = 128;
+pub const DEFAULT_PLAYABLE_MEDIA_PROMOTION_LIMIT: usize = 4;
+pub const MAX_PLAYABLE_MEDIA_PROMOTION_LIMIT: usize = 128;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct PromotePrimaryMediaForSourceResult {
+pub struct PromotePlayableMediaForSourceResult {
     pub promoted_count: usize,
     pub refreshed_count: usize,
     pub skipped_unusable_source: usize,
     pub skipped_unsupported_media_kind: usize,
-    pub skipped_no_facts: usize,
-    pub skipped_stale_facts: usize,
+    pub skipped_no_observations: usize,
+    pub skipped_stale_observations: usize,
     pub skipped_no_blake3: usize,
-    pub skipped_no_probe_facts: usize,
+    pub skipped_no_probe_observations: usize,
     pub skipped_missing_attachment_link: usize,
     pub skipped_stale_attachment_link: usize,
     pub remaining_candidates: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct PrimaryMediaPromotionCandidate {
+struct PlayableMediaPromotionCandidate {
     attachment_id: i64,
     source_file_id: i64,
     basis_fingerprint: String,
@@ -37,28 +37,28 @@ struct PrimaryMediaPromotionCandidate {
     channels: Option<i64>,
     bit_depth: Option<i64>,
     codec: Option<String>,
-    change: PrimaryMediaPromotionChange,
+    change: PlayableMediaPromotionChange,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PrimaryMediaPromotionChange {
+enum PlayableMediaPromotionChange {
     Create,
     Refresh,
 }
 
 impl SqliteDurableStore {
-    pub fn promote_primary_media_for_source(
+    pub fn promote_playable_media_for_source(
         &self,
         source_id: i64,
         limit: usize,
-    ) -> LibrarySqliteResult<PromotePrimaryMediaForSourceResult> {
+    ) -> LibrarySqliteResult<PromotePlayableMediaForSourceResult> {
         let promoted_at = unix_time_ms()?;
         self.with_write(|write| {
-            promote_primary_media_for_source(write, source_id, limit, promoted_at)
+            promote_playable_media_for_source(write, source_id, limit, promoted_at)
         })
     }
 
-    pub fn count_primary_media_promotion_candidates(
+    pub fn count_playable_media_promotion_candidates(
         &self,
         source_id: i64,
     ) -> LibrarySqliteResult<usize> {
@@ -67,23 +67,23 @@ impl SqliteDurableStore {
         if !source_usable {
             return Ok(0);
         }
-        count_primary_media_promotion_candidates(&connection, source_id)
+        count_playable_media_promotion_candidates(&connection, source_id)
     }
 }
 
-pub fn effective_primary_media_promotion_limit(limit: Option<usize>) -> usize {
+pub fn effective_playable_media_promotion_limit(limit: Option<usize>) -> usize {
     limit
-        .unwrap_or(DEFAULT_PRIMARY_MEDIA_PROMOTION_LIMIT)
-        .clamp(1, MAX_PRIMARY_MEDIA_PROMOTION_LIMIT)
+        .unwrap_or(DEFAULT_PLAYABLE_MEDIA_PROMOTION_LIMIT)
+        .clamp(1, MAX_PLAYABLE_MEDIA_PROMOTION_LIMIT)
 }
 
-fn promote_primary_media_for_source(
+fn promote_playable_media_for_source(
     write: &mut AdmittedWrite<'_>,
     source_id: i64,
     limit: usize,
     promoted_at: i64,
-) -> LibrarySqliteResult<PromotePrimaryMediaForSourceResult> {
-    let mut result = read_primary_media_promotion_skip_summary(write, source_id)?;
+) -> LibrarySqliteResult<PromotePlayableMediaForSourceResult> {
+    let mut result = read_playable_media_promotion_skip_summary(write, source_id)?;
     if !source_is_usable(write, source_id)? {
         if source_exists(write, source_id)? {
             result.skipped_unusable_source = 1;
@@ -91,15 +91,15 @@ fn promote_primary_media_for_source(
         return Ok(result);
     }
 
-    for candidate in read_primary_media_promotion_candidates(write, source_id, limit)? {
-        upsert_primary_media_fact(write, &candidate, promoted_at)?;
+    for candidate in read_playable_media_promotion_candidates(write, source_id, limit)? {
+        upsert_playable_media(write, &candidate, promoted_at)?;
         match candidate.change {
-            PrimaryMediaPromotionChange::Create => result.promoted_count += 1,
-            PrimaryMediaPromotionChange::Refresh => result.refreshed_count += 1,
+            PlayableMediaPromotionChange::Create => result.promoted_count += 1,
+            PlayableMediaPromotionChange::Refresh => result.refreshed_count += 1,
         }
     }
 
-    result.remaining_candidates = count_primary_media_promotion_candidates(write, source_id)?;
+    result.remaining_candidates = count_playable_media_promotion_candidates(write, source_id)?;
     Ok(result)
 }
 
@@ -147,10 +147,10 @@ fn source_is_usable(
         .map_err(Into::into)
 }
 
-fn read_primary_media_promotion_skip_summary(
+fn read_playable_media_promotion_skip_summary(
     connection: &rusqlite::Connection,
     source_id: i64,
-) -> LibrarySqliteResult<PromotePrimaryMediaForSourceResult> {
+) -> LibrarySqliteResult<PromotePlayableMediaForSourceResult> {
     connection
         .query_row(
             &format!(
@@ -161,72 +161,72 @@ fn read_primary_media_promotion_skip_summary(
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE
                         WHEN {present_audio_predicate}
-                         AND facts.source_file_id IS NULL
+                         AND observations.source_file_id IS NULL
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE
                         WHEN {present_audio_predicate}
-                         AND facts.source_file_id IS NOT NULL
-                         AND NOT ({current_facts_predicate})
+                         AND observations.source_file_id IS NOT NULL
+                         AND NOT ({current_observations_predicate})
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE
                         WHEN {present_audio_predicate}
-                         AND facts.source_file_id IS NOT NULL
-                         AND {current_facts_predicate}
+                         AND observations.source_file_id IS NOT NULL
+                         AND {current_observations_predicate}
                          AND NOT (
-                             facts.content_hash_algorithm = ?2
-                             AND facts.content_hash_value IS NOT NULL
+                             observations.content_hash_algorithm = ?2
+                             AND observations.content_hash_value IS NOT NULL
                          )
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE
                         WHEN {present_audio_predicate}
-                         AND facts.source_file_id IS NOT NULL
-                         AND {current_facts_predicate}
-                         AND facts.content_hash_algorithm = ?2
-                         AND facts.content_hash_value IS NOT NULL
+                         AND observations.source_file_id IS NOT NULL
+                         AND {current_observations_predicate}
+                         AND observations.content_hash_algorithm = ?2
+                         AND observations.content_hash_value IS NOT NULL
                          AND NOT ({playable_probe_predicate})
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE
                         WHEN {present_audio_predicate}
-                         AND facts.source_file_id IS NOT NULL
-                         AND {current_facts_predicate}
-                         AND facts.content_hash_algorithm = ?2
-                         AND facts.content_hash_value IS NOT NULL
+                         AND observations.source_file_id IS NOT NULL
+                         AND {current_observations_predicate}
+                         AND observations.content_hash_algorithm = ?2
+                         AND observations.content_hash_value IS NOT NULL
                          AND {playable_probe_predicate}
                          AND link.source_file_id IS NULL
                         THEN 1 ELSE 0 END), 0),
                     COALESCE(SUM(CASE
                         WHEN {present_audio_predicate}
-                         AND facts.source_file_id IS NOT NULL
-                         AND {current_facts_predicate}
-                         AND facts.content_hash_algorithm = ?2
-                         AND facts.content_hash_value IS NOT NULL
+                         AND observations.source_file_id IS NOT NULL
+                         AND {current_observations_predicate}
+                         AND observations.content_hash_algorithm = ?2
+                         AND observations.content_hash_value IS NOT NULL
                          AND {playable_probe_predicate}
                          AND link.source_file_id IS NOT NULL
                          AND NOT (
-                             attachment.content_hash_algorithm = facts.content_hash_algorithm
-                             AND attachment.content_hash_value = facts.content_hash_value
+                             attachment.content_hash_algorithm = observations.content_hash_algorithm
+                             AND attachment.content_hash_value = observations.content_hash_value
                          )
                         THEN 1 ELSE 0 END), 0)
                  FROM source_files file
-                 LEFT JOIN source_file_facts facts
-                   ON facts.source_file_id = file.source_file_id
+                 LEFT JOIN source_file_observations observations
+                   ON observations.source_file_id = file.source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_id = file.source_file_id
                  LEFT JOIN content_attachments attachment
                    ON attachment.attachment_id = link.attachment_id
                  WHERE file.source_id = ?1",
                 present_audio_predicate = PRESENT_AUDIO_PREDICATE,
-                current_facts_predicate = CURRENT_FACTS_PREDICATE,
+                current_observations_predicate = CURRENT_OBSERVATIONS_PREDICATE,
                 playable_probe_predicate = PLAYABLE_AUDIO_PROBE_PREDICATE,
             ),
             params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
             |row| {
-                Ok(PromotePrimaryMediaForSourceResult {
+                Ok(PromotePlayableMediaForSourceResult {
                     skipped_unsupported_media_kind: read_count(row, 0)?,
-                    skipped_no_facts: read_count(row, 1)?,
-                    skipped_stale_facts: read_count(row, 2)?,
+                    skipped_no_observations: read_count(row, 1)?,
+                    skipped_stale_observations: read_count(row, 2)?,
                     skipped_no_blake3: read_count(row, 3)?,
-                    skipped_no_probe_facts: read_count(row, 4)?,
+                    skipped_no_probe_observations: read_count(row, 4)?,
                     skipped_missing_attachment_link: read_count(row, 5)?,
                     skipped_stale_attachment_link: read_count(row, 6)?,
                     ..Default::default()
@@ -236,14 +236,14 @@ fn read_primary_media_promotion_skip_summary(
         .map_err(Into::into)
 }
 
-fn read_primary_media_promotion_candidates(
+fn read_playable_media_promotion_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
     limit: usize,
-) -> LibrarySqliteResult<Vec<PrimaryMediaPromotionCandidate>> {
+) -> LibrarySqliteResult<Vec<PlayableMediaPromotionCandidate>> {
     let limit_i64 =
         i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
-    let sql = primary_media_promotion_candidates_sql(
+    let sql = playable_media_promotion_candidates_sql(
         "SELECT candidate.attachment_id,
                 candidate.source_file_id,
                 candidate.basis_fingerprint,
@@ -255,7 +255,7 @@ fn read_primary_media_promotion_candidates(
                 candidate.bit_depth,
                 candidate.codec,
                 CASE
-                    WHEN existing.primary_media_fact_id IS NULL THEN 'create'
+                    WHEN existing.playable_media_id IS NULL THEN 'create'
                     ELSE 'refresh'
                 END AS promotion_change",
         "ORDER BY lower(candidate.relative_path) ASC,
@@ -268,10 +268,10 @@ fn read_primary_media_promotion_candidates(
             params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM, limit_i64],
             |row| {
                 let change = match row.get::<_, String>(10)?.as_str() {
-                    "create" => PrimaryMediaPromotionChange::Create,
-                    _ => PrimaryMediaPromotionChange::Refresh,
+                    "create" => PlayableMediaPromotionChange::Create,
+                    _ => PlayableMediaPromotionChange::Refresh,
                 };
-                Ok(PrimaryMediaPromotionCandidate {
+                Ok(PlayableMediaPromotionCandidate {
                     attachment_id: row.get(0)?,
                     source_file_id: row.get(1)?,
                     basis_fingerprint: row.get(2)?,
@@ -290,11 +290,11 @@ fn read_primary_media_promotion_candidates(
         .map_err(Into::into)
 }
 
-fn count_primary_media_promotion_candidates(
+fn count_playable_media_promotion_candidates(
     connection: &rusqlite::Connection,
     source_id: i64,
 ) -> LibrarySqliteResult<usize> {
-    let sql = primary_media_promotion_candidates_sql("SELECT COUNT(*)", "");
+    let sql = playable_media_promotion_candidates_sql("SELECT COUNT(*)", "");
     connection
         .query_row(
             &sql,
@@ -304,28 +304,28 @@ fn count_primary_media_promotion_candidates(
         .map_err(Into::into)
 }
 
-fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> String {
+fn playable_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> String {
     format!(
         "WITH eligible AS (
              SELECT attachment.attachment_id,
                     file.source_file_id,
                     file.relative_path,
-                    facts.basis_fingerprint,
-                    facts.media_kind,
-                    facts.mime_type,
-                    facts.duration_ms,
-                    facts.sample_rate_hz,
-                    facts.channels,
-                    facts.bit_depth,
-                    facts.codec,
+                    observations.basis_fingerprint,
+                    observations.media_kind,
+                    observations.mime_type,
+                    observations.duration_ms,
+                    observations.sample_rate_hz,
+                    observations.channels,
+                    observations.bit_depth,
+                    observations.codec,
                     ROW_NUMBER() OVER (
                         PARTITION BY attachment.attachment_id
                         ORDER BY lower(file.relative_path) ASC,
                                  file.source_file_id ASC
                     ) AS attachment_rank
              FROM source_files file
-             JOIN source_file_facts facts
-               ON facts.source_file_id = file.source_file_id
+             JOIN source_file_observations observations
+               ON observations.source_file_id = file.source_file_id
              JOIN source_file_attachment_links link
                ON link.source_file_id = file.source_file_id
               AND link.source_id = file.source_id
@@ -333,11 +333,11 @@ fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> 
                ON attachment.attachment_id = link.attachment_id
              WHERE file.source_id = ?1
                AND {present_audio_predicate}
-               AND {current_facts_predicate}
-               AND facts.content_hash_algorithm = ?2
-               AND facts.content_hash_value IS NOT NULL
-               AND attachment.content_hash_algorithm = facts.content_hash_algorithm
-               AND attachment.content_hash_value = facts.content_hash_value
+               AND {current_observations_predicate}
+               AND observations.content_hash_algorithm = ?2
+               AND observations.content_hash_value IS NOT NULL
+               AND attachment.content_hash_algorithm = observations.content_hash_algorithm
+               AND attachment.content_hash_value = observations.content_hash_value
                AND {playable_probe_predicate}
          ),
          candidates AS (
@@ -357,9 +357,9 @@ fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> 
          )
          {select_clause}
          FROM candidates candidate
-         LEFT JOIN primary_media_facts existing
+         LEFT JOIN playable_media existing
            ON existing.attachment_id = candidate.attachment_id
-         WHERE existing.primary_media_fact_id IS NULL
+         WHERE existing.playable_media_id IS NULL
             OR existing.evidence_source_file_id != candidate.source_file_id
             OR existing.evidence_basis_fingerprint != candidate.basis_fingerprint
             OR existing.media_kind != candidate.media_kind
@@ -371,18 +371,18 @@ fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> 
             OR existing.codec IS NOT candidate.codec
          {suffix}",
         present_audio_predicate = PRESENT_AUDIO_PREDICATE,
-        current_facts_predicate = CURRENT_FACTS_PREDICATE,
+        current_observations_predicate = CURRENT_OBSERVATIONS_PREDICATE,
         playable_probe_predicate = PLAYABLE_AUDIO_PROBE_PREDICATE,
     )
 }
 
-fn upsert_primary_media_fact(
+fn upsert_playable_media(
     write: &mut AdmittedWrite<'_>,
-    candidate: &PrimaryMediaPromotionCandidate,
+    candidate: &PlayableMediaPromotionCandidate,
     promoted_at: i64,
 ) -> LibrarySqliteResult<()> {
     write.execute(
-        "INSERT INTO primary_media_facts (
+        "INSERT INTO playable_media (
              attachment_id,
              evidence_source_file_id,
              evidence_basis_fingerprint,
@@ -433,20 +433,20 @@ fn read_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> 
 const PRESENT_AUDIO_PREDICATE: &str =
     "file.presence_state = 'present' AND file.file_class = 'audio' AND file.file_kind = 'audio'";
 
-const CURRENT_FACTS_PREDICATE: &str = "file.source_id = facts.basis_source_id
-    AND file.relative_path = facts.basis_relative_path
-    AND file.size_bytes IS facts.basis_size_bytes
-    AND file.mtime_ns IS facts.basis_mtime_ns
-    AND file.presence_state = facts.basis_presence_state";
+const CURRENT_OBSERVATIONS_PREDICATE: &str = "file.source_id = observations.basis_source_id
+    AND file.relative_path = observations.basis_relative_path
+    AND file.size_bytes IS observations.basis_size_bytes
+    AND file.mtime_ns IS observations.basis_mtime_ns
+    AND file.presence_state = observations.basis_presence_state";
 
-const PLAYABLE_AUDIO_PROBE_PREDICATE: &str = "facts.media_kind = 'audio'
+const PLAYABLE_AUDIO_PROBE_PREDICATE: &str = "observations.media_kind = 'audio'
     AND (
-        facts.mime_type IS NOT NULL
-        OR facts.duration_ms IS NOT NULL
-        OR facts.sample_rate_hz IS NOT NULL
-        OR facts.channels IS NOT NULL
-        OR facts.bit_depth IS NOT NULL
-        OR facts.codec IS NOT NULL
+        observations.mime_type IS NOT NULL
+        OR observations.duration_ms IS NOT NULL
+        OR observations.sample_rate_hz IS NOT NULL
+        OR observations.channels IS NOT NULL
+        OR observations.bit_depth IS NOT NULL
+        OR observations.codec IS NOT NULL
     )";
 
 #[cfg(test)]
@@ -456,21 +456,21 @@ mod tests {
 
     use crate::read_models::contents::{
         StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsScope,
-        StoreContentsScopeDepth, StoreContentsState, StorePrimaryMediaKind,
+        StoreContentsScopeDepth, StoreContentsState, StorePlayableMediaKind,
     };
-    use crate::{PromotePrimaryMediaForSourceResult, SqliteDurableStore};
+    use crate::{PromotePlayableMediaForSourceResult, SqliteDurableStore};
 
     const HASH_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const HASH_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const HASH_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
-    struct PrimaryMediaPromotionFixture {
+    struct PlayableMediaPromotionFixture {
         _tempdir: TempDir,
         store: SqliteDurableStore,
         source_id: i64,
     }
 
-    impl PrimaryMediaPromotionFixture {
+    impl PlayableMediaPromotionFixture {
         fn new() -> Self {
             let tempdir = TempDir::new().expect("create tempdir");
             let db_path = tempdir.path().join("library.sqlite3");
@@ -497,7 +497,7 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (?1, 'internal', 'system', 'source:primary-media-test', 'Primary Media Test', 1, 1)",
+                         VALUES (?1, 'internal', 'system', 'source:playable-media-test', 'Playable Media Test', 1, 1)",
                         [self.source_id],
                     )?;
                     write.execute(
@@ -574,7 +574,7 @@ mod tests {
                 .expect("insert source file");
         }
 
-        fn commit_current_facts(
+        fn commit_current_observations(
             &self,
             source_file_id: i64,
             hash_value: Option<&str>,
@@ -608,7 +608,7 @@ mod tests {
                              started_at,
                              outcome
                          )
-                         VALUES (1, 1, 'test.primary_media_promotion', '1', 1, 'ok')",
+                         VALUES (1, 1, 'test.playable_media_promotion', '1', 1, 'ok')",
                         [],
                     )?;
                     write.execute(
@@ -618,7 +618,6 @@ mod tests {
                              subject_kind,
                              subject_id,
                              artifact_kind,
-                             artifact_role,
                              adapter_key,
                              adapter_version,
                              basis_fingerprint,
@@ -627,7 +626,7 @@ mod tests {
                              payload_hash,
                              created_at
                          )
-                         VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test.primary_media_promotion', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
+                         VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'test.playable_media_promotion', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
                         params![
                             artifact_id,
                             source_file_id.to_string(),
@@ -648,7 +647,7 @@ mod tests {
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                     )?;
                     write.execute(
-                        "INSERT INTO source_file_facts (
+                        "INSERT INTO source_file_observations (
                              source_file_id,
                              basis_fingerprint,
                              basis_source_id,
@@ -710,7 +709,7 @@ mod tests {
                     )?;
                     Ok(())
                 })
-                .expect("commit facts");
+                .expect("commit observations");
         }
 
         fn link_attachment(&self, source_file_id: i64, hash_value: &str) -> i64 {
@@ -758,10 +757,10 @@ mod tests {
                 .expect("link attachment")
         }
 
-        fn promote(&self, limit: usize) -> PromotePrimaryMediaForSourceResult {
+        fn promote(&self, limit: usize) -> PromotePlayableMediaForSourceResult {
             self.store
-                .promote_primary_media_for_source(self.source_id, limit)
-                .expect("promote primary media")
+                .promote_playable_media_for_source(self.source_id, limit)
+                .expect("promote playable media")
         }
 
         fn count_rows(&self, table: &str) -> i64 {
@@ -793,21 +792,21 @@ mod tests {
 
     #[test]
     fn current_audio_attachment_and_probe_promotes_one_candidate() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         let attachment_id = fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", true);
 
         let result = fixture.promote(10);
 
         assert_eq!(
             result,
-            PromotePrimaryMediaForSourceResult {
+            PromotePlayableMediaForSourceResult {
                 promoted_count: 1,
                 ..Default::default()
             }
         );
-        assert_eq!(fixture.count_rows("primary_media_facts"), 1);
+        assert_eq!(fixture.count_rows("playable_media"), 1);
         let connection = fixture.store.open_read_connection().expect("open read");
         let stored: (i64, i64, Option<i64>, Option<i64>, Option<String>) = connection
             .query_row(
@@ -816,7 +815,7 @@ mod tests {
                         duration_ms,
                         sample_rate_hz,
                         codec
-                 FROM primary_media_facts",
+                 FROM playable_media",
                 [],
                 |row| {
                     Ok((
@@ -843,23 +842,23 @@ mod tests {
 
     #[test]
     fn duplicate_source_files_for_one_attachment_promote_one_candidate() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/a.wav");
         fixture.insert_source_file(101, "Album/b.wav");
         let attachment_id = fixture.link_attachment(100, HASH_A);
         fixture.link_attachment(101, HASH_A);
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", true);
-        fixture.commit_current_facts(101, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(101, Some(HASH_A), "audio", true);
 
         let result = fixture.promote(10);
 
         assert_eq!(result.promoted_count, 1);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 1);
+        assert_eq!(fixture.count_rows("playable_media"), 1);
         let connection = fixture.store.open_read_connection().expect("open read");
         let stored: (i64, i64) = connection
             .query_row(
                 "SELECT attachment_id, evidence_source_file_id
-                 FROM primary_media_facts",
+                 FROM playable_media",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
@@ -869,63 +868,63 @@ mod tests {
 
     #[test]
     fn hash_without_probe_does_not_promote() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/no-probe.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", false);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", false);
 
         let result = fixture.promote(10);
 
         assert_eq!(result.promoted_count, 0);
-        assert_eq!(result.skipped_no_probe_facts, 1);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
+        assert_eq!(result.skipped_no_probe_observations, 1);
+        assert_eq!(fixture.count_rows("playable_media"), 0);
     }
 
     #[test]
     fn probe_without_attachment_link_does_not_promote() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/no-link.wav");
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", true);
 
         let result = fixture.promote(10);
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_missing_attachment_link, 1);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
+        assert_eq!(fixture.count_rows("playable_media"), 0);
     }
 
     #[test]
-    fn stale_source_facts_do_not_promote() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+    fn stale_source_observations_do_not_promote() {
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/stale.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", true);
         fixture.change_file_basis(100);
 
         let result = fixture.promote(10);
 
         assert_eq!(result.promoted_count, 0);
-        assert_eq!(result.skipped_stale_facts, 1);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
+        assert_eq!(result.skipped_stale_observations, 1);
+        assert_eq!(fixture.count_rows("playable_media"), 0);
     }
 
     #[test]
     fn stale_attachment_link_does_not_promote() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/stale-link.wav");
         fixture.link_attachment(100, HASH_B);
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", true);
 
         let result = fixture.promote(10);
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_stale_attachment_link, 1);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
+        assert_eq!(fixture.count_rows("playable_media"), 0);
     }
 
     #[test]
     fn non_audio_files_do_not_promote() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         for (id, path, hash) in [
             (100, "Album/video.mp4", HASH_A),
             (101, "Album/cover.jpg", HASH_B),
@@ -936,23 +935,23 @@ mod tests {
         ] {
             fixture.insert_source_file(id, path);
             fixture.link_attachment(id, hash);
-            fixture.commit_current_facts(id, Some(hash), "audio", true);
+            fixture.commit_current_observations(id, Some(hash), "audio", true);
         }
 
         let result = fixture.promote(10);
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_unsupported_media_kind, 6);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
+        assert_eq!(fixture.count_rows("playable_media"), 0);
     }
 
     #[test]
-    fn read_contents_primary_media_returns_only_promoted_evidence_backed_rows() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+    fn read_contents_playable_media_returns_only_promoted_evidence_backed_rows() {
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/promoted.wav");
         fixture.insert_source_file(101, "Album/fallback-removed.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", true);
         fixture.promote(10);
 
         let result = fixture
@@ -961,7 +960,7 @@ mod tests {
                 StoreContentsScope::Source {
                     source_id: fixture.source_id,
                 },
-                primary_media_policy(),
+                playable_media_policy(),
                 StoreContentsScopeDepth::Recursive,
                 10,
                 None,
@@ -972,8 +971,8 @@ mod tests {
         assert_eq!(result.rows.len(), 1);
         let row = &result.rows[0];
         assert_eq!(row.source_file_id, 100);
-        let summary = row.primary_media.as_ref().expect("primary media summary");
-        assert!(summary.primary_media_fact_id.is_some());
+        let summary = row.playable_media.as_ref().expect("playable media summary");
+        assert!(summary.playable_media_id.is_some());
         assert!(summary.attachment_id.is_some());
         assert_eq!(summary.content_hash_value.as_deref(), Some(HASH_A));
         assert_eq!(summary.codec.as_deref(), Some("pcm"));
@@ -981,7 +980,7 @@ mod tests {
 
     #[test]
     fn source_file_inventory_default_remains_unchanged() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
 
         let result = fixture
@@ -1006,12 +1005,12 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
-        assert!(result.rows[0].primary_media.is_none());
+        assert!(result.rows[0].playable_media.is_none());
     }
 
     #[test]
     fn promotion_remaining_count_is_bounded_and_deterministic() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+        let fixture = PlayableMediaPromotionFixture::new();
         for (id, path, hash) in [
             (100, "Album/a.wav", HASH_A),
             (101, "Album/b.wav", HASH_B),
@@ -1019,13 +1018,13 @@ mod tests {
         ] {
             fixture.insert_source_file(id, path);
             fixture.link_attachment(id, hash);
-            fixture.commit_current_facts(id, Some(hash), "audio", true);
+            fixture.commit_current_observations(id, Some(hash), "audio", true);
         }
 
         let first = fixture.promote(2);
         assert_eq!(first.promoted_count, 2);
         assert_eq!(first.remaining_candidates, 1);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 2);
+        assert_eq!(fixture.count_rows("playable_media"), 2);
 
         let second = fixture.promote(2);
         assert_eq!(second.promoted_count, 1);
@@ -1035,7 +1034,7 @@ mod tests {
         let source_file_ids = connection
             .prepare(
                 "SELECT evidence_source_file_id
-                 FROM primary_media_facts
+                 FROM playable_media
                  ORDER BY evidence_source_file_id ASC",
             )
             .expect("prepare candidate read")
@@ -1047,22 +1046,22 @@ mod tests {
     }
 
     #[test]
-    fn promotion_writes_only_primary_media_facts() {
-        let fixture = PrimaryMediaPromotionFixture::new();
+    fn promotion_writes_only_playable_media() {
+        let fixture = PlayableMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, Some(HASH_A), "audio", true);
+        fixture.commit_current_observations(100, Some(HASH_A), "audio", true);
 
         fixture.promote(10);
 
-        assert_eq!(fixture.count_rows("primary_media_facts"), 1);
+        assert_eq!(fixture.count_rows("playable_media"), 1);
         assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
         assert_eq!(fixture.count_rows("track_identity_decisions"), 0);
     }
 
-    fn primary_media_policy() -> StoreContentsReadPolicy {
-        StoreContentsReadPolicy::PrimaryMedia {
-            media_kinds: vec![StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video],
+    fn playable_media_policy() -> StoreContentsReadPolicy {
+        StoreContentsReadPolicy::PlayableMedia {
+            media_kinds: vec![StorePlayableMediaKind::Audio, StorePlayableMediaKind::Video],
         }
     }
 }

@@ -44,7 +44,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
 
     if (
       sourceDirectoryId === null ||
-      row.directoryPrimaryMediaState === undefined ||
+      row.directoryPlayableMediaState === undefined ||
       row.directoryImageMediaState === undefined ||
       row.directoryScanState === undefined ||
       row.navigableChildScopeState === undefined
@@ -63,7 +63,7 @@ export function mapLibraryTreeNode(row: LibraryTreeNode): ChildRow | undefined {
         : { parentDirectoryId: row.parentSourceDirectoryId }),
       presence: row.presenceState,
       hasChildDirectories: row.hasChildDirectories ?? false,
-      directoryPrimaryMediaState: row.directoryPrimaryMediaState,
+      directoryPlayableMediaState: row.directoryPlayableMediaState,
       directoryImageMediaState: row.directoryImageMediaState,
       directoryScanState: row.directoryScanState,
       navigableChildScopeState: row.navigableChildScopeState,

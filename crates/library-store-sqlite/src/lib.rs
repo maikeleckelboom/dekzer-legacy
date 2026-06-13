@@ -22,7 +22,7 @@ pub use authority::promotion::{
     RebuildProjectionPromotionInput, RebuildProjectionPromotionResult,
 };
 pub use authority::sources::{
-    CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+    CommitAcceptedSourceFileObservationInput, CommitAcceptedSourceFileObservationMergePolicy,
     ContentHashEvidence, DeleteSourceLocationInput, RecordSourceFileObservationInput,
     SourceLocatorInput, UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
     UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
@@ -50,17 +50,13 @@ pub use read_models::attachment_identity::{
 pub use read_models::contents::{
     StoreContentsFileClass, StoreContentsFileRow, StoreContentsReadPolicy, StoreContentsResult,
     StoreContentsScope, StoreContentsScopeCoverage, StoreContentsScopeCoverageState,
-    StoreContentsScopeDepth, StoreContentsState, StorePrimaryMediaKind, StorePrimaryMediaSummary,
+    StoreContentsScopeDepth, StoreContentsState, StorePlayableMedia, StorePlayableMediaKind,
 };
 pub use read_models::literal_hierarchy::{
     StoreLiteralHierarchyCoverage, StoreLiteralHierarchyCoverageState,
     StoreLiteralHierarchyEntryPoint, StoreLiteralHierarchyNode, StoreLiteralHierarchyWindow,
 };
 pub use read_models::navigation::NavigationRow;
-pub use read_models::observed_file_facts::{
-    StoreContentHashEvidence, StoreObservedFileFactStatus, StoreObservedFileFacts,
-    read_observed_file_facts_for_source_file,
-};
 pub use read_models::search_filter::{
     RebuildSearchFilterIndexForSourceResult, StoreSearchAccessState,
     StoreSearchAttachmentLinkState, StoreSearchAuthorityLayer, StoreSearchEvidenceAvailability,
@@ -69,6 +65,10 @@ pub use read_models::search_filter::{
     StoreSearchPresenceState, StoreSearchQueryIdentity, StoreSearchRecursion, StoreSearchRequest,
     StoreSearchResult, StoreSearchResultKind, StoreSearchResultRow, StoreSearchScope,
     StoreSearchSort, StoreSearchState,
+};
+pub use read_models::source_file_observations::{
+    StoreContentHashEvidence, StoreSourceFileObservation, StoreSourceFileObservationStatus,
+    read_source_file_observation,
 };
 pub use read_models::source_integrity::{
     StoreSourceIntegrity, StoreSourceIntegrityCount, StoreSourceIntegrityCoverage,
@@ -106,7 +106,7 @@ pub use store::{
     ProbeSourceFileMediaBatchInput, ProbeSourceFileMediaBatchOutcome,
     ProbeSourceFileMediaBatchOutcomeStatus, ProbeSourceFileMediaBatchResult,
     ProduceTrackIdentityCandidatesForSourceResult, ProduceTrackIdentityDecisionsForSourceResult,
-    PromotePrimaryMediaForSourceResult, ReadLocalRootsResult,
+    PromotePlayableMediaForSourceResult, ReadLocalRootsResult,
     ReadSourceFileBlake3HashCandidatesInput, ReadSourceFileMediaProbeCandidatesInput,
     RegisterLocalRootInput, RegisterLocalRootResult, RootNavigationWindowEstablishment,
     RootNavigationWindowEstablishmentState, RootScanHierarchyObservationReason,
@@ -114,15 +114,15 @@ pub use store::{
     SourceFileBlake3HashAdmissionScope, SourceFileBlake3HashCandidate,
     SourceFileBlake3HashCandidateReason, SourceFileBlake3HashFailure,
     SourceFileBlake3HashSkipReason, SourceFileMediaProbeAdmissionScope,
-    SourceFileMediaProbeCandidate, SourceFileMediaProbeCandidateReason, SourceFileMediaProbeFacts,
-    SourceFileMediaProbeFailure, SourceFileMediaProbeSkipReason, SourceRegistrationProposal,
-    SourceRegistrationRejection, SourceRegistrationRootClass, SqliteDurableStore,
-    SqliteDurableStoreAppOwnedState, StoreEnvironment,
+    SourceFileMediaProbeCandidate, SourceFileMediaProbeCandidateReason,
+    SourceFileMediaProbeFailure, SourceFileMediaProbeObservations, SourceFileMediaProbeSkipReason,
+    SourceRegistrationProposal, SourceRegistrationRejection, SourceRegistrationRootClass,
+    SqliteDurableStore, SqliteDurableStoreAppOwnedState, StoreEnvironment,
     TRACK_IDENTITY_DECISION_SOURCE_SYSTEM_EXACT_CONTENT_V0,
     TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0, TrackIdentityDecisionChangeFailure,
     TrackIdentityDecisionChangeResult, TrackIdentityDecisionChangeSuccess,
     UnregisterLocalRootInput, UnregisterLocalRootResult, durable_store_path,
     effective_hash_batch_limit, effective_media_probe_batch_limit,
-    effective_primary_media_promotion_limit, effective_track_identity_candidate_limit,
+    effective_playable_media_promotion_limit, effective_track_identity_candidate_limit,
     effective_track_identity_decision_limit,
 };

@@ -128,7 +128,7 @@ The first slice must not choose names, tables, APIs, or job behavior that make t
 | Work unit                    | Bounded slice of scan work after which the job yields observations and accepts cancellation.         |
 | Traversal observation        | Evidence produced while walking directories, without reading media bytes.                            |
 | Candidate admission          | Decision that a file is plausible enough to inspect as media or companion metadata.                  |
-| Extension-admitted candidate | Scan admission fact: path/extension policy admitted the file for cheap inspection.                   |
+| Extension-admitted candidate | Scan admission observation: path/extension policy admitted the file for cheap inspection.                   |
 | Magic signature read         | Tiny byte read, normally 8 to 16 bytes, used to detect obvious container signatures.                 |
 | Format evidence grade        | Doctrine evidence grade such as declared, detected, computed, verified, tested, exported, confirmed. |
 | Attachment inventory         | Readable media objects admitted into the library substrate.                                          |
@@ -136,7 +136,7 @@ The first slice must not choose names, tables, APIs, or job behavior that make t
 
 ## Vocabulary separation
 
-Candidate admission facts and doctrine evidence grades must not share names unless they describe the same concept.
+Candidate admission observations and doctrine evidence grades must not share names unless they describe the same concept.
 
 The most important separation:
 
@@ -148,12 +148,12 @@ The most important separation:
 
 A file named `song.mp3` may have both:
 
-| Fact                     | Meaning                                             |
+| Observation                     | Meaning                                             |
 | ------------------------ | --------------------------------------------------- |
 | extension_admitted       | The scanner is allowed to perform cheap inspection. |
 | declared format evidence | The extension declares MP3.                         |
 
-Those facts belong to different layers. Code must not collapse them into one field, enum, table, or status.
+Those observations belong to different layers. Code must not collapse them into one field, enum, table, or status.
 
 ## Root identity law
 
@@ -543,7 +543,7 @@ Example:
 
 | File       | Role                                |
 | ---------- | ----------------------------------- |
-| album.flac | Primary media attachment candidate. |
+| album.flac | Playable media attachment candidate. |
 | album.cue  | Companion segmentation artifact.    |
 
 First-slice behavior:
@@ -785,7 +785,7 @@ A change fails this contract if it does any of the following:
 | ------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | Recursively scans C:\ as an ordinary folder                              | Ignores root classification and scan planning.                  |
 | Opens every file to see if it might be audio                             | Couples traversal to analysis and violates candidate admission. |
-| Uses declared_candidate as a stored fact name                            | Collides with doctrine evidence grade vocabulary.               |
+| Uses declared_candidate as a stored observation name                            | Collides with doctrine evidence grade vocabulary.               |
 | Treats MP3 frame sync as sufficient unknown-extension evidence           | Produces false positives from binary debris.                    |
 | Stores every ignored system file                                         | Pollutes durable substrate with irrelevant debris.              |
 | Treats permission error as scan failure                                  | Broad roots must tolerate inaccessible territory.               |

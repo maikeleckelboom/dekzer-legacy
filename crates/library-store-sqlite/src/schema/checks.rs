@@ -223,7 +223,6 @@ fn validate_artifact_constraints(connection: &Connection) -> LibrarySqliteResult
     for fragment in [
         "subject_kind IN ('source_file', 'projection_domain')",
         "artifact_kind IN ( 'inspection_result', 'projection_snapshot' )",
-        "artifact_role = 'primary_result'",
         "storage_kind IN ('inline_payload', 'file_store')",
         "artifact_kind <> 'inspection_result' OR subject_kind = 'source_file'",
         "subject_kind = 'source_file'",

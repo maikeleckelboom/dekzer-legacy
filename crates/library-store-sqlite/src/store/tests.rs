@@ -10,8 +10,8 @@ use crate::authority::roots::{
     RootMountStatus,
 };
 use crate::{
-    ClaimMachineWorkBatchInput, CommitAcceptedSourceFileFactsInput,
-    CommitAcceptedSourceFileFactsMergePolicy, CompleteMachineWorkInput, ContentHashEvidence,
+    ClaimMachineWorkBatchInput, CommitAcceptedSourceFileObservationInput,
+    CommitAcceptedSourceFileObservationMergePolicy, CompleteMachineWorkInput, ContentHashEvidence,
     DeleteSourceLocationInput, FinishWorkRunInput, InspectSourceFilePromotionInput,
     RecordArtifactInput, RecordInlineArtifactInput, SourceFileClassFilter, StartWorkRunInput,
     StoreContentsReadPolicy, StoreContentsScope, StoreContentsScopeCoverageState,
@@ -21,7 +21,7 @@ use crate::{
     UpsertSourceStateInput,
 };
 use library_domain::{
-    ArtifactKind, ArtifactRole, NavigationSelector, SourceAccessState, SourceFileId, SourceId,
+    ArtifactKind, NavigationSelector, SourceAccessState, SourceFileId, SourceId,
     SourcePresenceState, SourceScanPhase, WorkItemId, WorkPriorityClass, WorkRunOutcome,
     encode_selector,
 };
@@ -271,7 +271,6 @@ fn record_completed_inline_artifact(
             artifact: RecordArtifactInput {
                 work_run_id: work_run.work_run_id,
                 artifact_kind,
-                artifact_role: ArtifactRole::PrimaryResult,
                 media_type: "application/json".to_string(),
                 basis_fingerprint: basis_fingerprint.to_string(),
                 payload_hash: payload_hash.to_string(),
@@ -1872,7 +1871,7 @@ fn stale_scan_completion_still_rejects_old_mount_epochs() {
 }
 
 #[test]
-fn store_source_flow_drives_navigation_and_observed_facts() {
+fn store_source_flow_drives_navigation_and_source_observations() {
     let tempdir = TempDir::new().expect("create tempdir");
     let db_path = tempdir.path().join("library.sqlite3");
     let durable_store = SqliteDurableStore::open(&db_path).expect("open durable store");
@@ -1992,7 +1991,7 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
     );
     durable_store
         .inspect_source_file(InspectSourceFilePromotionInput {
-            source_file_facts: CommitAcceptedSourceFileFactsInput {
+            source_file_observations: CommitAcceptedSourceFileObservationInput {
                 source_file_id: SourceFileId::new(source_file_id).expect("positive source file id"),
                 accepted_artifact_id: library_domain::ArtifactId::new(inspection_artifact_id)
                     .expect("positive artifact id"),
@@ -2011,7 +2010,8 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
                 codec: Some("pcm".to_string()),
                 updated_at: 24,
             },
-            source_file_facts_merge_policy: CommitAcceptedSourceFileFactsMergePolicy::replacement(),
+            source_file_observation_merge_policy:
+                CommitAcceptedSourceFileObservationMergePolicy::replacement(),
             rebuild_projection_domains: vec![library_domain::ProjectionDomain::Navigation],
             rebuild_priority: WorkPriorityClass::Interactive,
         })
@@ -2159,12 +2159,12 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
         Some("source_location")
     );
     let connection = open_mutation_connection(&db_path);
-    let accepted_facts_count: i64 = connection
-        .query_row("SELECT COUNT(*) FROM source_file_facts", [], |row| {
+    let accepted_observations_count: i64 = connection
+        .query_row("SELECT COUNT(*) FROM source_file_observations", [], |row| {
             row.get(0)
         })
-        .expect("count source facts");
-    assert_eq!(accepted_facts_count, 1);
+        .expect("count source observations");
+    assert_eq!(accepted_observations_count, 1);
     assert_eq!(
         connection
             .query_row(

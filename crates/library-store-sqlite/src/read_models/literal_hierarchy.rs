@@ -57,7 +57,7 @@ pub struct StoreLiteralHierarchyNode {
     pub modified_at_ns: Option<i64>,
     pub updated_at: i64,
     pub has_child_directories: Option<bool>,
-    pub has_primary_media_descendant: Option<bool>,
+    pub has_playable_media_descendant: Option<bool>,
     pub has_image_media_descendant: Option<bool>,
     pub dir_scan_state: Option<String>,
 }
@@ -744,7 +744,7 @@ fn read_child_rows(
                 modified_at_ns,
                 updated_at,
                 has_child_directories,
-                has_primary_media_descendant,
+                has_playable_media_descendant,
                 has_image_media_descendant,
                 dir_scan_state
          FROM (
@@ -762,7 +762,7 @@ fn read_child_rows(
                     NULL AS modified_at_ns,
                     updated_at,
                     has_child_directories,
-                    has_primary_media_descendant,
+                    has_playable_media_descendant,
                     has_image_media_descendant,
                     dir_scan_state,
                     name_sort_key
@@ -789,7 +789,7 @@ fn read_child_rows(
                     mtime_ns AS modified_at_ns,
                     updated_at,
                     NULL AS has_child_directories,
-                    NULL AS has_primary_media_descendant,
+                    NULL AS has_playable_media_descendant,
                     NULL AS has_image_media_descendant,
                     NULL AS dir_scan_state,
                     name_sort_key
@@ -827,7 +827,7 @@ fn read_child_rows(
                     modified_at_ns: row.get(10)?,
                     updated_at: row.get(11)?,
                     has_child_directories: row.get(12)?,
-                    has_primary_media_descendant: row.get(13)?,
+                    has_playable_media_descendant: row.get(13)?,
                     has_image_media_descendant: row.get(14)?,
                     dir_scan_state: row.get(15)?,
                 })
@@ -839,11 +839,11 @@ fn read_child_rows(
 
 fn directory_visibility_predicate_sql(row_admission: SourceFileClassFilter) -> String {
     let revealable_descendant_predicate = match row_admission {
-        SourceFileClassFilter::NavigationOnly | SourceFileClassFilter::PrimaryMedia => {
-            "has_primary_media_descendant = 1"
+        SourceFileClassFilter::NavigationOnly | SourceFileClassFilter::PlayableMedia => {
+            "has_playable_media_descendant = 1"
         }
-        SourceFileClassFilter::PrimaryMediaAndImages => {
-            "(has_primary_media_descendant = 1 OR has_image_media_descendant = 1)"
+        SourceFileClassFilter::PlayableMediaAndImages => {
+            "(has_playable_media_descendant = 1 OR has_image_media_descendant = 1)"
         }
     };
 
@@ -962,9 +962,9 @@ mod tests {
             .expect("update directory scan issue");
     }
 
-    struct DirectoryFacts {
+    struct DirectoryObservations {
         has_child_directories: bool,
-        has_primary_media_descendant: bool,
+        has_playable_media_descendant: bool,
         has_image_media_descendant: bool,
     }
 
@@ -973,7 +973,7 @@ mod tests {
         source_directory_id: i64,
         parent_source_directory_id: Option<i64>,
         name: &str,
-        facts: DirectoryFacts,
+        observations: DirectoryObservations,
         dir_scan_state: &str,
         dir_scan_issue_kind: Option<&str>,
     ) {
@@ -989,7 +989,7 @@ mod tests {
                      relative_path,
                      presence_state,
                      has_child_directories,
-                     has_primary_media_descendant,
+                     has_playable_media_descendant,
                      has_image_media_descendant,
                      dir_scan_state,
                      dir_scan_issue_kind,
@@ -1003,9 +1003,9 @@ mod tests {
                     parent_source_directory_id,
                     name,
                     name_sort_key,
-                    facts.has_child_directories,
-                    facts.has_primary_media_descendant,
-                    facts.has_image_media_descendant,
+                    observations.has_child_directories,
+                    observations.has_playable_media_descendant,
+                    observations.has_image_media_descendant,
                     dir_scan_state,
                     dir_scan_issue_kind,
                 ],
@@ -1024,9 +1024,9 @@ mod tests {
                 *source_directory_id,
                 None,
                 name,
-                DirectoryFacts {
+                DirectoryObservations {
                     has_child_directories: false,
-                    has_primary_media_descendant: true,
+                    has_playable_media_descendant: true,
                     has_image_media_descendant: false,
                 },
                 "complete",
@@ -1102,7 +1102,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1125,9 +1125,9 @@ mod tests {
             20,
             None,
             "Music",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: true,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1138,9 +1138,9 @@ mod tests {
             21,
             Some(20),
             "Music/Locked",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1154,7 +1154,7 @@ mod tests {
             Some(20),
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1168,7 +1168,7 @@ mod tests {
     }
 
     #[test]
-    fn performance_file_rows_include_primary_media_only() {
+    fn performance_file_rows_include_playable_media_only() {
         let connection = test_connection();
         insert_source(&connection, 7);
 
@@ -1188,7 +1188,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1225,7 +1225,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1261,7 +1261,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1286,7 +1286,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1304,9 +1304,9 @@ mod tests {
             20,
             None,
             "Albums",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: true,
-                has_primary_media_descendant: true,
+                has_playable_media_descendant: true,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1317,9 +1317,9 @@ mod tests {
             21,
             None,
             "Singles",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: true,
+                has_playable_media_descendant: true,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1356,7 +1356,7 @@ mod tests {
     }
 
     #[test]
-    fn performance_paginates_over_primary_media_files_only() {
+    fn performance_paginates_over_playable_media_files_only() {
         let connection = test_connection();
         insert_source(&connection, 7);
 
@@ -1378,7 +1378,7 @@ mod tests {
             None,
             0,
             1,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read first literal hierarchy page")
         .expect("source window");
@@ -1388,7 +1388,7 @@ mod tests {
             None,
             1,
             1,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read second literal hierarchy page")
         .expect("source window");
@@ -1422,9 +1422,9 @@ mod tests {
             21,
             None,
             "Documents",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "pending",
@@ -1444,7 +1444,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1454,7 +1454,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy directory")
         .expect("directory window");
@@ -1481,9 +1481,9 @@ mod tests {
             21,
             None,
             "Covers",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: true,
             },
             "complete",
@@ -1497,7 +1497,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1515,9 +1515,9 @@ mod tests {
             21,
             None,
             "Covers",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: true,
             },
             "complete",
@@ -1531,7 +1531,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
         )
         .expect("read literal hierarchy root")
         .expect("source window");
@@ -1541,7 +1541,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
         )
         .expect("read literal hierarchy directory")
         .expect("directory window");
@@ -1570,9 +1570,9 @@ mod tests {
             20,
             None,
             "Music",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1585,7 +1585,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1609,9 +1609,9 @@ mod tests {
             20,
             None,
             "Music",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: true,
+                has_playable_media_descendant: true,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1623,9 +1623,9 @@ mod tests {
             21,
             Some(20),
             "Music/Locked",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1639,7 +1639,7 @@ mod tests {
             Some(20),
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -1671,9 +1671,9 @@ mod tests {
             20,
             None,
             "Music",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: true,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1684,9 +1684,9 @@ mod tests {
             21,
             Some(20),
             "Music/Good",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1697,9 +1697,9 @@ mod tests {
             22,
             Some(20),
             "Music/Locked",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1713,7 +1713,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read Music/Good hierarchy")
         .expect("Music/Good window");
@@ -1738,7 +1738,7 @@ mod tests {
             Some(22),
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read Music/Locked hierarchy")
         .expect("Music/Locked window");
@@ -1757,7 +1757,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read whole source hierarchy")
         .expect("whole source window");
@@ -1785,9 +1785,9 @@ mod tests {
             20,
             None,
             "Music",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: true,
-                has_primary_media_descendant: true,
+                has_playable_media_descendant: true,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1798,9 +1798,9 @@ mod tests {
             21,
             Some(20),
             "Music/Good",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: true,
+                has_playable_media_descendant: true,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1812,9 +1812,9 @@ mod tests {
             22,
             Some(20),
             "Music/Locked",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1828,7 +1828,7 @@ mod tests {
             Some(21),
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read Music/Good hierarchy")
         .expect("Music/Good window");
@@ -1850,7 +1850,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read whole source hierarchy")
         .expect("whole source window");
@@ -1910,9 +1910,9 @@ mod tests {
             20,
             None,
             "Music",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: true,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1923,9 +1923,9 @@ mod tests {
             22,
             Some(20),
             "Music/Locked",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1949,7 +1949,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source location window");
@@ -1977,9 +1977,9 @@ mod tests {
             20,
             None,
             "Music",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: true,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -1990,9 +1990,9 @@ mod tests {
             22,
             Some(20),
             "Music/Locked",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: false,
+                has_playable_media_descendant: false,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -2016,7 +2016,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source location window");
@@ -2041,7 +2041,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2068,7 +2068,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2088,9 +2088,9 @@ mod tests {
             100,
             None,
             "[2]",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: true,
+                has_playable_media_descendant: true,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -2102,9 +2102,9 @@ mod tests {
             101,
             None,
             "[1]",
-            DirectoryFacts {
+            DirectoryObservations {
                 has_child_directories: false,
-                has_primary_media_descendant: true,
+                has_playable_media_descendant: true,
                 has_image_media_descendant: false,
             },
             "complete",
@@ -2119,7 +2119,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2156,7 +2156,7 @@ mod tests {
             None,
             0,
             5,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read first page")
         .expect("source window");
@@ -2167,7 +2167,7 @@ mod tests {
             None,
             5,
             5,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read second page")
         .expect("source window");
@@ -2178,7 +2178,7 @@ mod tests {
             None,
             10,
             5,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read third page")
         .expect("source window");
@@ -2240,7 +2240,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2286,7 +2286,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMediaAndImages,
+            SourceFileClassFilter::PlayableMediaAndImages,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2315,7 +2315,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2351,7 +2351,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");
@@ -2385,7 +2385,7 @@ mod tests {
             None,
             0,
             10,
-            SourceFileClassFilter::PrimaryMedia,
+            SourceFileClassFilter::PlayableMedia,
         )
         .expect("read literal hierarchy")
         .expect("source window");

@@ -6,7 +6,7 @@ use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{ArtifactId, SourceFileId};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommitAcceptedSourceFileFactsInput {
+pub struct CommitAcceptedSourceFileObservationInput {
     pub source_file_id: SourceFileId,
     pub accepted_artifact_id: ArtifactId,
     pub basis_fingerprint: String,
@@ -23,12 +23,12 @@ pub struct CommitAcceptedSourceFileFactsInput {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CommitAcceptedSourceFileFactsMergePolicy {
+pub struct CommitAcceptedSourceFileObservationMergePolicy {
     pub preserve_current_content_hash_when_unspecified: bool,
     pub preserve_current_probe_fields_when_unspecified: bool,
 }
 
-impl CommitAcceptedSourceFileFactsMergePolicy {
+impl CommitAcceptedSourceFileObservationMergePolicy {
     pub const fn replacement() -> Self {
         Self {
             preserve_current_content_hash_when_unspecified: false,
@@ -67,7 +67,7 @@ struct SourceFileBasis {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct CurrentSourceFileFactsForMerge {
+struct CurrentSourceFileObservationForMerge {
     content_hash: Option<ContentHashEvidence>,
     mime_type: Option<String>,
     duration_ms: Option<i64>,
@@ -77,19 +77,19 @@ struct CurrentSourceFileFactsForMerge {
     codec: Option<String>,
 }
 
-pub struct SourceFileFactsAuthorityTx<'write, 'conn> {
+pub struct SourceFileObservationAuthorityTx<'write, 'conn> {
     tx: &'write AdmittedWrite<'conn>,
 }
 
-impl<'write, 'conn> SourceFileFactsAuthorityTx<'write, 'conn> {
+impl<'write, 'conn> SourceFileObservationAuthorityTx<'write, 'conn> {
     pub(crate) fn new(tx: &'write AdmittedWrite<'conn>) -> Self {
         Self { tx }
     }
 
-    pub fn commit_accepted_source_file_facts_with_merge(
+    pub fn commit_accepted_source_file_observation_with_merge(
         &self,
-        input: &CommitAcceptedSourceFileFactsInput,
-        merge_policy: CommitAcceptedSourceFileFactsMergePolicy,
+        input: &CommitAcceptedSourceFileObservationInput,
+        merge_policy: CommitAcceptedSourceFileObservationMergePolicy,
     ) -> LibrarySqliteResult<()> {
         validate_input(input)?;
         require_source_artifact(
@@ -101,7 +101,7 @@ impl<'write, 'conn> SourceFileFactsAuthorityTx<'write, 'conn> {
         )?;
         let source_file_basis = load_source_file_basis(self.tx, input.source_file_id)?;
         let merged_input =
-            merge_with_current_facts(self.tx, input, merge_policy, &source_file_basis)?;
+            merge_with_current_observation(self.tx, input, merge_policy, &source_file_basis)?;
         validate_input(&merged_input)?;
         let (content_hash_algorithm, content_hash_value) = merged_input
             .content_hash
@@ -110,7 +110,7 @@ impl<'write, 'conn> SourceFileFactsAuthorityTx<'write, 'conn> {
             .unwrap_or((None, None));
 
         self.tx.execute(
-            "INSERT INTO source_file_facts (
+            "INSERT INTO source_file_observations (
                  source_file_id,
                  basis_fingerprint,
                  basis_source_id,
@@ -177,20 +177,23 @@ impl<'write, 'conn> SourceFileFactsAuthorityTx<'write, 'conn> {
     }
 }
 
-fn merge_with_current_facts(
+fn merge_with_current_observation(
     tx: &AdmittedWrite<'_>,
-    input: &CommitAcceptedSourceFileFactsInput,
-    merge_policy: CommitAcceptedSourceFileFactsMergePolicy,
+    input: &CommitAcceptedSourceFileObservationInput,
+    merge_policy: CommitAcceptedSourceFileObservationMergePolicy,
     source_file_basis: &SourceFileBasis,
-) -> LibrarySqliteResult<CommitAcceptedSourceFileFactsInput> {
+) -> LibrarySqliteResult<CommitAcceptedSourceFileObservationInput> {
     if !merge_policy.preserve_current_content_hash_when_unspecified
         && !merge_policy.preserve_current_probe_fields_when_unspecified
     {
         return Ok(input.clone());
     }
 
-    let Some(current) =
-        load_current_source_file_facts_for_merge(tx, input.source_file_id, source_file_basis)?
+    let Some(current) = load_current_source_file_observation_for_merge(
+        tx,
+        input.source_file_id,
+        source_file_basis,
+    )?
     else {
         return Ok(input.clone());
     };
@@ -224,12 +227,13 @@ fn merge_with_current_facts(
     Ok(merged)
 }
 
-fn validate_input(input: &CommitAcceptedSourceFileFactsInput) -> LibrarySqliteResult<()> {
+fn validate_input(input: &CommitAcceptedSourceFileObservationInput) -> LibrarySqliteResult<()> {
     require_non_empty("basis_fingerprint", &input.basis_fingerprint)?;
     require_non_empty("media_kind", &input.media_kind)?;
     if input.updated_at < input.observed_at_ms {
         return Err(LibrarySqliteError::WriteInvariant(
-            "source facts updated_at must be greater than or equal to observed_at_ms".to_string(),
+            "source observations updated_at must be greater than or equal to observed_at_ms"
+                .to_string(),
         ));
     }
     if let Some(content_hash) = &input.content_hash {
@@ -242,7 +246,7 @@ fn validate_input(input: &CommitAcceptedSourceFileFactsInput) -> LibrarySqliteRe
 fn require_non_empty(field_name: &str, value: &str) -> LibrarySqliteResult<()> {
     if value.trim().is_empty() {
         Err(LibrarySqliteError::WriteInvariant(format!(
-            "source facts {field_name} must not be empty"
+            "source observations {field_name} must not be empty"
         )))
     } else {
         Ok(())
@@ -281,11 +285,11 @@ fn load_source_file_basis(
     })
 }
 
-fn load_current_source_file_facts_for_merge(
+fn load_current_source_file_observation_for_merge(
     tx: &AdmittedWrite<'_>,
     source_file_id: SourceFileId,
     source_file_basis: &SourceFileBasis,
-) -> LibrarySqliteResult<Option<CurrentSourceFileFactsForMerge>> {
+) -> LibrarySqliteResult<Option<CurrentSourceFileObservationForMerge>> {
     tx.query_row(
         "SELECT content_hash_algorithm,
                 content_hash_value,
@@ -295,7 +299,7 @@ fn load_current_source_file_facts_for_merge(
                 channels,
                 bit_depth,
                 codec
-         FROM source_file_facts
+         FROM source_file_observations
          WHERE source_file_id = ?1
            AND basis_source_id = ?2
            AND basis_relative_path = ?3
@@ -313,7 +317,7 @@ fn load_current_source_file_facts_for_merge(
         |row| {
             let content_hash_algorithm = row.get::<_, Option<String>>(0)?;
             let content_hash_value = row.get::<_, Option<String>>(1)?;
-            Ok(CurrentSourceFileFactsForMerge {
+            Ok(CurrentSourceFileObservationForMerge {
                 content_hash: content_hash_algorithm
                     .zip(content_hash_value)
                     .map(|(algorithm, value)| ContentHashEvidence { algorithm, value }),
@@ -335,12 +339,12 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
-        ContentHashEvidence, SourceFileFactsAuthorityTx,
+        CommitAcceptedSourceFileObservationInput, CommitAcceptedSourceFileObservationMergePolicy,
+        ContentHashEvidence, SourceFileObservationAuthorityTx,
     };
     use crate::authority::write_lane::{AdmittedWrite, admit_write};
-    use crate::read_models::observed_file_facts::{
-        StoreObservedFileFactStatus, read_observed_file_facts_for_source_file,
+    use crate::read_models::source_file_observations::{
+        StoreSourceFileObservationStatus, read_source_file_observation,
     };
     use crate::schema::install_baseline_schema_for_test;
     use library_domain::{ArtifactId, SourceFileId};
@@ -364,7 +368,7 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (1, 'internal', 'system', 'source:facts:test', 'Facts Test', 1, 1, 1)",
+                 VALUES (1, 'internal', 'system', 'source:observations:test', 'Observations Test', 1, 1, 1)",
                 [],
             )
             .expect("insert source");
@@ -465,7 +469,6 @@ mod tests {
                      subject_kind,
                      subject_id,
                      artifact_kind,
-                     artifact_role,
                      adapter_key,
                      adapter_version,
                      basis_fingerprint,
@@ -474,7 +477,7 @@ mod tests {
                      payload_hash,
                      created_at
                  )
-                 VALUES (?1, ?1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test.adapter', '1', ?3, 'application/json', 'inline_payload', ?4, 22)",
+                 VALUES (?1, ?1, 'source_file', ?2, 'inspection_result', 'test.adapter', '1', ?3, 'application/json', 'inline_payload', ?4, 22)",
                 params![
                     artifact_id,
                     source_file_id.to_string(),
@@ -485,7 +488,7 @@ mod tests {
             .expect("insert artifact");
     }
 
-    fn commit_source_fact(
+    fn commit_source_observation(
         connection: &mut Connection,
         artifact_id: i64,
         source_file_id: i64,
@@ -495,27 +498,29 @@ mod tests {
     ) {
         admit_write(connection, |write| {
             insert_artifact(write, artifact_id, source_file_id, basis_fingerprint);
-            SourceFileFactsAuthorityTx::new(write).commit_accepted_source_file_facts_with_merge(
-                &CommitAcceptedSourceFileFactsInput {
-                    source_file_id: SourceFileId::new(source_file_id)
-                        .expect("positive source_file_id"),
-                    accepted_artifact_id: ArtifactId::new(artifact_id).expect("positive artifact"),
-                    basis_fingerprint: basis_fingerprint.to_string(),
-                    observed_at_ms: 23,
-                    content_hash,
-                    media_kind: media_kind.to_string(),
-                    mime_type: None,
-                    duration_ms: None,
-                    sample_rate_hz: None,
-                    channels: None,
-                    bit_depth: None,
-                    codec: None,
-                    updated_at: 24,
-                },
-                CommitAcceptedSourceFileFactsMergePolicy::replacement(),
-            )
+            SourceFileObservationAuthorityTx::new(write)
+                .commit_accepted_source_file_observation_with_merge(
+                    &CommitAcceptedSourceFileObservationInput {
+                        source_file_id: SourceFileId::new(source_file_id)
+                            .expect("positive source_file_id"),
+                        accepted_artifact_id: ArtifactId::new(artifact_id)
+                            .expect("positive artifact"),
+                        basis_fingerprint: basis_fingerprint.to_string(),
+                        observed_at_ms: 23,
+                        content_hash,
+                        media_kind: media_kind.to_string(),
+                        mime_type: None,
+                        duration_ms: None,
+                        sample_rate_hz: None,
+                        channels: None,
+                        bit_depth: None,
+                        codec: None,
+                        updated_at: 24,
+                    },
+                    CommitAcceptedSourceFileObservationMergePolicy::replacement(),
+                )
         })
-        .expect("commit source facts");
+        .expect("commit source observations");
     }
 
     #[test]
@@ -524,7 +529,7 @@ mod tests {
         insert_source(&connection);
         insert_source_file(&connection, 100, "Album/track.flac", 123, 456);
 
-        commit_source_fact(
+        commit_source_observation(
             &mut connection,
             200,
             100,
@@ -536,24 +541,27 @@ mod tests {
             }),
         );
 
-        let facts = read_observed_file_facts_for_source_file(&connection, 100)
-            .expect("read observed facts")
-            .expect("facts exist");
-        assert_eq!(facts.source_file_id, 100);
-        assert_eq!(facts.basis_source_id, 1);
-        assert_eq!(facts.basis_relative_path, "Album/track.flac");
-        assert_eq!(facts.basis_size_bytes, Some(123));
-        assert_eq!(facts.basis_mtime_ns, Some(456));
-        assert_eq!(facts.basis_presence_state, "present");
-        assert_eq!(facts.observed_at_ms, 23);
+        let observations = read_source_file_observation(&connection, 100)
+            .expect("read source-file observations")
+            .expect("observations exist");
+        assert_eq!(observations.source_file_id, 100);
+        assert_eq!(observations.basis_source_id, 1);
+        assert_eq!(observations.basis_relative_path, "Album/track.flac");
+        assert_eq!(observations.basis_size_bytes, Some(123));
+        assert_eq!(observations.basis_mtime_ns, Some(456));
+        assert_eq!(observations.basis_presence_state, "present");
+        assert_eq!(observations.observed_at_ms, 23);
         assert_eq!(
-            facts.content_hash.expect("content hash"),
-            crate::read_models::observed_file_facts::StoreContentHashEvidence {
+            observations.content_hash.expect("content hash"),
+            crate::read_models::source_file_observations::StoreContentHashEvidence {
                 algorithm: "sha256".to_string(),
                 value: "fixture-digest".to_string(),
             }
         );
-        assert_eq!(facts.status, StoreObservedFileFactStatus::Current);
+        assert_eq!(
+            observations.status,
+            StoreSourceFileObservationStatus::Current
+        );
     }
 
     #[test]
@@ -561,7 +569,7 @@ mod tests {
         let mut connection = install_test_baseline();
         insert_source(&connection);
         insert_source_file(&connection, 100, "Album/track.flac", 123, 456);
-        commit_source_fact(
+        commit_source_observation(
             &mut connection,
             200,
             100,
@@ -584,12 +592,12 @@ mod tests {
             )
             .expect("change source file basis");
 
-        let facts = read_observed_file_facts_for_source_file(&connection, 100)
-            .expect("read observed facts")
-            .expect("facts exist");
-        assert_eq!(facts.basis_size_bytes, Some(123));
-        assert_eq!(facts.basis_mtime_ns, Some(456));
-        assert_eq!(facts.status, StoreObservedFileFactStatus::Stale);
+        let observations = read_source_file_observation(&connection, 100)
+            .expect("read source-file observations")
+            .expect("observations exist");
+        assert_eq!(observations.basis_size_bytes, Some(123));
+        assert_eq!(observations.basis_mtime_ns, Some(456));
+        assert_eq!(observations.status, StoreSourceFileObservationStatus::Stale);
     }
 
     #[test]
@@ -608,7 +616,7 @@ mod tests {
             )
             .expect("mark cue source file");
 
-        commit_source_fact(
+        commit_source_observation(
             &mut connection,
             201,
             101,
@@ -617,17 +625,20 @@ mod tests {
             None,
         );
 
-        let cue_facts = read_observed_file_facts_for_source_file(&connection, 101)
-            .expect("read cue facts")
-            .expect("cue facts exist");
-        assert_eq!(cue_facts.source_file_id, 101);
-        assert_eq!(cue_facts.basis_relative_path, "Album/album.cue");
-        assert_eq!(cue_facts.media_kind, "cue_sheet");
-        assert_eq!(cue_facts.content_hash, None);
-        assert_eq!(cue_facts.status, StoreObservedFileFactStatus::Current);
+        let cue_observation = read_source_file_observation(&connection, 101)
+            .expect("read cue observations")
+            .expect("cue observations exist");
+        assert_eq!(cue_observation.source_file_id, 101);
+        assert_eq!(cue_observation.basis_relative_path, "Album/album.cue");
+        assert_eq!(cue_observation.media_kind, "cue_sheet");
+        assert_eq!(cue_observation.content_hash, None);
+        assert_eq!(
+            cue_observation.status,
+            StoreSourceFileObservationStatus::Current
+        );
         assert!(
-            read_observed_file_facts_for_source_file(&connection, 100)
-                .expect("read audio facts")
+            read_source_file_observation(&connection, 100)
+                .expect("read audio observations")
                 .is_none(),
             "CUE evidence must not be copied to the adjacent audio file"
         );

@@ -45,7 +45,7 @@ export type ContentsScope =
 export type ContentsScopeDepth = 'immediate' | 'recursive'
 
 export type ContentsFileClass = 'audio' | 'video' | 'image' | 'unsupported'
-export type PrimaryMediaKind = 'audio' | 'video'
+export type PlayableMediaKind = 'audio' | 'video'
 export type ContentsFileKind =
   | 'audio'
   | 'video'
@@ -69,8 +69,8 @@ export type ContentsReadPolicy =
       readonly fileClasses: readonly ContentsFileClass[]
     }
   | {
-      readonly kind: 'primaryMedia'
-      readonly mediaKinds: readonly PrimaryMediaKind[]
+      readonly kind: 'playableMedia'
+      readonly mediaKinds: readonly PlayableMediaKind[]
     }
 
 export type ContentsReadRequest = {
@@ -109,8 +109,8 @@ export type ContentsScopeCoverage = {
 
 export type ContentsPresence = 'present' | 'missing' | 'removed'
 
-export type PrimaryMediaSummary = {
-  readonly primaryMediaFactId?: string
+export type PlayableMedia = {
+  readonly playableMediaId?: string
   readonly attachmentId?: string
   readonly contentHashAlgorithm?: string
   readonly contentHashValue?: string
@@ -135,7 +135,7 @@ export type ContentsFileRow = {
   readonly fileClass: ContentsFileClass
   readonly fileKind: ContentsFileKind
   readonly presence: ContentsPresence
-  readonly primaryMedia?: PrimaryMediaSummary
+  readonly playableMedia?: PlayableMedia
   readonly updatedAtMs?: number
 }
 

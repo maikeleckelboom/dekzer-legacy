@@ -53,7 +53,7 @@ but it is not expandable.
 
 Content/media presence must not create a chevron. Folder usefulness, folder admission, content rows, and facets may be
 filter-aware, but they do not decide tree disclosure. Audio files, video files, companion files, artwork, raw inventory,
-or known descendant media facts do not make a row expandable unless child browse scopes are confirmed.
+or known descendant media observations do not make a row expandable unless child browse scopes are confirmed.
 
 Unknown child-scope readiness must not be rendered as known expandable. A row whose child browse-scope state is unknown
 must show honest pending, probing, retained, blocked, failed, or absent disclosure state according to the active tree

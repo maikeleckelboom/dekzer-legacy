@@ -77,9 +77,9 @@ describe('source maintenance through the host', () => {
               linksCreated: 1,
               linksReplaced: 0,
               linksRefreshed: 0,
-              skippedStaleFacts: 0,
+              skippedStaleObservations: 0,
               skippedNoBlake3: 0,
-              skippedNoFacts: 0,
+              skippedNoObservations: 0,
               remainingCandidates: 0
             },
             probe: {
@@ -89,16 +89,16 @@ describe('source maintenance through the host', () => {
               failedCount: 0,
               remainingCandidates: 0
             },
-            primaryMediaPromotion: {
+            playableMediaPromotion: {
               effectiveLimit: 5,
               promotedCount: 1,
               refreshedCount: 0,
               skippedUnusableSource: 0,
               skippedUnsupportedMediaKind: 0,
-              skippedNoFacts: 0,
-              skippedStaleFacts: 0,
+              skippedNoObservations: 0,
+              skippedStaleObservations: 0,
               skippedNoBlake3: 0,
-              skippedNoProbeFacts: 0,
+              skippedNoProbeObservations: 0,
               skippedMissingAttachmentLink: 0,
               skippedStaleAttachmentLink: 0,
               remainingCandidates: 0
@@ -112,7 +112,7 @@ describe('source maintenance through the host', () => {
               evidenceCreated: 1,
               evidenceRefreshed: 0,
               candidatesMarkedStale: 0,
-              skippedStalePrimaryMediaFacts: 0,
+              skippedStalePlayableMedia: 0,
               remainingCandidates: 0
             },
             trackIdentityDecisions: {
@@ -126,7 +126,7 @@ describe('source maintenance through the host', () => {
             },
             remainingHashCandidates: 0,
             remainingProbeCandidates: 0,
-            remainingPrimaryMediaPromotionCandidates: 0,
+            remainingPlayableMediaPromotionCandidates: 0,
             remainingTrackIdentityCandidateProductionCandidates: 0,
             remainingTrackIdentityDecisionProductionCandidates: 0
           }
@@ -138,16 +138,16 @@ describe('source maintenance through the host', () => {
             status: 'idle',
             remainingHashCandidates: 0,
             remainingProbeCandidates: 0,
-            remainingPrimaryMediaPromotionCandidates: 0,
+            remainingPlayableMediaPromotionCandidates: 0,
             remainingTrackIdentityCandidateProductionCandidates: 0,
             remainingTrackIdentityDecisionProductionCandidates: 0,
             attachmentLinks: {
               currentLinksCount: 1,
               staleLinksCount: 0,
-              sourceFilesWithCurrentBlake3FactsCount: 1,
+              sourceFilesWithCurrentBlake3ObservationsCount: 1,
               sourceFilesWithAttachmentLinksCount: 1,
               sourceFilesMissingAttachmentLinksCount: 0,
-              unmaterializedBlake3FactsCount: 0
+              unmaterializedBlake3ObservationsCount: 0
             }
           }
         }
@@ -192,16 +192,16 @@ describe('source maintenance through the host', () => {
           status: 'idle',
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
-          remainingPrimaryMediaPromotionCandidates: 0,
+          remainingPlayableMediaPromotionCandidates: 0,
           remainingTrackIdentityCandidateProductionCandidates: 0,
           remainingTrackIdentityDecisionProductionCandidates: 0,
           attachmentLinks: {
             currentLinksCount: 1,
             staleLinksCount: 0,
-            sourceFilesWithCurrentBlake3FactsCount: 1,
+            sourceFilesWithCurrentBlake3ObservationsCount: 1,
             sourceFilesWithAttachmentLinksCount: 1,
             sourceFilesMissingAttachmentLinksCount: 0,
-            unmaterializedBlake3FactsCount: 0
+            unmaterializedBlake3ObservationsCount: 0
           }
         }
       }

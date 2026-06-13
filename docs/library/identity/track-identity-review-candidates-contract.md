@@ -94,9 +94,9 @@ V0 review states are exactly:
 - `userDeferred`: the effective decision is user deferred and current.
 - `staleDecision`: an effective decision exists but its current status is stale.
 
-The store fetches factual candidate, evidence, source, and effective-decision summary columns, then maps those facts to
+The store fetches factual candidate, evidence, source, and effective-decision summary columns, then maps those observations to
 the `reviewState` enum in Rust. SQL must not compute `reviewState`.
-SQL may use the same backend-owned decision facts to select the bounded candidate id window for a requested
+SQL may use the same backend-owned decision observations to select the bounded candidate id window for a requested
 `reviewState` filter before hydration. The Rust read model still derives and returns the `reviewState` enum for each
 returned row.
 
@@ -152,7 +152,7 @@ Do not implement cursor serialization, deserialization, or validation until the 
 This read model proves only:
 
 - the backend can list candidate-centered review rows;
-- each row is backed by stored candidate evidence summary and source participation facts;
+- each row is backed by stored candidate evidence summary and source participation observations;
 - each row reports the backend-owned effective decision summary;
 - each row has a backend-derived review state.
 

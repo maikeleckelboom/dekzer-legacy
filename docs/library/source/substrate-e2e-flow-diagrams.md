@@ -471,7 +471,7 @@ once.
 ## 5. Library tree branch cache lifecycle
 
 Library tree branch cache is a renderer projection cache only. It stabilizes visible frames but does not own substrate
-facts.
+observations.
 
 ```mermaid
 flowchart TD

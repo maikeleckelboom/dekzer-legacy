@@ -8,7 +8,7 @@ pub mod projection;
 pub mod source;
 pub mod work;
 
-pub use artifact::{ArtifactKind, ArtifactRole, ArtifactStorageKind};
+pub use artifact::{ArtifactKind, ArtifactStorageKind};
 pub use browser::LibraryBrowseScope;
 pub use ids::{
     ArtifactId, ProjectionSubscriberId, SourceDirectoryId, SourceFileId, SourceId,
@@ -177,10 +177,6 @@ mod tests {
                 (ArtifactKind::InspectionResult, "inspection_result"),
                 (ArtifactKind::ProjectionSnapshot, "projection_snapshot"),
             ]
-        );
-        assert_round_trip!(
-            ArtifactRole,
-            [(ArtifactRole::PrimaryResult, "primary_result")]
         );
         assert_round_trip!(
             ArtifactStorageKind,

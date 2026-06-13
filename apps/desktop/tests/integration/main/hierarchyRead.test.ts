@@ -93,7 +93,7 @@ describe('hierarchy and navigation reads through the host', () => {
                   modifiedAtNs: null,
                   updatedAtMs: 100,
                   hasChildDirectories: true,
-                  directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+                  directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
                   directoryImageMediaState: { kind: 'noImageMediaDescendants' },
                   directoryScanState: 'scanning',
                   navigableChildScopeState: 'hasNavigableChildScopes'
@@ -210,7 +210,7 @@ describe('hierarchy and navigation reads through the host', () => {
                   modifiedAtNs: null,
                   updatedAtMs: 100,
                   hasChildDirectories: true,
-                  directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+                  directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
                   directoryImageMediaState: { kind: 'noImageMediaDescendants' },
                   directoryScanState: 'scanning'
                 }

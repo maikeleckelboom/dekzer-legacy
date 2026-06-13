@@ -35,7 +35,7 @@ For current Dekzer work, this means:
 | No dual model            | Do not keep old and new substrate concepts alive as equal public surfaces. |
 | No wrapper endpoint      | Do not preserve an old boundary shape by wrapping new internals.           |
 | No fake migration bridge | Do not build migration machinery for data that does not exist yet.         |
-| No renderer repair path  | Renderer code must not invent or repair substrate facts.                   |
+| No renderer repair path  | Renderer code must not invent or repair substrate observations.                   |
 | No projection authority  | Disposable projection rows are not durable state.                          |
 
 If a file still needs old vocabulary to compile, that file has not been ported. Do not hide the failure with naming
@@ -106,7 +106,7 @@ Durable lessons from the old brief:
 | Law                                                | Meaning                                                                                              |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Work runs own work items                           | A work item belongs to an execution context.                                                         |
-| Work items produce artifacts                       | work_artifacts are evidence outputs, not free-floating facts.                                             |
+| Work items produce artifacts                       | work_artifacts are evidence outputs, not free-floating observations.                                             |
 | Artifact supersession is an edge                   | Do not mutate history into disappearance.                                                            |
 | Current pointers need validation                   | A current artifact pointer must match subject and facet/scope.                                       |
 | Projections are disposable                         | Browser rows and derived views are rebuildable, not source authority.                                |

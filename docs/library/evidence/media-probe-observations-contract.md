@@ -3,7 +3,7 @@ status: accepted
 last-reviewed: 2026-06-01
 owner: library-substrate-boundary
 canonical-context:
-  - observed-file-facts-contract
+  - observed-file-observations-contract
   - media-identity-schema-authority
   - media-relevant-file-inventory-contract
 scope:
@@ -17,22 +17,22 @@ scope:
 ## Purpose
 
 Media probe observations are durable evidence produced by reading a present source file enough to identify basic
-container/audio facts. They are attached to `source_file_id` and a copied source-file basis through `source_file_facts`.
+container/audio observations. They are attached to `source_file_id` and a copied source-file basis through `source_file_observations`.
 
-Probe facts are not track identity, attachment identity, `primaryMedia`, artwork intelligence, waveform state, stems
+Probe observations are not track identity, attachment identity, `playableMedia`, artwork intelligence, waveform state, stems
 state, preparation readiness, playlist state, CUE association, or UI status.
 
 ## Storage And Merge Policy
 
-`source_file_facts` remains the accepted current observed-file-facts row for media probe v0. No separate observation ledger is
+`source_file_observations` remains the accepted current observed-file-observations row for media probe v0. No separate observation ledger is
 introduced in this gate.
 
-Because `source_file_facts` is one accepted row per `source_file_id`, evidence jobs must merge compatible current facts instead
+Because `source_file_observations` is one accepted row per `source_file_id`, evidence jobs must merge compatible current observations instead
 of replacing unrelated evidence with nulls:
 
-- A media probe commit preserves current content hash evidence only when the previous `source_file_facts` row is current for
+- A media probe commit preserves current content hash evidence only when the previous `source_file_observations` row is current for
   the same `source_files` basis.
-- A BLAKE3 hash commit preserves current probe fields only when the previous `source_file_facts` row is current for the same
+- A BLAKE3 hash commit preserves current probe fields only when the previous `source_file_observations` row is current for the same
   `source_files` basis.
 - Stale hash evidence is never carried forward by a probe commit.
 - Stale probe fields are never carried forward by a hash commit.
@@ -69,7 +69,7 @@ V0 writes the fields Symphonia can honestly expose for supported audio files:
 
 The current v0 implementation supports audio probing. v0 source-scope media probe admission is audio-only: video source
 files are not admitted as media-probe candidates until a video-capable no-native-runtime adapter is selected. Direct
-probing of a video file returns a typed `UnsupportedMediaKind` failure and does not write `source_file_facts`. Images are not
+probing of a video file returns a typed `UnsupportedMediaKind` failure and does not write `source_file_observations`. Images are not
 admitted for media probe v0. CUE sheets are not admitted and are not parsed.
 
 MIME/container values are best-effort v0 labels derived from the source-relative extension after Symphonia has accepted
@@ -78,7 +78,7 @@ the file as a supported audio stream. They are evidence summary fields, not iden
 ## Unsupported And Failure Behavior
 
 Missing, unavailable, blocked, unreadable, unsupported, invalid-relative-path, root-escape, and basis-changed cases return
-typed outcomes. They do not write fake probe facts and do not erase source-file inventory.
+typed outcomes. They do not write fake probe observations and do not erase source-file inventory.
 
 Unsupported companion metadata such as CUE sheets is not parsed and is not paired to adjacent audio. A CUE source-file row
 will own future CUE parse observations on its own row in a separate gate.
@@ -87,8 +87,8 @@ will own future CUE parse observations on its own row in a separate gate.
 
 Media probe v0 does not:
 
-- promote attachments into `primaryMedia`;
-- create `content_attachments`, `source_file_attachment_links`, `primary_media_facts`, or track identity rows;
+- promote attachments into `playableMedia`;
+- create `content_attachments`, `source_file_attachment_links`, `playable_media`, or track identity rows;
 - infer track identity;
 - parse CUE sheets or associate CUE files with audio;
 - generate waveform data;
@@ -97,8 +97,8 @@ Media probe v0 does not:
 ## v0 Completion Heuristic
 
 v0 candidate admission treats any current non-null probe summary field (`mime_type`, `duration_ms`, `sample_rate_hz`,
-`channels`, `bit_depth`, or `codec`) in a current-basis `source_file_facts` row as sufficient evidence that a probe has
-produced accepted summary facts. Rows are selected when facts are missing or stale, or when all probe summary fields are
+`channels`, `bit_depth`, or `codec`) in a current-basis `source_file_observations` row as sufficient evidence that a probe has
+produced accepted summary observations. Rows are selected when observations are missing or stale, or when all probe summary fields are
 null. This predicate is expressed in `needs_media_probe_predicate_sql` in
 `crates/library-store-sqlite/src/store/source_file_media_probe.rs`.
 

@@ -384,7 +384,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         )?;
         let missing_file_ids =
             self.mark_missing_files(root_id, observed_file_paths, &unproven_prefixes, now_ms)?;
-        self.reconcile_directory_coverage_facts(root_id, now_ms)?;
+        self.reconcile_directory_coverage_observations(root_id, now_ms)?;
 
         let state_rows_changed = self.tx().execute(
             "UPDATE source_state
@@ -526,16 +526,16 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             return Ok(true);
         }
 
-        let has_facts = self.tx().query_row(
+        let has_observations = self.tx().query_row(
             "SELECT EXISTS(
                      SELECT 1
-                     FROM source_file_facts
+                     FROM source_file_observations
                      WHERE source_file_id = ?1
                  )",
             [existing.source_file_id],
             |row| row.get::<_, i64>(0),
         )? != 0;
-        Ok(!has_facts)
+        Ok(!has_observations)
     }
 
     fn process_discovered_file(
@@ -974,7 +974,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         Ok(None)
     }
 
-    fn reconcile_directory_coverage_facts(
+    fn reconcile_directory_coverage_observations(
         &self,
         root_id: i64,
         completed_at_ms: i64,
@@ -982,7 +982,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         self.tx().execute(
             "UPDATE source_directories
              SET has_child_directories = 0,
-                 has_primary_media_descendant = 0,
+                 has_playable_media_descendant = 0,
                  has_image_media_descendant = 0
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -1004,8 +1004,8 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
             [root_id],
         )?;
 
-        let primary_media_predicate = source_file_class_filter_predicate_sql_for_column(
-            SourceFileClassFilter::PrimaryMedia,
+        let playable_media_predicate = source_file_class_filter_predicate_sql_for_column(
+            SourceFileClassFilter::PlayableMedia,
             "f.file_class",
         );
         self.tx().execute(
@@ -1016,7 +1016,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                  WHERE f.source_id = ?1
                    AND f.presence_state = 'present'
                    AND f.parent_source_directory_id IS NOT NULL
-                   AND {primary_media_predicate}
+                   AND {playable_media_predicate}
                  UNION
                  SELECT d.parent_source_directory_id
                  FROM source_directories d
@@ -1026,7 +1026,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
                    AND d.parent_source_directory_id IS NOT NULL
              )
              UPDATE source_directories
-             SET has_primary_media_descendant = 1
+             SET has_playable_media_descendant = 1
              WHERE source_id = ?1
                AND presence_state = 'present'
                AND source_directory_id IN media_up"
@@ -1395,22 +1395,22 @@ mod tests {
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
-    struct DirectoryFacts {
+    struct DirectoryObservations {
         has_child_directories: bool,
-        has_primary_media_descendant: bool,
+        has_playable_media_descendant: bool,
         has_image_media_descendant: bool,
         dir_scan_state: String,
         scanned_at: Option<i64>,
     }
 
-    fn read_directory_facts(
+    fn read_directory_observations(
         connection: &rusqlite::Connection,
         relative_path: &str,
-    ) -> DirectoryFacts {
+    ) -> DirectoryObservations {
         connection
             .query_row(
                 "SELECT has_child_directories,
-                        has_primary_media_descendant,
+                        has_playable_media_descendant,
                         has_image_media_descendant,
                         dir_scan_state,
                         scanned_at
@@ -1418,16 +1418,16 @@ mod tests {
                  WHERE relative_path = ?1",
                 [relative_path],
                 |row| {
-                    Ok(DirectoryFacts {
+                    Ok(DirectoryObservations {
                         has_child_directories: row.get(0)?,
-                        has_primary_media_descendant: row.get(1)?,
+                        has_playable_media_descendant: row.get(1)?,
                         has_image_media_descendant: row.get(2)?,
                         dir_scan_state: row.get(3)?,
                         scanned_at: row.get(4)?,
                     })
                 },
             )
-            .expect("read directory facts")
+            .expect("read directory observations")
     }
 
     fn run_coverage_finalization(
@@ -1439,10 +1439,10 @@ mod tests {
         admit_write(connection, |write| {
             DiscoveryTx::new(write)
                 .finalize_scan(root_id, observed_file_paths, observed_directory_paths)
-                .expect("finalize scan to reconcile directory coverage facts");
+                .expect("finalize scan to reconcile directory coverage observations");
             Ok(())
         })
-        .expect("write directory coverage facts");
+        .expect("write directory coverage observations");
     }
 
     #[test]
@@ -1575,8 +1575,8 @@ mod tests {
 
         run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
 
-        let facts = read_directory_facts(&connection, "albums/locked");
-        assert_eq!(facts.dir_scan_state, "blocked");
+        let observations = read_directory_observations(&connection, "albums/locked");
+        assert_eq!(observations.dir_scan_state, "blocked");
     }
 
     #[test]
@@ -1680,7 +1680,7 @@ mod tests {
     }
 
     #[test]
-    fn wma_and_alac_media_policy_marks_directory_as_having_primary_media_descendants() {
+    fn wma_and_alac_media_policy_marks_directory_as_having_playable_media_descendants() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1726,10 +1726,10 @@ mod tests {
         assert_eq!(read_file_class(&connection, "nested/track.wma"), "audio");
         assert_eq!(read_file_class(&connection, "nested/track.alac"), "audio");
         assert!(
-            read_directory_facts(&connection, "nested").has_primary_media_descendant,
-            ".wma and .alac file_class values must feed primary media descendant facts"
+            read_directory_observations(&connection, "nested").has_playable_media_descendant,
+            ".wma and .alac file_class values must feed playable media descendant observations"
         );
-        assert!(!read_directory_facts(&connection, "nested").has_image_media_descendant);
+        assert!(!read_directory_observations(&connection, "nested").has_image_media_descendant);
 
         run_coverage_finalization(
             &mut connection,
@@ -1741,11 +1741,11 @@ mod tests {
             ],
         );
 
-        let facts = read_directory_facts(&connection, "nested");
-        assert!(facts.has_primary_media_descendant);
-        assert!(!facts.has_image_media_descendant);
-        assert_eq!(facts.dir_scan_state, "complete");
-        assert!(facts.scanned_at.is_some());
+        let observations = read_directory_observations(&connection, "nested");
+        assert!(observations.has_playable_media_descendant);
+        assert!(!observations.has_image_media_descendant);
+        assert_eq!(observations.dir_scan_state, "complete");
+        assert!(observations.scanned_at.is_some());
     }
 
     #[test]
@@ -1792,8 +1792,8 @@ mod tests {
             "docs/cover.png",
         );
 
-        let before_finalization = read_directory_facts(&connection, "docs");
-        assert!(!before_finalization.has_primary_media_descendant);
+        let before_finalization = read_directory_observations(&connection, "docs");
+        assert!(!before_finalization.has_playable_media_descendant);
         assert!(before_finalization.has_image_media_descendant);
         assert_eq!(before_finalization.dir_scan_state, "pending");
         assert_eq!(before_finalization.scanned_at, None);
@@ -1805,15 +1805,15 @@ mod tests {
             &["docs/readme.txt".to_string(), "docs/cover.png".to_string()],
         );
 
-        let after_finalization = read_directory_facts(&connection, "docs");
-        assert!(!after_finalization.has_primary_media_descendant);
+        let after_finalization = read_directory_observations(&connection, "docs");
+        assert!(!after_finalization.has_playable_media_descendant);
         assert!(after_finalization.has_image_media_descendant);
         assert_eq!(after_finalization.dir_scan_state, "complete");
         assert!(after_finalization.scanned_at.is_some());
     }
 
     #[test]
-    fn folder_with_only_unsupported_files_has_no_primary_or_image_media_descendants() {
+    fn folder_with_only_unsupported_files_has_no_playable_or_image_media_descendants() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1856,8 +1856,8 @@ mod tests {
             "misc/archive.zip",
         );
 
-        let before_finalization = read_directory_facts(&connection, "misc");
-        assert!(!before_finalization.has_primary_media_descendant);
+        let before_finalization = read_directory_observations(&connection, "misc");
+        assert!(!before_finalization.has_playable_media_descendant);
         assert!(!before_finalization.has_image_media_descendant);
         assert_eq!(before_finalization.dir_scan_state, "pending");
         assert_eq!(before_finalization.scanned_at, None);
@@ -1872,15 +1872,15 @@ mod tests {
             ],
         );
 
-        let after_finalization = read_directory_facts(&connection, "misc");
-        assert!(!after_finalization.has_primary_media_descendant);
+        let after_finalization = read_directory_observations(&connection, "misc");
+        assert!(!after_finalization.has_playable_media_descendant);
         assert!(!after_finalization.has_image_media_descendant);
         assert_eq!(after_finalization.dir_scan_state, "complete");
         assert!(after_finalization.scanned_at.is_some());
     }
 
     #[test]
-    fn nested_audio_files_propagate_primary_media_descendant_facts_to_ancestors() {
+    fn nested_audio_files_propagate_playable_media_descendant_observations_to_ancestors() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1933,9 +1933,14 @@ mod tests {
             "albums/mid/deep/song.flac",
         );
 
-        assert!(read_directory_facts(&connection, "albums").has_primary_media_descendant);
-        assert!(read_directory_facts(&connection, "albums/mid").has_primary_media_descendant);
-        assert!(read_directory_facts(&connection, "albums/mid/deep").has_primary_media_descendant);
+        assert!(read_directory_observations(&connection, "albums").has_playable_media_descendant);
+        assert!(
+            read_directory_observations(&connection, "albums/mid").has_playable_media_descendant
+        );
+        assert!(
+            read_directory_observations(&connection, "albums/mid/deep")
+                .has_playable_media_descendant
+        );
 
         run_coverage_finalization(
             &mut connection,
@@ -1949,21 +1954,21 @@ mod tests {
         );
 
         assert_eq!(
-            read_directory_facts(&connection, "albums/mid/deep").dir_scan_state,
+            read_directory_observations(&connection, "albums/mid/deep").dir_scan_state,
             "complete"
         );
         assert_eq!(
-            read_directory_facts(&connection, "albums/mid").dir_scan_state,
+            read_directory_observations(&connection, "albums/mid").dir_scan_state,
             "complete"
         );
         assert_eq!(
-            read_directory_facts(&connection, "albums").dir_scan_state,
+            read_directory_observations(&connection, "albums").dir_scan_state,
             "complete"
         );
     }
 
     #[test]
-    fn child_directory_observation_marks_immediate_parent_child_directory_fact() {
+    fn child_directory_observation_marks_immediate_parent_child_directory_marker() {
         let mut connection =
             rusqlite::Connection::open_in_memory().expect("open in-memory database");
         install_baseline_schema_for_test(&mut connection).expect("install baseline");
@@ -1992,7 +1997,7 @@ mod tests {
         .expect("write child directory");
 
         assert!(
-            read_directory_facts(&connection, "albums").has_child_directories,
+            read_directory_observations(&connection, "albums").has_child_directories,
             "observing albums/1998 must mark albums as having immediate child directories"
         );
     }
@@ -2061,8 +2066,8 @@ mod tests {
 
         run_coverage_finalization(&mut connection, source_id, &["Music".to_string()], &[]);
 
-        let locked_facts = read_directory_facts(&connection, "Music/Locked");
-        assert_eq!(locked_facts.dir_scan_state, "blocked");
+        let locked_observations = read_directory_observations(&connection, "Music/Locked");
+        assert_eq!(locked_observations.dir_scan_state, "blocked");
 
         let file_presence: String = connection
             .query_row(
@@ -2142,8 +2147,8 @@ mod tests {
 
         run_coverage_finalization(&mut connection, source_id, &["Music".to_string()], &[]);
 
-        let locked_facts = read_directory_facts(&connection, "Music/Locked");
-        assert_eq!(locked_facts.dir_scan_state, "blocked");
+        let locked_observations = read_directory_observations(&connection, "Music/Locked");
+        assert_eq!(locked_observations.dir_scan_state, "blocked");
 
         let subfolder_presence: String = connection
             .query_row(
@@ -2157,9 +2162,10 @@ mod tests {
             "directory under blocked ancestor must not be marked missing"
         );
 
-        let subfolder_facts = read_directory_facts(&connection, "Music/Locked/Subfolder");
+        let subfolder_observations =
+            read_directory_observations(&connection, "Music/Locked/Subfolder");
         assert_ne!(
-            subfolder_facts.dir_scan_state, "complete",
+            subfolder_observations.dir_scan_state, "complete",
             "unobserved directory under blocked subtree must not be finalized as complete"
         );
     }
@@ -2386,8 +2392,8 @@ mod tests {
             "partial scan phase must have a non-null scan_issue_kind"
         );
 
-        let locked_facts = read_directory_facts(&connection, "albums/locked");
-        assert_eq!(locked_facts.dir_scan_state, "blocked");
+        let locked_observations = read_directory_observations(&connection, "albums/locked");
+        assert_eq!(locked_observations.dir_scan_state, "blocked");
     }
 
     #[test]
@@ -2762,10 +2768,10 @@ name,
 
         run_coverage_finalization(&mut connection, source_id, &["albums".to_string()], &[]);
 
-        let locked_facts = read_directory_facts(&connection, "albums/locked");
-        assert_eq!(locked_facts.dir_scan_state, "blocked");
+        let locked_observations = read_directory_observations(&connection, "albums/locked");
+        assert_eq!(locked_observations.dir_scan_state, "blocked");
         assert_eq!(
-            locked_facts.scanned_at, None,
+            locked_observations.scanned_at, None,
             "blocked directory should not have scanned_at set during finalization"
         );
 

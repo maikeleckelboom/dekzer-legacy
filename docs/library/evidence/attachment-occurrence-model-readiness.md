@@ -19,8 +19,8 @@ scope:
 
 A-5 is implemented as a narrow substrate read-model slice and ready for substrate review.
 
-The implementation should not add a durable occurrence table. Current durable occurrence facts already exist as
-`source_files` rows linked to `content_attachments` by `source_file_attachment_links`. A-5 should make those facts
+The implementation should not add a durable occurrence table. Current durable occurrence observations already exist as
+`source_files` rows linked to `content_attachments` by `source_file_attachment_links`. A-5 should make those observations
 readable with source/path/status evidence and deterministic bounds.
 
 Primary motivation: local library correctness. The same audio/content may appear in multiple places because users copy
@@ -37,7 +37,7 @@ future concepts are architectural compatibility targets, not A-5 product scope.
 - `docs/library/evidence/attachment-identity-contract.md` is accepted and states that
   `source_file_attachment_links` is the canonical source-file occurrence table for the attachment identity pass.
 - `docs/library/evidence/media-probe-observations-contract.md` is accepted and stores probe observations in
-  `source_file_facts`, not on attachments or tracks.
+  `source_file_observations`, not on attachments or tracks.
 - `docs/library/health/source-integrity-read-model-contract.md` is accepted and documents the source-scoped
   `readSourceIntegrity` boundary.
 - `crates/library-store-sqlite/migrations/20260502000000_substrate_baseline.sql` contains `source_files`,
@@ -47,19 +47,19 @@ future concepts are architectural compatibility targets, not A-5 product scope.
 
 ## Occurrence Meaning
 
-An occurrence is a substrate fact, not a product or library-management decision.
+An occurrence is a substrate observation, not a product or library-management decision.
 
-A source-file occurrence is the existing `source_files` row: the durable source-relative inventory fact with source id,
+A source-file occurrence is the existing `source_files` row: the durable source-relative inventory observation with source id,
 relative path, file kind/class, size, mtime, and presence state.
 
 An attachment occurrence is that source-file occurrence when it is connected to a durable content identity through
 `source_file_attachment_links.attachment_id -> content_attachments.attachment_id`.
 
-A-5 occurrence grouping is a derived read over those existing facts:
+A-5 occurrence grouping is a derived read over those existing observations:
 
 - `content_attachments` owns exact BLAKE3 content identity.
 - `source_file_attachment_links` owns the current materialized source-file-to-attachment relation.
-- `source_files` owns the source-relative path and presence facts for the occurrence.
+- `source_files` owns the source-relative path and presence observations for the occurrence.
 - source lifecycle and source integrity own availability and health context.
 
 A-5 is therefore a read boundary and derived read query. It is not a new durable row, not a materialized projection, and
@@ -73,7 +73,7 @@ not a second source-file inventory model.
 | Source locator/path identity | `source_locators`, `SourceLocatorsAuthorityTx`, source lifecycle reads, and `source_locations` for accepted sub-roots | Reuse source and path evidence. Do not infer relocation acceptance. |
 | Source file inventory | `source_files`, `source_directories`, `SourceFilesAuthorityTx`, scan/finalization code | A source-file occurrence is this row. |
 | Attachment/content identity | `content_attachments`, `source_file_attachment_links`, and `materialize_attachments_for_source` | Group by `attachment_id` / BLAKE3 content identity. |
-| Probe observations | `source_file_facts` plus accepted inspection artifacts and media probe maintenance | Expose only as evidence availability if needed. Do not move probe facts onto occurrences. |
+| Probe observations | `source_file_observations` plus accepted inspection artifacts and media probe maintenance | Expose only as evidence availability if needed. Do not move probe observations onto occurrences. |
 | Source health/integrity | `readSourceIntegrity`, source lifecycle, scan coverage, source maintenance snapshot | Use to mark unavailable, missing, blocked, stale, or incomplete evidence without hiding rows. |
 | Occurrence grouping | Derived query over `source_file_attachment_links`, `content_attachments`, and `source_files` | No durable owner beyond existing tables. |
 | Occurrence read model | Existing attachment identity read path, especially `readAttachmentSourceFiles` | Extend in place for occurrence evidence rather than adding occurrence-interpretation commands. |
@@ -154,7 +154,7 @@ Returned occurrence evidence fields should include:
 - source/path fields: source display name or class when already available, source-file `relativePath`, `name`, and
   `parentSourceDirectoryId` if useful for navigation;
 - inventory fields: `fileKind`, `fileClass`, `presenceState`, size, mtime, and updated timestamps;
-- evidence fields: attachment link status, link timestamps, current BLAKE3 fact availability, and probe availability
+- evidence fields: attachment link status, link timestamps, current BLAKE3 observation availability, and probe availability
   summary if needed;
 - status fields: source availability, source coverage/integrity summary when needed, and stale-evidence state;
 - counts: total occurrences, current-link occurrences, stale-link occurrences, available occurrences, unavailable known
@@ -168,9 +168,9 @@ Implemented A-5 shape:
   `sourceFileId`, `sourceId`, source display/class context, source-file `name`, `relativePath`,
   `parentSourceDirectoryId`, `sizeBytes`, `mtimeNs`, `fileKind`, `fileClass`, `presenceState`, lifecycle-derived
   `sourceMountStatus`, `sourceAccessState`, `sourceAccessIssueKind`, `sourceScanPhase`, `sourceAvailabilityState`,
-  `hasCurrentBlake3Fact`, `linkStatus`, and derived `occurrenceStatus`.
+  `hasCurrentBlake3Observation`, `linkStatus`, and derived `occurrenceStatus`.
 - `sourceAvailabilityState` reuses `SourceIntegrityAvailabilityState` vocabulary but is locally derived in this read
-  from persisted lifecycle and scan-state facts. It is not a nested `readSourceIntegrity` result and must not imply
+  from persisted lifecycle and scan-state observations. It is not a nested `readSourceIntegrity` result and must not imply
   source-failure or maintenance evaluation.
 - `occurrenceStatus` is source/path availability only: `available`, `sourceUnavailable`, `sourceMissing`,
   `sourceBlocked`, `fileMissing`, `fileRemoved`, or `unknown`. Content-evidence freshness remains separate in
@@ -184,7 +184,7 @@ Implemented A-5 shape:
   it does not introduce cursor pagination in this slice.
 
 Availability limitation: A-5 does not perform filesystem access checks. Source availability is the strongest honest
-state available from persisted `source_state` / `source_scan_state` facts plus `source_files.presence_state`. If
+state available from persisted `source_state` / `source_scan_state` observations plus `source_files.presence_state`. If
 lifecycle state is absent or stale, the read reports the persisted status rather than collapsing the occurrence row into
 absence.
 
@@ -195,7 +195,7 @@ Invalidation scope:
 
 - A-5 is an explicit snapshot read in the first implementation.
 - It must not attach occurrence truth to navigation invalidations.
-- The read is invalidated by writes to source lifecycle/state, source-file inventory, `source_file_facts`, `content_attachments`,
+- The read is invalidated by writes to source lifecycle/state, source-file inventory, `source_file_observations`, `content_attachments`,
   or `source_file_attachment_links`.
 - A maintained occurrence invalidation scope is not required for the substrate slice. If a future UI needs live
   subscription semantics, add a dedicated source/attachment-scoped invalidation contract in a later slice.
@@ -211,7 +211,7 @@ A-5 needs:
 
 Justification:
 
-- `source_files` already owns occurrence identity and source-relative path facts.
+- `source_files` already owns occurrence identity and source-relative path observations.
 - `source_file_attachment_links` already owns the source-file-to-attachment relation and has an index on
   `attachment_id`.
 - `content_attachments` already owns BLAKE3 content identity and uniqueness.
@@ -226,14 +226,14 @@ index, not a new occurrence representation.
 
 Do not introduce a second occurrence authority, aliases, compatibility wrappers, or duplicate read paths for A-5.
 Attachment occurrence evidence must stay a derived read over `source_file_attachment_links`, `content_attachments`,
-`source_files`, source lifecycle state, and current `source_file_facts`.
+`source_files`, source lifecycle state, and current `source_file_observations`.
 
 Current non-occurrence tables keep their own roles:
 
-- `primary_media_facts`: playable-media candidate projection; one row per attachment in v0, not per source-file
+- `playable_media`: playable-media candidate projection; one row per attachment in v0, not per source-file
   occurrence.
 - `track_identity_candidates`, `track_identity_candidate_members`, and `track_identity_candidate_evidence`: exact
-  primary-media fact grouping; not A-5 occurrence grouping.
+  playable-media observation grouping; not A-5 occurrence grouping.
 - `track_identity_decisions` and related decision evidence tables: candidate decision authority; not occurrence
   preference or relocation decisions.
 

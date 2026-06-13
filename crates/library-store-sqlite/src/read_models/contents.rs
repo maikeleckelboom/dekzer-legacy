@@ -21,8 +21,8 @@ const BROWSE_RELEVANT_FILE_CLASSES: [StoreContentsFileClass; 3] = [
     StoreContentsFileClass::Video,
     StoreContentsFileClass::Image,
 ];
-const CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER: [StorePrimaryMediaKind; 2] =
-    [StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video];
+const CONTENTS_CURSOR_PLAYABLE_MEDIA_KIND_ORDER: [StorePlayableMediaKind; 2] =
+    [StorePlayableMediaKind::Audio, StorePlayableMediaKind::Video];
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct ContentsCursor {
@@ -39,7 +39,7 @@ enum ContentsCursorPolicy {
     PlayableMediaBrowse,
     AudioBrowse,
     SourceFileInventory { file_classes: Vec<String> },
-    PrimaryMedia { media_kinds: Vec<String> },
+    PlayableMedia { media_kinds: Vec<String> },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -63,7 +63,7 @@ enum ContentsCursorPosition {
         relative_path: String,
         source_file_id: i64,
     },
-    PrimaryMedia {
+    PlayableMedia {
         relative_path_key: String,
         source_file_id: i64,
     },
@@ -217,7 +217,7 @@ fn compute_cursor_position(
             relative_path: row.relative_path.clone(),
             source_file_id: row.source_file_id,
         },
-        StoreContentsReadPolicy::PrimaryMedia { .. } => ContentsCursorPosition::PrimaryMedia {
+        StoreContentsReadPolicy::PlayableMedia { .. } => ContentsCursorPosition::PlayableMedia {
             relative_path_key: row.relative_path.to_lowercase(),
             source_file_id: row.source_file_id,
         },
@@ -237,9 +237,9 @@ fn canonical_cursor_policy(policy: &StoreContentsReadPolicy) -> ContentsCursorPo
                     .collect(),
             }
         }
-        StoreContentsReadPolicy::PrimaryMedia { media_kinds } => {
-            ContentsCursorPolicy::PrimaryMedia {
-                media_kinds: CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER
+        StoreContentsReadPolicy::PlayableMedia { media_kinds } => {
+            ContentsCursorPolicy::PlayableMedia {
+                media_kinds: CONTENTS_CURSOR_PLAYABLE_MEDIA_KIND_ORDER
                     .iter()
                     .filter(|media_kind| media_kinds.contains(media_kind))
                     .map(|media_kind| media_kind.as_str().to_string())
@@ -368,12 +368,12 @@ impl StoreContentsFileClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum StorePrimaryMediaKind {
+pub enum StorePlayableMediaKind {
     Audio,
     Video,
 }
 
-impl StorePrimaryMediaKind {
+impl StorePlayableMediaKind {
     const fn as_str(self) -> &'static str {
         match self {
             Self::Audio => "audio",
@@ -395,14 +395,14 @@ pub enum StoreContentsReadPolicy {
     SourceFileInventory {
         file_classes: Vec<StoreContentsFileClass>,
     },
-    PrimaryMedia {
-        media_kinds: Vec<StorePrimaryMediaKind>,
+    PlayableMedia {
+        media_kinds: Vec<StorePlayableMediaKind>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct StorePrimaryMediaSummary {
-    pub primary_media_fact_id: Option<i64>,
+pub struct StorePlayableMedia {
+    pub playable_media_id: Option<i64>,
     pub attachment_id: Option<i64>,
     pub content_hash_algorithm: Option<String>,
     pub content_hash_value: Option<String>,
@@ -428,7 +428,7 @@ pub struct StoreContentsFileRow {
     pub file_class: String,
     pub file_kind: String,
     pub presence: String,
-    pub primary_media: Option<StorePrimaryMediaSummary>,
+    pub playable_media: Option<StorePlayableMedia>,
     pub updated_at: i64,
     pub(crate) path_sort_key: Option<String>,
 }
@@ -481,7 +481,7 @@ enum DirectoryPresence {
 }
 
 const RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL: &str = "char(48)";
-const PRIMARY_MEDIA_CONTENTS_ORDER_SQL: &str =
+const PLAYABLE_MEDIA_CONTENTS_ORDER_SQL: &str =
     "lower(COALESCE(relative_path, '')) ASC, source_file_id ASC";
 
 const SOURCE_FILE_CONTENTS_ORDER_SQL: &str = "sf.path_sort_key ASC,
@@ -552,8 +552,8 @@ pub(crate) fn read_contents(
                 ContentsCursorPosition::SourceFile { .. },
                 StoreContentsReadPolicy::AudioBrowse
             ) | (
-                ContentsCursorPosition::PrimaryMedia { .. },
-                StoreContentsReadPolicy::PrimaryMedia { .. },
+                ContentsCursorPosition::PlayableMedia { .. },
+                StoreContentsReadPolicy::PlayableMedia { .. },
             )
         );
         if !position_matches_policy {
@@ -705,14 +705,14 @@ pub(crate) fn canonicalize_policy(
             }
             Ok(StoreContentsReadPolicy::SourceFileInventory { file_classes })
         }
-        StoreContentsReadPolicy::PrimaryMedia { media_kinds } => {
-            let media_kinds = canonicalize_primary_media_kinds(media_kinds);
+        StoreContentsReadPolicy::PlayableMedia { media_kinds } => {
+            let media_kinds = canonicalize_playable_media_kinds(media_kinds);
             if media_kinds.is_empty() {
                 return Err(LibrarySqliteError::MalformedSchemaState(
-                    "contents primaryMedia mediaKinds must not be empty".to_string(),
+                    "contents playableMedia mediaKinds must not be empty".to_string(),
                 ));
             }
-            Ok(StoreContentsReadPolicy::PrimaryMedia { media_kinds })
+            Ok(StoreContentsReadPolicy::PlayableMedia { media_kinds })
         }
     }
 }
@@ -726,10 +726,10 @@ fn canonicalize_file_classes(
         .collect()
 }
 
-fn canonicalize_primary_media_kinds(
-    media_kinds: Vec<StorePrimaryMediaKind>,
-) -> Vec<StorePrimaryMediaKind> {
-    CONTENTS_CURSOR_PRIMARY_MEDIA_KIND_ORDER
+fn canonicalize_playable_media_kinds(
+    media_kinds: Vec<StorePlayableMediaKind>,
+) -> Vec<StorePlayableMediaKind> {
+    CONTENTS_CURSOR_PLAYABLE_MEDIA_KIND_ORDER
         .into_iter()
         .filter(|media_kind| media_kinds.contains(media_kind))
         .collect()
@@ -758,11 +758,11 @@ fn policy_file_classes(policy: &StoreContentsReadPolicy) -> Vec<StoreContentsFil
         StoreContentsReadPolicy::PlayableMediaBrowse => PLAYABLE_MEDIA_BROWSE_FILE_CLASSES.to_vec(),
         StoreContentsReadPolicy::AudioBrowse => AUDIO_BROWSE_FILE_CLASSES.to_vec(),
         StoreContentsReadPolicy::SourceFileInventory { file_classes } => file_classes.clone(),
-        StoreContentsReadPolicy::PrimaryMedia { media_kinds } => media_kinds
+        StoreContentsReadPolicy::PlayableMedia { media_kinds } => media_kinds
             .iter()
             .map(|media_kind| match media_kind {
-                StorePrimaryMediaKind::Audio => StoreContentsFileClass::Audio,
-                StorePrimaryMediaKind::Video => StoreContentsFileClass::Video,
+                StorePlayableMediaKind::Audio => StoreContentsFileClass::Audio,
+                StorePlayableMediaKind::Video => StoreContentsFileClass::Video,
             })
             .collect(),
     }
@@ -771,7 +771,7 @@ fn policy_file_classes(policy: &StoreContentsReadPolicy) -> Vec<StoreContentsFil
 fn policy_omitted_file_classes(
     policy: &StoreContentsReadPolicy,
 ) -> Option<Vec<StoreContentsFileClass>> {
-    if matches!(policy, StoreContentsReadPolicy::PrimaryMedia { .. }) {
+    if matches!(policy, StoreContentsReadPolicy::PlayableMedia { .. }) {
         return None;
     }
 
@@ -783,7 +783,7 @@ fn policy_omitted_file_classes(
         StoreContentsReadPolicy::PlayableMediaBrowse | StoreContentsReadPolicy::AudioBrowse => {
             BROWSE_RELEVANT_FILE_CLASSES.as_slice()
         }
-        StoreContentsReadPolicy::PrimaryMedia { .. } => unreachable!(),
+        StoreContentsReadPolicy::PlayableMedia { .. } => unreachable!(),
     };
 
     Some(
@@ -1505,7 +1505,7 @@ fn read_has_policy_omitted_rows(
     scope_depth: StoreContentsScopeDepth,
 ) -> LibrarySqliteResult<bool> {
     let Some(omitted_file_classes) = policy_omitted_file_classes(policy) else {
-        // primaryMedia omission metadata is not surfaced until its own row universe is queryable.
+        // playableMedia omission metadata is not surfaced until its own row universe is queryable.
         return Ok(false);
     };
     if omitted_file_classes.is_empty() {
@@ -1596,7 +1596,7 @@ fn read_rows(
     let file_classes = policy_file_classes(policy);
     let file_class_predicate =
         file_classes_predicate_sql("sf.file_class", "sf.file_kind", &file_classes);
-    let primary_media_rows = matches!(policy, StoreContentsReadPolicy::PrimaryMedia { .. });
+    let playable_media_rows = matches!(policy, StoreContentsReadPolicy::PlayableMedia { .. });
 
     match scope {
         ResolvedContentsScope::WholeSource { source_id } => {
@@ -1606,7 +1606,7 @@ fn read_rows(
                 SourcePredicateReadInput {
                     source_predicate: &source_predicate,
                     file_class_predicate: &file_class_predicate,
-                    primary_media_rows,
+                    playable_media_rows,
                     source_id: *source_id,
                     relative_path: None,
                     limit_plus_one,
@@ -1620,7 +1620,7 @@ fn read_rows(
                 connection,
                 &predicate,
                 &file_class_predicate,
-                primary_media_rows,
+                playable_media_rows,
                 *source_id,
                 limit_plus_one,
                 cursor_position,
@@ -1636,7 +1636,7 @@ fn read_rows(
                 SourcePredicateReadInput {
                     source_predicate: &predicate,
                     file_class_predicate: &file_class_predicate,
-                    primary_media_rows,
+                    playable_media_rows,
                     source_id: *source_id,
                     relative_path: Some(relative_path),
                     limit_plus_one,
@@ -1654,7 +1654,7 @@ fn read_rows(
                 SourcePredicateReadInput {
                     source_predicate: &predicate,
                     file_class_predicate: &file_class_predicate,
-                    primary_media_rows,
+                    playable_media_rows,
                     source_id: *source_id,
                     relative_path: Some(relative_path),
                     limit_plus_one,
@@ -1704,7 +1704,7 @@ fn read_rows_for_accepted_locations(
     connection: &Connection,
     source_predicate: &str,
     file_class_predicate: &str,
-    primary_media_rows: bool,
+    playable_media_rows: bool,
     source_id: i64,
     limit_plus_one: i64,
     cursor_position: Option<&ContentsCursorPosition>,
@@ -1712,7 +1712,7 @@ fn read_rows_for_accepted_locations(
     let scope_param_count: usize = 1;
     let cursor_param_count: usize = match cursor_position {
         Some(ContentsCursorPosition::SourceFile { .. }) => 3,
-        Some(ContentsCursorPosition::PrimaryMedia { .. }) => 2,
+        Some(ContentsCursorPosition::PlayableMedia { .. }) => 2,
         None => 0,
     };
     let cursor_start: Option<usize> = if cursor_param_count > 0 {
@@ -1726,7 +1726,7 @@ fn read_rows_for_accepted_locations(
         Some(accepted_locations_cte()),
         source_predicate,
         file_class_predicate,
-        primary_media_rows,
+        playable_media_rows,
         cursor_start,
         limit_param,
     );
@@ -1755,7 +1755,7 @@ fn read_rows_for_accepted_locations(
 struct SourcePredicateReadInput<'a> {
     source_predicate: &'a str,
     file_class_predicate: &'a str,
-    primary_media_rows: bool,
+    playable_media_rows: bool,
     source_id: i64,
     relative_path: Option<&'a str>,
     limit_plus_one: i64,
@@ -1769,7 +1769,7 @@ fn read_rows_with_source_predicate(
     let scope_param_count: usize = if input.relative_path.is_some() { 2 } else { 1 };
     let cursor_param_count: usize = match input.cursor_position {
         Some(ContentsCursorPosition::SourceFile { .. }) => 3,
-        Some(ContentsCursorPosition::PrimaryMedia { .. }) => 2,
+        Some(ContentsCursorPosition::PlayableMedia { .. }) => 2,
         None => 0,
     };
     let cursor_start: Option<usize> = if cursor_param_count > 0 {
@@ -1783,7 +1783,7 @@ fn read_rows_with_source_predicate(
         None,
         input.source_predicate,
         input.file_class_predicate,
-        input.primary_media_rows,
+        input.playable_media_rows,
         cursor_start,
         limit_param,
     );
@@ -1846,12 +1846,12 @@ fn contents_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
     file_class_predicate: &str,
-    primary_media_rows: bool,
+    playable_media_rows: bool,
     cursor_start: Option<usize>,
     limit_param: usize,
 ) -> String {
-    if primary_media_rows {
-        primary_media_rows_sql(
+    if playable_media_rows {
+        playable_media_rows_sql(
             prefix_cte,
             source_predicate,
             file_class_predicate,
@@ -1901,7 +1901,7 @@ SELECT sf.source_file_id, \
        sf.file_kind, \
        sf.presence_state, \
        sf.updated_at, \
-       NULL AS primary_media_fact_id, \
+       NULL AS playable_media_id, \
        NULL AS attachment_id, \
        NULL AS content_hash_algorithm, \
        NULL AS content_hash_value, \
@@ -1922,7 +1922,7 @@ WHERE {file_class_predicate} \
     )
 }
 
-fn primary_media_rows_sql(
+fn playable_media_rows_sql(
     prefix_cte: Option<&str>,
     source_predicate: &str,
     file_class_predicate: &str,
@@ -1968,7 +1968,7 @@ fn primary_media_rows_sql(
                  AND {source_predicate} \
            ), \
            candidate_scope AS ( \
-               SELECT pmc.primary_media_fact_id, \
+               SELECT pmc.playable_media_id, \
                       pmc.attachment_id, \
                       attachment.content_hash_algorithm, \
                       attachment.content_hash_value, \
@@ -1984,7 +1984,7 @@ fn primary_media_rows_sql(
                           pmc.updated_at, \
                           attachment.updated_at, \
                           link.updated_at, \
-                          facts.updated_at, \
+                          observations.updated_at, \
                           sf.updated_at \
                       ) AS updated_at, \
                       sf.source_file_id, \
@@ -1998,7 +1998,7 @@ fn primary_media_rows_sql(
                       sf.file_kind, \
                       sf.presence_state, \
                       ROW_NUMBER() OVER ( \
-                          PARTITION BY pmc.primary_media_fact_id \
+                          PARTITION BY pmc.playable_media_id \
                           ORDER BY CASE \
                                        WHEN sf.source_file_id = pmc.evidence_source_file_id THEN 0 \
                                        ELSE 1 \
@@ -2012,25 +2012,25 @@ fn primary_media_rows_sql(
                 AND link.source_id = sf.source_id \
                JOIN content_attachments attachment \
                  ON attachment.attachment_id = link.attachment_id \
-               JOIN primary_media_facts pmc \
+               JOIN playable_media pmc \
                  ON pmc.attachment_id = attachment.attachment_id \
-               JOIN source_file_facts facts \
-                 ON facts.source_file_id = sf.source_file_id \
-              WHERE sf.source_id = facts.basis_source_id \
-                AND sf.relative_path = facts.basis_relative_path \
-                AND sf.size_bytes IS facts.basis_size_bytes \
-                AND sf.mtime_ns IS facts.basis_mtime_ns \
-                AND sf.presence_state = facts.basis_presence_state \
-                AND facts.content_hash_algorithm = attachment.content_hash_algorithm \
-                AND facts.content_hash_value = attachment.content_hash_value \
-                AND facts.media_kind = 'audio' \
+               JOIN source_file_observations observations \
+                 ON observations.source_file_id = sf.source_file_id \
+              WHERE sf.source_id = observations.basis_source_id \
+                AND sf.relative_path = observations.basis_relative_path \
+                AND sf.size_bytes IS observations.basis_size_bytes \
+                AND sf.mtime_ns IS observations.basis_mtime_ns \
+                AND sf.presence_state = observations.basis_presence_state \
+                AND observations.content_hash_algorithm = attachment.content_hash_algorithm \
+                AND observations.content_hash_value = attachment.content_hash_value \
+                AND observations.media_kind = 'audio' \
                 AND ( \
-                    facts.mime_type IS NOT NULL \
-                    OR facts.duration_ms IS NOT NULL \
-                    OR facts.sample_rate_hz IS NOT NULL \
-                    OR facts.channels IS NOT NULL \
-                    OR facts.bit_depth IS NOT NULL \
-                    OR facts.codec IS NOT NULL \
+                    observations.mime_type IS NOT NULL \
+                    OR observations.duration_ms IS NOT NULL \
+                    OR observations.sample_rate_hz IS NOT NULL \
+                    OR observations.channels IS NOT NULL \
+                    OR observations.bit_depth IS NOT NULL \
+                    OR observations.codec IS NOT NULL \
                 ) \
            ), \
            promoted AS ( \
@@ -2043,7 +2043,7 @@ fn primary_media_rows_sql(
                       file_kind, \
                       presence_state, \
                       updated_at, \
-                      primary_media_fact_id, \
+                      playable_media_id, \
                       attachment_id, \
                       content_hash_algorithm, \
                       content_hash_value, \
@@ -2067,7 +2067,7 @@ fn primary_media_rows_sql(
                  file_kind, \
                  presence_state, \
                  updated_at, \
-                 primary_media_fact_id, \
+                 playable_media_id, \
                  attachment_id, \
                  content_hash_algorithm, \
                  content_hash_value, \
@@ -2081,7 +2081,7 @@ fn primary_media_rows_sql(
                  codec, \
                  NULL AS path_sort_key \
            FROM promoted{cursor_clause} \
-           ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL} \
+           ORDER BY {PLAYABLE_MEDIA_CONTENTS_ORDER_SQL} \
            LIMIT ?{limit_param}"
     )
 }
@@ -2097,7 +2097,7 @@ fn push_cursor_params(cursor: &ContentsCursorPosition, params: &mut Vec<rusqlite
             params.push(rusqlite::types::Value::Text(relative_path.clone()));
             params.push(rusqlite::types::Value::Integer(*source_file_id));
         }
-        ContentsCursorPosition::PrimaryMedia {
+        ContentsCursorPosition::PlayableMedia {
             relative_path_key,
             source_file_id,
         } => {
@@ -2143,7 +2143,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let file_kind: String = row.get(6)?;
     let presence: String = row.get(7)?;
     let updated_at: i64 = row.get(8)?;
-    let primary_media_fact_id: Option<i64> = row.get(9)?;
+    let playable_media_id: Option<i64> = row.get(9)?;
     let attachment_id: Option<i64> = row.get(10)?;
     let content_hash_algorithm: Option<String> = row.get(11)?;
     let content_hash_value: Option<String> = row.get(12)?;
@@ -2157,31 +2157,30 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let codec: Option<String> = row.get(20)?;
     let path_sort_key: Option<String> = row.get(21)?;
 
-    let primary_media =
-        primary_media_fact_id.map(|primary_media_fact_id| StorePrimaryMediaSummary {
-            primary_media_fact_id: Some(primary_media_fact_id),
-            attachment_id,
-            content_hash_algorithm: content_hash_algorithm.clone(),
-            content_hash_value: content_hash_value.clone(),
-            evidence_source_file_id,
-            media_kind: candidate_media_kind.clone(),
-            mime_type: mime_type.clone(),
-            duration_ms,
-            sample_rate_hz,
-            channels,
-            bit_depth,
-            codec: codec.clone(),
-        });
+    let playable_media = playable_media_id.map(|playable_media_id| StorePlayableMedia {
+        playable_media_id: Some(playable_media_id),
+        attachment_id,
+        content_hash_algorithm: content_hash_algorithm.clone(),
+        content_hash_value: content_hash_value.clone(),
+        evidence_source_file_id,
+        media_kind: candidate_media_kind.clone(),
+        mime_type: mime_type.clone(),
+        duration_ms,
+        sample_rate_hz,
+        channels,
+        bit_depth,
+        codec: codec.clone(),
+    });
 
     let label = contents_label(&file_name, &relative_path);
 
     Ok(StoreContentsFileRow {
-        id: primary_media
+        id: playable_media
             .as_ref()
             .and_then(|summary| {
                 summary
-                    .primary_media_fact_id
-                    .map(|id| format!("primary-media:{id}"))
+                    .playable_media_id
+                    .map(|id| format!("playable-media:{id}"))
             })
             .unwrap_or_else(|| format!("source-file:{source_file_id}")),
         source_id,
@@ -2193,7 +2192,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
         file_class,
         file_kind,
         presence,
-        primary_media,
+        playable_media,
         updated_at,
         path_sort_key,
     })
@@ -2216,7 +2215,7 @@ mod tests {
     use super::{
         StoreContentsFileClass, StoreContentsReadPolicy, StoreContentsScope,
         StoreContentsScopeCoverageState, StoreContentsScopeDepth, StoreContentsState,
-        StorePrimaryMediaKind, canonical_cursor_policy, read_contents,
+        StorePlayableMediaKind, canonical_cursor_policy, read_contents,
     };
     use crate::schema::install_baseline_schema_for_test;
 
@@ -2226,13 +2225,13 @@ mod tests {
         connection
     }
 
-    fn primary_media_policy() -> StoreContentsReadPolicy {
-        StoreContentsReadPolicy::PrimaryMedia {
-            media_kinds: vec![StorePrimaryMediaKind::Audio, StorePrimaryMediaKind::Video],
+    fn playable_media_policy() -> StoreContentsReadPolicy {
+        StoreContentsReadPolicy::PlayableMedia {
+            media_kinds: vec![StorePlayableMediaKind::Audio, StorePlayableMediaKind::Video],
         }
     }
 
-    fn primary_media_file_classes() -> Vec<StoreContentsFileClass> {
+    fn playable_media_file_classes() -> Vec<StoreContentsFileClass> {
         vec![StoreContentsFileClass::Audio, StoreContentsFileClass::Video]
     }
 
@@ -2305,10 +2304,10 @@ mod tests {
         );
     }
 
-    fn primary_media(row: &super::StoreContentsFileRow) -> &super::StorePrimaryMediaSummary {
-        row.primary_media
+    fn playable_media(row: &super::StoreContentsFileRow) -> &super::StorePlayableMedia {
+        row.playable_media
             .as_ref()
-            .expect("primary-media profile rows carry a summary")
+            .expect("playable-media profile rows carry a summary")
     }
 
     fn insert_source(connection: &Connection, source_id: i64) {
@@ -2555,7 +2554,6 @@ mod tests {
                      subject_kind,
                      subject_id,
                      artifact_kind,
-                     artifact_role,
                      adapter_key,
                      adapter_version,
                      basis_fingerprint,
@@ -2564,7 +2562,7 @@ mod tests {
                      payload_hash,
                      created_at
                  )
-                 VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test.contents', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
+                 VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'test.contents', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
                 params![
                     artifact_id,
                     source_file_id,
@@ -2590,7 +2588,7 @@ mod tests {
         let hash_value = format!("hash:{source_file_id}");
         connection
             .execute(
-                "INSERT INTO source_file_facts (
+                "INSERT INTO source_file_observations (
                      source_file_id,
                      basis_fingerprint,
                      basis_source_id,
@@ -2624,7 +2622,7 @@ mod tests {
                     artifact_id
                 ],
             )
-            .expect("insert source facts");
+            .expect("insert source observations");
         connection
             .execute(
                 "INSERT OR IGNORE INTO content_attachments (
@@ -2663,7 +2661,7 @@ mod tests {
             .expect("insert attachment link");
         connection
             .execute(
-                "INSERT INTO primary_media_facts (
+                "INSERT INTO playable_media (
                      attachment_id,
                      evidence_source_file_id,
                      evidence_basis_fingerprint,
@@ -2680,7 +2678,7 @@ mod tests {
                  VALUES (?1, ?2, ?3, 'audio', 'audio/wav', 120000, 44100, 2, 16, 'pcm', 1, 1)",
                 params![attachment_id, source_file_id, basis_fingerprint],
             )
-            .expect("insert primary media fact");
+            .expect("insert playable media observation");
     }
 
     fn seed_assets(connection: &Connection) {
@@ -2750,7 +2748,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -2763,9 +2761,9 @@ mod tests {
                 .rows
                 .iter()
                 .map(|row| {
-                    let summary = primary_media(row);
+                    let summary = playable_media(row);
                     (
-                        summary.primary_media_fact_id.is_some(),
+                        summary.playable_media_id.is_some(),
                         summary.attachment_id.is_some(),
                     )
                 })
@@ -2801,7 +2799,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -2857,7 +2855,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -2870,9 +2868,9 @@ mod tests {
                 .rows
                 .iter()
                 .map(|row| {
-                    let summary = primary_media(row);
+                    let summary = playable_media(row);
                     (
-                        summary.primary_media_fact_id.is_some(),
+                        summary.playable_media_id.is_some(),
                         summary.attachment_id.is_some(),
                         row.file_class.as_str(),
                     )
@@ -2895,7 +2893,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -2919,7 +2917,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -2944,7 +2942,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -2973,7 +2971,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3003,7 +3001,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3126,7 +3124,7 @@ mod tests {
     }
 
     #[test]
-    fn source_scope_returns_empty_primary_media_without_promotion() {
+    fn source_scope_returns_empty_playable_media_without_promotion() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -3136,7 +3134,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3173,7 +3171,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3182,14 +3180,14 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
-        let summary = primary_media(&result.rows[0]);
-        assert!(summary.primary_media_fact_id.is_some());
+        let summary = playable_media(&result.rows[0]);
+        assert!(summary.playable_media_id.is_some());
         assert!(summary.attachment_id.is_some());
         assert_eq!(summary.content_hash_value.as_deref(), Some("hash:1000"));
         assert_eq!(summary.media_kind.as_deref(), Some("audio"));
         assert!(
-            result.rows[0].id.starts_with("primary-media:"),
-            "promoted row id must start with 'primary-media:', got: {}",
+            result.rows[0].id.starts_with("playable-media:"),
+            "promoted row id must start with 'playable-media:', got: {}",
             result.rows[0].id
         );
     }
@@ -3207,7 +3205,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3237,7 +3235,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3273,7 +3271,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3298,7 +3296,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3323,7 +3321,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3340,7 +3338,7 @@ mod tests {
     }
 
     #[test]
-    fn primary_media_profile_omits_unpromoted_source_file_rows() {
+    fn playable_media_profile_omits_unpromoted_source_file_rows() {
         let connection = open_connection();
         seed_assets(&connection);
         insert_source(&connection, 1);
@@ -3360,7 +3358,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -3370,15 +3368,11 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         assert_eq!(result.rows[0].source_file_id, 1000);
-        assert!(
-            primary_media(&result.rows[0])
-                .primary_media_fact_id
-                .is_some()
-        );
+        assert!(playable_media(&result.rows[0]).playable_media_id.is_some());
     }
 
     #[test]
-    fn source_file_profile_returns_media_relevant_inventory_without_primary_media() {
+    fn source_file_profile_returns_media_relevant_inventory_without_playable_media() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
@@ -3431,7 +3425,7 @@ mod tests {
                 ("Media/track.wav", "audio", "audio"),
             ]
         );
-        assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
+        assert!(result.rows.iter().all(|row| row.playable_media.is_none()));
     }
 
     #[test]
@@ -3467,7 +3461,7 @@ mod tests {
         assert_eq!(result.rows[0].relative_path, "Media/track.wav");
         assert_eq!(result.rows[0].file_class, "audio");
         assert_eq!(result.rows[0].file_kind, "audio");
-        assert!(result.rows[0].primary_media.is_none());
+        assert!(result.rows[0].playable_media.is_none());
     }
 
     #[test]
@@ -3550,7 +3544,7 @@ mod tests {
         assert_relative_paths(&location_immediate.rows, &["Music/01.wav"]);
 
         for row in source_descendants.rows {
-            assert!(row.primary_media.is_none());
+            assert!(row.playable_media.is_none());
             assert_eq!(row.file_class, "audio");
         }
     }
@@ -3832,7 +3826,7 @@ mod tests {
     }
 
     #[test]
-    fn primary_media_omission_does_not_use_raw_source_files_as_a_proxy() {
+    fn playable_media_omission_does_not_use_raw_source_files_as_a_proxy() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Media", "complete");
@@ -3846,12 +3840,12 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
-        .expect("read primary media");
+        .expect("read playable media");
 
         assert!(result.rows.is_empty());
         assert!(!result.has_policy_omitted_rows);
@@ -3978,7 +3972,7 @@ mod tests {
         assert_eq!(result.rows[0].relative_path, "Media/album.cue");
         assert_eq!(result.rows[0].file_class, "unsupported");
         assert_eq!(result.rows[0].file_kind, "cue_sheet");
-        assert!(result.rows[0].primary_media.is_none());
+        assert!(result.rows[0].playable_media.is_none());
     }
 
     #[test]
@@ -4110,7 +4104,7 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 2);
         assert!(result.rows.iter().all(|row| row.file_class == "image"));
-        assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
+        assert!(result.rows.iter().all(|row| row.playable_media.is_none()));
     }
 
     #[test]
@@ -4141,21 +4135,21 @@ mod tests {
     }
 
     #[test]
-    fn empty_primary_media_policy_is_rejected() {
+    fn empty_playable_media_policy_is_rejected() {
         let connection = open_connection();
         insert_source(&connection, 1);
 
         let error = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            StoreContentsReadPolicy::PrimaryMedia {
+            StoreContentsReadPolicy::PlayableMedia {
                 media_kinds: Vec::new(),
             },
             StoreContentsScopeDepth::Recursive,
             10,
             None,
         )
-        .expect_err("empty primary-media kinds must be rejected");
+        .expect_err("empty playable-media kinds must be rejected");
         assert!(error.to_string().contains("mediaKinds must not be empty"));
     }
 
@@ -4187,7 +4181,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             Some("page-2"),
@@ -4235,7 +4229,7 @@ mod tests {
     }
 
     #[test]
-    fn primary_media_profile_returns_next_cursor_when_more_rows() {
+    fn playable_media_profile_returns_next_cursor_when_more_rows() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4255,7 +4249,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             3,
             None,
@@ -4309,7 +4303,7 @@ mod tests {
             3,
             Some(&cursor),
         )
-        .expect("reject primary-media cursor for audio browse");
+        .expect("reject playable-media cursor for audio browse");
         assert_eq!(
             audio_browse_mismatch.state,
             StoreContentsState::CursorInvalid
@@ -4318,14 +4312,14 @@ mod tests {
         let media_kind_mismatch = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            StoreContentsReadPolicy::PrimaryMedia {
-                media_kinds: vec![StorePrimaryMediaKind::Video],
+            StoreContentsReadPolicy::PlayableMedia {
+                media_kinds: vec![StorePlayableMediaKind::Video],
             },
             StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
-        .expect("reject primary-media cursor with changed media kinds");
+        .expect("reject playable-media cursor with changed media kinds");
         assert_eq!(media_kind_mismatch.state, StoreContentsState::CursorInvalid);
 
         let page2 = read_contents(
@@ -4426,7 +4420,7 @@ mod tests {
     }
 
     #[test]
-    fn primary_media_cursor_page_two_returns_next_deterministic_rows() {
+    fn playable_media_cursor_page_two_returns_next_deterministic_rows() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4446,7 +4440,7 @@ mod tests {
         let page1 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             3,
             None,
@@ -4459,7 +4453,7 @@ mod tests {
         let page2 = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
@@ -4682,7 +4676,7 @@ mod tests {
     }
 
     #[test]
-    fn source_file_inventory_cursor_rejects_primary_media_policy() {
+    fn source_file_inventory_cursor_rejects_playable_media_policy() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -4712,7 +4706,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
@@ -4844,23 +4838,23 @@ mod tests {
         );
         assert!(source_file_from_audio_cursor.rows.is_empty());
 
-        let primary_media_from_audio_cursor = read_contents(
+        let playable_media_from_audio_cursor = read_contents(
             &connection,
             StoreContentsScope::Directory {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             2,
             Some(&audio_browse_cursor),
         )
-        .expect("read primary-media with audio-browse cursor");
+        .expect("read playable-media with audio-browse cursor");
         assert_eq!(
-            primary_media_from_audio_cursor.state,
+            playable_media_from_audio_cursor.state,
             StoreContentsState::CursorInvalid
         );
-        assert!(primary_media_from_audio_cursor.rows.is_empty());
+        assert!(playable_media_from_audio_cursor.rows.is_empty());
     }
 
     #[test]
@@ -5103,7 +5097,7 @@ mod tests {
     }
 
     #[test]
-    fn primary_media_last_page_emits_no_next_cursor() {
+    fn playable_media_last_page_emits_no_next_cursor() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -5123,7 +5117,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5200,7 +5194,7 @@ mod tests {
     }
 
     #[test]
-    fn directory_primary_media_cursor_returns_correct_page_two() {
+    fn directory_playable_media_cursor_returns_correct_page_two() {
         let connection = open_connection();
         insert_source(&connection, 1);
         insert_directory(&connection, 10, 1, "Music", "complete");
@@ -5223,12 +5217,12 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             3,
             None,
         )
-        .expect("read page 1 (directory scope, primary media)");
+        .expect("read page 1 (directory scope, playable media)");
 
         assert_eq!(page1.rows.len(), 3);
         let cursor = page1.next_cursor.expect("expected cursor for page 2");
@@ -5239,12 +5233,12 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 10,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             3,
             Some(&cursor),
         )
-        .expect("read page 2 (directory scope, primary media)");
+        .expect("read page 2 (directory scope, playable media)");
 
         assert_eq!(page2.rows.len(), 2);
         assert!(
@@ -5399,9 +5393,9 @@ mod tests {
         let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
-            &primary_media_file_classes(),
+            &playable_media_file_classes(),
         );
-        let sql = super::primary_media_rows_sql(
+        let sql = super::playable_media_rows_sql(
             None,
             "sf.source_id = ?1",
             &file_class_predicate,
@@ -5490,10 +5484,10 @@ mod tests {
         let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
-            &primary_media_file_classes(),
+            &playable_media_file_classes(),
         );
         let sql =
-            super::primary_media_rows_sql(None, &source_predicate, &file_class_predicate, None, 3);
+            super::playable_media_rows_sql(None, &source_predicate, &file_class_predicate, None, 3);
         let plan = dump_query_plan(
             &connection,
             &sql,
@@ -5509,7 +5503,7 @@ mod tests {
 
         assert!(
             plan_lower.contains("source_files_source_relative_path_binary")
-                || plan_lower.contains("source_file_facts_source_basis"),
+                || plan_lower.contains("source_file_observations_source_basis"),
             "directory-prefix scope should use an indexed relative-path range, observed:\n{plan}"
         );
     }
@@ -5545,9 +5539,9 @@ mod tests {
         let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
-            &primary_media_file_classes(),
+            &playable_media_file_classes(),
         );
-        let sql = super::primary_media_rows_sql(
+        let sql = super::playable_media_rows_sql(
             Some(super::accepted_locations_cte()),
             &predicate,
             &file_class_predicate,
@@ -5606,9 +5600,9 @@ mod tests {
         let file_class_predicate = super::file_classes_predicate_sql(
             "sf.file_class",
             "sf.file_kind",
-            &primary_media_file_classes(),
+            &playable_media_file_classes(),
         );
-        let sql = super::primary_media_rows_sql(
+        let sql = super::playable_media_rows_sql(
             None,
             "sf.source_id = ?1",
             &file_class_predicate,
@@ -5640,7 +5634,7 @@ mod tests {
             "mixed-promotion plan should use content-attachment lookup, observed:\n{plan}"
         );
         assert!(
-            plan_lower.contains("primary_media_facts"),
+            plan_lower.contains("playable_media"),
             "mixed-promotion plan should use promoted-candidate lookup, observed:\n{plan}"
         );
         assert!(
@@ -5692,7 +5686,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5731,7 +5725,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5781,7 +5775,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 11,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5800,7 +5794,7 @@ mod tests {
         let source_result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5836,7 +5830,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 11,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5873,7 +5867,7 @@ mod tests {
                 source_id: 1,
                 source_directory_id: 11,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5917,7 +5911,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -5965,7 +5959,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6007,7 +6001,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6042,7 +6036,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6095,7 +6089,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6150,7 +6144,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6195,7 +6189,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6205,7 +6199,7 @@ mod tests {
         let source_result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6237,7 +6231,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 101,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6247,7 +6241,7 @@ mod tests {
         let source_result_blocked = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6302,7 +6296,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6364,7 +6358,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6415,7 +6409,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6476,7 +6470,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6539,7 +6533,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6581,7 +6575,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6626,7 +6620,7 @@ mod tests {
         let result = read_contents(
             &connection,
             StoreContentsScope::Source { source_id: 1 },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,
@@ -6660,7 +6654,7 @@ mod tests {
             StoreContentsScope::SourceLocation {
                 source_location_id: 100,
             },
-            primary_media_policy(),
+            playable_media_policy(),
             StoreContentsScopeDepth::Recursive,
             10,
             None,

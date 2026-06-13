@@ -195,7 +195,7 @@ hidden with release-budget gives its fraction back to the negotiation pool. Thes
 different consequences for the resize engine.
 
 **5. Placement** — where in the topology does this slot currently live?
-Placement is a topology fact, not a DOM fact. Dragging a pane to a new location produces a topology mutation that
+Placement is a topology observation, not a DOM observation. Dragging a pane to a new location produces a topology mutation that
 assigns it a new structural position. The renderer reprojects from the mutated topology. DOM adjacency is never the
 authority for placement.
 

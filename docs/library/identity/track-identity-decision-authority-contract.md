@@ -108,8 +108,8 @@ not accept `source_id`, path, title, artist, album, or metadata.
 If no source scope can be derived (no evidence snapshot and no candidate source provenance), the command is rejected
 with a typed `NoSourceScopeForDecision` failure. The store must not create a partial decision row in that case.
 
-Old decision evidence snapshots are immutable copied provenance. Later source facts, attachment links, candidate,
-candidate-member, candidate-evidence, primary-media, attachment, source-file, source, probe, or replacement changes must
+Old decision evidence snapshots are immutable copied provenance. Later source observations, attachment links, candidate,
+candidate-member, candidate-evidence, playable-media, attachment, source-file, source, probe, or replacement changes must
 not rewrite or cascade-delete historical snapshot rows. Decision deletion is the snapshot retention boundary.
 
 ## Source Maintenance Interaction

@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::authority::promotion::{InspectSourceFilePromotionInput, InspectSourceFilePromotionTx};
 use crate::authority::sources::{
-    CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+    CommitAcceptedSourceFileObservationInput, CommitAcceptedSourceFileObservationMergePolicy,
     ContentHashEvidence,
 };
 use crate::authority::work::{
@@ -19,7 +19,7 @@ use crate::authority::write_lane::AdmittedWrite;
 use crate::store::sources::source_observation_basis_fingerprint;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    ArtifactKind, ArtifactRole, SourceFileId, WorkItemState, WorkPriorityClass, WorkRunOutcome,
+    ArtifactKind, SourceFileId, WorkItemState, WorkPriorityClass, WorkRunOutcome,
 };
 
 use super::SqliteDurableStore;
@@ -73,10 +73,10 @@ pub struct SourceFileBlake3HashCandidate {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceFileBlake3HashCandidateReason {
-    MissingFacts,
+    MissingObservations,
     MissingContentHash,
     NonBlake3ContentHash,
-    StaleFacts,
+    StaleObservations,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -707,15 +707,15 @@ fn read_source_file_blake3_hash_candidates_for_scope(
                 sf.file_class,
                 sf.file_kind,
                 CASE
-                    WHEN facts.source_file_id IS NULL THEN 'missing_facts'
-                    WHEN facts.content_hash_algorithm IS NULL
-                      OR facts.content_hash_value IS NULL THEN 'missing_content_hash'
-                    WHEN facts.content_hash_algorithm != ?1 THEN 'non_blake3_content_hash'
-                    ELSE 'stale_facts'
+                    WHEN observations.source_file_id IS NULL THEN 'missing_observations'
+                    WHEN observations.content_hash_algorithm IS NULL
+                      OR observations.content_hash_value IS NULL THEN 'missing_content_hash'
+                    WHEN observations.content_hash_algorithm != ?1 THEN 'non_blake3_content_hash'
+                    ELSE 'stale_observations'
                 END AS reason
          FROM source_files sf
-         LEFT JOIN source_file_facts facts
-           ON facts.source_file_id = sf.source_file_id
+         LEFT JOIN source_file_observations observations
+           ON observations.source_file_id = sf.source_file_id
          WHERE {scope_predicate}
            AND sf.presence_state = 'present'
            AND {}
@@ -724,7 +724,7 @@ fn read_source_file_blake3_hash_candidates_for_scope(
                   sf.source_file_id ASC
          LIMIT ?{}",
         media_relevant_source_file_predicate_sql("sf"),
-        needs_blake3_hash_predicate_sql("sf", "facts"),
+        needs_blake3_hash_predicate_sql("sf", "observations"),
         values.len() + 1
     );
     let mut statement = connection.prepare(&sql)?;
@@ -763,14 +763,14 @@ fn count_source_file_blake3_hash_candidates_for_scope(
     let sql = format!(
         "SELECT COUNT(*)
          FROM source_files sf
-         LEFT JOIN source_file_facts facts
-           ON facts.source_file_id = sf.source_file_id
+         LEFT JOIN source_file_observations observations
+           ON observations.source_file_id = sf.source_file_id
          WHERE {scope_predicate}
            AND sf.presence_state = 'present'
            AND {}
            AND {}",
         media_relevant_source_file_predicate_sql("sf"),
-        needs_blake3_hash_predicate_sql("sf", "facts")
+        needs_blake3_hash_predicate_sql("sf", "observations")
     );
     let mut query_values = vec![Value::Text(SOURCE_FILE_BLAKE3_ALGORITHM.to_string())];
     query_values.extend(values);
@@ -821,18 +821,18 @@ fn media_relevant_source_file_predicate_sql(alias: &str) -> String {
     )
 }
 
-fn needs_blake3_hash_predicate_sql(source_file_alias: &str, facts_alias: &str) -> String {
+fn needs_blake3_hash_predicate_sql(source_file_alias: &str, observations_alias: &str) -> String {
     format!(
-        "({facts_alias}.source_file_id IS NULL
-          OR {facts_alias}.content_hash_algorithm IS NULL
-          OR {facts_alias}.content_hash_value IS NULL
-          OR {facts_alias}.content_hash_algorithm != ?1
+        "({observations_alias}.source_file_id IS NULL
+          OR {observations_alias}.content_hash_algorithm IS NULL
+          OR {observations_alias}.content_hash_value IS NULL
+          OR {observations_alias}.content_hash_algorithm != ?1
           OR NOT (
-              {source_file_alias}.source_id = {facts_alias}.basis_source_id
-              AND {source_file_alias}.relative_path = {facts_alias}.basis_relative_path
-              AND {source_file_alias}.size_bytes IS {facts_alias}.basis_size_bytes
-              AND {source_file_alias}.mtime_ns IS {facts_alias}.basis_mtime_ns
-              AND {source_file_alias}.presence_state = {facts_alias}.basis_presence_state
+              {source_file_alias}.source_id = {observations_alias}.basis_source_id
+              AND {source_file_alias}.relative_path = {observations_alias}.basis_relative_path
+              AND {source_file_alias}.size_bytes IS {observations_alias}.basis_size_bytes
+              AND {source_file_alias}.mtime_ns IS {observations_alias}.basis_mtime_ns
+              AND {source_file_alias}.presence_state = {observations_alias}.basis_presence_state
           ))"
     )
 }
@@ -841,10 +841,10 @@ fn parse_hash_candidate_reason(
     reason: &str,
 ) -> Result<SourceFileBlake3HashCandidateReason, String> {
     match reason {
-        "missing_facts" => Ok(SourceFileBlake3HashCandidateReason::MissingFacts),
+        "missing_observations" => Ok(SourceFileBlake3HashCandidateReason::MissingObservations),
         "missing_content_hash" => Ok(SourceFileBlake3HashCandidateReason::MissingContentHash),
         "non_blake3_content_hash" => Ok(SourceFileBlake3HashCandidateReason::NonBlake3ContentHash),
-        "stale_facts" => Ok(SourceFileBlake3HashCandidateReason::StaleFacts),
+        "stale_observations" => Ok(SourceFileBlake3HashCandidateReason::StaleObservations),
         other => Err(format!("unknown hash candidate reason {other:?}")),
     }
 }
@@ -1068,7 +1068,6 @@ fn commit_blake3_hash_evidence(
             artifact: RecordArtifactInput {
                 work_run_id: work_run.work_run_id,
                 artifact_kind: ArtifactKind::InspectionResult,
-                artifact_role: ArtifactRole::PrimaryResult,
                 media_type: "application/json".to_string(),
                 basis_fingerprint: basis_fingerprint.clone(),
                 payload_hash,
@@ -1079,7 +1078,7 @@ fn commit_blake3_hash_evidence(
 
     InspectSourceFilePromotionTx::new(write, file_store_root).inspect_source_file(
         &InspectSourceFilePromotionInput {
-            source_file_facts: CommitAcceptedSourceFileFactsInput {
+            source_file_observations: CommitAcceptedSourceFileObservationInput {
                 source_file_id: basis.source_file_id,
                 accepted_artifact_id: artifact.artifact_id,
                 basis_fingerprint,
@@ -1097,8 +1096,8 @@ fn commit_blake3_hash_evidence(
                 codec: None,
                 updated_at: observed_at_ms,
             },
-            source_file_facts_merge_policy:
-                CommitAcceptedSourceFileFactsMergePolicy::preserve_current_probe_fields(),
+            source_file_observation_merge_policy:
+                CommitAcceptedSourceFileObservationMergePolicy::preserve_current_probe_fields(),
             rebuild_projection_domains: vec![],
             rebuild_priority: WorkPriorityClass::Interactive,
         },
@@ -1195,8 +1194,8 @@ mod tests {
     use rusqlite::params;
     use tempfile::TempDir;
 
-    use crate::read_models::observed_file_facts::{
-        StoreObservedFileFactStatus, read_observed_file_facts_for_source_file,
+    use crate::read_models::source_file_observations::{
+        StoreSourceFileObservationStatus, read_source_file_observation,
     };
     use crate::store::{SqliteDurableStore, SqliteDurableStoreAppOwnedState};
 
@@ -1441,7 +1440,7 @@ mod tests {
                 .expect("run hash batch")
         }
 
-        fn insert_source_fact(
+        fn insert_source_observation(
             &self,
             artifact_id: i64,
             source_file_id: i64,
@@ -1517,7 +1516,6 @@ mod tests {
                              subject_kind,
                              subject_id,
                              artifact_kind,
-                             artifact_role,
                              adapter_key,
                              adapter_version,
                              basis_fingerprint,
@@ -1526,7 +1524,7 @@ mod tests {
                              payload_hash,
                              created_at
                          )
-                         VALUES (?1, ?1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test.hash.fixture', '1', ?3, 'application/json', 'inline_payload', ?4, 22)",
+                         VALUES (?1, ?1, 'source_file', ?2, 'inspection_result', 'test.hash.fixture', '1', ?3, 'application/json', 'inline_payload', ?4, 22)",
                         params![
                             artifact_id,
                             source_file_id.to_string(),
@@ -1535,7 +1533,7 @@ mod tests {
                         ],
                     )?;
                     write.execute(
-                        "INSERT INTO source_file_facts (
+                        "INSERT INTO source_file_observations (
                              source_file_id,
                              basis_fingerprint,
                              basis_source_id,
@@ -1572,7 +1570,7 @@ mod tests {
                     )?;
                     Ok(())
                 })
-                .expect("insert source fact");
+                .expect("insert source observation");
         }
 
         fn run_hash(
@@ -1600,9 +1598,9 @@ mod tests {
 
         fn content_hash_value(&self, source_file_id: i64) -> String {
             let connection = self.store.open_read_connection().expect("open read");
-            read_observed_file_facts_for_source_file(&connection, source_file_id)
-                .expect("read observed facts")
-                .expect("facts exist")
+            read_source_file_observation(&connection, source_file_id)
+                .expect("read source-file observations")
+                .expect("observations exist")
                 .content_hash
                 .expect("content hash exists")
                 .value
@@ -1633,26 +1631,29 @@ mod tests {
     }
 
     #[test]
-    fn hash_job_stores_current_observed_file_facts() {
+    fn hash_job_stores_current_source_file_observations() {
         let fixture = HashJobFixture::new();
-        let path = fixture.write_source_file(100, "Album/track.flac", b"current facts");
+        let path = fixture.write_source_file(100, "Album/track.flac", b"current observations");
 
         let result = fixture.run_hash(100, path).expect("hash file");
         let connection = fixture.store.open_read_connection().expect("open read");
-        let facts = read_observed_file_facts_for_source_file(&connection, 100)
-            .expect("read observed facts")
-            .expect("facts exist");
+        let observations = read_source_file_observation(&connection, 100)
+            .expect("read source-file observations")
+            .expect("observations exist");
 
-        assert_eq!(facts.source_file_id, 100);
+        assert_eq!(observations.source_file_id, 100);
         assert_eq!(
-            facts.content_hash.expect("content hash").algorithm,
+            observations.content_hash.expect("content hash").algorithm,
             "blake3"
         );
         assert_eq!(
-            facts.accepted_artifact_id, result.accepted_artifact_id,
-            "facts must point at the inspection artifact created by the job"
+            observations.accepted_artifact_id, result.accepted_artifact_id,
+            "observations must point at the inspection artifact created by the job"
         );
-        assert_eq!(facts.status, StoreObservedFileFactStatus::Current);
+        assert_eq!(
+            observations.status,
+            StoreSourceFileObservationStatus::Current
+        );
     }
 
     #[test]
@@ -1668,7 +1669,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_file_returns_typed_failure_and_writes_no_source_facts() {
+    fn missing_file_returns_typed_failure_and_writes_no_source_observations() {
         let fixture = HashJobFixture::new();
         fixture.insert_source_file(100, "Album/missing.flac", 12, 1000);
         let missing_path = fixture.tempdir.path().join("Album/missing.flac");
@@ -1677,7 +1678,7 @@ mod tests {
             .run_hash(100, missing_path)
             .expect_err("missing file must fail");
         assert!(matches!(error, HashSourceFileBlake3Error::FileOpen { .. }));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
@@ -1716,7 +1717,7 @@ mod tests {
             error,
             HashSourceFileBlake3Error::BasisChanged { .. }
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
@@ -1727,16 +1728,16 @@ mod tests {
 
         fixture.run_hash(101, cue_path).expect("hash cue file");
         let connection = fixture.store.open_read_connection().expect("open read");
-        let cue_facts = read_observed_file_facts_for_source_file(&connection, 101)
-            .expect("read cue facts")
-            .expect("cue facts exist");
+        let cue_observation = read_source_file_observation(&connection, 101)
+            .expect("read cue observations")
+            .expect("cue observations exist");
 
-        assert_eq!(cue_facts.basis_relative_path, "Album/album.cue");
-        assert_eq!(cue_facts.media_kind, "cue_sheet");
-        assert!(cue_facts.content_hash.is_some());
+        assert_eq!(cue_observation.basis_relative_path, "Album/album.cue");
+        assert_eq!(cue_observation.media_kind, "cue_sheet");
+        assert!(cue_observation.content_hash.is_some());
         assert!(
-            read_observed_file_facts_for_source_file(&connection, 100)
-                .expect("read audio facts")
+            read_source_file_observation(&connection, 100)
+                .expect("read audio observations")
                 .is_none(),
             "hashing a CUE file must not attach evidence to adjacent audio"
         );
@@ -1758,7 +1759,7 @@ mod tests {
     }
 
     #[test]
-    fn batch_rejects_traversal_relative_path_without_writing_source_facts() {
+    fn batch_rejects_traversal_relative_path_without_writing_source_observations() {
         let fixture = HashJobFixture::new();
         fixture.insert_source_file(100, "../escape.flac", 11, 1000);
 
@@ -1772,7 +1773,7 @@ mod tests {
                 failure: SourceFileBlake3HashFailure::InvalidRelativePath { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
@@ -1791,15 +1792,15 @@ mod tests {
         assert!(
             fixture
                 .store
-                .read_observed_file_facts_for_source_file(101)
-                .expect("read facts")
+                .read_source_file_observation(101)
+                .expect("read observations")
                 .is_none(),
             "batch scoped to source_file_id 100 must not hash row 101"
         );
     }
 
     #[test]
-    fn batch_missing_physical_file_returns_typed_failure_and_writes_no_source_facts() {
+    fn batch_missing_physical_file_returns_typed_failure_and_writes_no_source_observations() {
         let fixture = HashJobFixture::new();
         fixture.insert_source_file(100, "Album/missing.flac", 12, 1000);
 
@@ -1813,11 +1814,11 @@ mod tests {
                 failure: SourceFileBlake3HashFailure::PhysicalFileMissing { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
-    fn batch_unmounted_source_returns_typed_failure_without_writing_source_facts() {
+    fn batch_unmounted_source_returns_typed_failure_without_writing_source_observations() {
         let fixture = HashJobFixture::new();
         fixture.write_source_file(100, "Album/track.flac", b"unmounted bytes");
         fixture.set_source_state(
@@ -1839,7 +1840,7 @@ mod tests {
                 failure: SourceFileBlake3HashFailure::SourceRootUnavailable { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
@@ -1899,7 +1900,7 @@ mod tests {
         assert_eq!(candidates.len(), 1);
         assert_eq!(
             candidates[0].reason,
-            SourceFileBlake3HashCandidateReason::StaleFacts
+            SourceFileBlake3HashCandidateReason::StaleObservations
         );
 
         let result = fixture.run_hash_batch_for_source(10);
@@ -1915,7 +1916,7 @@ mod tests {
     fn current_sha256_evidence_is_candidate_for_blake3() {
         let fixture = HashJobFixture::new();
         fixture.write_source_file(100, "Album/sha.flac", b"hash me with blake3");
-        fixture.insert_source_fact(9000, 100, Some("sha256"), Some("fixture-sha"));
+        fixture.insert_source_observation(9000, 100, Some("sha256"), Some("fixture-sha"));
 
         let candidates = fixture.read_candidates_for_source(10);
         assert_eq!(candidates.len(), 1);
@@ -1927,10 +1928,10 @@ mod tests {
         let result = fixture.run_hash_batch_for_source(10);
 
         assert_eq!(result.hashed_count, 1);
-        let facts_hash = fixture.content_hash_value(100);
-        assert_ne!(facts_hash, "fixture-sha");
+        let observation_hash = fixture.content_hash_value(100);
+        assert_ne!(observation_hash, "fixture-sha");
         assert_eq!(
-            facts_hash,
+            observation_hash,
             blake3::hash(b"hash me with blake3").to_hex().to_string()
         );
     }
@@ -1956,15 +1957,15 @@ mod tests {
         assert!(
             fixture
                 .store
-                .read_observed_file_facts_for_source_file(100)
-                .expect("read z facts")
+                .read_source_file_observation(100)
+                .expect("read z observations")
                 .is_none(),
             "third deterministic candidate must remain unhashed under limit"
         );
     }
 
     #[test]
-    fn per_file_failure_continues_and_preserves_inventory_and_unrelated_facts() {
+    fn per_file_failure_continues_and_preserves_inventory_and_unrelated_observations() {
         let fixture = HashJobFixture::new();
         fixture.insert_source_file(100, "Album/missing.flac", 7, 1000);
         fixture.write_source_file(101, "Album/ok.flac", b"ok bytes");
@@ -1981,10 +1982,13 @@ mod tests {
         assert_eq!(fixture.count_rows("source_files"), 3);
         let current_after = fixture
             .store
-            .read_observed_file_facts_for_source_file(102)
-            .expect("read unrelated facts")
-            .expect("unrelated facts exist");
-        assert_eq!(current_after.status, StoreObservedFileFactStatus::Current);
+            .read_source_file_observation(102)
+            .expect("read unrelated observations")
+            .expect("unrelated observations exist");
+        assert_eq!(
+            current_after.status,
+            StoreSourceFileObservationStatus::Current
+        );
         assert_eq!(
             current_after.content_hash.expect("content hash").value,
             current_before
@@ -2016,14 +2020,14 @@ mod tests {
 
         assert_eq!(result.hashed_count, 1);
         let connection = fixture.store.open_read_connection().expect("open read");
-        let cue_facts = read_observed_file_facts_for_source_file(&connection, 101)
-            .expect("read cue facts")
-            .expect("cue facts exist");
-        assert_eq!(cue_facts.basis_relative_path, "Album/album.cue");
-        assert_eq!(cue_facts.media_kind, "cue_sheet");
+        let cue_observation = read_source_file_observation(&connection, 101)
+            .expect("read cue observations")
+            .expect("cue observations exist");
+        assert_eq!(cue_observation.basis_relative_path, "Album/album.cue");
+        assert_eq!(cue_observation.media_kind, "cue_sheet");
         assert!(
-            read_observed_file_facts_for_source_file(&connection, 100)
-                .expect("read audio facts")
+            read_source_file_observation(&connection, 100)
+                .expect("read audio observations")
                 .is_none()
         );
     }

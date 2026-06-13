@@ -3,7 +3,7 @@ import type {
   ContentsReadResult,
   ContentsResult,
   ContentsFileRow,
-  PrimaryMediaSummary
+  PlayableMedia
 } from '../../../shared/library/contents/read'
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
 import type { BrowserProjection } from '../tree/projection'
@@ -626,9 +626,9 @@ function projectFileContents(options: {
 function contentsRow(row: ContentsFileRow): ContentRow {
   const icon = contentsRowIcon(row)
   const detail =
-    row.primaryMedia === undefined
+    row.playableMedia === undefined
       ? sourceFileRowDetail(row)
-      : primaryMediaRowDetail(row.primaryMedia, row)
+      : playableMediaRowDetail(row.playableMedia, row)
   return {
     id: row.id,
     kind: 'file',
@@ -665,12 +665,12 @@ function sourceFileRowDetail(row: ContentsFileRow): string {
   return row.relativePath ?? sourceFileClassLabel(row.fileClass, row.fileKind)
 }
 
-function primaryMediaRowDetail(primaryMedia: PrimaryMediaSummary, row: ContentsFileRow): string {
-  const facts = [primaryMedia.mimeType, primaryMedia.codec]
+function playableMediaRowDetail(playableMedia: PlayableMedia, row: ContentsFileRow): string {
+  const observations = [playableMedia.mimeType, playableMedia.codec]
     .filter((value): value is string => value !== undefined && value.trim().length > 0)
     .join(' - ')
-  return facts.length > 0
-    ? facts
+  return observations.length > 0
+    ? observations
     : (row.relativePath ?? sourceFileClassLabel(row.fileClass, row.fileKind))
 }
 
@@ -839,8 +839,8 @@ function contentsCountSubject(result: ContentsResult, count: number): string {
       return count === 1 ? 'playable media item' : 'playable media items'
     case 'audioBrowse':
       return count === 1 ? 'audio track' : 'audio tracks'
-    case 'primaryMedia':
-      return count === 1 ? 'primary media item' : 'primary media items'
+    case 'playableMedia':
+      return count === 1 ? 'playable media item' : 'playable media items'
     case 'sourceFileInventory':
       return count === 1 ? 'requested file' : 'requested files'
   }
@@ -854,8 +854,8 @@ function policyEmptyLabel(policy: ContentsResult['policy']): string {
       return 'No audio items in this scope.'
     case 'sourceFileInventory':
       return sourceFileInventoryEmptyLabel(policy)
-    case 'primaryMedia':
-      return primaryMediaEmptyLabel(policy)
+    case 'playableMedia':
+      return playableMediaEmptyLabel(policy)
   }
 }
 
@@ -867,17 +867,17 @@ function trueEmptyLabel(policy: ContentsResult['policy']): string {
       return 'No audio items in this scope.'
     case 'sourceFileInventory':
       return sourceFileInventoryEmptyLabel(policy)
-    case 'primaryMedia':
-      return primaryMediaEmptyLabel(policy)
+    case 'playableMedia':
+      return playableMediaEmptyLabel(policy)
   }
 }
 
-function primaryMediaEmptyLabel(
-  policy: Extract<ContentsResult['policy'], { kind: 'primaryMedia' }>
+function playableMediaEmptyLabel(
+  policy: Extract<ContentsResult['policy'], { kind: 'playableMedia' }>
 ): string {
   return policy.mediaKinds.length === 1 && policy.mediaKinds[0] === 'video'
     ? 'No video items in this scope.'
-    : 'No primary media in this scope.'
+    : 'No playable media in this scope.'
 }
 
 function sourceFileInventoryEmptyLabel(

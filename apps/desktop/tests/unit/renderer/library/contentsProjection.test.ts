@@ -39,8 +39,8 @@ describe('projectContents', () => {
       'navigation-row:7',
       readyContents({
         rows: [
-          primaryMediaRow('asset-1', 'track.wav', 'audio'),
-          primaryMediaRow('asset-2', 'clip.mp4', 'video')
+          playableMediaRow('asset-1', 'track.wav', 'audio'),
+          playableMediaRow('asset-2', 'clip.mp4', 'video')
         ]
       })
     )
@@ -65,14 +65,14 @@ describe('projectContents', () => {
     ])
   })
 
-  it('projects primary-media rows with distinct stable IDs', () => {
+  it('projects playable-media rows with distinct stable IDs', () => {
     const contents = projectForSelection(
       browserState({}),
       'navigation-row:7',
       readyContents({
         rows: [
-          primaryMediaRow('primary-media:1', 'Promoted Track', 'audio'),
-          primaryMediaRow('source-file:2000', 'scanned.wav', 'audio')
+          playableMediaRow('playable-media:1', 'Promoted Track', 'audio'),
+          playableMediaRow('source-file:2000', 'scanned.wav', 'audio')
         ]
       })
     )
@@ -80,7 +80,7 @@ describe('projectContents', () => {
     expect(contents.kind).toBe('ready')
     expect(contents.rows).toHaveLength(2)
     const rowIds = contents.rows.map((row) => row.id)
-    expect(rowIds).toContain('primary-media:1')
+    expect(rowIds).toContain('playable-media:1')
     expect(rowIds).toContain('source-file:2000')
   })
 
@@ -94,7 +94,7 @@ describe('projectContents', () => {
     const contents = projectForSelection(
       state,
       'source-directory:12',
-      readyContents({ rows: [primaryMediaRow('asset-3', 'inside.wav', 'audio')] })
+      readyContents({ rows: [playableMediaRow('asset-3', 'inside.wav', 'audio')] })
     )
 
     expect(contents.kind).toBe('ready')
@@ -109,7 +109,7 @@ describe('projectContents', () => {
         children: loadedChildren([
           directoryNode('50', 'Covers', undefined, {
             hasChildDirectories: false,
-            directoryPrimaryMediaState: { kind: 'noPrimaryMediaDescendants' },
+            directoryPlayableMediaState: { kind: 'noPlayableMediaDescendants' },
             directoryImageMediaState: { kind: 'hasImageMediaDescendants' },
             directoryScanState: 'complete',
             navigableChildScopeState: 'noNavigableChildScopes'
@@ -136,7 +136,7 @@ describe('projectContents', () => {
     })
   })
 
-  it('projects cue sheet inventory rows as non-primary metadata files', () => {
+  it('projects cue sheet inventory rows as non-playable metadata files', () => {
     const contents = projectForSelection(
       browserState({}),
       'navigation-row:7',
@@ -196,19 +196,19 @@ describe('projectContents', () => {
       requestKey: 'source:7',
       nextCursor: 'c2Y6...',
       accumulatedRows: [
-        primaryMediaRow('asset-1', 'track.wav', 'audio'),
-        primaryMediaRow('asset-2', 'clip.mp4', 'audio')
+        playableMediaRow('asset-1', 'track.wav', 'audio'),
+        playableMediaRow('asset-2', 'clip.mp4', 'audio')
       ],
       result: {
         state: 'ready',
         result: {
           state: 'ready',
           scope: { kind: 'source', sourceId: '7' },
-          policy: { kind: 'primaryMedia', mediaKinds: ['audio', 'video'] },
+          policy: { kind: 'playableMedia', mediaKinds: ['audio', 'video'] },
           scopeDepth: 'recursive',
           rows: [
-            primaryMediaRow('asset-1', 'track.wav', 'audio'),
-            primaryMediaRow('asset-2', 'clip.mp4', 'audio')
+            playableMediaRow('asset-1', 'track.wav', 'audio'),
+            playableMediaRow('asset-2', 'clip.mp4', 'audio')
           ],
           scopeCoverage: {
             state: 'complete',
@@ -222,17 +222,17 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('ready')
-    expect(contents.detail).toBe('2 primary media items loaded. More available.')
+    expect(contents.detail).toBe('2 playable media items loaded. More available.')
     expect(contents.rows).toHaveLength(3)
     expect(contents.rows[2]).toMatchObject({
       kind: 'more',
-      label: 'More primary media items available',
+      label: 'More playable media items available',
       detail: 'Load more',
       icon: 'more',
       action: {
         kind: 'loadContentsPage',
         nodeId: 'navigation-row:7',
-        label: 'Load more primary media items',
+        label: 'Load more playable media items',
         cursor: 'c2Y6...'
       }
     })
@@ -273,7 +273,7 @@ describe('projectContents', () => {
 
     for (const profile of [
       { kind: 'audioBrowse' },
-      { kind: 'primaryMedia', mediaKinds: ['video'] },
+      { kind: 'playableMedia', mediaKinds: ['video'] },
       { kind: 'sourceFileInventory', fileClasses: ['unsupported'] },
       {
         kind: 'sourceFileInventory',
@@ -312,18 +312,18 @@ describe('projectContents', () => {
       requestKey: 'source:7',
       nextCursor: 'c2Y6...',
       accumulatedRows: [
-        primaryMediaRow('a', 'first.wav', 'audio'),
-        primaryMediaRow('b', 'second.wav', 'audio'),
-        primaryMediaRow('c', 'third.wav', 'audio')
+        playableMediaRow('a', 'first.wav', 'audio'),
+        playableMediaRow('b', 'second.wav', 'audio'),
+        playableMediaRow('c', 'third.wav', 'audio')
       ],
       result: {
         state: 'ready',
         result: {
           state: 'ready',
           scope: { kind: 'source', sourceId: '7' },
-          policy: { kind: 'primaryMedia', mediaKinds: ['audio', 'video'] },
+          policy: { kind: 'playableMedia', mediaKinds: ['audio', 'video'] },
           scopeDepth: 'recursive',
-          rows: [primaryMediaRow('c', 'third.wav', 'audio')],
+          rows: [playableMediaRow('c', 'third.wav', 'audio')],
           scopeCoverage: {
             state: 'complete',
             subtreeCoverageComplete: true,
@@ -336,7 +336,7 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('ready')
-    expect(contents.detail).toBe('3 primary media items loaded. More available.')
+    expect(contents.detail).toBe('3 playable media items loaded. More available.')
     expect(contents.rows).toHaveLength(4)
   })
 
@@ -346,9 +346,9 @@ describe('projectContents', () => {
       'navigation-row:7',
       readyContents({
         rows: [
-          primaryMediaRow('a', 'first.wav', 'audio'),
-          primaryMediaRow('b', 'second.wav', 'audio'),
-          primaryMediaRow('c', 'third.wav', 'audio')
+          playableMediaRow('a', 'first.wav', 'audio'),
+          playableMediaRow('b', 'second.wav', 'audio'),
+          playableMediaRow('c', 'third.wav', 'audio')
         ]
       })
     )
@@ -843,7 +843,7 @@ describe('projectContents', () => {
       readyContents({
         rows: [],
         state: 'empty',
-        profile: { kind: 'primaryMedia', mediaKinds: ['video'] },
+        profile: { kind: 'playableMedia', mediaKinds: ['video'] },
         emptyAuthoritative: false,
         omittedRows: true
       })
@@ -1127,10 +1127,10 @@ function directoryNode(
   parentDirectoryId?: string,
   options: {
     readonly hasChildDirectories?: boolean
-    readonly directoryPrimaryMediaState?: Extract<
+    readonly directoryPlayableMediaState?: Extract<
       ChildRow,
       { readonly kind: 'directory' }
-    >['directoryPrimaryMediaState']
+    >['directoryPlayableMediaState']
     readonly directoryImageMediaState?: Extract<
       ChildRow,
       { readonly kind: 'directory' }
@@ -1151,8 +1151,8 @@ function directoryNode(
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
     hasChildDirectories: options.hasChildDirectories ?? true,
-    directoryPrimaryMediaState: options.directoryPrimaryMediaState ?? {
-      kind: 'hasPrimaryMediaDescendants'
+    directoryPlayableMediaState: options.directoryPlayableMediaState ?? {
+      kind: 'hasPlayableMediaDescendants'
     },
     directoryImageMediaState: options.directoryImageMediaState ?? {
       kind: 'noImageMediaDescendants'
@@ -1265,7 +1265,7 @@ function contentsResult(options: {
   }
 }
 
-function primaryMediaRow(
+function playableMediaRow(
   stableId: string,
   label: string,
   fileClass: Exclude<ContentsFileRow['fileClass'], 'image' | 'unsupported'>
@@ -1280,8 +1280,8 @@ function primaryMediaRow(
     fileClass,
     fileKind: fileClass,
     presence: 'present',
-    primaryMedia: {
-      primaryMediaFactId: stableId,
+    playableMedia: {
+      playableMediaId: stableId,
       evidenceSourceFileId: `file-${stableId}`,
       mediaKind: fileClass,
       mimeType: fileClass === 'audio' ? 'audio/wav' : 'video/mp4'

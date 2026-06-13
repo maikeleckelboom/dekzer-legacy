@@ -449,7 +449,7 @@ Domain model owns:
 - whether an operation is legal;
 - final commit semantics.
 
-The DOM owns none of these facts. It realizes them.
+The DOM owns none of these observations. It realizes them.
 
 ## Rejection Cases
 
@@ -612,7 +612,7 @@ Stop and report instead of continuing if:
 - implementation needs two competing tree-row components;
 - tests require weakening keyboard navigation;
 - focus movement starts changing selected browse scope implicitly;
-- visual status indicators start deciding substrate facts.
+- visual status indicators start deciding substrate observations.
 
 ## Final Product Statement
 

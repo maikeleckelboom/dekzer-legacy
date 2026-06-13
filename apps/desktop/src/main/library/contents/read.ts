@@ -4,7 +4,7 @@ import type {
   ContentsReadRequest as ContractContentsReadRequest,
   ContentsResult as ContractContentsResult,
   ContentsScope as ContractContentsScope,
-  PrimaryMediaSummary as ContractPrimaryMediaSummary
+  PlayableMedia as ContractPlayableMedia
 } from '@dekzer/library-boundary-contract'
 
 import { LibraryBoundaryHostError } from '../boundary/errors'
@@ -20,8 +20,8 @@ import {
   type ContentsScopeDepth,
   type ContentsResult,
   type ContentsScope,
-  type PrimaryMediaKind,
-  type PrimaryMediaSummary
+  type PlayableMediaKind,
+  type PlayableMedia
 } from '../../../shared/library/contents/read'
 
 const defaultContentsLimit = 100
@@ -33,7 +33,7 @@ const canonicalFileClassOrder: readonly ContentsFileClass[] = [
   'image',
   'unsupported'
 ]
-const canonicalPrimaryMediaKindOrder: readonly PrimaryMediaKind[] = ['audio', 'video']
+const canonicalPlayableMediaKindOrder: readonly PlayableMediaKind[] = ['audio', 'video']
 
 export async function readContentsThroughHost(
   host: LibraryBoundaryHost,
@@ -207,9 +207,9 @@ function normalizePolicy(value: unknown): ContentsReadPolicy | ContentsReadResul
       : { kind: 'sourceFileInventory', fileClasses }
   }
 
-  if (value.kind === 'primaryMedia') {
-    const mediaKinds = normalizePrimaryMediaKinds(value.mediaKinds)
-    return isContentsReadResult(mediaKinds) ? mediaKinds : { kind: 'primaryMedia', mediaKinds }
+  if (value.kind === 'playableMedia') {
+    const mediaKinds = normalizePlayableMediaKinds(value.mediaKinds)
+    return isContentsReadResult(mediaKinds) ? mediaKinds : { kind: 'playableMedia', mediaKinds }
   }
 
   return createContentsErrorResult(
@@ -250,18 +250,18 @@ function normalizeFileClasses(value: unknown): readonly ContentsFileClass[] | Co
   return canonicalFileClassOrder.filter((fileClass) => fileClasses.has(fileClass))
 }
 
-function normalizePrimaryMediaKinds(
+function normalizePlayableMediaKinds(
   value: unknown
-): readonly PrimaryMediaKind[] | ContentsReadResult {
+): readonly PlayableMediaKind[] | ContentsReadResult {
   if (!Array.isArray(value) || value.length === 0) {
     return createContentsErrorResult(
       'invalidRequest',
       'invalidRequest',
-      'Contents primaryMedia mediaKinds must be a non-empty array.'
+      'Contents playableMedia mediaKinds must be a non-empty array.'
     )
   }
 
-  const mediaKinds = new Set<PrimaryMediaKind>()
+  const mediaKinds = new Set<PlayableMediaKind>()
   for (const mediaKind of value) {
     if (mediaKind !== 'audio' && mediaKind !== 'video') {
       return createContentsErrorResult(
@@ -272,7 +272,7 @@ function normalizePrimaryMediaKinds(
     }
     mediaKinds.add(mediaKind)
   }
-  return canonicalPrimaryMediaKindOrder.filter((mediaKind) => mediaKinds.has(mediaKind))
+  return canonicalPlayableMediaKindOrder.filter((mediaKind) => mediaKinds.has(mediaKind))
 }
 
 function normalizeScopeDepth(value: unknown): ContentsScopeDepth | ContentsReadResult {
@@ -378,7 +378,7 @@ function mapPolicyToContract(policy: ContentsReadPolicy): ContractContentsReadPo
         kind: policy.kind,
         fileClasses: [...policy.fileClasses]
       }
-    case 'primaryMedia':
+    case 'playableMedia':
       return {
         kind: policy.kind,
         mediaKinds: [...policy.mediaKinds]
@@ -396,7 +396,7 @@ function mapPolicyFromContract(policy: ContractContentsReadPolicy): ContentsRead
         kind: policy.kind,
         fileClasses: policy.fileClasses
       }
-    case 'primaryMedia':
+    case 'playableMedia':
       return {
         kind: policy.kind,
         mediaKinds: policy.mediaKinds
@@ -485,7 +485,7 @@ function mapCoverage(result: ContractContentsResult): ContentsScopeCoverage {
 
 function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefined {
   if (
-    row.primaryMedia !== undefined &&
+    row.playableMedia !== undefined &&
     (row.fileClass === 'image' || row.fileClass === 'unsupported')
   ) {
     return undefined
@@ -502,31 +502,31 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
     fileClass: row.fileClass,
     fileKind: row.fileKind,
     presence: row.presence,
-    ...(row.primaryMedia === undefined ? {} : { primaryMedia: mapPrimaryMedia(row.primaryMedia) }),
+    ...(row.playableMedia === undefined
+      ? {}
+      : { playableMedia: mapPlayableMedia(row.playableMedia) }),
     ...(row.updatedAtMs === undefined ? {} : { updatedAtMs: row.updatedAtMs })
   }
 }
 
-function mapPrimaryMedia(summary: ContractPrimaryMediaSummary): PrimaryMediaSummary {
+function mapPlayableMedia(media: ContractPlayableMedia): PlayableMedia {
   return {
-    ...(summary.primaryMediaFactId === null
+    ...(media.playableMediaId === null ? {} : { playableMediaId: media.playableMediaId }),
+    ...(media.attachmentId === null ? {} : { attachmentId: media.attachmentId }),
+    ...(media.contentHashAlgorithm === null
       ? {}
-      : { primaryMediaFactId: summary.primaryMediaFactId }),
-    ...(summary.attachmentId === null ? {} : { attachmentId: summary.attachmentId }),
-    ...(summary.contentHashAlgorithm === null
+      : { contentHashAlgorithm: media.contentHashAlgorithm }),
+    ...(media.contentHashValue === null ? {} : { contentHashValue: media.contentHashValue }),
+    ...(media.evidenceSourceFileId === null
       ? {}
-      : { contentHashAlgorithm: summary.contentHashAlgorithm }),
-    ...(summary.contentHashValue === null ? {} : { contentHashValue: summary.contentHashValue }),
-    ...(summary.evidenceSourceFileId === null
-      ? {}
-      : { evidenceSourceFileId: summary.evidenceSourceFileId }),
-    ...(summary.mediaKind === null ? {} : { mediaKind: summary.mediaKind }),
-    ...(summary.mimeType === null ? {} : { mimeType: summary.mimeType }),
-    ...(summary.durationMs === null ? {} : { durationMs: summary.durationMs }),
-    ...(summary.sampleRateHz === null ? {} : { sampleRateHz: summary.sampleRateHz }),
-    ...(summary.channels === null ? {} : { channels: summary.channels }),
-    ...(summary.bitDepth === null ? {} : { bitDepth: summary.bitDepth }),
-    ...(summary.codec === null ? {} : { codec: summary.codec })
+      : { evidenceSourceFileId: media.evidenceSourceFileId }),
+    ...(media.mediaKind === null ? {} : { mediaKind: media.mediaKind }),
+    ...(media.mimeType === null ? {} : { mimeType: media.mimeType }),
+    ...(media.durationMs === null ? {} : { durationMs: media.durationMs }),
+    ...(media.sampleRateHz === null ? {} : { sampleRateHz: media.sampleRateHz }),
+    ...(media.channels === null ? {} : { channels: media.channels }),
+    ...(media.bitDepth === null ? {} : { bitDepth: media.bitDepth }),
+    ...(media.codec === null ? {} : { codec: media.codec })
   }
 }
 

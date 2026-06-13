@@ -71,7 +71,7 @@ For Dekzer, this must become:
 - grid origin anchor sample, not ambiguous grid0 wording
 - samples-per-beat as rational or fixed-point, not rounded integer period
 - optional bar/downbeat anchor, separate from grid origin
-- optional downbeat confidence, not an implied fact
+- optional downbeat confidence, not an implied observation
 - provenance for analyzer version, decoded audio basis, imported/manual/edit source, and reanalysis policy
 - representation kind: rigid, segmented, flexible, unresolved
 - future support for explicit beat sample positions when fixed period is not enough
@@ -97,7 +97,7 @@ Diagnostics should be durable enough for review and QA, but not required on the 
 
 The diagnostics model is worth preserving as a design pattern. It captures:
 
-- audio facts
+- audio observations
 - input identity and optional content hash
 - config and config hash
 - tempo scan candidates

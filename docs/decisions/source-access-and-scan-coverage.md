@@ -15,7 +15,7 @@ Access failure never becomes empty contents.
 Empty means a selected scope was accessible, readable, scanned, and contained no rows relevant to the active projection.
 Missing, unavailable, blocked, failed, partial, pending, and unknown are separate product states.
 
-Dekzer starts source-rooted discovery with an access contract, not a raw path. The scanner commits observed facts and
+Dekzer starts source-rooted discovery with an access contract, not a raw path. The scanner commits source-file observations and
 enumeration outcomes. It must not infer empty, missing, blocked, or complete state from the absence of observed rows
 alone.
 
@@ -233,12 +233,12 @@ readable and scanned, no rows   -> empty with complete coverage
 `empty` is valid only when coverage proves that the selected scope was accessible and fully scanned for the active
 projection.
 
-Directory relevance facts must use precise names. Do not use a single broad media-descendant flag. Current and near-term
-directory facts include:
+Directory relevance observations must use precise names. Do not use a single broad media-descendant flag. Current and near-term
+directory observations include:
 
 ```text
 has_child_directories
-has_primary_media_descendant
+has_playable_media_descendant
 has_image_media_descendant
 future role/readiness-derived rollups
 ```

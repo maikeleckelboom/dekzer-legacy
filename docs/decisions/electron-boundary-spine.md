@@ -300,7 +300,7 @@ or when the subscription is no longer needed.
 - cleanup lifecycle for renderer subscriptions
 - `decodeCommandResponse` and `decodePublicationEvent` hooks at renderer ingress
 
-**Does not own:** `ReadAfter` or `WaitForEventsAfter` scheduling, source facts, contents
+**Does not own:** `ReadAfter` or `WaitForEventsAfter` scheduling, source observations, contents
 filtering, scan meaning, authority decisions.
 
 The renderer boundary client actively subscribes through preload APIs and owns calling
@@ -601,7 +601,7 @@ typed, testable, and owned.
 Dekzer's Electron boundary spine exists to prevent local-first desktop complexity from
 becoming hidden renderer authority.
 
-The spine must make these facts structurally true:
+The spine must make these observations structurally true:
 
 - commands are commands
 - publications are publications

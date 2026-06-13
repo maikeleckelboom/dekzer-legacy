@@ -53,12 +53,12 @@ pub struct RunSourceMaintenanceReply {
     pub hash: SourceMaintenanceHashSummary,
     pub attachment_materialization: SourceMaintenanceAttachmentMaterializationSummary,
     pub probe: SourceMaintenanceProbeSummary,
-    pub primary_media_promotion: SourceMaintenancePrimaryMediaPromotionSummary,
+    pub playable_media_promotion: SourceMaintenancePlayableMediaPromotionSummary,
     pub track_identity_candidates: SourceMaintenanceTrackIdentityCandidateSummary,
     pub track_identity_decisions: SourceMaintenanceTrackIdentityDecisionSummary,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
-    pub remaining_primary_media_promotion_candidates: usize,
+    pub remaining_playable_media_promotion_candidates: usize,
     pub remaining_track_identity_candidate_production_candidates: usize,
     pub remaining_track_identity_decision_production_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -101,7 +101,7 @@ pub struct ReadSourceMaintenanceReply {
     pub status: SourceMaintenanceSnapshotStatus,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
-    pub remaining_primary_media_promotion_candidates: usize,
+    pub remaining_playable_media_promotion_candidates: usize,
     pub remaining_track_identity_candidate_production_candidates: usize,
     pub remaining_track_identity_decision_production_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -178,9 +178,9 @@ pub struct SourceMaintenanceAttachmentMaterializationSummary {
     pub links_created: usize,
     pub links_replaced: usize,
     pub links_refreshed: usize,
-    pub skipped_stale_facts: usize,
+    pub skipped_stale_observations: usize,
     pub skipped_no_blake3: usize,
-    pub skipped_no_facts: usize,
+    pub skipped_no_observations: usize,
     pub remaining_candidates: usize,
 }
 
@@ -218,16 +218,16 @@ pub struct SourceMaintenanceProbeSummary {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct SourceMaintenancePrimaryMediaPromotionSummary {
+pub struct SourceMaintenancePlayableMediaPromotionSummary {
     pub effective_limit: usize,
     pub promoted_count: usize,
     pub refreshed_count: usize,
     pub skipped_unusable_source: usize,
     pub skipped_unsupported_media_kind: usize,
-    pub skipped_no_facts: usize,
-    pub skipped_stale_facts: usize,
+    pub skipped_no_observations: usize,
+    pub skipped_stale_observations: usize,
     pub skipped_no_blake3: usize,
-    pub skipped_no_probe_facts: usize,
+    pub skipped_no_probe_observations: usize,
     pub skipped_missing_attachment_link: usize,
     pub skipped_stale_attachment_link: usize,
     pub remaining_candidates: usize,
@@ -255,7 +255,7 @@ pub struct SourceMaintenanceTrackIdentityCandidateSummary {
     pub evidence_created: usize,
     pub evidence_refreshed: usize,
     pub candidates_marked_stale: usize,
-    pub skipped_stale_primary_media_facts: usize,
+    pub skipped_stale_playable_media: usize,
     pub remaining_candidates: usize,
 }
 
@@ -298,10 +298,10 @@ pub struct SourceMaintenanceTrackIdentityDecisionSummary {
 pub struct SourceMaintenanceAttachmentLinkSummary {
     pub current_links_count: usize,
     pub stale_links_count: usize,
-    pub source_files_with_current_blake3_facts_count: usize,
+    pub source_files_with_current_blake3_observations_count: usize,
     pub source_files_with_attachment_links_count: usize,
     pub source_files_missing_attachment_links_count: usize,
-    pub unmaterialized_blake3_facts_count: usize,
+    pub unmaterialized_blake3_observations_count: usize,
 }
 
 #[derive(
@@ -314,12 +314,12 @@ pub struct SourceMaintenanceLastRunSummary {
     pub hash: SourceMaintenanceHashSummary,
     pub attachment_materialization: SourceMaintenanceAttachmentMaterializationSummary,
     pub probe: SourceMaintenanceProbeSummary,
-    pub primary_media_promotion: SourceMaintenancePrimaryMediaPromotionSummary,
+    pub playable_media_promotion: SourceMaintenancePlayableMediaPromotionSummary,
     pub track_identity_candidates: SourceMaintenanceTrackIdentityCandidateSummary,
     pub track_identity_decisions: SourceMaintenanceTrackIdentityDecisionSummary,
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
-    pub remaining_primary_media_promotion_candidates: usize,
+    pub remaining_playable_media_promotion_candidates: usize,
     pub remaining_track_identity_candidate_production_candidates: usize,
     pub remaining_track_identity_decision_production_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]

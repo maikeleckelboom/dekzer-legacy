@@ -237,7 +237,7 @@ Permission failures during scan must not abort the source scan. They must not ca
 
 **Required behavior on permission failure:**
 
-- Record a `blockedSubtree` or `blockedFile` fact per affected path with a reason code.
+- Record a `blockedSubtree` or `blockedFile` observation per affected path with a reason code.
 - Continue scanning siblings and other branches.
 - Source scan final state becomes `partial` (not `completed`) if blocked subtrees exist.
 - Blocked state is retryable via explicit rescan.

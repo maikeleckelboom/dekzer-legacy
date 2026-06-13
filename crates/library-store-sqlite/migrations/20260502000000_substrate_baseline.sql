@@ -297,8 +297,8 @@ CREATE TABLE source_directories
         CHECK (presence_state IN ('present', 'missing', 'removed')),
     has_child_directories       INTEGER NOT NULL DEFAULT 0
         CHECK (has_child_directories IN (0, 1)),
-    has_primary_media_descendant INTEGER NOT NULL DEFAULT 0
-        CHECK (has_primary_media_descendant IN (0, 1)),
+    has_playable_media_descendant INTEGER NOT NULL DEFAULT 0
+        CHECK (has_playable_media_descendant IN (0, 1)),
     has_image_media_descendant  INTEGER NOT NULL DEFAULT 0
         CHECK (has_image_media_descendant IN (0, 1)),
     dir_scan_state              TEXT    NOT NULL DEFAULT 'pending'
@@ -459,8 +459,6 @@ CREATE TABLE work_artifacts
             'inspection_result',
             'projection_snapshot'
         )),
-    artifact_role       TEXT    NOT NULL
-        CHECK (artifact_role = 'primary_result'),
     adapter_key         TEXT    NOT NULL CHECK (length(trim(adapter_key)) > 0),
     adapter_version     TEXT    NOT NULL CHECK (length(trim(adapter_version)) > 0),
     basis_fingerprint   TEXT    NOT NULL CHECK (length(trim(basis_fingerprint)) > 0),
@@ -486,8 +484,8 @@ CREATE INDEX work_artifacts_work_run
 CREATE INDEX work_artifacts_subject_created_at
     ON work_artifacts (subject_kind, subject_id, created_at DESC);
 
-CREATE INDEX work_artifacts_kind_role_lookup
-    ON work_artifacts (subject_kind, subject_id, artifact_kind, artifact_role);
+CREATE INDEX work_artifacts_kind_lookup
+    ON work_artifacts (subject_kind, subject_id, artifact_kind);
 
 CREATE TABLE work_artifact_inline_payloads
 (
@@ -521,7 +519,7 @@ CREATE UNIQUE INDEX work_artifact_claims_active_claim
     ON work_artifact_claims (artifact_id, claimant_kind, claimant_key)
     WHERE released_at IS NULL;
 
-CREATE TABLE source_file_facts
+CREATE TABLE source_file_observations
 (
     source_file_id        INTEGER PRIMARY KEY REFERENCES source_files (source_file_id) ON DELETE CASCADE,
     basis_fingerprint     TEXT    NOT NULL CHECK (length(trim(basis_fingerprint)) > 0),
@@ -549,11 +547,11 @@ CREATE TABLE source_file_facts
     CHECK (updated_at >= observed_at_ms)
 ) STRICT;
 
-CREATE INDEX source_file_facts_source_basis
-    ON source_file_facts (basis_source_id, basis_relative_path);
+CREATE INDEX source_file_observations_source_basis
+    ON source_file_observations (basis_source_id, basis_relative_path);
 
-CREATE INDEX source_file_facts_media_kind
-    ON source_file_facts (media_kind);
+CREATE INDEX source_file_observations_media_kind
+    ON source_file_observations (media_kind);
 
 CREATE TABLE content_attachments
 (
@@ -707,9 +705,9 @@ CREATE VIRTUAL TABLE search_filter_index_fts USING fts5(
     tokenize = 'unicode61 remove_diacritics 1'
 );
 
-CREATE TABLE primary_media_facts
+CREATE TABLE playable_media
 (
-    primary_media_fact_id  INTEGER PRIMARY KEY,
+    playable_media_id  INTEGER PRIMARY KEY,
     attachment_id               INTEGER NOT NULL UNIQUE REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
     evidence_source_file_id     INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
     evidence_basis_fingerprint  TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
@@ -725,14 +723,14 @@ CREATE TABLE primary_media_facts
     CHECK (updated_at >= created_at)
 ) STRICT;
 
-CREATE INDEX primary_media_facts_evidence_source_file
-    ON primary_media_facts (evidence_source_file_id);
+CREATE INDEX playable_media_evidence_source_file
+    ON playable_media (evidence_source_file_id);
 
 CREATE TABLE track_identity_candidates
 (
     track_identity_candidate_id  INTEGER PRIMARY KEY,
-    candidate_kind               TEXT    NOT NULL CHECK (candidate_kind = 'exact_primary_media_content'),
-    evidence_basis               TEXT    NOT NULL CHECK (evidence_basis = 'current_primary_media_exact_blake3'),
+    candidate_kind               TEXT    NOT NULL CHECK (candidate_kind = 'exact_playable_media_content'),
+    evidence_basis               TEXT    NOT NULL CHECK (evidence_basis = 'current_playable_media_exact_blake3'),
     evidence_key_algorithm       TEXT    NOT NULL CHECK (evidence_key_algorithm = 'blake3'),
     evidence_key_value           TEXT    NOT NULL CHECK (length(trim(evidence_key_value)) > 0),
     status                       TEXT    NOT NULL CHECK (status IN ('active', 'stale', 'superseded')),
@@ -749,7 +747,7 @@ CREATE TABLE track_identity_candidate_members
 (
     track_identity_candidate_member_id  INTEGER PRIMARY KEY,
     track_identity_candidate_id         INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
-    primary_media_fact_id          INTEGER NOT NULL REFERENCES primary_media_facts (primary_media_fact_id) ON DELETE CASCADE,
+    playable_media_id          INTEGER NOT NULL REFERENCES playable_media (playable_media_id) ON DELETE CASCADE,
     attachment_id                       INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
     evidence_source_file_id             INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
     evidence_basis_fingerprint          TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
@@ -758,7 +756,7 @@ CREATE TABLE track_identity_candidate_members
     created_at                          INTEGER NOT NULL,
     updated_at                          INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
-    UNIQUE (primary_media_fact_id)
+    UNIQUE (playable_media_id)
 ) STRICT;
 
 CREATE INDEX track_identity_candidate_members_candidate
@@ -771,7 +769,7 @@ CREATE TABLE track_identity_candidate_evidence
 (
     track_identity_candidate_evidence_id  INTEGER PRIMARY KEY,
     track_identity_candidate_id           INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
-    primary_media_fact_id            INTEGER NOT NULL REFERENCES primary_media_facts (primary_media_fact_id) ON DELETE CASCADE,
+    playable_media_id            INTEGER NOT NULL REFERENCES playable_media (playable_media_id) ON DELETE CASCADE,
     attachment_id                         INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
     source_file_attachment_link_id        INTEGER NOT NULL,
     source_file_id                        INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
@@ -783,7 +781,7 @@ CREATE TABLE track_identity_candidate_evidence
     created_at                            INTEGER NOT NULL,
     updated_at                            INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
-    UNIQUE (track_identity_candidate_id, primary_media_fact_id, source_file_id)
+    UNIQUE (track_identity_candidate_id, playable_media_id, source_file_id)
 ) STRICT;
 
 CREATE INDEX track_identity_candidate_evidence_candidate
@@ -800,8 +798,8 @@ CREATE TABLE track_identity_decisions
     decision_source              TEXT    NOT NULL CHECK (length(trim(decision_source)) > 0),
     decision_basis               TEXT    NOT NULL CHECK (length(trim(decision_basis)) > 0),
     decision_reason              TEXT    NOT NULL CHECK (length(trim(decision_reason)) > 0),
-    candidate_kind               TEXT    NOT NULL CHECK (candidate_kind = 'exact_primary_media_content'),
-    candidate_evidence_basis     TEXT    NOT NULL CHECK (candidate_evidence_basis = 'current_primary_media_exact_blake3'),
+    candidate_kind               TEXT    NOT NULL CHECK (candidate_kind = 'exact_playable_media_content'),
+    candidate_evidence_basis     TEXT    NOT NULL CHECK (candidate_evidence_basis = 'current_playable_media_exact_blake3'),
     candidate_status_at_decision TEXT    NOT NULL CHECK (candidate_status_at_decision IN ('active', 'stale', 'superseded')),
     evidence_key_algorithm       TEXT    NOT NULL CHECK (evidence_key_algorithm = 'blake3'),
     evidence_key_value           TEXT    NOT NULL CHECK (length(trim(evidence_key_value)) > 0),
@@ -851,7 +849,7 @@ CREATE TABLE track_identity_decision_evidence
     track_identity_candidate_id          INTEGER NOT NULL,
     track_identity_candidate_member_id   INTEGER NOT NULL,
     track_identity_candidate_evidence_id INTEGER NOT NULL,
-    primary_media_fact_id           INTEGER NOT NULL,
+    playable_media_id           INTEGER NOT NULL,
     attachment_id                        INTEGER NOT NULL,
     source_file_attachment_link_id       INTEGER NOT NULL,
     source_file_id                       INTEGER NOT NULL,

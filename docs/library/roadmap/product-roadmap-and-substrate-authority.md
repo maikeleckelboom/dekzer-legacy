@@ -49,7 +49,7 @@ The next sequence is documentation and contract authority first, then bounded im
 4. Local browse renderer projection and UI only after entry point reads, item reads, and admission contracts stay
    distinct from admitted source rows.
 5. Workspace topology stays later because the related design work is not ready yet.
-6. Analysis and waveform contracts stay later over current attachment, primary-media, candidate, and decision
+6. Analysis and waveform contracts stay later over current attachment, playable-media, candidate, and decision
    authority.
 7. Implementation slices only after the relevant authority contract exists.
 
@@ -65,17 +65,17 @@ This slice adds the local browse item read boundary, `readLocalBrowseItems`, as 
 reads immediate child items for a validated entry point root or local descendant parent path, marks exact admitted-source
 duplicates as status, and does not register sources, create source substrate rows, or start scans. Renderer projection
 and visible local browse UI follow after this slice. Workspace topology remains later. Waveform and analysis remain
-later over current attachment, primary-media, candidate, and decision authority.
+later over current attachment, playable-media, candidate, and decision authority.
 
 A-5 attachment occurrence remains the accepted evidence-only substrate feeding A-6. It does not decide duplicate song,
 safe deletion, preferred copy, accepted relocation, canonical track, cleanup, or track merge.
 
-Media probe observations, source integrity / collection health v0, primary-media promotion, exact-content track identity
+Media probe observations, source integrity / collection health v0, playable-media promotion, exact-content track identity
 candidates, candidate decisions, explicit user decision commands, and the review-candidates read model are already
 implemented. Their accepted contracts are narrower than the later canonical media-candidate, canonical-track,
 preparation, analysis, waveform, playlist/crate, workspace, and performance roadmap layers and do not satisfy those
 future gates by themselves.
-Current primary-media promotion and exact-content track-identity candidate/decision production are source-scoped bounded
+Current playable-media promotion and exact-content track-identity candidate/decision production are source-scoped bounded
 maintenance units. Candidate reads and remaining counts are SQL-level bounded reads/counts, not full source-wide
 candidate vectors truncated in Rust.
 
@@ -88,14 +88,14 @@ The following layers are canonical.
 1. **Source lifecycle** — The app knows whether a source is known, mounted, accessible, scanning, failed, or blocked.
 2. **Media-relevant file inventory** — The app knows which source files exist and which are media-relevant by current
    policy.
-3. **Observed file facts** — The app can store basis-bound evidence about a source file. Staleness is tracked.
+3. **Observed file observations** — The app can store basis-bound evidence about a source file. Staleness is tracked.
 4. **BLAKE3 evidence** — The app can compute content evidence through backend-owned path resolution, bounded and
    scan-triggered in one maintenance unit; scheduler/drain behavior remains future work.
 5. **Attachment identity v0** — The app can say: these source-file rows have the same bytes and map to the same durable
    content attachment.
-6. **Media probe observations v0** — The app records accepted basis-bound audio probe summary facts through backend
+6. **Media probe observations v0** — The app records accepted basis-bound audio probe summary observations through backend
    inspection work.
-7. **Primary-media promotion v0** — The app promotes current audio evidence into backend-owned primary-media facts.
+7. **Playable-media promotion v0** — The app promotes current audio evidence into backend-owned playable-media observations.
 8. **Exact-content track identity candidate and decision v0** — The app groups exact current evidence, records
    backend/user candidate decisions, resolves effective decision precedence, and exposes review candidates without
    claiming canonical track identity.
@@ -109,7 +109,7 @@ no track columns. `first_observed_at` is frozen at first insert.
 
 `source_file_attachment_links` — links source files to attachments. `UNIQUE(source_file_id)` enforces one current
 materialized attachment per source file. `source_id` is copied source scope and is schema-guarded to match the linked
-`source_files.source_id`. Staleness computed by join against current `source_file_facts`, not stored as a flag.
+`source_files.source_id`. Staleness computed by join against current `source_file_observations`, not stored as a flag.
 
 Materialization: `materialize_attachments_for_source(source_id, limit)` — store authority, called by bounded
 service-owned scan/manual hash maintenance. Candidate admission applies source-scoped SQL ordering and limits before
@@ -120,17 +120,17 @@ read-only identity reads. They do not hash, materialize, populate product conten
 snapshot invalidation scope.
 
 Outcome fields: `attachments_created`, `attachments_refreshed`, `links_created`, `links_replaced`, `links_refreshed`,
-`skipped_stale_facts`, `skipped_no_blake3`, `skipped_no_facts`; remaining counts report bounded maintenance backlog
+`skipped_stale_observations`, `skipped_no_blake3`, `skipped_no_observations`; remaining counts report bounded maintenance backlog
 without requiring full source-wide candidate materialization in Rust.
 
 ### Deleted Non-Current Surfaces
 
 The current baseline is greenfield. Removed asset, browser, preparation, capability, playlist, and segment surfaces are
 not current, not aliases, not fallback views, and not implementation targets. Future media, track, preparation,
-analysis, playlist, waveform, workspace, or performance work must build on the current source-file, `source_file_facts`,
-attachment, primary-media, track-candidate, and track-decision substrate instead of reviving deleted tables.
+analysis, playlist, waveform, workspace, or performance work must build on the current source-file, `source_file_observations`,
+attachment, playable-media, track-candidate, and track-decision substrate instead of reviving deleted tables.
 
-`primaryMedia` is current as a narrow read policy over `primary_media_facts`; it remains non-default product
+`playableMedia` is current as a narrow read policy over `playable_media`; it remains non-default product
 doctrine until workflow-filter ownership explicitly chooses it. It is not track identity and not a fallback source-file
 browser.
 
@@ -155,7 +155,7 @@ Sources, source lifecycle, source locations, source directories, source files, s
 
 > "Where is the user's music, can we access it, what did we observe there?"
 
-### Layer 2 — Observed Facts
+### Layer 2 — Observed Observations
 
 _Evidence about a source file._
 
@@ -232,12 +232,12 @@ lands. Do not re-open without a written rationale and architectural review.
 Acoustic fingerprinting does not use `content_attachments`. It runs on known audio media candidates, not raw
 attachments. It produces its own evidence table consumed by track identity.
 
-### Staleness is computed, not stored — for observed-fact and attachment-link validity
+### Staleness is computed, not stored — for observed-observation and attachment-link validity
 
-No `is_current` or `is_stale` boolean column on observed-fact or attachment-link tables. Link status is computed by
-joining to the current `source_file_facts` row and comparing `source_file_facts.content_hash_value` to the linked
+No `is_current` or `is_stale` boolean column on observed-observation or attachment-link tables. Link status is computed by
+joining to the current `source_file_observations` row and comparing `source_file_observations.content_hash_value` to the linked
 `content_attachments.content_hash_value`. `source_file_attachment_links` does not store a duplicate hash copy. If
-current `source_file_facts` for a source file has a different hash or no current BLAKE3 fact, the link is stale.
+current `source_file_observations` for a source file has a different hash or no current BLAKE3 observation, the link is stale.
 
 This law applies to evidence and link validity. It does not prohibit stored lifecycle state fields for entities where
 state is an authority, not a cache — for example, user decision state, job status, or scan lifecycle.
@@ -252,10 +252,10 @@ When a source file's BLAKE3 hash changes: delete the old link, insert a new link
 `content_attachments` is pure content identity. `file_kind` is interpretation context from the source file; it goes on
 `source_file_attachment_links`.
 
-### Probe facts are required before product-facing duplicate/relocation surfaces
+### Probe observations are required before product-facing duplicate/relocation surfaces
 
-Exact-byte occurrence queries can be built internally before probe facts exist. No product-facing duplicate or
-relocation view surfaces until probe observations are available. Without probe facts, BLAKE3 cannot distinguish a
+Exact-byte occurrence queries can be built internally before probe observations exist. No product-facing duplicate or
+relocation view surfaces until probe observations are available. Without probe observations, BLAKE3 cannot distinguish a
 playable audio file from a corrupt container.
 
 ### Duplicate and relocation are one substrate, not two
@@ -313,7 +313,7 @@ Import data is never silently canonical; user confirmation is required for promo
 The RT Flight Deck creates requirements for: event log shape, evidence provenance, runtime observation history, user
 decisions, performance sessions, incident reconstruction. These are not V0 product surfaces and do not justify backend
 slices by themselves. A performance session entity (what was loaded, what played, what cues fired, what transitions
-happened, whether prep facts held, anomalies, recovery) must be sketched in a doctrine doc before runtime event design
+happened, whether prep observations held, anomalies, recovery) must be sketched in a doctrine doc before runtime event design
 begins.
 
 ### No automatic cleanup, removal, or merge without a user decision record
@@ -363,12 +363,12 @@ Wire bounded attachment materialization into service-owned maintenance after BLA
 - Service-owned — not test-only store method
 - Not a draining synchronous unit on scan completion
 - Manual `hashSourceFilesBlake3` can trigger materialization for the same source
-- No UI, no track identity, no CUE pairing, no primaryMedia activation
+- No UI, no track identity, no CUE pairing, no playableMedia activation
 - Scan-triggered maintenance performs at most one hash pass and one attachment materialization pass, then clears the
   pending source request.
 - Remaining hash and attachment materialization candidates are explicit-command or future-scheduler work.
 
-Completes: `scan → source files → BLAKE3 facts → attachment links`
+Completes: `scan → source files → BLAKE3 observations → attachment links`
 
 `feat(library): wire bounded attachment materialization into service maintenance`
 
@@ -394,7 +394,7 @@ product-trust read model. No attachment-detail UI may be built before A-4 lands.
 
 **A-3 [CODE] Media probe observations v0** [Ratified]
 
-Basis-bound probe evidence stored alongside observed facts.
+Basis-bound probe evidence stored alongside source-file observations.
 
 Fields: container, codec, duration, sample rate, channels, bit depth if available, bitrate if cheap, probe status,
 adapter/version, stale/current status.
@@ -419,8 +419,8 @@ Summarizes per source in v0. The collection-level aggregate is deferred as a pur
 - Sources by lifecycle/access state
 - Source files by presence state (present / missing / removed)
 - Media-relevant files with no BLAKE3 evidence
-- Media-relevant files with no probe facts
-- Source files with stale observed facts
+- Media-relevant files with no probe observations
+- Source files with stale source-file observations
 - Source files with stale attachment links
 - Unsupported/blocked/unreadable files
 - CUE files pending future parse
@@ -520,7 +520,7 @@ Deliverable: `docs/library/search-filter-substrate-contract.md`
 
 After A-7.
 
-Initial index: source file path/name, file kind, attachment hash/summary, probe facts when present. Tags and track
+Initial index: source file path/name, file kind, attachment hash/summary, probe observations when present. Tags and track
 metadata extend it later.
 
 `feat(library): add search and filter index v0`
@@ -629,7 +629,7 @@ Goal: Group evidence into candidate media units without declaring final tracks.
 
 Create playable/interpretable media candidates from attachment evidence.
 
-Inputs: audio/video attachments, probe facts, CUE parse facts, CUE association evidence.
+Inputs: audio/video attachments, probe observations, CUE parse observations, CUE association evidence.
 
 Candidate types: audio file candidate, video file candidate, CUE-derived track candidates, unsupported/blocked
 candidates.
@@ -742,7 +742,7 @@ Goal: Know what is ready for performance, what is missing, what changed, and wha
 **E-1 [DOCTRINE] Preparation, analysis, and waveform contracts** [Doctrine gate]
 
 After the post-deletion authority cleanup, preparation/work/analysis/waveform concepts must be contracted again before
-implementation. The future contracts must consume the current source-file, `source_file_facts`, attachment, primary-media,
+implementation. The future contracts must consume the current source-file, `source_file_observations`, attachment, playable-media,
 track-candidate, and track-decision substrate. They must not restore deleted preparation, capability, waveform, or
 segment models from earlier schema epochs.
 
@@ -783,7 +783,7 @@ This is a future compatibility gate, not V0 product scope.
 Defines:
 
 - Performance session entity: what was loaded, what played, what cue/loop actions fired, what transitions happened,
-  whether prep facts held under live use, anomalies, recovery actions
+  whether prep observations held under live use, anomalies, recovery actions
 - Runtime event log shape
 - Anomaly chain structure
 - Incident evidence and reconstruction
@@ -859,7 +859,7 @@ These substitutions are non-negotiable in product-facing surfaces, docs, and cod
 | --------------------------------------- | ------------------------------------------------------------------------ |
 | Product-facing duplicate/relocation UI  | Attachment occurrence evidence (A-5) exists; actions also require A-6    |
 | Track tables                            | Media candidate layer (C-1) is ratified                                  |
-| `primaryMedia` activation               | Media candidate / track identity layer is real                           |
+| `playableMedia` activation               | Media candidate / track identity layer is real                           |
 | CUE-to-audio pairing                    | CUE parse (B-3) + association evidence (B-4) exist                       |
 | Prep facets                             | Canonical track/media identity (D-2) is durable and D/E gate is ratified |
 | Waveform UI                             | Waveform artifact substrate is backend-owned                             |
@@ -890,7 +890,7 @@ silently kept.
 
 ## Strategic Principle
 
-> **Local DJ foundation first. Exact byte identity first. Probe facts before product occurrence claims. Collection health
+> **Local DJ foundation first. Exact byte identity first. Probe observations before product occurrence claims. Collection health
 > before occurrence UI. Occurrence model before occurrence interpretation views. User decision pattern before track and
 > prep schemas. Local browse entry points and items before local browse UI. Search/index contract before
 > browse surfaces. Import interoperability contract before track identity and prep facet hardening. Future Prepared Room formal model before room

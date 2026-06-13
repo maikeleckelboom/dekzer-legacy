@@ -16,9 +16,9 @@ pub struct MaterializeAttachmentsForSourceResult {
     pub links_created: usize,
     pub links_replaced: usize,
     pub links_refreshed: usize,
-    pub skipped_stale_facts: usize,
+    pub skipped_stale_observations: usize,
     pub skipped_no_blake3: usize,
-    pub skipped_no_facts: usize,
+    pub skipped_no_observations: usize,
     pub remaining_candidates: usize,
 }
 
@@ -125,44 +125,44 @@ fn read_attachment_materialization_skip_summary(
     write
         .query_row(
             "SELECT COALESCE(SUM(CASE
-                    WHEN facts.source_file_id IS NULL THEN 1
+                    WHEN observations.source_file_id IS NULL THEN 1
                     ELSE 0
                 END), 0),
                 COALESCE(SUM(CASE
-                    WHEN facts.source_file_id IS NOT NULL
+                    WHEN observations.source_file_id IS NOT NULL
                      AND NOT (
-                         file.source_id = facts.basis_source_id
-                         AND file.relative_path = facts.basis_relative_path
-                         AND file.size_bytes IS facts.basis_size_bytes
-                         AND file.mtime_ns IS facts.basis_mtime_ns
-                         AND file.presence_state = facts.basis_presence_state
+                         file.source_id = observations.basis_source_id
+                         AND file.relative_path = observations.basis_relative_path
+                         AND file.size_bytes IS observations.basis_size_bytes
+                         AND file.mtime_ns IS observations.basis_mtime_ns
+                         AND file.presence_state = observations.basis_presence_state
                      )
                     THEN 1 ELSE 0
                 END), 0),
                 COALESCE(SUM(CASE
-                    WHEN facts.source_file_id IS NOT NULL
+                    WHEN observations.source_file_id IS NOT NULL
                      AND (
-                         file.source_id = facts.basis_source_id
-                         AND file.relative_path = facts.basis_relative_path
-                         AND file.size_bytes IS facts.basis_size_bytes
-                         AND file.mtime_ns IS facts.basis_mtime_ns
-                         AND file.presence_state = facts.basis_presence_state
+                         file.source_id = observations.basis_source_id
+                         AND file.relative_path = observations.basis_relative_path
+                         AND file.size_bytes IS observations.basis_size_bytes
+                         AND file.mtime_ns IS observations.basis_mtime_ns
+                         AND file.presence_state = observations.basis_presence_state
                      )
                      AND NOT (
-                         facts.content_hash_algorithm = ?2
-                         AND facts.content_hash_value IS NOT NULL
+                         observations.content_hash_algorithm = ?2
+                         AND observations.content_hash_value IS NOT NULL
                      )
                     THEN 1 ELSE 0
                 END), 0)
              FROM source_files file
-             LEFT JOIN source_file_facts facts
-               ON facts.source_file_id = file.source_file_id
+             LEFT JOIN source_file_observations observations
+               ON observations.source_file_id = file.source_file_id
              WHERE file.source_id = ?1",
             params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
             |row| {
                 Ok(MaterializeAttachmentsForSourceResult {
-                    skipped_no_facts: read_count(row, 0)?,
-                    skipped_stale_facts: read_count(row, 1)?,
+                    skipped_no_observations: read_count(row, 0)?,
+                    skipped_stale_observations: read_count(row, 1)?,
                     skipped_no_blake3: read_count(row, 2)?,
                     ..Default::default()
                 })
@@ -179,16 +179,16 @@ fn count_attachment_materialization_candidates(
         .query_row(
             "SELECT COUNT(*)
              FROM source_files file
-             JOIN source_file_facts facts
-               ON facts.source_file_id = file.source_file_id
+             JOIN source_file_observations observations
+               ON observations.source_file_id = file.source_file_id
              WHERE file.source_id = ?1
-               AND file.source_id = facts.basis_source_id
-               AND file.relative_path = facts.basis_relative_path
-               AND file.size_bytes IS facts.basis_size_bytes
-               AND file.mtime_ns IS facts.basis_mtime_ns
-               AND file.presence_state = facts.basis_presence_state
-               AND facts.content_hash_algorithm = ?2
-               AND facts.content_hash_value IS NOT NULL",
+               AND file.source_id = observations.basis_source_id
+               AND file.relative_path = observations.basis_relative_path
+               AND file.size_bytes IS observations.basis_size_bytes
+               AND file.mtime_ns IS observations.basis_mtime_ns
+               AND file.presence_state = observations.basis_presence_state
+               AND observations.content_hash_algorithm = ?2
+               AND observations.content_hash_value IS NOT NULL",
             params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
             |row| read_count(row, 0),
         )
@@ -206,25 +206,25 @@ fn read_attachment_materialization_candidates(
         "SELECT file.source_file_id,
                 file.source_id,
                 file.file_kind,
-                facts.content_hash_value
+                observations.content_hash_value
          FROM source_files file
-         JOIN source_file_facts facts
-           ON facts.source_file_id = file.source_file_id
+         JOIN source_file_observations observations
+           ON observations.source_file_id = file.source_file_id
          LEFT JOIN source_file_attachment_links link
            ON link.source_file_id = file.source_file_id
          LEFT JOIN content_attachments attachment
            ON attachment.attachment_id = link.attachment_id
          WHERE file.source_id = ?1
-           AND file.source_id = facts.basis_source_id
-           AND file.relative_path = facts.basis_relative_path
-           AND file.size_bytes IS facts.basis_size_bytes
-           AND file.mtime_ns IS facts.basis_mtime_ns
-           AND file.presence_state = facts.basis_presence_state
-           AND facts.content_hash_algorithm = ?2
-           AND facts.content_hash_value IS NOT NULL
+           AND file.source_id = observations.basis_source_id
+           AND file.relative_path = observations.basis_relative_path
+           AND file.size_bytes IS observations.basis_size_bytes
+           AND file.mtime_ns IS observations.basis_mtime_ns
+           AND file.presence_state = observations.basis_presence_state
+           AND observations.content_hash_algorithm = ?2
+           AND observations.content_hash_value IS NOT NULL
          ORDER BY CASE
                     WHEN link.source_file_id IS NULL THEN 0
-                    WHEN attachment.content_hash_value != facts.content_hash_value THEN 1
+                    WHEN attachment.content_hash_value != observations.content_hash_value THEN 1
                     ELSE 2
                   END ASC,
                   lower(file.relative_path) ASC,
@@ -407,15 +407,15 @@ mod tests {
         get_source_files_for_attachment, get_source_files_for_attachment_limited,
     };
     use crate::{
-        CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+        CommitAcceptedSourceFileObservationInput, CommitAcceptedSourceFileObservationMergePolicy,
         CompleteMachineWorkInput, ContentHashEvidence, FinishWorkRunInput,
         InspectSourceFilePromotionInput, QueueInspectSourceFileWorkInput, RecordArtifactInput,
         RecordInlineArtifactInput, RecordSourceFileObservationInput, StartWorkRunInput,
         UpsertSourceInput, UpsertSourceStateInput,
     };
     use library_domain::{
-        ArtifactKind, ArtifactRole, SourceAccessIssueKind, SourceAccessState, SourceFileId,
-        SourcePresenceState, WorkPriorityClass, WorkRunOutcome,
+        ArtifactKind, SourceAccessIssueKind, SourceAccessState, SourceFileId, SourcePresenceState,
+        WorkPriorityClass, WorkRunOutcome,
     };
 
     use super::{MaterializeAttachmentsForSourceResult, SqliteDurableStore};
@@ -562,11 +562,20 @@ mod tests {
                 .expect("update source state");
         }
 
-        fn commit_blake3_fact(&mut self, source_file_id: i64, hash_value: &str, media_kind: &str) {
-            self.commit_source_fact(source_file_id, Some(("blake3", hash_value)), media_kind);
+        fn commit_blake3_observation(
+            &mut self,
+            source_file_id: i64,
+            hash_value: &str,
+            media_kind: &str,
+        ) {
+            self.commit_source_observation(
+                source_file_id,
+                Some(("blake3", hash_value)),
+                media_kind,
+            );
         }
 
-        fn commit_source_fact(
+        fn commit_source_observation(
             &mut self,
             source_file_id: i64,
             content_hash: Option<(&str, &str)>,
@@ -609,7 +618,6 @@ mod tests {
                     artifact: RecordArtifactInput {
                         work_run_id: work_run.work_run_id,
                         artifact_kind: ArtifactKind::InspectionResult,
-                        artifact_role: ArtifactRole::PrimaryResult,
                         media_type: "application/json".to_string(),
                         basis_fingerprint: basis_fingerprint.clone(),
                         payload_hash: format!("hash:attachment-test:{source_file_id}:{queued_at}"),
@@ -620,7 +628,7 @@ mod tests {
                 .expect("record inspection artifact");
             self.store
                 .inspect_source_file(InspectSourceFilePromotionInput {
-                    source_file_facts: CommitAcceptedSourceFileFactsInput {
+                    source_file_observations: CommitAcceptedSourceFileObservationInput {
                         source_file_id: source_file_domain_id(source_file_id),
                         accepted_artifact_id: artifact.artifact_id,
                         basis_fingerprint,
@@ -638,12 +646,12 @@ mod tests {
                         codec: None,
                         updated_at: queued_at + 4,
                     },
-                    source_file_facts_merge_policy:
-                        CommitAcceptedSourceFileFactsMergePolicy::replacement(),
+                    source_file_observation_merge_policy:
+                        CommitAcceptedSourceFileObservationMergePolicy::replacement(),
                     rebuild_projection_domains: vec![],
                     rebuild_priority: WorkPriorityClass::Interactive,
                 })
-                .expect("commit source facts through inspect_source_file");
+                .expect("commit source observations through inspect_source_file");
             self.store
                 .finish_work_run(FinishWorkRunInput {
                     work_run_id: work_run.work_run_id,
@@ -728,10 +736,10 @@ mod tests {
     }
 
     #[test]
-    fn current_blake3_fact_materializes_one_attachment_and_current_link() {
+    fn current_blake3_observation_materializes_one_attachment_and_current_link() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 123, 456);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
 
         let result = fixture.materialize(10);
 
@@ -767,7 +775,7 @@ mod tests {
     fn link_pointing_at_different_attachment_hash_reads_as_stale() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 123, 456);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
 
         let connection = fixture.read_connection();
         connection
@@ -824,8 +832,8 @@ mod tests {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/a.flac", 10, 100);
         fixture.record_source_file(101, "Album/b.flac", 10, 101);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-        fixture.commit_blake3_fact(101, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_A, "audio");
 
         let result = fixture.materialize(10);
 
@@ -885,8 +893,8 @@ mod tests {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/available.flac", 10, 100);
         fixture.record_source_file(101, "Album/missing.flac", 11, 101);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-        fixture.commit_blake3_fact(101, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_A, "audio");
         fixture.materialize(10);
         let attachment_id = fixture.attachment_id_for_hash(HASH_A);
 
@@ -952,7 +960,7 @@ mod tests {
     fn attachment_occurrence_read_does_not_require_occurrence_tables() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
         fixture.materialize(10);
         let attachment_id = fixture.attachment_id_for_hash(HASH_A);
         let connection = fixture.read_connection();
@@ -983,8 +991,8 @@ mod tests {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/a.flac", 10, 100);
         fixture.record_source_file(101, "Album/b.flac", 11, 101);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-        fixture.commit_blake3_fact(101, HASH_B, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_B, "audio");
 
         let result = fixture.materialize(10);
 
@@ -1004,12 +1012,12 @@ mod tests {
         fixture.record_source_file(100, "Album/a-current.flac", 10, 100);
         fixture.record_source_file(101, "Album/b-stale.flac", 11, 101);
         fixture.record_source_file(102, "Album/c-missing-link.flac", 12, 102);
-        fixture.record_source_file(103, "Album/d-no-facts.flac", 13, 103);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-        fixture.commit_blake3_fact(101, HASH_B, "audio");
-        fixture.commit_blake3_fact(102, HASH_C, "audio");
+        fixture.record_source_file(103, "Album/d-no-observations.flac", 13, 103);
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_B, "audio");
+        fixture.commit_blake3_observation(102, HASH_C, "audio");
         fixture.materialize(2);
-        fixture.commit_blake3_fact(101, HASH_C, "audio");
+        fixture.commit_blake3_observation(101, HASH_C, "audio");
 
         let connection = fixture.read_connection();
         let summary = get_source_attachment_summary(&connection, fixture.source_id)
@@ -1019,7 +1027,10 @@ mod tests {
         assert_eq!(summary.source_id, fixture.source_id);
         assert_eq!(summary.current_links_count, 1);
         assert_eq!(summary.stale_links_count, 1);
-        assert_eq!(summary.source_files_with_current_blake3_facts_count, 3);
+        assert_eq!(
+            summary.source_files_with_current_blake3_observations_count,
+            3
+        );
         assert_eq!(summary.source_files_with_attachment_links_count, 2);
         assert_eq!(summary.source_files_missing_attachment_links_count, 1);
     }
@@ -1042,9 +1053,9 @@ mod tests {
         fixture.record_source_file(100, "Album/a.flac", 10, 100);
         fixture.record_source_file(101, "Album/b.flac", 11, 101);
         fixture.record_source_file(102, "Album/c.flac", 12, 102);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-        fixture.commit_blake3_fact(101, HASH_B, "audio");
-        fixture.commit_blake3_fact(102, HASH_C, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_B, "audio");
+        fixture.commit_blake3_observation(102, HASH_C, "audio");
 
         let first = fixture.materialize(2);
         assert_eq!(first.links_created, 2);
@@ -1068,22 +1079,22 @@ mod tests {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/a.flac", 10, 100);
         fixture.record_source_file(101, "Album/b.flac", 11, 101);
-        fixture.record_source_file(102, "Album/no-facts.flac", 12, 102);
+        fixture.record_source_file(102, "Album/no-observations.flac", 12, 102);
         fixture.record_source_file(103, "Album/no-blake3.flac", 13, 103);
         fixture.record_source_file(104, "Album/stale.flac", 14, 104);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-        fixture.commit_blake3_fact(101, HASH_B, "audio");
-        fixture.commit_source_fact(103, Some(("sha256", "fixture-sha")), "audio");
-        fixture.commit_blake3_fact(104, HASH_C, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_B, "audio");
+        fixture.commit_source_observation(103, Some(("sha256", "fixture-sha")), "audio");
+        fixture.commit_blake3_observation(104, HASH_C, "audio");
         fixture.record_source_file(104, "Album/stale.flac", 15, 105);
 
         let result = fixture.materialize(1);
 
         assert_eq!(result.links_created, 1);
         assert_eq!(result.remaining_candidates, 1);
-        assert_eq!(result.skipped_no_facts, 1);
+        assert_eq!(result.skipped_no_observations, 1);
         assert_eq!(result.skipped_no_blake3, 1);
-        assert_eq!(result.skipped_stale_facts, 1);
+        assert_eq!(result.skipped_stale_observations, 1);
         assert_eq!(fixture.link_count_for_source_file(100), 1);
         assert_eq!(fixture.link_count_for_source_file(101), 0);
         assert_eq!(
@@ -1094,25 +1105,25 @@ mod tests {
     }
 
     #[test]
-    fn stale_observed_fact_is_skipped_without_creating_a_link() {
+    fn stale_source_file_observation_is_skipped_without_creating_a_link() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/stale.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
         fixture.record_source_file(100, "Album/stale.flac", 11, 101);
 
         let result = fixture.materialize(10);
 
-        assert_eq!(result.skipped_stale_facts, 1);
+        assert_eq!(result.skipped_stale_observations, 1);
         assert_eq!(result.links_created, 0);
         assert_eq!(fixture.count_rows("content_attachments"), 0);
         assert_eq!(fixture.count_rows("source_file_attachment_links"), 0);
     }
 
     #[test]
-    fn non_blake3_observed_fact_is_skipped_without_creating_a_link() {
+    fn non_blake3_source_file_observation_is_skipped_without_creating_a_link() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/sha.flac", 10, 100);
-        fixture.commit_source_fact(100, Some(("sha256", "fixture-sha")), "audio");
+        fixture.commit_source_observation(100, Some(("sha256", "fixture-sha")), "audio");
 
         let result = fixture.materialize(10);
 
@@ -1123,13 +1134,13 @@ mod tests {
     }
 
     #[test]
-    fn source_file_without_facts_is_skipped_without_creating_a_link() {
+    fn source_file_without_observations_is_skipped_without_creating_a_link() {
         let mut fixture = AttachmentIdentityFixture::new();
-        fixture.record_source_file(100, "Album/no-facts.flac", 10, 100);
+        fixture.record_source_file(100, "Album/no-observations.flac", 10, 100);
 
         let result = fixture.materialize(10);
 
-        assert_eq!(result.skipped_no_facts, 1);
+        assert_eq!(result.skipped_no_observations, 1);
         assert_eq!(result.links_created, 0);
         assert_eq!(fixture.count_rows("content_attachments"), 0);
         assert_eq!(fixture.count_rows("source_file_attachment_links"), 0);
@@ -1139,7 +1150,7 @@ mod tests {
     fn same_hash_materialization_refreshes_existing_attachment_and_link() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
         fixture.materialize(10);
 
         let result = fixture.materialize(10);
@@ -1160,11 +1171,11 @@ mod tests {
     fn existing_attachment_for_new_source_file_counts_as_refresh_not_creation() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/a.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
         fixture.materialize(10);
 
         fixture.record_source_file(101, "Album/b.flac", 11, 101);
-        fixture.commit_blake3_fact(101, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_A, "audio");
         let result = fixture.materialize(10);
 
         assert_eq!(result.attachments_created, 0);
@@ -1179,7 +1190,7 @@ mod tests {
     fn schema_rejects_multiple_current_attachment_links_for_one_source_file() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
         fixture.materialize(10);
 
         let connection = fixture.read_connection();
@@ -1274,11 +1285,11 @@ mod tests {
     fn hash_change_replaces_source_file_link_and_preserves_old_attachment() {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 10, 100);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
         fixture.materialize(10);
         let old_attachment_id = fixture.attachment_id_for_hash(HASH_A);
 
-        fixture.commit_blake3_fact(100, HASH_B, "audio");
+        fixture.commit_blake3_observation(100, HASH_B, "audio");
         let connection = fixture.read_connection();
         let stale_links = get_source_files_for_attachment(&connection, old_attachment_id)
             .expect("read stale old attachment links");
@@ -1332,8 +1343,8 @@ mod tests {
         let mut fixture = AttachmentIdentityFixture::new();
         fixture.record_source_file(100, "Album/track.flac", 10, 100);
         fixture.record_source_file(101, "Album/album.cue", 11, 101);
-        fixture.commit_blake3_fact(100, HASH_A, "audio");
-        fixture.commit_blake3_fact(101, HASH_B, "cue_sheet");
+        fixture.commit_blake3_observation(100, HASH_A, "audio");
+        fixture.commit_blake3_observation(101, HASH_B, "cue_sheet");
 
         let result = fixture.materialize(10);
 

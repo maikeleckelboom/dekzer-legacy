@@ -139,7 +139,7 @@ at the substrate level.
 
 The following are true of the current repo as of this writing:
 
-| Fact                                                                                                                               | Observation                                                              |
+| Observation                                                                                                                               | Observation                                                              |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `sourceFileVisibility` was implementation debt and has been removed from renderer-facing contracts.                                | Library tree row admission is now a product/boundary surface concern.    |
 | Library tree row admission is owned by the product/boundary surface, not the renderer.                                             | Renderer no longer chooses visibility or policy.                         |
@@ -170,7 +170,7 @@ The following names are canonical first-slice vocabulary:
 | `ContentsResult`                | Rust protocol → TS contract | Single contents read result page.                                                                       |
 | `ContentsReadPolicy`            | Shared TS → Rust service    | Policy parameter for contents reads.                                                                    |
 | `ContentsScope`                 | Shared TS → Rust service    | Scope parameter for contents reads.                                                                     |
-| `ContentsReadPolicy`            | Shared TS → Rust store      | `playableMediaBrowse`, `audioBrowse`, `sourceFileInventory`, or `primaryMedia` profile-specific policy. |
+| `ContentsReadPolicy`            | Shared TS → Rust store      | `playableMediaBrowse`, `audioBrowse`, `sourceFileInventory`, or `playableMedia` profile-specific policy. |
 | `StoreLiteralHierarchyWindow`   | Rust store                  | Store-level hierarchy window.                                                                           |
 | `StoreLiteralHierarchyCoverage` | Rust store                  | Store-level hierarchy coverage.                                                                         |
 

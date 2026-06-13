@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::authority::promotion::{InspectSourceFilePromotionInput, InspectSourceFilePromotionTx};
 use crate::authority::sources::{
-    CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+    CommitAcceptedSourceFileObservationInput, CommitAcceptedSourceFileObservationMergePolicy,
 };
 use crate::authority::work::{
     ClaimSpecificMachineWorkInput, CompleteMachineWorkInput, FinishWorkRunInput,
@@ -26,7 +26,7 @@ use crate::store::source_file_hash::{
 };
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
-    ArtifactKind, ArtifactRole, SourceFileId, WorkItemState, WorkPriorityClass, WorkRunOutcome,
+    ArtifactKind, SourceFileId, WorkItemState, WorkPriorityClass, WorkRunOutcome,
 };
 
 use super::SqliteDurableStore;
@@ -62,9 +62,9 @@ pub struct SourceFileMediaProbeCandidate {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceFileMediaProbeCandidateReason {
-    MissingFacts,
+    MissingObservations,
     MissingProbeFields,
-    StaleFacts,
+    StaleObservations,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,7 +96,7 @@ pub struct ProbeSourceFileMediaBatchOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProbeSourceFileMediaBatchOutcomeStatus {
     Probed {
-        facts: SourceFileMediaProbeFacts,
+        observations: SourceFileMediaProbeObservations,
         accepted_artifact_id: i64,
         work_item_id: i64,
     },
@@ -166,7 +166,7 @@ pub enum SourceFileMediaProbeFailure {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceFileMediaProbeFacts {
+pub struct SourceFileMediaProbeObservations {
     pub media_kind: String,
     pub mime_type: Option<String>,
     pub duration_ms: Option<i64>,
@@ -186,7 +186,7 @@ struct ProbeSourceFileMediaInput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ProbeSourceFileMediaResult {
     source_file_id: SourceFileId,
-    facts: SourceFileMediaProbeFacts,
+    observations: SourceFileMediaProbeObservations,
     accepted_artifact_id: i64,
     work_item_id: i64,
 }
@@ -286,7 +286,7 @@ impl SqliteDurableStore {
                             source_id,
                             relative_path,
                             status: ProbeSourceFileMediaBatchOutcomeStatus::Probed {
-                                facts: result.facts,
+                                observations: result.observations,
                                 accepted_artifact_id: result.accepted_artifact_id,
                                 work_item_id: result.work_item_id,
                             },
@@ -400,7 +400,8 @@ impl SqliteDurableStore {
                 file_kind: initial_basis.file_kind,
             });
         }
-        let facts = probe_audio_metadata(&input.source_file_path, &initial_basis.relative_path)?;
+        let observations =
+            probe_audio_metadata(&input.source_file_path, &initial_basis.relative_path)?;
         after_probe()?;
 
         let file_store_root = self.app_owned_state.artifact_file_store_root().clone();
@@ -416,7 +417,7 @@ impl SqliteDurableStore {
                 write,
                 file_store_root.clone(),
                 &initial_basis,
-                &facts,
+                &observations,
                 input.observed_at_ms,
             )?;
             Ok(result)
@@ -511,19 +512,19 @@ fn read_source_file_media_probe_candidates_for_scope(
                 sf.file_class,
                 sf.file_kind,
                 CASE
-                    WHEN facts.source_file_id IS NULL THEN 'missing_facts'
+                    WHEN observations.source_file_id IS NULL THEN 'missing_observations'
                     WHEN NOT (
-                        sf.source_id = facts.basis_source_id
-                        AND sf.relative_path = facts.basis_relative_path
-                        AND sf.size_bytes IS facts.basis_size_bytes
-                        AND sf.mtime_ns IS facts.basis_mtime_ns
-                        AND sf.presence_state = facts.basis_presence_state
-                    ) THEN 'stale_facts'
+                        sf.source_id = observations.basis_source_id
+                        AND sf.relative_path = observations.basis_relative_path
+                        AND sf.size_bytes IS observations.basis_size_bytes
+                        AND sf.mtime_ns IS observations.basis_mtime_ns
+                        AND sf.presence_state = observations.basis_presence_state
+                    ) THEN 'stale_observations'
                     ELSE 'missing_probe_fields'
                 END AS reason
          FROM source_files sf
-         LEFT JOIN source_file_facts facts
-           ON facts.source_file_id = sf.source_file_id
+         LEFT JOIN source_file_observations observations
+           ON observations.source_file_id = sf.source_file_id
          WHERE {scope_predicate}
            AND sf.presence_state = 'present'
            AND sf.file_class = 'audio'
@@ -531,7 +532,7 @@ fn read_source_file_media_probe_candidates_for_scope(
           ORDER BY lower(sf.relative_path) ASC,
                   sf.source_file_id ASC
          LIMIT ?{}",
-        needs_media_probe_predicate_sql("sf", "facts"),
+        needs_media_probe_predicate_sql("sf", "observations"),
         values.len()
     );
     let mut statement = connection.prepare(&sql)?;
@@ -568,13 +569,13 @@ fn count_source_file_media_probe_candidates_for_scope(
     let sql = format!(
         "SELECT COUNT(*)
          FROM source_files sf
-         LEFT JOIN source_file_facts facts
-           ON facts.source_file_id = sf.source_file_id
+         LEFT JOIN source_file_observations observations
+           ON observations.source_file_id = sf.source_file_id
                    WHERE {scope_predicate}
            AND sf.presence_state = 'present'
            AND sf.file_class = 'audio'
            AND {}",
-        needs_media_probe_predicate_sql("sf", "facts")
+        needs_media_probe_predicate_sql("sf", "observations")
     );
     let count = connection.query_row(&sql, params_from_iter(values.iter()), |row| {
         row.get::<_, i64>(0)
@@ -616,23 +617,23 @@ fn media_probe_candidate_scope_predicate(
     }
 }
 
-fn needs_media_probe_predicate_sql(source_file_alias: &str, facts_alias: &str) -> String {
+fn needs_media_probe_predicate_sql(source_file_alias: &str, observations_alias: &str) -> String {
     format!(
-        "({facts_alias}.source_file_id IS NULL
+        "({observations_alias}.source_file_id IS NULL
           OR NOT (
-              {source_file_alias}.source_id = {facts_alias}.basis_source_id
-              AND {source_file_alias}.relative_path = {facts_alias}.basis_relative_path
-              AND {source_file_alias}.size_bytes IS {facts_alias}.basis_size_bytes
-              AND {source_file_alias}.mtime_ns IS {facts_alias}.basis_mtime_ns
-              AND {source_file_alias}.presence_state = {facts_alias}.basis_presence_state
+              {source_file_alias}.source_id = {observations_alias}.basis_source_id
+              AND {source_file_alias}.relative_path = {observations_alias}.basis_relative_path
+              AND {source_file_alias}.size_bytes IS {observations_alias}.basis_size_bytes
+              AND {source_file_alias}.mtime_ns IS {observations_alias}.basis_mtime_ns
+              AND {source_file_alias}.presence_state = {observations_alias}.basis_presence_state
           )
           OR (
-              {facts_alias}.mime_type IS NULL
-              AND {facts_alias}.duration_ms IS NULL
-              AND {facts_alias}.sample_rate_hz IS NULL
-              AND {facts_alias}.channels IS NULL
-              AND {facts_alias}.bit_depth IS NULL
-              AND {facts_alias}.codec IS NULL
+              {observations_alias}.mime_type IS NULL
+              AND {observations_alias}.duration_ms IS NULL
+              AND {observations_alias}.sample_rate_hz IS NULL
+              AND {observations_alias}.channels IS NULL
+              AND {observations_alias}.bit_depth IS NULL
+              AND {observations_alias}.codec IS NULL
           ))"
     )
 }
@@ -641,9 +642,9 @@ fn parse_media_probe_candidate_reason(
     reason: &str,
 ) -> Result<SourceFileMediaProbeCandidateReason, String> {
     match reason {
-        "missing_facts" => Ok(SourceFileMediaProbeCandidateReason::MissingFacts),
+        "missing_observations" => Ok(SourceFileMediaProbeCandidateReason::MissingObservations),
         "missing_probe_fields" => Ok(SourceFileMediaProbeCandidateReason::MissingProbeFields),
-        "stale_facts" => Ok(SourceFileMediaProbeCandidateReason::StaleFacts),
+        "stale_observations" => Ok(SourceFileMediaProbeCandidateReason::StaleObservations),
         other => Err(format!("unknown media probe candidate reason {other:?}")),
     }
 }
@@ -651,7 +652,7 @@ fn parse_media_probe_candidate_reason(
 fn probe_audio_metadata(
     path: &Path,
     relative_path: &str,
-) -> ProbeSourceFileMediaJobResult<SourceFileMediaProbeFacts> {
+) -> ProbeSourceFileMediaJobResult<SourceFileMediaProbeObservations> {
     let file = File::open(path).map_err(|source| ProbeSourceFileMediaError::FileOpen {
         path: path.to_path_buf(),
         source,
@@ -694,7 +695,7 @@ fn probe_audio_metadata(
         })?;
     let params = &track.codec_params;
 
-    Ok(SourceFileMediaProbeFacts {
+    Ok(SourceFileMediaProbeObservations {
         media_kind: "audio".to_string(),
         mime_type: mime_type_for_format(&container_name, relative_path).map(str::to_string),
         duration_ms: duration_ms_from_codec_params(params),
@@ -787,7 +788,7 @@ fn commit_media_probe_observation(
     write: &mut AdmittedWrite<'_>,
     file_store_root: crate::authority::work::ArtifactFileStoreRoot,
     basis: &SourceFileHashBasis,
-    facts: &SourceFileMediaProbeFacts,
+    observations: &SourceFileMediaProbeObservations,
     observed_at_ms: i64,
 ) -> LibrarySqliteResult<ProbeSourceFileMediaResult> {
     let basis_fingerprint = basis.basis_fingerprint();
@@ -823,13 +824,13 @@ fn commit_media_probe_observation(
         "adapterVersion": MEDIA_PROBE_JOB_ADAPTER_VERSION,
         "sourceFileId": basis.source_file_id.get(),
         "basisFingerprint": basis_fingerprint,
-        "mediaKind": facts.media_kind,
-        "mimeType": facts.mime_type,
-        "durationMs": facts.duration_ms,
-        "sampleRateHz": facts.sample_rate_hz,
-        "channels": facts.channels,
-        "bitDepth": facts.bit_depth,
-        "codec": facts.codec,
+        "mediaKind": observations.media_kind,
+        "mimeType": observations.mime_type,
+        "durationMs": observations.duration_ms,
+        "sampleRateHz": observations.sample_rate_hz,
+        "channels": observations.channels,
+        "bitDepth": observations.bit_depth,
+        "codec": observations.codec,
     })
     .to_string()
     .into_bytes();
@@ -839,7 +840,6 @@ fn commit_media_probe_observation(
             artifact: RecordArtifactInput {
                 work_run_id: work_run.work_run_id,
                 artifact_kind: ArtifactKind::InspectionResult,
-                artifact_role: ArtifactRole::PrimaryResult,
                 media_type: "application/json".to_string(),
                 basis_fingerprint: basis_fingerprint.clone(),
                 payload_hash,
@@ -850,23 +850,23 @@ fn commit_media_probe_observation(
 
     InspectSourceFilePromotionTx::new(write, file_store_root).inspect_source_file(
         &InspectSourceFilePromotionInput {
-            source_file_facts: CommitAcceptedSourceFileFactsInput {
+            source_file_observations: CommitAcceptedSourceFileObservationInput {
                 source_file_id: basis.source_file_id,
                 accepted_artifact_id: artifact.artifact_id,
                 basis_fingerprint,
                 observed_at_ms,
                 content_hash: None,
-                media_kind: facts.media_kind.clone(),
-                mime_type: facts.mime_type.clone(),
-                duration_ms: facts.duration_ms,
-                sample_rate_hz: facts.sample_rate_hz,
-                channels: facts.channels,
-                bit_depth: facts.bit_depth,
-                codec: facts.codec.clone(),
+                media_kind: observations.media_kind.clone(),
+                mime_type: observations.mime_type.clone(),
+                duration_ms: observations.duration_ms,
+                sample_rate_hz: observations.sample_rate_hz,
+                channels: observations.channels,
+                bit_depth: observations.bit_depth,
+                codec: observations.codec.clone(),
                 updated_at: observed_at_ms,
             },
-            source_file_facts_merge_policy:
-                CommitAcceptedSourceFileFactsMergePolicy::preserve_current_content_hash(),
+            source_file_observation_merge_policy:
+                CommitAcceptedSourceFileObservationMergePolicy::preserve_current_content_hash(),
             rebuild_projection_domains: vec![],
             rebuild_priority: WorkPriorityClass::Interactive,
         },
@@ -886,7 +886,7 @@ fn commit_media_probe_observation(
 
     Ok(ProbeSourceFileMediaResult {
         source_file_id: basis.source_file_id,
-        facts: facts.clone(),
+        observations: observations.clone(),
         accepted_artifact_id: artifact.artifact_id.get(),
         work_item_id: claimed.work_item_id.get(),
     })
@@ -986,8 +986,8 @@ mod tests {
     use crate::read_models::attachment_identity::{
         StoreSourceFileAttachmentLinkStatus, get_attachment_for_source_file,
     };
-    use crate::read_models::observed_file_facts::{
-        StoreObservedFileFactStatus, read_observed_file_facts_for_source_file,
+    use crate::read_models::source_file_observations::{
+        StoreSourceFileObservationStatus, read_source_file_observation,
     };
     use crate::store::source_file_hash::{
         HashSourceFileBlake3BatchInput, HashSourceFileBlake3BatchOutcomeStatus,
@@ -1225,11 +1225,11 @@ mod tests {
             ));
         }
 
-        fn facts(&self, source_file_id: i64) -> crate::StoreObservedFileFacts {
+        fn observations(&self, source_file_id: i64) -> crate::StoreSourceFileObservation {
             let connection = self.store.open_read_connection().expect("open read");
-            read_observed_file_facts_for_source_file(&connection, source_file_id)
-                .expect("read facts")
-                .expect("facts exist")
+            read_source_file_observation(&connection, source_file_id)
+                .expect("read observations")
+                .expect("observations exist")
         }
 
         fn count_rows(&self, table: &str) -> i64 {
@@ -1243,7 +1243,7 @@ mod tests {
     }
 
     #[test]
-    fn media_probe_records_wav_observed_file_facts() {
+    fn media_probe_records_wav_source_file_observations() {
         let fixture = MediaProbeFixture::new();
         let bytes = tiny_wav_bytes(44_100, 2, 16, 4_410);
         fixture.write_source_file(100, "Album/track.wav", &bytes);
@@ -1252,21 +1252,21 @@ mod tests {
 
         assert_eq!(result.probed_count, 1);
         assert_eq!(result.failed_count, 0);
-        let ProbeSourceFileMediaBatchOutcomeStatus::Probed { facts, .. } =
+        let ProbeSourceFileMediaBatchOutcomeStatus::Probed { observations, .. } =
             &result.outcomes[0].status
         else {
             panic!("expected probed outcome");
         };
-        assert_eq!(facts.media_kind, "audio");
-        assert_eq!(facts.mime_type.as_deref(), Some("audio/wav"));
-        assert_eq!(facts.duration_ms, Some(100));
-        assert_eq!(facts.sample_rate_hz, Some(44_100));
-        assert_eq!(facts.channels, Some(2));
-        assert_eq!(facts.bit_depth, Some(16));
-        assert_eq!(facts.codec.as_deref(), Some("pcm"));
+        assert_eq!(observations.media_kind, "audio");
+        assert_eq!(observations.mime_type.as_deref(), Some("audio/wav"));
+        assert_eq!(observations.duration_ms, Some(100));
+        assert_eq!(observations.sample_rate_hz, Some(44_100));
+        assert_eq!(observations.channels, Some(2));
+        assert_eq!(observations.bit_depth, Some(16));
+        assert_eq!(observations.codec.as_deref(), Some("pcm"));
 
-        let stored = fixture.facts(100);
-        assert_eq!(stored.status, StoreObservedFileFactStatus::Current);
+        let stored = fixture.observations(100);
+        assert_eq!(stored.status, StoreSourceFileObservationStatus::Current);
         assert_eq!(stored.media_kind, "audio");
         assert_eq!(stored.mime_type.as_deref(), Some("audio/wav"));
         assert_eq!(stored.duration_ms, Some(100));
@@ -1278,7 +1278,7 @@ mod tests {
     }
 
     #[test]
-    fn unsupported_audio_bytes_return_typed_failure_and_write_no_facts() {
+    fn unsupported_audio_bytes_return_typed_failure_and_write_no_observations() {
         let fixture = MediaProbeFixture::new();
         fixture.write_source_file(100, "Album/broken.wav", b"not a wave file");
 
@@ -1294,11 +1294,11 @@ mod tests {
                     | SourceFileMediaProbeFailure::FileRead { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
-    fn missing_physical_file_returns_typed_failure_and_writes_no_facts() {
+    fn missing_physical_file_returns_typed_failure_and_writes_no_observations() {
         let fixture = MediaProbeFixture::new();
         fixture.insert_source_file(100, "Album/missing.wav", 12, 1000);
 
@@ -1312,7 +1312,7 @@ mod tests {
                 failure: SourceFileMediaProbeFailure::PhysicalFileMissing { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
@@ -1352,7 +1352,7 @@ mod tests {
             error,
             ProbeSourceFileMediaError::BasisChanged { .. }
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
     }
 
     #[test]
@@ -1361,15 +1361,18 @@ mod tests {
         let bytes = tiny_wav_bytes(44_100, 2, 16, 4_410);
         fixture.write_source_file(100, "Album/track.wav", &bytes);
         fixture.hash_source_file(100);
-        let hash_before = fixture.facts(100).content_hash.expect("hash before");
+        let hash_before = fixture.observations(100).content_hash.expect("hash before");
 
         fixture.run_probe_batch_for_source_files(&[100], 10);
 
-        let facts = fixture.facts(100);
-        assert_eq!(facts.status, StoreObservedFileFactStatus::Current);
-        assert_eq!(facts.content_hash, Some(hash_before));
-        assert_eq!(facts.duration_ms, Some(100));
-        assert_eq!(facts.sample_rate_hz, Some(44_100));
+        let observations = fixture.observations(100);
+        assert_eq!(
+            observations.status,
+            StoreSourceFileObservationStatus::Current
+        );
+        assert_eq!(observations.content_hash, Some(hash_before));
+        assert_eq!(observations.duration_ms, Some(100));
+        assert_eq!(observations.sample_rate_hz, Some(44_100));
     }
 
     #[test]
@@ -1382,10 +1385,13 @@ mod tests {
 
         fixture.run_probe_batch_for_source_files(&[100], 10);
 
-        let facts = fixture.facts(100);
-        assert_eq!(facts.status, StoreObservedFileFactStatus::Current);
-        assert_eq!(facts.content_hash, None);
-        assert_eq!(facts.duration_ms, Some(100));
+        let observations = fixture.observations(100);
+        assert_eq!(
+            observations.status,
+            StoreSourceFileObservationStatus::Current
+        );
+        assert_eq!(observations.content_hash, None);
+        assert_eq!(observations.duration_ms, Some(100));
     }
 
     #[test]
@@ -1397,17 +1403,23 @@ mod tests {
 
         fixture.hash_source_file(100);
 
-        let facts = fixture.facts(100);
-        assert_eq!(facts.status, StoreObservedFileFactStatus::Current);
+        let observations = fixture.observations(100);
         assert_eq!(
-            facts.content_hash.expect("hash after probe").algorithm,
+            observations.status,
+            StoreSourceFileObservationStatus::Current
+        );
+        assert_eq!(
+            observations
+                .content_hash
+                .expect("hash after probe")
+                .algorithm,
             "blake3"
         );
-        assert_eq!(facts.mime_type.as_deref(), Some("audio/wav"));
-        assert_eq!(facts.duration_ms, Some(100));
-        assert_eq!(facts.sample_rate_hz, Some(48_000));
-        assert_eq!(facts.channels, Some(2));
-        assert_eq!(facts.bit_depth, Some(16));
+        assert_eq!(observations.mime_type.as_deref(), Some("audio/wav"));
+        assert_eq!(observations.duration_ms, Some(100));
+        assert_eq!(observations.sample_rate_hz, Some(48_000));
+        assert_eq!(observations.channels, Some(2));
+        assert_eq!(observations.bit_depth, Some(16));
     }
 
     #[test]
@@ -1443,32 +1455,32 @@ mod tests {
         assert!(
             fixture
                 .store
-                .read_observed_file_facts_for_source_file(101)
-                .expect("read cue facts")
+                .read_source_file_observation(101)
+                .expect("read cue observations")
                 .is_none()
         );
         assert!(
             fixture
                 .store
-                .read_observed_file_facts_for_source_file(100)
-                .expect("read audio facts")
+                .read_source_file_observation(100)
+                .expect("read audio observations")
                 .is_none()
         );
     }
 
     #[test]
-    fn probing_writes_only_source_facts_and_artifacts() {
+    fn probing_writes_only_source_observations_and_artifacts() {
         let fixture = MediaProbeFixture::new();
         let bytes = tiny_wav_bytes(44_100, 2, 16, 4_410);
         fixture.write_source_file(100, "Album/track.wav", &bytes);
 
         fixture.run_probe_batch_for_source_files(&[100], 10);
 
-        assert_eq!(fixture.count_rows("source_file_facts"), 1);
+        assert_eq!(fixture.count_rows("source_file_observations"), 1);
         assert_eq!(fixture.count_rows("work_artifacts"), 1);
         assert_eq!(fixture.count_rows("content_attachments"), 0);
         assert_eq!(fixture.count_rows("source_file_attachment_links"), 0);
-        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
+        assert_eq!(fixture.count_rows("playable_media"), 0);
         assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
     }
 
@@ -1519,7 +1531,7 @@ mod tests {
         );
         assert_eq!(
             candidates[0].reason,
-            SourceFileMediaProbeCandidateReason::MissingFacts
+            SourceFileMediaProbeCandidateReason::MissingObservations
         );
     }
 
@@ -1534,16 +1546,16 @@ mod tests {
         assert_eq!(result.probed_count, 1);
         assert_eq!(result.failed_count, 0);
         assert_eq!(result.outcomes.len(), 1);
-        let ProbeSourceFileMediaBatchOutcomeStatus::Probed { facts, .. } =
+        let ProbeSourceFileMediaBatchOutcomeStatus::Probed { observations, .. } =
             &result.outcomes[0].status
         else {
             panic!("expected probed outcome for audio");
         };
-        assert_eq!(facts.media_kind, "audio");
+        assert_eq!(observations.media_kind, "audio");
     }
 
     #[test]
-    fn direct_video_probe_returns_unsupported_and_writes_no_facts() {
+    fn direct_video_probe_returns_unsupported_and_writes_no_observations() {
         let fixture = MediaProbeFixture::new();
         let video_path = fixture.write_source_file(101, "Album/video.mp4", b"video");
 
@@ -1561,7 +1573,7 @@ mod tests {
             ProbeSourceFileMediaError::UnsupportedMediaKind { file_kind, .. }
             if file_kind == "video"
         ));
-        assert_eq!(fixture.count_rows("source_file_facts"), 0);
+        assert_eq!(fixture.count_rows("source_file_observations"), 0);
         assert_eq!(fixture.count_rows("work_artifacts"), 0);
     }
 
@@ -1584,25 +1596,25 @@ mod tests {
             .expect("open read")
             .query_row(
                 "SELECT COUNT(*) FROM source_files sf
-                 LEFT JOIN source_file_facts facts ON facts.source_file_id = sf.source_file_id
+                 LEFT JOIN source_file_observations observations ON observations.source_file_id = sf.source_file_id
                  WHERE sf.source_id = 1
                    AND sf.presence_state = 'present'
                    AND sf.file_class = 'audio'
-                   AND (facts.source_file_id IS NULL
+                   AND (observations.source_file_id IS NULL
                         OR NOT (
-                            sf.source_id = facts.basis_source_id
-                            AND sf.relative_path = facts.basis_relative_path
-                            AND sf.size_bytes IS facts.basis_size_bytes
-                            AND sf.mtime_ns IS facts.basis_mtime_ns
-                            AND sf.presence_state = facts.basis_presence_state
+                            sf.source_id = observations.basis_source_id
+                            AND sf.relative_path = observations.basis_relative_path
+                            AND sf.size_bytes IS observations.basis_size_bytes
+                            AND sf.mtime_ns IS observations.basis_mtime_ns
+                            AND sf.presence_state = observations.basis_presence_state
                         )
                         OR (
-                            facts.mime_type IS NULL
-                            AND facts.duration_ms IS NULL
-                            AND facts.sample_rate_hz IS NULL
-                            AND facts.channels IS NULL
-                            AND facts.bit_depth IS NULL
-                            AND facts.codec IS NULL
+                            observations.mime_type IS NULL
+                            AND observations.duration_ms IS NULL
+                            AND observations.sample_rate_hz IS NULL
+                            AND observations.channels IS NULL
+                            AND observations.bit_depth IS NULL
+                            AND observations.codec IS NULL
                         ))",
                 [],
                 |row| row.get::<_, i64>(0),

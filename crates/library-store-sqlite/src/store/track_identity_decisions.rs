@@ -14,8 +14,8 @@ use super::SqliteDurableStore;
 
 pub const DEFAULT_TRACK_IDENTITY_DECISION_LIMIT: usize = 4;
 pub const MAX_TRACK_IDENTITY_DECISION_LIMIT: usize = 128;
-const TRACK_IDENTITY_CANDIDATE_KIND: &str = "exact_primary_media_content";
-const TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS: &str = "current_primary_media_exact_blake3";
+const TRACK_IDENTITY_CANDIDATE_KIND: &str = "exact_playable_media_content";
+const TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS: &str = "current_playable_media_exact_blake3";
 const TRACK_IDENTITY_DECISION_STATE_ACCEPTED: &str = "accepted";
 const TRACK_IDENTITY_DECISION_STATE_REJECTED: &str = "rejected";
 const TRACK_IDENTITY_DECISION_STATE_DEFERRED: &str = "deferred";
@@ -24,7 +24,7 @@ pub const TRACK_IDENTITY_DECISION_SOURCE_USER_LOCAL_V0: &str = "user_local_v0";
 const TRACK_IDENTITY_DECISION_BASIS_SYSTEM_EXACT_CONTENT_V0: &str =
     "active_exact_content_candidate_current_evidence_v0";
 const TRACK_IDENTITY_DECISION_REASON_SYSTEM_EXACT_CONTENT_V0: &str =
-    "accepted active exact-content track identity candidate from current primary-media evidence";
+    "accepted active exact-content track identity candidate from current playable-media evidence";
 const TRACK_IDENTITY_DECISION_BASIS_USER_LOCAL_V0: &str = "explicit_user_local_decision_v0";
 const TRACK_IDENTITY_DECISION_REASON_USER_ACCEPTED_V0: &str =
     "user explicitly accepted track identity candidate";
@@ -456,8 +456,8 @@ fn count_current_track_identity_candidate_evidence(
                  FROM track_identity_candidate_evidence evidence
                  JOIN source_files file
                    ON file.source_file_id = evidence.source_file_id
-                 LEFT JOIN source_file_facts facts
-                   ON facts.source_file_id = evidence.source_file_id
+                 LEFT JOIN source_file_observations observations
+                   ON observations.source_file_id = evidence.source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_attachment_link_id =
                       evidence.source_file_attachment_link_id
@@ -766,8 +766,8 @@ fn track_identity_decision_production_candidates_sql(select_clause: &str, suffix
            ON evidence.track_identity_candidate_id = candidate.track_identity_candidate_id
          JOIN source_files file
            ON file.source_file_id = evidence.source_file_id
-         LEFT JOIN source_file_facts facts
-           ON facts.source_file_id = evidence.source_file_id
+         LEFT JOIN source_file_observations observations
+           ON observations.source_file_id = evidence.source_file_id
          LEFT JOIN source_file_attachment_links link
            ON link.source_file_attachment_link_id =
               evidence.source_file_attachment_link_id
@@ -867,7 +867,7 @@ fn insert_decision_evidence_snapshot(
                      track_identity_candidate_id,
                      track_identity_candidate_member_id,
                      track_identity_candidate_evidence_id,
-                     primary_media_fact_id,
+                     playable_media_id,
                      attachment_id,
                      source_file_attachment_link_id,
                      source_file_id,
@@ -883,7 +883,7 @@ fn insert_decision_evidence_snapshot(
                         evidence.track_identity_candidate_id,
                         member.track_identity_candidate_member_id,
                         evidence.track_identity_candidate_evidence_id,
-                        evidence.primary_media_fact_id,
+                        evidence.playable_media_id,
                         evidence.attachment_id,
                         evidence.source_file_attachment_link_id,
                         evidence.source_file_id,
@@ -898,11 +898,11 @@ fn insert_decision_evidence_snapshot(
                  JOIN track_identity_candidate_members member
                    ON member.track_identity_candidate_id =
                       evidence.track_identity_candidate_id
-                  AND member.primary_media_fact_id = evidence.primary_media_fact_id
+                  AND member.playable_media_id = evidence.playable_media_id
                  JOIN source_files file
                    ON file.source_file_id = evidence.source_file_id
-                 LEFT JOIN source_file_facts facts
-                   ON facts.source_file_id = evidence.source_file_id
+                 LEFT JOIN source_file_observations observations
+                   ON observations.source_file_id = evidence.source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_attachment_link_id =
                       evidence.source_file_attachment_link_id
@@ -1157,7 +1157,7 @@ mod tests {
                 .expect("insert source file");
         }
 
-        fn commit_current_facts(&self, source_file_id: i64, hash_value: &str) {
+        fn commit_current_observations(&self, source_file_id: i64, hash_value: &str) {
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -1195,7 +1195,6 @@ mod tests {
                              subject_kind,
                              subject_id,
                              artifact_kind,
-                             artifact_role,
                              adapter_key,
                              adapter_version,
                              basis_fingerprint,
@@ -1204,7 +1203,7 @@ mod tests {
                              payload_hash,
                              created_at
                          )
-                         VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test.track_identity_decision', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
+                         VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'test.track_identity_decision', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
                         params![
                             artifact_id,
                             source_file_id.to_string(),
@@ -1225,7 +1224,7 @@ mod tests {
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                     )?;
                     write.execute(
-                        "INSERT INTO source_file_facts (
+                        "INSERT INTO source_file_observations (
                              source_file_id,
                              basis_fingerprint,
                              basis_source_id,
@@ -1279,7 +1278,7 @@ mod tests {
                     )?;
                     Ok(())
                 })
-                .expect("commit facts");
+                .expect("commit observations");
         }
 
         fn link_attachment(&self, source_file_id: i64, hash_value: &str) -> i64 {
@@ -1329,8 +1328,8 @@ mod tests {
 
         fn promote_and_candidate(&self) {
             self.store
-                .promote_primary_media_for_source(self.source_id, 10)
-                .expect("promote primary media");
+                .promote_playable_media_for_source(self.source_id, 10)
+                .expect("promote playable media");
             self.store
                 .produce_track_identity_candidates_for_source(self.source_id, 10)
                 .expect("produce track identity candidates");
@@ -1477,7 +1476,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         let attachment_id = fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
 
         let result = fixture.produce_decisions(10);
@@ -1539,7 +1538,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
 
@@ -1591,7 +1590,7 @@ mod tests {
         let reject_fixture = TrackIdentityDecisionFixture::new();
         reject_fixture.insert_source_file(100, "Album/reject.wav");
         reject_fixture.link_attachment(100, HASH_A);
-        reject_fixture.commit_current_facts(100, HASH_A);
+        reject_fixture.commit_current_observations(100, HASH_A);
         reject_fixture.promote_and_candidate();
         let reject_candidate_id = reject_fixture.single_candidate_id();
 
@@ -1609,7 +1608,7 @@ mod tests {
         let defer_fixture = TrackIdentityDecisionFixture::new();
         defer_fixture.insert_source_file(100, "Album/defer.wav");
         defer_fixture.link_attachment(100, HASH_A);
-        defer_fixture.commit_current_facts(100, HASH_A);
+        defer_fixture.commit_current_observations(100, HASH_A);
         defer_fixture.promote_and_candidate();
         let defer_candidate_id = defer_fixture.single_candidate_id();
 
@@ -1630,7 +1629,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/reject-blocks.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let system = fixture.produce_decisions(10);
@@ -1674,7 +1673,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/defer-blocks.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let system = fixture.produce_decisions(10);
@@ -1710,7 +1709,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/user-correction.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
 
@@ -1798,7 +1797,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/user-blocked.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let deferred =
@@ -1839,7 +1838,7 @@ mod tests {
         ] {
             fixture.insert_source_file(source_file_id, path);
             fixture.link_attachment(source_file_id, hash);
-            fixture.commit_current_facts(source_file_id, hash);
+            fixture.commit_current_observations(source_file_id, hash);
         }
         fixture.promote_and_candidate();
         let blocked_candidate_id = fixture
@@ -1884,7 +1883,7 @@ mod tests {
         let stale_fixture = TrackIdentityDecisionFixture::new();
         stale_fixture.insert_source_file(100, "Album/stale-accept.wav");
         stale_fixture.link_attachment(100, HASH_A);
-        stale_fixture.commit_current_facts(100, HASH_A);
+        stale_fixture.commit_current_observations(100, HASH_A);
         stale_fixture.promote_and_candidate();
         let stale_candidate_id = stale_fixture.single_candidate_id();
         stale_fixture.change_file_basis(100);
@@ -1904,7 +1903,7 @@ mod tests {
         let no_evidence_fixture = TrackIdentityDecisionFixture::new();
         no_evidence_fixture.insert_source_file(100, "Album/no-current-evidence.wav");
         no_evidence_fixture.link_attachment(100, HASH_A);
-        no_evidence_fixture.commit_current_facts(100, HASH_A);
+        no_evidence_fixture.commit_current_observations(100, HASH_A);
         no_evidence_fixture.promote_and_candidate();
         let no_evidence_candidate_id = no_evidence_fixture.single_candidate_id();
         no_evidence_fixture.change_file_basis(100);
@@ -1923,7 +1922,7 @@ mod tests {
         let reject_fixture = TrackIdentityDecisionFixture::new();
         reject_fixture.insert_source_file(100, "Album/reject-no-evidence.wav");
         reject_fixture.link_attachment(100, HASH_A);
-        reject_fixture.commit_current_facts(100, HASH_A);
+        reject_fixture.commit_current_observations(100, HASH_A);
         reject_fixture.promote_and_candidate();
         let reject_candidate_id = reject_fixture.single_candidate_id();
         reject_fixture.change_file_basis(100);
@@ -1936,7 +1935,7 @@ mod tests {
         let defer_fixture = TrackIdentityDecisionFixture::new();
         defer_fixture.insert_source_file(100, "Album/defer-stale-no-evidence.wav");
         defer_fixture.link_attachment(100, HASH_A);
-        defer_fixture.commit_current_facts(100, HASH_A);
+        defer_fixture.commit_current_observations(100, HASH_A);
         defer_fixture.promote_and_candidate();
         let defer_candidate_id = defer_fixture.single_candidate_id();
         defer_fixture.change_file_basis(100);
@@ -1963,18 +1962,18 @@ mod tests {
     }
 
     #[test]
-    fn decision_evidence_snapshots_are_immutable_after_later_facts_change() {
+    fn decision_evidence_snapshots_are_immutable_after_later_observations_change() {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/immutable.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let accepted =
             TrackIdentityDecisionFixture::expect_written(fixture.accept_candidate(candidate_id));
         assert_eq!(accepted.evidence_snapshot_count, 1);
 
-        fixture.commit_current_facts(100, HASH_B);
+        fixture.commit_current_observations(100, HASH_B);
         fixture.link_attachment(100, HASH_B);
 
         let decisions = fixture
@@ -1985,7 +1984,7 @@ mod tests {
         assert_eq!(decisions[0].evidence.len(), 1);
         assert_eq!(
             decisions[0].evidence[0].content_hash_value, HASH_A,
-            "old decision evidence snapshot must not be rewritten by later facts"
+            "old decision evidence snapshot must not be rewritten by later observations"
         );
     }
 
@@ -1994,7 +1993,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/copied-provenance.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let accepted =
@@ -2038,7 +2037,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/stale.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         fixture.change_file_basis(100);
         fixture
@@ -2059,7 +2058,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
 
         let first = fixture.produce_decisions(10);
@@ -2079,8 +2078,8 @@ mod tests {
         fixture.insert_source_file(101, "Album/track copy.wav");
         fixture.link_attachment(100, HASH_A);
         fixture.link_attachment(101, HASH_B);
-        fixture.commit_current_facts(100, HASH_A);
-        fixture.commit_current_facts(101, HASH_B);
+        fixture.commit_current_observations(100, HASH_A);
+        fixture.commit_current_observations(101, HASH_B);
         fixture.promote_and_candidate();
 
         fixture.produce_decisions(10);
@@ -2105,7 +2104,7 @@ mod tests {
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.insert_source_file(101, "Album/album.cue");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         fixture.produce_decisions(10);
 
@@ -2130,7 +2129,7 @@ mod tests {
             .expect("read contents");
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 2);
-        assert!(result.rows.iter().all(|row| row.primary_media.is_none()));
+        assert!(result.rows.iter().all(|row| row.playable_media.is_none()));
         assert_eq!(fixture.count_rows("track_identity_candidates"), 1);
         assert_eq!(fixture.count_rows("track_identity_decisions"), 1);
         assert_eq!(fixture.count_rows("track_identity_decision_evidence"), 1);
@@ -2160,8 +2159,8 @@ mod tests {
         fixture.insert_source_file(101, "Album/track copy.wav");
         fixture.link_attachment(100, HASH_A);
         fixture.link_attachment(101, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
-        fixture.commit_current_facts(101, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
+        fixture.commit_current_observations(101, HASH_A);
         fixture.promote_and_candidate();
 
         assert_eq!(
@@ -2211,7 +2210,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/source-scoped-survival.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let accepted =
@@ -2267,7 +2266,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/candidate-scoped-survival.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let accepted =
@@ -2338,7 +2337,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/effective-stale-missing.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let accepted =
@@ -2388,7 +2387,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/snapshot-survival.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         fixture.produce_decisions(10);
@@ -2449,7 +2448,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/reject-zero-evidence.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
 
@@ -2535,7 +2534,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/defer-zero-evidence.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
 
@@ -2577,7 +2576,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/source-scope-survival.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let _accepted =
@@ -2627,7 +2626,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/accept.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
 
@@ -2674,7 +2673,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/no-source-scope.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
 
@@ -2717,7 +2716,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/prior-decision.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
 
@@ -2778,7 +2777,7 @@ mod tests {
 
         fixture.insert_source_file(100, "Album/source-a.wav");
         let attachment_id = fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
 
         let source2_id: i64 = 2;
 
@@ -2849,19 +2848,19 @@ mod tests {
                 write.execute(
                     "INSERT OR REPLACE INTO work_artifacts (
                          artifact_id, work_run_id, subject_kind,
-                         subject_id, artifact_kind, artifact_role,
+                         subject_id, artifact_kind,
                          adapter_key, adapter_version, basis_fingerprint,
                          media_type, storage_kind, payload_hash, created_at
                      )
                      VALUES (20000, 10, 'source_file', '200',
-                             'inspection_result', 'primary_result',
+                             'inspection_result',
                              'test.multi_source', '1',
                              'basis:200', 'application/json',
                              'inline_payload', 'payload:200', 1)",
                     [],
                 )?;
                 write.execute(
-                    "INSERT INTO source_file_facts (
+                    "INSERT INTO source_file_observations (
                          source_file_id, basis_fingerprint,
                          basis_source_id, basis_relative_path,
                          basis_size_bytes, basis_mtime_ns,
@@ -2912,7 +2911,7 @@ mod tests {
 
         fixture
             .store
-            .promote_primary_media_for_source(source2_id, 10)
+            .promote_playable_media_for_source(source2_id, 10)
             .expect("promote source 2");
         fixture
             .store
@@ -2999,7 +2998,7 @@ mod tests {
         let fixture = TrackIdentityDecisionFixture::new();
         fixture.insert_source_file(100, "Album/fk-check.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A);
+        fixture.commit_current_observations(100, HASH_A);
         fixture.promote_and_candidate();
         let candidate_id = fixture.single_candidate_id();
         let accepted =

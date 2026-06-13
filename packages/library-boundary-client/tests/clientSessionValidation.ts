@@ -361,9 +361,9 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             linksCreated: 1,
             linksReplaced: 0,
             linksRefreshed: 0,
-            skippedStaleFacts: 0,
+            skippedStaleObservations: 0,
             skippedNoBlake3: 0,
-            skippedNoFacts: 0,
+            skippedNoObservations: 0,
             remainingCandidates: 0
           },
           probe: {
@@ -373,16 +373,16 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             failedCount: 0,
             remainingCandidates: 0
           },
-          primaryMediaPromotion: {
+          playableMediaPromotion: {
             effectiveLimit: 4,
             promotedCount: 1,
             refreshedCount: 0,
             skippedUnusableSource: 0,
             skippedUnsupportedMediaKind: 0,
-            skippedNoFacts: 0,
-            skippedStaleFacts: 0,
+            skippedNoObservations: 0,
+            skippedStaleObservations: 0,
             skippedNoBlake3: 0,
-            skippedNoProbeFacts: 0,
+            skippedNoProbeObservations: 0,
             skippedMissingAttachmentLink: 0,
             skippedStaleAttachmentLink: 0,
             remainingCandidates: 0
@@ -396,7 +396,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             evidenceCreated: 1,
             evidenceRefreshed: 0,
             candidatesMarkedStale: 0,
-            skippedStalePrimaryMediaFacts: 0,
+            skippedStalePlayableMedia: 0,
             remainingCandidates: 0
           },
           trackIdentityDecisions: {
@@ -410,7 +410,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
           },
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
-          remainingPrimaryMediaPromotionCandidates: 0,
+          remainingPlayableMediaPromotionCandidates: 0,
           remainingTrackIdentityCandidateProductionCandidates: 0,
           remainingTrackIdentityDecisionProductionCandidates: 0
         }
@@ -427,16 +427,16 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
           status: 'idle',
           remainingHashCandidates: 0,
           remainingProbeCandidates: 0,
-          remainingPrimaryMediaPromotionCandidates: 0,
+          remainingPlayableMediaPromotionCandidates: 0,
           remainingTrackIdentityCandidateProductionCandidates: 0,
           remainingTrackIdentityDecisionProductionCandidates: 0,
           attachmentLinks: {
             currentLinksCount: 1,
             staleLinksCount: 0,
-            sourceFilesWithCurrentBlake3FactsCount: 1,
+            sourceFilesWithCurrentBlake3ObservationsCount: 1,
             sourceFilesWithAttachmentLinksCount: 1,
             sourceFilesMissingAttachmentLinksCount: 0,
-            unmaterializedBlake3FactsCount: 0
+            unmaterializedBlake3ObservationsCount: 0
           },
           lastRun: {
             status: 'completed',
@@ -454,9 +454,9 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
               linksCreated: 1,
               linksReplaced: 0,
               linksRefreshed: 0,
-              skippedStaleFacts: 0,
+              skippedStaleObservations: 0,
               skippedNoBlake3: 0,
-              skippedNoFacts: 0,
+              skippedNoObservations: 0,
               remainingCandidates: 0
             },
             probe: {
@@ -466,16 +466,16 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
               failedCount: 0,
               remainingCandidates: 0
             },
-            primaryMediaPromotion: {
+            playableMediaPromotion: {
               effectiveLimit: 4,
               promotedCount: 1,
               refreshedCount: 0,
               skippedUnusableSource: 0,
               skippedUnsupportedMediaKind: 0,
-              skippedNoFacts: 0,
-              skippedStaleFacts: 0,
+              skippedNoObservations: 0,
+              skippedStaleObservations: 0,
               skippedNoBlake3: 0,
-              skippedNoProbeFacts: 0,
+              skippedNoProbeObservations: 0,
               skippedMissingAttachmentLink: 0,
               skippedStaleAttachmentLink: 0,
               remainingCandidates: 0
@@ -489,7 +489,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
               evidenceCreated: 1,
               evidenceRefreshed: 0,
               candidatesMarkedStale: 0,
-              skippedStalePrimaryMediaFacts: 0,
+              skippedStalePlayableMedia: 0,
               remainingCandidates: 0
             },
             trackIdentityDecisions: {
@@ -503,7 +503,7 @@ async function validatesSourceMaintenanceRequestsAndReplies(): Promise<void> {
             },
             remainingHashCandidates: 0,
             remainingProbeCandidates: 0,
-            remainingPrimaryMediaPromotionCandidates: 0,
+            remainingPlayableMediaPromotionCandidates: 0,
             remainingTrackIdentityCandidateProductionCandidates: 0,
             remainingTrackIdentityDecisionProductionCandidates: 0
           }
@@ -601,7 +601,7 @@ async function validatesSourceIntegrityReadRequestAndReply(): Promise<void> {
           evidenceAndMaintenance: {
             remainingHashCandidates: 2,
             remainingProbeCandidates: 1,
-            remainingPrimaryMediaPromotionCandidates: 0,
+            remainingPlayableMediaPromotionCandidates: 0,
             remainingTrackIdentityCandidateProductionCandidates: 0,
             remainingTrackIdentityDecisionProductionCandidates: 0
           },
@@ -609,9 +609,9 @@ async function validatesSourceIntegrityReadRequestAndReply(): Promise<void> {
             currentLinksCount: 0,
             staleLinksCount: 0,
             missingLinksCount: 0,
-            sourceFilesWithCurrentBlake3FactsCount: 0,
+            sourceFilesWithCurrentBlake3ObservationsCount: 0,
             sourceFilesWithAttachmentLinksCount: 0,
-            unmaterializedBlake3FactsCount: 0
+            unmaterializedBlake3ObservationsCount: 0
           },
           runtimeMaintenance: {
             state: 'idle'
@@ -928,8 +928,8 @@ async function validatesTrackIdentityReviewCandidateReads(): Promise<void> {
           candidates: [
             {
               candidateId: '7',
-              candidateKind: 'exact_primary_media_content',
-              candidateEvidenceBasis: 'current_primary_media_exact_blake3',
+              candidateKind: 'exact_playable_media_content',
+              candidateEvidenceBasis: 'current_playable_media_exact_blake3',
               candidateStatus: 'active',
               evidenceKeyAlgorithm: 'blake3',
               evidenceKeyValue: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -1019,7 +1019,7 @@ async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void
             fileKind: 'audio',
             fileClass: 'audio',
             presenceState: 'present',
-            hasCurrentBlake3Fact: true,
+            hasCurrentBlake3Observation: true,
             linkStatus: 'current',
             sourceMountStatus: 'mounted',
             sourceAccessState: 'accessible',
@@ -1064,10 +1064,10 @@ async function validatesAttachmentIdentityReadRequestsAndReplies(): Promise<void
             sourceId: '3',
             currentLinksCount: 1,
             staleLinksCount: 0,
-            sourceFilesWithCurrentBlake3FactsCount: 1,
+            sourceFilesWithCurrentBlake3ObservationsCount: 1,
             sourceFilesWithAttachmentLinksCount: 1,
             sourceFilesMissingAttachmentLinksCount: 0,
-            unmaterializedBlake3FactsCount: 0
+            unmaterializedBlake3ObservationsCount: 0
           }
         }
       }

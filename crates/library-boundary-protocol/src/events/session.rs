@@ -265,7 +265,7 @@ mod tests {
     use crate::{
         ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeDepth,
         LibraryTreeEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        PrimaryMediaKind, ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenRequest,
+        PlayableMediaKind, ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenRequest,
         ReadLocalBrowseEntryPointsRequest, ReadNavigationRowsRequest,
         ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentRequest,
         ReadSourceIntegrityRequest, ReadSourceLifecycleRequest, SnapshotReadCommand,
@@ -309,8 +309,8 @@ mod tests {
                     source_id: 8,
                     source_directory_id: 9,
                 },
-                policy: ContentsReadPolicy::PrimaryMedia {
-                    media_kinds: vec![PrimaryMediaKind::Audio, PrimaryMediaKind::Video],
+                policy: ContentsReadPolicy::PlayableMedia {
+                    media_kinds: vec![PlayableMediaKind::Audio, PlayableMediaKind::Video],
                 },
                 scope_depth: ContentsScopeDepth::Recursive,
                 limit: Some(100),

@@ -9,7 +9,6 @@ pub(crate) struct ArtifactRow {
     pub(crate) subject_kind: String,
     pub(crate) subject_id: String,
     pub(crate) artifact_kind: String,
-    pub(crate) artifact_role: String,
     pub(crate) basis_fingerprint: String,
 }
 
@@ -22,7 +21,6 @@ pub(crate) fn load_artifact_row(
                 subject_kind,
                 subject_id,
                 artifact_kind,
-                artifact_role,
                 basis_fingerprint
          FROM work_artifacts
          WHERE artifact_id = ?1",
@@ -33,8 +31,7 @@ pub(crate) fn load_artifact_row(
                 subject_kind: row.get(1)?,
                 subject_id: row.get(2)?,
                 artifact_kind: row.get(3)?,
-                artifact_role: row.get(4)?,
-                basis_fingerprint: row.get(5)?,
+                basis_fingerprint: row.get(4)?,
             })
         },
     )
@@ -72,13 +69,6 @@ pub(crate) fn require_source_artifact(
         format!(
             "artifact {artifact_id} must have artifact_kind={expected_artifact_kind}, found {}",
             artifact.artifact_kind
-        ),
-    )?;
-    require(
-        artifact.artifact_role == "primary_result",
-        format!(
-            "artifact {artifact_id} must have artifact_role=primary_result, found {}",
-            artifact.artifact_role
         ),
     )?;
     require(

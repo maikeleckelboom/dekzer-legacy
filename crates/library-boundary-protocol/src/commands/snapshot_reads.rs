@@ -733,10 +733,10 @@ pub enum ContentsReadPolicy {
         #[ts(rename = "fileClasses")]
         file_classes: Vec<ContentsFileClass>,
     },
-    PrimaryMedia {
+    PlayableMedia {
         #[serde(rename = "mediaKinds")]
         #[ts(rename = "mediaKinds")]
-        media_kinds: Vec<PrimaryMediaKind>,
+        media_kinds: Vec<PlayableMediaKind>,
     },
 }
 
@@ -787,7 +787,7 @@ impl ContentsFileClass {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum PrimaryMediaKind {
+pub enum PlayableMediaKind {
     Audio,
     Video,
 }
@@ -989,7 +989,7 @@ pub struct ContentsFileRow {
     pub presence: ContentsPresenceState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub primary_media: Option<PrimaryMediaSummary>,
+    pub playable_media: Option<PlayableMedia>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub updated_at_ms: Option<i64>,
@@ -1000,11 +1000,11 @@ pub struct ContentsFileRow {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub struct PrimaryMediaSummary {
+pub struct PlayableMedia {
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
-    pub primary_media_fact_id: Option<i64>,
+    pub playable_media_id: Option<i64>,
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
@@ -1291,10 +1291,10 @@ pub enum DirectoryScanState {
 )]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(tag = "kind", rename_all = "camelCase")]
-pub enum DirectoryPrimaryMediaState {
+pub enum DirectoryPlayableMediaState {
     Unknown,
-    HasPrimaryMediaDescendants,
-    NoPrimaryMediaDescendants,
+    HasPlayableMediaDescendants,
+    NoPlayableMediaDescendants,
 }
 
 #[derive(
@@ -1396,7 +1396,7 @@ pub struct LibraryTreeNode {
     pub has_child_directories: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
-    pub directory_primary_media_state: Option<DirectoryPrimaryMediaState>,
+    pub directory_playable_media_state: Option<DirectoryPlayableMediaState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub directory_image_media_state: Option<DirectoryImageMediaState>,
@@ -1780,7 +1780,7 @@ pub struct SourceIntegrityFileKindCount {
 pub struct SourceIntegrityEvidenceAndMaintenance {
     pub remaining_hash_candidates: usize,
     pub remaining_probe_candidates: usize,
-    pub remaining_primary_media_promotion_candidates: usize,
+    pub remaining_playable_media_promotion_candidates: usize,
     pub remaining_track_identity_candidate_production_candidates: usize,
     pub remaining_track_identity_decision_production_candidates: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1804,9 +1804,9 @@ pub struct SourceIntegrityAttachmentIntegrity {
     pub current_links_count: usize,
     pub stale_links_count: usize,
     pub missing_links_count: usize,
-    pub source_files_with_current_blake3_facts_count: usize,
+    pub source_files_with_current_blake3_observations_count: usize,
     pub source_files_with_attachment_links_count: usize,
-    pub unmaterialized_blake3_facts_count: usize,
+    pub unmaterialized_blake3_observations_count: usize,
 }
 
 #[derive(
@@ -2011,7 +2011,7 @@ pub struct SourceFileAttachmentLink {
     pub file_kind: ContentsFileKind,
     pub file_class: SearchFilterFileClass,
     pub presence_state: ContentsPresenceState,
-    pub has_current_blake3_fact: bool,
+    pub has_current_blake3_observation: bool,
     pub link_status: SourceFileAttachmentLinkStatus,
     pub source_mount_status: SourceMountStatus,
     pub source_access_state: SourceAccessState,
@@ -2067,10 +2067,10 @@ pub struct SourceAttachmentSummary {
     pub source_id: i64,
     pub current_links_count: usize,
     pub stale_links_count: usize,
-    pub source_files_with_current_blake3_facts_count: usize,
+    pub source_files_with_current_blake3_observations_count: usize,
     pub source_files_with_attachment_links_count: usize,
     pub source_files_missing_attachment_links_count: usize,
-    pub unmaterialized_blake3_facts_count: usize,
+    pub unmaterialized_blake3_observations_count: usize,
 }
 
 #[derive(
@@ -2480,7 +2480,7 @@ mod tests {
         AttachmentIdentity, AttachmentIdentityReadStatus, AttachmentSourceFileOccurrenceStatus,
         AttachmentSourceFilesSummary, ContentsFileClass, ContentsFileKind, ContentsPresenceState,
         ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeCoverageState,
-        ContentsScopeDepth, DirectoryImageMediaState, DirectoryPrimaryMediaState,
+        ContentsScopeDepth, DirectoryImageMediaState, DirectoryPlayableMediaState,
         DirectoryScanState, LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint,
         LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
         LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
@@ -2491,7 +2491,7 @@ mod tests {
         LocalBrowseItemFailureCode, LocalBrowseItemIdentity, LocalBrowseItemKind,
         LocalBrowseItemMediaRelevance, LocalBrowseItemStatus, LocalBrowseItemsReadStatus,
         LocalBrowsePlatform, LocalBrowseWindowIdentity, NavigableChildScopeState, NavigationRow,
-        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PrimaryMediaKind,
+        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PlayableMediaKind,
         ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
         ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
         ReadLocalBrowseEntryPointsReply, ReadLocalBrowseEntryPointsRequest,
@@ -2841,10 +2841,10 @@ mod tests {
                 "sourceFileInventory",
             ),
             (
-                ContentsReadPolicy::PrimaryMedia {
-                    media_kinds: vec![PrimaryMediaKind::Audio],
+                ContentsReadPolicy::PlayableMedia {
+                    media_kinds: vec![PlayableMediaKind::Audio],
                 },
-                "primaryMedia",
+                "playableMedia",
             ),
         ];
 
@@ -2897,7 +2897,7 @@ mod tests {
             evidence_and_maintenance: SourceIntegrityEvidenceAndMaintenance {
                 remaining_hash_candidates: 0,
                 remaining_probe_candidates: 0,
-                remaining_primary_media_promotion_candidates: 0,
+                remaining_playable_media_promotion_candidates: 0,
                 remaining_track_identity_candidate_production_candidates: 0,
                 remaining_track_identity_decision_production_candidates: 0,
                 source_failure: None,
@@ -2922,7 +2922,7 @@ mod tests {
     }
 
     #[test]
-    fn source_lifecycle_serializes_semantic_source_facts() {
+    fn source_lifecycle_serializes_semantic_source_state() {
         let reply = SnapshotReadReply::SourceLifecycle(ReadSourceLifecycleReply {
             lifecycle: Some(SourceLifecycle {
                 source_id: 7,
@@ -3016,8 +3016,8 @@ mod tests {
                     modified_at_ns: None,
                     updated_at_ms: 100,
                     has_child_directories: Some(true),
-                    directory_primary_media_state: Some(
-                        DirectoryPrimaryMediaState::HasPrimaryMediaDescendants,
+                    directory_playable_media_state: Some(
+                        DirectoryPlayableMediaState::HasPlayableMediaDescendants,
                     ),
                     directory_image_media_state: Some(DirectoryImageMediaState::Unknown),
                     directory_scan_state: Some(DirectoryScanState::Scanning),
@@ -3062,8 +3062,8 @@ mod tests {
                             "modifiedAtNs": null,
                             "updatedAtMs": 100,
                             "hasChildDirectories": true,
-                            "directoryPrimaryMediaState": {
-                                "kind": "hasPrimaryMediaDescendants"
+                            "directoryPlayableMediaState": {
+                                "kind": "hasPlayableMediaDescendants"
                             },
                             "directoryImageMediaState": {
                                 "kind": "unknown"
@@ -3110,7 +3110,7 @@ mod tests {
                     modified_at_ns: Some(20),
                     updated_at_ms: 100,
                     has_child_directories: None,
-                    directory_primary_media_state: None,
+                    directory_playable_media_state: None,
                     directory_image_media_state: None,
                     directory_scan_state: None,
                     navigable_child_scope_state: None,
@@ -3243,8 +3243,8 @@ mod tests {
                 status: TrackIdentityReviewReadStatus::Ok,
                 candidates: vec![TrackIdentityReviewCandidate {
                     candidate_id: 11,
-                    candidate_kind: "exact_primary_media_content".to_string(),
-                    candidate_evidence_basis: "current_primary_media_exact_blake3".to_string(),
+                    candidate_kind: "exact_playable_media_content".to_string(),
+                    candidate_evidence_basis: "current_playable_media_exact_blake3".to_string(),
                     candidate_status: TrackIdentityReviewCandidateStatus::Active,
                     evidence_key_algorithm: "blake3".to_string(),
                     evidence_key_value:
@@ -3314,7 +3314,7 @@ mod tests {
             file_kind: ContentsFileKind::Audio,
             file_class: SearchFilterFileClass::Audio,
             presence_state: ContentsPresenceState::Present,
-            has_current_blake3_fact: true,
+            has_current_blake3_observation: true,
             link_status: SourceFileAttachmentLinkStatus::Current,
             source_mount_status: SourceMountStatus::Mounted,
             source_access_state: SourceAccessState::Accessible,
@@ -3389,17 +3389,17 @@ mod tests {
                     source_id: 3,
                     current_links_count: 2,
                     stale_links_count: 1,
-                    source_files_with_current_blake3_facts_count: 4,
+                    source_files_with_current_blake3_observations_count: 4,
                     source_files_with_attachment_links_count: 3,
                     source_files_missing_attachment_links_count: 2,
-                    unmaterialized_blake3_facts_count: 2,
+                    unmaterialized_blake3_observations_count: 2,
                 }),
             });
         let json = serde_json::to_value(&summary_reply).expect("serialize summary reply");
         assert_eq!(json["type"], json!("sourceAttachmentSummary"));
         assert_eq!(json["payload"]["summary"]["sourceId"], json!("3"));
         assert_eq!(
-            json["payload"]["summary"]["unmaterializedBlake3FactsCount"],
+            json["payload"]["summary"]["unmaterializedBlake3ObservationsCount"],
             json!(2)
         );
         assert_eq!(

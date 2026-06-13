@@ -48,7 +48,7 @@ is acceptable. A false empty, disappearing branch, stolen selection, or twitchy 
 
 Scan is not user intent.
 
-A scan may discover data, refresh facts, publish progress, and invalidate affected projections. It must never take
+A scan may discover data, refresh observations, publish progress, and invalidate affected projections. It must never take
 ownership of selection, expansion, scroll, visible focus, or user navigation.
 
 Disclosure is not selection.
@@ -103,7 +103,7 @@ A source, branch, or contents scope may be in one of these readiness classes.
 
 ### Unknown
 
-The system has not yet attempted to establish the necessary fact.
+The system has not yet attempted to establish the necessary observation.
 
 Unknown must not be rendered as leaf, empty, or complete.
 
@@ -160,7 +160,7 @@ Activation may establish:
 - source is reachable;
 - root path is readable;
 - first navigation window can be read;
-- basic child-directory facts are available;
+- basic child-directory observations are available;
 - source should be shown as blocked or failed if activation cannot proceed.
 
 Activation must not require:
@@ -397,9 +397,9 @@ Background source and scan activity must not own those states.
 
 ## Backend Responsibility
 
-The backend owns source, filesystem, inventory, and coverage facts.
+The backend owns source, filesystem, inventory, and coverage observations.
 
-Where the backend cannot prove a fact, it must expose an honest state rather than relying on row absence.
+Where the backend cannot prove a observation, it must expose an honest state rather than relying on row absence.
 
 Backend read models should provide enough information for the renderer to distinguish:
 

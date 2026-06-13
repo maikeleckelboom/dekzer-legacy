@@ -12,7 +12,7 @@ During architectural review of the workspace resize model, the question arose of
 relative to the full-spectrum docking models found in professional creative tools. This ADR records the resulting
 room-level law governing topology mutation, floating surfaces, and docking posture.
 
-Dekzer is a performance instrument. That single fact is the dominant forcing function for every decision in this
+Dekzer is a performance instrument. That single observation is the dominant forcing function for every decision in this
 document.
 
 ---

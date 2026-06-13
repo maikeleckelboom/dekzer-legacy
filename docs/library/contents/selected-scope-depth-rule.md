@@ -7,13 +7,13 @@ read boundary vocabulary (`scopeDepth`, `scopeCoverage`, `hasPolicyOmittedRows`,
 
 ## Decision
 
-When a source-rooted library tree row is selected, the contents table represents the primary media under that selected
+When a source-rooted library tree row is selected, the contents table represents the playable media under that selected
 row recursively.
 
 Tree expansion and contents selection are separate product surfaces:
 
 - Tree expansion shows immediate hierarchy children for navigation.
-- Tree selection shows recursive primary media descendant contents for work.
+- Tree selection shows recursive playable media descendant contents for work.
 
 `immediate` and `recursive` are first-class read identity values. They must not share cursor identity, retained contents
 snapshots, page accumulators, coverage state, omission metadata, or verified-empty state. A hierarchy child read for
@@ -44,7 +44,7 @@ selection semantics. Those nodes use separate query contracts.
 
 ```text
 Tree expansion navigates immediate hierarchy.
-Tree selection projects recursive primary media contents.
+Tree selection projects recursive playable media contents.
 Source, source_location, and directory selections all resolve to substrate targets.
 The substrate owns descendant enumeration.
 The renderer never crawls the tree to answer recursive contents.
@@ -100,21 +100,21 @@ The substrate or boundary resolver owns payload validation and conversion into t
 ## Schema pre-requisites and enum contracts
 
 To support virtual trees and recursive completeness guarantees without eager reads, the schema must include structural
-and coverage facts. Coverage semantics (complete, pending, scanning, blocked, failed) and product issue kinds are
+and coverage observations. Coverage semantics (complete, pending, scanning, blocked, failed) and product issue kinds are
 defined in `source-access-and-scan-coverage.md`. This section defines the directory-level schema columns needed for tree
 affordance and recursive contents completeness.
 
 ### Required columns
 
-The baseline schema must include these facts directly in the baseline SQL. This project is greenfield for the current
+The baseline schema must include these observations directly in the baseline SQL. This project is greenfield for the current
 substrate baseline; do not add a patch migration for this pass unless explicitly instructed.
 
 ```sql
 source_directories.has_child_directories INTEGER NOT NULL DEFAULT 0
 CHECK (has_child_directories IN (0, 1));
 
-source_directories.has_primary_media_descendant INTEGER NOT NULL DEFAULT 0
-CHECK (has_primary_media_descendant IN (0, 1));
+source_directories.has_playable_media_descendant INTEGER NOT NULL DEFAULT 0
+CHECK (has_playable_media_descendant IN (0, 1));
 
 source_directories.has_image_media_descendant INTEGER NOT NULL DEFAULT 0
 CHECK (has_image_media_descendant IN (0, 1));
@@ -155,19 +155,19 @@ CASCADE;
 Do not keep `ON DELETE SET NULL` for ordinary parent-directory relationships in the greenfield baseline. Deleting a
 directory subtree must not produce orphaned hierarchy rows.
 
-`has_child_directories`, `has_primary_media_descendant`, and `has_image_media_descendant` are distinct facts:
+`has_child_directories`, `has_playable_media_descendant`, and `has_image_media_descendant` are distinct observations:
 
 - `has_child_directories` answers whether immediate child directories exist, regardless of media relevance.
-- `has_primary_media_descendant` answers whether the substrate has positive evidence that this directory has audio/video
+- `has_playable_media_descendant` answers whether the substrate has positive evidence that this directory has audio/video
   descendants.
 - `has_image_media_descendant` answers whether the substrate has positive evidence that this directory has image
   descendants.
 
-`has_primary_media_descendant = 0` and `has_image_media_descendant = 0` do not mean the directory is proven empty unless
+`has_playable_media_descendant = 0` and `has_image_media_descendant = 0` do not mean the directory is proven empty unless
 the relevant directory coverage is complete. Use `dir_scan_state` to distinguish unknown, pending, scanning, blocked,
 failed, and complete coverage.
 
-`has_primary_media_descendant` and `has_image_media_descendant` replace `media_browseability` in the greenfield
+`has_playable_media_descendant` and `has_image_media_descendant` replace `media_browseability` in the greenfield
 baseline. Do not keep stale aliases.
 
 ### Enum behavior matrix
@@ -234,25 +234,25 @@ Directory-level `dir_scan_state` values:
   also admit it.
 - `source_files.presence = missing`: excluded from ordinary playable-media contents; source lifecycle/integrity reads
   own missing/unavailable diagnostics.
-- `primary_media_facts`: eligible for `primaryMedia` policy only after current attachment identity and media probe
+- `playable_media`: eligible for `playableMedia` policy only after current attachment identity and media probe
   evidence revalidation.
 
 #### `source_files.file_class`
 
-- `audio`: raw source-file class for audio files; included in primary media.
-- `video`: raw source-file class for video files; visible as a primary media fact until future video inspection
+- `audio`: raw source-file class for audio files; included in playable media.
+- `video`: raw source-file class for video files; visible as a playable media observation until future video inspection
   proves actual deck/output eligibility.
 - `image`: raw source-file class for image files; image media is stored and can be exposed through explicit source-file
-  visibility in the tree, but is not primary media and is not included in normal recursive selected contents.
+  visibility in the tree, but is not playable media and is not included in normal recursive selected contents.
 - `unsupported`: strictly excluded from normal recursive selected contents.
 - `none`: strictly excluded from normal recursive selected contents.
 
 `source_files.file_class` is raw/provisional source-file classification. Normal recursive selected contents is
-primary-media content. Primary media currently means audio/video. Image files are source companion/image media, not
+playable-media content. Playable media currently means audio/video. Image files are source companion/image media, not
 normal selected contents rows.
 
 Tree row admission and selected contents scope are separate concepts. The product/boundary surface owns tree row
-admission policy. Image-only directories may not satisfy primary media descendant facts. Tree row admission is a
+admission policy. Image-only directories may not satisfy playable media descendant observations. Tree row admission is a
 product/boundary surface concern, not a renderer-chosen mode.
 
 **Historical note:** `performance` and `performanceAndImages` were interim tree mode names from a period when the
@@ -262,7 +262,7 @@ be used as current design vocabulary.
 ## Query execution contract
 
 The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target and returns
-rows from the current source-file inventory and, for `primaryMedia`, evidence-backed `primary_media_facts`.
+rows from the current source-file inventory and, for `playableMedia`, evidence-backed `playable_media`.
 
 The renderer never constructs fallback rows.
 
@@ -273,7 +273,7 @@ selected tree row
   -> resolve selector/binding target
   -> derive source_id and optional relative path prefix/scope
   -> query scoped source_files according to the requested contents policy
-  -> for primaryMedia, join current primary_media_facts with source_files, attachments, and source_file_facts
+  -> for playableMedia, join current playable_media with source_files, attachments, and source_file_observations
   -> for sourceFileInventory/audioBrowse/playableMediaBrowse, return scoped source-file inventory rows
   -> return rows plus scan coverage metadata
   -> render contents table
@@ -419,7 +419,7 @@ Every ordered query needs a stable tie-breaker. `source_file_id` is the default 
 
 ### 9. Deduplication
 
-Browse policies return one row per scoped scanned source file admitted by the policy. The `primaryMedia` policy returns
+Browse policies return one row per scoped scanned source file admitted by the policy. The `playableMedia` policy returns
 evidence-backed candidate rows revalidated against scoped source files and attachment identity.
 
 Do not leave duplicate collapse to the renderer.
@@ -477,7 +477,7 @@ Conceptual result states:
 Conceptual row shape requirements (not the contract shape):
 
 - Every contents row has exactly one scoped source file, identified by `sourceFileId`.
-- Rows carry source-file identity and may include a `primaryMedia` summary when current media-candidate evidence exists.
+- Rows carry source-file identity and may include a `playableMedia` summary when current media-candidate evidence exists.
 - Source-file rows must not invent track metadata.
 - `id` is the durable row identity for the boundary row.
 - All durable SQLite row identifiers crossing the renderer boundary are encoded as strings unless the boundary contract
@@ -492,7 +492,7 @@ The UI must reflect the exact `SelectedContentsResult` state truthfully.
 
 - `loading`: show progress skeleton or loading row. Do not show stale empty copy.
 - `partial`: show rows found so far plus `Still indexing. Results may be incomplete.`
-- `empty`: show `No primary media found under this folder.` Only valid with complete coverage.
+- `empty`: show `No playable media found under this folder.` Only valid with complete coverage.
   - Complete coverage with no scoped audio/video source files is authoritative empty.
 - `source_unavailable`: show known rows as unavailable if supplied, or show a global unavailable state. Never show
   empty.
@@ -509,7 +509,7 @@ The tree and contents table are independently virtualizable because they answer 
 
 ```text
 tree expansion -> immediate child rows for navigation
-contents table -> recursive primary media rows for selected target
+contents table -> recursive playable media rows for selected target
 ```
 
 The renderer does not need to hold recursive descendant contents inside the tree. It holds only:
@@ -527,16 +527,16 @@ on tree scroll position or tree expansion state.
 The renderer derives directory expandability from `navigableChildScopeState` (`unknown`, `hasNavigableChildScopes`,
 `noNavigableChildScopes`).
 The product boundary contract owns this rule: the renderer must not derive
-expandability from `directoryPrimaryMediaState` or `directoryImageMediaState`.
+expandability from `directoryPlayableMediaState` or `directoryImageMediaState`.
 A directory with `navigableChildScopeState === 'unknown'` must not show a disclosure chevron;
 only `hasNavigableChildScopes` warrants a disclosure affordance.
 Unknown child scope existence must not be projected as a known expandable branch.
 Leaf folders (including media-only folders) are selectable and have no disclosure.
 
-### Substrate descendant facts (store-level evidence)
+### Substrate descendant observations (store-level evidence)
 
-The store may maintain `has_child_directories`, `has_primary_media_descendant`, and `has_image_media_descendant`
-as substrate evidence for scan coverage and query optimization. These are internal store-level facts, not
+The store may maintain `has_child_directories`, `has_playable_media_descendant`, and `has_image_media_descendant`
+as substrate evidence for scan coverage and query optimization. These are internal store-level observations, not
 renderer affordance authority. The renderer does not use these fields to decide whether to show a chevron.
 
 The renderer must not fetch depth+1 children for every visible row just to decide whether to show a chevron.
@@ -563,7 +563,7 @@ Implementation is allowed only after:
 
 - the greenfield baseline SQL is edited directly; do not create a patch migration for this pass
 - `source_directories.has_child_directories` exists in the baseline schema
-- `source_directories.has_primary_media_descendant` exists in the baseline schema
+- `source_directories.has_playable_media_descendant` exists in the baseline schema
 - `source_directories.has_image_media_descendant` exists in the baseline schema
 - `source_directories.dir_scan_state` exists in the baseline schema
 - `source_directories.mtime_ns` exists in the baseline schema

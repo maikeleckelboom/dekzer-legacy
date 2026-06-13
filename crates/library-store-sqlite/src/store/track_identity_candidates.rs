@@ -9,8 +9,8 @@ use super::SqliteDurableStore;
 
 pub const DEFAULT_TRACK_IDENTITY_CANDIDATE_LIMIT: usize = 4;
 pub const MAX_TRACK_IDENTITY_CANDIDATE_LIMIT: usize = 128;
-const TRACK_IDENTITY_CANDIDATE_KIND: &str = "exact_primary_media_content";
-const TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS: &str = "current_primary_media_exact_blake3";
+const TRACK_IDENTITY_CANDIDATE_KIND: &str = "exact_playable_media_content";
+const TRACK_IDENTITY_CANDIDATE_EVIDENCE_BASIS: &str = "current_playable_media_exact_blake3";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProduceTrackIdentityCandidatesForSourceResult {
@@ -21,13 +21,13 @@ pub struct ProduceTrackIdentityCandidatesForSourceResult {
     pub evidence_created: usize,
     pub evidence_refreshed: usize,
     pub candidates_marked_stale: usize,
-    pub skipped_stale_primary_media_facts: usize,
+    pub skipped_stale_playable_media: usize,
     pub remaining_candidates: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TrackIdentityCandidateProductionRow {
-    primary_media_fact_id: i64,
+    playable_media_id: i64,
     attachment_id: i64,
     evidence_source_file_id: i64,
     evidence_basis_fingerprint: String,
@@ -77,10 +77,10 @@ fn produce_track_identity_candidates_for_source(
     limit: usize,
     produced_at: i64,
 ) -> LibrarySqliteResult<ProduceTrackIdentityCandidatesForSourceResult> {
-    let skipped_stale_primary_media_facts = count_stale_primary_media_facts(write, source_id)?;
+    let skipped_stale_playable_media = count_stale_playable_media(write, source_id)?;
 
     let mut result = ProduceTrackIdentityCandidatesForSourceResult {
-        skipped_stale_primary_media_facts,
+        skipped_stale_playable_media,
         ..Default::default()
     };
 
@@ -140,7 +140,7 @@ fn count_track_identity_candidate_production_candidates(
         .map_err(Into::into)
 }
 
-fn count_stale_primary_media_facts(
+fn count_stale_playable_media(
     connection: &rusqlite::Connection,
     source_id: i64,
 ) -> LibrarySqliteResult<usize> {
@@ -148,19 +148,19 @@ fn count_stale_primary_media_facts(
         .query_row(
             &format!(
                 "SELECT COUNT(*)
-                 FROM primary_media_facts pmc
+                 FROM playable_media pmc
                  JOIN source_files file
                    ON file.source_file_id = pmc.evidence_source_file_id
-                 LEFT JOIN source_file_facts facts
-                   ON facts.source_file_id = pmc.evidence_source_file_id
+                 LEFT JOIN source_file_observations observations
+                   ON observations.source_file_id = pmc.evidence_source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_id = pmc.evidence_source_file_id
                   AND link.attachment_id = pmc.attachment_id
                  LEFT JOIN content_attachments attachment
                    ON attachment.attachment_id = pmc.attachment_id
                  WHERE file.source_id = ?1
-                   AND NOT ({current_primary_media_predicate})",
-                current_primary_media_predicate = CURRENT_PRIMARY_MEDIA_PREDICATE,
+                   AND NOT ({current_playable_media_predicate})",
+                current_playable_media_predicate = CURRENT_PLAYABLE_MEDIA_PREDICATE,
             ),
             params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
             |row| read_count(row, 0),
@@ -176,7 +176,7 @@ fn read_track_identity_candidate_production_candidates(
     let limit_i64 =
         i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
     let sql = track_identity_candidate_production_candidates_sql(
-        "SELECT evidence.primary_media_fact_id,
+        "SELECT evidence.playable_media_id,
                 evidence.attachment_id,
                 evidence.evidence_source_file_id,
                 evidence.evidence_basis_fingerprint,
@@ -186,7 +186,7 @@ fn read_track_identity_candidate_production_candidates(
                 evidence.source_id,
                 evidence.accepted_artifact_id",
         "ORDER BY lower(evidence.relative_path) ASC,
-                 evidence.primary_media_fact_id ASC,
+                 evidence.playable_media_id ASC,
                  evidence.evidence_rank ASC
          LIMIT ?5",
     );
@@ -202,7 +202,7 @@ fn read_track_identity_candidate_production_candidates(
             ],
             |row| {
                 Ok(TrackIdentityCandidateProductionRow {
-                    primary_media_fact_id: row.get(0)?,
+                    playable_media_id: row.get(0)?,
                     attachment_id: row.get(1)?,
                     evidence_source_file_id: row.get(2)?,
                     evidence_basis_fingerprint: row.get(3)?,
@@ -220,28 +220,28 @@ fn read_track_identity_candidate_production_candidates(
 
 fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffix: &str) -> String {
     format!(
-        "WITH current_primary_media AS (
-                 SELECT pmc.primary_media_fact_id,
+        "WITH current_playable_media AS (
+                 SELECT pmc.playable_media_id,
                         pmc.attachment_id,
                         pmc.evidence_source_file_id,
                         pmc.evidence_basis_fingerprint,
                         attachment.content_hash_value,
                         file.relative_path
-                 FROM primary_media_facts pmc
+                 FROM playable_media pmc
                  JOIN source_files file
                    ON file.source_file_id = pmc.evidence_source_file_id
-                 JOIN source_file_facts facts
-                   ON facts.source_file_id = pmc.evidence_source_file_id
+                 JOIN source_file_observations observations
+                   ON observations.source_file_id = pmc.evidence_source_file_id
                  JOIN source_file_attachment_links link
                    ON link.source_file_id = pmc.evidence_source_file_id
                   AND link.attachment_id = pmc.attachment_id
                  JOIN content_attachments attachment
                    ON attachment.attachment_id = pmc.attachment_id
                  WHERE file.source_id = ?1
-                   AND {current_primary_media_predicate}
+                   AND {current_playable_media_predicate}
              ),
              current_attachment_evidence AS (
-                 SELECT current.primary_media_fact_id,
+                 SELECT current.playable_media_id,
                         current.attachment_id,
                         current.evidence_source_file_id,
                         current.evidence_basis_fingerprint,
@@ -250,19 +250,19 @@ fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffi
                         link.source_file_attachment_link_id,
                         link.source_file_id,
                         link.source_id,
-                        facts.accepted_artifact_id,
+                        observations.accepted_artifact_id,
                         ROW_NUMBER() OVER (
-                            PARTITION BY current.primary_media_fact_id
+                            PARTITION BY current.playable_media_id
                             ORDER BY lower(file.relative_path) ASC,
                                      file.source_file_id ASC
                         ) AS evidence_rank
-                 FROM current_primary_media current
+                 FROM current_playable_media current
                  JOIN source_file_attachment_links link
                    ON link.attachment_id = current.attachment_id
                  JOIN source_files file
                    ON file.source_file_id = link.source_file_id
-                 JOIN source_file_facts facts
-                   ON facts.source_file_id = link.source_file_id
+                 JOIN source_file_observations observations
+                   ON observations.source_file_id = link.source_file_id
                  JOIN content_attachments attachment
                    ON attachment.attachment_id = link.attachment_id
                  WHERE {current_attachment_link_predicate}
@@ -275,10 +275,10 @@ fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffi
               AND candidate.evidence_key_algorithm = ?2
               AND candidate.evidence_key_value = evidence.content_hash_value
              LEFT JOIN track_identity_candidate_members member
-               ON member.primary_media_fact_id = evidence.primary_media_fact_id
+               ON member.playable_media_id = evidence.playable_media_id
              LEFT JOIN track_identity_candidate_evidence stored_evidence
                ON stored_evidence.track_identity_candidate_id = candidate.track_identity_candidate_id
-              AND stored_evidence.primary_media_fact_id = evidence.primary_media_fact_id
+              AND stored_evidence.playable_media_id = evidence.playable_media_id
               AND stored_evidence.source_file_id = evidence.source_file_id
              WHERE candidate.track_identity_candidate_id IS NULL
                 OR candidate.status != 'active'
@@ -298,7 +298,7 @@ fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffi
                 OR stored_evidence.content_hash_value != evidence.content_hash_value
                 OR stored_evidence.probe_accepted_artifact_id != evidence.accepted_artifact_id
              {suffix}",
-            current_primary_media_predicate = CURRENT_PRIMARY_MEDIA_PREDICATE,
+            current_playable_media_predicate = CURRENT_PLAYABLE_MEDIA_PREDICATE,
             current_attachment_link_predicate = CURRENT_ATTACHMENT_LINK_PREDICATE,
     )
 }
@@ -385,8 +385,8 @@ fn upsert_track_identity_candidate_member(
         .query_row(
             "SELECT track_identity_candidate_member_id
              FROM track_identity_candidate_members
-             WHERE primary_media_fact_id = ?1",
-            [production.primary_media_fact_id],
+             WHERE playable_media_id = ?1",
+            [production.playable_media_id],
             |row| row.get(0),
         )
         .optional()?;
@@ -394,7 +394,7 @@ fn upsert_track_identity_candidate_member(
     write.execute(
         "INSERT INTO track_identity_candidate_members (
              track_identity_candidate_id,
-             primary_media_fact_id,
+             playable_media_id,
              attachment_id,
              evidence_source_file_id,
              evidence_basis_fingerprint,
@@ -404,7 +404,7 @@ fn upsert_track_identity_candidate_member(
              updated_at
          )
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
-         ON CONFLICT(primary_media_fact_id) DO UPDATE SET
+         ON CONFLICT(playable_media_id) DO UPDATE SET
              track_identity_candidate_id = excluded.track_identity_candidate_id,
              attachment_id = excluded.attachment_id,
              evidence_source_file_id = excluded.evidence_source_file_id,
@@ -414,7 +414,7 @@ fn upsert_track_identity_candidate_member(
              updated_at = excluded.updated_at",
         params![
             track_identity_candidate_id,
-            production.primary_media_fact_id,
+            production.playable_media_id,
             production.attachment_id,
             production.evidence_source_file_id,
             production.evidence_basis_fingerprint,
@@ -441,11 +441,11 @@ fn upsert_track_identity_candidate_evidence(
             "SELECT track_identity_candidate_evidence_id
              FROM track_identity_candidate_evidence
              WHERE track_identity_candidate_id = ?1
-               AND primary_media_fact_id = ?2
+               AND playable_media_id = ?2
                AND source_file_id = ?3",
             params![
                 track_identity_candidate_id,
-                production.primary_media_fact_id,
+                production.playable_media_id,
                 production.source_file_id,
             ],
             |row| row.get(0),
@@ -455,7 +455,7 @@ fn upsert_track_identity_candidate_evidence(
     write.execute(
         "INSERT INTO track_identity_candidate_evidence (
              track_identity_candidate_id,
-             primary_media_fact_id,
+             playable_media_id,
              attachment_id,
              source_file_attachment_link_id,
              source_file_id,
@@ -468,7 +468,7 @@ fn upsert_track_identity_candidate_evidence(
              updated_at
          )
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
-         ON CONFLICT(track_identity_candidate_id, primary_media_fact_id, source_file_id)
+         ON CONFLICT(track_identity_candidate_id, playable_media_id, source_file_id)
          DO UPDATE SET
              attachment_id = excluded.attachment_id,
              source_file_attachment_link_id = excluded.source_file_attachment_link_id,
@@ -480,7 +480,7 @@ fn upsert_track_identity_candidate_evidence(
              updated_at = excluded.updated_at",
         params![
             track_identity_candidate_id,
-            production.primary_media_fact_id,
+            production.playable_media_id,
             production.attachment_id,
             production.source_file_attachment_link_id,
             production.source_file_id,
@@ -512,12 +512,12 @@ fn mark_track_identity_candidates_without_current_members_stale(
                AND NOT EXISTS (
                    SELECT 1
                    FROM track_identity_candidate_members member
-                   JOIN primary_media_facts pmc
-                     ON pmc.primary_media_fact_id = member.primary_media_fact_id
+                   JOIN playable_media pmc
+                     ON pmc.playable_media_id = member.playable_media_id
                    JOIN source_files file
                      ON file.source_file_id = pmc.evidence_source_file_id
-                   JOIN source_file_facts facts
-                     ON facts.source_file_id = pmc.evidence_source_file_id
+                   JOIN source_file_observations observations
+                     ON observations.source_file_id = pmc.evidence_source_file_id
                    JOIN source_file_attachment_links link
                      ON link.source_file_id = pmc.evidence_source_file_id
                     AND link.attachment_id = pmc.attachment_id
@@ -525,9 +525,9 @@ fn mark_track_identity_candidates_without_current_members_stale(
                      ON attachment.attachment_id = pmc.attachment_id
                    WHERE member.track_identity_candidate_id =
                          track_identity_candidates.track_identity_candidate_id
-                     AND {current_primary_media_predicate}
+                     AND {current_playable_media_predicate}
                )",
-            current_primary_media_predicate = CURRENT_PRIMARY_MEDIA_PREDICATE,
+            current_playable_media_predicate = CURRENT_PLAYABLE_MEDIA_PREDICATE,
         ),
         params![produced_at, SOURCE_FILE_BLAKE3_ALGORITHM],
     )?;
@@ -541,47 +541,47 @@ fn read_count(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<usize> 
 
 // Candidate production validates source rows before stored candidate evidence exists.
 // Stored evidence currentness is shared by read status and decision snapshot predicates.
-const CURRENT_PRIMARY_MEDIA_PREDICATE: &str = "file.presence_state = 'present'
+const CURRENT_PLAYABLE_MEDIA_PREDICATE: &str = "file.presence_state = 'present'
     AND file.file_class = 'audio'
     AND file.file_kind = 'audio'
-    AND facts.source_file_id IS NOT NULL
-    AND file.source_id = facts.basis_source_id
-    AND file.relative_path = facts.basis_relative_path
-    AND file.size_bytes IS facts.basis_size_bytes
-    AND file.mtime_ns IS facts.basis_mtime_ns
-    AND file.presence_state = facts.basis_presence_state
-    AND facts.content_hash_algorithm = ?2
-    AND facts.content_hash_value IS NOT NULL
-    AND facts.media_kind = 'audio'
+    AND observations.source_file_id IS NOT NULL
+    AND file.source_id = observations.basis_source_id
+    AND file.relative_path = observations.basis_relative_path
+    AND file.size_bytes IS observations.basis_size_bytes
+    AND file.mtime_ns IS observations.basis_mtime_ns
+    AND file.presence_state = observations.basis_presence_state
+    AND observations.content_hash_algorithm = ?2
+    AND observations.content_hash_value IS NOT NULL
+    AND observations.media_kind = 'audio'
     AND (
-        facts.mime_type IS NOT NULL
-        OR facts.duration_ms IS NOT NULL
-        OR facts.sample_rate_hz IS NOT NULL
-        OR facts.channels IS NOT NULL
-        OR facts.bit_depth IS NOT NULL
-        OR facts.codec IS NOT NULL
+        observations.mime_type IS NOT NULL
+        OR observations.duration_ms IS NOT NULL
+        OR observations.sample_rate_hz IS NOT NULL
+        OR observations.channels IS NOT NULL
+        OR observations.bit_depth IS NOT NULL
+        OR observations.codec IS NOT NULL
     )
     AND link.source_file_id IS NOT NULL
-    AND attachment.content_hash_algorithm = facts.content_hash_algorithm
-    AND attachment.content_hash_value = facts.content_hash_value";
+    AND attachment.content_hash_algorithm = observations.content_hash_algorithm
+    AND attachment.content_hash_value = observations.content_hash_value";
 
 const CURRENT_ATTACHMENT_LINK_PREDICATE: &str = "file.presence_state = 'present'
-    AND file.source_id = facts.basis_source_id
-    AND file.relative_path = facts.basis_relative_path
-    AND file.size_bytes IS facts.basis_size_bytes
-    AND file.mtime_ns IS facts.basis_mtime_ns
-    AND file.presence_state = facts.basis_presence_state
-    AND facts.content_hash_algorithm = attachment.content_hash_algorithm
-    AND facts.content_hash_algorithm = ?2
-    AND facts.content_hash_value = attachment.content_hash_value
-    AND facts.media_kind = 'audio'
+    AND file.source_id = observations.basis_source_id
+    AND file.relative_path = observations.basis_relative_path
+    AND file.size_bytes IS observations.basis_size_bytes
+    AND file.mtime_ns IS observations.basis_mtime_ns
+    AND file.presence_state = observations.basis_presence_state
+    AND observations.content_hash_algorithm = attachment.content_hash_algorithm
+    AND observations.content_hash_algorithm = ?2
+    AND observations.content_hash_value = attachment.content_hash_value
+    AND observations.media_kind = 'audio'
     AND (
-        facts.mime_type IS NOT NULL
-        OR facts.duration_ms IS NOT NULL
-        OR facts.sample_rate_hz IS NOT NULL
-        OR facts.channels IS NOT NULL
-        OR facts.bit_depth IS NOT NULL
-        OR facts.codec IS NOT NULL
+        observations.mime_type IS NOT NULL
+        OR observations.duration_ms IS NOT NULL
+        OR observations.sample_rate_hz IS NOT NULL
+        OR observations.channels IS NOT NULL
+        OR observations.bit_depth IS NOT NULL
+        OR observations.codec IS NOT NULL
     )";
 
 #[cfg(test)]
@@ -712,14 +712,14 @@ mod tests {
                 .expect("insert source file");
         }
 
-        fn commit_current_facts(
+        fn commit_current_observations(
             &self,
             source_file_id: i64,
             hash_value: &str,
             media_kind: &str,
             with_probe: bool,
         ) {
-            self.commit_current_facts_with_artifact_id(
+            self.commit_current_observations_with_artifact_id(
                 source_file_id,
                 hash_value,
                 media_kind,
@@ -728,7 +728,7 @@ mod tests {
             );
         }
 
-        fn commit_current_facts_with_artifact_id(
+        fn commit_current_observations_with_artifact_id(
             &self,
             source_file_id: i64,
             hash_value: &str,
@@ -772,7 +772,6 @@ mod tests {
                              subject_kind,
                              subject_id,
                              artifact_kind,
-                             artifact_role,
                              adapter_key,
                              adapter_version,
                              basis_fingerprint,
@@ -781,7 +780,7 @@ mod tests {
                              payload_hash,
                              created_at
                          )
-                         VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'primary_result', 'test.track_identity_candidate', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
+                         VALUES (?1, 1, 'source_file', ?2, 'inspection_result', 'test.track_identity_candidate', '1', ?3, 'application/json', 'inline_payload', ?4, 1)",
                         params![
                             artifact_id,
                             source_file_id.to_string(),
@@ -802,7 +801,7 @@ mod tests {
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                     )?;
                     write.execute(
-                        "INSERT INTO source_file_facts (
+                        "INSERT INTO source_file_observations (
                              source_file_id,
                              basis_fingerprint,
                              basis_source_id,
@@ -863,7 +862,7 @@ mod tests {
                     )?;
                     Ok(())
                 })
-                .expect("commit facts");
+                .expect("commit observations");
         }
 
         fn link_attachment(&self, source_file_id: i64, hash_value: &str) -> i64 {
@@ -913,8 +912,8 @@ mod tests {
 
         fn promote(&self, limit: usize) {
             self.store
-                .promote_primary_media_for_source(self.source_id, limit)
-                .expect("promote primary media");
+                .promote_playable_media_for_source(self.source_id, limit)
+                .expect("promote playable media");
         }
 
         fn produce(&self, limit: usize) -> ProduceTrackIdentityCandidatesForSourceResult {
@@ -961,11 +960,11 @@ mod tests {
     }
 
     #[test]
-    fn current_primary_media_fact_produces_track_identity_candidate() {
+    fn current_playable_media_produces_track_identity_candidate() {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         let attachment_id = fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
 
         let result = fixture.produce(10);
@@ -1000,18 +999,18 @@ mod tests {
     }
 
     #[test]
-    fn stale_primary_media_fact_is_skipped_and_existing_candidate_becomes_stale() {
+    fn stale_playable_media_is_skipped_and_existing_candidate_becomes_stale() {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/stale.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
         fixture.produce(10);
         fixture.change_file_basis(100);
 
         let result = fixture.produce(10);
 
-        assert_eq!(result.skipped_stale_primary_media_facts, 1);
+        assert_eq!(result.skipped_stale_playable_media, 1);
         assert_eq!(result.candidates_created, 0);
         assert_eq!(result.candidates_refreshed, 0);
         assert_eq!(result.candidates_marked_stale, 1);
@@ -1034,11 +1033,11 @@ mod tests {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/no-probe.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
         fixture.produce(10);
 
-        fixture.commit_current_facts(100, HASH_A, "audio", false);
+        fixture.commit_current_observations(100, HASH_A, "audio", false);
 
         assert_eq!(
             fixture.single_evidence_status(),
@@ -1051,11 +1050,11 @@ mod tests {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/not-audio.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
         fixture.produce(10);
 
-        fixture.commit_current_facts(100, HASH_A, "video", true);
+        fixture.commit_current_observations(100, HASH_A, "video", true);
 
         assert_eq!(
             fixture.single_evidence_status(),
@@ -1068,11 +1067,11 @@ mod tests {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/probe-artifact.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
         fixture.produce(10);
 
-        fixture.commit_current_facts_with_artifact_id(100, HASH_A, "audio", true, 20_000);
+        fixture.commit_current_observations_with_artifact_id(100, HASH_A, "audio", true, 20_000);
 
         assert_eq!(
             fixture.single_evidence_status(),
@@ -1085,14 +1084,14 @@ mod tests {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/hash-changed.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
         fixture.produce(10);
 
-        fixture.commit_current_facts(100, HASH_B, "audio", true);
+        fixture.commit_current_observations(100, HASH_B, "audio", true);
         let result = fixture.produce(10);
 
-        assert_eq!(result.skipped_stale_primary_media_facts, 1);
+        assert_eq!(result.skipped_stale_playable_media, 1);
         assert_eq!(result.candidates_refreshed, 0);
         assert_eq!(result.evidence_refreshed, 0);
         assert_eq!(result.candidates_marked_stale, 1);
@@ -1117,8 +1116,8 @@ mod tests {
         fixture.insert_source_file(101, "Album/b.wav");
         fixture.link_attachment(100, HASH_A);
         fixture.link_attachment(101, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
-        fixture.commit_current_facts(101, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(101, HASH_A, "audio", true);
         fixture.promote(10);
 
         fixture.produce(10);
@@ -1135,8 +1134,8 @@ mod tests {
         fixture.insert_source_file(101, "Album/track copy.wav");
         fixture.link_attachment(100, HASH_A);
         fixture.link_attachment(101, HASH_B);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
-        fixture.commit_current_facts(101, HASH_B, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(101, HASH_B, "audio", true);
         fixture.promote(10);
 
         fixture.produce(10);
@@ -1164,7 +1163,7 @@ mod tests {
         ] {
             fixture.insert_source_file(source_file_id, path);
             fixture.link_attachment(source_file_id, hash);
-            fixture.commit_current_facts(source_file_id, hash, "audio", true);
+            fixture.commit_current_observations(source_file_id, hash, "audio", true);
         }
         fixture.promote(10);
 
@@ -1186,7 +1185,7 @@ mod tests {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
         fixture.produce(10);
 
@@ -1212,7 +1211,7 @@ mod tests {
 
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
-        assert!(result.rows[0].primary_media.is_none());
+        assert!(result.rows[0].playable_media.is_none());
     }
 
     #[test]
@@ -1221,7 +1220,7 @@ mod tests {
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.insert_source_file(101, "Album/album.cue");
         fixture.link_attachment(100, HASH_A);
-        fixture.commit_current_facts(100, HASH_A, "audio", true);
+        fixture.commit_current_observations(100, HASH_A, "audio", true);
         fixture.promote(10);
         fixture.produce(10);
 

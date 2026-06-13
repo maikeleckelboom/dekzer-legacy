@@ -111,7 +111,7 @@ crates/library-domain/src/
   ids.rs                 --  SourceId, DirectoryId, FileId, TrackId, SleeveId, …
   sources.rs             --  Source, SourceLocation, AvailabilityState, MountState
   hierarchy.rs           --  Directory, HierarchyRow, HierarchyPage
-  contents.rs            --  SourceFile, PrimaryMedia, ContentRow, ContentsPage
+  contents.rs            --  SourceFile, PlayableMedia, ContentRow, ContentsPage
   browse.rs              --  BrowseScope, BrowsePolicy, BrowseOrder
   organization.rs        --  Crate, Playlist, SmartList, Folder, Tag
   preparation.rs         --  FacetKind, FacetState, ReadinessProjection, PreparationJob, PreparationArtifact
@@ -143,7 +143,7 @@ crates/library-store-sqlite/src/
     directories.rs
     source_files.rs
     media_roles.rs
-    primary_media.rs
+    playable_media.rs
     presence.rs
     scan_coverage.rs
 
@@ -247,7 +247,7 @@ crates/library-store-sqlite/src/
 ```
 
 **Owns:** source registration and lifecycle, literal source hierarchy, source
-file inventory, media classification, primary media projection, contents reads,
+file inventory, media classification, playable media projection, contents reads,
 browse order, scan coverage, preparation artifact state, organization objects,
 integrity diagnostics.
 
@@ -258,7 +258,7 @@ integrity diagnostics.
 ### `library-boundary-protocol/`
 
 The Rust-side contract. Commands are requests from the host into the service.
-Events are facts emitted by the service to any subscriber.
+Events are observations emitted by the service to any subscriber.
 
 ```text
 crates/library-boundary-protocol/src/
@@ -887,7 +887,7 @@ Does not own tree rows, contents rows, selected scope, or scan internals.
 
 Scan status and summary copy. Wording for scan state lives here — not in
 contents, not in panel. Owns the distinction between files discovered,
-primary media discovered, image discoveries, and jobs scheduled.
+playable media discovered, image discoveries, and jobs scheduled.
 
 ### `hierarchy/`
 
@@ -903,7 +903,7 @@ windows are visibility-specific cache. These must stay separate.
 
 **Key law:** contents rows must be backend/query-owned, not
 renderer-derived from loaded tree state. The `sourceFile` row profile and
-the `primaryMedia` row profile are distinct. `browsePolicy/` governs which
+the `playableMedia` row profile are distinct. `browsePolicy/` governs which
 profile is active for a given visibility mode.
 
 ### `selection/`
@@ -922,7 +922,7 @@ names live here. The backend receives policy values, not UI mode names.
 
 **Key law:** the renderer does not reorder paginated backend results. The backend
 owns browse order. Cursor payloads encode the ordering identity. Eventually
-owns: sourceBrowseOrder, primaryMediaOrder, crateOrder, playlistOrder,
+owns: sourceBrowseOrder, playableMediaOrder, crateOrder, playlistOrder,
 requestQueueOrder, historyOrder.
 
 ### `viewState/`
@@ -967,7 +967,7 @@ not invented at implementation time. See doctrine §7.
 ### `sleeves/`
 
 Sleeves are workflow objects. Not playlists. Not organization. A sleeve
-gathers tracks, notes, ordering intent, readiness facts, alternates, and
+gathers tracks, notes, ordering intent, readiness observations, alternates, and
 purpose. Sleeves may reference organization objects, but they are not part
 of `organization/`. First-class domain, own service.
 
@@ -984,7 +984,7 @@ and post-event reporting possible without a future architecture rupture.
 
 ### `imports/`
 
-Repatriation, not middleware. An imported fact is a claim in state `imported`
+Repatriation, not middleware. An imported observation is a claim in state `imported`
 — not native authority. See doctrine §6 (Claim Lifecycle) and §V
 (Repatriation). Each system (rekordbox, serato, traktor, engine, filesystem)
 is a governed importer with provenance and validation.

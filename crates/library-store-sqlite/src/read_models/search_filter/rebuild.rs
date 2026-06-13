@@ -287,43 +287,43 @@ fn insert_source_file_rows(
                 state.access_state,
                 scan.scan_phase,
                 CASE
-                    WHEN facts.source_file_id IS NOT NULL
-                     AND facts.content_hash_algorithm = 'blake3'
-                     AND facts.content_hash_value IS NOT NULL
-                     AND file.source_id = facts.basis_source_id
-                     AND file.relative_path = facts.basis_relative_path
-                     AND file.size_bytes IS facts.basis_size_bytes
-                     AND file.mtime_ns IS facts.basis_mtime_ns
-                     AND file.presence_state = facts.basis_presence_state
+                    WHEN observations.source_file_id IS NOT NULL
+                     AND observations.content_hash_algorithm = 'blake3'
+                     AND observations.content_hash_value IS NOT NULL
+                     AND file.source_id = observations.basis_source_id
+                     AND file.relative_path = observations.basis_relative_path
+                     AND file.size_bytes IS observations.basis_size_bytes
+                     AND file.mtime_ns IS observations.basis_mtime_ns
+                     AND file.presence_state = observations.basis_presence_state
                     THEN 1 ELSE 0
                 END,
                 CASE
-                    WHEN facts.source_file_id IS NOT NULL
-                     AND file.source_id = facts.basis_source_id
-                     AND file.relative_path = facts.basis_relative_path
-                     AND file.size_bytes IS facts.basis_size_bytes
-                     AND file.mtime_ns IS facts.basis_mtime_ns
-                     AND file.presence_state = facts.basis_presence_state
+                    WHEN observations.source_file_id IS NOT NULL
+                     AND file.source_id = observations.basis_source_id
+                     AND file.relative_path = observations.basis_relative_path
+                     AND file.size_bytes IS observations.basis_size_bytes
+                     AND file.mtime_ns IS observations.basis_mtime_ns
+                     AND file.presence_state = observations.basis_presence_state
                      AND (
-                         facts.mime_type IS NOT NULL
-                         OR facts.duration_ms IS NOT NULL
-                         OR facts.sample_rate_hz IS NOT NULL
-                         OR facts.channels IS NOT NULL
-                         OR facts.bit_depth IS NOT NULL
-                         OR facts.codec IS NOT NULL
+                         observations.mime_type IS NOT NULL
+                         OR observations.duration_ms IS NOT NULL
+                         OR observations.sample_rate_hz IS NOT NULL
+                         OR observations.channels IS NOT NULL
+                         OR observations.bit_depth IS NOT NULL
+                         OR observations.codec IS NOT NULL
                      )
                     THEN 1 ELSE 0
                 END,
                 CASE
                     WHEN link.source_file_attachment_link_id IS NULL THEN 'missing'
-                    WHEN facts.source_file_id IS NOT NULL
-                     AND facts.content_hash_algorithm = attachment.content_hash_algorithm
-                     AND facts.content_hash_value = attachment.content_hash_value
-                     AND file.source_id = facts.basis_source_id
-                     AND file.relative_path = facts.basis_relative_path
-                     AND file.size_bytes IS facts.basis_size_bytes
-                     AND file.mtime_ns IS facts.basis_mtime_ns
-                     AND file.presence_state = facts.basis_presence_state
+                    WHEN observations.source_file_id IS NOT NULL
+                     AND observations.content_hash_algorithm = attachment.content_hash_algorithm
+                     AND observations.content_hash_value = attachment.content_hash_value
+                     AND file.source_id = observations.basis_source_id
+                     AND file.relative_path = observations.basis_relative_path
+                     AND file.size_bytes IS observations.basis_size_bytes
+                     AND file.mtime_ns IS observations.basis_mtime_ns
+                     AND file.presence_state = observations.basis_presence_state
                     THEN 'current'
                     ELSE 'stale'
                 END,
@@ -335,7 +335,7 @@ fn insert_source_file_rows(
          FROM source_files file
          LEFT JOIN source_state state ON state.source_id = file.source_id
          LEFT JOIN source_scan_state scan ON scan.source_id = file.source_id
-         LEFT JOIN source_file_facts facts ON facts.source_file_id = file.source_file_id
+         LEFT JOIN source_file_observations observations ON observations.source_file_id = file.source_file_id
          LEFT JOIN source_file_attachment_links link ON link.source_file_id = file.source_file_id
          LEFT JOIN content_attachments attachment ON attachment.attachment_id = link.attachment_id
          WHERE file.source_id = ?1",

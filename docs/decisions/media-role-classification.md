@@ -13,7 +13,7 @@ new names with companion terminology rather than introducing another taxonomy.
 
 Dekzer does not browse files directly.
 
-Dekzer discovers source files, records media facts, assigns product roles, computes target-specific readiness, and
+Dekzer discovers source files, records media observations, assigns product roles, computes target-specific readiness, and
 projects context-specific contents rows.
 
 ```
@@ -45,8 +45,8 @@ boundaries.
 
 ### 1. Files are not product objects
 
-A source file is a discovered filesystem object. It carries path observation facts, extension claims, availability
-state, scan lineage, and size/modified facts. It holds an optional link to a resolved file identity — it does not own
+A source file is a discovered filesystem object. It carries path observation observations, extension claims, availability
+state, scan lineage, and size/modified observations. It holds an optional link to a resolved file identity — it does not own
 the identity itself.
 
 A library item is created when Dekzer has a product-relevant reason to represent a media object. Library items are
@@ -180,9 +180,9 @@ evidence exists.** An unknown or absent extension is not evidence of non-media s
 is different. A file with no known extension may be a renamed audio file, a misextensioned container, or a non-media
 file — the distinction requires a sniff or probe, not an extension check.
 
-### 7. Media probe facts are separate from extension claims
+### 7. Media probe observations are separate from extension claims
 
-Extension claims and probe results are distinct facts with different reliability, availability timing, and eviction
+Extension claims and probe results are distinct observations with different reliability, availability timing, and eviction
 policy. They must be tracked separately.
 
 ```
@@ -196,12 +196,12 @@ A `.wav` may have corrupt or missing metadata.
 A renamed file may lie.
 A broken container may have a plausible extension and no usable stream.
 
-The classifier uses probe facts when available. It falls back to extension claims only as a bounded provisional signal.
+The classifier uses probe observations when available. It falls back to extension claims only as a bounded provisional signal.
 It never treats extension as final truth.
 
-Three tiers of recognition facts exist and are tracked in separate structures: `extension_claim` on `source_files` (
+Three tiers of recognition observations exist and are tracked in separate structures: `extension_claim` on `source_files` (
 filename-derived), `signature_sniff_results` rows (cheap bounded file-header sniff with structured kind and family
-fields), and `media_probe_results`/`media_streams` rows (expensive authoritative container parse). Stream-level facts
+fields), and `media_probe_results`/`media_streams` rows (expensive authoritative container parse). Stream-level observations
 are bound to a specific `probe_result_id`, not to the source file directly — this ensures superseded stream rows cannot
 survive a re-probe that contradicts them. See **Substrate Schema** below.
 
@@ -209,7 +209,7 @@ survive a re-probe that contradicts them. See **Substrate Schema** below.
 
 Classification says what an item appears to be. Readiness says whether Dekzer can use that item for a specific target.
 
-A file can hold a role and still be blocked for a specific target. These are independent facts.
+A file can hold a role and still be blocked for a specific target. These are independent observations.
 
 Readiness targets:
 
@@ -314,7 +314,7 @@ source_files.show_in_browser
 Correct model:
 
 ```
-source_files       → inventory facts
+source_files       → inventory observations
 role assignments   → product meaning
 readiness          → target-specific usability
 projections        → what appears in each context
@@ -440,7 +440,7 @@ signature_sniff_results (
   sniffed_at        INTEGER NOT NULL
 )
 
--- Container-level media facts. One row per probe pass.
+-- Container-level media observations. One row per probe pass.
 -- superseded_at marks historical rows when a re-probe produces a newer result.
 media_probe_results (
   media_probe_result_id INTEGER PRIMARY KEY,
@@ -456,7 +456,7 @@ media_probe_results (
   superseded_at         INTEGER            -- null if current; set when a newer probe replaces this result
 )
 
--- Stream-level media facts. Bound to a specific probe result, not the source file.
+-- Stream-level media observations. Bound to a specific probe result, not the source file.
 -- Old stream rows cannot survive a re-probe: they belong to their probe_result_id.
 media_streams (
   media_stream_id   INTEGER PRIMARY KEY,
@@ -545,7 +545,7 @@ justifies it.
 1.  Scanner discovers regular filesystem files in registered sources.
 2.  source_files row is inserted immediately. No extension-based filtering.
 3.  Records path, extension_claim, availability, size, modified_at,
-    and identity facts (hash when available).
+    and identity observations (hash when available).
 4.  Extension claims produce low-confidence provisional role assignments
     for files whose extension_claim matches known media types
     (audio, video, image, companion).
@@ -556,7 +556,7 @@ justifies it.
     No file is permanently excluded from future media recognition.
 ```
 
-Discovery does not classify final product meaning. It records facts and creates provisional claims where extension
+Discovery does not classify final product meaning. It records observations and creates provisional claims where extension
 evidence exists.
 
 ### Stage 2 — Signature Sniff
@@ -599,7 +599,7 @@ An expensive container and stream inspection. Scheduled only when media-relevanc
 
 11. Probe writes media_probe_results and media_streams rows.
 
-12. The classifier revises role assignments using probe facts.
+12. The classifier revises role assignments using probe observations.
     Provisional claims are confirmed, upgraded, degraded, or retracted.
     User-originated assignments are not touched.
 
@@ -746,7 +746,7 @@ library_items.browser_visible
 library_items.source_file_id          -- origins belong in item_origins
 source_files.excluded_from_browser
 source_files.show_in_browser
-source_files.signature_claim          -- sniff facts belong in signature_sniff_results
+source_files.signature_claim          -- sniff observations belong in signature_sniff_results
 item_readiness.evaluated_at           -- use invalidated_at + last_evaluated_at instead
 media_streams.source_file_id          -- streams must bind to probe_result_id
 

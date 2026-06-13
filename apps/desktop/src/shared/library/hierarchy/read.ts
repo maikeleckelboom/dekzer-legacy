@@ -67,15 +67,15 @@ export type Presence = 'present' | 'missing' | 'removed'
 
 export type FileClass = 'audio' | 'video' | 'image' | 'unsupported' | 'none'
 
-export type DirectoryPrimaryMediaState =
+export type DirectoryPlayableMediaState =
   | {
       readonly kind: 'unknown'
     }
   | {
-      readonly kind: 'hasPrimaryMediaDescendants'
+      readonly kind: 'hasPlayableMediaDescendants'
     }
   | {
-      readonly kind: 'noPrimaryMediaDescendants'
+      readonly kind: 'noPlayableMediaDescendants'
     }
 
 export type DirectoryImageMediaState =
@@ -117,7 +117,7 @@ export type ChildRow =
       readonly parentDirectoryId?: string
       readonly presence: Presence
       readonly hasChildDirectories: boolean
-      readonly directoryPrimaryMediaState: DirectoryPrimaryMediaState
+      readonly directoryPlayableMediaState: DirectoryPlayableMediaState
       readonly directoryImageMediaState: DirectoryImageMediaState
       readonly directoryScanState: DirectoryScanState
       readonly navigableChildScopeState: NavigableChildScopeState

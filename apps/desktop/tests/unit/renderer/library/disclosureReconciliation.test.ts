@@ -679,7 +679,7 @@ function directoryNode(
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
     presence: 'present',
     hasChildDirectories: true,
-    directoryPrimaryMediaState: { kind: 'hasPrimaryMediaDescendants' },
+    directoryPlayableMediaState: { kind: 'hasPlayableMediaDescendants' },
     directoryImageMediaState: { kind: 'noImageMediaDescendants' },
     directoryScanState: 'scanning',
     navigableChildScopeState: 'hasNavigableChildScopes',

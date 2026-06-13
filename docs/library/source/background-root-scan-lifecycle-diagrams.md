@@ -157,8 +157,8 @@ flowchart TD
 
 ## 4. Incremental maintained snapshot invalidation
 
-Each committed work batch, persisted blocked subtree, and terminal scan state change produces invalidation facts for
-affected scopes. The service publishes those facts immediately or coalesces repeated facts for the same scope within a
+Each committed work batch, persisted blocked subtree, and terminal scan state change produces invalidation observations for
+affected scopes. The service publishes those observations immediately or coalesces repeated observations for the same scope within a
 bounded freshness window. It must not collapse scan visibility to terminal-only invalidation. Renderers refresh only
 loaded, visible, or selected surfaces. They never refresh the full library hierarchy by default.
 
@@ -231,7 +231,7 @@ flowchart TD
   N --> A
   I -->|" no "| O["Main maps app-safe events"]
   O --> P["Main forwards events to renderer via IPC"]
-  P --> Q["Renderer applies event facts to non-authoritative state"]
+  P --> Q["Renderer applies event observations to non-authoritative state"]
   Q --> R{"Event family"}
   R -->|" SourceScanEvent "| S["Renderer updates scan operation feedback"]
   R -->|" MaintainedSnapshotInvalidated "| T{"Invalidation scope"}
@@ -424,7 +424,7 @@ flowchart LR
 > **Events are not initial state.** Main captures an event cursor on the renderer's behalf, the renderer reads
 > authoritative snapshots, then consumes events after that cursor via Main for incremental updates only.
 
-> **Snapshot invalidation is scoped and freshness-bounded.** Committed scan batches produce invalidation facts for
+> **Snapshot invalidation is scoped and freshness-bounded.** Committed scan batches produce invalidation observations for
 > affected scopes. The service may coalesce repeated invalidations for the same scope within a bounded freshness window,
 > but must not collapse scan visibility to terminal-only invalidation. Renderers refresh only loaded, visible, or
 > selected surfaces — never the full library hierarchy.
@@ -559,7 +559,7 @@ flowchart LR
 
 > **Warm events are not resource transport.** Scan events and invalidations carry small summaries and scope identifiers
 > only. Large payloads — audio bytes, artwork, waveform data, and future media resources — use the resource lane with
-> handles and ranged reads, not the event stream. Embedding large payloads in scan events or invalidation facts is
+> handles and ranged reads, not the event stream. Embedding large payloads in scan events or invalidation observations is
 > prohibited.
 
 ---
