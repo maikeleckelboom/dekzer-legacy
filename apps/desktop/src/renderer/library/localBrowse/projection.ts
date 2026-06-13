@@ -30,7 +30,7 @@ import {
 } from './types'
 import type { LocalPreviewMode } from './previewMode'
 
-export const localBrowseSectionNodeId = 'local-browse:section'
+export const addSourceSectionNodeId = 'local-browse:section'
 
 type LocalBrowseProjectionOptions = {
   readonly localPreviewMode: LocalPreviewMode
@@ -41,7 +41,7 @@ type LocalBrowseProjectionOptions = {
 
 type BrowserTreeReadState = 'notLoaded' | 'loading' | 'empty' | 'unavailable' | 'error'
 
-export function projectLocalBrowseSection(
+export function projectAddSourceSection(
   options: LocalBrowseProjectionOptions
 ): BrowserTreeNode | undefined {
   const state = options.entryPointsState
@@ -51,13 +51,13 @@ export function projectLocalBrowseSection(
   }
 
   if (state.kind === 'loading') {
-    options.bindingsById.set(localBrowseSectionNodeId, {
-      kind: 'localBrowseSection'
+    options.bindingsById.set(addSourceSectionNodeId, {
+      kind: 'addSourceSection'
     })
-    return localBrowseSectionNode(
+    return addSourceSectionNode(
       loadingChildren(
         {
-          ownerId: localBrowseSectionNodeId,
+          ownerId: addSourceSectionNodeId,
           label: 'Loading local folders',
           detail: state.detail ?? 'Loading local browse entry points.'
         },
@@ -67,13 +67,13 @@ export function projectLocalBrowseSection(
   }
 
   if (state.kind === 'failed') {
-    options.bindingsById.set(localBrowseSectionNodeId, {
-      kind: 'localBrowseSection'
+    options.bindingsById.set(addSourceSectionNodeId, {
+      kind: 'addSourceSection'
     })
-    return localBrowseSectionNode(
+    return addSourceSectionNode(
       failedChildren(
         {
-          ownerId: localBrowseSectionNodeId,
+          ownerId: addSourceSectionNodeId,
           label: 'Local folders unavailable',
           detail: state.detail
         },
@@ -88,11 +88,11 @@ export function projectLocalBrowseSection(
     return undefined
   }
 
-  options.bindingsById.set(localBrowseSectionNodeId, {
-    kind: 'localBrowseSection'
+  options.bindingsById.set(addSourceSectionNodeId, {
+    kind: 'addSourceSection'
   })
 
-  return localBrowseSectionNode(
+  return addSourceSectionNode(
     childrenForProjectedNodes(
       entries.map((entry) =>
         projectEntryPoint({
@@ -109,12 +109,12 @@ export function projectLocalBrowseSection(
   )
 }
 
-function localBrowseSectionNode(
+function addSourceSectionNode(
   children: BrowserTreeChildren,
   detail = 'Suggested folders are starting points for adding a managed music source.'
 ): BrowserTreeNode {
   return {
-    id: localBrowseSectionNodeId,
+    id: addSourceSectionNodeId,
     role: 'collectionView',
     label: 'Add Source',
     detail,

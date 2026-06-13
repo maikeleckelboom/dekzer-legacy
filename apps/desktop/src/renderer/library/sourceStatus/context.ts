@@ -53,7 +53,7 @@ export type StatusAdmission = {
 }
 
 export type LocalBrowseStatusState =
-  | 'localBrowseOnly'
+  | 'notCandidate'
   | 'eligible'
   | 'broadRoot'
   | 'protected'
@@ -175,7 +175,7 @@ function contextForBinding(
         title,
         ...(nodeDetail === undefined ? {} : { detail: nodeDetail })
       }
-    case 'localBrowseSection':
+    case 'addSourceSection':
       return {
         kind: 'navigation',
         title,
@@ -227,7 +227,7 @@ function localBrowseEntryState(
   }
 
   return sourceAdmissionOperation(entry.availableOperations) === undefined
-    ? 'localBrowseOnly'
+    ? 'notCandidate'
     : 'eligible'
 }
 
@@ -265,7 +265,7 @@ function localBrowseItemState(
   }
 
   return sourceAdmissionOperation(item.availableOperations) === undefined
-    ? 'localBrowseOnly'
+    ? 'notCandidate'
     : 'eligible'
 }
 

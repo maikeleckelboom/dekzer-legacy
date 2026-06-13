@@ -470,11 +470,13 @@ describe('panel runtime wiring', () => {
     const panel = readRendererSource('panel.vue')
 
     expect(panel).toContain("import { useLocalBrowseController } from './localBrowse/controller'")
-    expect(panel).toContain('const libraryBrowseProfile = createProfileController()')
+    expect(panel).toContain('const libraryBrowseProfile = createLibraryBrowseProfileController()')
     expect(panel).toContain('const localPreviewMode = createLocalPreviewModeController()')
     expect(panel).toContain('const localBrowse = useLocalBrowseController(undefined, {')
     expect(panel).toContain('localPreviewMode: localPreviewMode.mode')
-    expect(panel).not.toContain('profile: browseProfile.profile')
+    expect(panel).not.toContain(
+      'const localBrowse = useLocalBrowseController(undefined, {\n  profile'
+    )
     expect(panel).toContain('void localBrowse.refreshEntryPoints()')
     expect(panel).toContain('refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints()')
   })

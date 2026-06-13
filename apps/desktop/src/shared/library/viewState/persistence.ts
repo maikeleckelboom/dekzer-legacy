@@ -1,5 +1,5 @@
 export type PersistedLibraryViewState = {
-  readonly version: 1
+  readonly version: 2
   readonly selectedNodeId?: string
   readonly expandedNodeIds: readonly string[]
   readonly libraryBrowseProfile?: 'audio' | 'playable' | 'allFiles'

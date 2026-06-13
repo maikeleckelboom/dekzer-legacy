@@ -200,23 +200,23 @@ fn read_local_browse_items(
     offset: usize,
     limit: usize,
 ) -> protocol::ReadLocalBrowseItemsReply {
-    read_local_browse_items_with_profile(
+    read_local_browse_items_with_filter(
         service,
         entry_point_kind,
         root,
         parent,
-        protocol::LocalBrowseProfile::Audio,
+        protocol::LocalBrowseItemFilter::Audio,
         offset,
         limit,
     )
 }
 
-fn read_local_browse_items_with_profile(
+fn read_local_browse_items_with_filter(
     service: &LibraryBoundaryService,
     entry_point_kind: protocol::LocalBrowseEntryPointKind,
     root: &Path,
     parent: &Path,
-    profile: protocol::LocalBrowseProfile,
+    item_filter: protocol::LocalBrowseItemFilter,
     offset: usize,
     limit: usize,
 ) -> protocol::ReadLocalBrowseItemsReply {
@@ -227,7 +227,7 @@ fn read_local_browse_items_with_profile(
                     entry_point_kind,
                     resolved_root_path: root.to_string_lossy().into_owned(),
                     resolved_parent_path: parent.to_string_lossy().into_owned(),
-                    profile,
+                    item_filter,
                     offset,
                     limit,
                 },
@@ -453,12 +453,12 @@ fn unsupported_files_are_marked_unsupported_items() {
         root.path(),
     );
 
-    let reply = read_local_browse_items_with_profile(
+    let reply = read_local_browse_items_with_filter(
         &service,
         protocol::LocalBrowseEntryPointKind::Music,
         root.path(),
         root.path(),
-        protocol::LocalBrowseProfile::AllFiles,
+        protocol::LocalBrowseItemFilter::AllFiles,
         0,
         20,
     );
@@ -482,7 +482,7 @@ fn unsupported_files_are_marked_unsupported_items() {
 
 #[cfg(windows)]
 #[test]
-fn default_audio_browse_profile_keeps_musical_rows_and_hides_noise() {
+fn default_audio_filter_keeps_musical_rows_and_hides_noise() {
     let root = TempDir::new().expect("create local root");
     std::fs::create_dir(root.path().join("Album")).expect("create album");
     std::fs::write(root.path().join("Track.flac"), []).expect("write track");
@@ -540,39 +540,7 @@ fn default_audio_browse_profile_keeps_musical_rows_and_hides_noise() {
 
 #[cfg(windows)]
 #[test]
-fn playable_profile_keeps_audio_video_and_cue_rows_but_hides_noise() {
-    let root = TempDir::new().expect("create local root");
-    std::fs::create_dir(root.path().join("Album")).expect("create album");
-    std::fs::write(root.path().join("Track.flac"), []).expect("write track");
-    std::fs::write(root.path().join("Album.cue"), []).expect("write cue");
-    std::fs::write(root.path().join("cover.png"), []).expect("write image");
-    std::fs::write(root.path().join("desktop.ini"), []).expect("write desktop ini");
-    std::fs::write(root.path().join("clip.mp4"), []).expect("write video");
-    let (_tempdir, _context, service) = open_test_service_with_local_browse_root(
-        protocol::LocalBrowseEntryPointKind::Music,
-        root.path(),
-    );
-
-    let reply = read_local_browse_items_with_profile(
-        &service,
-        protocol::LocalBrowseEntryPointKind::Music,
-        root.path(),
-        root.path(),
-        protocol::LocalBrowseProfile::Playable,
-        0,
-        20,
-    );
-
-    assert_eq!(reply.status, protocol::LocalBrowseItemsReadStatus::Complete);
-    assert_eq!(
-        item_names(&reply),
-        vec!["Album", "Album.cue", "clip.mp4", "Track.flac"]
-    );
-}
-
-#[cfg(windows)]
-#[test]
-fn all_files_profile_keeps_images_unsupported_and_unknown_noise() {
+fn all_files_filter_keeps_images_unsupported_and_unknown_noise() {
     let root = TempDir::new().expect("create local root");
     std::fs::create_dir(root.path().join("Album")).expect("create album");
     std::fs::write(root.path().join("Track.flac"), []).expect("write track");
@@ -583,12 +551,12 @@ fn all_files_profile_keeps_images_unsupported_and_unknown_noise() {
         root.path(),
     );
 
-    let reply = read_local_browse_items_with_profile(
+    let reply = read_local_browse_items_with_filter(
         &service,
         protocol::LocalBrowseEntryPointKind::Music,
         root.path(),
         root.path(),
-        protocol::LocalBrowseProfile::AllFiles,
+        protocol::LocalBrowseItemFilter::AllFiles,
         0,
         20,
     );

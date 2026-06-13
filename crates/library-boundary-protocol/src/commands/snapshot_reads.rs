@@ -332,9 +332,8 @@ pub enum LocalBrowseSourceAdmissionRequestKind {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
-pub enum LocalBrowseProfile {
+pub enum LocalBrowseItemFilter {
     Audio,
-    Playable,
     AllFiles,
 }
 
@@ -393,7 +392,7 @@ pub struct ReadLocalBrowseItemsRequest {
     pub entry_point_kind: LocalBrowseEntryPointKind,
     pub resolved_root_path: String,
     pub resolved_parent_path: String,
-    pub profile: LocalBrowseProfile,
+    pub item_filter: LocalBrowseItemFilter,
     pub offset: usize,
     pub limit: usize,
 }
@@ -2545,22 +2544,23 @@ mod tests {
         LoadNavigationRowRequest, LocalBrowseEntryPoint, LocalBrowseEntryPointFailure,
         LocalBrowseEntryPointFailureCode, LocalBrowseEntryPointIdentity, LocalBrowseEntryPointKind,
         LocalBrowseEntryPointStatus, LocalBrowseEntryPointsReadStatus, LocalBrowseItem,
-        LocalBrowseItemFailure, LocalBrowseItemFailureCode, LocalBrowseItemIdentity,
-        LocalBrowseItemKind, LocalBrowseItemMediaRelevance, LocalBrowseItemStatus,
-        LocalBrowseItemsReadStatus, LocalBrowseOperation, LocalBrowsePlatform, LocalBrowseProfile,
-        LocalBrowseSourceAdmissionRequestKind, LocalBrowseWindowIdentity, NavigableChildScopeState,
-        NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
-        PlayableMedia, PlayableMediaKind, ReadAttachmentSourceFilesReply,
-        ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenReply,
-        ReadLibraryTreeChildrenRequest, ReadLocalBrowseEntryPointsReply,
-        ReadLocalBrowseEntryPointsRequest, ReadLocalBrowseItemsReply, ReadLocalBrowseItemsRequest,
-        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
-        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
-        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceLifecycleReply,
-        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
-        ReadTrackIdentityReviewCandidatesRequest, SearchFilterFileClass, SnapshotReadCommand,
-        SnapshotReadReply, SourceAccessState, SourceAttachmentSummary, SourceClass,
-        SourceFileAttachmentLink, SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
+        LocalBrowseItemFailure, LocalBrowseItemFailureCode, LocalBrowseItemFilter,
+        LocalBrowseItemIdentity, LocalBrowseItemKind, LocalBrowseItemMediaRelevance,
+        LocalBrowseItemStatus, LocalBrowseItemsReadStatus, LocalBrowseOperation,
+        LocalBrowsePlatform, LocalBrowseSourceAdmissionRequestKind, LocalBrowseWindowIdentity,
+        NavigableChildScopeState, NavigationRow, NavigationRowFamily, NavigationRowKind,
+        NavigationRowSelectorKind, PlayableMedia, PlayableMediaKind,
+        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
+        ReadLocalBrowseEntryPointsReply, ReadLocalBrowseEntryPointsRequest,
+        ReadLocalBrowseItemsReply, ReadLocalBrowseItemsRequest, ReadNavigationRowsRequest,
+        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
+        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
+        ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
+        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
+        SearchFilterFileClass, SnapshotReadCommand, SnapshotReadReply, SourceAccessState,
+        SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
+        SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
         SourceIntegrityAvailabilityState, SourceIntegrityCoverage,
         SourceIntegrityEvidenceAndMaintenance, SourceIntegrityRuntimeMaintenance,
         SourceIntegrityRuntimeMaintenanceState, SourceLifecycle, SourceLifecycleIssueKind,
@@ -2584,7 +2584,7 @@ mod tests {
             entry_point_kind: LocalBrowseEntryPointKind::Music,
             resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
             resolved_parent_path: "C:\\Users\\DJ\\Music\\Albums".to_string(),
-            profile: LocalBrowseProfile::Audio,
+            item_filter: LocalBrowseItemFilter::Audio,
             offset: 5,
             limit: 25,
         });
@@ -2613,7 +2613,7 @@ mod tests {
                 entry_point_kind: LocalBrowseEntryPointKind::Music,
                 ref resolved_root_path,
                 ref resolved_parent_path,
-                profile: LocalBrowseProfile::Audio,
+                item_filter: LocalBrowseItemFilter::Audio,
                 offset: 5,
                 limit: 25,
             }) if resolved_root_path == "C:\\Users\\DJ\\Music"
@@ -2720,7 +2720,7 @@ mod tests {
             entry_point_kind: LocalBrowseEntryPointKind::Music,
             resolved_root_path: "C:\\Users\\DJ\\Music".to_string(),
             resolved_parent_path: "C:\\Users\\DJ\\Music".to_string(),
-            profile: LocalBrowseProfile::Audio,
+            item_filter: LocalBrowseItemFilter::Audio,
             offset: 0,
             limit: 50,
         });
@@ -2733,7 +2733,7 @@ mod tests {
                         "entryPointKind": "music",
                         "resolvedRootPath": "C:\\Users\\DJ\\Music",
                         "resolvedParentPath": "C:\\Users\\DJ\\Music",
-                        "profile": "audio",
+                        "itemFilter": "audio",
                         "offset": 0,
                         "limit": 50
                     }

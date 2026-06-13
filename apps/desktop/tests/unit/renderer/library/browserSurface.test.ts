@@ -22,8 +22,8 @@ describe('library browser surface containment', () => {
   it('keeps browse profile control icon-only and accessible in the header', () => {
     const panel = readRendererSource('panel.vue')
 
-    expect(panel).toContain(':aria-label="toolbarModel.browseProfile.label"')
-    expect(panel).toContain(':title="toolbarModel.browseProfile.title"')
+    expect(panel).toContain(':aria-label="toolbarModel.libraryBrowseProfile.label"')
+    expect(panel).toContain(':title="toolbarModel.libraryBrowseProfile.title"')
     expect(panel).toContain('<Icon role="action.browseView" size="md" />')
     expect(panel).not.toContain('Browse profile:')
     expect(panel).toContain('role="listbox"')

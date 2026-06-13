@@ -9,7 +9,7 @@ import type { BrowserTreeNodeId } from '../tree/types'
 import type { RowBinding } from '../state'
 import {
   localBrowseRootTarget,
-  localBrowseProfileForTarget,
+  localBrowseItemFilterForTarget,
   localBrowseWindowKey,
   localBrowseWindowKeyFromIdentity,
   type LoadedLocalBrowseItems,
@@ -529,7 +529,7 @@ function readItemsRequest(
     entryPointKind: target.entryPointKind,
     resolvedRootPath: target.resolvedRootPath,
     resolvedParentPath: target.resolvedParentPath,
-    profile: localBrowseProfileForTarget(target),
+    itemFilter: localBrowseItemFilterForTarget(target),
     offset,
     limit: readLimit
   }

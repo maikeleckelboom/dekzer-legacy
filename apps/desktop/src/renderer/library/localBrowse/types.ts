@@ -5,11 +5,11 @@ import type {
 } from '../../../shared/library/localBrowse/entryPoints'
 import type {
   LocalBrowseItem,
-  LocalBrowseProfile,
+  LocalBrowseItemFilter,
   LocalBrowseWindowIdentity,
   ReadLocalBrowseItemsResult
 } from '../../../shared/library/localBrowse/items'
-import { mapLocalPreviewModeToLocalBrowseProfile, type LocalPreviewMode } from './previewMode'
+import { mapLocalPreviewModeToLocalBrowseItemFilter, type LocalPreviewMode } from './previewMode'
 
 export type LocalBrowseEntryPointsState =
   | {
@@ -157,8 +157,8 @@ export function localBrowseWindowKeyFromIdentity(
   })
 }
 
-export function localBrowseProfileForTarget(
+export function localBrowseItemFilterForTarget(
   target: LocalBrowseDirectoryTarget
-): LocalBrowseProfile {
-  return mapLocalPreviewModeToLocalBrowseProfile(target.previewMode)
+): LocalBrowseItemFilter {
+  return mapLocalPreviewModeToLocalBrowseItemFilter(target.previewMode)
 }

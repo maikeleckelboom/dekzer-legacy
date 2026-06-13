@@ -1,6 +1,9 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 
-import { defaultProfile, type ProfileKey } from '../browseProfile/types'
+import {
+  defaultLibraryBrowseProfile,
+  type LibraryBrowseProfile
+} from '../libraryBrowseProfile/types'
 import type { SearchFilterReadController } from './searchFilterState'
 import type { SearchFilterReadRequest } from '../../../shared/library/searchFilter/read'
 
@@ -20,7 +23,7 @@ export type LibrarySearchController = {
 export type LibrarySearchReadPort = Pick<SearchFilterReadController, 'submit' | 'clear'>
 
 export type LibrarySearchControllerOptions = {
-  readonly profile?: Ref<ProfileKey>
+  readonly profile?: Ref<LibraryBrowseProfile>
   readonly searchFilterRead: LibrarySearchReadPort
   readonly debounceMs?: number
 }
@@ -31,7 +34,7 @@ const searchLimit = 100
 export function createLibrarySearchController(
   options: LibrarySearchControllerOptions
 ): LibrarySearchController {
-  const profile = options.profile ?? ref<ProfileKey>(defaultProfile)
+  const profile = options.profile ?? ref<LibraryBrowseProfile>(defaultLibraryBrowseProfile)
   const debounceMs = options.debounceMs ?? defaultSearchDebounceMs
   const searchText = ref('')
   const activeQuery = ref('')
@@ -142,7 +145,7 @@ export function createLibrarySearchController(
 
 export function createLibrarySearchRequest(
   query: string,
-  profile: ProfileKey
+  profile: LibraryBrowseProfile
 ): SearchFilterReadRequest {
   return {
     scope: { type: 'library' },
@@ -155,7 +158,9 @@ export function createLibrarySearchRequest(
   }
 }
 
-function searchFiltersForProfile(profile: ProfileKey): SearchFilterReadRequest['filters'] {
+function searchFiltersForProfile(
+  profile: LibraryBrowseProfile
+): SearchFilterReadRequest['filters'] {
   switch (profile) {
     case 'audio':
       return { fileClasses: ['audio'] }

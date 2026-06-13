@@ -11,9 +11,9 @@ describe('createViewStateStore', () => {
     const { api, writes, resolveAll } = createQueuedWriteApi()
     const store = createViewStateStore(api)
 
-    store.save({ version: 1, expandedNodeIds: ['node-1'] })
-    store.save({ version: 1, expandedNodeIds: ['node-2'] })
-    store.save({ version: 1, expandedNodeIds: ['node-3'] })
+    store.save({ version: 2, expandedNodeIds: ['node-1'] })
+    store.save({ version: 2, expandedNodeIds: ['node-2'] })
+    store.save({ version: 2, expandedNodeIds: ['node-3'] })
 
     await resolveAll()
 
@@ -28,7 +28,7 @@ describe('createViewStateStore', () => {
 
     await expect(store.load()).resolves.toEqual({ state: 'empty' })
     store.save({
-      version: 1,
+      version: 2,
       selectedNodeId: 'node-a',
       expandedNodeIds,
       libraryBrowseProfile: 'playable',
@@ -38,7 +38,7 @@ describe('createViewStateStore', () => {
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
-      version: 1,
+      version: 2,
       selectedNodeId: 'node-a',
       expandedNodeIds: ['node-a'],
       libraryBrowseProfile: 'playable',
@@ -51,7 +51,7 @@ describe('createViewStateStore', () => {
     const store = createViewStateStore(api)
 
     store.save({
-      version: 1,
+      version: 2,
       expandedNodeIds: [],
       libraryBrowseProfile: 'allFiles',
       localPreviewMode: 'advancedInventory'
@@ -59,14 +59,14 @@ describe('createViewStateStore', () => {
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
-      version: 1,
+      version: 2,
       expandedNodeIds: [],
       libraryBrowseProfile: 'allFiles',
       localPreviewMode: 'advancedInventory'
     })
 
     store.save({
-      version: 1,
+      version: 2,
       expandedNodeIds: [],
       libraryBrowseProfile: 'invalid',
       localPreviewMode: 'invalid'
@@ -74,7 +74,7 @@ describe('createViewStateStore', () => {
     await resolveAll()
 
     expect(writes[1]?.state).toEqual({
-      version: 1,
+      version: 2,
       expandedNodeIds: []
     })
   })
@@ -84,7 +84,7 @@ describe('createViewStateStore', () => {
     const store = createViewStateStore(api)
 
     store.save({
-      version: 1,
+      version: 2,
       expandedNodeIds: [],
       libraryBrowseProfile: 'audio',
       localPreviewMode: 'musicEvidence',
@@ -93,7 +93,7 @@ describe('createViewStateStore', () => {
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
-      version: 1,
+      version: 2,
       expandedNodeIds: [],
       libraryBrowseProfile: 'audio',
       localPreviewMode: 'musicEvidence'
@@ -118,14 +118,14 @@ describe('createViewStateStore', () => {
     const store = createViewStateStore(api)
 
     store.save({
-      version: 1,
+      version: 2,
       selectedNodeId: 'will-fail',
       expandedNodeIds: ['will-fail']
     })
     await waitForMicrotasks()
 
     store.save({
-      version: 1,
+      version: 2,
       selectedNodeId: 'will-succeed',
       expandedNodeIds: ['will-succeed']
     })
@@ -134,7 +134,7 @@ describe('createViewStateStore', () => {
     expect(callCount).toBe(2)
     expect(writes).toEqual([
       {
-        version: 1,
+        version: 2,
         selectedNodeId: 'will-succeed',
         expandedNodeIds: ['will-succeed']
       }

@@ -2300,6 +2300,13 @@
         "unknownFileType"
       ]
     },
+    "LocalBrowseItemFilter": {
+      "type": "string",
+      "enum": [
+        "audio",
+        "allFiles"
+      ]
+    },
     "LocalBrowseItemIdentity": {
       "type": "object",
       "properties": {
@@ -2419,14 +2426,6 @@
         "macos",
         "linux",
         "unsupported"
-      ]
-    },
-    "LocalBrowseProfile": {
-      "type": "string",
-      "enum": [
-        "audio",
-        "playable",
-        "allFiles"
       ]
     },
     "LocalBrowseSourceAdmissionRequestKind": {
@@ -3062,6 +3061,9 @@
         "entryPointKind": {
           "$ref": "#/$defs/LocalBrowseEntryPointKind"
         },
+        "itemFilter": {
+          "$ref": "#/$defs/LocalBrowseItemFilter"
+        },
         "limit": {
           "type": "integer",
           "format": "uint",
@@ -3071,9 +3073,6 @@
           "type": "integer",
           "format": "uint",
           "minimum": 0
-        },
-        "profile": {
-          "$ref": "#/$defs/LocalBrowseProfile"
         },
         "resolvedParentPath": {
           "type": "string"
@@ -3086,7 +3085,7 @@
         "entryPointKind",
         "resolvedRootPath",
         "resolvedParentPath",
-        "profile",
+        "itemFilter",
         "offset",
         "limit"
       ]

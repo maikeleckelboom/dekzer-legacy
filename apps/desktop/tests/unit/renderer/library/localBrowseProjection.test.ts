@@ -27,7 +27,7 @@ describe('local browse tree projection', () => {
     expect(projection.nodes[0]?.label).toBe('Add Source')
     expect(firstLoadedChildLabels(projection.nodes[0])).toEqual(['Music'])
     expect(projection.bindingsById.get('local-browse:section')).toEqual({
-      kind: 'localBrowseSection'
+      kind: 'addSourceSection'
     })
   })
 

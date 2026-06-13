@@ -41,7 +41,7 @@ import {
   type LoadedLocalBrowseItems,
   type LocalBrowseItemState
 } from '../../../../src/renderer/library/localBrowse/types'
-import type { ProfileKey } from '../../../../src/renderer/library/browseProfile/types'
+import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 import type { LocalPreviewMode } from '../../../../src/renderer/library/localBrowse/previewMode'
 
 describe('projectContents', () => {
@@ -377,7 +377,7 @@ describe('projectContents', () => {
     expect(contents.rows.some((row) => row.label === 'Windows')).toBe(false)
   })
 
-  it('keeps raw local inventory out of normal admission but available in advanced inventory', () => {
+  it('keeps raw local inventory out of normal admission but available in Inventory', () => {
     const items = [
       localBrowseItem('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
       localBrowseItem('unsupportedFile', 'notes.txt', 'C:\\Users\\Maikel\\Music\\notes.txt', {
@@ -1464,7 +1464,7 @@ function browserState(options: {
   readonly directoryStates?: ReadonlyMap<string, DirectoryState>
   readonly entries?: readonly LocalBrowseEntryPoint[]
   readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
-  readonly libraryBrowseProfile?: ProfileKey
+  readonly libraryBrowseProfile?: LibraryBrowseProfile
   readonly localPreviewMode?: LocalPreviewMode
 }): BrowserState {
   const sourceStates = new Map<string, SourceState>()

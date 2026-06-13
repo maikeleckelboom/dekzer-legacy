@@ -18,7 +18,7 @@ describe('library toolbar projection', () => {
       label: 'Add music folder'
     })
     expect(toolbar.search.visible).toBe(false)
-    expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.localPreviewMode.visible).toBe(false)
   })
 
@@ -26,38 +26,38 @@ describe('library toolbar projection', () => {
     const toolbar = projectLibraryToolbar(
       input({
         selectedNodeId: 'selected',
-        binding: { kind: 'localBrowseSection' }
+        binding: { kind: 'addSourceSection' }
       })
     )
 
     expect(toolbar.scope).toBe('localAdmission')
     expect(toolbar.addMusicFolder.visible).toBe(true)
     expect(toolbar.search.visible).toBe(false)
-    expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.localPreviewMode).toMatchObject({
       visible: true,
       label: 'Local preview mode',
-      title: 'Local preview mode: Music Evidence'
+      title: 'Local preview mode: Music Preview'
     })
   })
 
-  it('keeps advanced inventory explicit and hides folder picker/search', () => {
+  it('keeps Inventory explicit and hides folder picker/search', () => {
     const toolbar = projectLibraryToolbar(
       input({
         selectedNodeId: 'selected',
-        binding: { kind: 'localBrowseSection' },
+        binding: { kind: 'addSourceSection' },
         localPreviewMode: 'advancedInventory',
-        selectedLocalPreviewModeLabel: 'Advanced Inventory'
+        selectedLocalPreviewModeLabel: 'Inventory'
       })
     )
 
     expect(toolbar.scope).toBe('localAdmission')
     expect(toolbar.addMusicFolder.visible).toBe(false)
     expect(toolbar.search.visible).toBe(false)
-    expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.localPreviewMode).toMatchObject({
       visible: true,
-      title: 'Local preview mode: Advanced Inventory'
+      title: 'Local preview mode: Inventory'
     })
   })
 
@@ -114,7 +114,7 @@ describe('library toolbar projection', () => {
       visible: true,
       label: 'Search indexed library'
     })
-    expect(toolbar.browseProfile).toMatchObject({
+    expect(toolbar.libraryBrowseProfile).toMatchObject({
       visible: true,
       label: 'Indexed contents view'
     })
@@ -137,7 +137,7 @@ describe('library toolbar projection', () => {
     expect(toolbar.scope).toBe('neutral')
     expect(toolbar.addMusicFolder.visible).toBe(false)
     expect(toolbar.search.visible).toBe(false)
-    expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.localPreviewMode.visible).toBe(false)
   })
 })
@@ -151,8 +151,8 @@ function input(
     projection:
       overrides.binding === undefined ? undefined : projectionForBinding(overrides.binding),
     selectedNodeId: 'selected',
-    selectedBrowseProfileLabel: 'Audio',
-    selectedLocalPreviewModeLabel: 'Music Evidence',
+    selectedLibraryBrowseProfileLabel: 'Audio',
+    selectedLocalPreviewModeLabel: 'Music Preview',
     localPreviewMode: 'musicEvidence',
     addMusicFolderLabel: 'Add music folder',
     canAddMusicFolder: true,

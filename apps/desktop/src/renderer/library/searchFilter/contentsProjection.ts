@@ -1,4 +1,4 @@
-import type { ProfileKey } from '../browseProfile/types'
+import type { LibraryBrowseProfile } from '../libraryBrowseProfile/types'
 import type { ContentProjection, ContentRow, ContentRowIcon } from '../contents/projection'
 import type { SearchQueryState } from '../runtime/searchFilterState'
 import type { SearchFilterResultRow } from '../../../shared/library/searchFilter/read'
@@ -6,7 +6,7 @@ import type { SearchFilterResultRow } from '../../../shared/library/searchFilter
 export function projectSearchFilterContents(options: {
   readonly state: SearchQueryState
   readonly activeQuery: string
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
 }): ContentProjection {
   const rows = rowsForSearchState(options.state)
   const nextCursor = nextCursorForSearchState(options.state)
@@ -75,7 +75,10 @@ function searchProjectionKind(state: SearchQueryState): ContentProjection['kind'
   return state.kind === 'Idle' || state.kind === 'Pending' ? 'loading' : 'ready'
 }
 
-function emptyOrPendingSearchRow(state: SearchQueryState, profile: ProfileKey): ContentRow {
+function emptyOrPendingSearchRow(
+  state: SearchQueryState,
+  profile: LibraryBrowseProfile
+): ContentRow {
   if (state.kind === 'Retained' && state.resultState === 'unsupported') {
     return stateRow('search-unsupported', 'unsupported', 'Search unavailable', state.resultDetail)
   }
@@ -207,7 +210,7 @@ function stateRow(
   }
 }
 
-function emptySearchLabel(profile: ProfileKey): string {
+function emptySearchLabel(profile: LibraryBrowseProfile): string {
   switch (profile) {
     case 'audio':
       return 'No matching audio files.'

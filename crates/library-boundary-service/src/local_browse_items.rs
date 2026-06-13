@@ -182,7 +182,7 @@ fn read_windows_items(
         ));
     }
 
-    item_keys.retain(|key| item_visible_for_profile(key, request.profile));
+    item_keys.retain(|key| item_visible_for_filter(key, request.item_filter));
     sort_item_keys(&mut item_keys);
 
     let total_items = item_keys.len();
@@ -498,28 +498,13 @@ fn is_plausible_music_source_name(display_name: &str) -> bool {
         || normalized.contains("dj")
 }
 
-fn item_visible_for_profile(
+fn item_visible_for_filter(
     key: &LocalBrowseItemKey,
-    profile: protocol::LocalBrowseProfile,
+    item_filter: protocol::LocalBrowseItemFilter,
 ) -> bool {
-    match profile {
-        protocol::LocalBrowseProfile::AllFiles => true,
-        protocol::LocalBrowseProfile::Playable => match key.item_kind {
-            protocol::LocalBrowseItemKind::Directory
-            | protocol::LocalBrowseItemKind::RejectedRoot
-            | protocol::LocalBrowseItemKind::Inaccessible => true,
-            protocol::LocalBrowseItemKind::MediaFile => matches!(
-                key.file_kind,
-                Some(
-                    protocol::ContentsFileKind::Audio
-                        | protocol::ContentsFileKind::Video
-                        | protocol::ContentsFileKind::CueSheet
-                )
-            ),
-            protocol::LocalBrowseItemKind::UnsupportedFile
-            | protocol::LocalBrowseItemKind::Unknown => false,
-        },
-        protocol::LocalBrowseProfile::Audio => match key.item_kind {
+    match item_filter {
+        protocol::LocalBrowseItemFilter::AllFiles => true,
+        protocol::LocalBrowseItemFilter::Audio => match key.item_kind {
             protocol::LocalBrowseItemKind::Directory
             | protocol::LocalBrowseItemKind::RejectedRoot
             | protocol::LocalBrowseItemKind::Inaccessible => true,
@@ -790,7 +775,7 @@ pub(crate) fn classify_item_file_for_test(
                     .unwrap_or_else(|| Path::new(""))
                     .to_string_lossy()
                     .into_owned(),
-                profile: protocol::LocalBrowseProfile::Audio,
+                item_filter: protocol::LocalBrowseItemFilter::Audio,
                 offset: 0,
                 limit: 1,
             },
@@ -825,7 +810,7 @@ pub(crate) fn directory_operations_for_test(
             entry_point_kind,
             resolved_root_path: root.to_string_lossy().into_owned(),
             resolved_parent_path: parent.to_string_lossy().into_owned(),
-            profile: protocol::LocalBrowseProfile::Audio,
+            item_filter: protocol::LocalBrowseItemFilter::Audio,
             offset: 0,
             limit: 1,
         },

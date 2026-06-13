@@ -9,7 +9,11 @@ import type {
 } from '../../../shared/library/contents/read'
 import type { RendererApi } from '../../../shared/rendererApi'
 import type { RowBinding } from '../state'
-import { defaultProfile, mapProfileToContentsPolicy, type ProfileKey } from '../browseProfile/types'
+import {
+  defaultLibraryBrowseProfile,
+  mapLibraryBrowseProfileToContentsPolicy,
+  type LibraryBrowseProfile
+} from '../libraryBrowseProfile/types'
 
 export type ContentsBoundaryState =
   | {
@@ -48,8 +52,8 @@ export type ContentsPendingRead = {
 
 export type ContentsReadController = {
   readonly state: Ref<ContentsBoundaryState>
-  readonly profile: Ref<ProfileKey>
-  readonly setProfile: (profile: ProfileKey) => void
+  readonly profile: Ref<LibraryBrowseProfile>
+  readonly setProfile: (profile: LibraryBrowseProfile) => void
   readonly readForBinding: (
     binding: RowBinding | undefined,
     options?: ReadOptions
@@ -79,7 +83,7 @@ const safeContentsRequestFailure = 'Unable to request library contents.'
 
 type ContentsReadTarget = {
   readonly scope: NonNullable<Parameters<LibraryContentsApi['read']>[0]['scope']>
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
   readonly policy: ContentsReadPolicy
   readonly scopeDepth: ContentsScopeDepth
   readonly requestKey: string
@@ -100,7 +104,7 @@ type SpeculativeRead = {
 
 export function useContentsRead(
   contentsApi: LibraryContentsApi = getRendererApi().library.contents,
-  options: { readonly profile?: Ref<ProfileKey> } = {}
+  options: { readonly profile?: Ref<LibraryBrowseProfile> } = {}
 ): ContentsReadController {
   const controller = createContentsReadController(contentsApi, options)
 
@@ -121,13 +125,13 @@ function getRendererApi(): RendererApi {
 
 export function createContentsReadController(
   contentsApi: LibraryContentsApi,
-  options: { readonly profile?: Ref<ProfileKey> } = {}
+  options: { readonly profile?: Ref<LibraryBrowseProfile> } = {}
 ): ContentsReadController {
   const state = ref<ContentsBoundaryState>({
     kind: 'idle',
     detail: 'No contents scope has been requested.'
   })
-  const profile = options.profile ?? ref<ProfileKey>(defaultProfile)
+  const profile = options.profile ?? ref<LibraryBrowseProfile>(defaultLibraryBrowseProfile)
   let readSequence = 0
   let started = false
   let thresholdTimer: ReturnType<typeof setTimeout> | undefined = undefined
@@ -157,7 +161,7 @@ export function createContentsReadController(
     }
   }
 
-  function setProfile(nextProfile: ProfileKey): void {
+  function setProfile(nextProfile: LibraryBrowseProfile): void {
     if (profile.value === nextProfile) {
       return
     }
@@ -645,7 +649,7 @@ export function createContentsReadController(
 
 function contentsReadTargetForBinding(
   binding: RowBinding | undefined,
-  profile: ProfileKey
+  profile: LibraryBrowseProfile
 ): ContentsReadTarget | undefined {
   const scope = contentsScopeForBinding(binding)
 
@@ -653,7 +657,7 @@ function contentsReadTargetForBinding(
     return undefined
   }
 
-  const policy = mapProfileToContentsPolicy(profile)
+  const policy = mapLibraryBrowseProfileToContentsPolicy(profile)
   return {
     scope,
     profile,
@@ -693,7 +697,7 @@ function contentsScopeForBinding(
     case 'navigation':
     case 'readState':
     case 'more':
-    case 'localBrowseSection':
+    case 'addSourceSection':
     case 'localBrowseEntryPoint':
     case 'localBrowseItem':
     case 'localBrowseMore':

@@ -9,7 +9,7 @@ export type LibraryToolbarScope = 'libraryStart' | 'indexedLibrary' | 'localAdmi
 export type LibraryToolbarModel = {
   readonly scope: LibraryToolbarScope
   readonly search: ToolbarControl
-  readonly browseProfile: ToolbarControl
+  readonly libraryBrowseProfile: ToolbarControl
   readonly localPreviewMode: ToolbarControl
   readonly addMusicFolder: ToolbarAction
 }
@@ -32,7 +32,7 @@ export type ToolbarAction = {
 export type LibraryToolbarInput = {
   readonly projection: BrowserProjection | undefined
   readonly selectedNodeId: BrowserTreeNodeId | undefined
-  readonly selectedBrowseProfileLabel: string
+  readonly selectedLibraryBrowseProfileLabel: string
   readonly selectedLocalPreviewModeLabel: string
   readonly localPreviewMode: LocalPreviewMode
   readonly addMusicFolderLabel: string
@@ -62,11 +62,11 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
       title: 'Search indexed library',
       placeholder: 'Search indexed library'
     },
-    browseProfile: {
+    libraryBrowseProfile: {
       visible: scope === 'indexedLibrary',
       enabled: scope === 'indexedLibrary',
       label: 'Indexed contents view',
-      title: `Indexed contents view: ${input.selectedBrowseProfileLabel}`
+      title: `Indexed contents view: ${input.selectedLibraryBrowseProfileLabel}`
     },
     localPreviewMode: {
       visible: scope === 'localAdmission',
@@ -110,7 +110,7 @@ function toolbarScope(
 
 function isLocalAdmissionBinding(binding: RowBinding): boolean {
   return (
-    binding.kind === 'localBrowseSection' ||
+    binding.kind === 'addSourceSection' ||
     binding.kind === 'localBrowseEntryPoint' ||
     binding.kind === 'localBrowseItem' ||
     binding.kind === 'localBrowseMore'

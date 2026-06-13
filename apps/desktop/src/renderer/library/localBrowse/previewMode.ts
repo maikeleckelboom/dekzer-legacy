@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 
-import type { LocalBrowseProfile } from '../../../shared/library/localBrowse/items'
+import type { LocalBrowseItemFilter } from '../../../shared/library/localBrowse/items'
 
 export type LocalPreviewMode = 'musicEvidence' | 'advancedInventory'
 
@@ -19,8 +19,8 @@ export type LocalPreviewModeController = {
 export const defaultLocalPreviewMode: LocalPreviewMode = 'musicEvidence'
 
 export const localPreviewModeOptions: readonly LocalPreviewModeOption[] = [
-  { key: 'musicEvidence', label: 'Music Evidence' },
-  { key: 'advancedInventory', label: 'Advanced Inventory' }
+  { key: 'musicEvidence', label: 'Music Preview' },
+  { key: 'advancedInventory', label: 'Inventory' }
 ]
 
 export function createLocalPreviewModeController(
@@ -53,7 +53,7 @@ export function isLocalPreviewMode(value: unknown): value is LocalPreviewMode {
 }
 
 export function localPreviewModeLabel(mode: LocalPreviewMode): string {
-  return localPreviewModeOptions.find((option) => option.key === mode)?.label ?? 'Music Evidence'
+  return localPreviewModeOptions.find((option) => option.key === mode)?.label ?? 'Music Preview'
 }
 
 export function localPreviewSurfaceLabel(
@@ -62,8 +62,8 @@ export function localPreviewSurfaceLabel(
   return mode === 'advancedInventory' ? 'Source Inventory' : 'Source Preview'
 }
 
-export function mapLocalPreviewModeToLocalBrowseProfile(
+export function mapLocalPreviewModeToLocalBrowseItemFilter(
   mode: LocalPreviewMode
-): LocalBrowseProfile {
+): LocalBrowseItemFilter {
   return mode === 'advancedInventory' ? 'allFiles' : 'audio'
 }

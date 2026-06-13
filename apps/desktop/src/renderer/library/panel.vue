@@ -2,8 +2,12 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { Icon } from '../icons'
-import { profileLabel, profileOptions, type ProfileKey } from './browseProfile/types'
-import { createProfileController } from './browseProfile/controller'
+import {
+  libraryBrowseProfileLabel,
+  libraryBrowseProfileOptions,
+  type LibraryBrowseProfile
+} from './libraryBrowseProfile/types'
+import { createLibraryBrowseProfileController } from './libraryBrowseProfile/controller'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
@@ -67,7 +71,7 @@ const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color
 const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--color-border) bg-(--color-background) p-0 text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 
 const viewStateStore = createViewStateStore()
-const libraryBrowseProfile = createProfileController()
+const libraryBrowseProfile = createLibraryBrowseProfileController()
 const localPreviewMode = createLocalPreviewModeController()
 const hierarchyRead = useLibraryHierarchyRead(undefined, {
   profile: libraryBrowseProfile.profile
@@ -106,8 +110,8 @@ const sourceRevealRequest = ref<{
   readonly nodeId: BrowserTreeNodeId
   readonly sequence: number
 }>()
-const browseProfileMenuOpen = ref(false)
-const browseProfileMenuRef = ref<HTMLElement>()
+const libraryBrowseProfileMenuOpen = ref(false)
+const libraryBrowseProfileMenuRef = ref<HTMLElement>()
 const localPreviewModeMenuOpen = ref(false)
 const localPreviewModeMenuRef = ref<HTMLElement>()
 const searchInputRef = ref<HTMLInputElement>()
@@ -152,7 +156,9 @@ const browserState = computed<BrowserState>(() => ({
     : { navigationReadResult: hierarchyRead.navigationReadResult.value })
 }))
 
-const selectedBrowseProfileLabel = computed(() => profileLabel(libraryBrowseProfile.profile.value))
+const selectedLibraryBrowseProfileLabel = computed(() =>
+  libraryBrowseProfileLabel(libraryBrowseProfile.profile.value)
+)
 const selectedLocalPreviewModeLabel = computed(() =>
   localPreviewModeLabel(localPreviewMode.mode.value)
 )
@@ -163,7 +169,7 @@ const toolbarModel = computed(() =>
   projectLibraryToolbar({
     projection: browserProjection.value,
     selectedNodeId: selectedNodeId.value,
-    selectedBrowseProfileLabel: selectedBrowseProfileLabel.value,
+    selectedLibraryBrowseProfileLabel: selectedLibraryBrowseProfileLabel.value,
     selectedLocalPreviewModeLabel: selectedLocalPreviewModeLabel.value,
     localPreviewMode: localPreviewMode.mode.value,
     addMusicFolderLabel: rootActions.rootChoiceButtonLabel.value,
@@ -406,11 +412,11 @@ watch(
 )
 
 onMounted(() => {
-  document.addEventListener('pointerdown', handleBrowseProfileOutsidePointerDown)
+  document.addEventListener('pointerdown', handleLibraryBrowseProfileOutsidePointerDown)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('pointerdown', handleBrowseProfileOutsidePointerDown)
+  document.removeEventListener('pointerdown', handleLibraryBrowseProfileOutsidePointerDown)
   clearMaintenanceRefreshTimer()
   librarySearch.dispose()
 })
@@ -504,7 +510,7 @@ watch(
 
 function saveViewState(): void {
   viewStateStore.save({
-    version: 1,
+    version: 2,
     expandedNodeIds: [...expandedNodeIds.value],
     libraryBrowseProfile: libraryBrowseProfile.profile.value,
     localPreviewMode: localPreviewMode.mode.value,
@@ -538,17 +544,17 @@ async function restoreViewState(): Promise<void> {
   }
 }
 
-function toggleBrowseProfileMenu(): void {
-  browseProfileMenuOpen.value = !browseProfileMenuOpen.value
+function toggleLibraryBrowseProfileMenu(): void {
+  libraryBrowseProfileMenuOpen.value = !libraryBrowseProfileMenuOpen.value
 }
 
-function selectBrowseProfile(profile: ProfileKey): void {
+function selectLibraryBrowseProfile(profile: LibraryBrowseProfile): void {
   libraryBrowseProfile.setProfile(profile)
-  browseProfileMenuOpen.value = false
+  libraryBrowseProfileMenuOpen.value = false
 }
 
-function closeBrowseProfileMenu(): void {
-  browseProfileMenuOpen.value = false
+function closeLibraryBrowseProfileMenu(): void {
+  libraryBrowseProfileMenuOpen.value = false
 }
 
 function toggleLocalPreviewModeMenu(): void {
@@ -579,14 +585,14 @@ function handleSearchEscape(): void {
   librarySearch.handleEscape()
 }
 
-function handleBrowseProfileOutsidePointerDown(event: PointerEvent): void {
+function handleLibraryBrowseProfileOutsidePointerDown(event: PointerEvent): void {
   const target = event.target
 
   if (
-    browseProfileMenuOpen.value &&
-    (!(target instanceof Node) || !browseProfileMenuRef.value?.contains(target))
+    libraryBrowseProfileMenuOpen.value &&
+    (!(target instanceof Node) || !libraryBrowseProfileMenuRef.value?.contains(target))
   ) {
-    browseProfileMenuOpen.value = false
+    libraryBrowseProfileMenuOpen.value = false
   }
 
   if (
@@ -934,7 +940,7 @@ function clearBrowserView(): void {
   restoreState.initialNodeApplied = false
 
   viewStateStore.save({
-    version: 1,
+    version: 2,
     libraryBrowseProfile: libraryBrowseProfile.profile.value,
     localPreviewMode: localPreviewMode.mode.value,
     expandedNodeIds: []
@@ -1040,34 +1046,34 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
         </div>
 
         <div
-          v-if="toolbarModel.browseProfile.visible"
-          ref="browseProfileMenuRef"
+          v-if="toolbarModel.libraryBrowseProfile.visible"
+          ref="libraryBrowseProfileMenuRef"
           class="relative inline-flex"
         >
           <button
             type="button"
             :class="iconButtonClass"
-            :aria-label="toolbarModel.browseProfile.label"
-            :aria-expanded="browseProfileMenuOpen"
+            :aria-label="toolbarModel.libraryBrowseProfile.label"
+            :aria-expanded="libraryBrowseProfileMenuOpen"
             aria-haspopup="listbox"
-            :title="toolbarModel.browseProfile.title"
-            :disabled="!toolbarModel.browseProfile.enabled"
-            @click="toggleBrowseProfileMenu"
-            @keydown.escape.stop.prevent="closeBrowseProfileMenu"
+            :title="toolbarModel.libraryBrowseProfile.title"
+            :disabled="!toolbarModel.libraryBrowseProfile.enabled"
+            @click="toggleLibraryBrowseProfileMenu"
+            @keydown.escape.stop.prevent="closeLibraryBrowseProfileMenu"
           >
             <Icon role="action.browseView" size="md" />
           </button>
 
           <div
-            v-if="browseProfileMenuOpen"
+            v-if="libraryBrowseProfileMenuOpen"
             class="absolute right-0 top-full z-20 mt-1 min-w-40 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
             role="listbox"
-            :aria-label="toolbarModel.browseProfile.label"
+            :aria-label="toolbarModel.libraryBrowseProfile.label"
             tabindex="-1"
-            @keydown.escape.stop.prevent="closeBrowseProfileMenu"
+            @keydown.escape.stop.prevent="closeLibraryBrowseProfileMenu"
           >
             <button
-              v-for="option in profileOptions"
+              v-for="option in libraryBrowseProfileOptions"
               :key="option.key"
               type="button"
               class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
@@ -1076,7 +1082,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
               "
               role="option"
               :aria-selected="libraryBrowseProfile.profile.value === option.key"
-              @click="selectBrowseProfile(option.key)"
+              @click="selectLibraryBrowseProfile(option.key)"
             >
               <span>{{ option.label }}</span>
             </button>

@@ -18,7 +18,7 @@ import {
   type LoadedLocalBrowseItems,
   type LocalBrowseItemState
 } from '../localBrowse/types'
-import { emptyStateLabel } from '../browseProfile/types'
+import { libraryBrowseEmptyStateLabel } from '../libraryBrowseProfile/types'
 import {
   defaultLocalPreviewMode,
   localPreviewSurfaceLabel,
@@ -273,7 +273,7 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         detail: binding.detail,
         rows: [contentMoreRow(selectedNodeId, binding)]
       })
-    case 'localBrowseSection':
+    case 'addSourceSection':
       return contentProjection(addSourceSurface, {
         kind: 'ready',
         title: 'Add Source',
@@ -971,7 +971,7 @@ function localBrowseSelectionDetail(options: {
   }
 
   if (options.localPreviewMode === 'advancedInventory') {
-    return `Advanced Inventory shows local inventory for diagnostics. ${options.folderDetail}`
+    return `Inventory shows local inventory for diagnostics. ${options.folderDetail}`
   }
 
   return `Preview local folders and media evidence before adding a managed source. ${options.folderDetail}`
@@ -1446,9 +1446,9 @@ function contentsCountSubject(result: ContentsResult, count: number): string {
 function policyEmptyLabel(policy: ContentsResult['policy']): string {
   switch (policy.kind) {
     case 'playableMediaBrowse':
-      return emptyStateLabel('playable')
+      return libraryBrowseEmptyStateLabel('playable')
     case 'audioBrowse':
-      return emptyStateLabel('audio')
+      return libraryBrowseEmptyStateLabel('audio')
     case 'sourceFileInventory':
       return sourceFileInventoryEmptyLabel(policy)
     case 'playableMedia':
@@ -1459,9 +1459,9 @@ function policyEmptyLabel(policy: ContentsResult['policy']): string {
 function trueEmptyLabel(policy: ContentsResult['policy']): string {
   switch (policy.kind) {
     case 'playableMediaBrowse':
-      return emptyStateLabel('playable')
+      return libraryBrowseEmptyStateLabel('playable')
     case 'audioBrowse':
-      return emptyStateLabel('audio')
+      return libraryBrowseEmptyStateLabel('audio')
     case 'sourceFileInventory':
       return sourceFileInventoryEmptyLabel(policy)
     case 'playableMedia':
@@ -1487,7 +1487,7 @@ function sourceFileInventoryEmptyLabel(
   }
 
   if (fileClasses === 'audio,video,image,unsupported') {
-    return emptyStateLabel('allFiles')
+    return libraryBrowseEmptyStateLabel('allFiles')
   }
 
   return 'No requested files in this scope.'

@@ -58,7 +58,7 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::LocalBrowsePlatform>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseOperation>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseSourceAdmissionRequestKind>(&cfg, &mut output);
-    push_ts_decl::<crate::LocalBrowseProfile>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowseItemFilter>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseEntryPointFailureCode>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLocalBrowseItemsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LocalBrowseItemKind>(&cfg, &mut output);

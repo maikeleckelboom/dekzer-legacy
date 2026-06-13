@@ -26,7 +26,10 @@ import type {
 } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { copyEntryPoint, sameEntryPoint } from '../runtime/entryPoint'
-import { defaultProfile, type ProfileKey } from '../browseProfile/types'
+import {
+  defaultLibraryBrowseProfile,
+  type LibraryBrowseProfile
+} from '../libraryBrowseProfile/types'
 
 const readLimit = 50
 const safeNavigationReadRequestFailure = 'Unable to request library navigation rows.'
@@ -65,7 +68,7 @@ export type LibraryHierarchyReadController = {
 
 export function useLibraryHierarchyRead(
   libraryApi: LibraryHierarchyReadApi = getRendererApi().library,
-  options: { readonly profile?: Ref<ProfileKey> } = {}
+  options: { readonly profile?: Ref<LibraryBrowseProfile> } = {}
 ): LibraryHierarchyReadController {
   const controller = createLibraryHierarchyReadController(libraryApi, options)
 
@@ -86,7 +89,7 @@ function getRendererApi(): RendererApi {
 
 export function createLibraryHierarchyReadController(
   libraryApi: LibraryHierarchyReadApi,
-  options: { readonly profile?: Ref<ProfileKey> } = {}
+  options: { readonly profile?: Ref<LibraryBrowseProfile> } = {}
 ): LibraryHierarchyReadController {
   const hostStatus = ref<LibraryBoundaryHostStatus>()
   const navigationReadResult = shallowRef<NavigationReadRowsResult>()
@@ -97,7 +100,7 @@ export function createLibraryHierarchyReadController(
   const hierarchyReadIsLoading = ref(false)
   const sourceReadStates = shallowRef<ReadonlyMap<string, SourceState>>(new Map())
   const directoryReadStates = shallowRef<ReadonlyMap<string, DirectoryState>>(new Map())
-  const profile = options.profile ?? ref<ProfileKey>(defaultProfile)
+  const profile = options.profile ?? ref<LibraryBrowseProfile>(defaultLibraryBrowseProfile)
   let hasRequestedNavigationRead = false
   let unsubscribeFromHostStatus: (() => void) | undefined
   let navigationReadSequence = 0
@@ -918,7 +921,7 @@ function acceptedNavigationResult(
   return result?.state === 'ready' ? result : undefined
 }
 
-function sourceReadRequest(target: SourceTarget, profile: ProfileKey): ReadRequest {
+function sourceReadRequest(target: SourceTarget, profile: LibraryBrowseProfile): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -931,7 +934,7 @@ function sourceReadRequest(target: SourceTarget, profile: ProfileKey): ReadReque
   }
 }
 
-function directoryReadRequest(target: DirectoryTarget, profile: ProfileKey): ReadRequest {
+function directoryReadRequest(target: DirectoryTarget, profile: LibraryBrowseProfile): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -945,7 +948,7 @@ function directoryReadRequest(target: DirectoryTarget, profile: ProfileKey): Rea
   }
 }
 
-function moreReadRequest(target: MoreTarget, profile: ProfileKey): ReadRequest {
+function moreReadRequest(target: MoreTarget, profile: LibraryBrowseProfile): ReadRequest {
   return {
     target: {
       kind: 'entryPoint',
@@ -1119,7 +1122,7 @@ function addDiscoveredUnloadedDirectoryStates(
   }
 }
 
-function createEntryPointRequestKey(entryPoint: EntryPoint, profile: ProfileKey): string {
+function createEntryPointRequestKey(entryPoint: EntryPoint, profile: LibraryBrowseProfile): string {
   const policyKey = rowPolicyForProfile(profile)
 
   switch (entryPoint.kind) {
@@ -1130,7 +1133,7 @@ function createEntryPointRequestKey(entryPoint: EntryPoint, profile: ProfileKey)
   }
 }
 
-function rowPolicyForProfile(profile: ProfileKey): LibraryTreeRowPolicy {
+function rowPolicyForProfile(profile: LibraryBrowseProfile): LibraryTreeRowPolicy {
   switch (profile) {
     case 'audio':
       return 'audioBrowse'
@@ -1144,12 +1147,12 @@ function rowPolicyForProfile(profile: ProfileKey): LibraryTreeRowPolicy {
 function createDirectoryRequestKey(
   entryPoint: EntryPoint,
   directoryId: string,
-  profile: ProfileKey
+  profile: LibraryBrowseProfile
 ): string {
   return `${createEntryPointRequestKey(entryPoint, profile)}/directory:${directoryId}`
 }
 
-function createMoreRequestKey(target: MoreTarget, profile: ProfileKey): string {
+function createMoreRequestKey(target: MoreTarget, profile: LibraryBrowseProfile): string {
   return `${createEntryPointRequestKey(target.entryPoint, profile)}/directory:${
     target.parentDirectoryId ?? 'root'
   }/offset:${target.offset}`

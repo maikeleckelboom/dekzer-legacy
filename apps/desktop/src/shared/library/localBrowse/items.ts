@@ -38,7 +38,7 @@ export type LocalBrowseItemMediaRelevance =
   | 'unsupported'
   | 'unknown'
 
-export type LocalBrowseProfile = 'audio' | 'playable' | 'allFiles'
+export type LocalBrowseItemFilter = 'audio' | 'allFiles'
 
 export type LocalBrowseItemFailureCode =
   | 'unsupportedPlatform'
@@ -59,7 +59,7 @@ export type ReadLocalBrowseItemsRequest = {
   readonly entryPointKind: LocalBrowseEntryPointKind
   readonly resolvedRootPath: string
   readonly resolvedParentPath: string
-  readonly profile: LocalBrowseProfile
+  readonly itemFilter: LocalBrowseItemFilter
   readonly offset: number
   readonly limit: number
 }

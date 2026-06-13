@@ -9,6 +9,13 @@ import type {
 import type { LibraryBoundaryHost } from '../boundary/host'
 
 const viewStateFileName = 'library-view-state.json'
+const viewStateKeys = new Set([
+  'version',
+  'selectedNodeId',
+  'expandedNodeIds',
+  'libraryBrowseProfile',
+  'localPreviewMode'
+])
 
 export async function readViewStateFromHost(
   host: LibraryBoundaryHost
@@ -98,7 +105,8 @@ function viewStateFilePath(host: LibraryBoundaryHost): string {
 export function isValidViewState(value: unknown): value is PersistedLibraryViewState {
   if (value === null || typeof value !== 'object') return false
   const obj = value as Record<string, unknown>
-  if (obj.version !== 1) return false
+  if (!Object.keys(obj).every((key) => viewStateKeys.has(key))) return false
+  if (obj.version !== 2) return false
   if ('selectedNodeId' in obj && obj.selectedNodeId !== undefined) {
     if (typeof obj.selectedNodeId !== 'string') return false
   }

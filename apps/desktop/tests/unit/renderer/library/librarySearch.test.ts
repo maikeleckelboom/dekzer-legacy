@@ -5,7 +5,7 @@ import {
   createLibrarySearchController,
   createLibrarySearchRequest
 } from '../../../../src/renderer/library/runtime/librarySearch'
-import type { ProfileKey } from '../../../../src/renderer/library/browseProfile/types'
+import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 import type { SearchFilterReadRequest } from '../../../../src/shared/library/searchFilter/read'
 
 describe('library search controller', () => {
@@ -119,7 +119,7 @@ describe('library search controller', () => {
   it('refreshes active search when browse profile changes', () => {
     vi.useFakeTimers()
     const read = searchReadSpy()
-    const profile = ref<ProfileKey>('audio')
+    const profile = ref<LibraryBrowseProfile>('audio')
     const search = createLibrarySearchController({
       searchFilterRead: read,
       profile,

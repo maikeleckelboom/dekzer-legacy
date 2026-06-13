@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createProfileController } from '../../../../src/renderer/library/browseProfile/controller'
+import { createLibraryBrowseProfileController } from '../../../../src/renderer/library/libraryBrowseProfile/controller'
 import type { StatusContext } from '../../../../src/renderer/library/sourceStatus/context'
 import { projectStatusContext } from '../../../../src/renderer/library/sourceStatus/context'
 import {
@@ -59,7 +59,7 @@ describe('source status projection', () => {
   })
 
   it('Add Source root shows guidance without source-specific actions or unknown badge', () => {
-    const projection = localBrowseProjection({ kind: 'localBrowseSection' }, 'Add Source')
+    const projection = localBrowseProjection({ kind: 'addSourceSection' }, 'Add Source')
     const view = statusView(
       projectStatusContext({
         projection,
@@ -301,7 +301,7 @@ describe('source status projection', () => {
   })
 
   it('does not change browse profile state', () => {
-    const profile = createProfileController()
+    const profile = createLibraryBrowseProfileController()
     profile.setProfile('allFiles')
 
     registeredView({ sourceIntegrity: integrity({ coverage: 'complete' }) })

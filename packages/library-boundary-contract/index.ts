@@ -75,11 +75,11 @@ export type LocalBrowseOperation = { "kind": "browseChildren" } | { "kind": "cho
 
 export type LocalBrowseSourceAdmissionRequestKind = "defaultMusicFolder" | "selectedDirectory" | "parentDirectory";
 
-export type LocalBrowseProfile = "audio" | "playable" | "allFiles";
+export type LocalBrowseItemFilter = "audio" | "allFiles";
 
 export type LocalBrowseEntryPointFailureCode = "unsupportedPlatform" | "knownFolderUnavailable" | "systemDriveUnavailable" | "volumeEnumerationUnavailable" | "metadataUnavailable";
 
-export type ReadLocalBrowseItemsRequest = { entryPointKind: LocalBrowseEntryPointKind, resolvedRootPath: string, resolvedParentPath: string, profile: LocalBrowseProfile, offset: number, limit: number, };
+export type ReadLocalBrowseItemsRequest = { entryPointKind: LocalBrowseEntryPointKind, resolvedRootPath: string, resolvedParentPath: string, itemFilter: LocalBrowseItemFilter, offset: number, limit: number, };
 
 export type LocalBrowseItemKind = "directory" | "mediaFile" | "unsupportedFile" | "rejectedRoot" | "inaccessible" | "unknown";
 

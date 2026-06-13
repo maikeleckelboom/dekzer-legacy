@@ -235,7 +235,7 @@ function localRootIdForBinding(binding: RowBinding | undefined): string | undefi
       return localRootIdForEntryPoint(binding.target.entryPoint)
     case 'navigation':
     case 'readState':
-    case 'localBrowseSection':
+    case 'addSourceSection':
     case 'localBrowseEntryPoint':
     case 'localBrowseItem':
     case 'localBrowseMore':

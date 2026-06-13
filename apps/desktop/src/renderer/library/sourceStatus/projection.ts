@@ -529,7 +529,7 @@ function localBrowseBadge(
       return 'Could not fully resolve this location'
     case 'alreadyAdded':
       return 'Already added'
-    case 'localBrowseOnly':
+    case 'notCandidate':
       return 'Not a music-source candidate'
   }
 }
@@ -564,7 +564,7 @@ function localBrowseDetail(
       return detail ?? 'Could not fully resolve this location.'
     case 'alreadyAdded':
       return 'Already added as a library source. Use the managed source entry for scans and maintenance.'
-    case 'localBrowseOnly':
+    case 'notCandidate':
       return 'Not a music-source candidate.'
   }
 }

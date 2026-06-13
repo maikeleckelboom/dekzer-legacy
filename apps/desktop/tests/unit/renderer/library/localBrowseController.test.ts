@@ -96,7 +96,7 @@ describe('createLocalBrowseController', () => {
       entryPointKind: 'music',
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
-      profile: 'audio',
+      itemFilter: 'audio',
       offset: 0,
       limit: 50
     })
@@ -114,7 +114,7 @@ describe('createLocalBrowseController', () => {
       entryPointKind: 'music',
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music\\Albums',
-      profile: 'audio',
+      itemFilter: 'audio',
       offset: 0,
       limit: 50
     })
@@ -177,7 +177,7 @@ describe('createLocalBrowseController', () => {
     })
     await controller.requestNodeMore(musicNodeId, projection)
 
-    expect(itemRequests.map((request) => request.profile)).toEqual(['allFiles', 'allFiles'])
+    expect(itemRequests.map((request) => request.itemFilter)).toEqual(['allFiles', 'allFiles'])
     expect(itemRequests[1]).toMatchObject({
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
       offset: 1
@@ -185,7 +185,7 @@ describe('createLocalBrowseController', () => {
 
     localPreviewMode.value = 'musicEvidence'
     await controller.requestNodeChildren(musicNodeId, projection)
-    expect(itemRequests[2]?.profile).toBe('audio')
+    expect(itemRequests[2]?.itemFilter).toBe('audio')
   })
 })
 

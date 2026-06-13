@@ -25,8 +25,11 @@ import { copyEntryPoint } from '../runtime/entryPoint'
 import type { SourceReadiness } from '../runtime/sourceReadiness'
 import { formatSourceDisplayName } from './sourcePresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
-import { projectLocalBrowseSection } from '../localBrowse/projection'
-import { defaultProfile, type ProfileKey } from '../browseProfile/types'
+import { projectAddSourceSection } from '../localBrowse/projection'
+import {
+  defaultLibraryBrowseProfile,
+  type LibraryBrowseProfile
+} from '../libraryBrowseProfile/types'
 import { defaultLocalPreviewMode } from '../localBrowse/previewMode'
 
 export type BrowserProjection = {
@@ -97,7 +100,7 @@ function isRendererVisibleNavigationRow(row: NavigationRow): boolean {
 function projectNavigationResult(state: BrowserState): BrowserProjection {
   const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
   const result = state.navigationReadResult
-  const localBrowseSection = projectLocalBrowseSection({
+  const addSourceSection = projectAddSourceSection({
     localPreviewMode: state.localPreviewMode ?? defaultLocalPreviewMode,
     ...(state.localBrowseEntryPointsState === undefined
       ? {}
@@ -108,7 +111,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
     bindingsById
   })
   const localBrowseNodes =
-    localBrowseSection === undefined ? [] : ([localBrowseSection] satisfies BrowserTreeNode[])
+    addSourceSection === undefined ? [] : ([addSourceSection] satisfies BrowserTreeNode[])
 
   if (result === undefined) {
     if (localBrowseNodes.length > 0) {
@@ -170,7 +173,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
       ...visibleRows.map((row) =>
         projectNavigationRow({
           row,
-          profile: state.libraryBrowseProfile ?? defaultProfile,
+          profile: state.libraryBrowseProfile ?? defaultLibraryBrowseProfile,
           ...(state.sourceReadinessByNodeId === undefined
             ? {}
             : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),
@@ -187,7 +190,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
 
 function projectNavigationRow(options: {
   readonly row: NavigationRow
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
   readonly sourceReadinessByNodeId?: ReadonlyMap<string, SourceReadiness>
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
@@ -242,7 +245,7 @@ function projectSourceChildren(options: {
   readonly ownerId: string
   readonly target: SourceTarget
   readonly state: SourceState | undefined
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): ProjectedNodeState {
@@ -316,7 +319,7 @@ function projectSourceChildren(options: {
 function projectLoadedHierarchyChildren(options: {
   readonly ownerId: string
   readonly children: LoadedChildren
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
   readonly suppressFileOnlyTerminalState?: boolean
@@ -440,7 +443,7 @@ function noChildFoldersStateNode(
 function projectLiteralNodes(options: {
   readonly nodes: readonly ChildRow[]
   readonly entryPoint: EntryPoint
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
   readonly label?: string
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -472,7 +475,7 @@ function projectLiteralNodes(options: {
 function projectLiteralDirectoryNode(options: {
   readonly node: Extract<ChildRow, { readonly kind: 'directory' }>
   readonly entryPoint: EntryPoint
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
   readonly label?: string
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -708,7 +711,7 @@ function failedChildren(
 function projectDirectoryChildren(options: {
   readonly ownerId: string
   readonly state: DirectoryState | undefined
-  readonly profile: ProfileKey
+  readonly profile: LibraryBrowseProfile
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): ProjectedNodeState {

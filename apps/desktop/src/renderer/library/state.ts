@@ -11,7 +11,7 @@ import type {
   LocalBrowseMoreTarget
 } from './localBrowse/types'
 import type { SourceReadiness } from './runtime/sourceReadiness'
-import type { ProfileKey } from './browseProfile/types'
+import type { LibraryBrowseProfile } from './libraryBrowseProfile/types'
 import type { LocalPreviewMode } from './localBrowse/previewMode'
 
 export type DirectoryTarget = {
@@ -154,7 +154,7 @@ export type RowBinding =
       readonly detail: string
     }
   | {
-      readonly kind: 'localBrowseSection'
+      readonly kind: 'addSourceSection'
     }
   | {
       readonly kind: 'localBrowseEntryPoint'
@@ -175,7 +175,7 @@ export type RowBinding =
     }
 
 export type BrowserState = {
-  readonly libraryBrowseProfile?: ProfileKey
+  readonly libraryBrowseProfile?: LibraryBrowseProfile
   readonly localPreviewMode?: LocalPreviewMode
   readonly hostStatus?: LibraryBoundaryHostStatus
   readonly navigationReadResult?: NavigationReadRowsResult

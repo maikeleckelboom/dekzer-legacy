@@ -1,29 +1,31 @@
 import type { ContentsReadPolicy } from '../../../shared/library/contents/read'
 
-export type ProfileKey = 'audio' | 'playable' | 'allFiles'
+export type LibraryBrowseProfile = 'audio' | 'playable' | 'allFiles'
 
-export type ProfileOption = {
-  readonly key: ProfileKey
+export type LibraryBrowseProfileOption = {
+  readonly key: LibraryBrowseProfile
   readonly label: string
 }
 
-export const defaultProfile: ProfileKey = 'audio'
+export const defaultLibraryBrowseProfile: LibraryBrowseProfile = 'audio'
 
-export const profileOptions: readonly ProfileOption[] = [
+export const libraryBrowseProfileOptions: readonly LibraryBrowseProfileOption[] = [
   { key: 'audio', label: 'Audio' },
   { key: 'playable', label: 'Audio + Video' },
   { key: 'allFiles', label: 'All Files' }
 ]
 
-export function isProfileKey(value: unknown): value is ProfileKey {
+export function isLibraryBrowseProfile(value: unknown): value is LibraryBrowseProfile {
   return value === 'audio' || value === 'playable' || value === 'allFiles'
 }
 
-export function profileLabel(profile: ProfileKey): string {
-  return profileOptions.find((option) => option.key === profile)?.label ?? 'Audio'
+export function libraryBrowseProfileLabel(profile: LibraryBrowseProfile): string {
+  return libraryBrowseProfileOptions.find((option) => option.key === profile)?.label ?? 'Audio'
 }
 
-export function mapProfileToContentsPolicy(profile: ProfileKey): ContentsReadPolicy {
+export function mapLibraryBrowseProfileToContentsPolicy(
+  profile: LibraryBrowseProfile
+): ContentsReadPolicy {
   switch (profile) {
     case 'audio':
       return { kind: 'audioBrowse' }
@@ -37,7 +39,7 @@ export function mapProfileToContentsPolicy(profile: ProfileKey): ContentsReadPol
   }
 }
 
-export function emptyStateLabel(profile: ProfileKey): string {
+export function libraryBrowseEmptyStateLabel(profile: LibraryBrowseProfile): string {
   switch (profile) {
     case 'audio':
       return 'No audio tracks'
