@@ -139,7 +139,7 @@ at the substrate level.
 
 The following are true of the current repo as of this writing:
 
-| Observation                                                                                                                               | Observation                                                              |
+| Observation                                                                                                                        | Observation                                                              |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `sourceFileVisibility` was implementation debt and has been removed from renderer-facing contracts.                                | Library tree row admission is now a product/boundary surface concern.    |
 | Library tree row admission is owned by the product/boundary surface, not the renderer.                                             | Renderer no longer chooses visibility or policy.                         |
@@ -161,18 +161,18 @@ The provisional `sourceFileVisibility` vocabulary has been removed. Library tree
 
 The following names are canonical first-slice vocabulary:
 
-| Canonical name                  | Location / owner            | Meaning                                                                                                 |
-| ------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `readLibraryTreeChildren`       | Rust protocol → TS contract | Product-facing hierarchy read command.                                                                  |
-| `LibraryTreeWindow`             | Rust protocol → TS contract | Single page of hierarchy children.                                                                      |
-| `LibraryTreeCoverage`           | Rust protocol → TS contract | Coverage for a hierarchy window.                                                                        |
-| `ContentsReadRequest`           | Rust protocol → TS contract | Single contents read request.                                                                           |
-| `ContentsResult`                | Rust protocol → TS contract | Single contents read result page.                                                                       |
-| `ContentsReadPolicy`            | Shared TS → Rust service    | Policy parameter for contents reads.                                                                    |
-| `ContentsScope`                 | Shared TS → Rust service    | Scope parameter for contents reads.                                                                     |
+| Canonical name                  | Location / owner            | Meaning                                                                                                  |
+| ------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `readLibraryTreeChildren`       | Rust protocol → TS contract | Product-facing hierarchy read command.                                                                   |
+| `LibraryTreeWindow`             | Rust protocol → TS contract | Single page of hierarchy children.                                                                       |
+| `LibraryTreeCoverage`           | Rust protocol → TS contract | Coverage for a hierarchy window.                                                                         |
+| `ContentsReadRequest`           | Rust protocol → TS contract | Single contents read request.                                                                            |
+| `ContentsResult`                | Rust protocol → TS contract | Single contents read result page.                                                                        |
+| `ContentsReadPolicy`            | Shared TS → Rust service    | Policy parameter for contents reads.                                                                     |
+| `ContentsScope`                 | Shared TS → Rust service    | Scope parameter for contents reads.                                                                      |
 | `ContentsReadPolicy`            | Shared TS → Rust store      | `playableMediaBrowse`, `audioBrowse`, `sourceFileInventory`, or `playableMedia` profile-specific policy. |
-| `StoreLiteralHierarchyWindow`   | Rust store                  | Store-level hierarchy window.                                                                           |
-| `StoreLiteralHierarchyCoverage` | Rust store                  | Store-level hierarchy coverage.                                                                         |
+| `StoreLiteralHierarchyWindow`   | Rust store                  | Store-level hierarchy window.                                                                            |
+| `StoreLiteralHierarchyCoverage` | Rust store                  | Store-level hierarchy coverage.                                                                          |
 
 ## Deferred work
 

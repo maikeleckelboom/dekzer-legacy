@@ -27,7 +27,7 @@ This preserves diagnostic and future migration room while making the contents pa
 
 `source_files` owns durable file observations. The required inventory observations are:
 
-| Observation                         | Meaning                                                                                                   |
+| Observation                  | Meaning                                                                                                   |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `source_file_id`             | Stable durable file row identity inside the store.                                                        |
 | `source_id`                  | Owning source root.                                                                                       |
@@ -82,7 +82,7 @@ or indexing is incomplete.
 
 Explicit non-default source-file inventory reads may include:
 
-| Stored observations                                                                    | Explicit inventory admission                                 |
+| Stored observations                                                             | Explicit inventory admission                                 |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------ |
 | `file_class = audio`                                                            | Include.                                                     |
 | `file_class = video`                                                            | Include when policy requests video.                          |
@@ -143,7 +143,7 @@ Rust and SQLite own durable observations and read-model admission. Boundary prot
 
 The renderer may project icons and labels:
 
-| Row observations              | Renderer projection |
+| Row observations       | Renderer projection |
 | ---------------------- | ------------------- |
 | audio                  | music/file row      |
 | video                  | video/file row      |

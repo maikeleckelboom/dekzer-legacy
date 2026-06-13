@@ -134,10 +134,10 @@ models do not recompute it from `relative_path`.
 
 The following surfaces have not yet been migrated to natural browse sort keys:
 
-| Surface                         | File                                                | Current ordering                          | Backend paginated        | Requires cursor change |
-| ------------------------------- | --------------------------------------------------- | ----------------------------------------- | ------------------------ | ---------------------- |
-| **Contents playable-media** | `contents.rs` `PLAYABLE_MEDIA_CONTENTS_ORDER_SQL` | `lower(title/artist/album/relative_path)` | Yes | Yes |
-| **Navigation** | `navigation.rs` (projections) | `sibling_position` | No | N/A |
+| Surface                     | File                                              | Current ordering                          | Backend paginated | Requires cursor change |
+| --------------------------- | ------------------------------------------------- | ----------------------------------------- | ----------------- | ---------------------- |
+| **Contents playable-media** | `contents.rs` `PLAYABLE_MEDIA_CONTENTS_ORDER_SQL` | `lower(title/artist/album/relative_path)` | Yes               | Yes                    |
+| **Navigation**              | `navigation.rs` (projections)                     | `sibling_position`                        | No                | N/A                    |
 
 ### Rationale for deferral
 

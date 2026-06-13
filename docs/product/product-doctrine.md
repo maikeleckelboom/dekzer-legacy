@@ -11,11 +11,11 @@ segment surfaces are not current product authority, aliases, fallback surfaces, 
 
 ## 1. Status and Authority
 
-| Field         | Value                                                                                                                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**    | Product doctrine                                                                                                                                          |
-| **Scope**     | Defines the V0 product target, long-term product model, and present-day substrate obligations implied by both                                              |
-| **Not**       | A UI specification. An implementation specification. A domain object schema. A VR/AR roadmap.                                                             |
+| Field         | Value                                                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**    | Product doctrine                                                                                                                                            |
+| **Scope**     | Defines the V0 product target, long-term product model, and present-day substrate obligations implied by both                                               |
+| **Not**       | A UI specification. An implementation specification. A domain object schema. A VR/AR roadmap.                                                               |
 | **Authority** | This document owns product phasing, product laws, and roadmap pressure. The Prepared Room canonical foundations document owns the future room domain model. |
 
 ---

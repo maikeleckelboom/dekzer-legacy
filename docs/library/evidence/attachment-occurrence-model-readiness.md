@@ -67,18 +67,18 @@ not a second source-file inventory model.
 
 ## Ownership Map
 
-| Concept | Current durable owner | A-5 stance |
-| --- | --- | --- |
-| Source registration | `sources`, `source_state`, `SourcesAuthorityTx`, and the `RegisterLocalRoot` boundary | Reuse only. Do not create occurrence-owned source records. |
-| Source locator/path identity | `source_locators`, `SourceLocatorsAuthorityTx`, source lifecycle reads, and `source_locations` for accepted sub-roots | Reuse source and path evidence. Do not infer relocation acceptance. |
-| Source file inventory | `source_files`, `source_directories`, `SourceFilesAuthorityTx`, scan/finalization code | A source-file occurrence is this row. |
-| Attachment/content identity | `content_attachments`, `source_file_attachment_links`, and `materialize_attachments_for_source` | Group by `attachment_id` / BLAKE3 content identity. |
-| Probe observations | `source_file_observations` plus accepted inspection artifacts and media probe maintenance | Expose only as evidence availability if needed. Do not move probe observations onto occurrences. |
-| Source health/integrity | `readSourceIntegrity`, source lifecycle, scan coverage, source maintenance snapshot | Use to mark unavailable, missing, blocked, stale, or incomplete evidence without hiding rows. |
-| Occurrence grouping | Derived query over `source_file_attachment_links`, `content_attachments`, and `source_files` | No durable owner beyond existing tables. |
-| Occurrence read model | Existing attachment identity read path, especially `readAttachmentSourceFiles` | Extend in place for occurrence evidence rather than adding occurrence-interpretation commands. |
-| Future user decisions | A-6 user decision pattern. Existing track identity decisions govern candidates only. | Absent from A-5. Do not write decision rows. |
-| Renderer projection | Existing desktop attachment identity forwarding only | Renderer may project later but must not own occurrence authority. |
+| Concept                      | Current durable owner                                                                                                 | A-5 stance                                                                                       |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Source registration          | `sources`, `source_state`, `SourcesAuthorityTx`, and the `RegisterLocalRoot` boundary                                 | Reuse only. Do not create occurrence-owned source records.                                       |
+| Source locator/path identity | `source_locators`, `SourceLocatorsAuthorityTx`, source lifecycle reads, and `source_locations` for accepted sub-roots | Reuse source and path evidence. Do not infer relocation acceptance.                              |
+| Source file inventory        | `source_files`, `source_directories`, `SourceFilesAuthorityTx`, scan/finalization code                                | A source-file occurrence is this row.                                                            |
+| Attachment/content identity  | `content_attachments`, `source_file_attachment_links`, and `materialize_attachments_for_source`                       | Group by `attachment_id` / BLAKE3 content identity.                                              |
+| Probe observations           | `source_file_observations` plus accepted inspection artifacts and media probe maintenance                             | Expose only as evidence availability if needed. Do not move probe observations onto occurrences. |
+| Source health/integrity      | `readSourceIntegrity`, source lifecycle, scan coverage, source maintenance snapshot                                   | Use to mark unavailable, missing, blocked, stale, or incomplete evidence without hiding rows.    |
+| Occurrence grouping          | Derived query over `source_file_attachment_links`, `content_attachments`, and `source_files`                          | No durable owner beyond existing tables.                                                         |
+| Occurrence read model        | Existing attachment identity read path, especially `readAttachmentSourceFiles`                                        | Extend in place for occurrence evidence rather than adding occurrence-interpretation commands.   |
+| Future user decisions        | A-6 user decision pattern. Existing track identity decisions govern candidates only.                                  | Absent from A-5. Do not write decision rows.                                                     |
+| Renderer projection          | Existing desktop attachment identity forwarding only                                                                  | Renderer may project later but must not own occurrence authority.                                |
 
 ## Evidence Versus Decision
 
@@ -103,12 +103,12 @@ not be encoded into occurrence status.
 These are possible interpretations over occurrence evidence. They are not product decisions and must not appear as
 action recommendations.
 
-| Interpretation | Evidence-only definition |
-| --- | --- |
-| exact duplicate | Multiple available occurrences with the same attachment/content identity. |
-| relocation candidate | One or more unavailable prior occurrences and one or more available occurrences with matching identity, where path/source context may suggest movement. |
-| offline occurrence | Occurrence is known but currently unavailable because the source, locator, or path is unavailable. |
-| backup/copy occurrence | Available occurrence with the same identity in a different source or backup-like location, without deleting, preferring, or merging either occurrence. |
+| Interpretation         | Evidence-only definition                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| exact duplicate        | Multiple available occurrences with the same attachment/content identity.                                                                               |
+| relocation candidate   | One or more unavailable prior occurrences and one or more available occurrences with matching identity, where path/source context may suggest movement. |
+| offline occurrence     | Occurrence is known but currently unavailable because the source, locator, or path is unavailable.                                                      |
+| backup/copy occurrence | Available occurrence with the same identity in a different source or backup-like location, without deleting, preferring, or merging either occurrence.  |
 
 The read boundary should expose enough evidence for these interpretations, but it should not return product commands
 such as "delete", "merge", "accept relocation", or "prefer".

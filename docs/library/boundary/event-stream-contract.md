@@ -116,9 +116,9 @@ reread snapshot data authoritatively.
 
 Snapshot scopes:
 
-| Scope            | Invalidated reads                                                                                                                                        |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `navigationRows` | `ReadNavigationRows`, `LoadNavigationRow`, `LoadNavigationRowByStableKey`.                                                                               |
+| Scope            | Invalidated reads                                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `navigationRows` | `ReadNavigationRows`, `LoadNavigationRow`, `LoadNavigationRowByStableKey`.                                                                             |
 | `contents`       | `ReadLibraryTreeChildren`, `ReadSourceLifecycle`, `ReadSourceIntegrity`, `ReadSourceMaintenance`, `ReadTrackIdentityReviewCandidates`, `ContentsRead`. |
 
 `SourceScanEvent` and `MaintainedSnapshotInvalidated` are distinct families. They are emitted through

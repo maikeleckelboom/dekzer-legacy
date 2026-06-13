@@ -128,7 +128,7 @@ The first slice must not choose names, tables, APIs, or job behavior that make t
 | Work unit                    | Bounded slice of scan work after which the job yields observations and accepts cancellation.         |
 | Traversal observation        | Evidence produced while walking directories, without reading media bytes.                            |
 | Candidate admission          | Decision that a file is plausible enough to inspect as media or companion metadata.                  |
-| Extension-admitted candidate | Scan admission observation: path/extension policy admitted the file for cheap inspection.                   |
+| Extension-admitted candidate | Scan admission observation: path/extension policy admitted the file for cheap inspection.            |
 | Magic signature read         | Tiny byte read, normally 8 to 16 bytes, used to detect obvious container signatures.                 |
 | Format evidence grade        | Doctrine evidence grade such as declared, detected, computed, verified, tested, exported, confirmed. |
 | Attachment inventory         | Readable media objects admitted into the library substrate.                                          |
@@ -148,7 +148,7 @@ The most important separation:
 
 A file named `song.mp3` may have both:
 
-| Observation                     | Meaning                                             |
+| Observation              | Meaning                                             |
 | ------------------------ | --------------------------------------------------- |
 | extension_admitted       | The scanner is allowed to perform cheap inspection. |
 | declared format evidence | The extension declares MP3.                         |
@@ -215,17 +215,17 @@ so the upgrade is additive rather than a migration from a false model.
 
 Before scanning, Dekzer classifies the selected root.
 
-| Root class         | Examples                                 | Default behavior                                                            |
-| ------------------ | ---------------------------------------- | --------------------------------------------------------------------------- |
-| normal_music_root  | D:\Music, ~/Music/DJ                     | Allow normal scan plan.                                                     |
-| broad_drive_root   | E:\, external disk root                  | Allow broad-root scan plan after summary.                                   |
-| system_volume_root | C:\                                      | Warn, suggest narrower roots, require explicit confirmation for broad scan. |
-| user_profile_root  | C:\Users\Maikel, /home/user              | Warn, suggest Music, Downloads, Desktop, or chosen subfolders.              |
-| cloud_backed_root  | OneDrive, Dropbox, iCloud, Google Drive  | Warn about placeholders, hydration, offline behavior, and provider churn.   |
-| network_root       | NAS, SMB share, mounted share            | Use latency/offline-aware plan.                                             |
+| Root class         | Examples                                 | Default behavior                                                                                                         |
+| ------------------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| normal_music_root  | D:\Music, ~/Music/DJ                     | Allow normal scan plan.                                                                                                  |
+| broad_drive_root   | E:\, external disk root                  | Allow broad-root scan plan after summary.                                                                                |
+| system_volume_root | C:\                                      | Warn, suggest narrower roots, require explicit confirmation for broad scan.                                              |
+| user_profile_root  | C:\Users\Maikel, /home/user              | Warn, suggest Music, Downloads, Desktop, or chosen subfolders.                                                           |
+| cloud_backed_root  | OneDrive, Dropbox, iCloud, Google Drive  | Warn about placeholders, hydration, offline behavior, and provider churn.                                                |
+| network_root       | NAS, SMB share, mounted share            | Use latency/offline-aware plan.                                                                                          |
 | protected_root     | system/protected/inaccessible path       | Arc A: reject. Future limited protected scanning requires a separate contract and must not reuse registration proposals. |
-| indirection_root   | shortcut, symlink, junction, mount point | Resolve, classify target, show indirection before scan.                     |
-| unknown_root       | identity or access cannot be determined  | Require conservative plan.                                                  |
+| indirection_root   | shortcut, symlink, junction, mount point | Resolve, classify target, show indirection before scan.                                                                  |
+| unknown_root       | identity or access cannot be determined  | Require conservative plan.                                                                                               |
 
 The classification is persisted. It is part of the source root registration record, not a transient UI label.
 
@@ -541,10 +541,10 @@ A CUE sheet is a companion metadata artifact that may describe segmentation over
 
 Example:
 
-| File       | Role                                |
-| ---------- | ----------------------------------- |
+| File       | Role                                 |
+| ---------- | ------------------------------------ |
 | album.flac | Playable media attachment candidate. |
-| album.cue  | Companion segmentation artifact.    |
+| album.cue  | Companion segmentation artifact.     |
 
 First-slice behavior:
 
@@ -785,7 +785,7 @@ A change fails this contract if it does any of the following:
 | ------------------------------------------------------------------------ | --------------------------------------------------------------- |
 | Recursively scans C:\ as an ordinary folder                              | Ignores root classification and scan planning.                  |
 | Opens every file to see if it might be audio                             | Couples traversal to analysis and violates candidate admission. |
-| Uses declared_candidate as a stored observation name                            | Collides with doctrine evidence grade vocabulary.               |
+| Uses declared_candidate as a stored observation name                     | Collides with doctrine evidence grade vocabulary.               |
 | Treats MP3 frame sync as sufficient unknown-extension evidence           | Produces false positives from binary debris.                    |
 | Stores every ignored system file                                         | Pollutes durable substrate with irrelevant debris.              |
 | Treats permission error as scan failure                                  | Broad roots must tolerate inaccessible territory.               |

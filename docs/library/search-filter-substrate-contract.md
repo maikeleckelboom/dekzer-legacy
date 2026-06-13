@@ -66,9 +66,9 @@ rebuilt from authoritative tables and read models:
 | Source locations                                                  | `source_locations`                                                                           |
 | Directory identity, path, presence, scan coverage                 | `source_directories`                                                                         |
 | Source-file identity, path, name, file class, file kind, presence | `source_files`                                                                               |
-| Current BLAKE3 evidence availability                              | current `source_file_observations` basis and `content_hash_algorithm = 'blake3'`                          |
+| Current BLAKE3 evidence availability                              | current `source_file_observations` basis and `content_hash_algorithm = 'blake3'`             |
 | Attachment identity summary                                       | `content_attachments` plus `source_file_attachment_links`, with link status computed by join |
-| Media probe summary                                               | current-basis `source_file_observations` probe fields                                                     |
+| Media probe summary                                               | current-basis `source_file_observations` probe fields                                        |
 | CUE/companion classification                                      | current source-file `file_kind`/`file_class` only                                            |
 
 The renderer may:
@@ -147,14 +147,14 @@ Search results are typed. They must not be flattened into tracks.
 
 V0 target kinds:
 
-| Result kind                 | Stable identity                                                          | Required authority                       |
-| --------------------------- | ------------------------------------------------------------------------ | ---------------------------------------- |
-| `source`                    | `source_id`                                                              | source lifecycle/source record authority |
-| `sourceLocation`            | `source_location_id`                                                     | source-location authority                |
-| `directory`                 | `source_directory_id` plus `source_id`                                   | source hierarchy authority               |
-| `sourceFile`                | `source_file_id` plus `source_id`                                        | source-file inventory authority          |
-| `attachmentEvidenceSummary` | attachment id plus source-file link id when link-scoped                  | attachment identity read authority       |
-| `mediaProbeEvidenceSummary` | `source_file_id` plus accepted probe artifact/observation basis where available | observed-observations/media-probe authority     |
+| Result kind                 | Stable identity                                                                 | Required authority                          |
+| --------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------- |
+| `source`                    | `source_id`                                                                     | source lifecycle/source record authority    |
+| `sourceLocation`            | `source_location_id`                                                            | source-location authority                   |
+| `directory`                 | `source_directory_id` plus `source_id`                                          | source hierarchy authority                  |
+| `sourceFile`                | `source_file_id` plus `source_id`                                               | source-file inventory authority             |
+| `attachmentEvidenceSummary` | attachment id plus source-file link id when link-scoped                         | attachment identity read authority          |
+| `mediaProbeEvidenceSummary` | `source_file_id` plus accepted probe artifact/observation basis where available | observed-observations/media-probe authority |
 
 The backend may choose to return evidence summaries as separate results or as attached summaries on `sourceFile`
 results. Either shape is valid only when the response states the result kind and authority layer explicitly.

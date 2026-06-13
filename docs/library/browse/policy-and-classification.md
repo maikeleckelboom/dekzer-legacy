@@ -140,7 +140,7 @@ independently of and asynchronously from classification.
 
 | Field             | Description                                                |
 | ----------------- | ---------------------------------------------------------- |
-| `sourceFileId`    | Foreign key to source-file observations (§3.2)                    |
+| `sourceFileId`    | Foreign key to source-file observations (§3.2)             |
 | `hashState`       | `pending` / `computing` / `complete` / `failed`            |
 | `blake3Hash`      | BLAKE3 content hash, populated once `hashState = complete` |
 | `hashGeneratedAt` | Timestamp when the hash was last successfully computed     |

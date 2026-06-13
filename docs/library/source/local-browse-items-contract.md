@@ -23,14 +23,14 @@ roots. Items are bounded path entries under one validated entry point root and p
 
 The finite V0 item kinds are:
 
-| Item kind         | Meaning                                                                  |
-| ----------------- | ------------------------------------------------------------------------ |
-| `directory`       | Immediate directory item that may be browsed and may request admission.  |
-| `mediaFile`       | Immediate media-relevant file shown before admission.                    |
-| `unsupportedFile` | Immediate file that is accessible but not media-relevant for V0 action.  |
-| `rejectedRoot`    | Directory path that is displayable but rejected by local browse policy.  |
-| `inaccessible`    | Item path whose metadata or access state cannot be resolved safely.      |
-| `unknown`         | Item path with an unknown or unsupported filesystem kind.                |
+| Item kind         | Meaning                                                                 |
+| ----------------- | ----------------------------------------------------------------------- |
+| `directory`       | Immediate directory item that may be browsed and may request admission. |
+| `mediaFile`       | Immediate media-relevant file shown before admission.                   |
+| `unsupportedFile` | Immediate file that is accessible but not media-relevant for V0 action. |
+| `rejectedRoot`    | Directory path that is displayable but rejected by local browse policy. |
+| `inaccessible`    | Item path whose metadata or access state cannot be resolved safely.     |
+| `unknown`         | Item path with an unknown or unsupported filesystem kind.               |
 
 V0 may include files only as local browse items. Files discovered by a local browse item read must not appear in
 admitted-source tree rows. Admitted-source trees remain source, source-location, and source-directory scoped.

@@ -855,27 +855,27 @@ These substitutions are non-negotiable in product-facing surfaces, docs, and cod
 
 ## Big Vetoes
 
-| Do not do                               | Until                                                                    |
-| --------------------------------------- | ------------------------------------------------------------------------ |
-| Product-facing duplicate/relocation UI  | Attachment occurrence evidence (A-5) exists; actions also require A-6    |
-| Track tables                            | Media candidate layer (C-1) is ratified                                  |
-| `playableMedia` activation               | Media candidate / track identity layer is real                           |
-| CUE-to-audio pairing                    | CUE parse (B-3) + association evidence (B-4) exist                       |
-| Prep facets                             | Canonical track/media identity (D-2) is durable and D/E gate is ratified |
-| Waveform UI                             | Waveform artifact substrate is backend-owned                             |
-| Acoustic fingerprinting                 | Audio media candidates (C-1) exist                                       |
-| Track identity schema hardened          | C/D import interoperability gate lands first                             |
-| Auto-cleanup, removal, or merge         | Never without explicit user decision flow and record                     |
-| Product contents rows populated from attachments | Product contents projection is a future layer                     |
-| Renderer-owned library truth            | Never                                                                    |
-| Local browse projection/UI              | Local browse entry point, local browse item, and root-admission contracts are in force; local browse rows stay distinct from admitted sources |
-| Playlists as central workflow model     | Crates/sleeves/routes designed first                                     |
-| Search from renderer                    | A-7 search/filter contract must land first                               |
-| Import as silent canonical              | Always evidence; user confirmation required                              |
-| Import interoperability implementation  | C/D gate contract must land first                                        |
-| Prepared Room implementation            | D/E gate formal model must land first                                    |
-| Runtime event design                    | F-1 Flight Deck constraints must land first                              |
-| Attachment-detail UI                    | Collection health (A-4) must land first                                  |
+| Do not do                                        | Until                                                                                                                                         |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product-facing duplicate/relocation UI           | Attachment occurrence evidence (A-5) exists; actions also require A-6                                                                         |
+| Track tables                                     | Media candidate layer (C-1) is ratified                                                                                                       |
+| `playableMedia` activation                       | Media candidate / track identity layer is real                                                                                                |
+| CUE-to-audio pairing                             | CUE parse (B-3) + association evidence (B-4) exist                                                                                            |
+| Prep facets                                      | Canonical track/media identity (D-2) is durable and D/E gate is ratified                                                                      |
+| Waveform UI                                      | Waveform artifact substrate is backend-owned                                                                                                  |
+| Acoustic fingerprinting                          | Audio media candidates (C-1) exist                                                                                                            |
+| Track identity schema hardened                   | C/D import interoperability gate lands first                                                                                                  |
+| Auto-cleanup, removal, or merge                  | Never without explicit user decision flow and record                                                                                          |
+| Product contents rows populated from attachments | Product contents projection is a future layer                                                                                                 |
+| Renderer-owned library truth                     | Never                                                                                                                                         |
+| Local browse projection/UI                       | Local browse entry point, local browse item, and root-admission contracts are in force; local browse rows stay distinct from admitted sources |
+| Playlists as central workflow model              | Crates/sleeves/routes designed first                                                                                                          |
+| Search from renderer                             | A-7 search/filter contract must land first                                                                                                    |
+| Import as silent canonical                       | Always evidence; user confirmation required                                                                                                   |
+| Import interoperability implementation           | C/D gate contract must land first                                                                                                             |
+| Prepared Room implementation                     | D/E gate formal model must land first                                                                                                         |
+| Runtime event design                             | F-1 Flight Deck constraints must land first                                                                                                   |
+| Attachment-detail UI                             | Collection health (A-4) must land first                                                                                                       |
 
 ---
 

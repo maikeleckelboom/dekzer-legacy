@@ -33,11 +33,11 @@ single healthy/unhealthy boolean.
 
 The public read is:
 
-| Layer                   | Read                                                        |
-| ----------------------- | ----------------------------------------------------------- |
-| Rust protocol           | `SnapshotRead.ReadSourceIntegrity`                          |
-| Generated TS contract   | `readSourceIntegrity`                                       |
-| Boundary client         | `client.readSourceIntegrity({ sourceId })`                  |
+| Layer                 | Read                                       |
+| --------------------- | ------------------------------------------ |
+| Rust protocol         | `SnapshotRead.ReadSourceIntegrity`         |
+| Generated TS contract | `readSourceIntegrity`                      |
+| Boundary client       | `client.readSourceIntegrity({ sourceId })` |
 
 The read is read-only. It must not hash files, probe files, materialize attachments, promote playable media, produce
 track identity candidates, create decisions, mutate maintenance runtime state, publish invalidations, or request a

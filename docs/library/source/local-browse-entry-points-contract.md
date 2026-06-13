@@ -61,15 +61,15 @@ Neither is an admitted source.
 
 V0 is Windows-first. These entry point kinds are the canonical V0 kinds.
 
-| Entry point kind       | Meaning                                                                  | Source admission stance                                             |
-| ---------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| `systemDriveRoot`      | Root of the OS/system volume, such as the resolved Windows system drive. | Browseable entry point; not directly admissible as a source root.    |
-| `localDataVolumeRoot`  | Local non-system volume root.                                            | May request admission; admission policy decides confirmation.        |
-| `removableVolumeRoot`  | Removable drive root.                                                    | May request admission; removable policy decides warning/confirmation. |
-| `userHome`             | Current user's home directory.                                           | May request admission; admission policy decides confirmation.        |
-| `desktop`              | Current user's Desktop directory.                                        | May request admission.                                              |
-| `downloads`            | Current user's Downloads directory.                                      | May request admission.                                              |
-| `music`                | Platform-resolved Music directory.                                       | May request default Music admission action.                         |
+| Entry point kind      | Meaning                                                                  | Source admission stance                                               |
+| --------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| `systemDriveRoot`     | Root of the OS/system volume, such as the resolved Windows system drive. | Browseable entry point; not directly admissible as a source root.     |
+| `localDataVolumeRoot` | Local non-system volume root.                                            | May request admission; admission policy decides confirmation.         |
+| `removableVolumeRoot` | Removable drive root.                                                    | May request admission; removable policy decides warning/confirmation. |
+| `userHome`            | Current user's home directory.                                           | May request admission; admission policy decides confirmation.         |
+| `desktop`             | Current user's Desktop directory.                                        | May request admission.                                                |
+| `downloads`           | Current user's Downloads directory.                                      | May request admission.                                                |
+| `music`               | Platform-resolved Music directory.                                       | May request default Music admission action.                           |
 
 `music` is the only entry point whose local browse action can be `requestDefaultMusicFolderAdmission`. That action is a
 display/action recommendation only. It is not an admission result and cannot bypass root admission.
@@ -101,7 +101,7 @@ Entry point status describes local browse availability. It is not a source lifec
 | `permissionBlocked`         | The path exists or is known, but access is blocked by permissions or policy. |
 | `missing`                   | The resolved path does not currently exist.                                  |
 | `unsupportedPlatform`       | The entry point kind has no supported resolver on the current platform.      |
-| `duplicateOfAdmittedSource` | The entry point path exactly matches an already admitted source path.         |
+| `duplicateOfAdmittedSource` | The entry point path exactly matches an already admitted source path.        |
 
 These statuses must not be projected as `mounted`, `blocked`, `partial`, `scanning`, `completed`, or any other admitted
 source lifecycle state.

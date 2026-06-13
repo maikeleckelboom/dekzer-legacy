@@ -21,11 +21,11 @@ acts and source root admission succeeds.
 
 ## Platform Music Folder Resolution
 
-| Platform | Canonical path        | Resolution method                                                |
-| -------- | --------------------- | ---------------------------------------------------------------- |
-| Windows  | `%USERPROFILE%\Music` | `SHGetKnownFolderPath(FOLDERID_Music)`; not string construction  |
-| macOS    | `~/Music`             | `FileManager.default.urls(for: .musicDirectory, ...)`            |
-| Linux    | `~/Music`             | XDG user dirs (`xdg-user-dir MUSIC`) with `~/Music` fallback     |
+| Platform | Canonical path        | Resolution method                                               |
+| -------- | --------------------- | --------------------------------------------------------------- |
+| Windows  | `%USERPROFILE%\Music` | `SHGetKnownFolderPath(FOLDERID_Music)`; not string construction |
+| macOS    | `~/Music`             | `FileManager.default.urls(for: .musicDirectory, ...)`           |
+| Linux    | `~/Music`             | XDG user dirs (`xdg-user-dir MUSIC`) with `~/Music` fallback    |
 
 **V0 implementation targets Windows.** macOS and Linux resolution rules are included for cross-platform design intent
 and must not be implemented accidentally in the Windows V0 slice.
