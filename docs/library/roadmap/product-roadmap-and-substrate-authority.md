@@ -3,7 +3,7 @@
 **Status:** Living document — maintained alongside implementation
 **Scope:** Full product spine from substrate to performance
 **Rule:** Every layer has one owner, one durable representation, one read contract, and one reason to exist. Anything
-stale, transitional, or misleading gets deleted once its replacement exists.
+stale or misleading gets deleted once its replacement exists.
 
 **This document is not itself a schema contract. Layer-specific documents remain authoritative for implementation
 details. This document defines sequence, dependency, vetoes, and long-term ownership.**
@@ -36,19 +36,27 @@ workflow.
 
 ## Next Executable Queue
 
-The immediate implementation sequence. Read the full roadmap for context; use this list for operational clarity.
+The legacy deletion sequence is complete. Public legacy surfaces, internal store/schema/projection/domain residue,
+dormant browser preference state, and stale audit documentation have been removed or revised. `browser_user_order`
+remains current as source/source-location navigation ordering.
 
-1. A-6 user decision pattern contract is ratified in `docs/library/user-decision-pattern-contract.md`. It is now the
-   reusable gate for later CUE association, canonical track identity, duplicate/relocation handling, prep facets,
-   source-file preference, and future stable item references.
+The next sequence is documentation and contract authority first, then bounded implementation slices:
+
+1. Documentation authority alignment over the post-deletion substrate.
+2. Performance bounding for current reads, maintenance, and projection paths.
+3. Analysis and waveform contracts over current attachment, primary-media, candidate, and decision authority.
+4. Local browser default source policy, including first-run/default-source behavior.
+5. Workspace layout contract for current library surfaces.
+6. Implementation slices only after the relevant authority contract exists.
 
 A-5 attachment occurrence remains the accepted evidence-only substrate feeding A-6. It does not decide duplicate song,
 safe deletion, preferred copy, accepted relocation, canonical track, cleanup, or track merge.
 
 Media probe observations, source integrity / collection health v0, primary-media promotion, exact-content track identity
 candidates, candidate decisions, explicit user decision commands, and the review-candidates read model are already
-implemented. Their accepted contracts are narrower than the later canonical media-candidate and canonical-track roadmap
-layers and do not satisfy those future gates by themselves.
+implemented. Their accepted contracts are narrower than the later canonical media-candidate, canonical-track,
+preparation, analysis, waveform, playlist/crate, workspace, and performance roadmap layers and do not satisfy those
+future gates by themselves.
 
 ---
 
@@ -91,12 +99,12 @@ snapshot invalidation scope.
 Outcome fields: `attachments_created`, `attachments_refreshed`, `links_created`, `links_replaced`, `links_refreshed`,
 `skipped_stale_facts`, `skipped_no_blake3`, `skipped_no_facts`.
 
-### Deleted compatibility surfaces
+### Deleted Non-Current Surfaces
 
-The current baseline is greenfield. Removed compatibility surfaces are not migration targets, compatibility views, or
-aliases. Future media, track, preparation, playlist, or waveform work must build on the current source-file,
-`SourceFacts`, attachment, primary-media, track-candidate, and track-decision substrate instead of reviving deleted
-tables.
+The current baseline is greenfield. Removed asset, browser, preparation, capability, playlist, and segment surfaces are
+not current, not aliases, not fallback views, and not implementation targets. Future media, track, preparation,
+analysis, playlist, waveform, workspace, or performance work must build on the current source-file, `SourceFacts`,
+attachment, primary-media, track-candidate, and track-decision substrate instead of reviving deleted tables.
 
 `primaryMedia` is current as a narrow read policy over `primary_media_candidates`; it remains non-default product
 doctrine until workflow-filter ownership explicitly chooses it. It is not track identity and not a fallback source-file
@@ -701,13 +709,26 @@ Deliverable: `docs/library/prepared-room-formal-model.md`
 
 ---
 
-### Phase E — Preparation
+### Phase E — Preparation, Analysis, and Waveform Contracts
 
 Goal: Know what is ready for performance, what is missing, what changed, and what can be trusted.
 
 ---
 
-**E-1 [CODE] Preparation facets** [Blocked — requires D-2, C/D gate, D/E gate]
+**E-1 [DOCTRINE] Preparation, analysis, and waveform contracts** [Doctrine gate]
+
+After the post-deletion authority cleanup, preparation/work/analysis/waveform concepts must be contracted again before
+implementation. The future contracts must consume the current source-file, `SourceFacts`, attachment, primary-media,
+track-candidate, and track-decision substrate. They must not restore deleted preparation, capability, waveform, or
+segment models from earlier schema epochs.
+
+Deliverables are intentionally separate contracts, not a single revived substrate:
+
+- analysis work and artifact ownership;
+- waveform artifact basis, storage, invalidation, and read behavior;
+- preparation facet target identity, evidence, decisions, and readiness projection.
+
+**E-2 [CODE] Preparation facets** [Blocked — requires D-2, C/D gate, D/E gate, E-1]
 
 Independent facets: beatgrid, BPM, key, waveform, cues, loops, phrases, loudness, energy, stems, notes, tags.
 

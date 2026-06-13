@@ -9,7 +9,6 @@ canonical-context:
   - product/product-doctrine
   - source-access-and-scan-coverage
   - source-locations-lifecycle-contract
-  - library-preparation-substrate
   - source-hierarchy-contract
   - first-slice-substrate-map
 scope:

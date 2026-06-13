@@ -25,6 +25,8 @@ scope:
 
 This document owns the current authority decision for media identity surfaces that sit beyond source lifecycle and
 source-file inventory. It decides what is canonical now and what must remain outside the current implementation surface.
+It is current-only authority. Deleted asset, browser, preparation, capability, playlist, and segment surfaces are not
+live, dormant, fallback views, aliases, or implementation targets.
 
 Reading order:
 
@@ -58,6 +60,11 @@ The uncompiled `crates/library-store-sqlite/src/authority/media/*` scaffold was 
 non-current tables such as `media_assets`, `file_media_latest`, `releases`, `media_sets`, and `entity_asset_links` that are
 not present in the current baseline schema and was not included from `authority/mod.rs`. Its local SHA-256 inspection
 code was therefore not current product hashing authority.
+
+No removed browser, preparation, capability, playlist, or segment substrate remains as a path for future work. Future
+CUE association, canonical track identity, waveform, analysis, playlist/crate, preparation, and performance concepts
+must define new contracts that consume current source-file, `SourceFacts`, attachment, primary-media candidate,
+track-identity candidate, and track-identity decision authority.
 
 ## `primaryMedia` Decision
 
@@ -216,9 +223,11 @@ CUE sheets remain source-file companion metadata rows and are not parsed by medi
 
 ## Next Implementation Gate
 
-The next gate is collection health / source integrity work, video-capable probe adapter selection,
-source-location-scoped admission, broader scheduler policy, CUE parse observations, user correction commands, or a later
-canonical track identity layer that consumes exact candidate evidence plus additional evidence and user decisions.
-Follow-on work must not conflate the attachment foundation, media probe evidence, primary-media candidates, track
-identity candidates, or track identity decisions with canonical track tables, CUE pairing, artwork intelligence,
-playlist UI, prep facets, or waveform generation.
+Follow-on work must not conflate the attachment foundation, media probe evidence, primary-media candidates,
+track-identity candidates, or track identity decisions with canonical track tables, CUE pairing, artwork intelligence,
+playlist UI, preparation facets, analysis artifacts, or waveform generation.
+
+The next media-identity-adjacent work must land through its own contract before implementation. That includes
+video-capable probe adapter selection, source-location-scoped admission, broader scheduler policy, CUE parse
+observations, user correction commands, canonical track identity, preparation facets, analysis work, waveform artifacts,
+playlist/crate imports, or performance surfaces.

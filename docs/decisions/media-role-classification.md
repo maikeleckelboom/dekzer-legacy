@@ -1,6 +1,6 @@
 # Media Role Classification
 
-**Status:** FUTURE ARCHITECTURE — This document describes the long-term media classification pipeline. The schema vocabulary (`library_items`, `library_item_roles`, `item_readiness`, `file_identities`) predates the v1 substrate decision at `docs/decisions/library-preparation-substrate.md`. The v1 substrate uses `tracks`, `track_attachments`, `preparation_facets`, etc. Concepts such as role classification, the three-stage probe pipeline, and readiness evaluation are beyond the current v1 scope. Do not treat table shapes or column names in this document as current v1 implementation targets.
+**Status:** FUTURE ARCHITECTURE - This document describes the long-term media classification pipeline. Its schema vocabulary and table examples predate the post-deletion substrate baseline. Concepts such as role classification, the three-stage probe pipeline, and readiness evaluation are future work. Do not treat table shapes or column names in this document as current implementation targets.
 
 _Canonical architecture note. Governs library substrate, classification pipeline, browser projection, and all
 file-to-product-object mapping in Dekzer._

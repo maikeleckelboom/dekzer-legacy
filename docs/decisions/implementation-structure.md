@@ -3,7 +3,6 @@ authority: support-map
 purpose: Target implementation structure map. Not architecture authority.
 canonical-context:
   - product/product-doctrine
-  - library-preparation-substrate
   - source-root-scan-admission-contract
 ---
 
@@ -57,7 +56,7 @@ Public functions and exported types may remain explicit because
 call sites need meaning without relying on file paths.
 
 SQL table names use full durable vocabulary:
-  preparation_facets
+  content_attachments
 Rust files use full vocabulary when folder context does not already carry it.
 Inside a domain folder, prefer role names:
   preparation/apply_decision.rs

@@ -4,6 +4,8 @@
 
 Dekzer's long-term product model includes spatial performance memory, but V0 is local DJ basics first: sources,
 indexing, browsing, search/filter/sort, clear availability states, deterministic reads, and stable renderer projection.
+The post-deletion baseline has no legacy fallback path: removed asset, browser, preparation, capability, playlist, and
+segment surfaces are not current product authority, aliases, fallback surfaces, or implementation targets.
 
 ---
 
@@ -53,6 +55,9 @@ Future room-based concepts are architectural compatibility targets, not V0 produ
 supports them by preserving identity, availability, provenance, stable references, and evidence versus decision
 boundaries, but the first product bar remains a minimal, reliable local DJ workflow.
 
+Future waveform, analysis, workspace, hardware, Prepared Room, RT Flight Deck, and performance surfaces must project the
+current local-first substrate. They must not introduce parallel schema authority or revive deleted substrate models.
+
 ---
 
 ## 4. Future Product Direction
@@ -74,6 +79,11 @@ Dekzer builds local DJ basics on a correct substrate first.
 
 Library scanning. Canonical track identity. Source registration. Browse scopes. Contents reads. Media filtering. Event
 pump. Lifecycle reads. Stable references. Deterministic renderer projection.
+
+Current implementation authority is narrower than the long-term product model: source files, SourceFacts, content
+attachments, source-file attachment links, primary-media candidates, track-identity candidates, track-identity
+decisions, source lifecycle/integrity, contents/search/filter, and navigation. Future product surfaces consume this
+substrate when their contracts exist; they do not own it.
 
 Prepared Room, Performed Room, RT Flight Deck, audience-attended rooms, AR/VR, and hardware room projection apply
 architectural pressure now only where they preserve identity, availability, provenance, source isolation, stable
