@@ -349,6 +349,9 @@ const sourceStatusView = computed(() => {
 
   return projectStatusView({
     context,
+    ...(activeSurface.value === 'libraryBrowse'
+      ? { libraryBrowseProfile: libraryBrowseProfile.profile.value }
+      : {}),
     ...(sourceLifecycle === undefined ? {} : { sourceLifecycle }),
     ...(sourceIntegrity === undefined ? {} : { sourceIntegrity }),
     ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),

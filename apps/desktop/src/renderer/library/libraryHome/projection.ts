@@ -360,10 +360,11 @@ function dominantLibraryHomeState(
   }
 
   if (summaries.every((summary) => summary.productState === 'emptyCurrentView')) {
+    const emptyLabel = libraryBrowseEmptyStateLabel(profile)
     return {
       productState: 'emptyCurrentView',
-      title: 'Library ready',
-      detail: libraryBrowseEmptyStateLabel(profile)
+      title: emptyLabel,
+      detail: emptyLabel
     }
   }
 

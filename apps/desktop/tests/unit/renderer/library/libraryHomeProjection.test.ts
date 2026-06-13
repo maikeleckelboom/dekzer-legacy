@@ -116,6 +116,7 @@ describe('Library home projection', () => {
     })
 
     expect(projection.productState).toBe('emptyCurrentView')
+    expect(projection.title).toBe('No playable media in this view.')
     expect(projection.detail).toBe('No playable media in this view.')
     expect(projection.rows).toEqual([
       expect.objectContaining({

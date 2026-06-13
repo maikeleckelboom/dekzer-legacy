@@ -9,7 +9,14 @@ import type { SourceReadiness } from '../runtime/sourceReadiness'
 import type { SourceLifecycleRecord } from '../../../shared/library/source/lifecycle'
 import type { StatusContext } from './context'
 import { projectAddSourceStatusText } from '../addSource/projection'
-import { projectLibrarySourceReadiness } from '../libraryHome/projection'
+import {
+  libraryBrowseEmptyStateLabel,
+  projectLibrarySourceReadiness
+} from '../libraryHome/projection'
+import {
+  defaultLibraryBrowseProfile,
+  type LibraryBrowseProfile
+} from '../libraryBrowseProfile/types'
 import {
   hasSourceMaintenanceBacklog,
   sourceMaintenanceBacklog
@@ -91,6 +98,7 @@ export type StatusView = {
 
 export type StatusViewInput = {
   readonly context: StatusContext
+  readonly libraryBrowseProfile?: LibraryBrowseProfile
   readonly sourceLifecycle?: SourceLifecycleRecord
   readonly sourceReadiness?: SourceReadiness
   readonly sourceIntegrity?: ReadSourceIntegrityReply
@@ -266,7 +274,10 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
   const sourceReadinessBadge =
     input.sourceReadiness === undefined
       ? undefined
-      : projectLibrarySourceReadiness({ sourceReadiness: input.sourceReadiness }).badge
+      : projectLibrarySourceReadiness({
+          sourceReadiness: input.sourceReadiness,
+          profile: input.libraryBrowseProfile ?? defaultLibraryBrowseProfile
+        }).badge
   if (
     sourceReadinessBadge === 'Missing' ||
     sourceReadinessBadge === 'Blocked' ||
@@ -365,7 +376,7 @@ function compactDetail(input: StatusViewInput, prefix: string | undefined): stri
   }
 
   if (input.sourceReadiness?.kind === 'empty') {
-    return 'No audio tracks in this view.'
+    return libraryBrowseEmptyStateLabel(input.libraryBrowseProfile ?? defaultLibraryBrowseProfile)
   }
 
   return input.sourceReadiness?.detail ?? 'Source status is current.'

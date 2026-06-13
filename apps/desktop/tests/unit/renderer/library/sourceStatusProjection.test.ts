@@ -16,6 +16,7 @@ import type {
 } from '../../../../src/shared/library/localBrowse/entryPoints'
 import type { LocalBrowseItem } from '../../../../src/shared/library/localBrowse/items'
 import type { SourceLifecycleRecord } from '../../../../src/shared/library/source/lifecycle'
+import type { LibraryBrowseProfile } from '../../../../src/renderer/library/libraryBrowseProfile/types'
 import type {
   ReadSourceIntegrityReply,
   ReadSourceMaintenanceReply
@@ -282,8 +283,29 @@ describe('source status projection', () => {
     ).toBe('Partial')
   })
 
-  it('empty registered source shows concise no-audio status', () => {
+  it.each([
+    {
+      profile: 'audio',
+      badge: 'No audio tracks in this view',
+      detail: 'No audio tracks in this view.'
+    },
+    {
+      profile: 'playable',
+      badge: 'No playable media in this view',
+      detail: 'No playable media in this view.'
+    },
+    {
+      profile: 'allFiles',
+      badge: 'No files in this source inventory view',
+      detail: 'No files in this source inventory view.'
+    }
+  ] satisfies readonly {
+    readonly profile: LibraryBrowseProfile
+    readonly badge: string
+    readonly detail: string
+  }[])('empty registered source uses $profile browse profile status copy', (expected) => {
     const view = registeredView({
+      libraryBrowseProfile: expected.profile,
       sourceReadiness: {
         kind: 'empty',
         sourceNodeId: 'selected',
@@ -291,8 +313,8 @@ describe('source status projection', () => {
       }
     })
 
-    expect(view.badge).toBe('No audio tracks in this view')
-    expect(view.detail).toBe('No audio tracks in this view.')
+    expect(view.badge).toBe(expected.badge)
+    expect(view.detail).toBe(expected.detail)
   })
 
   it('registered source fallback is concrete while rows are unresolved', () => {
