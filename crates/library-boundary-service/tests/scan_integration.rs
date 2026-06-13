@@ -179,6 +179,7 @@ fn read_library_tree(
         SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
             entry_point: LibraryTreeEntryPoint::Source { source_id },
             parent_source_directory_id,
+            row_policy: None,
             offset: 0,
             limit: 50,
         }),

@@ -12,8 +12,18 @@ import type { StatusContext } from './context'
 export type StatusBadge =
   | 'Ready'
   | 'Scanning'
+  | 'Still indexing'
+  | 'No audio tracks'
   | 'Needs scan'
   | 'Maintenance needed'
+  | 'Maintenance running'
+  | 'Maintenance unavailable'
+  | 'Local browse only'
+  | 'Not in library yet'
+  | 'Choose a narrower folder'
+  | 'Protected location'
+  | 'Already added'
+  | 'Could not fully resolve this location'
   | 'Blocked'
   | 'Missing'
   | 'Offline/unavailable'
@@ -23,7 +33,7 @@ export type StatusBadge =
 export type StatusAction =
   | {
       readonly kind: 'addLocalPath'
-      readonly label: 'Add this folder' | 'Add parent folder'
+      readonly label: 'Add as music source' | 'Add parent as music source'
       readonly resolvedPath: string
       readonly enabled: boolean
       readonly reason?: string
@@ -125,16 +135,14 @@ function localBrowseStatus(
   context: Extract<StatusContext, { readonly kind: 'localBrowse' }>
 ): StatusView {
   const admission = context.admission
+  const badge = localBrowseBadge(context.localState)
 
   return {
     role: 'localBrowse',
     title: context.title,
-    badge: 'Unknown',
-    tone: 'muted',
-    detail:
-      admission === undefined
-        ? 'Local browse only. Add a folder before scan or maintenance.'
-        : 'Local browse admission available.',
+    badge,
+    tone: localBrowseTone(badge),
+    detail: localBrowseDetail(context.localState, context.detail),
     actions:
       admission === undefined
         ? []
@@ -243,7 +251,14 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
   }
 
   if (input.maintenanceRunState === 'running' || input.sourceMaintenance?.status === 'running') {
-    return 'Maintenance needed'
+    return 'Maintenance running'
+  }
+  if (
+    input.sourceMaintenance?.status === 'unavailable' ||
+    input.sourceMaintenance?.status === 'blocked' ||
+    input.sourceMaintenance?.status === 'failed'
+  ) {
+    return 'Maintenance unavailable'
   }
   if (hasMaintenanceBacklog(input.sourceMaintenance, input.sourceIntegrity)) {
     return 'Maintenance needed'
@@ -257,11 +272,15 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
     return 'Needs scan'
   }
 
+  if (input.sourceReadiness?.kind === 'empty') {
+    return 'No audio tracks'
+  }
+
   if (input.sourceReadiness?.kind === 'ready' || coverage === 'complete') {
     return 'Ready'
   }
 
-  return 'Unknown'
+  return 'Still indexing'
 }
 
 function compactDetail(input: StatusViewInput, prefix: string | undefined): string {
@@ -275,7 +294,13 @@ function compactDetail(input: StatusViewInput, prefix: string | undefined): stri
     input.maintenanceRunState === 'running' ||
     input.sourceMaintenance?.status === 'running'
   ) {
-    parts.push('Maintenance is running.')
+    parts.push('Maintenance is running for this source.')
+  } else if (input.sourceMaintenance?.status === 'unavailable') {
+    parts.push('Maintenance is unavailable for this source.')
+  } else if (input.sourceMaintenance?.status === 'blocked') {
+    parts.push('Maintenance is blocked for this source.')
+  } else if (input.sourceMaintenance?.status === 'failed') {
+    parts.push('Maintenance status could not be read.')
   } else if (maintenanceDetail !== undefined) {
     parts.push(maintenanceDetail)
   }
@@ -286,6 +311,10 @@ function compactDetail(input: StatusViewInput, prefix: string | undefined): stri
 
   if (parts.length > 0) {
     return parts.join(' ')
+  }
+
+  if (input.sourceReadiness?.kind === 'empty') {
+    return 'No audio tracks found in this view.'
   }
 
   return input.sourceReadiness?.detail ?? 'Source status is current.'
@@ -379,17 +408,23 @@ function maintenanceAction(input: StatusViewInput, sourceId: string): StatusActi
   const scanRunning = input.scanStatus === 'scanning'
   const maintenanceRunning =
     input.maintenanceRunState === 'running' || input.sourceMaintenance?.status === 'running'
+  const maintenanceUnavailable =
+    input.sourceMaintenance?.status === 'unavailable' ||
+    input.sourceMaintenance?.status === 'blocked' ||
+    input.sourceMaintenance?.status === 'failed'
 
   return {
     kind: 'runMaintenance',
     label: 'Run maintenance',
     sourceId,
-    enabled: !scanRunning && !maintenanceRunning,
+    enabled: !scanRunning && !maintenanceRunning && !maintenanceUnavailable,
     ...(scanRunning
       ? { reason: 'Wait for scan to finish.' }
       : maintenanceRunning
         ? { reason: 'Maintenance is running.' }
-        : {})
+        : maintenanceUnavailable
+          ? { reason: maintenanceUnavailableReason(input.sourceMaintenance?.status) }
+          : {})
   }
 }
 
@@ -431,16 +466,96 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'Ready':
       return 'ready'
     case 'Scanning':
+    case 'Still indexing':
       return 'active'
     case 'Needs scan':
     case 'Maintenance needed':
+    case 'Maintenance unavailable':
+    case 'Local browse only':
+    case 'Not in library yet':
+    case 'Choose a narrower folder':
+    case 'Protected location':
+    case 'Already added':
+    case 'Could not fully resolve this location':
     case 'Partial':
     case 'Unknown':
+    case 'No audio tracks':
       return 'warning'
+    case 'Maintenance running':
+      return 'active'
     case 'Blocked':
     case 'Missing':
     case 'Offline/unavailable':
       return 'danger'
+  }
+}
+
+function localBrowseBadge(
+  state: Extract<StatusContext, { readonly kind: 'localBrowse' }>['localState']
+): StatusBadge {
+  switch (state) {
+    case 'eligible':
+      return 'Not in library yet'
+    case 'broadRoot':
+      return 'Choose a narrower folder'
+    case 'protected':
+      return 'Protected location'
+    case 'resolutionFailed':
+      return 'Could not fully resolve this location'
+    case 'alreadyAdded':
+      return 'Already added'
+    case 'localBrowseOnly':
+      return 'Local browse only'
+  }
+}
+
+function localBrowseTone(badge: StatusBadge): StatusView['tone'] {
+  switch (badge) {
+    case 'Not in library yet':
+    case 'Local browse only':
+      return 'muted'
+    case 'Already added':
+      return 'ready'
+    case 'Protected location':
+    case 'Could not fully resolve this location':
+      return 'danger'
+    default:
+      return 'warning'
+  }
+}
+
+function localBrowseDetail(
+  state: Extract<StatusContext, { readonly kind: 'localBrowse' }>['localState'],
+  detail: string | undefined
+): string {
+  switch (state) {
+    case 'eligible':
+      return 'Not in library yet.'
+    case 'broadRoot':
+      return 'Choose a narrower folder before adding it as a music source.'
+    case 'protected':
+      return 'Protected location.'
+    case 'resolutionFailed':
+      return detail ?? 'Could not fully resolve this location.'
+    case 'alreadyAdded':
+      return 'Already added.'
+    case 'localBrowseOnly':
+      return 'Local browse only.'
+  }
+}
+
+function maintenanceUnavailableReason(
+  status: ReadSourceMaintenanceReply['status'] | undefined
+): string {
+  switch (status) {
+    case 'unavailable':
+      return 'Maintenance is unavailable for this source.'
+    case 'blocked':
+      return 'Maintenance is blocked for this source.'
+    case 'failed':
+      return 'Maintenance status could not be read.'
+    default:
+      return 'Maintenance is unavailable.'
   }
 }
 

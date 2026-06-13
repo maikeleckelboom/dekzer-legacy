@@ -63,17 +63,17 @@ A deck with four active stems may have four stem page streams plus optional mix 
 
 Each page has:
 
-| Field | Meaning |
-| --- | --- |
-| stream id | Deck/component stream identity. |
-| generation | Changes when playback material or alignment changes. |
-| page index | Zero-based page number in track-local time. |
-| frame start | Track-local start frame. |
-| frame count | Number of valid frames. |
-| channel layout | Mono/stereo/planar layout. |
-| sample format | Runtime f32. |
-| pointer/handle | Runtime-resident page memory. |
-| state | resident, warming, missing, stale. |
+| Field          | Meaning                                              |
+| -------------- | ---------------------------------------------------- |
+| stream id      | Deck/component stream identity.                      |
+| generation     | Changes when playback material or alignment changes. |
+| page index     | Zero-based page number in track-local time.          |
+| frame start    | Track-local start frame.                             |
+| frame count    | Number of valid frames.                              |
+| channel layout | Mono/stereo/planar layout.                           |
+| sample format  | Runtime f32.                                         |
+| pointer/handle | Runtime-resident page memory.                        |
+| state          | resident, warming, missing, stale.                   |
 
 Default V1 page size proposal:
 

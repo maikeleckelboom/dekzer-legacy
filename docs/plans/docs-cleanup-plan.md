@@ -26,16 +26,16 @@ Current docs have grown through migrations, planning, architecture exploration, 
 
 Recommended top-level docs groups:
 
-| Folder | Purpose |
-| --- | --- |
-| `docs/product` | Product doctrine, user-facing mental models, workflow principles. |
-| `docs/architecture` | Active architecture proposals/specs/contracts not yet code. |
-| `docs/library` | Current library substrate contracts and accepted behavior. |
-| `docs/workspace` | Workspace topology/layout contracts. |
-| `docs/runtime` | Runtime/audio/rendering/performance contracts once accepted. |
-| `docs/decisions` | Accepted durable decisions and implementation discipline. |
-| `docs/plans` | Temporary plans, cleanup plans, roadmaps, migration plans. |
-| `docs/archive` | Historical/deprecated material only if retained deliberately. |
+| Folder              | Purpose                                                           |
+| ------------------- | ----------------------------------------------------------------- |
+| `docs/product`      | Product doctrine, user-facing mental models, workflow principles. |
+| `docs/architecture` | Active architecture proposals/specs/contracts not yet code.       |
+| `docs/library`      | Current library substrate contracts and accepted behavior.        |
+| `docs/workspace`    | Workspace topology/layout contracts.                              |
+| `docs/runtime`      | Runtime/audio/rendering/performance contracts once accepted.      |
+| `docs/decisions`    | Accepted durable decisions and implementation discipline.         |
+| `docs/plans`        | Temporary plans, cleanup plans, roadmaps, migration plans.        |
+| `docs/archive`      | Historical/deprecated material only if retained deliberately.     |
 
 Rule: avoid more than one nested level unless the directory is an explicit domain with many accepted docs. Prefer filenames to carry specificity.
 

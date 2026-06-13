@@ -21,13 +21,13 @@ Control-plane APIs may return readiness, manifest summaries, and opaque tile fet
 
 ## Rejected for V1
 
-| Rejected mechanism | Reason |
-| --- | --- |
-| Normal JSON IPC for tile bytes | Structured clone / serialization overhead and high copy pressure for waveform tiles. |
-| Multiple competing delivery modes | Produces divergent cache and parser contracts. V1 needs one path. |
-| SharedArrayBuffer as a requirement | Requires cross-origin isolation and a torn-read protocol. Useful later for hot lanes, not required for tile bytes. |
-| Electron mmap_file_range abstraction | Electron renderers do not receive a first-class safe mmap file-range primitive for app-owned files. |
-| Raw filesystem paths to renderer | Breaks containment, permission, and future cache ownership. |
+| Rejected mechanism                   | Reason                                                                                                             |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Normal JSON IPC for tile bytes       | Structured clone / serialization overhead and high copy pressure for waveform tiles.                               |
+| Multiple competing delivery modes    | Produces divergent cache and parser contracts. V1 needs one path.                                                  |
+| SharedArrayBuffer as a requirement   | Requires cross-origin isolation and a torn-read protocol. Useful later for hot lanes, not required for tile bytes. |
+| Electron mmap_file_range abstraction | Electron renderers do not receive a first-class safe mmap file-range primitive for app-owned files.                |
+| Raw filesystem paths to renderer     | Breaks containment, permission, and future cache ownership.                                                        |
 
 ## Boundary split
 
@@ -91,58 +91,58 @@ The implementation must satisfy these checks before any renderer can fetch tile 
 
 `WaveformManifestSummary`:
 
-| Field | Meaning |
-| --- | --- |
-| `artifactId` | Stable artifact id. |
-| `basisHash` | Canonical basis hash for validation. |
-| `targetKind` | Target kind, such as `playable_media_full_mix` or future `audio_component`. |
-| `targetId` | Target id. |
-| `schemaKey` | Column schema key. |
-| `trackLengthSamples` | Track-local/component-local sample length. |
-| `analysisSampleRate` | Analysis sample rate. |
-| `lods` | List of LOD summaries. |
-| `normalizationHints` | Rendering hints, not basis inputs. |
-| `readiness` | Artifact readiness. |
+| Field                | Meaning                                                                     |
+| -------------------- | --------------------------------------------------------------------------- |
+| `artifactId`         | Stable artifact id.                                                         |
+| `basisHash`          | Canonical basis hash for validation.                                        |
+| `targetKind`         | Target kind, such as `playable_media_full_mix` or future `audio_component`. |
+| `targetId`           | Target id.                                                                  |
+| `schemaKey`          | Column schema key.                                                          |
+| `trackLengthSamples` | Track-local/component-local sample length.                                  |
+| `analysisSampleRate` | Analysis sample rate.                                                       |
+| `lods`               | List of LOD summaries.                                                      |
+| `normalizationHints` | Rendering hints, not basis inputs.                                          |
+| `readiness`          | Artifact readiness.                                                         |
 
 `WaveformLodSummary`:
 
-| Field | Meaning |
-| --- | --- |
-| `lod` | LOD number 0..4. |
-| `bucketSamples` | Samples per column. |
-| `columnCount` | Number of columns. |
-| `columnBytes` | Column byte width. |
-| `tileColumnCount` | Columns per tile. |
-| `tileCount` | Tile count. |
-| `persistence` | persistent, partial, on_demand, evicted. |
+| Field             | Meaning                                  |
+| ----------------- | ---------------------------------------- |
+| `lod`             | LOD number 0..4.                         |
+| `bucketSamples`   | Samples per column.                      |
+| `columnCount`     | Number of columns.                       |
+| `columnBytes`     | Column byte width.                       |
+| `tileColumnCount` | Columns per tile.                        |
+| `tileCount`       | Tile count.                              |
+| `persistence`     | persistent, partial, on_demand, evicted. |
 
 ## Tile descriptors
 
 `TileFetchDescriptor`:
 
-| Field | Meaning |
-| --- | --- |
+| Field          | Meaning                                    |
+| -------------- | ------------------------------------------ |
 | `descriptorId` | Opaque descriptor id used by app protocol. |
-| `artifactId` | Artifact id. |
-| `basisHash` | Basis hash expected by renderer. |
-| `lod` | LOD number. |
-| `tileIndex` | Tile index. |
-| `columnStart` | First column. |
-| `columnCount` | Number of columns. |
-| `columnBytes` | Column byte width. |
-| `payloadBytes` | Derived payload byte length. |
-| `fetchUrl` | App-protocol URL. |
-| `expiresAt` | Descriptor expiration, if enforced. |
+| `artifactId`   | Artifact id.                               |
+| `basisHash`    | Basis hash expected by renderer.           |
+| `lod`          | LOD number.                                |
+| `tileIndex`    | Tile index.                                |
+| `columnStart`  | First column.                              |
+| `columnCount`  | Number of columns.                         |
+| `columnBytes`  | Column byte width.                         |
+| `payloadBytes` | Derived payload byte length.               |
+| `fetchUrl`     | App-protocol URL.                          |
+| `expiresAt`    | Descriptor expiration, if enforced.        |
 
 `TileRangeDescriptor`:
 
-| Field | Meaning |
-| --- | --- |
-| `sampleStart` | Track-local sample start. |
-| `sampleEnd` | Track-local sample end. |
-| `lod` | Requested LOD. |
-| `reason` | deck_visible, deck_prefetch, stem_lane_visible, overview, inspector, edit_zoom. |
-| `maxBytes` | Hard limit for this range. |
+| Field         | Meaning                                                                         |
+| ------------- | ------------------------------------------------------------------------------- |
+| `sampleStart` | Track-local sample start.                                                       |
+| `sampleEnd`   | Track-local sample end.                                                         |
+| `lod`         | Requested LOD.                                                                  |
+| `reason`      | deck_visible, deck_prefetch, stem_lane_visible, overview, inspector, edit_zoom. |
+| `maxBytes`    | Hard limit for this range.                                                      |
 
 `TileMissingReason`:
 
@@ -251,13 +251,13 @@ Artifacts carry signal facts. Renderer context carries color and presentation po
 
 Future implementation should place contracts in layers by ownership:
 
-| Contract | Proposed owner |
-| --- | --- |
-| Artifact/readiness/request semantics | Rust boundary protocol and generated contract package. |
-| App protocol URL construction | Desktop main/preload boundary, not general library protocol. |
-| Renderer surface context | Desktop renderer shared types. |
-| Binary column/tile schemas | Shared architecture docs first; later Rust + TS constants generated or mirrored from a single source. |
-| Worker parser types | Renderer implementation detail derived from generated/shared schema constants. |
+| Contract                             | Proposed owner                                                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Artifact/readiness/request semantics | Rust boundary protocol and generated contract package.                                                |
+| App protocol URL construction        | Desktop main/preload boundary, not general library protocol.                                          |
+| Renderer surface context             | Desktop renderer shared types.                                                                        |
+| Binary column/tile schemas           | Shared architecture docs first; later Rust + TS constants generated or mirrored from a single source. |
+| Worker parser types                  | Renderer implementation detail derived from generated/shared schema constants.                        |
 
 Do not create a new package until the boundary generation pattern clearly requires it.
 

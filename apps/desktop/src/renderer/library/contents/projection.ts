@@ -712,7 +712,7 @@ function projectLocalBrowseFolderContents(options: {
   const admissionRow = localBrowseAdmissionRow(
     `local-browse-admission:${options.ownerId}`,
     options.folderOperations,
-    'Add this folder'
+    'Add as music source'
   )
   const state = options.windowState
 
@@ -821,7 +821,7 @@ function projectLocalBrowseFileContents(
   const admissionRow = localBrowseAdmissionRow(
     `local-browse-admission:${ownerId}`,
     item.availableOperations,
-    'Add parent folder'
+    'Add parent as music source'
   )
   const selectedRow = localBrowseItemRow(item)
 
@@ -932,9 +932,9 @@ function sourceAdmissionLabel(
   switch (operation.requestKind) {
     case 'defaultMusicFolder':
     case 'selectedDirectory':
-      return 'Add this folder'
+      return 'Add as music source'
     case 'parentDirectory':
-      return 'Add parent folder'
+      return 'Add parent as music source'
   }
 }
 

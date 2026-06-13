@@ -26,7 +26,7 @@ import type { SourceReadiness } from '../runtime/sourceReadiness'
 import { formatSourceDisplayName } from './sourcePresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
 import { projectLocalBrowseSection } from '../localBrowse/projection'
-import { defaultProfile } from '../browseProfile/types'
+import { defaultProfile, type ProfileKey } from '../browseProfile/types'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -169,6 +169,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
       ...visibleRows.map((row) =>
         projectNavigationRow({
           row,
+          profile: state.profile ?? defaultProfile,
           ...(state.sourceReadinessByNodeId === undefined
             ? {}
             : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),
@@ -185,6 +186,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
 
 function projectNavigationRow(options: {
   readonly row: NavigationRow
+  readonly profile: ProfileKey
   readonly sourceReadinessByNodeId?: ReadonlyMap<string, SourceReadiness>
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
@@ -213,6 +215,7 @@ function projectNavigationRow(options: {
         ownerId: nodeId,
         target: sourceTarget,
         state: sourceState,
+        profile: options.profile,
         directoryReadStates: options.directoryReadStates,
         bindingsById: options.bindingsById
       })
@@ -238,6 +241,7 @@ function projectSourceChildren(options: {
   readonly ownerId: string
   readonly target: SourceTarget
   readonly state: SourceState | undefined
+  readonly profile: ProfileKey
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): ProjectedNodeState {
@@ -294,6 +298,7 @@ function projectSourceChildren(options: {
         projectLoadedHierarchyChildren({
           ownerId: options.ownerId,
           children: state.children,
+          profile: options.profile,
           directoryReadStates: options.directoryReadStates,
           bindingsById: options.bindingsById
         })
@@ -309,6 +314,7 @@ function projectSourceChildren(options: {
 function projectLoadedHierarchyChildren(options: {
   readonly ownerId: string
   readonly children: LoadedChildren
+  readonly profile: ProfileKey
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): readonly BrowserTreeNode[] {
@@ -324,6 +330,7 @@ function projectLoadedHierarchyChildren(options: {
   const projectedNodes = projectLiteralNodes({
     nodes: options.children.rows,
     entryPoint: options.children.entryPoint,
+    profile: options.profile,
     ...(options.children.label === undefined ? {} : { label: options.children.label }),
     directoryReadStates: options.directoryReadStates,
     bindingsById: options.bindingsById
@@ -368,8 +375,8 @@ function hierarchyCoverageStateNode(
         {
           ownerId,
           state: 'empty',
-          label: 'No visible items',
-          detail: coverage.detail ?? 'No visible items in this scope.'
+          label: 'No matches',
+          detail: coverage.detail ?? 'No matching content.'
         },
         bindingsById
       )
@@ -412,6 +419,7 @@ function hierarchyCoverageStateNode(
 function projectLiteralNodes(options: {
   readonly nodes: readonly ChildRow[]
   readonly entryPoint: EntryPoint
+  readonly profile: ProfileKey
   readonly label?: string
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -422,6 +430,7 @@ function projectLiteralNodes(options: {
           projectLiteralDirectoryNode({
             node,
             entryPoint: options.entryPoint,
+            profile: options.profile,
             ...(options.label === undefined ? {} : { label: options.label }),
             directoryReadStates: options.directoryReadStates,
             bindingsById: options.bindingsById
@@ -434,6 +443,7 @@ function projectLiteralNodes(options: {
 function projectLiteralDirectoryNode(options: {
   readonly node: Extract<ChildRow, { readonly kind: 'directory' }>
   readonly entryPoint: EntryPoint
+  readonly profile: ProfileKey
   readonly label?: string
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -492,6 +502,7 @@ function projectLiteralDirectoryNode(options: {
     ...projectDirectoryChildren({
       ownerId: node.id,
       state: directoryState,
+      profile: options.profile,
       directoryReadStates: options.directoryReadStates,
       bindingsById: options.bindingsById
     })
@@ -643,6 +654,7 @@ function failedChildren(
 function projectDirectoryChildren(options: {
   readonly ownerId: string
   readonly state: DirectoryState | undefined
+  readonly profile: ProfileKey
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): ProjectedNodeState {
@@ -699,6 +711,7 @@ function projectDirectoryChildren(options: {
         projectLoadedHierarchyChildren({
           ownerId: options.ownerId,
           children: state.children,
+          profile: options.profile,
           directoryReadStates: options.directoryReadStates,
           bindingsById: options.bindingsById
         })

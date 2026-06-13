@@ -89,7 +89,7 @@ export type LocalBrowseItemMediaRelevance = "mediaRelevant" | "companionMetadata
 
 export type LocalBrowseItemFailureCode = "unsupportedPlatform" | "rootIdentityMismatch" | "rootPathUnavailable" | "parentPathUnavailable" | "parentMissing" | "parentNotDirectory" | "parentOutsideRoot" | "permissionDenied" | "metadataUnavailable" | "enumerationUnavailable" | "reparsePointSkipped" | "rejectedRoot" | "unknownFileType";
 
-export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, offset: number, limit: number, };
+export type ReadLibraryTreeChildrenRequest = { entryPoint: LibraryTreeEntryPoint, parentSourceDirectoryId: string | null, rowPolicy?: LibraryTreeRowPolicy, offset: number, limit: number, };
 
 export type NavigableChildScopeState = "unknown" | "hasNavigableChildScopes" | "noNavigableChildScopes";
 

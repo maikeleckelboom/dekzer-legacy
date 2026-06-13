@@ -1,9 +1,13 @@
-import type { ReadLibraryTreeChildrenRequest } from '@dekzer/library-boundary-contract'
+import type {
+  LibraryTreeRowPolicy as ContractLibraryTreeRowPolicy,
+  ReadLibraryTreeChildrenRequest
+} from '@dekzer/library-boundary-contract'
 
 import {
   type ReadErrorCode,
   type ChildRow,
   type HierarchyCoverage,
+  type LibraryTreeRowPolicy,
   type ReadResult
 } from '../../../shared/library/hierarchy/read'
 import type { LibraryBoundaryHost, LibraryBoundaryHostClient } from '../boundary/host'
@@ -38,6 +42,7 @@ export async function readThroughHost(
     const reply = await client.readLibraryTreeChildren({
       entryPoint: resolvedTarget.entryPoint,
       parentSourceDirectoryId: normalizedRequest.parentDirectoryId ?? null,
+      rowPolicy: mapRowPolicyToContract(normalizedRequest.rowPolicy),
       offset: normalizedRequest.offset,
       limit: normalizedRequest.limit
     } satisfies ReadLibraryTreeChildrenRequest)
@@ -80,6 +85,17 @@ export async function readThroughHost(
       'readFailed',
       'Unable to read library hierarchy children.'
     )
+  }
+}
+
+function mapRowPolicyToContract(rowPolicy: LibraryTreeRowPolicy): ContractLibraryTreeRowPolicy {
+  switch (rowPolicy) {
+    case 'audioBrowse':
+      return 'audioBrowse'
+    case 'playableMediaBrowse':
+      return 'playableMediaBrowse'
+    case 'sourceFileInventory':
+      return 'sourceFileInventory'
   }
 }
 

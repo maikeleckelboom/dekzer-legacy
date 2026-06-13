@@ -524,7 +524,7 @@ impl LibraryBoundaryService {
                 request.parent_source_directory_id,
                 request.offset,
                 request.limit,
-                library_store_sqlite::SourceFileClassFilter::NavigationOnly,
+                library_tree_row_policy_filter(request.row_policy),
             )
             .map_err(map_store_error)?;
         let mut reply = map_read_library_tree_children_reply(window).map_err(map_store_error)?;
@@ -953,6 +953,22 @@ impl LibraryBoundaryService {
         self.session_events
             .publish_revisions(map_maintained_read_model_revisions(revisions));
         Ok(())
+    }
+}
+
+fn library_tree_row_policy_filter(
+    row_policy: Option<protocol::LibraryTreeRowPolicy>,
+) -> library_store_sqlite::SourceFileClassFilter {
+    match row_policy.unwrap_or(protocol::LibraryTreeRowPolicy::PlayableMediaBrowse) {
+        protocol::LibraryTreeRowPolicy::AudioBrowse => {
+            library_store_sqlite::SourceFileClassFilter::Audio
+        }
+        protocol::LibraryTreeRowPolicy::PlayableMediaBrowse => {
+            library_store_sqlite::SourceFileClassFilter::PlayableMedia
+        }
+        protocol::LibraryTreeRowPolicy::SourceFileInventory => {
+            library_store_sqlite::SourceFileClassFilter::PlayableMediaAndImages
+        }
     }
 }
 
@@ -2305,6 +2321,7 @@ mod tests {
                 ReadLibraryTreeChildrenRequest {
                     entry_point,
                     parent_source_directory_id,
+                    row_policy: None,
                     offset: 0,
                     limit: 10,
                 },

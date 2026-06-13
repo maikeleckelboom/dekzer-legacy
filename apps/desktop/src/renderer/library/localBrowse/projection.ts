@@ -664,7 +664,11 @@ function formatEntryPointDetail(entry: LocalBrowseEntryPoint): string {
     return entryPointStatusLabel(entry.status)
   }
 
-  return sourceAdmissionOperationDetail(entry.availableOperations) ?? 'Local folder.'
+  if (entry.identity.entryPointKind === 'systemDriveRoot') {
+    return 'Choose a narrower folder.'
+  }
+
+  return sourceAdmissionOperationDetail(entry.availableOperations) ?? 'Local browse only.'
 }
 
 function formatItemDetail(item: LocalBrowseItem): string {
@@ -694,11 +698,11 @@ function sourceAdmissionOperationDetail(
 
   switch (operation.requestKind) {
     case 'defaultMusicFolder':
-      return 'Default music folder admission candidate.'
+      return 'Not in library yet.'
     case 'selectedDirectory':
-      return 'Folder admission candidate.'
+      return 'Not in library yet.'
     case 'parentDirectory':
-      return 'Parent folder admission candidate.'
+      return 'Parent folder can be added as a music source.'
   }
 }
 
@@ -723,17 +727,17 @@ export function sourceAdmissionOperation(
 function itemKindLabel(kind: LocalBrowseItemKind): string {
   switch (kind) {
     case 'directory':
-      return 'Local folder.'
+      return 'Local browse only.'
     case 'mediaFile':
       return 'Media file.'
     case 'unsupportedFile':
       return 'Unsupported file.'
     case 'rejectedRoot':
-      return 'Protected local folder.'
+      return 'Protected location.'
     case 'inaccessible':
       return 'Local item inaccessible.'
     case 'unknown':
-      return 'Unknown local item.'
+      return 'Could not fully resolve this location.'
   }
 }
 
@@ -778,11 +782,11 @@ function entryPointStatusLabel(status: LocalBrowseEntryPointStatus): string {
 function itemStatusLabel(status: LocalBrowseItemStatus): string {
   switch (status) {
     case 'available':
-      return 'Local item.'
+      return 'Local browse only.'
     case 'unavailable':
       return 'Local item unavailable.'
     case 'permissionBlocked':
-      return 'Local item access blocked.'
+      return 'Protected location.'
     case 'missing':
       return 'Local item missing.'
     case 'unsupportedPlatform':
@@ -790,9 +794,9 @@ function itemStatusLabel(status: LocalBrowseItemStatus): string {
     case 'duplicateOfAdmittedSource':
       return 'Already added as a library source.'
     case 'rejected':
-      return 'Local item rejected.'
+      return 'Protected location.'
     case 'unknown':
-      return 'Unknown local item.'
+      return 'Could not fully resolve this location.'
   }
 }
 

@@ -20,13 +20,13 @@ The extra two bytes in high-detail columns exist so JavaScript workers can decod
 
 All LOD tiers are independently addressable.
 
-| LOD | Bucket samples | Duration at 48 kHz | Mix column bytes | Stem column bytes | Persistence policy |
-| --- | ---: | ---: | ---: | ---: | --- |
-| 0 | 8192 | about 170 ms | 32 | 20 | persistent preview/overview |
-| 1 | 2048 | about 42 ms | 32 | 20 | persistent overview |
-| 2 | 512 | about 10.7 ms | 32 | 20 | persistent deck standard |
-| 3 | 128 | about 2.7 ms | 52 | 40 | generated for deck/edit/high-detail use |
-| 4 | 32 | about 0.67 ms | 52 | 40 | on-demand/cache by default, especially for stems |
+| LOD | Bucket samples | Duration at 48 kHz | Mix column bytes | Stem column bytes | Persistence policy                               |
+| --- | -------------: | -----------------: | ---------------: | ----------------: | ------------------------------------------------ |
+| 0   |           8192 |       about 170 ms |               32 |                20 | persistent preview/overview                      |
+| 1   |           2048 |        about 42 ms |               32 |                20 | persistent overview                              |
+| 2   |            512 |      about 10.7 ms |               32 |                20 | persistent deck standard                         |
+| 3   |            128 |       about 2.7 ms |               52 |                40 | generated for deck/edit/high-detail use          |
+| 4   |             32 |      about 0.67 ms |               52 |                40 | on-demand/cache by default, especially for stems |
 
 Column count:
 
@@ -59,36 +59,36 @@ For the final partial column, metrics are computed only from true samples. Paddi
 
 Schema key: `mix_spectral_microtrace_v1`
 
-| Offset | Field | Type | Meaning |
-| ---: | --- | --- | --- |
-| 0 | rms | f32 | RMS amplitude, normalized [0, 1] |
-| 4 | peak | f32 | Peak absolute amplitude, normalized [0, 1] |
-| 8 | energy_low | f32 | Low-band energy, normalized [0, 1] |
-| 12 | energy_mid | f32 | Mid-band energy, normalized [0, 1] |
-| 16 | energy_high | f32 | High-band energy, normalized [0, 1] |
-| 20 | transient_flux | f32 | Transient whiteness/flux, normalized [0, 1] |
-| 24 | min_sample | f32 | Signed minimum sample, normalized [-1, 1] |
-| 28 | max_sample | f32 | Signed maximum sample, normalized [-1, 1] |
+| Offset | Field          | Type | Meaning                                     |
+| -----: | -------------- | ---- | ------------------------------------------- |
+|      0 | rms            | f32  | RMS amplitude, normalized [0, 1]            |
+|      4 | peak           | f32  | Peak absolute amplitude, normalized [0, 1]  |
+|      8 | energy_low     | f32  | Low-band energy, normalized [0, 1]          |
+|     12 | energy_mid     | f32  | Mid-band energy, normalized [0, 1]          |
+|     16 | energy_high    | f32  | High-band energy, normalized [0, 1]         |
+|     20 | transient_flux | f32  | Transient whiteness/flux, normalized [0, 1] |
+|     24 | min_sample     | f32  | Signed minimum sample, normalized [-1, 1]   |
+|     28 | max_sample     | f32  | Signed maximum sample, normalized [-1, 1]   |
 
 ## Mix high-detail payload, 52 bytes
 
 Used only for LOD 3 and LOD 4.
 
-| Offset | Field | Type | Meaning |
-| ---: | --- | --- | --- |
-| 0 | rms | f32 | Same as base |
-| 4 | peak | f32 | Same as base |
-| 8 | energy_low | f32 | Same as base |
-| 12 | energy_mid | f32 | Same as base |
-| 16 | energy_high | f32 | Same as base |
-| 20 | transient_flux | f32 | Same as base |
-| 24 | min_sample | f32 | Same as base |
-| 28 | max_sample | f32 | Same as base |
-| 32 | mt_samples[6] | i16[6] | Endpoint-inclusive signed microtrace samples |
-| 44 | argmin_pos | u16 | Position of true minimum within bucket |
-| 46 | min_val | i16 | Quantized value at argmin_pos |
-| 48 | argmax_pos | u16 | Position of true maximum within bucket |
-| 50 | max_val | i16 | Quantized value at argmax_pos |
+| Offset | Field          | Type   | Meaning                                      |
+| -----: | -------------- | ------ | -------------------------------------------- |
+|      0 | rms            | f32    | Same as base                                 |
+|      4 | peak           | f32    | Same as base                                 |
+|      8 | energy_low     | f32    | Same as base                                 |
+|     12 | energy_mid     | f32    | Same as base                                 |
+|     16 | energy_high    | f32    | Same as base                                 |
+|     20 | transient_flux | f32    | Same as base                                 |
+|     24 | min_sample     | f32    | Same as base                                 |
+|     28 | max_sample     | f32    | Same as base                                 |
+|     32 | mt_samples[6]  | i16[6] | Endpoint-inclusive signed microtrace samples |
+|     44 | argmin_pos     | u16    | Position of true minimum within bucket       |
+|     46 | min_val        | i16    | Quantized value at argmin_pos                |
+|     48 | argmax_pos     | u16    | Position of true maximum within bucket       |
+|     50 | max_val        | i16    | Quantized value at argmax_pos                |
 
 ## Stem base payload, 20 bytes
 
@@ -96,30 +96,30 @@ Schema key: `stem_amp_microtrace_v1`
 
 Stem columns omit spectral color by default because stem color is renderer/theme context, not artifact payload.
 
-| Offset | Field | Type | Meaning |
-| ---: | --- | --- | --- |
-| 0 | rms | f32 | RMS amplitude, normalized [0, 1] |
-| 4 | peak | f32 | Peak absolute amplitude, normalized [0, 1] |
-| 8 | transient_flux | f32 | Transient whiteness/flux, normalized [0, 1] |
-| 12 | min_sample | f32 | Signed minimum sample, normalized [-1, 1] |
-| 16 | max_sample | f32 | Signed maximum sample, normalized [-1, 1] |
+| Offset | Field          | Type | Meaning                                     |
+| -----: | -------------- | ---- | ------------------------------------------- |
+|      0 | rms            | f32  | RMS amplitude, normalized [0, 1]            |
+|      4 | peak           | f32  | Peak absolute amplitude, normalized [0, 1]  |
+|      8 | transient_flux | f32  | Transient whiteness/flux, normalized [0, 1] |
+|     12 | min_sample     | f32  | Signed minimum sample, normalized [-1, 1]   |
+|     16 | max_sample     | f32  | Signed maximum sample, normalized [-1, 1]   |
 
 ## Stem high-detail payload, 40 bytes
 
 Used only for LOD 3 and LOD 4.
 
-| Offset | Field | Type | Meaning |
-| ---: | --- | --- | --- |
-| 0 | rms | f32 | Same as base |
-| 4 | peak | f32 | Same as base |
-| 8 | transient_flux | f32 | Same as base |
-| 12 | min_sample | f32 | Same as base |
-| 16 | max_sample | f32 | Same as base |
-| 20 | mt_samples[6] | i16[6] | Endpoint-inclusive signed microtrace samples |
-| 32 | argmin_pos | u16 | Position of true minimum within bucket |
-| 34 | min_val | i16 | Quantized value at argmin_pos |
-| 36 | argmax_pos | u16 | Position of true maximum within bucket |
-| 38 | max_val | i16 | Quantized value at argmax_pos |
+| Offset | Field          | Type   | Meaning                                      |
+| -----: | -------------- | ------ | -------------------------------------------- |
+|      0 | rms            | f32    | Same as base                                 |
+|      4 | peak           | f32    | Same as base                                 |
+|      8 | transient_flux | f32    | Same as base                                 |
+|     12 | min_sample     | f32    | Same as base                                 |
+|     16 | max_sample     | f32    | Same as base                                 |
+|     20 | mt_samples[6]  | i16[6] | Endpoint-inclusive signed microtrace samples |
+|     32 | argmin_pos     | u16    | Position of true minimum within bucket       |
+|     34 | min_val        | i16    | Quantized value at argmin_pos                |
+|     36 | argmax_pos     | u16    | Position of true maximum within bucket       |
+|     38 | max_val        | i16    | Quantized value at argmax_pos                |
 
 ## Microtrace extraction
 

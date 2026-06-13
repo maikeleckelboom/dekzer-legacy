@@ -51,9 +51,12 @@ export type NavigableChildScopeState =
 export type ReadRequest = {
   readonly target?: ReadTarget
   readonly parentDirectoryId?: string
+  readonly rowPolicy?: LibraryTreeRowPolicy
   readonly offset?: number
   readonly limit?: number
 }
+
+export type LibraryTreeRowPolicy = 'audioBrowse' | 'playableMediaBrowse' | 'sourceFileInventory'
 
 export type ReadRoot = {
   readonly id: string

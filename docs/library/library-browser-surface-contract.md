@@ -95,12 +95,12 @@ Collections may reference media or scopes, but they do not replace source proven
 
 ## Ownership
 
-| Owner              | Owns                                                                                  | Must not own                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Backend/store      | Substrate state, source lifecycle, durable evidence, accepted objects, work artifacts. | Renderer presentation state, workspace placement, local projection cosmetics.  |
-| Renderer           | Presentation state, active projection UI state, selection affordance, visual density. | Durable library facts, source lifecycle, artifact ownership.                   |
-| Workspace topology | Placement, resize, visibility, docking/parking of the library surface.                | Source meaning, selected scope, contents query mechanics, projection meaning.  |
-| Projection mode    | How the active scope is represented inside Contents.                                  | Durable library state, source identity, collection membership, backend facts.  |
+| Owner              | Owns                                                                                   | Must not own                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Backend/store      | Substrate state, source lifecycle, durable evidence, accepted objects, work artifacts. | Renderer presentation state, workspace placement, local projection cosmetics. |
+| Renderer           | Presentation state, active projection UI state, selection affordance, visual density.  | Durable library facts, source lifecycle, artifact ownership.                  |
+| Workspace topology | Placement, resize, visibility, docking/parking of the library surface.                 | Source meaning, selected scope, contents query mechanics, projection meaning. |
+| Projection mode    | How the active scope is represented inside Contents.                                   | Durable library state, source identity, collection membership, backend facts. |
 
 ## Perform Bench And Library Bench
 

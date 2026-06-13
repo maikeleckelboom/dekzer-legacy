@@ -1173,8 +1173,31 @@ pub struct ReadLibraryTreeChildrenRequest {
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
     pub parent_source_directory_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub row_policy: Option<LibraryTreeRowPolicy>,
     pub offset: usize,
     pub limit: usize,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LibraryTreeRowPolicy {
+    AudioBrowse,
+    PlayableMediaBrowse,
+    SourceFileInventory,
 }
 
 #[derive(
@@ -2508,13 +2531,13 @@ mod tests {
         ContentsScopeDepth, DirectoryImageMediaState, DirectoryPlayableMediaState,
         DirectoryScanState, LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint,
         LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
-        LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        LocalBrowseEntryPoint, LocalBrowseEntryPointFailure, LocalBrowseEntryPointFailureCode,
-        LocalBrowseEntryPointIdentity, LocalBrowseEntryPointKind, LocalBrowseEntryPointStatus,
-        LocalBrowseEntryPointsReadStatus, LocalBrowseItem, LocalBrowseItemFailure,
-        LocalBrowseItemFailureCode, LocalBrowseItemIdentity, LocalBrowseItemKind,
-        LocalBrowseItemMediaRelevance, LocalBrowseItemStatus, LocalBrowseItemsReadStatus,
-        LocalBrowseOperation, LocalBrowsePlatform, LocalBrowseProfile,
+        LibraryTreeRowPolicy, LibraryTreeWindow, LoadNavigationRowByStableKeyRequest,
+        LoadNavigationRowRequest, LocalBrowseEntryPoint, LocalBrowseEntryPointFailure,
+        LocalBrowseEntryPointFailureCode, LocalBrowseEntryPointIdentity, LocalBrowseEntryPointKind,
+        LocalBrowseEntryPointStatus, LocalBrowseEntryPointsReadStatus, LocalBrowseItem,
+        LocalBrowseItemFailure, LocalBrowseItemFailureCode, LocalBrowseItemIdentity,
+        LocalBrowseItemKind, LocalBrowseItemMediaRelevance, LocalBrowseItemStatus,
+        LocalBrowseItemsReadStatus, LocalBrowseOperation, LocalBrowsePlatform, LocalBrowseProfile,
         LocalBrowseSourceAdmissionRequestKind, LocalBrowseWindowIdentity, NavigableChildScopeState,
         NavigationRow, NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind,
         PlayableMedia, PlayableMediaKind, ReadAttachmentSourceFilesReply,
@@ -2559,6 +2582,7 @@ mod tests {
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
                 parent_source_directory_id: None,
+                row_policy: Some(LibraryTreeRowPolicy::AudioBrowse),
                 offset: 0,
                 limit: 50,
             });
@@ -2590,6 +2614,7 @@ mod tests {
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
                 parent_source_directory_id: None,
+                row_policy: Some(LibraryTreeRowPolicy::AudioBrowse),
                 offset: 0,
                 limit: 50,
             },)
@@ -3530,6 +3555,7 @@ mod tests {
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 1 },
                 parent_source_directory_id: None,
+                row_policy: None,
                 offset: 0,
                 limit: 50,
             }),

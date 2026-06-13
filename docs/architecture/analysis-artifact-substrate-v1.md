@@ -15,16 +15,16 @@ This document is a proposal. It does not implement migrations or generated contr
 
 Use current dev-branch vocabulary:
 
-| Current vocabulary | Meaning in this proposal |
-| --- | --- |
-| `source_files` | Observed filesystem entries and file inventory. |
-| `source_file_observations` | Evidence/probe/observation layer about source files. |
-| `content_attachments` | Content-addressable attachment inventory used as byte identity/provenance input. |
-| `source_file_attachment_links` | Occurrence-to-attachment link. This may supply bytes, but does not own analysis artifacts. |
-| `playable_media` | Current playable media substrate target for full-mix V0 analysis. |
-| `track_identity_candidates` | Candidate identity evidence, not canonical track identity. |
-| `track_identity_decisions` | Human or decision records over candidates, not automatic semantic identity. |
-| `work_items`, `work_runs`, `work_artifacts` | Existing general work/artifact substrate to extend unless human review rejects. |
+| Current vocabulary                          | Meaning in this proposal                                                                   |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `source_files`                              | Observed filesystem entries and file inventory.                                            |
+| `source_file_observations`                  | Evidence/probe/observation layer about source files.                                       |
+| `content_attachments`                       | Content-addressable attachment inventory used as byte identity/provenance input.           |
+| `source_file_attachment_links`              | Occurrence-to-attachment link. This may supply bytes, but does not own analysis artifacts. |
+| `playable_media`                            | Current playable media substrate target for full-mix V0 analysis.                          |
+| `track_identity_candidates`                 | Candidate identity evidence, not canonical track identity.                                 |
+| `track_identity_decisions`                  | Human or decision records over candidates, not automatic semantic identity.                |
+| `work_items`, `work_runs`, `work_artifacts` | Existing general work/artifact substrate to extend unless human review rejects.            |
 
 Stale planning terms such as `primary_media_candidate`, `primaryMedia`, `primary_media_facts`, `SourceFacts`, and `source_file_facts` must not appear in target schemas. If encountered in older notes, translate them to the current substrate before using them.
 
@@ -89,18 +89,18 @@ Until then, docs may say “future audio component target” or “logical audio
 
 Future extension of current `work_items` needs these concepts:
 
-| Concept | Required decision |
-| --- | --- |
-| Subject/target vocabulary | Must support `playable_media_full_mix`, future `audio_component`, `content_attachment`, `source_range`, and artifact targets. |
-| `priority_order` | Numeric queue priority. Do not sort text priority names. |
-| `enqueue_seq` | Stable FIFO order within priority. Do not sort queued work by `updated_at`. |
-| `not_before_at` | Separate scheduled-readiness filter/index, not part of the main claim ordering index. |
-| `compute_backend` | `cpu`, `gpu`, `cpu_or_gpu`, `io_bound`, or `hybrid`. Stem separation is GPU/hybrid, not a normal CPU waveform worker. |
-| Lease fields | `lease_owner`, `lease_id`, `lease_until` or equivalent. Running jobs must recover if workers die. |
-| Output artifact linkage | Runs need a clear producer relationship to artifacts. |
-| Artifact dependency DAG | Artifacts need dependency rows and reverse dependency indexes for invalidation cascades. |
-| Supersession | Artifacts can be current, stale, superseded, failed, partial, or ready. |
-| Manifest/file-store fields | Large payloads live in artifact files, not SQLite JSON blobs. |
+| Concept                    | Required decision                                                                                                             |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Subject/target vocabulary  | Must support `playable_media_full_mix`, future `audio_component`, `content_attachment`, `source_range`, and artifact targets. |
+| `priority_order`           | Numeric queue priority. Do not sort text priority names.                                                                      |
+| `enqueue_seq`              | Stable FIFO order within priority. Do not sort queued work by `updated_at`.                                                   |
+| `not_before_at`            | Separate scheduled-readiness filter/index, not part of the main claim ordering index.                                         |
+| `compute_backend`          | `cpu`, `gpu`, `cpu_or_gpu`, `io_bound`, or `hybrid`. Stem separation is GPU/hybrid, not a normal CPU waveform worker.         |
+| Lease fields               | `lease_owner`, `lease_id`, `lease_until` or equivalent. Running jobs must recover if workers die.                             |
+| Output artifact linkage    | Runs need a clear producer relationship to artifacts.                                                                         |
+| Artifact dependency DAG    | Artifacts need dependency rows and reverse dependency indexes for invalidation cascades.                                      |
+| Supersession               | Artifacts can be current, stale, superseded, failed, partial, or ready.                                                       |
+| Manifest/file-store fields | Large payloads live in artifact files, not SQLite JSON blobs.                                                                 |
 
 ## Queue ordering law
 

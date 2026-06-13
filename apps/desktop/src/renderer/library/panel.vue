@@ -52,6 +52,7 @@ defineOptions({
 const emptyTreeLabel = 'Add a music folder to start building your library.'
 const removeSourceMessage = 'Remove this source from Dekzer? Your files stay on disk.'
 const maxRestoreAttempts = 10
+const maintenanceRunningRefreshMs = 1500
 
 const buttonBaseClass =
   'inline-flex min-h-9 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60'
@@ -63,7 +64,7 @@ const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--col
 
 const viewStateStore = createViewStateStore()
 const browseProfile = createProfileController()
-const hierarchyRead = useLibraryHierarchyRead()
+const hierarchyRead = useLibraryHierarchyRead(undefined, { profile: browseProfile.profile })
 const localBrowse = useLocalBrowseController(undefined, { profile: browseProfile.profile })
 const contentsRead = useContentsRead(undefined, { profile: browseProfile.profile })
 const rootActions = useLocalRootActions()
@@ -100,6 +101,7 @@ const browseProfileMenuOpen = ref(false)
 const browseProfileMenuRef = ref<HTMLElement>()
 const searchInputRef = ref<HTMLInputElement>()
 let sourceRevealSequence = 0
+let maintenanceRefreshTimer: ReturnType<typeof setTimeout> | undefined
 
 const restoreState = {
   readStarted: false,
@@ -314,6 +316,7 @@ watch(
   () => browseProfile.profile.value,
   async () => {
     contentsRead.clear()
+    await hierarchyRead.refreshBrowserWindows(expandedNodeIds.value)
     await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
     requestContentsForCurrentSelection({ force: true })
     saveViewState()
@@ -387,6 +390,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('pointerdown', handleBrowseProfileOutsidePointerDown)
+  clearMaintenanceRefreshTimer()
   librarySearch.dispose()
 })
 
@@ -411,6 +415,19 @@ watch(
 
     void integrityRead.refresh(sourceIds)
     void maintenanceRead.refresh(sourceIds)
+  },
+  { immediate: true }
+)
+
+watch(
+  [
+    sourceStatusSourceIds,
+    () => maintenanceRead.snapshotBySourceId.value,
+    () => maintenanceRead.runStateBySourceId.value,
+    () => hierarchyRead.hostStatus.value?.state
+  ],
+  () => {
+    scheduleRunningMaintenanceRefresh()
   },
   { immediate: true }
 )
@@ -762,6 +779,40 @@ async function refreshSourceStatus(sourceId: string): Promise<boolean> {
   ])
 
   return lifecycle && integrity && maintenance
+}
+
+function scheduleRunningMaintenanceRefresh(): void {
+  clearMaintenanceRefreshTimer()
+
+  if (hierarchyRead.hostStatus.value?.state !== 'started') {
+    return
+  }
+
+  const runningSourceIds = [...sourceStatusSourceIds.value].filter(
+    (sourceId) =>
+      maintenanceRead.runStateBySourceId.value.get(sourceId) === 'running' ||
+      maintenanceRead.snapshotBySourceId.value.get(sourceId)?.status === 'running'
+  )
+
+  if (runningSourceIds.length === 0) {
+    return
+  }
+
+  maintenanceRefreshTimer = setTimeout(() => {
+    maintenanceRefreshTimer = undefined
+    void Promise.all(runningSourceIds.map((sourceId) => refreshSourceStatus(sourceId))).finally(
+      scheduleRunningMaintenanceRefresh
+    )
+  }, maintenanceRunningRefreshMs)
+}
+
+function clearMaintenanceRefreshTimer(): void {
+  if (maintenanceRefreshTimer === undefined) {
+    return
+  }
+
+  clearTimeout(maintenanceRefreshTimer)
+  maintenanceRefreshTimer = undefined
 }
 
 function requestBrowserNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {

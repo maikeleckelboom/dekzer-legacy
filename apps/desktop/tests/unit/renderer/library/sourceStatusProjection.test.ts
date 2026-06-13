@@ -31,7 +31,7 @@ describe('source status projection', () => {
     expect(view.actions).toEqual([])
   })
 
-  it('local browse folder with admission shows Add this folder only', () => {
+  it('local browse folder with admission shows Add as music source only', () => {
     const projection = localBrowseProjection(
       {
         kind: 'localBrowseEntryPoint',
@@ -52,13 +52,13 @@ describe('source status projection', () => {
     const view = statusView(context)
 
     expect(view.actions).toEqual([
-      expect.objectContaining({ kind: 'addLocalPath', label: 'Add this folder' })
+      expect.objectContaining({ kind: 'addLocalPath', label: 'Add as music source' })
     ])
     expect(view.actions.some((action) => action.kind === 'scanSource')).toBe(false)
     expect(view.actions.some((action) => action.kind === 'runMaintenance')).toBe(false)
   })
 
-  it('local browse media file with parent admission shows Add parent folder only', () => {
+  it('local browse media file with parent admission shows Add parent as music source only', () => {
     const projection = localBrowseProjection(
       {
         kind: 'localBrowseItem',
@@ -71,13 +71,13 @@ describe('source status projection', () => {
     )
 
     expect(view.actions).toEqual([
-      expect.objectContaining({ kind: 'addLocalPath', label: 'Add parent folder' })
+      expect.objectContaining({ kind: 'addLocalPath', label: 'Add parent as music source' })
     ])
     expect(view.actions.some((action) => action.kind === 'scanSource')).toBe(false)
     expect(view.actions.some((action) => action.kind === 'runMaintenance')).toBe(false)
   })
 
-  it('duplicate local browse row does not show Add this folder', () => {
+  it('duplicate local browse row does not show Add as music source', () => {
     const projection = localBrowseProjection(
       {
         kind: 'localBrowseItem',
@@ -157,6 +157,25 @@ describe('source status projection', () => {
         sourceIntegrity: integrity({ availability: 'partial', coverage: 'incomplete' })
       }).badge
     ).toBe('Partial')
+  })
+
+  it('empty registered source shows concise no-audio status', () => {
+    const view = registeredView({
+      sourceReadiness: {
+        kind: 'empty',
+        sourceNodeId: 'selected',
+        detail: 'No visible rows.'
+      }
+    })
+
+    expect(view.badge).toBe('No audio tracks')
+    expect(view.detail).toBe('No audio tracks found in this view.')
+  })
+
+  it('registered source fallback is concrete while rows are unresolved', () => {
+    const view = registeredView()
+
+    expect(view.badge).toBe('Still indexing')
   })
 
   it('does not treat local browse rows as durable source rows', () => {

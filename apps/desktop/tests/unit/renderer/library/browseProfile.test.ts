@@ -46,8 +46,8 @@ describe('browse profile', () => {
   })
 
   it('maps empty-state copy by profile', () => {
-    expect(emptyStateLabel('audio')).toBe('No audio files found in this view.')
-    expect(emptyStateLabel('playable')).toBe('No playable media found in this view.')
-    expect(emptyStateLabel('allFiles')).toBe('No files found in this view.')
+    expect(emptyStateLabel('audio')).toBe('No audio tracks')
+    expect(emptyStateLabel('playable')).toBe('No playable media')
+    expect(emptyStateLabel('allFiles')).toBe('No files')
   })
 })

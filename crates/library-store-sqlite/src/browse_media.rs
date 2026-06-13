@@ -25,6 +25,7 @@ impl SourceFileClass {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SourceFileClassFilter {
+    Audio,
     NavigationOnly,
     PlayableMedia,
     PlayableMediaAndImages,
@@ -42,6 +43,7 @@ pub(crate) fn source_file_class_filter_predicate_sql(
     source_file_class_filter: SourceFileClassFilter,
 ) -> &'static str {
     match source_file_class_filter {
+        SourceFileClassFilter::Audio => "file_class = 'audio'",
         SourceFileClassFilter::NavigationOnly => "0 = 1",
         SourceFileClassFilter::PlayableMedia => "file_class IN ('audio', 'video')",
         SourceFileClassFilter::PlayableMediaAndImages => {
@@ -55,6 +57,7 @@ pub(crate) fn source_file_class_filter_predicate_sql_for_column(
     column_sql: &str,
 ) -> String {
     match source_file_class_filter {
+        SourceFileClassFilter::Audio => format!("{column_sql} = 'audio'"),
         SourceFileClassFilter::NavigationOnly => "0 = 1".to_string(),
         SourceFileClassFilter::PlayableMedia => {
             format!("{column_sql} IN ('audio', 'video')")

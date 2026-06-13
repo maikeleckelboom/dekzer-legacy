@@ -381,6 +381,41 @@ describe('projectState', () => {
     expect(visibleItems).toHaveLength(1)
   })
 
+  it('expanded terminal directory keeps its state child visible', () => {
+    const node: BrowserTreeNode = {
+      id: 'source-directory:12',
+      label: 'Empty Album',
+      role: 'literalDirectory',
+      children: {
+        kind: 'loaded',
+        nodes: [
+          {
+            id: 'read-state:source-directory:12',
+            label: 'No matches',
+            role: 'state',
+            children: { kind: 'none' }
+          }
+        ]
+      }
+    }
+    const visibleItems = flattenVisibleTree({
+      nodes: [node],
+      expandedNodeIds: new Set(['source-directory:12'])
+    })
+
+    expect(isBrowserTreeBranch(node)).toBe(false)
+    expect(canRevealBrowserTreeChildren(node)).toBe(false)
+    expect(visibleItems.map((item) => item.id)).toEqual([
+      'source-directory:12',
+      'read-state:source-directory:12'
+    ])
+    expect(visibleItems[0]).toMatchObject({
+      isBranch: true,
+      canRevealChildren: true,
+      isExpanded: true
+    })
+  })
+
   it('leaf expansion does not create disclosure', () => {
     const projection = projectTree(
       browserState({

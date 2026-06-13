@@ -1970,6 +1970,14 @@
         "removed"
       ]
     },
+    "LibraryTreeRowPolicy": {
+      "type": "string",
+      "enum": [
+        "audioBrowse",
+        "playableMediaBrowse",
+        "sourceFileInventory"
+      ]
+    },
     "LibraryTreeWindow": {
       "type": "object",
       "properties": {
@@ -2936,6 +2944,16 @@
           "type": [
             "string",
             "null"
+          ]
+        },
+        "rowPolicy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LibraryTreeRowPolicy"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },

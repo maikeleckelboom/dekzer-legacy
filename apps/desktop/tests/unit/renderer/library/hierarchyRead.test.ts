@@ -48,6 +48,7 @@ describe('createLibraryHierarchyReadController', () => {
         },
         label: 'Source Fixture'
       },
+      rowPolicy: 'audioBrowse',
       offset: 0,
       limit: 50
     })
@@ -70,6 +71,7 @@ describe('createLibraryHierarchyReadController', () => {
         label: 'Source Fixture'
       },
       parentDirectoryId: '12',
+      rowPolicy: 'audioBrowse',
       offset: 0,
       limit: 50
     })

@@ -1,5 +1,6 @@
 import {
   type EntryPoint,
+  type LibraryTreeRowPolicy,
   type ReadErrorCode,
   type ReadErrorState,
   type ReadResult,
@@ -13,6 +14,7 @@ const positiveOpaqueIdPattern = /^[1-9]\d*$/
 export type NormalizedRequest = {
   readonly target: ReadTarget
   readonly parentDirectoryId?: string
+  readonly rowPolicy: LibraryTreeRowPolicy
   readonly offset: number
   readonly limit: number
 }
@@ -53,9 +55,16 @@ export function normalizeRequest(request: unknown): NormalizedRequest | ReadResu
     return limit
   }
 
+  const rowPolicy = normalizeRowPolicy(request.rowPolicy)
+
+  if (isReadResult(rowPolicy)) {
+    return rowPolicy
+  }
+
   return {
     target,
     ...(parentDirectoryId === undefined ? {} : { parentDirectoryId }),
+    rowPolicy,
     offset,
     limit
   }
@@ -214,6 +223,26 @@ function normalizeLimit(value: unknown): number | ReadResult {
     'invalidRequest',
     'invalidRequest',
     'Library hierarchy read limit is invalid.'
+  )
+}
+
+function normalizeRowPolicy(value: unknown): LibraryTreeRowPolicy | ReadResult {
+  if (value === undefined) {
+    return 'playableMediaBrowse'
+  }
+
+  if (
+    value === 'audioBrowse' ||
+    value === 'playableMediaBrowse' ||
+    value === 'sourceFileInventory'
+  ) {
+    return value
+  }
+
+  return createHierarchyReadErrorResult(
+    'invalidRequest',
+    'invalidRequest',
+    'Library hierarchy row policy is invalid.'
   )
 }
 

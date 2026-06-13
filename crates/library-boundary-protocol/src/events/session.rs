@@ -299,6 +299,7 @@ mod tests {
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 8 },
                 parent_source_directory_id: None,
+                row_policy: None,
                 offset: 0,
                 limit: 100,
             }),

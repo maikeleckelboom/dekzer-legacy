@@ -67,6 +67,7 @@ describe('hierarchy and navigation reads through the host', () => {
               payload: { sourceId: '7' }
             },
             parentSourceDirectoryId: null,
+            rowPolicy: 'playableMediaBrowse',
             offset: 0,
             limit: 50
           })

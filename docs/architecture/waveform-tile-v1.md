@@ -31,12 +31,12 @@ Recommended V1 tile size:
 
 Full tile payload sizes:
 
-| Schema | Column bytes | Full tile payload |
-| --- | ---: | ---: |
-| mix LOD0/1/2 | 32 | 131,072 bytes |
-| mix LOD3/4 | 52 | 212,992 bytes |
-| stem LOD0/1/2 | 20 | 81,920 bytes |
-| stem LOD3/4 | 40 | 163,840 bytes |
+| Schema        | Column bytes | Full tile payload |
+| ------------- | -----------: | ----------------: |
+| mix LOD0/1/2  |           32 |     131,072 bytes |
+| mix LOD3/4    |           52 |     212,992 bytes |
+| stem LOD0/1/2 |           20 |      81,920 bytes |
+| stem LOD3/4   |           40 |     163,840 bytes |
 
 These sizes keep normal tile fetches small enough for bounded worker delivery while avoiding excessive file fragmentation.
 
@@ -50,23 +50,23 @@ Payload starts at byte 160.
 
 All numeric fields are little-endian. All multi-byte numeric fields are aligned to 2-byte or 4-byte boundaries. There are no odd-offset i16/u16 fields.
 
-| Offset | Field | Type | Bytes | Meaning |
-| ---: | --- | --- | ---: | --- |
-| 0 | magic | u8[4] | 4 | ASCII `DZWT` |
-| 4 | version | u16 | 2 | Tile format version, V1 = 1 |
-| 6 | header_bytes | u16 | 2 | Must be 160 |
-| 8 | artifact_id_hash | u8[32] | 32 | Hash of artifact identity string |
-| 40 | basis_hash | u8[32] | 32 | Canonical basis hash |
-| 72 | payload_hash | u8[32] | 32 | SHA-256 of payload bytes only |
-| 104 | manifest_hash | u8[32] | 32 | Hash of immutable manifest sidecar |
-| 136 | lod | u16 | 2 | LOD number 0..4 |
-| 138 | schema_id | u16 | 2 | Numeric schema id for column schema key |
-| 140 | column_bytes | u16 | 2 | Column byte width for this LOD/schema |
-| 142 | compression_kind | u16 | 2 | 0 = none for V1 |
-| 144 | bucket_samples | u32 | 4 | Samples per column at this LOD |
-| 148 | tile_index | u32 | 4 | Zero-based tile index |
-| 152 | column_start | u32 | 4 | First column index represented by this tile |
-| 156 | column_count | u32 | 4 | Number of columns in this tile |
+| Offset | Field            | Type   | Bytes | Meaning                                     |
+| -----: | ---------------- | ------ | ----: | ------------------------------------------- |
+|      0 | magic            | u8[4]  |     4 | ASCII `DZWT`                                |
+|      4 | version          | u16    |     2 | Tile format version, V1 = 1                 |
+|      6 | header_bytes     | u16    |     2 | Must be 160                                 |
+|      8 | artifact_id_hash | u8[32] |    32 | Hash of artifact identity string            |
+|     40 | basis_hash       | u8[32] |    32 | Canonical basis hash                        |
+|     72 | payload_hash     | u8[32] |    32 | SHA-256 of payload bytes only               |
+|    104 | manifest_hash    | u8[32] |    32 | Hash of immutable manifest sidecar          |
+|    136 | lod              | u16    |     2 | LOD number 0..4                             |
+|    138 | schema_id        | u16    |     2 | Numeric schema id for column schema key     |
+|    140 | column_bytes     | u16    |     2 | Column byte width for this LOD/schema       |
+|    142 | compression_kind | u16    |     2 | 0 = none for V1                             |
+|    144 | bucket_samples   | u32    |     4 | Samples per column at this LOD              |
+|    148 | tile_index       | u32    |     4 | Zero-based tile index                       |
+|    152 | column_start     | u32    |     4 | First column index represented by this tile |
+|    156 | column_count     | u32    |     4 | Number of columns in this tile              |
 
 Payload byte length is derived:
 
@@ -78,10 +78,10 @@ The payload hash covers payload bytes only, not the header.
 
 V1 schema ids:
 
-| schema_id | schema key |
-| ---: | --- |
-| 1 | `mix_spectral_microtrace_v1` |
-| 2 | `stem_amp_microtrace_v1` |
+| schema_id | schema key                   |
+| --------: | ---------------------------- |
+|         1 | `mix_spectral_microtrace_v1` |
+|         2 | `stem_amp_microtrace_v1`     |
 
 ## Compression
 

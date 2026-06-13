@@ -52,10 +52,10 @@ export function mapProfileToContentsPolicy(profile: ProfileKey): ContentsReadPol
 export function emptyStateLabel(profile: ProfileKey): string {
   switch (profile) {
     case 'audio':
-      return 'No audio files found in this view.'
+      return 'No audio tracks'
     case 'playable':
-      return 'No playable media found in this view.'
+      return 'No playable media'
     case 'allFiles':
-      return 'No files found in this view.'
+      return 'No files'
   }
 }

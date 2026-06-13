@@ -153,8 +153,10 @@ function appendVisibleNodes(options: {
 
   options.nodes.forEach((node, nodeIndex) => {
     const children = getBrowserTreeChildRows(node)
-    const isBranch = isBrowserTreeBranch(node)
-    const canReveal = canRevealBrowserTreeChildren(node)
+    const hasExpandedTerminalState =
+      options.expandedNodeIds.has(node.id) && hasOnlyStateChildren(node)
+    const isBranch = isBrowserTreeBranch(node) || hasExpandedTerminalState
+    const canReveal = canRevealBrowserTreeChildren(node) || hasExpandedTerminalState
     const canActivate = canActivateBrowserTreeAction(node)
     const isActionLoading = isBrowserTreeActionLoading(node)
     const isExpanded = isBranch && options.expandedNodeIds.has(node.id)
@@ -192,6 +194,24 @@ function appendVisibleNodes(options: {
       })
     }
   })
+}
+
+function hasOnlyStateChildren(node: BrowserTreeNode): boolean {
+  return (
+    isDisclosureTerminalOwner(node) &&
+    node.children.kind === 'loaded' &&
+    node.children.nodes.length > 0 &&
+    node.children.nodes.every((child) => child.role === 'state')
+  )
+}
+
+function isDisclosureTerminalOwner(node: BrowserTreeNode): boolean {
+  return (
+    node.id.startsWith('navigation-row:') ||
+    node.id.startsWith('source-directory:') ||
+    node.id.startsWith('local-browse-entry:') ||
+    node.id.startsWith('local-browse-item:')
+  )
 }
 
 function getVisibleItemIndex(

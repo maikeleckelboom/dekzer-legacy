@@ -839,6 +839,17 @@ fn read_child_rows(
 
 fn directory_visibility_predicate_sql(row_admission: SourceFileClassFilter) -> String {
     let revealable_descendant_predicate = match row_admission {
+        SourceFileClassFilter::Audio => {
+            "EXISTS (
+                SELECT 1
+                FROM source_files descendant_file
+                WHERE descendant_file.source_id = source_directories.source_id
+                  AND descendant_file.presence_state = 'present'
+                  AND descendant_file.file_class = 'audio'
+                  AND descendant_file.relative_path COLLATE BINARY >= source_directories.relative_path || '/'
+                  AND descendant_file.relative_path COLLATE BINARY < source_directories.relative_path || char(48)
+            )"
+        }
         SourceFileClassFilter::NavigationOnly | SourceFileClassFilter::PlayableMedia => {
             "has_playable_media_descendant = 1"
         }
@@ -1202,6 +1213,97 @@ mod tests {
             file_classes,
             vec![("clip.mp4", Some("video")), ("track.flac", Some("audio"))]
         );
+    }
+
+    #[test]
+    fn audio_tree_hides_complete_video_only_directories() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Audio Album",
+            DirectoryObservations {
+                has_child_directories: false,
+                has_playable_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file_in_directory(&connection, 21, Some(20), "Audio Album/track.flac", "audio");
+        insert_directory(
+            &connection,
+            30,
+            None,
+            "Video Album",
+            DirectoryObservations {
+                has_child_directories: false,
+                has_playable_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "complete",
+            None,
+        );
+        insert_file_in_directory(&connection, 31, Some(30), "Video Album/clip.mp4", "video");
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileClassFilter::Audio,
+        )
+        .expect("read audio hierarchy")
+        .expect("source window");
+
+        assert_display_names(&window.rows, &["Audio Album"]);
+    }
+
+    #[test]
+    fn audio_tree_keeps_incomplete_unmatched_directories_pending() {
+        let connection = test_connection();
+        insert_source(&connection, 7);
+        insert_directory(
+            &connection,
+            20,
+            None,
+            "Scanning Videos",
+            DirectoryObservations {
+                has_child_directories: false,
+                has_playable_media_descendant: true,
+                has_image_media_descendant: false,
+            },
+            "scanning",
+            None,
+        );
+        insert_file_in_directory(
+            &connection,
+            21,
+            Some(20),
+            "Scanning Videos/clip.mp4",
+            "video",
+        );
+
+        let window = read_children(
+            &connection,
+            StoreLiteralHierarchyEntryPoint::Source { source_id: 7 },
+            None,
+            0,
+            10,
+            SourceFileClassFilter::Audio,
+        )
+        .expect("read audio hierarchy")
+        .expect("source window");
+
+        assert_display_names(&window.rows, &["Scanning Videos"]);
+        assert_eq!(
+            window.coverage.state,
+            StoreLiteralHierarchyCoverageState::Scanning
+        );
+        assert!(!window.coverage.empty_result_authoritative);
     }
 
     #[test]

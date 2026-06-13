@@ -11,6 +11,7 @@ export type StatusContext =
       readonly kind: 'localBrowse'
       readonly title: string
       readonly itemRole: 'folder' | 'file'
+      readonly localState: LocalBrowseStatusState
       readonly detail?: string
       readonly admission?: StatusAdmission
     }
@@ -47,8 +48,16 @@ export type StatusContext =
 
 export type StatusAdmission = {
   readonly resolvedPath: string
-  readonly label: 'Add this folder' | 'Add parent folder'
+  readonly label: 'Add as music source' | 'Add parent as music source'
 }
+
+export type LocalBrowseStatusState =
+  | 'localBrowseOnly'
+  | 'eligible'
+  | 'broadRoot'
+  | 'protected'
+  | 'resolutionFailed'
+  | 'alreadyAdded'
 
 export type StatusContextInput = {
   readonly projection: BrowserProjection | undefined
@@ -123,8 +132,9 @@ function contextForBinding(
         kind: 'localBrowse',
         title,
         itemRole: 'folder',
+        localState: localBrowseEntryState(binding.entry),
         ...(entryDetail === undefined ? {} : { detail: entryDetail }),
-        ...admissionField(binding.entry.availableOperations)
+        ...admissionField(binding.entry.availableOperations, localBrowseEntryState(binding.entry))
       }
     }
     case 'localBrowseItem':
@@ -132,8 +142,9 @@ function contextForBinding(
         kind: 'localBrowse',
         title,
         itemRole: binding.target === undefined ? 'file' : 'folder',
+        localState: localBrowseItemState(binding.item),
         detail: binding.item.identity.resolvedItemPath,
-        ...admissionField(binding.item.availableOperations)
+        ...admissionField(binding.item.availableOperations, localBrowseItemState(binding.item))
       }
     case 'readState':
       return {
@@ -158,9 +169,16 @@ function contextForBinding(
   }
 }
 
-function admissionField(operations: Parameters<typeof sourceAdmissionOperation>[0]): {
+function admissionField(
+  operations: Parameters<typeof sourceAdmissionOperation>[0],
+  localState: LocalBrowseStatusState
+): {
   readonly admission?: StatusAdmission
 } {
+  if (localState !== 'eligible') {
+    return {}
+  }
+
   const operation = sourceAdmissionOperation(operations)
 
   if (operation === undefined) {
@@ -170,9 +188,60 @@ function admissionField(operations: Parameters<typeof sourceAdmissionOperation>[
   return {
     admission: {
       resolvedPath: operation.resolvedPath,
-      label: operation.requestKind === 'parentDirectory' ? 'Add parent folder' : 'Add this folder'
+      label:
+        operation.requestKind === 'parentDirectory'
+          ? 'Add parent as music source'
+          : 'Add as music source'
     }
   }
+}
+
+function localBrowseEntryState(
+  entry: Extract<RowBinding, { readonly kind: 'localBrowseEntryPoint' }>['entry']
+): LocalBrowseStatusState {
+  if (entry.status === 'duplicateOfAdmittedSource') {
+    return 'alreadyAdded'
+  }
+
+  if (entry.status !== 'available' && entry.status !== 'resolving') {
+    return 'resolutionFailed'
+  }
+
+  if (entry.identity.entryPointKind === 'systemDriveRoot') {
+    return 'broadRoot'
+  }
+
+  return sourceAdmissionOperation(entry.availableOperations) === undefined
+    ? 'localBrowseOnly'
+    : 'eligible'
+}
+
+function localBrowseItemState(
+  item: Extract<RowBinding, { readonly kind: 'localBrowseItem' }>['item']
+): LocalBrowseStatusState {
+  if (item.status === 'duplicateOfAdmittedSource') {
+    return 'alreadyAdded'
+  }
+
+  if (item.itemKind === 'rejectedRoot' || item.status === 'rejected') {
+    return 'protected'
+  }
+
+  if (item.status === 'permissionBlocked') {
+    return 'protected'
+  }
+
+  if (item.status !== 'available' && item.status !== 'unknown') {
+    return 'resolutionFailed'
+  }
+
+  if (item.status === 'unknown' || item.itemKind === 'unknown') {
+    return 'resolutionFailed'
+  }
+
+  return sourceAdmissionOperation(item.availableOperations) === undefined
+    ? 'localBrowseOnly'
+    : 'eligible'
 }
 
 function findNode(

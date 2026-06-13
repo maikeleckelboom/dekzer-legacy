@@ -221,7 +221,7 @@ describe('projectContents', () => {
     expect(rootContents.kind).toBe('ready')
     expect(rootContents.title).toBe('Music')
     expect(rootContents.rows.map((row) => row.label)).toEqual([
-      'Add this folder',
+      'Add as music source',
       'Albums',
       'loose.flac'
     ])
@@ -239,7 +239,10 @@ describe('projectContents', () => {
 
     expect(albumContents.kind).toBe('ready')
     expect(albumContents.title).toBe('Albums')
-    expect(albumContents.rows.map((row) => row.label)).toEqual(['Add this folder', 'track.flac'])
+    expect(albumContents.rows.map((row) => row.label)).toEqual([
+      'Add as music source',
+      'track.flac'
+    ])
   })
 
   it('projects selected unloaded local browse folders as loadable instead of unsupported', () => {
@@ -257,7 +260,7 @@ describe('projectContents', () => {
 
     expect(contents.kind).toBe('notLoaded')
     expect(contents.rows.map((row) => row.label)).toEqual([
-      'Add this folder',
+      'Add as music source',
       'Local folder contents not loaded'
     ])
     expect(contents.rows[1]).toMatchObject({
@@ -399,10 +402,10 @@ describe('projectContents', () => {
 
   it('does not render verified-empty policy labels while nextCursor exists', () => {
     const verifiedEmptyLabels = [
-      'No audio files found in this view.',
+      'No audio tracks',
       'No video items in this scope.',
       'No companion files in this scope.',
-      'No files found in this view.'
+      'No files'
     ]
 
     for (const profile of [
@@ -508,7 +511,7 @@ describe('projectContents', () => {
     expect(empty.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media found in this view.'
+      label: 'No playable media'
     })
 
     const partial = projectForSelection(browserState({}), 'navigation-row:7', {
@@ -827,7 +830,7 @@ describe('projectContents', () => {
     expect(authoritative.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media found in this view.'
+      label: 'No playable media'
     })
   })
 
@@ -846,8 +849,8 @@ describe('projectContents', () => {
     expect(contents.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No audio files found in this view.',
-      detail: 'No audio files found in this view.'
+      label: 'No audio tracks',
+      detail: 'No audio tracks'
     })
   })
 
@@ -950,8 +953,8 @@ describe('projectContents', () => {
     expect(audioBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No audio files found in this view.',
-      detail: 'No audio files found in this view.'
+      label: 'No audio tracks',
+      detail: 'No audio tracks'
     })
 
     const playableMediaBrowse = projectForSelection(
@@ -968,7 +971,7 @@ describe('projectContents', () => {
     expect(playableMediaBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media found in this view.'
+      label: 'No playable media'
     })
 
     const video = projectForSelection(
@@ -1022,7 +1025,7 @@ describe('projectContents', () => {
     expect(allFiles.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No files found in this view.'
+      label: 'No files'
     })
   })
 
