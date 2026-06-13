@@ -132,7 +132,7 @@ describe('projectState', () => {
   it('projects literal file rows in the all-files tree projection', () => {
     const projection = projectTree(
       browserState({
-        profile: 'allFiles',
+        libraryBrowseProfile: 'allFiles',
         sourceChildren: loadedChildren([
           fileNode('11', 'track.wav', { fileClass: 'audio' }),
           fileNode('12', 'clip.mp4', { fileClass: 'video' }),
@@ -1294,14 +1294,16 @@ function childItemsFor(
 function browserState(
   options: {
     readonly rows?: readonly NavigationRow[]
-    readonly profile?: BrowserState['profile']
+    readonly libraryBrowseProfile?: BrowserState['libraryBrowseProfile']
     readonly sourceChildren?: LoadedChildren
     readonly sourceStates?: BrowserState['sourceReadStates']
     readonly directoryStates?: BrowserState['directoryReadStates']
   } = {}
 ): BrowserState {
   return {
-    ...(options.profile === undefined ? {} : { profile: options.profile }),
+    ...(options.libraryBrowseProfile === undefined
+      ? {}
+      : { libraryBrowseProfile: options.libraryBrowseProfile }),
     navigationReadResult: readyNavigation(options.rows ?? [sourceNavigationRow()]),
     sourceReadStates:
       options.sourceStates ??

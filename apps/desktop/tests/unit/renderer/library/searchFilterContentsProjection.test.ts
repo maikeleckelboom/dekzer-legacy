@@ -22,6 +22,8 @@ describe('search/filter contents projection', () => {
     })
 
     expect(contents.kind).toBe('ready')
+    expect(contents.surfaceLabel).toBe('Contents')
+    expect(contents.surfaceKind).toBe('indexedContents')
     expect(contents.title).toBe('Search results')
     expect(contents.rows.map((projected) => projected.label)).toEqual(['Amen.wav', 'Clip.mp4'])
     expect(contents.rows.map((projected) => projected.icon)).toEqual(['music', 'video'])

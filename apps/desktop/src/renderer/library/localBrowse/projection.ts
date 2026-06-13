@@ -28,12 +28,12 @@ import {
   type LocalBrowseItemState,
   type LocalBrowseMoreTarget
 } from './types'
-import type { ProfileKey } from '../browseProfile/types'
+import type { LocalPreviewMode } from './previewMode'
 
 export const localBrowseSectionNodeId = 'local-browse:section'
 
 type LocalBrowseProjectionOptions = {
-  readonly profile: ProfileKey
+  readonly localPreviewMode: LocalPreviewMode
   readonly entryPointsState?: LocalBrowseEntryPointsState
   readonly itemStates?: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -97,7 +97,7 @@ export function projectLocalBrowseSection(
       entries.map((entry) =>
         projectEntryPoint({
           entry,
-          profile: options.profile,
+          localPreviewMode: options.localPreviewMode,
           itemStates: options.itemStates ?? new Map(),
           bindingsById: options.bindingsById
         })
@@ -111,12 +111,12 @@ export function projectLocalBrowseSection(
 
 function localBrowseSectionNode(
   children: BrowserTreeChildren,
-  detail = 'Music, Downloads, Desktop, and Home are starting points for adding sources.'
+  detail = 'Suggested folders are starting points for adding a managed music source.'
 ): BrowserTreeNode {
   return {
     id: localBrowseSectionNodeId,
     role: 'collectionView',
-    label: 'Local Files',
+    label: 'Add Source',
     detail,
     icon: 'navigation',
     children
@@ -125,7 +125,7 @@ function localBrowseSectionNode(
 
 function projectEntryPoint(options: {
   readonly entry: LocalBrowseEntryPoint
-  readonly profile: ProfileKey
+  readonly localPreviewMode: LocalPreviewMode
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
 }): BrowserTreeNode {
@@ -151,7 +151,7 @@ function projectEntryPoint(options: {
     ...projectEntryPointChildren({
       ownerId: nodeId,
       entry: options.entry,
-      profile: options.profile,
+      localPreviewMode: options.localPreviewMode,
       target,
       itemStates: options.itemStates,
       bindingsById: options.bindingsById
@@ -162,7 +162,7 @@ function projectEntryPoint(options: {
 function projectEntryPointChildren(options: {
   readonly ownerId: string
   readonly entry: LocalBrowseEntryPoint
-  readonly profile: ProfileKey
+  readonly localPreviewMode: LocalPreviewMode
   readonly target: LocalBrowseEntryPointTarget | undefined
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
@@ -176,7 +176,7 @@ function projectEntryPointChildren(options: {
     return { children: { kind: 'none' } }
   }
 
-  const rootTarget = localBrowseRootTarget(target, options.profile)
+  const rootTarget = localBrowseRootTarget(target, options.localPreviewMode)
 
   return projectLocalBrowseChildren({
     ownerId: options.ownerId,
@@ -189,14 +189,14 @@ function projectEntryPointChildren(options: {
 
 function projectLocalBrowseItem(options: {
   readonly item: LocalBrowseItem
-  readonly profile: ProfileKey
+  readonly localPreviewMode: LocalPreviewMode
   readonly bindingsById: Map<BrowserTreeNodeId, RowBinding>
   readonly itemStates: ReadonlyMap<string, LocalBrowseItemState>
 }): BrowserTreeNode {
   const item = options.item
   const nodeId = localBrowseItemNodeId(item)
   const target = hasLocalBrowseOperation(item.availableOperations, 'browseChildren')
-    ? directoryTargetForItem(item, options.profile)
+    ? directoryTargetForItem(item, options.localPreviewMode)
     : undefined
 
   options.bindingsById.set(nodeId, {
@@ -310,7 +310,7 @@ function projectLoadedLocalBrowseWindow(options: {
   const projectedItems = options.window.items.map((item) =>
     projectLocalBrowseItem({
       item,
-      profile: options.window.profile,
+      localPreviewMode: options.window.previewMode,
       itemStates: options.itemStates,
       bindingsById: options.bindingsById
     })
@@ -502,7 +502,7 @@ function trackedMoreNode(
 
   const target: LocalBrowseMoreTarget = {
     ownerNodeId: options.ownerId,
-    profile: options.window.profile,
+    previewMode: options.window.previewMode,
     entryPointKind: options.window.identity.entryPointKind,
     resolvedRootPath: options.window.identity.resolvedRootPath,
     resolvedParentPath: options.window.identity.resolvedParentPath,
@@ -590,14 +590,14 @@ function entryPointPriority(entry: LocalBrowseEntryPoint): string {
 
 function directoryTargetForItem(
   item: LocalBrowseItem,
-  profile: ProfileKey
+  localPreviewMode: LocalPreviewMode
 ): LocalBrowseDirectoryTarget | undefined {
   if (!hasLocalBrowseOperation(item.availableOperations, 'browseChildren')) {
     return undefined
   }
 
   return {
-    profile,
+    previewMode: localPreviewMode,
     entryPointKind: item.identity.entryPointKind,
     resolvedRootPath: item.identity.resolvedRootPath,
     resolvedParentPath: item.identity.resolvedItemPath,

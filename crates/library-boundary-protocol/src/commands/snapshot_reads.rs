@@ -177,6 +177,11 @@ pub struct LocalBrowseEntryPoint {
     pub display_name: String,
     pub status: LocalBrowseEntryPointStatus,
     pub platform: LocalBrowsePlatform,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub matched_source_id: Option<i64>,
     pub available_operations: Vec<LocalBrowseOperation>,
     pub failure: Option<LocalBrowseEntryPointFailure>,
 }
@@ -477,6 +482,11 @@ pub struct LocalBrowseItem {
     pub platform: LocalBrowsePlatform,
     pub file_kind: Option<ContentsFileKind>,
     pub media_relevance: Option<LocalBrowseItemMediaRelevance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(with = "crate::wire::option_i64_string")]
+    #[schemars(with = "Option<String>")]
+    #[ts(as = "Option<String>")]
+    pub matched_source_id: Option<i64>,
     pub available_operations: Vec<LocalBrowseOperation>,
     pub failure: Option<LocalBrowseItemFailure>,
 }
@@ -2648,6 +2658,7 @@ mod tests {
                 },
                 display_name: "Music".to_string(),
                 status: LocalBrowseEntryPointStatus::Available,
+                matched_source_id: None,
                 platform: LocalBrowsePlatform::Windows,
                 available_operations: vec![
                     LocalBrowseOperation::BrowseChildren,
@@ -2753,6 +2764,7 @@ mod tests {
                 item_kind: LocalBrowseItemKind::MediaFile,
                 display_name: "Track.flac".to_string(),
                 status: LocalBrowseItemStatus::Available,
+                matched_source_id: None,
                 platform: LocalBrowsePlatform::Windows,
                 file_kind: Some(ContentsFileKind::Audio),
                 media_relevance: Some(LocalBrowseItemMediaRelevance::MediaRelevant),

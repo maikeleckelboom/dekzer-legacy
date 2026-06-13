@@ -18,7 +18,7 @@ import {
   type LocalBrowseItemState,
   type LocalBrowseMoreTarget
 } from './types'
-import { defaultProfile, type ProfileKey } from '../browseProfile/types'
+import { defaultLocalPreviewMode, type LocalPreviewMode } from './previewMode'
 
 const readLimit = 50
 const safeEntryPointsReadFailure = 'Unable to read local browse entry points.'
@@ -49,7 +49,7 @@ export type LocalBrowseController = {
 
 export function useLocalBrowseController(
   libraryApi: LocalBrowseReadApi = getRendererApi().library,
-  options: { readonly profile?: Ref<ProfileKey> } = {}
+  options: { readonly localPreviewMode?: Ref<LocalPreviewMode> } = {}
 ): LocalBrowseController {
   const controller = createLocalBrowseController(libraryApi, options)
 
@@ -66,11 +66,12 @@ export function useLocalBrowseController(
 
 export function createLocalBrowseController(
   libraryApi: LocalBrowseReadApi,
-  options: { readonly profile?: Ref<ProfileKey> } = {}
+  options: { readonly localPreviewMode?: Ref<LocalPreviewMode> } = {}
 ): LocalBrowseController {
   const entryPointsState = ref<LocalBrowseEntryPointsState>({ kind: 'unread' })
   const itemStates = shallowRef<ReadonlyMap<string, LocalBrowseItemState>>(new Map())
-  const profile = options.profile ?? ref<ProfileKey>(defaultProfile)
+  const localPreviewMode =
+    options.localPreviewMode ?? ref<LocalPreviewMode>(defaultLocalPreviewMode)
   let started = false
   let entryPointReadSequence = 0
   let itemReadSequence = 0
@@ -171,7 +172,7 @@ export function createLocalBrowseController(
 
     switch (binding.kind) {
       case 'localBrowseEntryPoint':
-        return readItems(localBrowseRootTarget(binding.target, profile.value))
+        return readItems(localBrowseRootTarget(binding.target, localPreviewMode.value))
       case 'localBrowseItem':
         return binding.target === undefined ? false : readItems(binding.target)
       case 'localBrowseMore':
@@ -191,7 +192,7 @@ export function createLocalBrowseController(
 
     const binding = projection.bindingsById.get(nodeId)
     const target =
-      binding === undefined ? undefined : windowTargetFromBinding(binding, profile.value)
+      binding === undefined ? undefined : windowTargetFromBinding(binding, localPreviewMode.value)
 
     if (target === undefined) {
       return false
@@ -248,7 +249,7 @@ export function createLocalBrowseController(
 
     for (const binding of projection.bindingsById.values()) {
       if (binding.kind === 'localBrowseEntryPoint') {
-        const target = localBrowseRootTarget(binding.target, profile.value)
+        const target = localBrowseRootTarget(binding.target, localPreviewMode.value)
         const state = itemStates.value.get(localBrowseWindowKey(target))
 
         if (state?.kind === 'loaded') {
@@ -267,7 +268,7 @@ export function createLocalBrowseController(
       const binding = projection.bindingsById.get(nodeId)
 
       if (binding?.kind === 'localBrowseEntryPoint') {
-        addTarget(localBrowseRootTarget(binding.target, profile.value))
+        addTarget(localBrowseRootTarget(binding.target, localPreviewMode.value))
       } else if (binding?.kind === 'localBrowseItem' && binding.target !== undefined) {
         addTarget(binding.target)
       }
@@ -549,7 +550,7 @@ function loadedWindowFromResult(
       : undefined
 
   return {
-    profile: target.profile,
+    previewMode: target.previewMode,
     identity: result.windowIdentity,
     label: target.label,
     items: result.items,
@@ -571,7 +572,7 @@ function appendLoadedWindow(
       : undefined
 
   return {
-    profile: current.profile,
+    previewMode: current.previewMode,
     identity: current.identity,
     label: current.label,
     items: [...current.items, ...next.items],
@@ -603,10 +604,10 @@ function isExpectedWindow(
 
 function windowTargetFromBinding(
   binding: RowBinding,
-  profile: ProfileKey = defaultProfile
+  localPreviewMode: LocalPreviewMode = defaultLocalPreviewMode
 ): LocalBrowseDirectoryTarget | undefined {
   if (binding.kind === 'localBrowseEntryPoint') {
-    return localBrowseRootTarget(binding.target, profile)
+    return localBrowseRootTarget(binding.target, localPreviewMode)
   }
 
   if (binding.kind === 'localBrowseItem') {
@@ -619,16 +620,16 @@ function windowTargetFromBinding(
 export function localBrowseStateForBinding(
   itemStates: ReadonlyMap<string, LocalBrowseItemState>,
   binding: RowBinding,
-  profile: ProfileKey = defaultProfile
+  localPreviewMode: LocalPreviewMode = defaultLocalPreviewMode
 ): LocalBrowseItemState | undefined {
-  const target = windowTargetFromBinding(binding, profile)
+  const target = windowTargetFromBinding(binding, localPreviewMode)
 
   return target === undefined ? undefined : itemStates.get(localBrowseWindowKey(target))
 }
 
 export function localBrowseWindowKeyForIdentity(
   identity: LoadedLocalBrowseItems['identity'],
-  profile: ProfileKey = defaultProfile
+  localPreviewMode: LocalPreviewMode = defaultLocalPreviewMode
 ): string {
-  return localBrowseWindowKeyFromIdentity(identity, profile)
+  return localBrowseWindowKeyFromIdentity(identity, localPreviewMode)
 }

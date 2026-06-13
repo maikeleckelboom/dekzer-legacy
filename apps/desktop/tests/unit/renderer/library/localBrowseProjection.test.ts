@@ -24,6 +24,7 @@ describe('local browse tree projection', () => {
     )
 
     expect(projection.nodes.map((node) => node.id)).toEqual(['local-browse:section'])
+    expect(projection.nodes[0]?.label).toBe('Add Source')
     expect(firstLoadedChildLabels(projection.nodes[0])).toEqual(['Music'])
     expect(projection.bindingsById.get('local-browse:section')).toEqual({
       kind: 'localBrowseSection'
@@ -122,7 +123,7 @@ describe('local browse tree projection', () => {
 
   it('projects local browse child row kinds without source bindings', () => {
     const rootTarget = {
-      profile: 'audio' as const,
+      previewMode: 'musicEvidence' as const,
       entryPointKind: 'music' as const,
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
@@ -132,7 +133,7 @@ describe('local browse tree projection', () => {
       ...browserState({ entries: [musicEntryPoint()] }),
       localBrowseItemStates: new Map([
         [
-          'audio:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
+          'musicEvidence:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
           {
             kind: 'loaded',
             window: {
@@ -141,7 +142,7 @@ describe('local browse tree projection', () => {
                 resolvedRootPath: rootTarget.resolvedRootPath,
                 resolvedParentPath: rootTarget.resolvedParentPath
               },
-              profile: rootTarget.profile,
+              previewMode: rootTarget.previewMode,
               label: rootTarget.label,
               items: [
                 item('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
@@ -189,9 +190,9 @@ describe('local browse tree projection', () => {
     ).toHaveLength(5)
   })
 
-  it('does not reuse a loaded window from another profile', () => {
+  it('does not reuse a loaded window from another local preview mode', () => {
     const rootTarget = {
-      profile: 'audio' as const,
+      previewMode: 'musicEvidence' as const,
       entryPointKind: 'music' as const,
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
@@ -199,14 +200,14 @@ describe('local browse tree projection', () => {
     }
     const projection = projectTree({
       ...browserState({ entries: [musicEntryPoint()] }),
-      profile: 'playable',
+      localPreviewMode: 'advancedInventory',
       localBrowseItemStates: new Map([
         [
-          'audio:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
+          'musicEvidence:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic',
           {
             kind: 'loaded',
             window: {
-              profile: rootTarget.profile,
+              previewMode: rootTarget.previewMode,
               identity: {
                 entryPointKind: rootTarget.entryPointKind,
                 resolvedRootPath: rootTarget.resolvedRootPath,

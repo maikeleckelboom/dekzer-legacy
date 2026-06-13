@@ -8,6 +8,12 @@ import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import { useLocalBrowseController } from './localBrowse/controller'
+import {
+  createLocalPreviewModeController,
+  localPreviewModeLabel,
+  localPreviewModeOptions,
+  type LocalPreviewMode
+} from './localBrowse/previewMode'
 import { useBoundaryEvents, type ScanProgressState } from './boundary/boundaryEvents'
 import {
   sourceLifecycleIdsForBrowserContext,
@@ -61,10 +67,15 @@ const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color
 const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--color-border) bg-(--color-background) p-0 text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 
 const viewStateStore = createViewStateStore()
-const browseProfile = createProfileController()
-const hierarchyRead = useLibraryHierarchyRead(undefined, { profile: browseProfile.profile })
-const localBrowse = useLocalBrowseController(undefined, { profile: browseProfile.profile })
-const contentsRead = useContentsRead(undefined, { profile: browseProfile.profile })
+const libraryBrowseProfile = createProfileController()
+const localPreviewMode = createLocalPreviewModeController()
+const hierarchyRead = useLibraryHierarchyRead(undefined, {
+  profile: libraryBrowseProfile.profile
+})
+const localBrowse = useLocalBrowseController(undefined, {
+  localPreviewMode: localPreviewMode.mode
+})
+const contentsRead = useContentsRead(undefined, { profile: libraryBrowseProfile.profile })
 const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
@@ -72,7 +83,7 @@ const integrityRead = useIntegrityRead()
 const maintenanceRead = useMaintenanceRead()
 const searchFilterRead = useSearchFilterRead()
 const librarySearch = createLibrarySearchController({
-  profile: browseProfile.profile,
+  profile: libraryBrowseProfile.profile,
   searchFilterRead
 })
 const disclosureReconciler = createDisclosureReconciler({
@@ -97,6 +108,8 @@ const sourceRevealRequest = ref<{
 }>()
 const browseProfileMenuOpen = ref(false)
 const browseProfileMenuRef = ref<HTMLElement>()
+const localPreviewModeMenuOpen = ref(false)
+const localPreviewModeMenuRef = ref<HTMLElement>()
 const searchInputRef = ref<HTMLInputElement>()
 let sourceRevealSequence = 0
 let maintenanceRefreshTimer: ReturnType<typeof setTimeout> | undefined
@@ -124,7 +137,8 @@ const sourceReadinessByNodeId = computed(() =>
 )
 
 const browserState = computed<BrowserState>(() => ({
-  profile: browseProfile.profile.value,
+  libraryBrowseProfile: libraryBrowseProfile.profile.value,
+  localPreviewMode: localPreviewMode.mode.value,
   sourceReadinessByNodeId: sourceReadinessByNodeId.value,
   sourceReadStates: hierarchyRead.sourceReadStates.value,
   directoryReadStates: hierarchyRead.directoryReadStates.value,
@@ -138,7 +152,10 @@ const browserState = computed<BrowserState>(() => ({
     : { navigationReadResult: hierarchyRead.navigationReadResult.value })
 }))
 
-const selectedBrowseProfileLabel = computed(() => profileLabel(browseProfile.profile.value))
+const selectedBrowseProfileLabel = computed(() => profileLabel(libraryBrowseProfile.profile.value))
+const selectedLocalPreviewModeLabel = computed(() =>
+  localPreviewModeLabel(localPreviewMode.mode.value)
+)
 
 const browserProjection = computed(() => projectState(browserState.value))
 
@@ -147,6 +164,8 @@ const toolbarModel = computed(() =>
     projection: browserProjection.value,
     selectedNodeId: selectedNodeId.value,
     selectedBrowseProfileLabel: selectedBrowseProfileLabel.value,
+    selectedLocalPreviewModeLabel: selectedLocalPreviewModeLabel.value,
+    localPreviewMode: localPreviewMode.mode.value,
     addMusicFolderLabel: rootActions.rootChoiceButtonLabel.value,
     canAddMusicFolder: rootLifecycle.canAddMusicFolder.value
   })
@@ -203,7 +222,7 @@ const contentsProjection = computed(() => {
     return projectSearchFilterContents({
       state: searchFilterRead.state.value,
       activeQuery: librarySearch.activeQuery.value,
-      profile: browseProfile.profile.value
+      profile: libraryBrowseProfile.profile.value
     })
   }
 
@@ -308,12 +327,19 @@ watch(
 )
 
 watch(
-  () => browseProfile.profile.value,
+  () => libraryBrowseProfile.profile.value,
   async () => {
     contentsRead.clear()
     await hierarchyRead.refreshBrowserWindows(expandedNodeIds.value)
-    await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
     requestContentsForCurrentSelection({ force: true })
+    saveViewState()
+  }
+)
+
+watch(
+  () => localPreviewMode.mode.value,
+  async () => {
+    await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
     saveViewState()
   }
 )
@@ -480,7 +506,8 @@ function saveViewState(): void {
   viewStateStore.save({
     version: 1,
     expandedNodeIds: [...expandedNodeIds.value],
-    profile: browseProfile.profile.value,
+    libraryBrowseProfile: libraryBrowseProfile.profile.value,
+    localPreviewMode: localPreviewMode.mode.value,
     ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
   })
 }
@@ -504,7 +531,8 @@ async function restoreViewState(): Promise<void> {
 
     applyRestoredSelection(result.viewState.selectedNodeId, projection.bindingsById)
     applyRestoredExpansion(result.viewState.expandedNodeIds, projection.bindingsById)
-    browseProfile.restoreProfile(result.viewState.profile)
+    libraryBrowseProfile.restoreProfile(result.viewState.libraryBrowseProfile)
+    localPreviewMode.restoreMode(result.viewState.localPreviewMode)
   } catch {
     restoreState.readCompleted = true
   }
@@ -515,12 +543,25 @@ function toggleBrowseProfileMenu(): void {
 }
 
 function selectBrowseProfile(profile: ProfileKey): void {
-  browseProfile.setProfile(profile)
+  libraryBrowseProfile.setProfile(profile)
   browseProfileMenuOpen.value = false
 }
 
 function closeBrowseProfileMenu(): void {
   browseProfileMenuOpen.value = false
+}
+
+function toggleLocalPreviewModeMenu(): void {
+  localPreviewModeMenuOpen.value = !localPreviewModeMenuOpen.value
+}
+
+function selectLocalPreviewMode(mode: LocalPreviewMode): void {
+  localPreviewMode.setMode(mode)
+  localPreviewModeMenuOpen.value = false
+}
+
+function closeLocalPreviewModeMenu(): void {
+  localPreviewModeMenuOpen.value = false
 }
 
 function openSearch(): void {
@@ -539,13 +580,20 @@ function handleSearchEscape(): void {
 }
 
 function handleBrowseProfileOutsidePointerDown(event: PointerEvent): void {
-  if (!browseProfileMenuOpen.value) {
-    return
+  const target = event.target
+
+  if (
+    browseProfileMenuOpen.value &&
+    (!(target instanceof Node) || !browseProfileMenuRef.value?.contains(target))
+  ) {
+    browseProfileMenuOpen.value = false
   }
 
-  const target = event.target
-  if (!(target instanceof Node) || !browseProfileMenuRef.value?.contains(target)) {
-    browseProfileMenuOpen.value = false
+  if (
+    localPreviewModeMenuOpen.value &&
+    (!(target instanceof Node) || !localPreviewModeMenuRef.value?.contains(target))
+  ) {
+    localPreviewModeMenuOpen.value = false
   }
 }
 
@@ -733,6 +781,9 @@ async function handleStatusAction(action: StatusAction): Promise<void> {
         }
       })
       break
+    case 'showSource':
+      showAdmittedSource(action.sourceId)
+      break
     case 'scanSource':
       await rootLifecycle.scanRoot(action.sourceId)
       break
@@ -749,6 +800,47 @@ async function handleStatusAction(action: StatusAction): Promise<void> {
       await refreshSourceStatus(action.sourceId)
       break
   }
+}
+
+function showAdmittedSource(sourceId: string): void {
+  markUserInteraction()
+  const projection = browserProjection.value
+  const nodeId = sourceNodeIdForSourceId(projection, sourceId)
+
+  if (nodeId === undefined) {
+    pendingSourceRegistration.value = sourceRegistrationIntent(sourceId, undefined)
+    return
+  }
+
+  sourceRevealRequest.value = {
+    nodeId,
+    sequence: ++sourceRevealSequence
+  }
+  selectedNodeId.value = nodeId
+  restoreState.initialNodeApplied = true
+  requestContentsForCurrentSelection()
+  saveViewState()
+}
+
+function sourceNodeIdForSourceId(
+  projection: ReturnType<typeof projectState>,
+  sourceId: string
+): BrowserTreeNodeId | undefined {
+  if (projection?.kind !== 'tree') {
+    return undefined
+  }
+
+  for (const [nodeId, binding] of projection.bindingsById) {
+    if (
+      binding.kind === 'source' &&
+      binding.target.entryPoint.kind === 'source' &&
+      binding.target.entryPoint.sourceId === sourceId
+    ) {
+      return nodeId
+    }
+  }
+
+  return undefined
 }
 
 async function refreshSelectedSourceStatus(): Promise<boolean> {
@@ -843,7 +935,8 @@ function clearBrowserView(): void {
 
   viewStateStore.save({
     version: 1,
-    profile: browseProfile.profile.value,
+    libraryBrowseProfile: libraryBrowseProfile.profile.value,
+    localPreviewMode: localPreviewMode.mode.value,
     expandedNodeIds: []
   })
 }
@@ -978,10 +1071,54 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
               :key="option.key"
               type="button"
               class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
-              :class="browseProfile.profile.value === option.key ? 'font-bold' : 'font-normal'"
+              :class="
+                libraryBrowseProfile.profile.value === option.key ? 'font-bold' : 'font-normal'
+              "
               role="option"
-              :aria-selected="browseProfile.profile.value === option.key"
+              :aria-selected="libraryBrowseProfile.profile.value === option.key"
               @click="selectBrowseProfile(option.key)"
+            >
+              <span>{{ option.label }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="toolbarModel.localPreviewMode.visible"
+          ref="localPreviewModeMenuRef"
+          class="relative inline-flex"
+        >
+          <button
+            type="button"
+            :class="iconButtonClass"
+            :aria-label="toolbarModel.localPreviewMode.label"
+            :aria-expanded="localPreviewModeMenuOpen"
+            aria-haspopup="listbox"
+            :title="toolbarModel.localPreviewMode.title"
+            :disabled="!toolbarModel.localPreviewMode.enabled"
+            @click="toggleLocalPreviewModeMenu"
+            @keydown.escape.stop.prevent="closeLocalPreviewModeMenu"
+          >
+            <Icon role="action.browseView" size="md" />
+          </button>
+
+          <div
+            v-if="localPreviewModeMenuOpen"
+            class="absolute right-0 top-full z-20 mt-1 min-w-48 border border-(--color-border) bg-(--color-background) py-1 shadow-lg"
+            role="listbox"
+            :aria-label="toolbarModel.localPreviewMode.label"
+            tabindex="-1"
+            @keydown.escape.stop.prevent="closeLocalPreviewModeMenu"
+          >
+            <button
+              v-for="option in localPreviewModeOptions"
+              :key="option.key"
+              type="button"
+              class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-(--color-text) hover:bg-(--color-surface) focus-visible:bg-(--color-surface) focus-visible:outline-none"
+              :class="localPreviewMode.mode.value === option.key ? 'font-bold' : 'font-normal'"
+              role="option"
+              :aria-selected="localPreviewMode.mode.value === option.key"
+              @click="selectLocalPreviewMode(option.key)"
             >
               <span>{{ option.label }}</span>
             </button>

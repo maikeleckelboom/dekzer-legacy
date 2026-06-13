@@ -2101,6 +2101,12 @@
         "identity": {
           "$ref": "#/$defs/LocalBrowseEntryPointIdentity"
         },
+        "matchedSourceId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "platform": {
           "$ref": "#/$defs/LocalBrowsePlatform"
         },
@@ -2228,6 +2234,12 @@
         },
         "itemKind": {
           "$ref": "#/$defs/LocalBrowseItemKind"
+        },
+        "matchedSourceId": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "mediaRelevance": {
           "anyOf": [

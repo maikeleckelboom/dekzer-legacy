@@ -31,7 +31,8 @@ describe('createViewStateStore', () => {
       version: 1,
       selectedNodeId: 'node-a',
       expandedNodeIds,
-      profile: 'playable'
+      libraryBrowseProfile: 'playable',
+      localPreviewMode: 'musicEvidence'
     })
     expandedNodeIds.push('node-b')
     await resolveAll()
@@ -40,27 +41,35 @@ describe('createViewStateStore', () => {
       version: 1,
       selectedNodeId: 'node-a',
       expandedNodeIds: ['node-a'],
-      profile: 'playable'
+      libraryBrowseProfile: 'playable',
+      localPreviewMode: 'musicEvidence'
     })
   })
 
-  it('persists valid browse profile and drops invalid profile values', async () => {
+  it('persists valid library profile and local preview mode independently', async () => {
     const { api, writes, resolveAll } = createQueuedWriteApi()
     const store = createViewStateStore(api)
 
-    store.save({ version: 1, expandedNodeIds: [], profile: 'allFiles' })
+    store.save({
+      version: 1,
+      expandedNodeIds: [],
+      libraryBrowseProfile: 'allFiles',
+      localPreviewMode: 'advancedInventory'
+    })
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
       version: 1,
       expandedNodeIds: [],
-      profile: 'allFiles'
+      libraryBrowseProfile: 'allFiles',
+      localPreviewMode: 'advancedInventory'
     })
 
     store.save({
       version: 1,
       expandedNodeIds: [],
-      profile: 'invalid'
+      libraryBrowseProfile: 'invalid',
+      localPreviewMode: 'invalid'
     } as unknown as PersistedLibraryViewState)
     await resolveAll()
 
@@ -77,7 +86,8 @@ describe('createViewStateStore', () => {
     store.save({
       version: 1,
       expandedNodeIds: [],
-      profile: 'audio',
+      libraryBrowseProfile: 'audio',
+      localPreviewMode: 'musicEvidence',
       searchText: 'amen'
     } as unknown as PersistedLibraryViewState)
     await resolveAll()
@@ -85,7 +95,8 @@ describe('createViewStateStore', () => {
     expect(writes[0]?.state).toEqual({
       version: 1,
       expandedNodeIds: [],
-      profile: 'audio'
+      libraryBrowseProfile: 'audio',
+      localPreviewMode: 'musicEvidence'
     })
   })
 

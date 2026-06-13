@@ -7,7 +7,7 @@ import {
   type LocalBrowseReadApi
 } from '../../../../src/renderer/library/localBrowse/controller'
 import { localBrowseWindowKey } from '../../../../src/renderer/library/localBrowse/types'
-import type { ProfileKey } from '../../../../src/renderer/library/browseProfile/types'
+import type { LocalPreviewMode } from '../../../../src/renderer/library/localBrowse/previewMode'
 import type { BrowserState } from '../../../../src/renderer/library/state'
 import {
   projectState,
@@ -20,9 +20,9 @@ import type {
 } from '../../../../src/shared/library/localBrowse/items'
 
 describe('createLocalBrowseController', () => {
-  it('keys local browse windows by profile', () => {
+  it('keys local browse windows by local preview mode', () => {
     const target = {
-      profile: 'playable' as const,
+      previewMode: 'advancedInventory' as const,
       entryPointKind: 'music' as const,
       resolvedRootPath: 'C:\\Users\\Maikel\\Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
@@ -30,9 +30,11 @@ describe('createLocalBrowseController', () => {
     }
 
     expect(localBrowseWindowKey(target)).toBe(
-      'playable:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic'
+      'advancedInventory:music:C%3A%5CUsers%5CMaikel%5CMusic:C%3A%5CUsers%5CMaikel%5CMusic'
     )
-    expect(localBrowseWindowKeyForIdentity(target, 'playable')).toBe(localBrowseWindowKey(target))
+    expect(localBrowseWindowKeyForIdentity(target, 'advancedInventory')).toBe(
+      localBrowseWindowKey(target)
+    )
   })
 
   it('reads entry points and item windows with boundary identities', async () => {
@@ -118,9 +120,9 @@ describe('createLocalBrowseController', () => {
     })
   })
 
-  it('uses selected profile for reads and preserves it for read-more', async () => {
+  it('uses selected local preview mode for reads and preserves it for read-more', async () => {
     const itemRequests: ReadLocalBrowseItemsRequest[] = []
-    const profile = ref<ProfileKey>('playable')
+    const localPreviewMode = ref<LocalPreviewMode>('advancedInventory')
     const readItems = vi.fn(async (request: ReadLocalBrowseItemsRequest) => {
       itemRequests.push(structuredClone(request))
 
@@ -151,7 +153,9 @@ describe('createLocalBrowseController', () => {
         failure: null
       }
     })
-    const controller = createLocalBrowseController(testLocalBrowseApi({ readItems }), { profile })
+    const controller = createLocalBrowseController(testLocalBrowseApi({ readItems }), {
+      localPreviewMode
+    })
     controller.start()
 
     await controller.refreshEntryPoints()
@@ -165,7 +169,7 @@ describe('createLocalBrowseController', () => {
     await controller.requestNodeChildren(musicNodeId, projection)
 
     projection = projectTree({
-      profile: 'playable',
+      localPreviewMode: 'advancedInventory',
       sourceReadStates: new Map(),
       directoryReadStates: new Map(),
       localBrowseEntryPointsState: controller.entryPointsState.value,
@@ -173,15 +177,15 @@ describe('createLocalBrowseController', () => {
     })
     await controller.requestNodeMore(musicNodeId, projection)
 
-    expect(itemRequests.map((request) => request.profile)).toEqual(['playable', 'playable'])
+    expect(itemRequests.map((request) => request.profile)).toEqual(['allFiles', 'allFiles'])
     expect(itemRequests[1]).toMatchObject({
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
       offset: 1
     })
 
-    profile.value = 'allFiles'
+    localPreviewMode.value = 'musicEvidence'
     await controller.requestNodeChildren(musicNodeId, projection)
-    expect(itemRequests[2]?.profile).toBe('allFiles')
+    expect(itemRequests[2]?.profile).toBe('audio')
   })
 })
 

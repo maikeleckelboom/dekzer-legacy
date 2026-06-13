@@ -27,6 +27,7 @@ import { formatSourceDisplayName } from './sourcePresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
 import { projectLocalBrowseSection } from '../localBrowse/projection'
 import { defaultProfile, type ProfileKey } from '../browseProfile/types'
+import { defaultLocalPreviewMode } from '../localBrowse/previewMode'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -97,7 +98,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
   const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
   const result = state.navigationReadResult
   const localBrowseSection = projectLocalBrowseSection({
-    profile: state.profile ?? defaultProfile,
+    localPreviewMode: state.localPreviewMode ?? defaultLocalPreviewMode,
     ...(state.localBrowseEntryPointsState === undefined
       ? {}
       : { entryPointsState: state.localBrowseEntryPointsState }),
@@ -169,7 +170,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
       ...visibleRows.map((row) =>
         projectNavigationRow({
           row,
-          profile: state.profile ?? defaultProfile,
+          profile: state.libraryBrowseProfile ?? defaultProfile,
           ...(state.sourceReadinessByNodeId === undefined
             ? {}
             : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),

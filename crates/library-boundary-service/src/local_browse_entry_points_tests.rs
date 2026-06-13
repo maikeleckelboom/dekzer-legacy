@@ -430,7 +430,7 @@ fn local_browse_entry_points_exact_admitted_source_match_is_duplicate_entry() {
                 protocol::LocalBrowseEntryPointStatus::Available,
             ),
         ]));
-    let _registered = register_local_root(&service, source_root.to_string_lossy().into_owned());
+    let registered = register_local_root(&service, source_root.to_string_lossy().into_owned());
     let before_counts = application_table_row_counts(&context);
 
     let reply = read_local_browse_entry_points(&service);
@@ -440,6 +440,7 @@ fn local_browse_entry_points_exact_admitted_source_match_is_duplicate_entry() {
         reply.entries[0].status,
         protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
     );
+    assert_eq!(reply.entries[0].matched_source_id, Some(registered.root_id));
     assert!(!has_source_admission_operation(
         &reply.entries[0].available_operations
     ));

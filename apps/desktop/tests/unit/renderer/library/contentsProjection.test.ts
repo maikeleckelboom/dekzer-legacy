@@ -42,6 +42,7 @@ import {
   type LocalBrowseItemState
 } from '../../../../src/renderer/library/localBrowse/types'
 import type { ProfileKey } from '../../../../src/renderer/library/browseProfile/types'
+import type { LocalPreviewMode } from '../../../../src/renderer/library/localBrowse/previewMode'
 
 describe('projectContents', () => {
   it('projects selected source contents from contents state', () => {
@@ -57,6 +58,8 @@ describe('projectContents', () => {
     )
 
     expect(contents.kind).toBe('ready')
+    expect(contents.surfaceLabel).toBe('Contents')
+    expect(contents.surfaceKind).toBe('indexedContents')
     expect(contents.title).toBe('Source Fixture')
     expect(contents.rows.map(rowSummary)).toEqual([
       {
@@ -220,7 +223,9 @@ describe('projectContents', () => {
     })
 
     expect(rootContents.kind).toBe('ready')
-    expect(rootContents.title).toBe('Local Files: Music')
+    expect(rootContents.surfaceLabel).toBe('Source Preview')
+    expect(rootContents.surfaceKind).toBe('localPreview')
+    expect(rootContents.title).toBe('Music')
     expect(rootContents.rows.map((row) => row.label)).toEqual(['Albums', 'loose.flac'])
     expect(
       rootContents.rows.every((row) => row.action?.kind !== 'requestLocalBrowseAdmission')
@@ -238,7 +243,8 @@ describe('projectContents', () => {
     })
 
     expect(albumContents.kind).toBe('ready')
-    expect(albumContents.title).toBe('Local folder: Albums')
+    expect(albumContents.surfaceLabel).toBe('Source Preview')
+    expect(albumContents.title).toBe('Albums')
     expect(albumContents.rows.map((row) => row.label)).toEqual(['track.flac'])
     expect(
       albumContents.rows.every((row) => row.action?.kind !== 'requestLocalBrowseAdmission')
@@ -259,7 +265,8 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('notLoaded')
-    expect(contents.title).toBe('Local Files: Music')
+    expect(contents.surfaceLabel).toBe('Source Preview')
+    expect(contents.title).toBe('Music')
     expect(contents.detail).toContain('Preview local folders and media evidence')
     expect(contents.rows.map((row) => row.label)).toEqual(['Folder preview not loaded'])
     expect(contents.rows[0]).toMatchObject({
@@ -272,7 +279,7 @@ describe('projectContents', () => {
     })
   })
 
-  it('projects Local Files root as admission guidance without library-empty copy', () => {
+  it('projects Add Source root as admission guidance without library-empty copy', () => {
     const state = browserState({
       navigationReadResult: emptyNavigation(),
       entries: [localBrowseEntryPoint()]
@@ -285,7 +292,9 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('ready')
-    expect(contents.title).toBe('Local Files')
+    expect(contents.surfaceLabel).toBe('Add Source')
+    expect(contents.surfaceKind).toBe('addSource')
+    expect(contents.title).toBe('Add Source')
     expect(contents.detail).toContain('managed source')
     expect(contents.rows).toEqual([
       expect.objectContaining({
@@ -361,13 +370,14 @@ describe('projectContents', () => {
       bindingsById: projection.bindingsById
     })
 
-    expect(contents.title).toBe('Local Files: System Drive')
+    expect(contents.surfaceLabel).toBe('Source Preview')
+    expect(contents.title).toBe('System Drive')
     expect(contents.detail).toContain('plausible music-source candidate')
     expect(contents.rows.map((row) => row.label)).toEqual(['Music'])
     expect(contents.rows.some((row) => row.label === 'Windows')).toBe(false)
   })
 
-  it('keeps raw local inventory out of normal admission but available in All Files', () => {
+  it('keeps raw local inventory out of normal admission but available in advanced inventory', () => {
     const items = [
       localBrowseItem('directory', 'Albums', 'C:\\Users\\Maikel\\Music\\Albums'),
       localBrowseItem('unsupportedFile', 'notes.txt', 'C:\\Users\\Maikel\\Music\\notes.txt', {
@@ -386,7 +396,7 @@ describe('projectContents', () => {
       items
     })
     const inventoryWindow = localBrowseWindow({
-      profile: 'allFiles',
+      previewMode: 'advancedInventory',
       label: 'Music',
       resolvedParentPath: 'C:\\Users\\Maikel\\Music',
       items
@@ -408,9 +418,10 @@ describe('projectContents', () => {
     })
 
     expect(audioContents.rows.map((row) => row.label)).toEqual(['Albums'])
+    expect(audioContents.surfaceLabel).toBe('Source Preview')
 
     const inventoryState = browserState({
-      profile: 'allFiles',
+      localPreviewMode: 'advancedInventory',
       navigationReadResult: emptyNavigation(),
       entries: [localBrowseEntryPoint()],
       localBrowseItemStates: new Map([
@@ -425,6 +436,8 @@ describe('projectContents', () => {
       bindingsById: inventoryProjection.bindingsById
     })
 
+    expect(inventoryContents.surfaceLabel).toBe('Source Inventory')
+    expect(inventoryContents.surfaceKind).toBe('localInventory')
     expect(inventoryContents.detail).toContain('local inventory items shown')
     expect(inventoryContents.rows.map((row) => row.label)).toEqual([
       'Albums',
@@ -1451,7 +1464,8 @@ function browserState(options: {
   readonly directoryStates?: ReadonlyMap<string, DirectoryState>
   readonly entries?: readonly LocalBrowseEntryPoint[]
   readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
-  readonly profile?: ProfileKey
+  readonly libraryBrowseProfile?: ProfileKey
+  readonly localPreviewMode?: LocalPreviewMode
 }): BrowserState {
   const sourceStates = new Map<string, SourceState>()
 
@@ -1460,7 +1474,12 @@ function browserState(options: {
   }
 
   return {
-    ...(options.profile === undefined ? {} : { profile: options.profile }),
+    ...(options.libraryBrowseProfile === undefined
+      ? {}
+      : { libraryBrowseProfile: options.libraryBrowseProfile }),
+    ...(options.localPreviewMode === undefined
+      ? {}
+      : { localPreviewMode: options.localPreviewMode }),
     navigationReadResult: options.navigationReadResult ?? {
       state: 'ready',
       rows: [sourceNavigationRow()]
@@ -1667,7 +1686,7 @@ function localBrowseItem(
 }
 
 function localBrowseWindow(options: {
-  readonly profile?: ProfileKey
+  readonly previewMode?: LocalPreviewMode
   readonly entryPointKind?: LoadedLocalBrowseItems['identity']['entryPointKind']
   readonly resolvedRootPath?: string
   readonly label: string
@@ -1678,7 +1697,7 @@ function localBrowseWindow(options: {
 }): LoadedLocalBrowseItems {
   const resolvedRootPath = options.resolvedRootPath ?? 'C:\\Users\\Maikel\\Music'
   return {
-    profile: options.profile ?? 'audio',
+    previewMode: options.previewMode ?? 'musicEvidence',
     identity: {
       entryPointKind: options.entryPointKind ?? 'music',
       resolvedRootPath,
@@ -1696,7 +1715,7 @@ function localBrowseWindow(options: {
 
 function localBrowseWindowStateKey(window: LoadedLocalBrowseItems): string {
   return localBrowseWindowKey({
-    profile: window.profile,
+    previewMode: window.previewMode,
     entryPointKind: window.identity.entryPointKind,
     resolvedRootPath: window.identity.resolvedRootPath,
     resolvedParentPath: window.identity.resolvedParentPath,

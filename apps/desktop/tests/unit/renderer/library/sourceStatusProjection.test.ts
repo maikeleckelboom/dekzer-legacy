@@ -58,8 +58,8 @@ describe('source status projection', () => {
     expect(view.actions.some((action) => action.kind === 'runMaintenance')).toBe(false)
   })
 
-  it('local files root shows guidance without source-specific actions or unknown badge', () => {
-    const projection = localBrowseProjection({ kind: 'localBrowseSection' }, 'Local Files')
+  it('Add Source root shows guidance without source-specific actions or unknown badge', () => {
+    const projection = localBrowseProjection({ kind: 'localBrowseSection' }, 'Add Source')
     const view = statusView(
       projectStatusContext({
         projection,
@@ -93,7 +93,7 @@ describe('source status projection', () => {
     expect(view.actions.some((action) => action.kind === 'runMaintenance')).toBe(false)
   })
 
-  it('duplicate local browse row does not show Add as music source', () => {
+  it('duplicate local browse row without matched source identity has no add or show-source action', () => {
     const projection = localBrowseProjection(
       {
         kind: 'localBrowseItem',
@@ -102,7 +102,7 @@ describe('source status projection', () => {
           status: 'duplicateOfAdmittedSource'
         },
         target: {
-          profile: 'audio',
+          previewMode: 'musicEvidence',
           entryPointKind: 'music',
           resolvedRootPath: 'C:/Music',
           resolvedParentPath: 'C:/Music/Duplicate',
@@ -116,6 +116,36 @@ describe('source status projection', () => {
     )
 
     expect(view.actions).toEqual([])
+  })
+
+  it('duplicate local browse row with matched source identity shows Show source only', () => {
+    const projection = localBrowseProjection(
+      {
+        kind: 'localBrowseItem',
+        item: {
+          ...localItem([], 'directory'),
+          status: 'duplicateOfAdmittedSource',
+          matchedSourceId: '7'
+        },
+        target: {
+          previewMode: 'musicEvidence',
+          entryPointKind: 'music',
+          resolvedRootPath: 'C:/Music',
+          resolvedParentPath: 'C:/Music/Duplicate',
+          label: 'Duplicate'
+        }
+      },
+      'Duplicate'
+    )
+    const view = statusView(
+      projectStatusContext({ projection, selectedNodeId: 'selected', selectedTitle: 'Duplicate' })
+    )
+
+    expect(view.badge).toBe('Already added')
+    expect(view.actions).toEqual([
+      expect.objectContaining({ kind: 'showSource', label: 'Show source', sourceId: '7' })
+    ])
+    expect(view.actions.some((action) => action.kind === 'addLocalPath')).toBe(false)
   })
 
   it('does not offer broad system root admission from a loose media file', () => {
@@ -249,7 +279,7 @@ describe('source status projection', () => {
         kind: 'localBrowseItem',
         item: localItem([], 'directory'),
         target: {
-          profile: 'audio',
+          previewMode: 'musicEvidence',
           entryPointKind: 'music',
           resolvedRootPath: 'C:/Music',
           resolvedParentPath: 'C:/Music/Albums',

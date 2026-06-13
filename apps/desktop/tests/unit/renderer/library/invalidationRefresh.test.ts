@@ -470,11 +470,27 @@ describe('panel runtime wiring', () => {
     const panel = readRendererSource('panel.vue')
 
     expect(panel).toContain("import { useLocalBrowseController } from './localBrowse/controller'")
-    expect(panel).toContain(
-      'const localBrowse = useLocalBrowseController(undefined, { profile: browseProfile.profile })'
-    )
+    expect(panel).toContain('const libraryBrowseProfile = createProfileController()')
+    expect(panel).toContain('const localPreviewMode = createLocalPreviewModeController()')
+    expect(panel).toContain('const localBrowse = useLocalBrowseController(undefined, {')
+    expect(panel).toContain('localPreviewMode: localPreviewMode.mode')
+    expect(panel).not.toContain('profile: browseProfile.profile')
     expect(panel).toContain('void localBrowse.refreshEntryPoints()')
     expect(panel).toContain('refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints()')
+  })
+
+  it('keeps library profile and local preview mode watchers separate', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain('() => libraryBrowseProfile.profile.value')
+    expect(panel).toContain('await hierarchyRead.refreshBrowserWindows(expandedNodeIds.value)')
+    expect(panel).toContain('requestContentsForCurrentSelection({ force: true })')
+    expect(panel).toContain('() => localPreviewMode.mode.value')
+    expect(panel).toContain(
+      'await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)'
+    )
+    expect(panel).toContain('libraryBrowseProfile: libraryBrowseProfile.profile.value')
+    expect(panel).toContain('localPreviewMode: localPreviewMode.mode.value')
   })
 
   it('clears failed disclosure ledger entries from scan completion and manual retries', () => {

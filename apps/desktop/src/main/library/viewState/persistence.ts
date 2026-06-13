@@ -27,7 +27,12 @@ export async function readViewStateFromHost(
         version: parsed.version,
         ...(parsed.selectedNodeId === undefined ? {} : { selectedNodeId: parsed.selectedNodeId }),
         expandedNodeIds: deduplicateStringIds(parsed.expandedNodeIds),
-        ...(parsed.profile === undefined ? {} : { profile: parsed.profile })
+        ...(parsed.libraryBrowseProfile === undefined
+          ? {}
+          : { libraryBrowseProfile: parsed.libraryBrowseProfile }),
+        ...(parsed.localPreviewMode === undefined
+          ? {}
+          : { localPreviewMode: parsed.localPreviewMode })
       }
     }
   } catch {
@@ -48,7 +53,12 @@ export async function writeViewStateToHost(
         ? {}
         : { selectedNodeId: viewState.selectedNodeId }),
       expandedNodeIds: deduplicateStringIds(viewState.expandedNodeIds),
-      ...(viewState.profile === undefined ? {} : { profile: viewState.profile })
+      ...(viewState.libraryBrowseProfile === undefined
+        ? {}
+        : { libraryBrowseProfile: viewState.libraryBrowseProfile }),
+      ...(viewState.localPreviewMode === undefined
+        ? {}
+        : { localPreviewMode: viewState.localPreviewMode })
     })
     const filePath = viewStateFilePath(host)
     const tempPath = `${filePath}.tmp`
@@ -94,8 +104,17 @@ export function isValidViewState(value: unknown): value is PersistedLibraryViewS
   }
   if (!Array.isArray(obj.expandedNodeIds)) return false
   if (!obj.expandedNodeIds.every((id: unknown) => typeof id === 'string')) return false
-  if ('profile' in obj && obj.profile !== undefined) {
-    return obj.profile === 'audio' || obj.profile === 'playable' || obj.profile === 'allFiles'
+  if ('libraryBrowseProfile' in obj && obj.libraryBrowseProfile !== undefined) {
+    if (
+      obj.libraryBrowseProfile !== 'audio' &&
+      obj.libraryBrowseProfile !== 'playable' &&
+      obj.libraryBrowseProfile !== 'allFiles'
+    ) {
+      return false
+    }
+  }
+  if ('localPreviewMode' in obj && obj.localPreviewMode !== undefined) {
+    return obj.localPreviewMode === 'musicEvidence' || obj.localPreviewMode === 'advancedInventory'
   }
   return true
 }

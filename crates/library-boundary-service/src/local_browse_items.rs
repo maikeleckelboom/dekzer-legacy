@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
@@ -16,7 +16,7 @@ pub(crate) trait LocalBrowseItemReader: Send + Sync {
     fn read_items(
         &self,
         request: protocol::ReadLocalBrowseItemsRequest,
-        admitted_source_path_keys: &HashSet<String>,
+        admitted_source_ids_by_path_key: &HashMap<String, i64>,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply>;
 }
 
@@ -30,13 +30,13 @@ impl LocalBrowseItemReader for PlatformLocalBrowseItemReader {
     fn read_items(
         &self,
         request: protocol::ReadLocalBrowseItemsRequest,
-        admitted_source_path_keys: &HashSet<String>,
+        admitted_source_ids_by_path_key: &HashMap<String, i64>,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
         validate_common_request(&request)?;
 
         #[cfg(not(windows))]
         {
-            let _ = admitted_source_path_keys;
+            let _ = admitted_source_ids_by_path_key;
             Ok(failure_reply(
                 &request,
                 protocol::LocalBrowseItemsReadStatus::UnsupportedPlatform,
@@ -47,7 +47,7 @@ impl LocalBrowseItemReader for PlatformLocalBrowseItemReader {
 
         #[cfg(windows)]
         {
-            read_windows_items(request, admitted_source_path_keys)
+            read_windows_items(request, admitted_source_ids_by_path_key)
         }
     }
 }
@@ -78,7 +78,7 @@ fn validate_common_request(
 #[cfg(windows)]
 fn read_windows_items(
     request: protocol::ReadLocalBrowseItemsRequest,
-    admitted_source_path_keys: &HashSet<String>,
+    admitted_source_ids_by_path_key: &HashMap<String, i64>,
 ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
     let root_path = PathBuf::from(&request.resolved_root_path);
     let parent_path = PathBuf::from(&request.resolved_parent_path);
@@ -193,7 +193,7 @@ fn read_windows_items(
         .into_iter()
         .skip(request.offset)
         .take(request.limit)
-        .map(|key| item_for_key(&request, key, admitted_source_path_keys))
+        .map(|key| item_for_key(&request, key, admitted_source_ids_by_path_key))
         .collect::<Vec<_>>();
 
     let status = if enumeration_failure || key_failure {
@@ -388,10 +388,14 @@ fn inaccessible_key(
 fn item_for_key(
     request: &protocol::ReadLocalBrowseItemsRequest,
     key: LocalBrowseItemKey,
-    admitted_source_path_keys: &HashSet<String>,
+    admitted_source_ids_by_path_key: &HashMap<String, i64>,
 ) -> protocol::LocalBrowseItem {
-    let duplicate = key.item_kind != protocol::LocalBrowseItemKind::RejectedRoot
-        && admitted_source_path_keys.contains(&key.path_key);
+    let matched_source_id = if key.item_kind == protocol::LocalBrowseItemKind::RejectedRoot {
+        None
+    } else {
+        admitted_source_ids_by_path_key.get(&key.path_key).copied()
+    };
+    let duplicate = matched_source_id.is_some();
     let status = if duplicate {
         protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource
     } else {
@@ -407,6 +411,7 @@ fn item_for_key(
         platform: local_browse_entry_point_platform(),
         file_kind: key.file_kind,
         media_relevance: key.media_relevance,
+        matched_source_id,
         available_operations,
         failure: key.failure,
     }

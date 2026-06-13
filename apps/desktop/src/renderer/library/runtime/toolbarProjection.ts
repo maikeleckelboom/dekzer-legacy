@@ -1,4 +1,6 @@
 import type { RowBinding } from '../state'
+import { sourceAdmissionOperation } from '../localBrowse/projection'
+import type { LocalPreviewMode } from '../localBrowse/previewMode'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNodeId } from '../tree/types'
 
@@ -8,6 +10,7 @@ export type LibraryToolbarModel = {
   readonly scope: LibraryToolbarScope
   readonly search: ToolbarControl
   readonly browseProfile: ToolbarControl
+  readonly localPreviewMode: ToolbarControl
   readonly addMusicFolder: ToolbarAction
 }
 
@@ -30,14 +33,25 @@ export type LibraryToolbarInput = {
   readonly projection: BrowserProjection | undefined
   readonly selectedNodeId: BrowserTreeNodeId | undefined
   readonly selectedBrowseProfileLabel: string
+  readonly selectedLocalPreviewModeLabel: string
+  readonly localPreviewMode: LocalPreviewMode
   readonly addMusicFolderLabel: string
   readonly canAddMusicFolder: boolean
 }
 
 export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolbarModel {
   const scope = toolbarScope(input.projection, input.selectedNodeId)
-  const browseProfileScopeLabel =
-    scope === 'localAdmission' ? 'Local preview filter' : 'Indexed contents view'
+  const selectedBinding =
+    input.selectedNodeId === undefined
+      ? undefined
+      : input.projection?.bindingsById.get(input.selectedNodeId)
+  const selectedLocalAdmissionAvailable =
+    selectedBinding === undefined ? false : hasLocalSourceAdmission(selectedBinding)
+  const showFolderPicker =
+    scope === 'libraryStart' ||
+    (scope === 'localAdmission' &&
+      input.localPreviewMode !== 'advancedInventory' &&
+      !selectedLocalAdmissionAvailable)
 
   return {
     scope,
@@ -49,13 +63,19 @@ export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolba
       placeholder: 'Search indexed library'
     },
     browseProfile: {
-      visible: scope === 'indexedLibrary' || scope === 'localAdmission',
-      enabled: scope === 'indexedLibrary' || scope === 'localAdmission',
-      label: browseProfileScopeLabel,
-      title: `${browseProfileScopeLabel}: ${input.selectedBrowseProfileLabel}`
+      visible: scope === 'indexedLibrary',
+      enabled: scope === 'indexedLibrary',
+      label: 'Indexed contents view',
+      title: `Indexed contents view: ${input.selectedBrowseProfileLabel}`
+    },
+    localPreviewMode: {
+      visible: scope === 'localAdmission',
+      enabled: scope === 'localAdmission',
+      label: 'Local preview mode',
+      title: `Local preview mode: ${input.selectedLocalPreviewModeLabel}`
     },
     addMusicFolder: {
-      visible: scope === 'libraryStart' || scope === 'localAdmission',
+      visible: showFolderPicker,
       enabled: input.canAddMusicFolder,
       label: input.addMusicFolderLabel,
       ...(input.canAddMusicFolder ? {} : { reason: 'A source action is already running.' })
@@ -95,6 +115,17 @@ function isLocalAdmissionBinding(binding: RowBinding): boolean {
     binding.kind === 'localBrowseItem' ||
     binding.kind === 'localBrowseMore'
   )
+}
+
+function hasLocalSourceAdmission(binding: RowBinding): boolean {
+  switch (binding.kind) {
+    case 'localBrowseEntryPoint':
+      return sourceAdmissionOperation(binding.entry.availableOperations) !== undefined
+    case 'localBrowseItem':
+      return sourceAdmissionOperation(binding.item.availableOperations) !== undefined
+    default:
+      return false
+  }
 }
 
 function isIndexedLibraryBinding(binding: RowBinding): boolean {

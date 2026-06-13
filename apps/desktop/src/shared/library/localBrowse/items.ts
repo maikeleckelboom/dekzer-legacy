@@ -89,6 +89,7 @@ export type LocalBrowseItem = {
   readonly platform: LocalBrowsePlatform
   readonly fileKind: ContentsFileKind | null
   readonly mediaRelevance: LocalBrowseItemMediaRelevance | null
+  readonly matchedSourceId?: string
   readonly availableOperations: readonly LocalBrowseOperation[]
   readonly failure: LocalBrowseItemFailure | null
 }

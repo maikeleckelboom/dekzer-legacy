@@ -1,5 +1,4 @@
 import type { ContentsReadPolicy } from '../../../shared/library/contents/read'
-import type { LocalBrowseProfile } from '../../../shared/library/localBrowse/items'
 
 export type ProfileKey = 'audio' | 'playable' | 'allFiles'
 
@@ -22,17 +21,6 @@ export function isProfileKey(value: unknown): value is ProfileKey {
 
 export function profileLabel(profile: ProfileKey): string {
   return profileOptions.find((option) => option.key === profile)?.label ?? 'Audio'
-}
-
-export function mapProfileToLocalBrowseProfile(profile: ProfileKey): LocalBrowseProfile {
-  switch (profile) {
-    case 'audio':
-      return 'audio'
-    case 'playable':
-      return 'playable'
-    case 'allFiles':
-      return 'allFiles'
-  }
 }
 
 export function mapProfileToContentsPolicy(profile: ProfileKey): ContentsReadPolicy {

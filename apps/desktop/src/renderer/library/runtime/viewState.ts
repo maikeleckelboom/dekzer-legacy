@@ -4,6 +4,7 @@ import type {
   PersistedLibraryViewState
 } from '../../../shared/library/viewState/persistence'
 import { isProfileKey } from '../browseProfile/types'
+import { isLocalPreviewMode } from '../localBrowse/previewMode'
 
 export type ViewStateApi = {
   readonly library: {
@@ -30,7 +31,12 @@ function normalizeViewStateForPersist(state: PersistedLibraryViewState): Persist
     version: 1,
     ...(state.selectedNodeId === undefined ? {} : { selectedNodeId: state.selectedNodeId }),
     expandedNodeIds: [...new Set(state.expandedNodeIds)],
-    ...(isProfileKey(state.profile) ? { profile: state.profile } : {})
+    ...(isProfileKey(state.libraryBrowseProfile)
+      ? { libraryBrowseProfile: state.libraryBrowseProfile }
+      : {}),
+    ...(isLocalPreviewMode(state.localPreviewMode)
+      ? { localPreviewMode: state.localPreviewMode }
+      : {})
   }
 }
 

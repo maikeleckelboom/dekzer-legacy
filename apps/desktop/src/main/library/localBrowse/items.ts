@@ -125,6 +125,7 @@ function mapItem(item: ContractLocalBrowseItem): LocalBrowseItem {
     platform: item.platform,
     fileKind: item.fileKind,
     mediaRelevance: item.mediaRelevance,
+    ...(item.matchedSourceId === undefined ? {} : { matchedSourceId: item.matchedSourceId }),
     availableOperations: item.availableOperations,
     failure: item.failure
   }

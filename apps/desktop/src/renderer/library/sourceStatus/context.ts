@@ -13,6 +13,7 @@ export type StatusContext =
       readonly itemRole: 'folder' | 'file'
       readonly localState: LocalBrowseStatusState
       readonly detail?: string
+      readonly matchedSourceId?: string
       readonly admission?: StatusAdmission
     }
   | {
@@ -134,6 +135,9 @@ function contextForBinding(
         title,
         itemRole: 'folder',
         localState,
+        ...(binding.entry.matchedSourceId === undefined
+          ? {}
+          : { matchedSourceId: binding.entry.matchedSourceId }),
         ...(entryDetail === undefined ? {} : { detail: entryDetail }),
         ...admissionField(binding.entry.availableOperations, localState)
       }
@@ -146,6 +150,9 @@ function contextForBinding(
         itemRole: binding.target === undefined ? 'file' : 'folder',
         localState,
         detail: binding.item.failure?.detail ?? binding.item.identity.resolvedItemPath,
+        ...(binding.item.matchedSourceId === undefined
+          ? {}
+          : { matchedSourceId: binding.item.matchedSourceId }),
         ...admissionField(binding.item.availableOperations, localState)
       }
     }

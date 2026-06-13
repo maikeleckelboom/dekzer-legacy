@@ -9,7 +9,7 @@ import type {
   LocalBrowseWindowIdentity,
   ReadLocalBrowseItemsResult
 } from '../../../shared/library/localBrowse/items'
-import { mapProfileToLocalBrowseProfile, type ProfileKey } from '../browseProfile/types'
+import { mapLocalPreviewModeToLocalBrowseProfile, type LocalPreviewMode } from './previewMode'
 
 export type LocalBrowseEntryPointsState =
   | {
@@ -44,7 +44,7 @@ export type LocalBrowseEntryPointTarget = {
 }
 
 export type LocalBrowseDirectoryTarget = {
-  readonly profile: ProfileKey
+  readonly previewMode: LocalPreviewMode
   readonly entryPointKind: LocalBrowseEntryPointKind
   readonly resolvedRootPath: string
   readonly resolvedParentPath: string
@@ -70,7 +70,7 @@ export type LocalBrowseMoreState =
     }
 
 export type LoadedLocalBrowseItems = {
-  readonly profile: ProfileKey
+  readonly previewMode: LocalPreviewMode
   readonly identity: LocalBrowseWindowIdentity
   readonly label: string
   readonly items: readonly LocalBrowseItem[]
@@ -124,10 +124,10 @@ export function targetForEntryPoint(
 
 export function localBrowseRootTarget(
   target: LocalBrowseEntryPointTarget,
-  profile: ProfileKey
+  previewMode: LocalPreviewMode
 ): LocalBrowseDirectoryTarget {
   return {
-    profile,
+    previewMode,
     entryPointKind: target.entryPointKind,
     resolvedRootPath: target.resolvedRootPath,
     resolvedParentPath: target.resolvedRootPath,
@@ -137,7 +137,7 @@ export function localBrowseRootTarget(
 
 export function localBrowseWindowKey(target: LocalBrowseDirectoryTarget): string {
   return [
-    target.profile,
+    target.previewMode,
     target.entryPointKind,
     encodeURIComponent(target.resolvedRootPath),
     encodeURIComponent(target.resolvedParentPath)
@@ -146,10 +146,10 @@ export function localBrowseWindowKey(target: LocalBrowseDirectoryTarget): string
 
 export function localBrowseWindowKeyFromIdentity(
   identity: LocalBrowseWindowIdentity,
-  profile: ProfileKey
+  previewMode: LocalPreviewMode
 ): string {
   return localBrowseWindowKey({
-    profile,
+    previewMode,
     entryPointKind: identity.entryPointKind,
     resolvedRootPath: identity.resolvedRootPath,
     resolvedParentPath: identity.resolvedParentPath,
@@ -160,5 +160,5 @@ export function localBrowseWindowKeyFromIdentity(
 export function localBrowseProfileForTarget(
   target: LocalBrowseDirectoryTarget
 ): LocalBrowseProfile {
-  return mapProfileToLocalBrowseProfile(target.profile)
+  return mapLocalPreviewModeToLocalBrowseProfile(target.previewMode)
 }

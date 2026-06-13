@@ -38,6 +38,13 @@ export type StatusAction =
       readonly reason?: string
     }
   | {
+      readonly kind: 'showSource'
+      readonly label: 'Show source'
+      readonly sourceId: string
+      readonly enabled: boolean
+      readonly reason?: string
+    }
+  | {
       readonly kind: 'scanSource'
       readonly label: 'Scan source' | 'Rescan source'
       readonly sourceId: string
@@ -140,19 +147,41 @@ function localBrowseStatus(
     badge,
     tone: localBrowseTone(badge),
     detail: localBrowseDetail(context.localState, context.detail),
-    actions:
-      admission === undefined
-        ? []
-        : [
-            {
-              kind: 'addLocalPath',
-              label: admission.label,
-              resolvedPath: admission.resolvedPath,
-              enabled: input.canAddLocalPath,
-              ...(input.canAddLocalPath ? {} : { reason: 'A source action is already running.' })
-            }
-          ]
+    actions: localBrowseActions(input, context, admission)
   }
+}
+
+function localBrowseActions(
+  input: StatusViewInput,
+  context: Extract<StatusContext, { readonly kind: 'localBrowse' }>,
+  admission: Extract<StatusContext, { readonly kind: 'localBrowse' }>['admission']
+): readonly StatusAction[] {
+  if (context.localState === 'alreadyAdded') {
+    return context.matchedSourceId === undefined
+      ? []
+      : [
+          {
+            kind: 'showSource',
+            label: 'Show source',
+            sourceId: context.matchedSourceId,
+            enabled: true
+          }
+        ]
+  }
+
+  if (admission === undefined) {
+    return []
+  }
+
+  return [
+    {
+      kind: 'addLocalPath',
+      label: admission.label,
+      resolvedPath: admission.resolvedPath,
+      enabled: input.canAddLocalPath,
+      ...(input.canAddLocalPath ? {} : { reason: 'A source action is already running.' })
+    }
+  ]
 }
 
 function registeredStatus(

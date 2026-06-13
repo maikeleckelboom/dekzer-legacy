@@ -15,6 +15,8 @@ export function projectSearchFilterContents(options: {
 
   if (rows.length === 0) {
     return {
+      surfaceKind: 'indexedContents',
+      surfaceLabel: 'Contents',
       kind: searchProjectionKind(options.state),
       title: 'Search results',
       detail,
@@ -24,6 +26,8 @@ export function projectSearchFilterContents(options: {
 
   const projectedRows = rows.map(searchResultContentRow)
   return {
+    surfaceKind: 'indexedContents',
+    surfaceLabel: 'Contents',
     kind: 'ready',
     title: 'Search results',
     detail,

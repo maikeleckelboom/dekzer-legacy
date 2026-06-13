@@ -236,7 +236,7 @@ export type ReadLocalBrowseEntryPointsReply = { status: LocalBrowseEntryPointsRe
 
 export type LocalBrowseEntryPointsReadStatus = "complete" | "partialFailure" | "failed" | "unsupportedPlatform";
 
-export type LocalBrowseEntryPoint = { identity: LocalBrowseEntryPointIdentity, displayName: string, status: LocalBrowseEntryPointStatus, platform: LocalBrowsePlatform, availableOperations: Array<LocalBrowseOperation>, failure: LocalBrowseEntryPointFailure | null, };
+export type LocalBrowseEntryPoint = { identity: LocalBrowseEntryPointIdentity, displayName: string, status: LocalBrowseEntryPointStatus, platform: LocalBrowsePlatform, matchedSourceId?: string | null, availableOperations: Array<LocalBrowseOperation>, failure: LocalBrowseEntryPointFailure | null, };
 
 export type LocalBrowseEntryPointIdentity = { entryPointKind: LocalBrowseEntryPointKind, resolvedPath: string | null, };
 
@@ -248,7 +248,7 @@ export type LocalBrowseItemsReadStatus = "complete" | "partialFailure" | "failed
 
 export type LocalBrowseWindowIdentity = { entryPointKind: LocalBrowseEntryPointKind, resolvedRootPath: string, resolvedParentPath: string, };
 
-export type LocalBrowseItem = { identity: LocalBrowseItemIdentity, itemKind: LocalBrowseItemKind, displayName: string, status: LocalBrowseItemStatus, platform: LocalBrowsePlatform, fileKind: ContentsFileKind | null, mediaRelevance: LocalBrowseItemMediaRelevance | null, availableOperations: Array<LocalBrowseOperation>, failure: LocalBrowseItemFailure | null, };
+export type LocalBrowseItem = { identity: LocalBrowseItemIdentity, itemKind: LocalBrowseItemKind, displayName: string, status: LocalBrowseItemStatus, platform: LocalBrowsePlatform, fileKind: ContentsFileKind | null, mediaRelevance: LocalBrowseItemMediaRelevance | null, matchedSourceId?: string | null, availableOperations: Array<LocalBrowseOperation>, failure: LocalBrowseItemFailure | null, };
 
 export type LocalBrowseItemIdentity = { entryPointKind: LocalBrowseEntryPointKind, resolvedRootPath: string, resolvedItemPath: string, };
 

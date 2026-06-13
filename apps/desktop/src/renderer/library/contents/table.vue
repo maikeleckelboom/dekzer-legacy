@@ -161,6 +161,7 @@ function statusBadgeClass(view: StatusView): string {
 function resolveStatusActionIcon(action: StatusAction): IconRole {
   switch (action.kind) {
     case 'addLocalPath':
+    case 'showSource':
       return 'folder.plain'
     case 'scanSource':
     case 'runMaintenance':
@@ -180,7 +181,9 @@ function resolveStatusActionIcon(action: StatusAction): IconRole {
     aria-live="polite"
   >
     <header class="shrink-0 border-b border-(--color-border) px-4 py-3">
-      <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">Contents</p>
+      <p class="text-xs font-bold uppercase tracking-normal text-(--color-text-muted)">
+        {{ projection.surfaceLabel }}
+      </p>
       <h3
         id="library-contents-title"
         class="mt-1 text-base font-bold leading-6 text-(--color-text)"

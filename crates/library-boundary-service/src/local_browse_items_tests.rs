@@ -634,7 +634,7 @@ fn exact_admitted_source_path_marks_duplicate_without_mutation() {
         protocol::LocalBrowseEntryPointKind::Music,
         root.path(),
     );
-    register_local_root(&service, admitted.to_string_lossy().into_owned());
+    let registered = register_local_root(&service, admitted.to_string_lossy().into_owned());
 
     let before = application_table_row_counts(&context);
     let reply = read_local_browse_items(
@@ -655,6 +655,7 @@ fn exact_admitted_source_path_marks_duplicate_without_mutation() {
         item.status,
         protocol::LocalBrowseItemStatus::DuplicateOfAdmittedSource
     );
+    assert_eq!(item.matched_source_id, Some(registered.root_id));
     assert!(!has_source_admission_operation(&item.available_operations));
     assert!(has_browse_children_operation(&item.available_operations));
     assert_eq!(application_table_row_counts(&context), before);

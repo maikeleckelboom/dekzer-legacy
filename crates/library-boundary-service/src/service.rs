@@ -420,14 +420,19 @@ impl LibraryBoundaryService {
         &self,
         _request: protocol::ReadLocalBrowseEntryPointsRequest,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseEntryPointsReply> {
-        let admitted_source_path_keys = self
+        let admitted_source_ids_by_path_key = self
             .durable_store
             .read_local_roots()
             .map_err(map_store_error)?
             .roots
             .into_iter()
-            .map(|root| normalize_local_browse_path_key(&root.admitted_root_path))
-            .collect::<HashSet<_>>();
+            .map(|root| {
+                (
+                    normalize_local_browse_path_key(&root.admitted_root_path),
+                    root.root_id,
+                )
+            })
+            .collect::<HashMap<_, _>>();
 
         let resolution = self
             .local_browse_entry_point_resolver
@@ -438,7 +443,7 @@ impl LibraryBoundaryService {
 
         Ok(map_local_browse_entry_points_reply(
             resolution,
-            &admitted_source_path_keys,
+            &admitted_source_ids_by_path_key,
         ))
     }
 
@@ -446,14 +451,19 @@ impl LibraryBoundaryService {
         &self,
         request: protocol::ReadLocalBrowseItemsRequest,
     ) -> protocol::ProtocolResult<protocol::ReadLocalBrowseItemsReply> {
-        let admitted_source_path_keys = self
+        let admitted_source_ids_by_path_key = self
             .durable_store
             .read_local_roots()
             .map_err(map_store_error)?
             .roots
             .into_iter()
-            .map(|root| normalize_local_browse_path_key(&root.admitted_root_path))
-            .collect::<HashSet<_>>();
+            .map(|root| {
+                (
+                    normalize_local_browse_path_key(&root.admitted_root_path),
+                    root.root_id,
+                )
+            })
+            .collect::<HashMap<_, _>>();
 
         let resolution = self
             .local_browse_entry_point_resolver
@@ -469,7 +479,7 @@ impl LibraryBoundaryService {
         }
 
         self.local_browse_item_reader
-            .read_items(request, &admitted_source_path_keys)
+            .read_items(request, &admitted_source_ids_by_path_key)
     }
 
     pub fn read_navigation_rows(
@@ -974,12 +984,12 @@ fn library_tree_row_policy_filter(
 
 fn map_local_browse_entry_points_reply(
     resolution: LocalBrowseEntryPointResolution,
-    admitted_source_path_keys: &HashSet<String>,
+    admitted_source_ids_by_path_key: &HashMap<String, i64>,
 ) -> protocol::ReadLocalBrowseEntryPointsReply {
     let entries = resolution
         .entries
         .into_iter()
-        .map(|entry| map_local_browse_entry_point(entry, admitted_source_path_keys))
+        .map(|entry| map_local_browse_entry_point(entry, admitted_source_ids_by_path_key))
         .collect::<Vec<_>>();
     let status = local_browse_entry_points_read_status(&entries, resolution.failure.as_ref());
     protocol::ReadLocalBrowseEntryPointsReply {
@@ -1014,14 +1024,14 @@ fn local_browse_entry_points_read_status(
 
 fn map_local_browse_entry_point(
     entry: ResolvedLocalBrowseEntryPoint,
-    admitted_source_path_keys: &HashSet<String>,
+    admitted_source_ids_by_path_key: &HashMap<String, i64>,
 ) -> protocol::LocalBrowseEntryPoint {
-    let duplicate_of_admitted_source = entry
+    let matched_source_id = entry
         .resolved_path
         .as_deref()
         .map(normalize_local_browse_path_key)
-        .is_some_and(|key| admitted_source_path_keys.contains(&key));
-    let status = if duplicate_of_admitted_source {
+        .and_then(|key| admitted_source_ids_by_path_key.get(&key).copied());
+    let status = if matched_source_id.is_some() {
         protocol::LocalBrowseEntryPointStatus::DuplicateOfAdmittedSource
     } else {
         entry.status
@@ -1042,6 +1052,7 @@ fn map_local_browse_entry_point(
         display_name: entry.display_name,
         status,
         platform: entry.platform,
+        matched_source_id,
         available_operations,
         failure: entry.failure.map(map_local_browse_entry_point_failure),
     }

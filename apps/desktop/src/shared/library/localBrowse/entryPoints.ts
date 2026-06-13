@@ -64,6 +64,7 @@ export type LocalBrowseEntryPoint = {
   readonly displayName: string
   readonly status: LocalBrowseEntryPointStatus
   readonly platform: LocalBrowsePlatform
+  readonly matchedSourceId?: string
   readonly availableOperations: readonly LocalBrowseOperation[]
   readonly failure: LocalBrowseEntryPointFailure | null
 }

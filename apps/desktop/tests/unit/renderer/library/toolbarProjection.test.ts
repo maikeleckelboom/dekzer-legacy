@@ -19,9 +19,10 @@ describe('library toolbar projection', () => {
     })
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.localPreviewMode.visible).toBe(false)
   })
 
-  it('scopes Local Files root to admission actions without indexed search', () => {
+  it('scopes Add Source root to local preview controls without indexed search', () => {
     const toolbar = projectLibraryToolbar(
       input({
         selectedNodeId: 'selected',
@@ -32,11 +33,71 @@ describe('library toolbar projection', () => {
     expect(toolbar.scope).toBe('localAdmission')
     expect(toolbar.addMusicFolder.visible).toBe(true)
     expect(toolbar.search.visible).toBe(false)
-    expect(toolbar.browseProfile).toMatchObject({
+    expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.localPreviewMode).toMatchObject({
       visible: true,
-      label: 'Local preview filter',
-      title: 'Local preview filter: Audio'
+      label: 'Local preview mode',
+      title: 'Local preview mode: Music Evidence'
     })
+  })
+
+  it('keeps advanced inventory explicit and hides folder picker/search', () => {
+    const toolbar = projectLibraryToolbar(
+      input({
+        selectedNodeId: 'selected',
+        binding: { kind: 'localBrowseSection' },
+        localPreviewMode: 'advancedInventory',
+        selectedLocalPreviewModeLabel: 'Advanced Inventory'
+      })
+    )
+
+    expect(toolbar.scope).toBe('localAdmission')
+    expect(toolbar.addMusicFolder.visible).toBe(false)
+    expect(toolbar.search.visible).toBe(false)
+    expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.localPreviewMode).toMatchObject({
+      visible: true,
+      title: 'Local preview mode: Advanced Inventory'
+    })
+  })
+
+  it('does not duplicate add actions for an eligible local preview selection', () => {
+    const toolbar = projectLibraryToolbar(
+      input({
+        selectedNodeId: 'selected',
+        binding: {
+          kind: 'localBrowseEntryPoint',
+          entry: {
+            identity: {
+              entryPointKind: 'music',
+              resolvedPath: 'C:/Music'
+            },
+            displayName: 'Music',
+            status: 'available',
+            platform: 'windows',
+            availableOperations: [
+              { kind: 'browseChildren' },
+              { kind: 'chooseDescendant' },
+              {
+                kind: 'requestSourceAdmission',
+                requestKind: 'defaultMusicFolder',
+                resolvedPath: 'C:/Music'
+              }
+            ],
+            failure: null
+          },
+          target: {
+            entryPointKind: 'music',
+            resolvedRootPath: 'C:/Music',
+            label: 'Music'
+          }
+        }
+      })
+    )
+
+    expect(toolbar.scope).toBe('localAdmission')
+    expect(toolbar.addMusicFolder.visible).toBe(false)
+    expect(toolbar.localPreviewMode.visible).toBe(true)
   })
 
   it('scopes admitted source rows to indexed controls only', () => {
@@ -57,6 +118,7 @@ describe('library toolbar projection', () => {
       visible: true,
       label: 'Indexed contents view'
     })
+    expect(toolbar.localPreviewMode.visible).toBe(false)
   })
 
   it('hides scoped controls for neutral read-state selections', () => {
@@ -76,6 +138,7 @@ describe('library toolbar projection', () => {
     expect(toolbar.addMusicFolder.visible).toBe(false)
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.browseProfile.visible).toBe(false)
+    expect(toolbar.localPreviewMode.visible).toBe(false)
   })
 })
 
@@ -89,6 +152,8 @@ function input(
       overrides.binding === undefined ? undefined : projectionForBinding(overrides.binding),
     selectedNodeId: 'selected',
     selectedBrowseProfileLabel: 'Audio',
+    selectedLocalPreviewModeLabel: 'Music Evidence',
+    localPreviewMode: 'musicEvidence',
     addMusicFolderLabel: 'Add music folder',
     canAddMusicFolder: true,
     ...overrides
