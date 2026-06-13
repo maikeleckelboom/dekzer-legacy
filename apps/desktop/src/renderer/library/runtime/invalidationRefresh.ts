@@ -56,7 +56,7 @@ export function classifyInvalidationScope(scope: string): InvalidationScope {
 
 export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan {
   let refreshNavigationRows = false
-  const refreshExpandedBrowserWindows = false
+  let refreshExpandedBrowserWindows = false
   let refreshCurrentContents = false
   let refreshActiveSearchFilter = false
   let clearAllContentsWarmSnapshots = false
@@ -69,6 +69,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
         addSourceLifecycleIds(refreshSourceLifecycleIds, input.sourceLifecycleSourceIds)
         break
       case 'contents':
+        refreshExpandedBrowserWindows = true
         refreshCurrentContents = true
         refreshActiveSearchFilter = true
         clearAllContentsWarmSnapshots = true
@@ -93,6 +94,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
 export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
   const refreshSourceLifecycleIds = new Set<string>()
   const visibleSourceIds = input.sourceLifecycleSourceIds
+  let refreshExpandedBrowserWindows = false
   let refreshActiveSearchFilter = false
 
   if (visibleSourceIds !== undefined) {
@@ -105,12 +107,17 @@ export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
 
   for (const event of input.events) {
     if (isTerminalSourceScanEvent(event)) {
+      refreshExpandedBrowserWindows = true
       refreshActiveSearchFilter = true
       break
     }
   }
 
-  return refreshPlan({ refreshSourceLifecycleIds, refreshActiveSearchFilter })
+  return refreshPlan({
+    refreshExpandedBrowserWindows,
+    refreshSourceLifecycleIds,
+    refreshActiveSearchFilter
+  })
 }
 
 export function buildGapPlan(): RefreshPlan {

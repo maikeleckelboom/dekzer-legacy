@@ -932,7 +932,7 @@ function formatUnknownDirectoryChildReadinessDetail(
     case 'failed':
       return 'Folder child scope read failed.'
     case 'complete':
-      return 'Folder child scopes are not yet proven.'
+      return 'Hierarchy read model completed without proving folder child-scope readiness.'
   }
 }
 
@@ -949,7 +949,7 @@ function formatUnknownDirectoryChildReadinessLabel(
     case 'failed':
       return 'Folder child scope read failed'
     case 'complete':
-      return 'Folder child scopes unproven'
+      return 'Hierarchy readiness unresolved'
   }
 }
 
@@ -965,6 +965,6 @@ function unknownDirectoryChildReadinessState(
     case 'failed':
       return 'error'
     case 'complete':
-      return 'notLoaded'
+      return 'error'
   }
 }

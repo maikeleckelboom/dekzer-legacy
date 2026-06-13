@@ -776,10 +776,10 @@ describe('projectState', () => {
     },
     {
       scanState: 'complete',
-      label: 'Folder child scopes unproven',
-      detail: 'Folder child scopes are not yet proven.',
-      bindingState: 'notLoaded',
-      icon: 'state'
+      label: 'Hierarchy readiness unresolved',
+      detail: 'Hierarchy read model completed without proving folder child-scope readiness.',
+      bindingState: 'error',
+      icon: 'warning'
     }
   ] as const)(
     'projects unknown child-readiness with $scanState state visibly and without expansion',

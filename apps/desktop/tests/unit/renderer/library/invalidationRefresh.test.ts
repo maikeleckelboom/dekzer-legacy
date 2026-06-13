@@ -50,7 +50,7 @@ describe('buildInvalidationPlan', () => {
     expect(planSnapshot(first)).toEqual({
       refreshRootHierarchy: false,
       refreshNavigationRows: true,
-      refreshExpandedBrowserWindows: false,
+      refreshExpandedBrowserWindows: true,
       refreshCurrentContents: true,
       refreshActiveSearchFilter: true,
       clearAllContentsWarmSnapshots: true,
@@ -88,6 +88,15 @@ describe('buildInvalidationPlan', () => {
     expect(plan.refreshActiveSearchFilter).toBe(true)
   })
 
+  it('refreshes expanded browser windows for contents invalidation', () => {
+    const plan = buildInvalidationPlan({
+      invalidations: [invalidation('contents', '1')],
+      sourceLifecycleSourceIds: []
+    })
+
+    expect(plan.refreshExpandedBrowserWindows).toBe(true)
+  })
+
   it('does not refresh active search/filter for navigation rows alone', () => {
     const plan = buildInvalidationPlan({
       invalidations: [invalidation('navigationRows', '1')],
@@ -113,13 +122,13 @@ describe('buildScanPlan', () => {
     expect(planSnapshot(plan)).toMatchObject({
       refreshSourceLifecycleIds: ['7', '9'],
       refreshNavigationRows: false,
-      refreshExpandedBrowserWindows: false,
+      refreshExpandedBrowserWindows: true,
       refreshCurrentContents: false,
       refreshActiveSearchFilter: true
     })
   })
 
-  it('does not refresh active search/filter for started or progressed scan events', () => {
+  it('does not refresh active search/filter or browser windows for started or progressed scan events', () => {
     const plan = buildScanPlan({
       events: [
         sourceScanEvent('7', 1, 'sourceScanStarted'),
@@ -129,9 +138,10 @@ describe('buildScanPlan', () => {
     })
 
     expect(plan.refreshActiveSearchFilter).toBe(false)
+    expect(plan.refreshExpandedBrowserWindows).toBe(false)
   })
 
-  it('refreshes active search/filter for terminal scan events', () => {
+  it('refreshes active search/filter and browser windows for terminal scan events', () => {
     const terminalKinds = [
       'sourceScanCompleted',
       'sourceScanFailed',
@@ -146,6 +156,7 @@ describe('buildScanPlan', () => {
       })
 
       expect(plan.refreshActiveSearchFilter).toBe(true)
+      expect(plan.refreshExpandedBrowserWindows).toBe(true)
     }
   })
 })
@@ -189,7 +200,8 @@ describe('executeRefreshPlan', () => {
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
 
     expect(deps.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
-    expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(deps.expandedNodeIds)
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(
       new Set(['7', '9'])
@@ -219,7 +231,7 @@ describe('executeRefreshPlan', () => {
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
 
     expect(deps.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
-    expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
     expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
@@ -246,7 +258,7 @@ describe('executeRefreshPlan', () => {
     expect(plan.acknowledgeGapAfterExecution).toBe(true)
   })
 
-  it('scan plans do not refresh hierarchy or contents', async () => {
+  it('terminal scan plans refresh browser windows but not navigation rows or contents', async () => {
     const deps = testDeps({
       sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) }
     })
@@ -258,7 +270,8 @@ describe('executeRefreshPlan', () => {
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
 
     expect(deps.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
-    expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(deps.expandedNodeIds)
     expect(deps.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(new Set(['7']))
     expect(deps.refreshActiveSearchFilter).toHaveBeenCalledTimes(1)
@@ -280,7 +293,7 @@ describe('executeRefreshPlan', () => {
 
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
 
-    expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
     expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
