@@ -10,12 +10,18 @@ import type { SourceLifecycleRecord } from '../../../shared/library/source/lifec
 import type { StatusContext } from './context'
 import { projectAddSourceStatusText } from '../addSource/projection'
 import { projectLibrarySourceReadiness } from '../libraryHome/projection'
+import {
+  hasSourceMaintenanceBacklog,
+  sourceMaintenanceBacklog
+} from '../runtime/sourceMaintenanceSummary'
 
 export type StatusBadge =
   | 'Ready'
   | 'Indexing'
   | 'Still indexing'
   | 'No audio tracks in this view'
+  | 'No playable media in this view'
+  | 'No files in this source inventory view'
   | 'Needs scan'
   | 'Maintenance needed'
   | 'Maintenance running'
@@ -300,7 +306,12 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
   ) {
     return 'Maintenance unavailable'
   }
-  if (hasMaintenanceBacklog(input.sourceMaintenance, input.sourceIntegrity)) {
+  if (
+    hasSourceMaintenanceBacklog({
+      ...(input.sourceMaintenance === undefined ? {} : { maintenance: input.sourceMaintenance }),
+      ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity })
+    })
+  ) {
     return 'Maintenance needed'
   }
 
@@ -364,7 +375,10 @@ function maintenanceSummary(
   maintenance: ReadSourceMaintenanceReply | undefined,
   integrity: ReadSourceIntegrityReply | undefined
 ): string | undefined {
-  const backlog = maintenanceBacklog(maintenance, integrity)
+  const backlog = sourceMaintenanceBacklog({
+    ...(maintenance === undefined ? {} : { maintenance }),
+    ...(integrity === undefined ? {} : { integrity })
+  })
   if (backlog.total > 0) {
     const categories = backlog.categories
       .map((category) => `${category.label} ${category.count}`)
@@ -518,6 +532,8 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'Already added':
     case 'Partial':
     case 'No audio tracks in this view':
+    case 'No playable media in this view':
+    case 'No files in this source inventory view':
       return 'warning'
     case 'Maintenance running':
       return 'active'
@@ -573,69 +589,4 @@ function maintenanceUnavailableReason(
     default:
       return 'Maintenance is unavailable.'
   }
-}
-
-function hasMaintenanceBacklog(
-  maintenance: ReadSourceMaintenanceReply | undefined,
-  integrity: ReadSourceIntegrityReply | undefined
-): boolean {
-  return maintenanceBacklog(maintenance, integrity).total > 0
-}
-
-function maintenanceBacklog(
-  maintenance: ReadSourceMaintenanceReply | undefined,
-  integrity: ReadSourceIntegrityReply | undefined
-): {
-  readonly total: number
-  readonly categories: readonly { readonly label: string; readonly count: number }[]
-} {
-  const hash =
-    maintenance?.remainingHashCandidates ??
-    integrity?.evidenceAndMaintenance.remainingHashCandidates ??
-    0
-  const probe =
-    maintenance?.remainingProbeCandidates ??
-    integrity?.evidenceAndMaintenance.remainingProbeCandidates ??
-    0
-  const promotion =
-    maintenance?.remainingPlayableMediaPromotionCandidates ??
-    integrity?.evidenceAndMaintenance.remainingPlayableMediaPromotionCandidates ??
-    0
-  const identity =
-    (maintenance?.remainingTrackIdentityCandidateProductionCandidates ??
-      integrity?.evidenceAndMaintenance.remainingTrackIdentityCandidateProductionCandidates ??
-      0) +
-    (maintenance?.remainingTrackIdentityDecisionProductionCandidates ??
-      integrity?.evidenceAndMaintenance.remainingTrackIdentityDecisionProductionCandidates ??
-      0)
-  const attachment = maintenanceAttachmentRemaining(maintenance, integrity)
-
-  const categories = [
-    { label: 'hash', count: hash },
-    { label: 'probe', count: probe },
-    { label: 'promotion', count: promotion },
-    { label: 'identity', count: identity },
-    { label: 'attachment', count: attachment }
-  ].filter((category) => category.count > 0)
-
-  return {
-    total: hash + probe + promotion + identity + attachment,
-    categories
-  }
-}
-
-function maintenanceAttachmentRemaining(
-  maintenance: ReadSourceMaintenanceReply | undefined,
-  integrity: ReadSourceIntegrityReply | undefined
-): number {
-  const staleLinks =
-    maintenance?.attachmentLinks?.staleLinksCount ??
-    integrity?.attachmentIntegrity?.staleLinksCount ??
-    0
-  const missingLinks =
-    maintenance?.attachmentLinks?.sourceFilesMissingAttachmentLinksCount ??
-    integrity?.attachmentIntegrity?.missingLinksCount ??
-    0
-
-  return staleLinks + missingLinks
 }

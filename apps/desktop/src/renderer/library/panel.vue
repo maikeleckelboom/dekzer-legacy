@@ -263,7 +263,9 @@ const selectedLibraryContentsProjection = computed(() => {
       ? {}
       : { selectedNodeId: selectedLibraryNodeId.value }),
     ...(projection === undefined ? {} : { bindingsById: projection.bindingsById }),
-    contentsState: contentsRead.state.value
+    contentsState: contentsRead.state.value,
+    sourceIntegrityBySourceId: integrityRead.snapshotBySourceId.value,
+    sourceMaintenanceBySourceId: maintenanceRead.snapshotBySourceId.value
   })
 })
 

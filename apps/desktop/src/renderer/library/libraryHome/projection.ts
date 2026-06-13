@@ -1,7 +1,16 @@
+import type {
+  ReadSourceIntegrityReply,
+  ReadSourceMaintenanceReply
+} from '@dekzer/library-boundary-contract'
+
 import type { BrowserState, RowBinding } from '../state'
 import type { SourceReadiness } from '../runtime/sourceReadiness'
 import type { BrowserTreeNodeId } from '../tree/types'
-import type { LibraryBrowseProfile } from '../libraryBrowseProfile/types'
+import {
+  defaultLibraryBrowseProfile,
+  type LibraryBrowseProfile
+} from '../libraryBrowseProfile/types'
+import { hasSourceMaintenanceBacklog } from '../runtime/sourceMaintenanceSummary'
 
 export type LibraryHomeProductState =
   | 'noSources'
@@ -38,16 +47,21 @@ export type LibraryHomeProjection = {
   readonly rows: readonly LibraryHomeRow[]
 }
 
+export type LibrarySourceReadinessBadge =
+  | 'Ready'
+  | 'Indexing'
+  | 'Needs scan'
+  | 'Missing'
+  | 'Blocked'
+  | 'Offline/unavailable'
+  | 'Maintenance needed'
+  | 'No audio tracks in this view'
+  | 'No playable media in this view'
+  | 'No files in this source inventory view'
+
 export type LibrarySourceReadinessProjection = {
   readonly productState: LibraryHomeProductState
-  readonly badge:
-    | 'Ready'
-    | 'Indexing'
-    | 'Needs scan'
-    | 'Missing'
-    | 'Blocked'
-    | 'Offline/unavailable'
-    | 'No audio tracks in this view'
+  readonly badge: LibrarySourceReadinessBadge
   readonly tone: LibraryHomeTone
   readonly detail: string
 }
@@ -55,9 +69,12 @@ export type LibrarySourceReadinessProjection = {
 export function projectLibraryHome(input: {
   readonly state: BrowserState
   readonly bindingsById?: ReadonlyMap<BrowserTreeNodeId, RowBinding>
+  readonly sourceIntegrityBySourceId?: ReadonlyMap<string, ReadSourceIntegrityReply>
+  readonly sourceMaintenanceBySourceId?: ReadonlyMap<string, ReadSourceMaintenanceReply>
 }): LibraryHomeProjection {
-  const sourceBindings = admittedSourceBindings(input.bindingsById)
+  const sourceBindings = admittedLibraryHomeRootBindings(input.bindingsById)
   const navigationReadResult = input.state.navigationReadResult
+  const profile = input.state.libraryBrowseProfile ?? defaultLibraryBrowseProfile
 
   if (sourceBindings.length === 0) {
     if (navigationReadResult === undefined) {
@@ -114,13 +131,22 @@ export function projectLibraryHome(input: {
     }
   }
 
-  const summaries = sourceBindings.map(([nodeId]) => {
+  const summaries = sourceBindings.map(([nodeId, binding]) => {
     const sourceReadiness = input.state.sourceReadinessByNodeId?.get(nodeId)
-    return projectLibrarySourceReadiness({
-      ...(sourceReadiness === undefined ? {} : { sourceReadiness })
+    const sourceId = sourceIdForLibraryHomeRoot(binding)
+    const sourceIntegrity =
+      sourceId === undefined ? undefined : input.sourceIntegrityBySourceId?.get(sourceId)
+    const sourceMaintenance =
+      sourceId === undefined ? undefined : input.sourceMaintenanceBySourceId?.get(sourceId)
+
+    return projectLibraryHomeRootReadiness({
+      profile,
+      ...(sourceReadiness === undefined ? {} : { sourceReadiness }),
+      ...(sourceIntegrity === undefined ? {} : { sourceIntegrity }),
+      ...(sourceMaintenance === undefined ? {} : { sourceMaintenance })
     })
   })
-  const dominant = dominantLibraryHomeState(summaries)
+  const dominant = dominantLibraryHomeState(summaries, profile)
 
   return {
     productState: dominant.productState,
@@ -133,8 +159,10 @@ export function projectLibraryHome(input: {
 
 export function projectLibrarySourceReadiness(input: {
   readonly sourceReadiness?: SourceReadiness
+  readonly profile?: LibraryBrowseProfile
 }): LibrarySourceReadinessProjection {
   const readiness = input.sourceReadiness
+  const profile = input.profile ?? 'audio'
 
   if (readiness === undefined) {
     return {
@@ -171,9 +199,9 @@ export function projectLibrarySourceReadiness(input: {
     case 'empty':
       return {
         productState: 'emptyCurrentView',
-        badge: 'No audio tracks in this view',
+        badge: libraryBrowseEmptyStateBadge(profile),
         tone: 'warning',
-        detail: readiness.detail
+        detail: libraryBrowseEmptyStateLabel(profile)
       }
     case 'missing':
       return {
@@ -206,6 +234,38 @@ export function projectLibrarySourceReadiness(input: {
   }
 }
 
+function projectLibraryHomeRootReadiness(input: {
+  readonly profile: LibraryBrowseProfile
+  readonly sourceReadiness?: SourceReadiness
+  readonly sourceIntegrity?: ReadSourceIntegrityReply
+  readonly sourceMaintenance?: ReadSourceMaintenanceReply
+}): LibrarySourceReadinessProjection {
+  const summary = projectLibrarySourceReadiness({
+    profile: input.profile,
+    ...(input.sourceReadiness === undefined ? {} : { sourceReadiness: input.sourceReadiness })
+  })
+
+  if (summary.productState !== 'ready' && summary.productState !== 'emptyCurrentView') {
+    return summary
+  }
+
+  if (
+    hasSourceMaintenanceBacklog({
+      ...(input.sourceMaintenance === undefined ? {} : { maintenance: input.sourceMaintenance }),
+      ...(input.sourceIntegrity === undefined ? {} : { integrity: input.sourceIntegrity })
+    })
+  ) {
+    return {
+      productState: 'maintenanceNeeded',
+      badge: 'Maintenance needed',
+      tone: 'warning',
+      detail: 'Run maintenance to finish preparing music.'
+    }
+  }
+
+  return summary
+}
+
 export function libraryBrowseEmptyStateLabel(profile: LibraryBrowseProfile): string {
   switch (profile) {
     case 'audio':
@@ -217,7 +277,7 @@ export function libraryBrowseEmptyStateLabel(profile: LibraryBrowseProfile): str
   }
 }
 
-function admittedSourceBindings(
+function admittedLibraryHomeRootBindings(
   bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding> | undefined
 ): readonly (readonly [BrowserTreeNodeId, Extract<RowBinding, { readonly kind: 'source' }>])[] {
   if (bindingsById === undefined) {
@@ -225,14 +285,31 @@ function admittedSourceBindings(
   }
 
   return [...bindingsById.entries()].flatMap(([nodeId, binding]) =>
-    binding.kind === 'source' && binding.target.entryPoint.kind === 'source'
-      ? [[nodeId, binding] as const]
-      : []
+    isAdmittedLibraryHomeRootBinding(binding) ? [[nodeId, binding] as const] : []
   )
 }
 
+function isAdmittedLibraryHomeRootBinding(
+  binding: RowBinding
+): binding is Extract<RowBinding, { readonly kind: 'source' }> {
+  return (
+    binding.kind === 'source' &&
+    (binding.target.entryPoint.kind === 'source' ||
+      binding.target.entryPoint.kind === 'sourceLocation')
+  )
+}
+
+function sourceIdForLibraryHomeRoot(
+  binding: Extract<RowBinding, { readonly kind: 'source' }>
+): string | undefined {
+  return binding.target.entryPoint.kind === 'source'
+    ? binding.target.entryPoint.sourceId
+    : undefined
+}
+
 function dominantLibraryHomeState(
-  summaries: readonly LibrarySourceReadinessProjection[]
+  summaries: readonly LibrarySourceReadinessProjection[],
+  profile: LibraryBrowseProfile
 ): Pick<LibraryHomeProjection, 'productState' | 'title' | 'detail'> {
   if (summaries.some((summary) => summary.productState === 'missing')) {
     return {
@@ -274,11 +351,19 @@ function dominantLibraryHomeState(
     }
   }
 
-  if (summaries.some((summary) => summary.productState === 'emptyCurrentView')) {
+  if (summaries.some((summary) => summary.productState === 'maintenanceNeeded')) {
+    return {
+      productState: 'maintenanceNeeded',
+      title: 'Library needs maintenance',
+      detail: 'Run maintenance to finish preparing music.'
+    }
+  }
+
+  if (summaries.every((summary) => summary.productState === 'emptyCurrentView')) {
     return {
       productState: 'emptyCurrentView',
       title: 'Library ready',
-      detail: 'Your library is ready. Select a source, folder, or search your music.'
+      detail: libraryBrowseEmptyStateLabel(profile)
     }
   }
 
@@ -340,12 +425,23 @@ function sourceSummaryDetail(summary: LibrarySourceReadinessProjection): string 
     case 'unavailable':
       return 'This source is offline or unavailable.'
     case 'emptyCurrentView':
-      return 'No audio tracks in this view.'
+      return summary.detail
     case 'maintenanceNeeded':
       return 'Run maintenance to finish preparing music.'
     case 'noSources':
     case 'chooseSource':
       return summary.detail
+  }
+}
+
+function libraryBrowseEmptyStateBadge(profile: LibraryBrowseProfile): LibrarySourceReadinessBadge {
+  switch (profile) {
+    case 'audio':
+      return 'No audio tracks in this view'
+    case 'playable':
+      return 'No playable media in this view'
+    case 'allFiles':
+      return 'No files in this source inventory view'
   }
 }
 

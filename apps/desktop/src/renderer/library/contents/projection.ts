@@ -1,5 +1,9 @@
 import type { ChildRow, Presence } from '../../../shared/library/hierarchy/read'
 import type {
+  ReadSourceIntegrityReply,
+  ReadSourceMaintenanceReply
+} from '@dekzer/library-boundary-contract'
+import type {
   ContentsReadResult,
   ContentsResult,
   ContentsFileRow,
@@ -128,6 +132,8 @@ export type ProjectContentsOptions = {
   readonly selectedNodeId?: BrowserTreeNodeId
   readonly bindingsById?: BrowserProjection['bindingsById']
   readonly contentsState?: ContentsBoundaryState
+  readonly sourceIntegrityBySourceId?: ReadonlyMap<string, ReadSourceIntegrityReply>
+  readonly sourceMaintenanceBySourceId?: ReadonlyMap<string, ReadSourceMaintenanceReply>
 }
 
 type ContentSurface = {
@@ -193,7 +199,13 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
       return contentProjectionFromLibraryHome(
         projectLibraryHome({
           state: options.state,
-          ...(options.bindingsById === undefined ? {} : { bindingsById: options.bindingsById })
+          ...(options.bindingsById === undefined ? {} : { bindingsById: options.bindingsById }),
+          ...(options.sourceIntegrityBySourceId === undefined
+            ? {}
+            : { sourceIntegrityBySourceId: options.sourceIntegrityBySourceId }),
+          ...(options.sourceMaintenanceBySourceId === undefined
+            ? {}
+            : { sourceMaintenanceBySourceId: options.sourceMaintenanceBySourceId })
         })
       )
     }
