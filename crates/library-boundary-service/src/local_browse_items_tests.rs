@@ -10,7 +10,10 @@ use crate::local_browse_entry_points::{
     LocalBrowseEntryPointResolution, LocalBrowseEntryPointResolveFailure,
     LocalBrowseEntryPointResolver, ResolvedLocalBrowseEntryPoint,
 };
-use crate::local_browse_items::{classify_item_file_for_test, window_item_names_for_test};
+use crate::local_browse_items::{
+    classify_item_file_for_test, directory_operations_for_test,
+    rejected_system_drive_item_for_test, window_item_names_for_test,
+};
 use crate::service::LibraryBoundaryService;
 
 #[derive(Clone)]
@@ -833,6 +836,64 @@ fn local_browse_item_file_classification_is_provisional_display_state() {
         )
     );
     assert!(operations.is_empty());
+}
+
+#[test]
+fn system_drive_root_children_are_browsable_without_broad_admission() {
+    let root = Path::new("C:\\");
+
+    for name in [
+        "Program Files",
+        "Program Files (x86)",
+        "ProgramData",
+        "corepack",
+        "nvm4w",
+        "inetpub",
+        "Python313",
+        ".pnpm-store",
+    ] {
+        let operations = directory_operations_for_test(
+            protocol::LocalBrowseEntryPointKind::SystemDriveRoot,
+            root,
+            root,
+            name,
+        );
+        assert!(has_browse_children_operation(&operations));
+        assert!(!has_source_admission_operation(&operations));
+    }
+
+    let music_operations = directory_operations_for_test(
+        protocol::LocalBrowseEntryPointKind::SystemDriveRoot,
+        root,
+        root,
+        "Music",
+    );
+    assert!(has_source_admission_request_kind(
+        &music_operations,
+        protocol::LocalBrowseSourceAdmissionRequestKind::SelectedDirectory
+    ));
+}
+
+#[test]
+fn system_drive_noise_names_are_rejected_at_the_root() {
+    for name in [
+        "$Recycle.Bin",
+        "$AV_NLL",
+        ".pnpm-store",
+        "Program Files",
+        "Program Files (x86)",
+        "ProgramData",
+        "System Volume Information",
+        "corepack",
+        "nvm4w",
+        "inetpub",
+        "Python313",
+    ] {
+        assert!(
+            rejected_system_drive_item_for_test(name),
+            "{name} should be rejected"
+        );
+    }
 }
 
 #[test]

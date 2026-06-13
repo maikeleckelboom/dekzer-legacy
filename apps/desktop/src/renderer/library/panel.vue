@@ -58,7 +58,6 @@ const buttonBaseClass =
   'inline-flex min-h-9 items-center justify-center gap-2 rounded-sm px-3 py-2 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60'
 
 const primaryButtonClass = `${buttonBaseClass} min-w-38.5 border border-(--color-accent) bg-(--color-accent) text-(--color-background) hover:brightness-110`
-const secondaryButtonClass = `${buttonBaseClass} min-w-31.5 border border-(--color-border) bg-(--color-background) text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 const dangerButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-(--color-background) text-(--color-accent) hover:brightness-110`
 const iconButtonClass = `${buttonBaseClass} h-9 w-9 min-w-0 border border-(--color-border) bg-(--color-background) p-0 text-(--color-text) hover:border-(--color-accent) hover:text-(--color-accent)`
 
@@ -211,6 +210,21 @@ const sourceActionModel = computed(() =>
     removeSourceStatus: rootActions.removeSourceStatus.value,
     refreshStatus: rootLifecycle.refreshStatus.value
   })
+)
+
+const selectedBrowserBinding = computed<RowBinding | undefined>(() => {
+  const selectedId = selectedNodeId.value
+  const projection = browserProjection.value
+
+  if (selectedId === undefined || projection === undefined) {
+    return undefined
+  }
+
+  return projection.bindingsById.get(selectedId)
+})
+
+const showAddMusicFolderToolbarAction = computed(
+  () => selectedBrowserBinding.value?.kind === 'localBrowseSection'
 )
 
 const removeSourceRootId = computed(() => sourceActionModel.value.selectedRemovableSourceRootId)
@@ -992,23 +1006,13 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
         </div>
 
         <button
+          v-if="showAddMusicFolderToolbarAction"
           type="button"
           :class="primaryButtonClass"
           :disabled="!rootLifecycle.canAddMusicFolder.value"
           @click="rootLifecycle.addMusicFolder"
         >
           {{ rootActions.rootChoiceButtonLabel.value }}
-        </button>
-
-        <button
-          v-if="rootActions.registeredRootPath.value !== undefined"
-          type="button"
-          :class="secondaryButtonClass"
-          :disabled="!rootLifecycle.canScanRoot.value"
-          @click="rootLifecycle.scanRoot()"
-        >
-          <Icon role="action.scan" size="md" />
-          <span>{{ rootActions.scanButtonLabel.value }}</span>
         </button>
 
         <button

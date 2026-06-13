@@ -220,11 +220,10 @@ describe('projectContents', () => {
 
     expect(rootContents.kind).toBe('ready')
     expect(rootContents.title).toBe('Music')
-    expect(rootContents.rows.map((row) => row.label)).toEqual([
-      'Add as music source',
-      'Albums',
-      'loose.flac'
-    ])
+    expect(rootContents.rows.map((row) => row.label)).toEqual(['Albums', 'loose.flac'])
+    expect(
+      rootContents.rows.every((row) => row.action?.kind !== 'requestLocalBrowseAdmission')
+    ).toBe(true)
     expect(rootContents.rows.some((row) => row.label === 'Contents unavailable')).toBe(false)
 
     const albumNode = entryNode.children.kind === 'loaded' ? entryNode.children.nodes[0] : undefined
@@ -239,10 +238,10 @@ describe('projectContents', () => {
 
     expect(albumContents.kind).toBe('ready')
     expect(albumContents.title).toBe('Albums')
-    expect(albumContents.rows.map((row) => row.label)).toEqual([
-      'Add as music source',
-      'track.flac'
-    ])
+    expect(albumContents.rows.map((row) => row.label)).toEqual(['track.flac'])
+    expect(
+      albumContents.rows.every((row) => row.action?.kind !== 'requestLocalBrowseAdmission')
+    ).toBe(true)
   })
 
   it('projects selected unloaded local browse folders as loadable instead of unsupported', () => {
@@ -259,17 +258,83 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('notLoaded')
-    expect(contents.rows.map((row) => row.label)).toEqual([
-      'Add as music source',
-      'Local folder contents not loaded'
-    ])
-    expect(contents.rows[1]).toMatchObject({
+    expect(contents.rows.map((row) => row.label)).toEqual(['Local folder contents not loaded'])
+    expect(contents.rows[0]).toMatchObject({
       state: 'notLoaded',
       action: {
         kind: 'loadLocalBrowseChildren',
         nodeId: entryNode.id
       }
     })
+  })
+
+  it('projects Local Files root as admission guidance without library-empty copy', () => {
+    const state = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()]
+    })
+    const projection = browserProjection(state)
+    const contents = projectContents({
+      state,
+      selectedNodeId: 'local-browse:section',
+      bindingsById: projection.bindingsById
+    })
+
+    expect(contents.kind).toBe('ready')
+    expect(contents.title).toBe('Local browse')
+    expect(contents.detail).toBe('Choose a folder to add as a music source.')
+    expect(contents.rows).toEqual([])
+    expect(`${contents.title} ${contents.detail}`).not.toMatch(
+      /Unknown|Unsupported|No library contents/
+    )
+  })
+
+  it('projects protected reparse local browse items as terminal state without echoing the item', () => {
+    const link = localBrowseItem(
+      'inaccessible',
+      'OutsideLink',
+      'C:\\Users\\Maikel\\Music\\OutsideLink',
+      {
+        status: 'rejected',
+        failure: {
+          code: 'reparsePointSkipped',
+          detail: 'Item is a reparse point and was not followed.'
+        }
+      }
+    )
+    const rootWindow = localBrowseWindow({
+      label: 'Music',
+      resolvedParentPath: 'C:\\Users\\Maikel\\Music',
+      items: [link]
+    })
+    const state = browserState({
+      navigationReadResult: emptyNavigation(),
+      entries: [localBrowseEntryPoint()],
+      localBrowseItemStates: new Map([
+        [localBrowseWindowStateKey(rootWindow), { kind: 'loaded', window: rootWindow }]
+      ])
+    })
+    const projection = browserProjection(state)
+    const entryNode = firstLocalBrowseEntryNode(projection)
+    const linkNode = entryNode.children.kind === 'loaded' ? entryNode.children.nodes[0] : undefined
+    if (linkNode === undefined) {
+      throw new Error('Expected protected local browse item node.')
+    }
+
+    const contents = projectContents({
+      state,
+      selectedNodeId: linkNode.id,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(contents.kind).toBe('unsupported')
+    expect(contents.rows).toHaveLength(1)
+    expect(contents.rows[0]).toMatchObject({
+      kind: 'state',
+      label: 'Protected location',
+      detail: 'Item is a reparse point and was not followed.'
+    })
+    expect(contents.rows[0]?.label).not.toBe('OutsideLink')
   })
 
   it('projects local browse load-more from contents without switching to durable rows', () => {
@@ -296,8 +361,8 @@ describe('projectContents', () => {
     })
 
     expect(contents.kind).toBe('ready')
-    expect(contents.rows.map((row) => row.kind)).toEqual(['state', 'directory', 'more'])
-    expect(contents.rows[2]).toMatchObject({
+    expect(contents.rows.map((row) => row.kind)).toEqual(['directory', 'more'])
+    expect(contents.rows[1]).toMatchObject({
       label: 'Load more',
       action: {
         kind: 'loadLocalBrowseMore',

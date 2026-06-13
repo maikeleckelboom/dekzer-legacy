@@ -18,7 +18,7 @@ export type StatusBadge =
   | 'Maintenance needed'
   | 'Maintenance running'
   | 'Maintenance unavailable'
-  | 'Local browse only'
+  | 'Not a music-source candidate'
   | 'Not in library yet'
   | 'Choose a narrower folder'
   | 'Protected location'
@@ -28,7 +28,6 @@ export type StatusBadge =
   | 'Missing'
   | 'Offline/unavailable'
   | 'Partial'
-  | 'Unknown'
 
 export type StatusAction =
   | {
@@ -40,7 +39,7 @@ export type StatusAction =
     }
   | {
       readonly kind: 'scanSource'
-      readonly label: 'Scan' | 'Rescan'
+      readonly label: 'Scan source' | 'Rescan source'
       readonly sourceId: string
       readonly enabled: boolean
       readonly reason?: string
@@ -113,16 +112,14 @@ export function projectStatusView(input: StatusViewInput): StatusView {
       return {
         role: 'navigation',
         title: context.title,
-        badge: 'Unknown',
         tone: 'muted',
-        detail: context.detail ?? 'Navigation row.',
+        detail: context.detail,
         actions: []
       }
     case 'readState':
       return {
         role: 'readState',
         title: context.title,
-        badge: 'Unknown',
         tone: 'muted',
         detail: context.detail,
         actions: []
@@ -384,8 +381,8 @@ function scanAction(input: StatusViewInput, sourceId: string): StatusAction | un
   }
 
   const scanRunning = input.scanStatus === 'scanning'
-  const label: 'Scan' | 'Rescan' =
-    input.sourceLifecycle?.lastSuccessfulScanAtMs === undefined ? 'Scan' : 'Rescan'
+  const label: 'Scan source' | 'Rescan source' =
+    input.sourceLifecycle?.lastSuccessfulScanAtMs === undefined ? 'Scan source' : 'Rescan source'
 
   return {
     kind: 'scanSource',
@@ -471,14 +468,13 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'Needs scan':
     case 'Maintenance needed':
     case 'Maintenance unavailable':
-    case 'Local browse only':
+    case 'Not a music-source candidate':
     case 'Not in library yet':
     case 'Choose a narrower folder':
     case 'Protected location':
     case 'Already added':
     case 'Could not fully resolve this location':
     case 'Partial':
-    case 'Unknown':
     case 'No audio tracks':
       return 'warning'
     case 'Maintenance running':
@@ -505,14 +501,14 @@ function localBrowseBadge(
     case 'alreadyAdded':
       return 'Already added'
     case 'localBrowseOnly':
-      return 'Local browse only'
+      return 'Not a music-source candidate'
   }
 }
 
 function localBrowseTone(badge: StatusBadge): StatusView['tone'] {
   switch (badge) {
     case 'Not in library yet':
-    case 'Local browse only':
+    case 'Not a music-source candidate':
       return 'muted'
     case 'Already added':
       return 'ready'
@@ -540,7 +536,7 @@ function localBrowseDetail(
     case 'alreadyAdded':
       return 'Already added.'
     case 'localBrowseOnly':
-      return 'Local browse only.'
+      return 'Not a music-source candidate.'
   }
 }
 

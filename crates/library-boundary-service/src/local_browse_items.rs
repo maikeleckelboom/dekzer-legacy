@@ -419,15 +419,20 @@ fn available_operations_for_item(
 ) -> Vec<protocol::LocalBrowseOperation> {
     match (key.item_kind, status) {
         (protocol::LocalBrowseItemKind::Directory, protocol::LocalBrowseItemStatus::Available) => {
-            vec![
+            let mut operations = vec![
                 protocol::LocalBrowseOperation::BrowseChildren,
                 protocol::LocalBrowseOperation::ChooseDescendant,
-                protocol::LocalBrowseOperation::RequestSourceAdmission {
+            ];
+
+            if directory_source_admission_available(request, key) {
+                operations.push(protocol::LocalBrowseOperation::RequestSourceAdmission {
                     request_kind:
                         protocol::LocalBrowseSourceAdmissionRequestKind::SelectedDirectory,
                     resolved_path: key.path.to_string_lossy().into_owned(),
-                },
-            ]
+                });
+            }
+
+            operations
         }
         (
             protocol::LocalBrowseItemKind::Directory,
@@ -446,6 +451,46 @@ fn available_operations_for_item(
         }
         _ => Vec::new(),
     }
+}
+
+fn directory_source_admission_available(
+    request: &protocol::ReadLocalBrowseItemsRequest,
+    key: &LocalBrowseItemKey,
+) -> bool {
+    if request.entry_point_kind != protocol::LocalBrowseEntryPointKind::SystemDriveRoot {
+        return true;
+    }
+
+    let root_key = normalize_local_browse_path_key(Path::new(&request.resolved_root_path));
+    let parent_key = normalize_local_browse_path_key(Path::new(&request.resolved_parent_path));
+
+    if parent_key != root_key {
+        return true;
+    }
+
+    is_plausible_music_source_name(&key.display_name)
+}
+
+fn is_plausible_music_source_name(display_name: &str) -> bool {
+    let normalized = display_name.to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "music"
+            | "musics"
+            | "audio"
+            | "audios"
+            | "dj"
+            | "djs"
+            | "library"
+            | "libraries"
+            | "media"
+            | "rekordbox"
+            | "serato"
+            | "traktor"
+            | "virtualdj"
+    ) || normalized.contains("music")
+        || normalized.contains("audio")
+        || normalized.contains("dj")
 }
 
 fn item_visible_for_profile(
@@ -690,10 +735,16 @@ fn is_rejected_system_drive_item(
         && matches!(
             display_name.to_ascii_lowercase().as_str(),
             "$recycle.bin"
+                | "$av_nll"
                 | "$sysreset"
+                | ".pnpm-store"
+                | "corepack"
+                | "inetpub"
+                | "nvm4w"
                 | "program files"
                 | "program files (x86)"
                 | "programdata"
+                | "python313"
                 | "recovery"
                 | "system volume information"
                 | "windows"
@@ -741,6 +792,50 @@ pub(crate) fn classify_item_file_for_test(
             &key,
             classification.status,
         ),
+    )
+}
+
+#[cfg(test)]
+pub(crate) fn directory_operations_for_test(
+    entry_point_kind: protocol::LocalBrowseEntryPointKind,
+    root: &Path,
+    parent: &Path,
+    child_name: &str,
+) -> Vec<protocol::LocalBrowseOperation> {
+    let child_path = parent.join(child_name);
+    let key = LocalBrowseItemKey {
+        path: child_path.clone(),
+        path_key: normalize_local_browse_path_key(&child_path),
+        display_name: child_name.to_string(),
+        item_kind: protocol::LocalBrowseItemKind::Directory,
+        status: protocol::LocalBrowseItemStatus::Available,
+        file_kind: None,
+        media_relevance: None,
+        parent_admission_available: false,
+        failure: None,
+    };
+
+    available_operations_for_item(
+        &protocol::ReadLocalBrowseItemsRequest {
+            entry_point_kind,
+            resolved_root_path: root.to_string_lossy().into_owned(),
+            resolved_parent_path: parent.to_string_lossy().into_owned(),
+            profile: protocol::LocalBrowseProfile::Audio,
+            offset: 0,
+            limit: 1,
+        },
+        &key,
+        protocol::LocalBrowseItemStatus::Available,
+    )
+}
+
+#[cfg(test)]
+pub(crate) fn rejected_system_drive_item_for_test(display_name: &str) -> bool {
+    is_rejected_system_drive_item(
+        protocol::LocalBrowseEntryPointKind::SystemDriveRoot,
+        "c:",
+        "c:",
+        display_name,
     )
 }
 

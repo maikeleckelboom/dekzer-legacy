@@ -128,24 +128,27 @@ function contextForBinding(
       }
     case 'localBrowseEntryPoint': {
       const entryDetail = binding.entry.identity.resolvedPath ?? nodeDetail
+      const localState = localBrowseEntryState(binding.entry)
       return {
         kind: 'localBrowse',
         title,
         itemRole: 'folder',
-        localState: localBrowseEntryState(binding.entry),
+        localState,
         ...(entryDetail === undefined ? {} : { detail: entryDetail }),
-        ...admissionField(binding.entry.availableOperations, localBrowseEntryState(binding.entry))
+        ...admissionField(binding.entry.availableOperations, localState)
       }
     }
-    case 'localBrowseItem':
+    case 'localBrowseItem': {
+      const localState = localBrowseItemState(binding.item)
       return {
         kind: 'localBrowse',
         title,
         itemRole: binding.target === undefined ? 'file' : 'folder',
-        localState: localBrowseItemState(binding.item),
-        detail: binding.item.identity.resolvedItemPath,
-        ...admissionField(binding.item.availableOperations, localBrowseItemState(binding.item))
+        localState,
+        detail: binding.item.failure?.detail ?? binding.item.identity.resolvedItemPath,
+        ...admissionField(binding.item.availableOperations, localState)
       }
+    }
     case 'readState':
       return {
         kind: 'readState',
@@ -159,12 +162,17 @@ function contextForBinding(
         ...(nodeDetail === undefined ? {} : { detail: nodeDetail })
       }
     case 'more':
-    case 'localBrowseSection':
     case 'localBrowseMore':
       return {
         kind: 'navigation',
         title,
         ...(nodeDetail === undefined ? {} : { detail: nodeDetail })
+      }
+    case 'localBrowseSection':
+      return {
+        kind: 'navigation',
+        title,
+        detail: nodeDetail ?? 'Choose a folder to add as a music source.'
       }
   }
 }

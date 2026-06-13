@@ -54,7 +54,7 @@ export function deriveSourceActionModel(input: SourceActionModelInput): SourceAc
     visibleRootIds.has(selectedSourceRootId) &&
     removableRootIds.has(selectedSourceRootId)
       ? selectedSourceRootId
-      : selectedFallbackRootId(input.selectedNodeId, visibleRemovableRows)
+      : undefined
   const removeVisible = selectedRemovableSourceRootId !== undefined
   const reasonUnavailable = removeUnavailableReason({
     ...input,
@@ -92,7 +92,7 @@ export function sourceRegistrationIntent(
 ): SourceRegistrationIntent {
   return {
     rootId,
-    activateWhenVisible: selectedNodeId === undefined
+    activateWhenVisible: selectedNodeId === undefined || selectedNodeId.startsWith('local-browse')
   }
 }
 
@@ -159,17 +159,6 @@ function sourceRootIdForSelectedBinding(input: SourceActionModelInput): string |
   }
 
   return localRootIdForBinding(input.projection.bindingsById.get(input.selectedNodeId))
-}
-
-function selectedFallbackRootId(
-  selectedNodeId: BrowserTreeNodeId | undefined,
-  visibleRemovableRows: readonly VisibleSourceRow[]
-): string | undefined {
-  if (selectedNodeId !== undefined || visibleRemovableRows.length !== 1) {
-    return undefined
-  }
-
-  return visibleRemovableRows[0]?.rootId
 }
 
 function removeUnavailableReason(

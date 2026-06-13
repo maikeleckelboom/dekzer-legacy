@@ -668,7 +668,9 @@ function formatEntryPointDetail(entry: LocalBrowseEntryPoint): string {
     return 'Choose a narrower folder.'
   }
 
-  return sourceAdmissionOperationDetail(entry.availableOperations) ?? 'Local browse only.'
+  return (
+    sourceAdmissionOperationDetail(entry.availableOperations) ?? 'Not a music-source candidate.'
+  )
 }
 
 function formatItemDetail(item: LocalBrowseItem): string {
@@ -727,7 +729,7 @@ export function sourceAdmissionOperation(
 function itemKindLabel(kind: LocalBrowseItemKind): string {
   switch (kind) {
     case 'directory':
-      return 'Local browse only.'
+      return 'Not a music-source candidate.'
     case 'mediaFile':
       return 'Media file.'
     case 'unsupportedFile':
@@ -782,7 +784,7 @@ function entryPointStatusLabel(status: LocalBrowseEntryPointStatus): string {
 function itemStatusLabel(status: LocalBrowseItemStatus): string {
   switch (status) {
     case 'available':
-      return 'Local browse only.'
+      return 'Not a music-source candidate.'
     case 'unavailable':
       return 'Local item unavailable.'
     case 'permissionBlocked':

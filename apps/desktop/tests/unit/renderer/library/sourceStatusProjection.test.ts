@@ -58,6 +58,22 @@ describe('source status projection', () => {
     expect(view.actions.some((action) => action.kind === 'runMaintenance')).toBe(false)
   })
 
+  it('local files root shows guidance without source-specific actions or unknown badge', () => {
+    const projection = localBrowseProjection({ kind: 'localBrowseSection' }, 'Local Files')
+    const view = statusView(
+      projectStatusContext({
+        projection,
+        selectedNodeId: 'selected',
+        selectedTitle: 'Local browse'
+      })
+    )
+
+    expect(view.role).toBe('navigation')
+    expect(view.badge).toBeUndefined()
+    expect(view.detail).toBe('Choose a folder to add as a music source.')
+    expect(view.actions).toEqual([])
+  })
+
   it('local browse media file with parent admission shows Add parent as music source only', () => {
     const projection = localBrowseProjection(
       {
@@ -110,7 +126,7 @@ describe('source status projection', () => {
 
     expect(view.badge).toBe('Maintenance needed')
     expect(view.actions).toEqual([
-      expect.objectContaining({ kind: 'scanSource', label: 'Rescan', enabled: true }),
+      expect.objectContaining({ kind: 'scanSource', label: 'Rescan source', enabled: true }),
       expect.objectContaining({ kind: 'runMaintenance', label: 'Run maintenance', enabled: true }),
       expect.objectContaining({ kind: 'refreshStatus', enabled: true }),
       expect.objectContaining({ kind: 'removeSource', label: 'Remove source', enabled: true })

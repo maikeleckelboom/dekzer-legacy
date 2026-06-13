@@ -8,7 +8,6 @@ import type {
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
 import type { LocalBrowseOperation } from '../../../shared/library/localBrowse/entryPoints'
 import type { LocalBrowseItem } from '../../../shared/library/localBrowse/items'
-import { sourceAdmissionOperation } from '../localBrowse/projection'
 import {
   localBrowseRootTarget,
   localBrowseWindowKey,
@@ -194,20 +193,17 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         rows: [contentMoreRow(selectedNodeId, binding)]
       }
     case 'localBrowseSection':
-      return stateProjection({
-        kind: 'unsupported',
-        ownerId: selectedNodeId,
-        title: 'Local Files',
-        state: 'unsupported',
-        label: 'No library contents',
-        detail: 'Select a registered source or folder to see indexed contents.'
-      })
+      return {
+        kind: 'ready',
+        title: 'Local browse',
+        detail: 'Choose a folder to add as a music source.',
+        rows: []
+      }
     case 'localBrowseEntryPoint':
       return projectLocalBrowseFolderContents({
         ownerId: selectedNodeId,
         title: binding.entry.displayName,
         targetNodeId: selectedNodeId,
-        folderOperations: binding.entry.availableOperations,
         folderDetail: binding.entry.identity.resolvedPath ?? binding.entry.displayName,
         windowState: options.state.localBrowseItemStates?.get(
           localBrowseWindowKey(
@@ -221,7 +217,6 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
           ownerId: selectedNodeId,
           title: binding.item.displayName,
           targetNodeId: selectedNodeId,
-          folderOperations: binding.item.availableOperations,
           folderDetail: localBrowseItemDetail(binding.item),
           windowState: options.state.localBrowseItemStates?.get(
             localBrowseWindowKey(binding.target)
@@ -705,15 +700,9 @@ function projectLocalBrowseFolderContents(options: {
   readonly ownerId: BrowserTreeNodeId
   readonly title: string
   readonly targetNodeId: BrowserTreeNodeId
-  readonly folderOperations: readonly LocalBrowseOperation[]
   readonly folderDetail: string
   readonly windowState: LocalBrowseItemState | undefined
 }): ContentProjection {
-  const admissionRow = localBrowseAdmissionRow(
-    `local-browse-admission:${options.ownerId}`,
-    options.folderOperations,
-    'Add as music source'
-  )
   const state = options.windowState
 
   if (state === undefined) {
@@ -722,7 +711,6 @@ function projectLocalBrowseFolderContents(options: {
       title: options.title,
       detail: options.folderDetail,
       rows: [
-        ...(admissionRow === undefined ? [] : [admissionRow]),
         stateRow({
           ownerId: options.ownerId,
           state: 'notLoaded',
@@ -744,7 +732,6 @@ function projectLocalBrowseFolderContents(options: {
       title: options.title,
       detail: options.folderDetail,
       rows: [
-        ...(admissionRow === undefined ? [] : [admissionRow]),
         stateRow({
           ownerId: options.ownerId,
           state: 'loading',
@@ -761,7 +748,6 @@ function projectLocalBrowseFolderContents(options: {
       title: options.title,
       detail: options.folderDetail,
       rows: [
-        ...(admissionRow === undefined ? [] : [admissionRow]),
         stateRow({
           ownerId: options.ownerId,
           state: 'failed',
@@ -778,14 +764,10 @@ function projectLocalBrowseFolderContents(options: {
   }
 
   const window = state.window
-  const contentRows = window.items.map(localBrowseItemRow)
+  const contentRows = window.items.filter(isVisibleLocalBrowsePreviewItem).map(localBrowseItemRow)
   const moreRow =
     window.nextOffset === undefined ? undefined : localBrowseMoreContentRow(options.ownerId, window)
-  const rows = [
-    ...(admissionRow === undefined ? [] : [admissionRow]),
-    ...contentRows,
-    ...(moreRow === undefined ? [] : [moreRow])
-  ]
+  const rows = [...contentRows, ...(moreRow === undefined ? [] : [moreRow])]
 
   if (rows.length > 0) {
     return {
@@ -818,23 +800,28 @@ function projectLocalBrowseFileContents(
   ownerId: BrowserTreeNodeId,
   item: LocalBrowseItem
 ): ContentProjection {
-  const admissionRow = localBrowseAdmissionRow(
-    `local-browse-admission:${ownerId}`,
-    item.availableOperations,
-    'Add parent as music source'
-  )
+  if (isTerminalLocalBrowseItem(item)) {
+    return stateProjection({
+      kind: localBrowseTerminalProjectionKind(item),
+      ownerId,
+      title: item.displayName,
+      state: localBrowseTerminalRowState(item),
+      label: localBrowseTerminalLabel(item),
+      detail: item.failure?.detail ?? localBrowseItemDetail(item)
+    })
+  }
+
   const selectedRow = localBrowseItemRow(item)
 
   return {
     kind: 'ready',
     title: item.displayName,
     detail: localBrowseItemDetail(item),
-    rows: admissionRow === undefined ? [selectedRow] : [selectedRow, admissionRow]
+    rows: [selectedRow]
   }
 }
 
 function localBrowseItemRow(item: LocalBrowseItem): ContentRow {
-  const admission = sourceAdmissionOperation(item.availableOperations)
   const fileClass = localBrowseFileClass(item)
 
   return {
@@ -845,43 +832,63 @@ function localBrowseItemRow(item: LocalBrowseItem): ContentRow {
     label: item.displayName,
     detail: localBrowseItemDetail(item),
     icon: localBrowseItemIcon(item),
-    ...(fileClass === undefined ? {} : { fileClass }),
-    ...(admission === undefined
-      ? {}
-      : {
-          action: {
-            kind: 'requestLocalBrowseAdmission',
-            requestKind: admission.requestKind,
-            resolvedPath: admission.resolvedPath,
-            label: sourceAdmissionLabel(admission)
-          }
-        })
+    ...(fileClass === undefined ? {} : { fileClass })
   }
 }
 
-function localBrowseAdmissionRow(
-  rowId: string,
-  operations: readonly LocalBrowseOperation[],
-  fallbackLabel: string
-): ContentRow | undefined {
-  const admission = sourceAdmissionOperation(operations)
-
-  if (admission === undefined) {
-    return undefined
+function isVisibleLocalBrowsePreviewItem(item: LocalBrowseItem): boolean {
+  if (isTerminalLocalBrowseItem(item)) {
+    return true
   }
 
-  return {
-    id: rowId,
-    kind: 'state',
-    label: sourceAdmissionLabel(admission) ?? fallbackLabel,
-    detail: admission.resolvedPath,
-    icon: 'folder',
-    action: {
-      kind: 'requestLocalBrowseAdmission',
-      requestKind: admission.requestKind,
-      resolvedPath: admission.resolvedPath,
-      label: sourceAdmissionLabel(admission) ?? fallbackLabel
-    }
+  if (item.itemKind === 'directory') {
+    return true
+  }
+
+  return (
+    item.itemKind === 'mediaFile' &&
+    item.mediaRelevance !== 'unsupported' &&
+    (item.fileKind === 'audio' || item.fileKind === 'cueSheet')
+  )
+}
+
+function isTerminalLocalBrowseItem(item: LocalBrowseItem): boolean {
+  return (
+    item.itemKind === 'rejectedRoot' ||
+    item.itemKind === 'inaccessible' ||
+    item.status === 'rejected' ||
+    item.status === 'permissionBlocked' ||
+    item.failure?.code === 'reparsePointSkipped'
+  )
+}
+
+function localBrowseTerminalProjectionKind(item: LocalBrowseItem): ContentProjectionKind {
+  return item.status === 'permissionBlocked' || item.status === 'rejected'
+    ? 'unsupported'
+    : 'failed'
+}
+
+function localBrowseTerminalRowState(
+  item: LocalBrowseItem
+): Exclude<ContentRow['state'], undefined> {
+  return item.status === 'permissionBlocked' || item.status === 'rejected'
+    ? 'unsupported'
+    : 'failed'
+}
+
+function localBrowseTerminalLabel(item: LocalBrowseItem): string {
+  if (item.failure?.code === 'reparsePointSkipped') {
+    return 'Protected location'
+  }
+
+  switch (item.status) {
+    case 'permissionBlocked':
+    case 'rejected':
+      return 'Protected location'
+    case 'missing':
+      return 'Local item missing'
+    default:
+      return 'Not available'
   }
 }
 
@@ -923,18 +930,6 @@ function localBrowseMoreContentRow(
             label: window.more?.kind === 'failed' ? 'Retry' : 'Load more'
           }
         })
-  }
-}
-
-function sourceAdmissionLabel(
-  operation: Extract<LocalBrowseOperation, { readonly kind: 'requestSourceAdmission' }>
-): string {
-  switch (operation.requestKind) {
-    case 'defaultMusicFolder':
-    case 'selectedDirectory':
-      return 'Add as music source'
-    case 'parentDirectory':
-      return 'Add parent as music source'
   }
 }
 

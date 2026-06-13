@@ -30,7 +30,7 @@ describe('deriveSourceActionModel', () => {
     expect(model.reasonUnavailable).toBeUndefined()
   })
 
-  it('falls back to the only visible removable source when no row is selected', () => {
+  it('does not expose source removal when no row is selected', () => {
     const model = deriveSourceActionModel({
       projection: sourceProjection(['root-1']),
       selectedNodeId: undefined,
@@ -40,9 +40,9 @@ describe('deriveSourceActionModel', () => {
       refreshStatus: 'idle'
     })
 
-    expect(model.selectedRemovableSourceRootId).toBe('root-1')
-    expect(model.removeVisible).toBe(true)
-    expect(model.removeEnabled).toBe(true)
+    expect(model.selectedRemovableSourceRootId).toBeUndefined()
+    expect(model.removeVisible).toBe(false)
+    expect(model.removeEnabled).toBe(false)
   })
 
   it('keeps remove visible but disabled while scan, refresh, or removal is active', () => {
@@ -147,6 +147,10 @@ describe('deriveSourceActionModel', () => {
 
   it('authors activation only from selection state at registration response time', () => {
     expect(sourceRegistrationIntent('root-2', undefined)).toEqual({
+      rootId: 'root-2',
+      activateWhenVisible: true
+    })
+    expect(sourceRegistrationIntent('root-2', 'local-browse-entry:music:C%3A%5CMusic')).toEqual({
       rootId: 'root-2',
       activateWhenVisible: true
     })
