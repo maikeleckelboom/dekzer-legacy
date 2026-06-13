@@ -14,6 +14,20 @@ Admission is owned by the service layer. The renderer displays results; it does 
 
 ---
 
+## Displayable Local Entry Points
+
+A displayable local browser entry point does not imply an admissible source root. Entry points are browse candidates
+until the user selects a path and the service runs this admission policy.
+
+The OS drive can be shown as a local browser entry point while remaining rejected as a source root. Broad roots remain
+confirmation-required or rejected according to this policy, regardless of where they appeared in a local entry point
+surface.
+
+Admission remains the only path to source persistence and scan. A rejected path must not create a source, source
+lifecycle row, source location, source scan root, or scan job.
+
+---
+
 ## Admission pipeline
 
 Admission runs in four sequential stages. A rejection at any stage terminates the pipeline and returns a result immediately.

@@ -77,6 +77,10 @@ evolve a DJ set as a durable room-shaped performance artifact.
 
 Dekzer builds local DJ basics on a correct substrate first.
 
+Dekzer should feel immediately local-first: local filesystem entry points make likely music locations discoverable
+without silently indexing them. Explicit admission and explicit scan protect users from broad-root mistakes. Local
+browser candidates are not sources.
+
 Library scanning. Canonical track identity. Source registration. Browse scopes. Contents reads. Media filtering. Event
 pump. Lifecycle reads. Stable references. Deterministic renderer projection.
 

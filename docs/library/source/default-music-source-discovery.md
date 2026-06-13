@@ -1,199 +1,223 @@
 # Default Music Source Discovery
 
+## Scope
+
+This document is scoped to the `music` entry point class under
+[`local-browser-entry-points-contract.md`](local-browser-entry-points-contract.md). The local browser entry points
+contract is the canonical owner for the general local filesystem entry point model, entry point identity, candidate
+status, browse-versus-scan boundary, and source admission handoff.
+
+This document owns the Music-specific implementation companion behavior: platform Music path resolution, Music candidate
+production, Music-specific deduplication application, and admission handoff as `defaultMusicFolder`.
+
 ## Purpose
 
-On first launch, Dekzer presents the platform music folder as an immediately visible source candidate without requiring the user to navigate a folder picker or understand Dekzer's source model. This is a product-first-run experience, not a silent import or background index.
+On each launch before the platform Music folder has been admitted as a source, Dekzer presents the platform Music folder
+as an immediately visible browse candidate. This gives the user an obvious first local choice without silently importing,
+indexing, or scanning anything.
 
----
+The Music candidate is not a source root, not a registered source, and not part of source lifecycle until the user acts
+and source root admission succeeds.
 
-## Platform music folder resolution
+## Platform Music Folder Resolution
 
 | Platform | Canonical path        | Resolution method                                                |
 | -------- | --------------------- | ---------------------------------------------------------------- |
-| Windows  | `%USERPROFILE%\Music` | `SHGetKnownFolderPath(FOLDERID_Music)` — not string construction |
+| Windows  | `%USERPROFILE%\Music` | `SHGetKnownFolderPath(FOLDERID_Music)`; not string construction  |
 | macOS    | `~/Music`             | `FileManager.default.urls(for: .musicDirectory, ...)`            |
 | Linux    | `~/Music`             | XDG user dirs (`xdg-user-dir MUSIC`) with `~/Music` fallback     |
 
-**V0 implementation targets Windows.** macOS and Linux resolution rules are included for cross-platform design intent and must not be implemented accidentally in the Windows V0 slice.
+**V0 implementation targets Windows.** macOS and Linux resolution rules are included for cross-platform design intent
+and must not be implemented accidentally in the Windows V0 slice.
 
-Resolution must use platform-native APIs, not path string construction. On Windows, `%USERPROFILE%` concatenation is not acceptable because user profiles can be relocated. Use the Known Folder API.
+Resolution must use platform-native APIs. On Windows, `%USERPROFILE%` concatenation is not acceptable because user
+profiles can be relocated. Use the Known Folder API.
 
 If the platform API fails to return a path, discovery produces no candidate. Do not hard-code fallback strings.
 
----
+## Discovery Behavior
 
-## Discovery behavior
-
-Discovery runs during startup as a bounded, non-scanning startup task. It must not block first shell render. It may complete shortly after the library panel mounts. Even a cheap stat can hang on cloud-redirected, network-backed, or broken shell-folder paths, so discovery must be async with a hard timeout (suggested: 2s). It is a stat check, not a scan.
+Discovery runs during startup as a bounded, non-scanning startup task. It must not block first shell render. It may
+complete shortly after the library surface mounts. Even a cheap stat can hang on cloud-redirected, network-backed, or
+broken shell-folder paths, so discovery must be async with a hard timeout (suggested: 2s). It is a stat check, not a
+scan.
 
 Steps:
 
-1. Resolve the platform music folder path using the platform API.
-2. Stat the resolved path (existence and directory type only).
-3. Produce a `DiscoveredMusicSource` candidate.
+1. Resolve the platform Music folder path using the platform API.
+2. Stat the resolved path for existence and directory type only.
+3. Produce a Music local browser entry point candidate when resolution succeeds.
 
-**If the path exists and is a directory:**
-Candidate is `present`. Visible in the library navigation as a default local source. No scan starts automatically.
+If the path exists and is a directory, the candidate status is `available`. No scan starts automatically.
 
-**If the path does not exist:**
-Candidate is `absent`. V0: hide entirely. Do not create the folder. Do not show a "create Music folder" prompt.
+If the path does not exist, the candidate status is `missing`. V0 hides the candidate entirely. Do not create the folder
+and do not show a "create Music folder" prompt.
 
-**If the path exists but cannot be statted:**
-Candidate is `unavailable`. Show with inaccessible state. Do not scan.
-
----
+If the path exists but cannot be statted or enumerated cheaply, the candidate status is `permissionBlocked` or
+`unavailable`, depending on the resolved failure. Do not scan.
 
 ## Presentation
 
-The discovered default source is presented in the library navigation tree as a **suggested candidate**, distinct from admitted/scanned sources until the user explicitly acts on it.
+The Music candidate is presented as a local browser entry point or local candidate row, distinct from admitted and
+scanned sources until the user explicitly acts on it.
 
-**Must show:**
+Must show:
 
-- Source name: "Music" (or localized platform equivalent)
-- State: not scanned — no audio rows are available yet
-- Primary action: "Start scan"
-- Secondary action: "Choose another folder"
-- Dismissal: "Not now" or equivalent
+- source name: "Music" or localized platform equivalent;
+- candidate state, such as `available`, `permissionBlocked`, or `unavailable`;
+- primary action to request admission and start scan after successful registration;
+- secondary action to choose another folder;
+- dismissal action such as "Not now".
 
-**Must not show:**
+Must not show:
 
-- Audio row contents — the source is not scanned and contains no accepted rows
-- A "scanning" or "loading" state — no automatic process has run
-- A "ready to browse" label — there is nothing to browse until scanned
-- Any implication that the folder has been indexed or is a confirmed library root
+- audio row contents;
+- a scanning state;
+- a label implying that the folder has been indexed;
+- an implication that the folder is a confirmed library root;
+- source lifecycle state before admission.
 
-If V0 later adds shallow top-level browse before scan (showing immediate child folders of the Music folder without full scan), that is a separate design decision with its own admission and partial-state semantics. Do not implement it by accident.
-
----
+The browse-versus-scan boundary for any shallow local browse behavior is owned by
+[`local-browser-entry-points-contract.md`](local-browser-entry-points-contract.md).
 
 ## Admission
 
-When the user chooses to use the Music folder candidate (by starting a scan or explicitly accepting it), the service runs source root admission.
+When the user chooses to use the Music candidate, the service runs source root admission.
 
-The platform music folder is classified as `defaultMusicFolder` by the source root admission policy. It passes admission without warning or confirmation. See `source-root-admission-policy.md`.
+The platform Music folder is classified as `defaultMusicFolder` by the source root admission policy. It passes admission
+without warning or confirmation only when platform resolution and admission classification agree. See
+[`root-admission-policy.md`](root-admission-policy.md).
 
 Discovery does not pre-admit or pre-persist the source. The source is admitted and persisted only when the user acts.
 
-**A discovery candidate is not a source root, not a registered source, and not part of source lifecycle until admitted.** Renderer code must not treat the candidate as a half-source, pass it to source lifecycle reads, or attach IPC subscriptions to it before admission.
-
----
+Renderer code must not treat the candidate as a half-source, pass it to source lifecycle reads, create source-location
+state for it, or attach source IPC subscriptions to it before admission.
 
 ## Deduplication
 
-If the user has already manually registered the platform music folder path, the discovery candidate is suppressed. It does not appear as a second source.
+Music discovery inherits the general deduplication contract from
+[`local-browser-entry-points-contract.md`](local-browser-entry-points-contract.md). The rules below are the Music-specific
+application.
 
-Deduplication rule: if the normalized canonical form of the discovered path matches the normalized canonical form of any existing admitted source path, discovery does not produce a visible candidate.
+If the user has already manually registered the platform Music folder path, the Music candidate is suppressed or marked
+as `duplicateOfAdmittedSource` according to the active surface's projection rules. It must not appear as a second source.
 
-On Windows, path comparison is case-insensitive and normalized (trailing separators stripped, slashes normalized).
+Deduplication rule: if the normalized canonical form of the discovered path matches the normalized canonical form of
+any existing admitted source path, discovery does not produce a second source row.
 
-If the Music folder is a parent or child of an existing registered source, it is not automatically suppressed. Standard overlap rules from the source root admission policy apply when the user chooses to act on it.
+On Windows, path comparison is case-insensitive and normalized by stripping trailing separators and normalizing slashes.
 
----
+If the Music folder is a parent or child of an existing registered source, it is not automatically suppressed. Standard
+overlap rules from source root admission apply when the user chooses to act on it.
 
-## Unavailable and inaccessible states
+## Unavailable and Inaccessible States
 
 **Folder exists, read denied:**
-Show candidate as `permissionBlocked`. Display: cannot access Music folder. Offer retry or choose another folder. Do not scan. Do not persist as admitted.
+Show the candidate as `permissionBlocked`. Offer retry or choose another folder. Do not scan. Do not persist as admitted.
 
 **Folder is missing after previously being available:**
-On next launch, re-run discovery. If the folder is now absent, treat as `absent`. The source is not marked deleted if it was previously admitted — it follows normal source unavailable lifecycle.
+On the next launch before the Music folder has been admitted as a source, re-run discovery. If the folder is now missing,
+treat the candidate as `missing`. If the Music folder was previously admitted, it follows normal source unavailable
+lifecycle instead of discovery candidate behavior.
 
-**Folder is a junction/reparse point:**
-If the resolved Music folder path is itself a reparse point (e.g., the user redirected it to an external drive or cloud folder), detect the reparse at preflight. Apply the appropriate admission warning from `source-root-admission-policy.md` (cloud-backed or removable rules). Do not silently admit as a plain `defaultMusicFolder`.
+**Folder is a junction or reparse point:**
+If the resolved Music folder path is itself a reparse point, detect the reparse at preflight. Apply the appropriate
+admission warning from [`root-admission-policy.md`](root-admission-policy.md), such as cloud-backed or removable rules.
+Do not silently admit it as a plain `defaultMusicFolder`.
 
----
+## Scan Behavior
 
-## Scan behavior
+Scan is always explicit. The Music candidate does not auto-scan on launch or on any subsequent launch.
 
-Scan is always explicit. The discovery candidate does not auto-scan on launch or on any subsequent launch.
+When the user initiates scan from the Music candidate:
 
-When the user initiates scan of the Music folder candidate:
+- run source root admission;
+- require `accepted` with reason `defaultMusicFolder`;
+- persist the source record;
+- start scan only because the user explicitly initiated it;
+- use `normal` scan policy;
+- publish hierarchy and contents through normal admitted-source paths;
+- use standard permission handling, where blocked subfolders are marked blocked and scan continues;
+- finish as `completed` or `partial` if blocked subtrees exist.
 
-- Run source root admission (produces `accepted`, `defaultMusicFolder`, scan policy: `normal`).
-- Persist source record.
-- Start scan using `normal` scan policy.
-- Incremental hierarchy publication.
-- Standard permission handling: blocked subfolders are marked blocked, scan continues.
-- Source state after scan: `completed` or `partial` if blocked subtrees exist.
+## State After Admission
 
----
+Once the Music folder is admitted and scanned, it becomes a normal library source with full lifecycle behavior. It is no
+longer a discovery candidate.
 
-## State after the source is admitted
+On subsequent launches, the admitted Music folder appears through admitted-source navigation. Discovery does not
+re-present it as a candidate.
 
-Once the Music folder is admitted and scanned, it becomes a normal library source with full lifecycle behavior. It is no longer a "discovery candidate." Discovery candidate presentation applies only until the source is admitted and persisted.
-
-On subsequent launches, the admitted Music folder appears as a normal library root. Discovery does not re-present it as a candidate.
-
----
-
-## Session dismissal
+## Session Dismissal
 
 If the user dismisses the candidate without acting:
 
-- Do not persist any source record.
-- Do not scan.
-- On next launch, re-run discovery. The candidate reappears.
+- do not persist any source record;
+- do not scan;
+- on the next launch before the Music folder has been admitted, re-run discovery.
 
-Dekzer does not track "the user dismissed the Music folder suggestion" as a persistent preference in V0. The candidate reappears each launch until the user either admits it or registers a different source.
+Dekzer does not track "the user dismissed the Music folder suggestion" as a persistent preference in V0. The candidate
+reappears each launch until the user either admits it or registers a different source.
 
-Future: allow persistent "don't show this" preference. Not V0.
+Future: allow persistent "do not show this" preference. Not V0.
 
----
+## What This Is Not
 
-## What this is not
+Default Music source discovery is not:
 
-Default music source discovery is not:
+- the owner of the general local filesystem entry point contract;
+- a silent background index;
+- a forced library location;
+- a one-time wizard the app cannot show again;
+- a guarantee that the Music folder is scanned on every launch;
+- a substitute for source root admission policy;
+- an import from iTunes, Rekordbox, Traktor, or any third-party library format.
 
-- a silent background index — no scan runs without user action
-- a forced library location — the user can dismiss or choose differently
-- a one-time wizard the app cannot show again
-- a guarantee that the Music folder is scanned on every launch
-- a substitute for the source root admission policy
-- an import from iTunes, Rekordbox, Traktor, or any third-party library format
+It is: Dekzer noticing that the platform Music folder exists and making it an obvious first local choice, while still
+requiring explicit user action and source root admission.
 
-It is: Dekzer noticing that the platform music folder exists and making it the obvious first choice, requiring no configuration.
+## Future Candidates
 
----
+V0 covers Windows Music discovery only. macOS and Linux paths are defined above but may not ship in V0.
 
-## Future: multi-platform and additional candidates
+The general model for additional local browser entry points is owned by
+[`local-browser-entry-points-contract.md`](local-browser-entry-points-contract.md).
 
-V0 covers Windows only. macOS and Linux paths are defined above but may not ship in V0.
+Future Music-specific companion behavior may include:
 
-Future additional candidates (post-V0):
+- source recovery for a previously admitted Music source;
+- persistent dismissal preference;
+- user-configured default Music path.
 
-- External drive roots detected as connected and containing music-named top-level folders
-- Previously used sources from a prior Dekzer session (source recovery, not discovery)
-- User-configured default source paths
-
-These are not part of default music source discovery V0. They belong to a separate source recovery or quick-start feature.
-
----
-
-## Test matrix
+## Test Matrix
 
 **Discovery:**
 
-- Platform music folder exists and is a directory → candidate is `present`
-- Platform music folder does not exist → no candidate
-- Platform music folder exists but stat/access check fails → candidate is `unavailable`
+- Platform Music folder exists and is a directory -> candidate is `available`.
+- Platform Music folder does not exist -> no visible candidate, or candidate is `missing` if a future surface chooses to
+  show missing candidates.
+- Platform Music folder exists but stat/access check fails -> candidate is `permissionBlocked` or `unavailable`.
 
 **Deduplication:**
 
-- Music folder already registered as source → discovery produces no visible candidate
-- Unrelated source registered, Music folder not registered → discovery candidate appears
-- Music folder is a child of a registered source → deduplication does not suppress (overlap rules apply on act)
+- Music folder already registered as source -> discovery produces no duplicate source row.
+- Unrelated source registered, Music folder not registered -> Music candidate appears.
+- Music folder is a child of a registered source -> deduplication does not suppress by itself; overlap rules apply on
+  act.
 
 **Session dismissal:**
 
-- User dismisses candidate → no source persisted, no scan started
-- On next launch after dismissal → candidate reappears (V0 has no persistent dismissal)
+- User dismisses candidate -> no source persisted, no scan started.
+- On next launch after dismissal -> candidate reappears while the Music folder remains unadmitted.
 
 **Admission on act:**
 
-- User starts scan from candidate → admission runs, `defaultMusicFolder`, `normal` policy, source persisted, scan starts
-- User chooses folder picker from candidate → folder picker opens, user selects a different path, that path goes through normal admission
+- User starts scan from candidate -> admission runs, `defaultMusicFolder` is returned, source is persisted, explicit scan
+  starts.
+- User chooses folder picker from candidate -> folder picker opens, user selects a different path, and that path goes
+  through normal admission.
 
 **Post-admission:**
 
-- Admitted Music folder appears as normal library source, not as discovery candidate, on next launch
-- Discovery does not re-present an already-admitted path
+- Admitted Music folder appears as normal library source, not as discovery candidate, on next launch.
+- Discovery does not re-present an already admitted path.
