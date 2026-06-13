@@ -161,7 +161,7 @@ Default sidebar rules for source-rooted hierarchy:
 3. Unregistered physical hierarchy remains accessible through an explicit affordance, such as `Browse whole drive` or
    `Browse whole source`, below the library folders.
 4. If no accepted user-visible source locations exist, source expansion shows raw immediate hierarchy.
-5. `browser_user_order` owns source-location sidebar order. The renderer must not invent a second ordering mechanism.
+5. `source_navigation_user_order` owns source-location sidebar order. The renderer must not invent a second ordering mechanism.
 
 Source locations must have a subtle visual distinction from ordinary directories, such as pinned-folder or
 library-folder treatment. Do not use a text badge such as `Location`.

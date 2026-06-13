@@ -1275,7 +1275,7 @@ mod tests {
                     display_name: "Test Source".to_string(),
                     medium_label: None,
                     is_user_visible: true,
-                    browser_order_ordinal: Some(0),
+                    source_navigation_order_ordinal: Some(0),
                     changed_at: 10,
                 })
                 .expect("upsert source");
@@ -2242,7 +2242,7 @@ mod tests {
                     display_name: "Reprobe Test".to_string(),
                     medium_label: None,
                     is_user_visible: true,
-                    browser_order_ordinal: Some(0),
+                    source_navigation_order_ordinal: Some(0),
                     changed_at: 10,
                 })
                 .expect("upsert source");
@@ -2655,7 +2655,7 @@ mod tests {
                     display_name: "Check Test".to_string(),
                     medium_label: None,
                     is_user_visible: true,
-                    browser_order_ordinal: Some(0),
+                    source_navigation_order_ordinal: Some(0),
                     changed_at: 10,
                 })
                 .expect("upsert source");
@@ -2704,7 +2704,7 @@ name,
                     display_name: "Check Test 2".to_string(),
                     medium_label: None,
                     is_user_visible: true,
-                    browser_order_ordinal: Some(0),
+                    source_navigation_order_ordinal: Some(0),
                     changed_at: 10,
                 })
                 .expect("upsert source");

@@ -446,7 +446,7 @@ mod tests {
                     display_name: "Attachment Identity Source".to_string(),
                     medium_label: None,
                     is_user_visible: true,
-                    browser_order_ordinal: Some(0),
+                    source_navigation_order_ordinal: Some(0),
                     changed_at: 1,
                 })
                 .expect("upsert source");

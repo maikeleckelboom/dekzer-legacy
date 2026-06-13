@@ -17,7 +17,7 @@ pub struct UpsertSourceInput {
     pub display_name: String,
     pub medium_label: Option<String>,
     pub is_user_visible: bool,
-    pub browser_order_ordinal: Option<i64>,
+    pub source_navigation_order_ordinal: Option<i64>,
     pub changed_at: i64,
 }
 
@@ -55,7 +55,11 @@ impl<'write, 'conn> SourcesAuthorityTx<'write, 'conn> {
                     input.changed_at,
                 ],
             )?;
-            self.upsert_source_order(source_id, input.browser_order_ordinal, input.changed_at)?;
+            self.upsert_source_order(
+                source_id,
+                input.source_navigation_order_ordinal,
+                input.changed_at,
+            )?;
             return Ok(source_id);
         }
 
@@ -114,7 +118,11 @@ impl<'write, 'conn> SourcesAuthorityTx<'write, 'conn> {
                 self.tx.last_insert_rowid()
             }
         };
-        self.upsert_source_order(source_id, input.browser_order_ordinal, input.changed_at)?;
+        self.upsert_source_order(
+            source_id,
+            input.source_navigation_order_ordinal,
+            input.changed_at,
+        )?;
         Ok(source_id)
     }
 
@@ -126,7 +134,7 @@ impl<'write, 'conn> SourcesAuthorityTx<'write, 'conn> {
     ) -> LibrarySqliteResult<()> {
         if let Some(ordinal) = ordinal {
             self.tx.execute(
-                "INSERT INTO browser_user_order (
+                "INSERT INTO source_navigation_user_order (
                      node_domain,
                      node_id,
                      parent_scope,

@@ -17,7 +17,7 @@ pub struct UpsertSourceLocationInput {
     pub relative_path: String,
     pub display_name: Option<String>,
     pub is_user_visible: bool,
-    pub browser_order_ordinal: Option<i64>,
+    pub source_navigation_order_ordinal: Option<i64>,
     pub first_created_at: Option<i64>,
     pub changed_at: i64,
 }
@@ -101,7 +101,7 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
             self.upsert_source_location_order(
                 source_location_id,
                 input.source_id,
-                input.browser_order_ordinal,
+                input.source_navigation_order_ordinal,
                 input.changed_at,
             )?;
             return Ok(source_location_id);
@@ -168,7 +168,7 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
         self.upsert_source_location_order(
             source_location_id,
             input.source_id,
-            input.browser_order_ordinal,
+            input.source_navigation_order_ordinal,
             input.changed_at,
         )?;
         Ok(source_location_id)
@@ -185,7 +185,7 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
         )? > 0;
         if deleted {
             self.tx.execute(
-                "DELETE FROM browser_user_order
+                "DELETE FROM source_navigation_user_order
                  WHERE node_domain = 'source_location'
                    AND node_id = ?1",
                 [input.source_location_id.to_string()],
@@ -235,7 +235,7 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
     ) -> LibrarySqliteResult<()> {
         if let Some(ordinal) = ordinal {
             self.tx.execute(
-                "INSERT INTO browser_user_order (
+                "INSERT INTO source_navigation_user_order (
                      node_domain,
                      node_id,
                      parent_scope,

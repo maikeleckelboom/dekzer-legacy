@@ -46,7 +46,7 @@ fn validate_residual_semantic_checks(connection: &Connection) -> LibrarySqliteRe
     validate_source_scan_state_constraints(connection)?;
     validate_source_directories_constraints(connection)?;
     validate_source_location_constraints(connection)?;
-    validate_browser_user_order_constraints(connection)?;
+    validate_source_navigation_user_order_constraints(connection)?;
     validate_navigation_rows_constraints(connection)?;
     validate_work_item_constraints(connection)?;
     validate_artifact_constraints(connection)?;
@@ -159,8 +159,10 @@ fn validate_source_location_constraints(connection: &Connection) -> LibrarySqlit
     Ok(())
 }
 
-fn validate_browser_user_order_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
-    let sql = read_required_normalized_table_sql(connection, "browser_user_order")?;
+fn validate_source_navigation_user_order_constraints(
+    connection: &Connection,
+) -> LibrarySqliteResult<()> {
+    let sql = read_required_normalized_table_sql(connection, "source_navigation_user_order")?;
     for fragment in [
         "node_domain IN ('source', 'source_location')",
         "node_domain = 'source' AND parent_scope IS NULL",
@@ -172,7 +174,7 @@ fn validate_browser_user_order_constraints(connection: &Connection) -> LibrarySq
             &sql,
             fragment,
             format!(
-                "browser_user_order must retain ordering-shape constraint fragment {fragment:?}"
+                "source_navigation_user_order must retain ordering-shape constraint fragment {fragment:?}"
             ),
         )?;
     }

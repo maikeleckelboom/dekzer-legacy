@@ -400,7 +400,7 @@ fn repeated_upsert_source_keeps_one_order_row_and_one_navigation_row() {
             display_name: "Repeated Source".to_string(),
             medium_label: None,
             is_user_visible: true,
-            browser_order_ordinal: Some(5),
+            source_navigation_order_ordinal: Some(5),
             changed_at: 10,
         })
         .expect("insert source");
@@ -414,7 +414,7 @@ fn repeated_upsert_source_keeps_one_order_row_and_one_navigation_row() {
             display_name: "Repeated Source Renamed".to_string(),
             medium_label: None,
             is_user_visible: true,
-            browser_order_ordinal: Some(7),
+            source_navigation_order_ordinal: Some(7),
             changed_at: 20,
         })
         .expect("update source");
@@ -425,7 +425,7 @@ fn repeated_upsert_source_keeps_one_order_row_and_one_navigation_row() {
     let order_row: (i64, i64) = connection
         .query_row(
             "SELECT COUNT(*), MAX(ordinal)
-             FROM browser_user_order
+             FROM source_navigation_user_order
              WHERE node_domain = 'source'
                AND node_id = ?1
                AND parent_scope IS NULL",
@@ -464,7 +464,7 @@ fn source_navigation_projection_uses_active_top_level_substrate_rows() {
             display_name: "Internal Library".to_string(),
             medium_label: Some("SSD".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             changed_at: 10,
         })
         .expect("insert internal source");
@@ -478,7 +478,7 @@ fn source_navigation_projection_uses_active_top_level_substrate_rows() {
             display_name: "Rekordbox Export".to_string(),
             medium_label: Some("USB Drive".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(1),
+            source_navigation_order_ordinal: Some(1),
             changed_at: 11,
         })
         .expect("insert removable source");
@@ -529,7 +529,7 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
             display_name: "Location Source".to_string(),
             medium_label: None,
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             changed_at: 10,
         })
         .expect("insert source");
@@ -543,7 +543,7 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
             relative_path: "Music/DJ Pool".to_string(),
             display_name: Some("DJ Pool".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(3),
+            source_navigation_order_ordinal: Some(3),
             first_created_at: Some(20),
             changed_at: 20,
         })
@@ -557,7 +557,7 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
             relative_path: "Music/DJ Pool".to_string(),
             display_name: Some("DJ Pool Renamed".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(4),
+            source_navigation_order_ordinal: Some(4),
             first_created_at: None,
             changed_at: 21,
         })
@@ -583,7 +583,7 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
                 relative_path: invalid_path.to_string(),
                 display_name: None,
                 is_user_visible: true,
-                browser_order_ordinal: None,
+                source_navigation_order_ordinal: None,
                 first_created_at: None,
                 changed_at: 22,
             })
@@ -596,12 +596,12 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
             "SELECT COUNT(*),
                     MAX(relative_path),
                     MAX(display_name),
-                    MAX(browser_user_order.ordinal)
+                    MAX(source_navigation_user_order.ordinal)
              FROM source_locations
-             LEFT JOIN browser_user_order
-               ON browser_user_order.node_domain = 'source_location'
-              AND browser_user_order.node_id = CAST(source_locations.source_location_id AS TEXT)
-              AND browser_user_order.parent_scope = CAST(source_locations.source_id AS TEXT)
+             LEFT JOIN source_navigation_user_order
+               ON source_navigation_user_order.node_domain = 'source_location'
+              AND source_navigation_user_order.node_id = CAST(source_locations.source_location_id AS TEXT)
+              AND source_navigation_user_order.parent_scope = CAST(source_locations.source_id AS TEXT)
              WHERE source_locations.source_id = ?1",
             [source_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
@@ -627,7 +627,7 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
         .query_row(
             "SELECT
                  (SELECT COUNT(*) FROM source_locations),
-                 (SELECT COUNT(*) FROM browser_user_order WHERE node_domain = 'source_location')",
+                 (SELECT COUNT(*) FROM source_navigation_user_order WHERE node_domain = 'source_location')",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
@@ -650,7 +650,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             display_name: "Nested Location Source".to_string(),
             medium_label: None,
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             changed_at: 10,
         })
         .expect("insert source");
@@ -664,7 +664,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             relative_path: "Albums".to_string(),
             display_name: Some("Albums".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             first_created_at: Some(20),
             changed_at: 20,
         })
@@ -678,7 +678,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             relative_path: "Albums".to_string(),
             display_name: Some("Observed Albums".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: None,
+            source_navigation_order_ordinal: None,
             first_created_at: Some(21),
             changed_at: 21,
         })
@@ -694,7 +694,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             relative_path: "Albums/1998".to_string(),
             display_name: Some("Albums 1998".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(1),
+            source_navigation_order_ordinal: Some(1),
             first_created_at: Some(22),
             changed_at: 22,
         })
@@ -709,7 +709,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             relative_path: "Compilations".to_string(),
             display_name: Some("Compilations".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(1),
+            source_navigation_order_ordinal: Some(1),
             first_created_at: Some(23),
             changed_at: 23,
         })
@@ -724,7 +724,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             relative_path: "Albums/1998".to_string(),
             display_name: Some("Observed Albums 1998".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: None,
+            source_navigation_order_ordinal: None,
             first_created_at: Some(24),
             changed_at: 24,
         })
@@ -739,7 +739,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             relative_path: "Singles/1998".to_string(),
             display_name: Some("Singles 1998".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(2),
+            source_navigation_order_ordinal: Some(2),
             first_created_at: Some(25),
             changed_at: 25,
         })
@@ -754,7 +754,7 @@ fn source_locations_reject_nested_accepted_locations_but_allow_siblings_and_obse
             relative_path: "Singles".to_string(),
             display_name: Some("Singles".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(3),
+            source_navigation_order_ordinal: Some(3),
             first_created_at: Some(26),
             changed_at: 26,
         })
@@ -776,7 +776,7 @@ fn source_directory_writes_do_not_reseed_navigation_projection() {
             display_name: "Directory Source".to_string(),
             medium_label: None,
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             changed_at: 10,
         })
         .expect("insert source");
@@ -1887,7 +1887,7 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
             display_name: "Store Flow".to_string(),
             medium_label: None,
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             changed_at: 10,
         })
         .expect("upsert source");
@@ -2088,7 +2088,7 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
             relative_path: "observed-album".to_string(),
             display_name: Some("Observed Album".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             first_created_at: Some(40),
             changed_at: 40,
         })
@@ -2109,7 +2109,7 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
             relative_path: "album".to_string(),
             display_name: Some("Album".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(1),
+            source_navigation_order_ordinal: Some(1),
             first_created_at: Some(41),
             changed_at: 41,
         })
@@ -2123,7 +2123,7 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
             relative_path: "crates".to_string(),
             display_name: Some("Crates".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             first_created_at: Some(42),
             changed_at: 42,
         })

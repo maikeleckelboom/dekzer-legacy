@@ -96,7 +96,7 @@ mod tests {
         "ArtifactInlinePayloads",
         "Artifacts",
         "LibraryMetadata",
-        "browser_user_order",
+        "source_navigation_user_order",
         "source_root_navigation_state",
         "source_registration_proposals",
         "source_state",
@@ -283,7 +283,7 @@ mod tests {
             "source_locations",
             "source_directories",
             "source_files",
-            "browser_user_order",
+            "source_navigation_user_order",
             "navigation_rows",
         ] {
             assert!(
@@ -992,23 +992,23 @@ mod tests {
     }
 
     #[test]
-    fn browser_user_order_uses_partial_unique_indexes_and_legal_parent_shapes() {
+    fn source_navigation_user_order_uses_partial_unique_indexes_and_legal_parent_shapes() {
         let connection = install_test_baseline();
-        let index_names = table_index_names(&connection, "browser_user_order");
+        let index_names = table_index_names(&connection, "source_navigation_user_order");
         assert!(
             index_names
                 .iter()
-                .any(|name| name == "browser_user_order_source_node")
+                .any(|name| name == "source_navigation_user_order_source_node")
         );
         assert!(
             index_names
                 .iter()
-                .any(|name| name == "browser_user_order_source_location_node")
+                .any(|name| name == "source_navigation_user_order_source_location_node")
         );
 
         connection
             .execute(
-                "INSERT INTO browser_user_order (
+                "INSERT INTO source_navigation_user_order (
                      node_domain,
                      node_id,
                      parent_scope,
@@ -1022,7 +1022,7 @@ mod tests {
             .expect("insert source order row");
         connection
             .execute(
-                "INSERT INTO browser_user_order (
+                "INSERT INTO source_navigation_user_order (
                      node_domain,
                      node_id,
                      parent_scope,
@@ -1036,7 +1036,7 @@ mod tests {
             .expect_err("partial unique index rejects duplicate source order row");
         connection
             .execute(
-                "INSERT INTO browser_user_order (
+                "INSERT INTO source_navigation_user_order (
                      node_domain,
                      node_id,
                      parent_scope,
@@ -1050,7 +1050,7 @@ mod tests {
             .expect_err("source order rows must not have parent scope");
         connection
             .execute(
-                "INSERT INTO browser_user_order (
+                "INSERT INTO source_navigation_user_order (
                      node_domain,
                      node_id,
                      parent_scope,

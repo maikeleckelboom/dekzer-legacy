@@ -37,7 +37,7 @@ workflow.
 ## Next Executable Queue
 
 The legacy deletion sequence is complete. Public legacy surfaces, internal store/schema/projection/domain residue,
-dormant browser preference state, and stale audit documentation have been removed or revised. `browser_user_order`
+dormant browser preference state, and stale audit documentation have been removed or revised. `source_navigation_user_order`
 remains current as source/source-location navigation ordering.
 
 The next sequence is documentation and contract authority first, then bounded implementation slices:

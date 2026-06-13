@@ -258,7 +258,7 @@ fn load_next_navigation_rows(
          FROM sources s
          LEFT JOIN source_state ss
            ON ss.source_id = s.source_id
-         LEFT JOIN browser_user_order buo
+         LEFT JOIN source_navigation_user_order buo
            ON buo.node_domain = 'source'
           AND buo.node_id = CAST(s.source_id AS TEXT)
           AND buo.parent_scope IS NULL
@@ -434,7 +434,7 @@ fn insert_source_location_navigation_rows(
                         sl.source_location_id
                 ) - 1 AS sibling_position
          FROM source_locations sl
-         LEFT JOIN browser_user_order buo
+         LEFT JOIN source_navigation_user_order buo
            ON buo.node_domain = 'source_location'
           AND buo.node_id = CAST(sl.source_location_id AS TEXT)
           AND buo.parent_scope = CAST(sl.source_id AS TEXT)

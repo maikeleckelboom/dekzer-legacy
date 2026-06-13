@@ -801,7 +801,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             return Ok(existing.source_id);
         }
 
-        let browser_order = self.next_source_order()?;
+        let source_navigation_order = self.next_source_order()?;
         self.tx().execute(
             "INSERT INTO sources (
                  source_class,
@@ -824,7 +824,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         )?;
         let source_id = self.tx().last_insert_rowid();
         self.tx().execute(
-            "INSERT INTO browser_user_order (
+            "INSERT INTO source_navigation_user_order (
                  node_domain,
                  node_id,
                  parent_scope,
@@ -833,7 +833,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
                  updated_at
              )
              VALUES ('source', ?1, NULL, ?2, ?3, ?3)",
-            params![source_id.to_string(), browser_order, changed_at],
+            params![source_id.to_string(), source_navigation_order, changed_at],
         )?;
         Ok(source_id)
     }
@@ -864,7 +864,7 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         self.tx()
             .query_row(
                 "SELECT COALESCE(MAX(ordinal), -1) + 1
-                 FROM browser_user_order
+                 FROM source_navigation_user_order
                  WHERE node_domain = 'source'
                    AND parent_scope IS NULL",
                 [],

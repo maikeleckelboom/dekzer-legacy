@@ -449,7 +449,7 @@ fn unregister_local_root_hides_rows_purges_rebuild_and_invalidates_old_cursor() 
             relative_path: "Music".to_string(),
             display_name: Some("Music".to_string()),
             is_user_visible: true,
-            browser_order_ordinal: Some(0),
+            source_navigation_order_ordinal: Some(0),
             first_created_at: Some(changed_at),
             changed_at,
         })

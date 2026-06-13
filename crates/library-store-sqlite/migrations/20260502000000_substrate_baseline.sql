@@ -252,7 +252,7 @@ CREATE TABLE source_locations
 CREATE INDEX source_locations_source
     ON source_locations (source_id);
 
-CREATE TABLE browser_user_order
+CREATE TABLE source_navigation_user_order
 (
     order_id     INTEGER PRIMARY KEY,
     node_domain  TEXT    NOT NULL CHECK (node_domain IN ('source', 'source_location')),
@@ -272,18 +272,18 @@ CREATE TABLE browser_user_order
     )
 ) STRICT;
 
-CREATE UNIQUE INDEX browser_user_order_source_node
-    ON browser_user_order (node_domain, node_id)
+CREATE UNIQUE INDEX source_navigation_user_order_source_node
+    ON source_navigation_user_order (node_domain, node_id)
     WHERE node_domain = 'source'
       AND parent_scope IS NULL;
 
-CREATE UNIQUE INDEX browser_user_order_source_location_node
-    ON browser_user_order (node_domain, node_id)
+CREATE UNIQUE INDEX source_navigation_user_order_source_location_node
+    ON source_navigation_user_order (node_domain, node_id)
     WHERE node_domain = 'source_location'
       AND parent_scope IS NOT NULL;
 
-CREATE INDEX browser_user_order_domain_parent_ordinal
-    ON browser_user_order (node_domain, parent_scope, ordinal);
+CREATE INDEX source_navigation_user_order_domain_parent_ordinal
+    ON source_navigation_user_order (node_domain, parent_scope, ordinal);
 
 CREATE TABLE source_directories
 (

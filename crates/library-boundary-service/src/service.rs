@@ -2226,7 +2226,7 @@ mod tests {
                 display_name: "Fixture".to_string(),
                 medium_label: None,
                 is_user_visible: true,
-                browser_order_ordinal: None,
+                source_navigation_order_ordinal: None,
                 changed_at: 100,
             })
             .expect("insert source without lifecycle side rows");
@@ -4137,7 +4137,7 @@ mod tests {
                 display_name: "Manual System Root".to_string(),
                 medium_label: None,
                 is_user_visible: true,
-                browser_order_ordinal: None,
+                source_navigation_order_ordinal: None,
                 changed_at: 100,
             })
             .expect("insert manual source");
