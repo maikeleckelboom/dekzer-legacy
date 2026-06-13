@@ -609,9 +609,11 @@ watch(
       disclosureReconciler.clearFailed()
     }
 
+    const currentContentsSourceId = selectedContentsSourceId()
     const plan = buildScanPlan({
       events,
-      sourceLifecycleSourceIds: sourceLifecycleSourceIds.value
+      sourceLifecycleSourceIds: sourceLifecycleSourceIds.value,
+      ...(currentContentsSourceId === undefined ? {} : { currentContentsSourceId })
     })
 
     void executeRefreshPlan(plan, refreshPlanExecutionDependencies())
@@ -1087,6 +1089,24 @@ function sourceNodeIdForSourceId(
     ) {
       return nodeId
     }
+  }
+
+  return undefined
+}
+
+function selectedContentsSourceId(): string | undefined {
+  const selectedId = selectedLibraryNodeId.value
+  const binding =
+    selectedId === undefined
+      ? undefined
+      : libraryBrowseProjection.value?.bindingsById.get(selectedId)
+
+  if (binding?.kind === 'source' && binding.target.entryPoint.kind === 'source') {
+    return binding.target.entryPoint.sourceId
+  }
+
+  if (binding?.kind === 'directory') {
+    return binding.sourceId
   }
 
   return undefined

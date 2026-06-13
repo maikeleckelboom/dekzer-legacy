@@ -154,12 +154,38 @@ describe('buildScanPlan', () => {
     for (const [index, kind] of terminalKinds.entries()) {
       const plan = buildScanPlan({
         events: [sourceScanEvent('7', index + 1, kind)],
-        sourceLifecycleSourceIds: new Set(['7'])
+        sourceLifecycleSourceIds: new Set(['7']),
+        currentContentsSourceId: '7'
       })
 
       expect(plan.refreshActiveSearchFilter).toBe(true)
       expect(plan.refreshExpandedBrowserWindows).toBe(true)
+      expect(plan.refreshCurrentContents).toBe(true)
     }
+  })
+
+  it('does not refresh selected contents for unrelated terminal scan events', () => {
+    const plan = buildScanPlan({
+      events: [sourceScanEvent('8', 1)],
+      sourceLifecycleSourceIds: new Set(['7', '8']),
+      currentContentsSourceId: '7'
+    })
+
+    expect(plan.refreshExpandedBrowserWindows).toBe(true)
+    expect(plan.refreshActiveSearchFilter).toBe(true)
+    expect(plan.refreshCurrentContents).toBe(false)
+  })
+
+  it('does not refresh selected contents for matching scan progress events', () => {
+    const plan = buildScanPlan({
+      events: [sourceScanEvent('7', 1, 'sourceScanProgressed')],
+      sourceLifecycleSourceIds: new Set(['7']),
+      currentContentsSourceId: '7'
+    })
+
+    expect(plan.refreshExpandedBrowserWindows).toBe(false)
+    expect(plan.refreshActiveSearchFilter).toBe(false)
+    expect(plan.refreshCurrentContents).toBe(false)
   })
 })
 
@@ -264,13 +290,14 @@ describe('executeRefreshPlan', () => {
     expect(plan.acknowledgeGapAfterExecution).toBe(true)
   })
 
-  it('terminal scan plans refresh browser windows but not navigation rows or contents', async () => {
+  it('terminal scan plans refresh browser windows but not navigation rows or unrelated contents', async () => {
     const deps = testDeps({
       sourceLifecycleRead: { refreshSourceLifecycles: vi.fn(async () => true) }
     })
     const plan = buildScanPlan({
       events: [sourceScanEvent('7', 1), sourceScanEvent('8', 2)],
-      sourceLifecycleSourceIds: new Set(['7'])
+      sourceLifecycleSourceIds: new Set(['7']),
+      currentContentsSourceId: '9'
     })
 
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
@@ -282,6 +309,36 @@ describe('executeRefreshPlan', () => {
     expect(deps.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledWith(new Set(['7']))
     expect(deps.refreshActiveSearchFilter).toHaveBeenCalledTimes(1)
+  })
+
+  it('terminal scan plans refresh matching selected contents after browser windows', async () => {
+    const calls: string[] = []
+    const deps = testDeps({
+      hierarchyRead: {
+        refresh: vi.fn(async () => true),
+        refreshNavigationRows: vi.fn(async () => true),
+        refreshBrowserWindows: vi.fn(async () => {
+          calls.push('browserWindows')
+          return true
+        })
+      },
+      refreshContentsForCurrentSelection: vi.fn(async () => {
+        calls.push('contents')
+        return true
+      })
+    })
+    const plan = buildScanPlan({
+      events: [sourceScanEvent('7', 1)],
+      sourceLifecycleSourceIds: new Set(['7']),
+      currentContentsSourceId: '7'
+    })
+
+    await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
+
+    expect(deps.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
+    expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
+    expect(deps.refreshContentsForCurrentSelection).toHaveBeenCalledTimes(1)
+    expect(calls).toEqual(['browserWindows', 'contents'])
   })
 
   it('continues independent refreshes after search/filter refresh fails', async () => {
@@ -441,6 +498,61 @@ describe('executeRefreshPlan', () => {
       }
     })
   })
+
+  it('refreshes a selected source root from zero known rows when its terminal scan arrives', async () => {
+    const responses: ContentsReadResult[] = [
+      readyContentsResult([], 'partial'),
+      readyContentsResult([audioRow('source-file:1', 'track.wav')], 'ready')
+    ]
+    const requests: ContentsReadRequest[] = []
+    const contentsRead = createContentsReadController({
+      read: async (request) => {
+        requests.push(request)
+        const response = responses.shift()
+        if (response === undefined) {
+          throw new Error('Unexpected contents read.')
+        }
+        return response
+      }
+    })
+    const selectedSourceBinding = sourceBinding('7')
+
+    contentsRead.start()
+    await expect(contentsRead.readForBinding(selectedSourceBinding)).resolves.toBe(true)
+
+    const plan = buildScanPlan({
+      events: [sourceScanEvent('7', 1, 'sourceScanCompleted')],
+      sourceLifecycleSourceIds: new Set(['7']),
+      currentContentsSourceId: '7'
+    })
+    await expect(
+      executeRefreshPlan(
+        plan,
+        testDeps({
+          refreshContentsForCurrentSelection: () =>
+            contentsRead.readForBinding(selectedSourceBinding, { force: true })
+        })
+      )
+    ).resolves.toBe(true)
+
+    expect(requests).toHaveLength(2)
+    expect(requests[1]).toEqual({
+      scope: { kind: 'source', sourceId: '7' },
+      policy: { kind: 'audioBrowse' },
+      scopeDepth: 'recursive',
+      limit: 100
+    })
+    expect(contentsRead.state.value).toMatchObject({
+      kind: 'ready',
+      result: {
+        state: 'ready',
+        result: {
+          state: 'ready',
+          rows: [{ id: 'source-file:1', label: 'track.wav' }]
+        }
+      }
+    })
+  })
 })
 
 describe('panel runtime wiring', () => {
@@ -554,6 +666,31 @@ function sourceScanEvent(
     mediaCandidates: 4,
     queuedWorkItems: 5,
     detail: null
+  }
+}
+
+function sourceBinding(sourceId: string): RowBinding {
+  return {
+    kind: 'source',
+    navigationRow: {
+      navigationRowId: sourceId,
+      stableKey: `source:${sourceId}`,
+      parentNavigationRowId: null,
+      family: 'sources',
+      rowKind: 'source',
+      displayName: 'Source Fixture',
+      siblingPosition: 0,
+      selectable: true,
+      selectorKind: 'source',
+      selectorPayload: sourceId,
+      updatedAtMs: 100,
+      rowVersion: '1'
+    },
+    target: {
+      navigationRowId: sourceId,
+      entryPoint: { kind: 'source', sourceId },
+      label: 'Source Fixture'
+    }
   }
 }
 

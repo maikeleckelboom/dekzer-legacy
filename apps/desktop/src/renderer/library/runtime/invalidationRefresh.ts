@@ -29,6 +29,7 @@ export type InvalidationPlanInput = {
 export type ScanPlanInput = {
   readonly events: readonly AppSourceScanEvent[]
   readonly sourceLifecycleSourceIds?: ReadonlySet<string>
+  readonly currentContentsSourceId?: string
 }
 
 export type RefreshPlanDeps = {
@@ -101,6 +102,7 @@ export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
   const visibleSourceIds = input.sourceLifecycleSourceIds
   let refreshExpandedBrowserWindows = false
   let refreshActiveSearchFilter = false
+  let refreshCurrentContents = false
 
   if (visibleSourceIds !== undefined) {
     for (const event of input.events) {
@@ -114,14 +116,21 @@ export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
     if (isTerminalSourceScanEvent(event)) {
       refreshExpandedBrowserWindows = true
       refreshActiveSearchFilter = true
-      break
+
+      if (
+        input.currentContentsSourceId !== undefined &&
+        event.rootId === input.currentContentsSourceId
+      ) {
+        refreshCurrentContents = true
+      }
     }
   }
 
   return refreshPlan({
     refreshExpandedBrowserWindows,
     refreshSourceLifecycleIds,
-    refreshActiveSearchFilter
+    refreshActiveSearchFilter,
+    refreshCurrentContents
   })
 }
 
