@@ -52,6 +52,12 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadNavigationRowsRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowRequest>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowByStableKeyRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadLocalBrowserEntryPointsRequest>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointKind>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointPlatform>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointAdmissionHint>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointFailureCode>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenRequest>(&cfg, &mut output);
     push_ts_decl::<crate::NavigableChildScopeState>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleRequest>(&cfg, &mut output);
@@ -113,6 +119,12 @@ pub fn generated_contract_index_ts() -> String {
     push_ts_decl::<crate::ReadNavigationRowsReply>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowReply>(&cfg, &mut output);
     push_ts_decl::<crate::LoadNavigationRowByStableKeyReply>(&cfg, &mut output);
+    push_ts_decl::<crate::ReadLocalBrowserEntryPointsReply>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointsReadStatus>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPoint>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointIdentity>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointAffordances>(&cfg, &mut output);
+    push_ts_decl::<crate::LocalBrowserEntryPointFailure>(&cfg, &mut output);
     push_ts_decl::<crate::ReadLibraryTreeChildrenReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceLifecycleReply>(&cfg, &mut output);
     push_ts_decl::<crate::ReadSourceIntegrityReply>(&cfg, &mut output);

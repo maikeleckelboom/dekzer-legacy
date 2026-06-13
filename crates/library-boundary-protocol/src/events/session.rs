@@ -42,6 +42,7 @@ impl MaintainedSnapshotScope {
             SnapshotReadCommand::ReadSourceFileAttachment(_)
             | SnapshotReadCommand::ReadAttachmentSourceFiles(_)
             | SnapshotReadCommand::ReadSourceAttachmentSummary(_)
+            | SnapshotReadCommand::ReadLocalBrowserEntryPoints(_)
             | SnapshotReadCommand::SearchFilterRead(_) => None,
         }
     }
@@ -264,9 +265,9 @@ mod tests {
         ContentsReadPolicy, ContentsReadRequest, ContentsScope, ContentsScopeDepth,
         LibraryTreeEntryPoint, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
         PrimaryMediaKind, ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenRequest,
-        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryRequest,
-        ReadSourceFileAttachmentRequest, ReadSourceIntegrityRequest, ReadSourceLifecycleRequest,
-        SnapshotReadCommand,
+        ReadLocalBrowserEntryPointsRequest, ReadNavigationRowsRequest,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentRequest,
+        ReadSourceIntegrityRequest, ReadSourceLifecycleRequest, SnapshotReadCommand,
     };
     use serde_json::json;
 
@@ -324,6 +325,7 @@ mod tests {
         }
 
         let explicit_attachment_reads = [
+            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest),
             SnapshotReadCommand::ReadSourceFileAttachment(ReadSourceFileAttachmentRequest {
                 source_file_id: 8,
             }),
@@ -340,7 +342,7 @@ mod tests {
             assert_eq!(
                 MaintainedSnapshotScope::for_snapshot_read(command),
                 None,
-                "attachment identity reads are explicit until a precise maintained scope exists"
+                "explicit non-maintained reads are not invalidated by source snapshot revisions"
             );
         }
     }

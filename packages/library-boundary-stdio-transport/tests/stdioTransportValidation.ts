@@ -220,6 +220,23 @@ async function validatesSuccessResponseResolution(): Promise<void> {
   }
 }
 
+async function validatesLocalBrowserEntryPointSnapshotResponse(): Promise<void> {
+  const transport = createTransport();
+  try {
+    const client = createLibraryBoundaryClient(transport);
+    const reply = await client.readLocalBrowserEntryPoints(null);
+
+    equal(reply.status, "complete", "local browser entry point read status is preserved");
+    equal(
+      reply.entries[0]?.identity.entryPointKind,
+      "music",
+      "local browser entry point fixture routes through stdio transport"
+    );
+  } finally {
+    await transport.close();
+  }
+}
+
 async function validatesProtocolErrorOutcomeIsPreserved(): Promise<void> {
   const transport = createTransport();
   try {
@@ -635,6 +652,7 @@ await validatesExecuteBeforeReadyWaitsForReadiness();
 await validatesProcessExitBeforeReadyRejectsReady();
 await validatesMalformedStdoutBeforeReadyRejectsReady();
 await validatesSuccessResponseResolution();
+await validatesLocalBrowserEntryPointSnapshotResponse();
 await validatesProtocolErrorOutcomeIsPreserved();
 await validatesClientTurnsProtocolErrorOutcomeIntoClientError();
 await validatesRemoteTransportErrorCodeParsing();

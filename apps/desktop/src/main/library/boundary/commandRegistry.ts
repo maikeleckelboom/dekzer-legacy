@@ -6,6 +6,7 @@ import {
 } from '../attachmentIdentity/read'
 import { readContentsThroughHost } from '../contents/read'
 import { readThroughHost } from '../hierarchy/read'
+import { readLocalBrowserEntryPointsThroughHost } from '../localBrowser/entryPoints'
 import { readNavigationRowsThroughHost } from '../navigation/read'
 import { readSearchFilterThroughHost } from '../searchFilter/read'
 import { cancelRootScanThroughHost, type CancelScanLogger } from '../roots/cancel'
@@ -87,6 +88,9 @@ export function registerLibraryIpcCommands(options: RegisterLibraryIpcCommandsOp
   )
   ipcMain.handle(libraryControlChannels.navigation.read, (_event, request) =>
     readNavigationRowsThroughHost(host, request)
+  )
+  ipcMain.handle(libraryControlChannels.localBrowser.entryPoints.read, () =>
+    readLocalBrowserEntryPointsThroughHost(host)
   )
   ipcMain.handle(libraryControlChannels.hierarchy.read, (_event, request) =>
     readThroughHost(host, request)

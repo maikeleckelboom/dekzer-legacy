@@ -187,6 +187,16 @@ directory. They do not operate on local browser candidate selectors.
 
 ## Local Browser Read Model Expectations
 
+Implemented V0 backend read:
+
+- `readLocalBrowserEntryPoints` returns the current platform's displayable local entry point candidates.
+- The read returns candidate status, identity, display name, platform, admission hint, affordance flags, and platform
+  failure detail when resolution partially fails.
+- The read is a snapshot read boundary only. It does not register sources, create source lifecycle rows, populate
+  navigation rows, start scans, or materialize inventory/facts/work.
+- Exact admitted source canonical path matches are marked as `duplicateOfAdmittedSource` while preserving the candidate
+  versus source distinction.
+
 Future backend reads should satisfy these constraints:
 
 - Read the available local browser entry points for the current platform.

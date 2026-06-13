@@ -2068,6 +2068,165 @@
         "navigationRowId"
       ]
     },
+    "LocalBrowserEntryPoint": {
+      "type": "object",
+      "properties": {
+        "admissionHint": {
+          "$ref": "#/$defs/LocalBrowserEntryPointAdmissionHint"
+        },
+        "affordances": {
+          "$ref": "#/$defs/LocalBrowserEntryPointAffordances"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalBrowserEntryPointFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "identity": {
+          "$ref": "#/$defs/LocalBrowserEntryPointIdentity"
+        },
+        "platform": {
+          "$ref": "#/$defs/LocalBrowserEntryPointPlatform"
+        },
+        "status": {
+          "$ref": "#/$defs/LocalBrowserEntryPointStatus"
+        }
+      },
+      "required": [
+        "identity",
+        "displayName",
+        "status",
+        "platform",
+        "admissionHint",
+        "affordances"
+      ]
+    },
+    "LocalBrowserEntryPointAdmissionHint": {
+      "type": "string",
+      "enum": [
+        "notDirectlyAdmissible",
+        "requiresConfirmation",
+        "defaultMusicFolder",
+        "duplicateOfAdmittedSource",
+        "unavailable",
+        "unsupportedPlatform"
+      ]
+    },
+    "LocalBrowserEntryPointAffordances": {
+      "type": "object",
+      "properties": {
+        "canBrowse": {
+          "type": "boolean"
+        },
+        "canChooseDescendant": {
+          "type": "boolean"
+        },
+        "canRequestAdmission": {
+          "type": "boolean"
+        },
+        "requiresConfirmation": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "canBrowse",
+        "canRequestAdmission",
+        "canChooseDescendant",
+        "requiresConfirmation"
+      ]
+    },
+    "LocalBrowserEntryPointFailure": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/LocalBrowserEntryPointFailureCode"
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ]
+    },
+    "LocalBrowserEntryPointFailureCode": {
+      "type": "string",
+      "enum": [
+        "unsupportedPlatform",
+        "knownFolderUnavailable",
+        "systemDriveUnavailable",
+        "volumeEnumerationUnavailable",
+        "metadataUnavailable"
+      ]
+    },
+    "LocalBrowserEntryPointIdentity": {
+      "type": "object",
+      "properties": {
+        "canonicalPath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "entryPointKind": {
+          "$ref": "#/$defs/LocalBrowserEntryPointKind"
+        }
+      },
+      "required": [
+        "entryPointKind"
+      ]
+    },
+    "LocalBrowserEntryPointKind": {
+      "type": "string",
+      "enum": [
+        "systemDriveRoot",
+        "localDataVolumeRoot",
+        "removableVolumeRoot",
+        "userHome",
+        "desktop",
+        "downloads",
+        "music"
+      ]
+    },
+    "LocalBrowserEntryPointPlatform": {
+      "type": "string",
+      "enum": [
+        "windows",
+        "macos",
+        "linux",
+        "unsupported"
+      ]
+    },
+    "LocalBrowserEntryPointStatus": {
+      "type": "string",
+      "enum": [
+        "resolving",
+        "available",
+        "unavailable",
+        "permissionBlocked",
+        "missing",
+        "unsupportedPlatform",
+        "duplicateOfAdmittedSource"
+      ]
+    },
+    "LocalBrowserEntryPointsReadStatus": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partialFailure",
+        "failed",
+        "unsupportedPlatform"
+      ]
+    },
     "LocalRoot": {
       "type": "object",
       "properties": {
@@ -2586,6 +2745,37 @@
         "offset",
         "limit"
       ]
+    },
+    "ReadLocalBrowserEntryPointsReply": {
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LocalBrowserEntryPoint"
+          }
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LocalBrowserEntryPointFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/LocalBrowserEntryPointsReadStatus"
+        }
+      },
+      "required": [
+        "status",
+        "entries"
+      ]
+    },
+    "ReadLocalBrowserEntryPointsRequest": {
+      "type": "null"
     },
     "ReadLocalRootsReply": {
       "type": "object",
@@ -3814,6 +4004,22 @@
           "type": "object",
           "properties": {
             "payload": {
+              "$ref": "#/$defs/ReadLocalBrowserEntryPointsRequest"
+            },
+            "type": {
+              "type": "string",
+              "const": "readLocalBrowserEntryPoints"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/ReadLibraryTreeChildrenRequest"
             },
             "type": {
@@ -4015,6 +4221,22 @@
             "type": {
               "type": "string",
               "const": "navigationRowByStableKey"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ReadLocalBrowserEntryPointsReply"
+            },
+            "type": {
+              "type": "string",
+              "const": "localBrowserEntryPoints"
             }
           },
           "required": [

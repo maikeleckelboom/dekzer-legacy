@@ -1,5 +1,6 @@
 #![deny(unsafe_code)]
 
+mod local_browser_entry_points;
 mod search_filter_protocol;
 mod service;
 mod session_events;

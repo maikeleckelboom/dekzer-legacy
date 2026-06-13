@@ -648,6 +648,62 @@ async function validatesSourceIntegrityReadRequestAndReply(): Promise<void> {
   )
 }
 
+async function validatesLocalBrowserEntryPointReadRequestAndReply(): Promise<void> {
+  const transport = new RecordingTransport()
+  transport.enqueueOutcome(
+    success({
+      type: 'snapshotRead',
+      payload: {
+        type: 'localBrowserEntryPoints',
+        payload: {
+          status: 'complete',
+          entries: [
+            {
+              identity: {
+                entryPointKind: 'music',
+                canonicalPath: 'C:\\Users\\DJ\\Music'
+              },
+              displayName: 'Music',
+              status: 'available',
+              platform: 'windows',
+              admissionHint: 'defaultMusicFolder',
+              affordances: {
+                canBrowse: true,
+                canRequestAdmission: true,
+                canChooseDescendant: true,
+                requiresConfirmation: false
+              },
+              failure: null
+            }
+          ],
+          failure: null
+        }
+      }
+    })
+  )
+  const client = new LibraryBoundaryClient(transport)
+
+  const reply = await client.readLocalBrowserEntryPoints(null)
+
+  deepEqual(
+    transport.sentRequests[0],
+    {
+      type: 'snapshotRead',
+      payload: {
+        type: 'readLocalBrowserEntryPoints',
+        payload: null
+      }
+    } satisfies CommandRequest,
+    'readLocalBrowserEntryPoints sends the generated snapshot command'
+  )
+  equal(reply.entries[0]?.identity.entryPointKind, 'music', 'entry point kind is preserved')
+  equal(
+    reply.entries[0]?.admissionHint,
+    'defaultMusicFolder',
+    'admission hint is preserved'
+  )
+}
+
 async function validatesTrackIdentityDecisionRequestsAndReplies(): Promise<void> {
   const transport = new RecordingTransport()
   transport.enqueueOutcome(
@@ -1414,6 +1470,7 @@ await validatesRegisterLocalRootRequestAndReply()
 await validatesHashSourceFilesBlake3RequestAndReply()
 await validatesSourceMaintenanceRequestsAndReplies()
 await validatesSourceIntegrityReadRequestAndReply()
+await validatesLocalBrowserEntryPointReadRequestAndReply()
 await validatesTrackIdentityDecisionRequestsAndReplies()
 await validatesTrackIdentityReviewCandidateReads()
 await validatesAttachmentIdentityReadRequestsAndReplies()

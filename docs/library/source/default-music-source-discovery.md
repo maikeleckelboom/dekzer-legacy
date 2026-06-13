@@ -37,10 +37,13 @@ If the platform API fails to return a path, discovery produces no candidate. Do 
 
 ## Discovery Behavior
 
-Discovery runs during startup as a bounded, non-scanning startup task. It must not block first shell render. It may
-complete shortly after the library surface mounts. Even a cheap stat can hang on cloud-redirected, network-backed, or
-broken shell-folder paths, so discovery must be async with a hard timeout (suggested: 2s). It is a stat check, not a
-scan.
+The implemented V0 read path for this candidate is `readLocalBrowserEntryPoints`. The Music row returned by that read is
+the `music` local browser entry point with the `defaultMusicFolder` admission hint when the platform Music folder is
+resolved. It remains a candidate until the user acts and admission succeeds.
+
+Discovery runs as a bounded, non-scanning read. It must not block first shell render. It may complete shortly after the
+library surface mounts. Even a cheap stat can hang on cloud-redirected, network-backed, or broken shell-folder paths, so
+discovery must be async with a hard timeout (suggested: 2s). It is a stat check, not a scan.
 
 Steps:
 

@@ -119,6 +119,249 @@ pub struct LoadNavigationRowByStableKeyReply {
 )]
 #[serde(rename_all = "camelCase")]
 #[ts(rename_all = "camelCase")]
+pub struct ReadLocalBrowserEntryPointsRequest;
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct ReadLocalBrowserEntryPointsReply {
+    pub status: LocalBrowserEntryPointsReadStatus,
+    pub entries: Vec<LocalBrowserEntryPoint>,
+    pub failure: Option<LocalBrowserEntryPointFailure>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserEntryPointsReadStatus {
+    Complete,
+    PartialFailure,
+    Failed,
+    UnsupportedPlatform,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserEntryPoint {
+    pub identity: LocalBrowserEntryPointIdentity,
+    pub display_name: String,
+    pub status: LocalBrowserEntryPointStatus,
+    pub platform: LocalBrowserEntryPointPlatform,
+    pub admission_hint: LocalBrowserEntryPointAdmissionHint,
+    pub affordances: LocalBrowserEntryPointAffordances,
+    pub failure: Option<LocalBrowserEntryPointFailure>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserEntryPointIdentity {
+    pub entry_point_kind: LocalBrowserEntryPointKind,
+    pub canonical_path: Option<String>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserEntryPointKind {
+    SystemDriveRoot,
+    LocalDataVolumeRoot,
+    RemovableVolumeRoot,
+    UserHome,
+    Desktop,
+    Downloads,
+    Music,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserEntryPointStatus {
+    Resolving,
+    Available,
+    Unavailable,
+    PermissionBlocked,
+    Missing,
+    UnsupportedPlatform,
+    DuplicateOfAdmittedSource,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserEntryPointPlatform {
+    Windows,
+    Macos,
+    Linux,
+    Unsupported,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserEntryPointAdmissionHint {
+    NotDirectlyAdmissible,
+    RequiresConfirmation,
+    DefaultMusicFolder,
+    DuplicateOfAdmittedSource,
+    Unavailable,
+    UnsupportedPlatform,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserEntryPointAffordances {
+    pub can_browse: bool,
+    pub can_request_admission: bool,
+    pub can_choose_descendant: bool,
+    pub requires_confirmation: bool,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub struct LocalBrowserEntryPointFailure {
+    pub code: LocalBrowserEntryPointFailureCode,
+    pub detail: String,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
+pub enum LocalBrowserEntryPointFailureCode {
+    UnsupportedPlatform,
+    KnownFolderUnavailable,
+    SystemDriveUnavailable,
+    VolumeEnumerationUnavailable,
+    MetadataUnavailable,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+    ts_rs::TS,
+)]
+#[serde(rename_all = "camelCase")]
+#[ts(rename_all = "camelCase")]
 pub struct NavigationRow {
     #[serde(with = "crate::wire::i64_string")]
     #[schemars(with = "String")]
@@ -1954,6 +2197,7 @@ pub enum SnapshotReadCommand {
     ReadNavigationRows(ReadNavigationRowsRequest),
     LoadNavigationRow(LoadNavigationRowRequest),
     LoadNavigationRowByStableKey(LoadNavigationRowByStableKeyRequest),
+    ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest),
     ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest),
     ReadSourceLifecycle(ReadSourceLifecycleRequest),
     ReadSourceIntegrity(ReadSourceIntegrityRequest),
@@ -1975,6 +2219,7 @@ pub enum SnapshotReadReply {
     NavigationRows(ReadNavigationRowsReply),
     NavigationRow(LoadNavigationRowReply),
     NavigationRowByStableKey(LoadNavigationRowByStableKeyReply),
+    LocalBrowserEntryPoints(ReadLocalBrowserEntryPointsReply),
     LibraryTreeChildren(ReadLibraryTreeChildrenReply),
     SourceLifecycle(ReadSourceLifecycleReply),
     SourceIntegrity(Box<ReadSourceIntegrityReply>),
@@ -1997,17 +2242,22 @@ mod tests {
         DirectoryScanState, LibraryTreeCoverage, LibraryTreeCoverageState, LibraryTreeEntryPoint,
         LibraryTreeFileClass, LibraryTreeNode, LibraryTreeNodeKind, LibraryTreePresenceState,
         LibraryTreeWindow, LoadNavigationRowByStableKeyRequest, LoadNavigationRowRequest,
-        NavigableChildScopeState, NavigationRow, NavigationRowFamily, NavigationRowKind,
-        NavigationRowSelectorKind, PrimaryMediaKind, ReadAttachmentSourceFilesReply,
-        ReadAttachmentSourceFilesRequest, ReadLibraryTreeChildrenReply,
-        ReadLibraryTreeChildrenRequest, ReadNavigationRowsRequest,
-        ReadSourceAttachmentSummaryReply, ReadSourceAttachmentSummaryRequest,
-        ReadSourceFileAttachmentReply, ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply,
-        ReadSourceLifecycleReply, ReadSourceLifecycleRequest,
-        ReadTrackIdentityReviewCandidatesReply, ReadTrackIdentityReviewCandidatesRequest,
-        SearchFilterFileClass, SnapshotReadCommand, SnapshotReadReply, SourceAccessState,
-        SourceAttachmentSummary, SourceClass, SourceFileAttachmentLink,
-        SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
+        LocalBrowserEntryPoint, LocalBrowserEntryPointAdmissionHint,
+        LocalBrowserEntryPointAffordances, LocalBrowserEntryPointFailure,
+        LocalBrowserEntryPointFailureCode, LocalBrowserEntryPointIdentity,
+        LocalBrowserEntryPointKind, LocalBrowserEntryPointPlatform, LocalBrowserEntryPointStatus,
+        LocalBrowserEntryPointsReadStatus, NavigableChildScopeState, NavigationRow,
+        NavigationRowFamily, NavigationRowKind, NavigationRowSelectorKind, PrimaryMediaKind,
+        ReadAttachmentSourceFilesReply, ReadAttachmentSourceFilesRequest,
+        ReadLibraryTreeChildrenReply, ReadLibraryTreeChildrenRequest,
+        ReadLocalBrowserEntryPointsReply, ReadLocalBrowserEntryPointsRequest,
+        ReadNavigationRowsRequest, ReadSourceAttachmentSummaryReply,
+        ReadSourceAttachmentSummaryRequest, ReadSourceFileAttachmentReply,
+        ReadSourceFileAttachmentRequest, ReadSourceIntegrityReply, ReadSourceLifecycleReply,
+        ReadSourceLifecycleRequest, ReadTrackIdentityReviewCandidatesReply,
+        ReadTrackIdentityReviewCandidatesRequest, SearchFilterFileClass, SnapshotReadCommand,
+        SnapshotReadReply, SourceAccessState, SourceAttachmentSummary, SourceClass,
+        SourceFileAttachmentLink, SourceFileAttachmentLinkStatus, SourceIntegrityAvailability,
         SourceIntegrityAvailabilityState, SourceIntegrityCoverage,
         SourceIntegrityEvidenceAndMaintenance, SourceIntegrityRuntimeMaintenance,
         SourceIntegrityRuntimeMaintenanceState, SourceLifecycle, SourceLifecycleIssueKind,
@@ -2025,6 +2275,8 @@ mod tests {
         let navigation = SnapshotReadCommand::ReadNavigationRows(ReadNavigationRowsRequest {
             parent_navigation_row_id: Some(7),
         });
+        let entry_points =
+            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest);
         let library_tree =
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
@@ -2040,6 +2292,10 @@ mod tests {
             })
         ));
         assert!(matches!(
+            entry_points,
+            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest)
+        ));
+        assert!(matches!(
             library_tree,
             SnapshotReadCommand::ReadLibraryTreeChildren(ReadLibraryTreeChildrenRequest {
                 entry_point: LibraryTreeEntryPoint::Source { source_id: 7 },
@@ -2048,6 +2304,85 @@ mod tests {
                 limit: 50,
             },)
         ));
+    }
+
+    #[test]
+    fn local_browser_entry_points_serialize_candidate_boundary_shape() {
+        let command =
+            SnapshotReadCommand::ReadLocalBrowserEntryPoints(ReadLocalBrowserEntryPointsRequest);
+        let command_json = serde_json::to_value(&command).expect("serialize command");
+        assert_eq!(
+            command_json,
+            json!({
+                "type": "readLocalBrowserEntryPoints",
+                "payload": null
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadCommand>(command_json)
+                .expect("deserialize command"),
+            command
+        );
+
+        let reply = SnapshotReadReply::LocalBrowserEntryPoints(ReadLocalBrowserEntryPointsReply {
+            status: LocalBrowserEntryPointsReadStatus::Complete,
+            entries: vec![LocalBrowserEntryPoint {
+                identity: LocalBrowserEntryPointIdentity {
+                    entry_point_kind: LocalBrowserEntryPointKind::Music,
+                    canonical_path: Some("C:\\Users\\DJ\\Music".to_string()),
+                },
+                display_name: "Music".to_string(),
+                status: LocalBrowserEntryPointStatus::Available,
+                platform: LocalBrowserEntryPointPlatform::Windows,
+                admission_hint: LocalBrowserEntryPointAdmissionHint::DefaultMusicFolder,
+                affordances: LocalBrowserEntryPointAffordances {
+                    can_browse: true,
+                    can_request_admission: true,
+                    can_choose_descendant: true,
+                    requires_confirmation: false,
+                },
+                failure: None,
+            }],
+            failure: Some(LocalBrowserEntryPointFailure {
+                code: LocalBrowserEntryPointFailureCode::VolumeEnumerationUnavailable,
+                detail: "volume enumeration failed".to_string(),
+            }),
+        });
+        let reply_json = serde_json::to_value(&reply).expect("serialize reply");
+        assert_eq!(
+            reply_json,
+            json!({
+                "type": "localBrowserEntryPoints",
+                "payload": {
+                    "status": "complete",
+                    "entries": [{
+                        "identity": {
+                            "entryPointKind": "music",
+                            "canonicalPath": "C:\\Users\\DJ\\Music"
+                        },
+                        "displayName": "Music",
+                        "status": "available",
+                        "platform": "windows",
+                        "admissionHint": "defaultMusicFolder",
+                        "affordances": {
+                            "canBrowse": true,
+                            "canRequestAdmission": true,
+                            "canChooseDescendant": true,
+                            "requiresConfirmation": false
+                        },
+                        "failure": null
+                    }],
+                    "failure": {
+                        "code": "volumeEnumerationUnavailable",
+                        "detail": "volume enumeration failed"
+                    }
+                }
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<SnapshotReadReply>(reply_json).expect("deserialize reply"),
+            reply
+        );
     }
 
     #[test]

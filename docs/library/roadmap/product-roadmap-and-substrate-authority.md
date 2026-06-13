@@ -55,6 +55,9 @@ The next sequence is documentation and contract authority first, then bounded im
 This keeps the V0 local DJ foundation first: visible local entry points, explicit admission, explicit scan, deterministic
 reads, and stable projection before broader workspace, preparation, waveform, or runtime surfaces.
 
+The implemented local browser entry point read boundary is `readLocalBrowserEntryPoints`. It is a read-only candidate
+listing boundary and does not implement local browse UI, child browsing, source admission, or scan start.
+
 A-5 attachment occurrence remains the accepted evidence-only substrate feeding A-6. It does not decide duplicate song,
 safe deletion, preferred copy, accepted relocation, canonical track, cleanup, or track merge.
 

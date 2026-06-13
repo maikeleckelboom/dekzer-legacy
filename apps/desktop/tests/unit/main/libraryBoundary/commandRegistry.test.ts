@@ -98,6 +98,7 @@ function expectedLibraryControlChannels(): readonly string[] {
     libraryControlChannels.contents.read,
     libraryControlChannels.searchFilter.read,
     libraryControlChannels.hierarchy.read,
+    libraryControlChannels.localBrowser.entryPoints.read,
     libraryControlChannels.navigation.read,
     libraryControlChannels.roots.cancel,
     libraryControlChannels.roots.chooseLocal,

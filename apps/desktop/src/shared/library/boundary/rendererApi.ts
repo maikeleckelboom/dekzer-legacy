@@ -6,6 +6,7 @@ import type {
   PersistedLibraryViewState
 } from '../viewState/persistence'
 import type { ReadRequest, ReadResult } from '../hierarchy/read'
+import type { ReadLocalBrowserEntryPointsOutcome } from '../localBrowser/entryPoints'
 import type { NavigationReadRowsRequest, NavigationReadRowsResult } from '../navigation/read'
 import type { ContentsReadRequest, ContentsReadResult } from '../contents/read'
 import type { SearchFilterReadRequest, SearchFilterReadResult } from '../searchFilter/read'
@@ -41,6 +42,7 @@ import type { UnregisterLocalRootRequest, UnregisterLocalRootResult } from '../r
 
 export type LibraryApi = {
   readonly host: LibraryHostApi
+  readonly localBrowser: LibraryLocalBrowserApi
   readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
   readonly sourceLifecycle: LibrarySourceLifecycleApi
@@ -65,6 +67,10 @@ export type BoundaryEventDeliveryCallback = (payload: BoundaryEventDeliveryPaylo
 export type LibraryHostApi = {
   getStatus(): Promise<LibraryBoundaryHostStatus>
   onStatusChanged(callback: LibraryBoundaryHostStatusChangedCallback): () => void
+}
+
+export type LibraryLocalBrowserApi = {
+  readEntryPoints(): Promise<ReadLocalBrowserEntryPointsOutcome>
 }
 
 export type LibraryHierarchyApi = {

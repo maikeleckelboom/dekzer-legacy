@@ -7,6 +7,7 @@ import {
   type PersistedLibraryViewState
 } from '../shared/library/viewState/persistence'
 import { type ReadRequest, type ReadResult } from '../shared/library/hierarchy/read'
+import type { ReadLocalBrowserEntryPointsOutcome } from '../shared/library/localBrowser/entryPoints'
 import {
   type NavigationReadRowsRequest,
   type NavigationReadRowsResult
@@ -102,6 +103,13 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
           return () => {
             ipcRenderer.off(libraryPublicationChannels.boundary.statusChanged, listener)
           }
+        }
+      },
+      localBrowser: {
+        async readEntryPoints(): Promise<ReadLocalBrowserEntryPointsOutcome> {
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.localBrowser.entryPoints.read
+          )) as ReadLocalBrowserEntryPointsOutcome
         }
       },
       navigation: {

@@ -21,6 +21,11 @@ export const libraryControlChannels = {
   hierarchy: {
     read: 'desktop:library-hierarchy:read-children'
   },
+  localBrowser: {
+    entryPoints: {
+      read: 'desktop:library-local-browser-entry-points:read'
+    }
+  },
   navigation: {
     read: 'desktop:library-navigation:read-rows'
   },

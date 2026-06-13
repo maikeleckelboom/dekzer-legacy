@@ -50,6 +50,14 @@ stdin.on("line", (line) => {
     return;
   }
 
+  const commandFamily = envelope.request.type;
+  const commandType = envelope.request.payload.type;
+
+  if (commandFamily === "snapshotRead" && commandType === "readLocalBrowserEntryPoints") {
+    writeLocalBrowserEntryPointsSuccess(envelope);
+    return;
+  }
+
   const absolutePath = String(
     envelope.request.payload.payload.absolutePath ?? ""
   );
@@ -184,6 +192,47 @@ function writeSuccess(envelope: RequestEnvelope, rootId: string): void {
                 rootId,
                 canonicalPath: `fixture:${rootId}`
               }
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function writeLocalBrowserEntryPointsSuccess(envelope: RequestEnvelope): void {
+  writeEnvelope({
+    type: "commandOutcome",
+    requestId: envelope.requestId,
+    outcome: {
+      type: "success",
+      payload: {
+        reply: {
+          type: "snapshotRead",
+          payload: {
+            type: "localBrowserEntryPoints",
+            payload: {
+              status: "complete",
+              entries: [
+                {
+                  identity: {
+                    entryPointKind: "music",
+                    canonicalPath: "C:\\Users\\DJ\\Music"
+                  },
+                  displayName: "Music",
+                  status: "available",
+                  platform: "windows",
+                  admissionHint: "defaultMusicFolder",
+                  affordances: {
+                    canBrowse: true,
+                    canRequestAdmission: true,
+                    canChooseDescendant: true,
+                    requiresConfirmation: false
+                  },
+                  failure: null
+                }
+              ],
+              failure: null
             }
           }
         }
