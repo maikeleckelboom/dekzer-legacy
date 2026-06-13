@@ -8,19 +8,26 @@ import type {
 import type { LibraryPanelSurface } from '../../../shared/library/viewState/persistence'
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
 import type { LocalBrowseOperation } from '../../../shared/library/localBrowse/entryPoints'
-import { libraryBrowseEmptyStateLabel } from '../libraryBrowseProfile/types'
 import {
   projectAddSourceProjection,
   type AddSourceAction,
   type AddSourceProjection,
   type AddSourceRow
 } from '../addSource/projection'
+import {
+  libraryBrowseEmptyStateLabel,
+  projectLibraryHome,
+  type LibraryHomeAction,
+  type LibraryHomeProjection,
+  type LibraryHomeRow
+} from '../libraryHome/projection'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserState, RowBinding } from '../state'
 import type { BrowserTreeNodeId } from '../tree/types'
 import { formatSourceDisplayName } from '../tree/sourcePresentation'
 
 export type ContentProjectionKind =
+  | 'libraryHome'
   | 'libraryStart'
   | 'emptySelection'
   | 'unsupported'
@@ -31,6 +38,7 @@ export type ContentProjectionKind =
 
 export type ContentSurfaceKind =
   | 'indexedContents'
+  | 'libraryHome'
   | 'libraryStart'
   | 'addSource'
   | 'sourcePreview'
@@ -137,6 +145,11 @@ const librarySurface = {
   surfaceLabel: 'Library'
 } satisfies ContentSurface
 
+const libraryHomeSurface = {
+  surfaceKind: 'libraryHome',
+  surfaceLabel: 'Library'
+} satisfies ContentSurface
+
 const sourceStatusSurface = {
   surfaceKind: 'sourceStatus',
   surfaceLabel: 'Source Status'
@@ -177,15 +190,12 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
     }
 
     if (options.surface === 'libraryBrowse') {
-      return stateProjection({
-        surface: librarySurface,
-        kind: 'emptySelection',
-        ownerId: 'selection',
-        title: 'Select a source',
-        state: 'empty',
-        label: 'No source selected',
-        detail: 'Select an admitted source to browse indexed contents.'
-      })
+      return contentProjectionFromLibraryHome(
+        projectLibraryHome({
+          state: options.state,
+          ...(options.bindingsById === undefined ? {} : { bindingsById: options.bindingsById })
+        })
+      )
     }
 
     return stateProjection({
@@ -343,6 +353,39 @@ function contentProjectionFromAddSource(projection: AddSourceProjection): Conten
     ...(projection.detail === undefined ? {} : { detail: projection.detail }),
     rows: projection.rows.map(contentRowFromAddSource)
   })
+}
+
+function contentProjectionFromLibraryHome(projection: LibraryHomeProjection): ContentProjection {
+  return contentProjection(libraryHomeSurface, {
+    kind: 'libraryHome',
+    title: projection.title,
+    detail: projection.detail,
+    rows: projection.rows.map(contentRowFromLibraryHome)
+  })
+}
+
+function contentRowFromLibraryHome(row: LibraryHomeRow): ContentRow {
+  return {
+    id: row.id,
+    kind: 'state',
+    label: row.label,
+    detail: row.detail,
+    state: row.state,
+    icon:
+      row.state === 'loading'
+        ? 'loading'
+        : row.state === 'failed' || row.state === 'unsupported'
+          ? 'warning'
+          : 'state',
+    ...(row.action === undefined ? {} : { action: contentActionFromLibraryHome(row.action) })
+  }
+}
+
+function contentActionFromLibraryHome(action: LibraryHomeAction): ContentRowAction {
+  switch (action.kind) {
+    case 'chooseMusicFolder':
+      return action
+  }
 }
 
 function addSourceContentSurface(projection: AddSourceProjection): ContentSurface {
@@ -1016,8 +1059,8 @@ function contentsDetail(
     return result.detail
   }
 
-  if (rowCount === 0 && (result.state === 'ready' || result.state === 'empty')) {
-    return contentsStateLabel(result, rowCount)
+  if (rowCount === 0) {
+    return contentsCoveragePrefix(result) ?? contentsStateLabel(result, rowCount)
   }
 
   if (rowCount === 1) {
@@ -1115,18 +1158,30 @@ function sourceFileInventoryEmptyLabel(
 
 function contentsCoveragePrefix(result: ContentsResult): string | undefined {
   if (result.state === 'partial') {
-    return 'Still indexing. Results may be incomplete.'
+    return indexingDetail(result)
   }
 
   if (result.scopeCoverage.state === 'pending' || result.scopeCoverage.state === 'scanning') {
-    return 'Indexing is incomplete.'
+    return indexingDetail(result)
   }
 
   if (result.scopeCoverage.state === 'incomplete') {
-    return 'One or more accepted source locations are missing. Results may be incomplete.'
+    return 'One or more source locations are missing. Results may be incomplete.'
   }
 
   return undefined
+}
+
+function indexingDetail(result: ContentsResult): string {
+  switch (result.policy.kind) {
+    case 'audioBrowse':
+      return 'Still indexing. More tracks may appear as scanning finishes.'
+    case 'playableMediaBrowse':
+    case 'playableMedia':
+      return 'Still indexing. More playable media may appear as scanning finishes.'
+    case 'sourceFileInventory':
+      return 'Still indexing. More files may appear as scanning finishes.'
+  }
 }
 
 function loadMoreRow(

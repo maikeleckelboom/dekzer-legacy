@@ -9,12 +9,13 @@ import type { SourceReadiness } from '../runtime/sourceReadiness'
 import type { SourceLifecycleRecord } from '../../../shared/library/source/lifecycle'
 import type { StatusContext } from './context'
 import { projectAddSourceStatusText } from '../addSource/projection'
+import { projectLibrarySourceReadiness } from '../libraryHome/projection'
 
 export type StatusBadge =
   | 'Ready'
-  | 'Scanning'
+  | 'Indexing'
   | 'Still indexing'
-  | 'No audio tracks'
+  | 'No audio tracks in this view'
   | 'Needs scan'
   | 'Maintenance needed'
   | 'Maintenance running'
@@ -212,7 +213,7 @@ function registeredStatus(
 
 function registeredBadge(input: StatusViewInput): StatusBadge {
   if (input.scanStatus === 'scanning' || input.sourceLifecycle?.scanPhase === 'scanning') {
-    return 'Scanning'
+    return 'Indexing'
   }
 
   const availability = input.sourceIntegrity?.sourceAvailability.state
@@ -256,6 +257,19 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
     return 'Partial'
   }
 
+  const sourceReadinessBadge =
+    input.sourceReadiness === undefined
+      ? undefined
+      : projectLibrarySourceReadiness({ sourceReadiness: input.sourceReadiness }).badge
+  if (
+    sourceReadinessBadge === 'Missing' ||
+    sourceReadinessBadge === 'Blocked' ||
+    sourceReadinessBadge === 'Offline/unavailable' ||
+    sourceReadinessBadge === 'Indexing'
+  ) {
+    return sourceReadinessBadge
+  }
+
   const coverage = input.sourceIntegrity?.coverageIntegrity.state
   if (coverage === 'locationMissing') {
     return 'Missing'
@@ -273,7 +287,7 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
     return 'Needs scan'
   }
   if (coverage === 'scanning') {
-    return 'Scanning'
+    return 'Indexing'
   }
 
   if (input.maintenanceRunState === 'running' || input.sourceMaintenance?.status === 'running') {
@@ -290,6 +304,10 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
     return 'Maintenance needed'
   }
 
+  if (sourceReadinessBadge !== undefined) {
+    return sourceReadinessBadge
+  }
+
   if (
     input.sourceLifecycle !== undefined &&
     input.sourceLifecycle.scanPhase === 'idle' &&
@@ -298,11 +316,7 @@ function registeredBadge(input: StatusViewInput): StatusBadge {
     return 'Needs scan'
   }
 
-  if (input.sourceReadiness?.kind === 'empty') {
-    return 'No audio tracks'
-  }
-
-  if (input.sourceReadiness?.kind === 'ready' || coverage === 'complete') {
+  if (coverage === 'complete') {
     return 'Ready'
   }
 
@@ -340,7 +354,7 @@ function compactDetail(input: StatusViewInput, prefix: string | undefined): stri
   }
 
   if (input.sourceReadiness?.kind === 'empty') {
-    return 'No audio tracks found in this view.'
+    return 'No audio tracks in this view.'
   }
 
   return input.sourceReadiness?.detail ?? 'Source status is current.'
@@ -491,7 +505,7 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
   switch (badge) {
     case 'Ready':
       return 'ready'
-    case 'Scanning':
+    case 'Indexing':
     case 'Still indexing':
       return 'active'
     case 'Needs scan':
@@ -503,7 +517,7 @@ function toneForBadge(badge: StatusBadge): StatusView['tone'] {
     case 'Protected location':
     case 'Already added':
     case 'Partial':
-    case 'No audio tracks':
+    case 'No audio tracks in this view':
       return 'warning'
     case 'Maintenance running':
       return 'active'

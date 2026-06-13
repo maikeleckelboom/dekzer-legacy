@@ -38,14 +38,3 @@ export function mapLibraryBrowseProfileToContentsPolicy(
       }
   }
 }
-
-export function libraryBrowseEmptyStateLabel(profile: LibraryBrowseProfile): string {
-  switch (profile) {
-    case 'audio':
-      return 'No audio tracks'
-    case 'playable':
-      return 'No playable media'
-    case 'allFiles':
-      return 'No files'
-  }
-}

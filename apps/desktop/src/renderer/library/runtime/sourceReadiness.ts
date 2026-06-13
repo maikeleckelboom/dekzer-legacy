@@ -11,6 +11,7 @@ export type SourceReadinessKind =
   | 'rescanRunning'
   | 'ready'
   | 'empty'
+  | 'missing'
   | 'unavailable'
   | 'blocked'
   | 'failed'
@@ -136,7 +137,7 @@ export function deriveSourceReadiness(input: SourceReadinessInput): SourceReadin
   return readiness(
     input,
     'registered',
-    'The source is registered. Scan or expand it to read library rows.'
+    'The source is registered. Scan source to index your music.'
   )
 }
 
@@ -173,7 +174,7 @@ function backendSourceLifecycleBarrierReadiness(
 
   switch (lifecycle.accessState) {
     case 'missing':
-      return readiness(input, 'unavailable', 'The registered source root is missing.')
+      return readiness(input, 'missing', 'The registered source root is missing.')
     case 'blocked':
       return readiness(
         input,
@@ -275,7 +276,7 @@ function sourceReadStateReadiness(input: SourceReadinessInput): SourceReadiness 
   switch (coverage.state) {
     case 'sourceUnavailable':
     case 'locationMissing':
-      return readiness(input, 'unavailable', coverage.detail ?? 'The source is unavailable.')
+      return readiness(input, 'missing', coverage.detail ?? 'The source location is missing.')
     case 'blocked':
       return readiness(input, 'blocked', coverage.detail ?? 'The source is blocked.')
     case 'failed':

@@ -222,7 +222,7 @@ describe('source status projection', () => {
       sourceMaintenance: maintenance({ remainingHashCandidates: 1 })
     })
 
-    expect(view.badge).toBe('Scanning')
+    expect(view.badge).toBe('Indexing')
     expect(view.actions.find((action) => action.kind === 'scanSource')).toMatchObject({
       enabled: false,
       reason: 'A scan is running.'
@@ -291,8 +291,8 @@ describe('source status projection', () => {
       }
     })
 
-    expect(view.badge).toBe('No audio tracks')
-    expect(view.detail).toBe('No audio tracks found in this view.')
+    expect(view.badge).toBe('No audio tracks in this view')
+    expect(view.detail).toBe('No audio tracks in this view.')
   })
 
   it('registered source fallback is concrete while rows are unresolved', () => {

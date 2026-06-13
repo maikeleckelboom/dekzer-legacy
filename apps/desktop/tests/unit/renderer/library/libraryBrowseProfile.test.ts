@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { createLibraryBrowseProfileController } from '../../../../src/renderer/library/libraryBrowseProfile/controller'
 import {
-  libraryBrowseEmptyStateLabel,
   mapLibraryBrowseProfileToContentsPolicy,
   libraryBrowseProfileLabel,
   libraryBrowseProfileOptions
@@ -48,12 +47,6 @@ describe('library browse profile', () => {
       kind: 'sourceFileInventory',
       fileClasses: ['audio', 'video', 'image', 'unsupported']
     })
-  })
-
-  it('maps empty-state copy by profile', () => {
-    expect(libraryBrowseEmptyStateLabel('audio')).toBe('No audio tracks')
-    expect(libraryBrowseEmptyStateLabel('playable')).toBe('No playable media')
-    expect(libraryBrowseEmptyStateLabel('allFiles')).toBe('No files')
   })
 })
 

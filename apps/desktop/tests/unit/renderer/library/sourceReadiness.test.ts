@@ -150,6 +150,14 @@ describe('source readiness', () => {
   })
 
   it('backend barrier beats active scan', () => {
+    const missing = readinessFor(browserState(), {
+      lifecycle: sourceLifecycle({
+        accessState: 'missing',
+        scanPhase: 'complete'
+      })
+    })
+    expect(missing?.kind).toBe('missing')
+
     const blocked = readinessFor(browserState(), {
       lifecycle: sourceLifecycle({
         accessState: 'blocked',

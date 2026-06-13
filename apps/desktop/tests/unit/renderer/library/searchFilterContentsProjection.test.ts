@@ -76,9 +76,9 @@ describe('search/filter contents projection', () => {
 
   it('uses profile-aware empty copy for profile-mapped searches', () => {
     for (const [profile, expected] of [
-      ['audio', 'No matching audio files.'],
+      ['audio', 'No matching audio tracks.'],
       ['playable', 'No matching playable media.'],
-      ['allFiles', 'No matching tracks.']
+      ['allFiles', 'No matching files.']
     ] as const) {
       const contents = projectSearchFilterContents({
         state: {

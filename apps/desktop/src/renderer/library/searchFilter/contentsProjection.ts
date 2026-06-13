@@ -213,11 +213,11 @@ function stateRow(
 function emptySearchLabel(profile: LibraryBrowseProfile): string {
   switch (profile) {
     case 'audio':
-      return 'No matching audio files.'
+      return 'No matching audio tracks.'
     case 'playable':
       return 'No matching playable media.'
     case 'allFiles':
-      return 'No matching tracks.'
+      return 'No matching files.'
   }
 }
 

@@ -312,6 +312,66 @@ describe('projectContents', () => {
     )
   })
 
+  it('projects no-source Library Browse as Library home with Add Source CTA', () => {
+    const state = browserState({ navigationReadResult: emptyNavigation() })
+    const projection = projectState(state)
+
+    const contents = projectContents({
+      surface: 'libraryBrowse',
+      state,
+      ...(projection === undefined ? {} : { bindingsById: projection.bindingsById })
+    })
+
+    expect(contents.kind).toBe('libraryHome')
+    expect(contents.surfaceKind).toBe('libraryHome')
+    expect(contents.surfaceLabel).toBe('Library')
+    expect(contents.title).toBe('Library')
+    expect(contents.rows).toEqual([
+      expect.objectContaining({
+        label: 'Add Source',
+        action: {
+          kind: 'chooseMusicFolder',
+          label: 'Add Source'
+        }
+      })
+    ])
+  })
+
+  it('projects sources-exist no-selection state as Library home readiness', () => {
+    const state = browserState({
+      sourceReadinessByNodeId: new Map([
+        [
+          'navigation-row:7',
+          {
+            kind: 'ready',
+            sourceNodeId: 'navigation-row:7',
+            detail: 'The source hierarchy is ready.'
+          }
+        ]
+      ])
+    })
+    const projection = browserProjection(state)
+
+    const contents = projectContents({
+      surface: 'libraryBrowse',
+      state,
+      bindingsById: projection.bindingsById
+    })
+
+    expect(contents.kind).toBe('libraryHome')
+    expect(contents.title).toBe('Library ready')
+    expect(contents.detail).toBe(
+      'Your library is ready. Select a source, folder, or search your music.'
+    )
+    expect(contents.rows).toEqual([
+      expect.objectContaining({
+        label: 'Ready',
+        detail: 'Ready to browse.'
+      })
+    ])
+    expect(contents.rows[0]).not.toMatchObject({ label: 'No source selected' })
+  })
+
   it('demotes system-drive root preview to specific folder guidance', () => {
     const systemRoot = 'C:\\'
     const rootWindow = localBrowseWindow({
@@ -660,10 +720,10 @@ describe('projectContents', () => {
 
   it('does not render verified-empty policy labels while nextCursor exists', () => {
     const verifiedEmptyLabels = [
-      'No audio tracks',
+      'No audio tracks in this view.',
       'No video items in this scope.',
       'No companion files in this scope.',
-      'No files'
+      'No files in this source inventory view.'
     ]
 
     for (const profile of [
@@ -769,7 +829,7 @@ describe('projectContents', () => {
     expect(empty.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media'
+      label: 'No playable media in this view.'
     })
 
     const partial = projectForSelection(browserState({}), 'navigation-row:7', {
@@ -1088,7 +1148,7 @@ describe('projectContents', () => {
     expect(authoritative.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media'
+      label: 'No playable media in this view.'
     })
   })
 
@@ -1107,8 +1167,8 @@ describe('projectContents', () => {
     expect(contents.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No audio tracks',
-      detail: 'No audio tracks'
+      label: 'No audio tracks in this view.',
+      detail: 'No audio tracks in this view.'
     })
   })
 
@@ -1211,8 +1271,8 @@ describe('projectContents', () => {
     expect(audioBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No audio tracks',
-      detail: 'No audio tracks'
+      label: 'No audio tracks in this view.',
+      detail: 'No audio tracks in this view.'
     })
 
     const playableMediaBrowse = projectForSelection(
@@ -1229,7 +1289,7 @@ describe('projectContents', () => {
     expect(playableMediaBrowse.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No playable media'
+      label: 'No playable media in this view.'
     })
 
     const video = projectForSelection(
@@ -1283,7 +1343,7 @@ describe('projectContents', () => {
     expect(allFiles.rows[0]).toMatchObject({
       kind: 'state',
       state: 'empty',
-      label: 'No files'
+      label: 'No files in this source inventory view.'
     })
   })
 
@@ -1474,6 +1534,7 @@ function browserState(options: {
   readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
   readonly libraryBrowseProfile?: LibraryBrowseProfile
   readonly addSourceView?: AddSourceView
+  readonly sourceReadinessByNodeId?: BrowserState['sourceReadinessByNodeId']
 }): BrowserState {
   const sourceStates = new Map<string, SourceState>()
 
@@ -1492,6 +1553,9 @@ function browserState(options: {
     },
     sourceReadStates: sourceStates,
     directoryReadStates: options.directoryStates ?? new Map(),
+    ...(options.sourceReadinessByNodeId === undefined
+      ? {}
+      : { sourceReadinessByNodeId: options.sourceReadinessByNodeId }),
     ...(options.entries === undefined
       ? {}
       : {
