@@ -12,6 +12,7 @@ import type { NavigationReadRowsRequest, NavigationReadRowsResult } from '../nav
 import type { ContentsReadRequest, ContentsReadResult } from '../contents/read'
 import type { SearchFilterReadRequest, SearchFilterReadResult } from '../searchFilter/read'
 import type { ReadSourceLifecycleRequest, ReadSourceLifecycleResult } from '../source/lifecycle'
+import type { ReadSourceIntegrityRequest, SourceIntegrityReadResult } from '../source/integrity'
 import type {
   ReadAttachmentSourceFilesRequest,
   ReadAttachmentSourceFilesResult,
@@ -48,6 +49,7 @@ export type LibraryApi = {
   readonly navigation: LibraryNavigationApi
   readonly hierarchy: LibraryHierarchyApi
   readonly sourceLifecycle: LibrarySourceLifecycleApi
+  readonly sourceIntegrity: LibrarySourceIntegrityApi
   readonly attachmentIdentity: LibraryAttachmentIdentityApi
   readonly hashing: LibraryHashingApi
   readonly sourceMaintenance: LibrarySourceMaintenanceApi
@@ -94,6 +96,10 @@ export type LibrarySearchFilterApi = {
 
 export type LibrarySourceLifecycleApi = {
   readSourceLifecycle(request: ReadSourceLifecycleRequest): Promise<ReadSourceLifecycleResult>
+}
+
+export type LibrarySourceIntegrityApi = {
+  readSourceIntegrity(request: ReadSourceIntegrityRequest): Promise<SourceIntegrityReadResult>
 }
 
 export type LibraryAttachmentIdentityApi = {

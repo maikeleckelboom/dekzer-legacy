@@ -26,6 +26,10 @@ import type {
   ReadSourceLifecycleResult,
   ReadSourceLifecycleRequest
 } from '../shared/library/source/lifecycle'
+import type {
+  ReadSourceIntegrityRequest,
+  SourceIntegrityReadResult
+} from '../shared/library/source/integrity'
 
 import type {
   ReadAttachmentSourceFilesRequest,
@@ -152,6 +156,16 @@ export function createRendererApi(ipcRenderer: RendererApiPreloadIpcRenderer): R
             libraryControlChannels.source.lifecycle,
             request
           )) as ReadSourceLifecycleResult
+        }
+      },
+      sourceIntegrity: {
+        async readSourceIntegrity(
+          request: ReadSourceIntegrityRequest
+        ): Promise<SourceIntegrityReadResult> {
+          return (await ipcRenderer.invoke(
+            libraryControlChannels.source.integrity,
+            request
+          )) as SourceIntegrityReadResult
         }
       },
       attachmentIdentity: {

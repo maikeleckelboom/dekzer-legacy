@@ -111,6 +111,7 @@ export function createFakeClient(
     loadNavigationRowByStableKey: rejectUnexpectedClientCall,
     readLibraryTreeChildren: rejectUnexpectedClientCall,
     readSourceLifecycle: rejectUnexpectedClientCall,
+    readSourceIntegrity: rejectUnexpectedClientCall,
     readSourceMaintenance: rejectUnexpectedClientCall,
     readSourceFileAttachment: rejectUnexpectedClientCall,
     readAttachmentSourceFiles: rejectUnexpectedClientCall,

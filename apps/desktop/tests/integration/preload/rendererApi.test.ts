@@ -20,6 +20,7 @@ import type { UnregisterLocalRootResult } from '../../../src/shared/library/root
 import { type ContentsReadResult } from '../../../src/shared/library/contents/read'
 
 import type { ReadSourceLifecycleResult } from '../../../src/shared/library/source/lifecycle'
+import type { SourceIntegrityReadResult } from '../../../src/shared/library/source/integrity'
 
 import type {
   ReadAttachmentSourceFilesResult,
@@ -55,6 +56,7 @@ describe('preload renderer API', () => {
       limit: 100
     }
     const sourceLifecycleRequest = { sourceId: '7' }
+    const sourceIntegrityRequest = { sourceId: '7' }
     const sourceFileAttachmentRequest = { sourceFileId: '11' }
     const attachmentSourceFilesRequest = { attachmentId: '7', limit: 25 }
     const sourceAttachmentSummaryRequest = { sourceId: '7' }
@@ -136,6 +138,36 @@ describe('preload renderer API', () => {
         lastSuccessfulScanAtMs: 20,
         lastSeenAtMs: 9,
         updatedAtMs: 21
+      }
+    }
+    const sourceIntegrityResult: SourceIntegrityReadResult = {
+      state: 'ready',
+      integrity: {
+        sourceId: '7',
+        sourceAvailability: {
+          state: 'mounted'
+        },
+        coverageIntegrity: {
+          state: 'complete',
+          subtreeCoverageComplete: true,
+          emptyResultAuthoritative: true,
+          totalDirectoriesCount: 1,
+          missingDirectoriesCount: 0,
+          pendingDirectoriesCount: 0,
+          scanningDirectoriesCount: 0,
+          blockedDirectoriesCount: 0,
+          failedDirectoriesCount: 0
+        },
+        evidenceAndMaintenance: {
+          remainingHashCandidates: 0,
+          remainingProbeCandidates: 0,
+          remainingPlayableMediaPromotionCandidates: 0,
+          remainingTrackIdentityCandidateProductionCandidates: 0,
+          remainingTrackIdentityDecisionProductionCandidates: 0
+        },
+        runtimeMaintenance: {
+          state: 'idle'
+        }
       }
     }
     const sourceFileAttachmentResult: ReadSourceFileAttachmentResult = {
@@ -434,6 +466,7 @@ describe('preload renderer API', () => {
     let receivedCancelScanRequest: unknown
     let receivedContentsRequest: unknown
     let receivedSourceLifecycleRequest: unknown
+    let receivedSourceIntegrityRequest: unknown
     let receivedSourceFileAttachmentRequest: unknown
     let receivedAttachmentSourceFilesRequest: unknown
     let receivedSourceAttachmentSummaryRequest: unknown
@@ -473,6 +506,11 @@ describe('preload renderer API', () => {
         if (channel === libraryControlChannels.source.lifecycle) {
           receivedSourceLifecycleRequest = args[0]
           return sourceLifecycleResult
+        }
+
+        if (channel === libraryControlChannels.source.integrity) {
+          receivedSourceIntegrityRequest = args[0]
+          return sourceIntegrityResult
         }
 
         if (channel === libraryControlChannels.attachmentIdentity.readSourceFileAttachment) {
@@ -627,6 +665,10 @@ describe('preload renderer API', () => {
       api.library.sourceLifecycle.readSourceLifecycle(sourceLifecycleRequest)
     ).resolves.toBe(sourceLifecycleResult)
     expect(receivedSourceLifecycleRequest).toBe(sourceLifecycleRequest)
+    await expect(
+      api.library.sourceIntegrity.readSourceIntegrity(sourceIntegrityRequest)
+    ).resolves.toBe(sourceIntegrityResult)
+    expect(receivedSourceIntegrityRequest).toBe(sourceIntegrityRequest)
     await expect(
       api.library.attachmentIdentity.readSourceFileAttachment(sourceFileAttachmentRequest)
     ).resolves.toBe(sourceFileAttachmentResult)

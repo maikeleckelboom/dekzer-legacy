@@ -13,6 +13,8 @@ import {
   sourceLifecycleIdsForBrowserContext,
   useSourceLifecycleRead
 } from './boundary/sourceLifecycleRead'
+import { useSourceIntegrityRead } from './boundary/sourceIntegrityRead'
+import { useSourceMaintenanceRead } from './boundary/sourceMaintenanceRead'
 import ContentsTable from './contents/table.vue'
 import { projectContents, type ContentRow } from './contents/projection'
 import { projectSearchFilterContents } from './searchFilter/contentsProjection'
@@ -35,6 +37,8 @@ import {
   type SourceRegistrationIntent
 } from './runtime/sourceActions'
 import { projectSourceReadinessByNodeId } from './runtime/sourceReadiness'
+import { projectStatusContext } from './sourceStatus/context'
+import { projectStatusView, type StatusAction } from './sourceStatus/projection'
 import type { BrowserState, RowBinding } from './state'
 import { createViewStateStore } from './runtime/viewState'
 import { projectState } from './tree/projection'
@@ -65,6 +69,8 @@ const contentsRead = useContentsRead(undefined, { profile: browseProfile.profile
 const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
+const sourceIntegrityRead = useSourceIntegrityRead()
+const sourceMaintenanceRead = useSourceMaintenanceRead()
 const searchFilterRead = useSearchFilterRead()
 const librarySearch = createLibrarySearchController({
   profile: browseProfile.profile,
@@ -171,6 +177,17 @@ const treeRootProps = computed(() => ({
   ...(sourceRevealRequest.value === undefined ? {} : { revealRequest: sourceRevealRequest.value })
 }))
 
+const selectedContentsProjection = computed(() => {
+  const projection = browserProjection.value
+
+  return projectContents({
+    state: browserState.value,
+    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
+    ...(projection === undefined ? {} : { bindingsById: projection.bindingsById }),
+    contentsState: contentsRead.state.value
+  })
+})
+
 const contentsProjection = computed(() => {
   if (librarySearch.searchActive.value) {
     return projectSearchFilterContents({
@@ -180,14 +197,7 @@ const contentsProjection = computed(() => {
     })
   }
 
-  const projection = browserProjection.value
-
-  return projectContents({
-    state: browserState.value,
-    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
-    ...(projection === undefined ? {} : { bindingsById: projection.bindingsById }),
-    contentsState: contentsRead.state.value
-  })
+  return selectedContentsProjection.value
 })
 
 const sourceActionModel = computed(() =>
@@ -202,6 +212,71 @@ const sourceActionModel = computed(() =>
 )
 
 const removeSourceRootId = computed(() => sourceActionModel.value.selectedRemovableSourceRootId)
+
+const sourceStatusContext = computed(() =>
+  projectStatusContext({
+    projection: browserProjection.value,
+    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
+    selectedTitle: selectedContentsProjection.value.title
+  })
+)
+
+const selectedStatusSourceId = computed(() => {
+  const context = sourceStatusContext.value
+  return 'sourceId' in context ? context.sourceId : undefined
+})
+
+const sourceStatusSourceIds = computed(() => {
+  const sourceIds = new Set(sourceLifecycleSourceIds.value)
+  const selectedSourceId = selectedStatusSourceId.value
+
+  if (selectedSourceId !== undefined) {
+    sourceIds.add(selectedSourceId)
+  }
+
+  return sourceIds
+})
+
+const sourceStatusView = computed(() => {
+  const context = sourceStatusContext.value
+  const sourceId = selectedStatusSourceId.value
+  const sourceLifecycle =
+    sourceId === undefined
+      ? undefined
+      : sourceLifecycleRead.sourceLifecycleBySourceId.value.get(sourceId)
+  const sourceIntegrity =
+    sourceId === undefined
+      ? undefined
+      : sourceIntegrityRead.sourceIntegrityBySourceId.value.get(sourceId)
+  const sourceMaintenance =
+    sourceId === undefined
+      ? undefined
+      : sourceMaintenanceRead.sourceMaintenanceBySourceId.value.get(sourceId)
+  const maintenanceRunState =
+    sourceId === undefined
+      ? undefined
+      : sourceMaintenanceRead.sourceMaintenanceRunStateBySourceId.value.get(sourceId)
+  const sourceReadiness =
+    selectedNodeId.value === undefined
+      ? undefined
+      : sourceReadinessByNodeId.value.get(selectedNodeId.value)
+
+  return projectStatusView({
+    context,
+    ...(sourceLifecycle === undefined ? {} : { sourceLifecycle }),
+    ...(sourceIntegrity === undefined ? {} : { sourceIntegrity }),
+    ...(sourceMaintenance === undefined ? {} : { sourceMaintenance }),
+    ...(maintenanceRunState === undefined ? {} : { maintenanceRunState }),
+    ...(sourceReadiness === undefined ? {} : { sourceReadiness }),
+    localAddEnabled: rootLifecycle.canAddMusicFolder.value,
+    scanStatus: rootActions.scanStatus.value,
+    removeSourceStatus: rootActions.removeSourceStatus.value,
+    refreshStatus: rootLifecycle.refreshStatus.value,
+    scanSupported: sourceId !== undefined && rootLifecycle.canScanSourceRoot(sourceId),
+    removeSupported: sourceId !== undefined && rootActions.canUnregisterLocalRootId(sourceId),
+    maintenanceSupported: sourceId !== undefined
+  })
+})
 
 watch(scanProgressForRegisteredRoot, (progress) => {
   if (progress === undefined) {
@@ -334,6 +409,19 @@ watch(
 )
 
 watch(
+  [sourceStatusSourceIds, () => hierarchyRead.hostStatus.value?.state],
+  ([sourceIds, hostState]) => {
+    if (hostState !== 'started') {
+      return
+    }
+
+    void sourceIntegrityRead.refreshSourceIntegrities(sourceIds)
+    void sourceMaintenanceRead.refreshSourceMaintenances(sourceIds)
+  },
+  { immediate: true }
+)
+
+watch(
   () => boundaryEvents.recoveryNeeded.value,
   async (needed) => {
     if (!needed) {
@@ -359,6 +447,7 @@ watch(
     })
 
     await executeRefreshPlan(plan, refreshPlanExecutionDependencies())
+    void refreshSelectedSourceStatus()
   }
 )
 
@@ -377,6 +466,7 @@ watch(
     })
 
     void executeRefreshPlan(plan, refreshPlanExecutionDependencies())
+    void refreshSelectedSourceStatus()
   }
 )
 
@@ -630,6 +720,56 @@ async function handleRemoveSource(): Promise<void> {
   await rootLifecycle.removeSource(rootId)
 }
 
+async function handleStatusAction(action: StatusAction): Promise<void> {
+  if (!action.enabled) {
+    return
+  }
+
+  switch (action.kind) {
+    case 'addLocalPath':
+      await rootLifecycle.addLocalPath(action.resolvedPath).then(async (registered) => {
+        if (registered) {
+          await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
+        }
+      })
+      break
+    case 'scanSource':
+      await rootLifecycle.scanRoot(action.sourceId)
+      break
+    case 'runMaintenance':
+      await sourceMaintenanceRead.runSourceMaintenance(action.sourceId)
+      await refreshSourceStatus(action.sourceId)
+      await refreshContentsForCurrentSelection()
+      await searchFilterRead.invalidationSignal()
+      break
+    case 'removeSource':
+      await rootLifecycle.removeSource(action.sourceId)
+      break
+    case 'refreshStatus':
+      await refreshSourceStatus(action.sourceId)
+      break
+  }
+}
+
+async function refreshSelectedSourceStatus(): Promise<boolean> {
+  const sourceId = selectedStatusSourceId.value
+  if (sourceId === undefined) {
+    return false
+  }
+
+  return refreshSourceStatus(sourceId)
+}
+
+async function refreshSourceStatus(sourceId: string): Promise<boolean> {
+  const [lifecycle, integrity, maintenance] = await Promise.all([
+    sourceLifecycleRead.readSourceLifecycle(sourceId),
+    sourceIntegrityRead.readSourceIntegrity(sourceId),
+    sourceMaintenanceRead.readSourceMaintenance(sourceId)
+  ])
+
+  return lifecycle && integrity && maintenance
+}
+
 function requestBrowserNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
   const projection = browserProjection.value
   const binding = projection?.bindingsById.get(nodeId)
@@ -820,7 +960,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           type="button"
           :class="secondaryButtonClass"
           :disabled="!rootLifecycle.canScanRoot.value"
-          @click="rootLifecycle.scanRoot"
+          @click="rootLifecycle.scanRoot()"
         >
           <Icon role="action.scan" size="md" />
           <span>{{ rootActions.scanButtonLabel.value }}</span>
@@ -856,7 +996,9 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
 
       <ContentsTable
         :projection="contentsProjection"
+        :status-view="sourceStatusView"
         :activate-row-action="activateContentRowAction"
+        :activate-status-action="handleStatusAction"
       />
     </div>
   </section>

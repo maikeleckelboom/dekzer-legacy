@@ -42,6 +42,7 @@ export const libraryControlChannels = {
   },
   source: {
     fileHashing: 'desktop:library-source-file-hashing:hash-source-files-blake3',
+    integrity: 'desktop:library-source-integrity:read-source-integrity',
     lifecycle: 'desktop:library-source-lifecycle:read-source-lifecycle',
     maintenance: {
       run: 'desktop:library-source-maintenance:run-source-maintenance',

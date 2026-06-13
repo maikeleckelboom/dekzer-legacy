@@ -13,10 +13,11 @@ export type RootLifecycleController = {
   readonly canAddMusicFolder: ComputedRef<boolean>
   readonly canScanRoot: ComputedRef<boolean>
   readonly canRemoveSource: ComputedRef<boolean>
+  readonly canScanSourceRoot: (rootId: string | undefined) => boolean
   readonly canRemoveSourceRoot: (rootId: string | undefined) => boolean
   readonly addMusicFolder: () => Promise<boolean>
   readonly addLocalPath: (requestedPath: string) => Promise<boolean>
-  readonly scanRoot: () => Promise<boolean>
+  readonly scanRoot: (rootId?: string) => Promise<boolean>
   readonly removeSource: (rootId?: string) => Promise<boolean>
   readonly hydrateLocalRoots: () => Promise<boolean>
 }
@@ -61,6 +62,12 @@ export function createRootLifecycleController(
     )
   }
 
+  function canScanSourceRoot(rootId: string | undefined): boolean {
+    return (
+      dependencies.rootActions.canRunLocalRootScan(rootId) && refreshStatus.value !== 'refreshing'
+    )
+  }
+
   async function addMusicFolder(): Promise<boolean> {
     if (!canAddMusicFolder.value) {
       return false
@@ -99,14 +106,19 @@ export function createRootLifecycleController(
     return registrationRefreshed && scanned
   }
 
-  async function scanRoot(): Promise<boolean> {
-    if (!canScanRoot.value) {
+  async function scanRoot(rootId?: string): Promise<boolean> {
+    const selectedRootId = rootId ?? dependencies.rootActions.registeredRoot.value?.rootId
+
+    if (selectedRootId === undefined || !canScanSourceRoot(selectedRootId)) {
       return false
     }
 
     resetRefreshState()
 
-    const scanWasRequested = await dependencies.rootActions.runRegisteredRootScan()
+    const scanWasRequested =
+      rootId === undefined
+        ? await dependencies.rootActions.runRegisteredRootScan()
+        : await dependencies.rootActions.runRootScan(selectedRootId)
 
     if (!scanWasRequested) {
       return false
@@ -199,6 +211,7 @@ export function createRootLifecycleController(
     canAddMusicFolder,
     canScanRoot,
     canRemoveSource,
+    canScanSourceRoot,
     canRemoveSourceRoot,
     addMusicFolder,
     addLocalPath,

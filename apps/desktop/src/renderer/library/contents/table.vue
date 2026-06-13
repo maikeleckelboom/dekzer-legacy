@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon, type IconRole, type IconTone } from '../../icons'
 import { type ContentProjection, type ContentRow, type ContentRowIcon } from './projection'
+import { type StatusAction, type StatusView } from '../sourceStatus/projection'
 
 defineOptions({
   name: 'ContentsTable'
@@ -8,7 +9,9 @@ defineOptions({
 
 defineProps<{
   projection: ContentProjection
+  statusView?: StatusView
   activateRowAction: (row: ContentRow) => void
+  activateStatusAction?: (action: StatusAction) => void
 }>()
 
 function formatContentDetail(row: ContentRow): string {
@@ -128,6 +131,35 @@ function labelClassForRow(row: ContentRow): string {
 function resolveContentActionIcon(): IconRole {
   return 'action.more'
 }
+
+function statusBadgeClass(view: StatusView): string {
+  switch (view.badgeTone) {
+    case 'ready':
+      return 'border-(--color-border) text-(--color-text)'
+    case 'active':
+      return 'border-(--color-accent) text-(--color-accent)'
+    case 'warning':
+      return 'border-(--color-warning) text-(--color-warning)'
+    case 'danger':
+      return 'border-(--color-danger) text-(--color-danger)'
+    case 'muted':
+      return 'border-(--color-border) text-(--color-text-muted)'
+  }
+}
+
+function resolveStatusActionIcon(action: StatusAction): IconRole {
+  switch (action.kind) {
+    case 'addLocalPath':
+      return 'folder.plain'
+    case 'scanSource':
+    case 'runMaintenance':
+      return 'action.scan'
+    case 'removeSource':
+      return 'action.remove'
+    case 'refreshStatus':
+      return 'state.unknown'
+  }
+}
 </script>
 
 <template>
@@ -150,6 +182,37 @@ function resolveContentActionIcon(): IconRole {
       >
         {{ projection.detail }}
       </p>
+      <div
+        v-if="statusView !== undefined && statusView.badge !== undefined"
+        class="mt-2 flex min-w-0 flex-wrap items-center gap-2"
+        aria-label="Source status"
+      >
+        <span
+          class="inline-flex min-h-7 items-center rounded-sm border px-2 py-1 text-xs font-bold"
+          :class="statusBadgeClass(statusView)"
+        >
+          {{ statusView.badge }}
+        </span>
+        <span
+          v-if="statusView.detail !== undefined"
+          class="min-w-0 flex-1 truncate text-xs leading-5 text-(--color-text-muted)"
+          :title="statusView.detail"
+        >
+          {{ statusView.detail }}
+        </span>
+        <button
+          v-for="action in statusView.actions"
+          :key="`${action.kind}:${'sourceId' in action ? action.sourceId : action.resolvedPath}`"
+          type="button"
+          class="inline-flex min-h-7 shrink-0 items-center justify-center gap-1.5 rounded-sm border border-(--color-border) bg-(--color-surface) px-2 py-1 text-xs font-bold text-(--color-text) transition hover:border-(--color-accent) hover:text-(--color-accent) focus-visible:ring-2 focus-visible:ring-(--color-accent) focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-background) disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="!action.enabled"
+          :title="action.reason"
+          @click="activateStatusAction?.(action)"
+        >
+          <Icon :role="resolveStatusActionIcon(action)" size="xs" />
+          <span>{{ action.label }}</span>
+        </button>
+      </div>
     </header>
 
     <div
