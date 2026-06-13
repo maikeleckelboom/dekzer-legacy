@@ -4,6 +4,7 @@ import type { ComputedRef, Ref } from 'vue'
 import type { LibraryHierarchyReadController } from '../boundary/hierarchyRead'
 import type { LocalRootActionsController } from '../boundary/localRootActions'
 import type { LocalRootRegistrationRoot } from '../../../shared/library/roots/register'
+import type { LocalBrowseController } from '../localBrowse/controller'
 
 export type RootLifecycleRefreshStatus = 'idle' | 'refreshing' | 'refreshed' | 'failed'
 
@@ -22,6 +23,7 @@ export type RootLifecycleController = {
 export type RootLifecycleDependencies = {
   readonly rootActions: LocalRootActionsController
   readonly hierarchyRead: Pick<LibraryHierarchyReadController, 'refresh'>
+  readonly localBrowseRead?: Pick<LocalBrowseController, 'refreshEntryPoints'>
   readonly confirmRemoveSource: () => boolean
   readonly isSourceRootVisible: (rootId: string) => boolean
   readonly onSourceRegistered?: (root: LocalRootRegistrationRoot) => void
@@ -150,7 +152,7 @@ export function createRootLifecycleController(
     let refreshed = false
 
     try {
-      refreshed = await dependencies.hierarchyRead.refresh()
+      refreshed = await refreshAll()
     } catch {
       refreshed = false
     }
@@ -161,6 +163,15 @@ export function createRootLifecycleController(
 
     refreshStatus.value = refreshed ? 'refreshed' : 'failed'
     return refreshed
+  }
+
+  async function refreshAll(): Promise<boolean> {
+    const [hierarchyRefreshed, localBrowseRefreshed] = await Promise.all([
+      runBooleanRefresh(dependencies.hierarchyRead.refresh),
+      runBooleanRefresh(dependencies.localBrowseRead?.refreshEntryPoints)
+    ])
+
+    return hierarchyRefreshed && localBrowseRefreshed
   }
 
   function resetRefreshState(): void {
@@ -178,5 +189,17 @@ export function createRootLifecycleController(
     scanRoot,
     removeSource,
     hydrateLocalRoots: dependencies.rootActions.hydrateLocalRoots
+  }
+}
+
+async function runBooleanRefresh(refresh: (() => Promise<boolean>) | undefined): Promise<boolean> {
+  if (refresh === undefined) {
+    return true
+  }
+
+  try {
+    return await refresh()
+  } catch {
+    return false
   }
 }

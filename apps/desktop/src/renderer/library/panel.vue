@@ -5,6 +5,7 @@ import { Icon } from '../icons'
 import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
+import { useLocalBrowseController } from './localBrowse/controller'
 import { useBoundaryEvents, type ScanProgressState } from './boundary/boundaryEvents'
 import {
   sourceLifecycleIdsForBrowserContext,
@@ -53,13 +54,14 @@ const dangerButtonClass = `${buttonBaseClass} border border-(--color-accent) bg-
 
 const viewStateStore = createViewStateStore()
 const hierarchyRead = useLibraryHierarchyRead()
+const localBrowse = useLocalBrowseController()
 const contentsRead = useContentsRead()
 const rootActions = useLocalRootActions()
 const boundaryEvents = useBoundaryEvents()
 const sourceLifecycleRead = useSourceLifecycleRead()
 const searchFilterRead = useSearchFilterRead()
 const disclosureReconciler = createDisclosureReconciler({
-  requestNodeChildren: (nodeId) => hierarchyRead.requestNodeChildren(nodeId)
+  requestNodeChildren: (nodeId) => requestBrowserNodeChildren(nodeId)
 })
 
 const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
@@ -106,6 +108,8 @@ const browserState = computed<BrowserState>(() => ({
   sourceReadinessByNodeId: sourceReadinessByNodeId.value,
   sourceReadStates: hierarchyRead.sourceReadStates.value,
   directoryReadStates: hierarchyRead.directoryReadStates.value,
+  localBrowseEntryPointsState: localBrowse.entryPointsState.value,
+  localBrowseItemStates: localBrowse.itemStates.value,
   ...(hierarchyRead.hostStatus.value === undefined
     ? {}
     : { hostStatus: hierarchyRead.hostStatus.value }),
@@ -128,6 +132,9 @@ const rootLifecycle = useRootLifecycle({
   rootActions,
   hierarchyRead: {
     refresh: hierarchyRead.refresh
+  },
+  localBrowseRead: {
+    refreshEntryPoints: localBrowse.refreshEntryPoints
   },
   confirmRemoveSource: () => window.confirm(removeSourceMessage),
   isSourceRootVisible: (rootId) => hasVisibleSourceRootBinding(browserProjection.value, rootId),
@@ -235,7 +242,8 @@ watch(
       projection,
       expandedNodeIds: expandedIds,
       sourceReadStates: hierarchyRead.sourceReadStates.value,
-      directoryReadStates: hierarchyRead.directoryReadStates.value
+      directoryReadStates: hierarchyRead.directoryReadStates.value,
+      localBrowseItemStates: localBrowse.itemStates.value
     })
   },
   { immediate: true }
@@ -265,6 +273,7 @@ watch(
     }
 
     void rootLifecycle.hydrateLocalRoots()
+    void localBrowse.refreshEntryPoints()
   },
   { immediate: true }
 )
@@ -469,6 +478,7 @@ function applyPendingSourceRegistration(projection: ReturnType<typeof projectSta
 function selectNode(nodeId: BrowserTreeNodeId): void {
   markUserInteraction()
   selectedNodeId.value = nodeId
+  void requestLocalBrowseNodeChildren(nodeId)
   requestContentsForCurrentSelection()
   saveViewState()
 }
@@ -495,7 +505,7 @@ function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   saveViewState()
 
   disclosureReconciler.clearFailedForNode(nodeId)
-  void hierarchyRead.requestNodeChildren(nodeId)
+  void requestBrowserNodeChildren(nodeId)
 }
 
 function prepareNodeContents(nodeId: BrowserTreeNodeId): void {
@@ -509,6 +519,7 @@ function cancelPrepareNodeContents(nodeId: BrowserTreeNodeId): void {
 function refreshPlanExecutionDependencies(): RefreshPlanDeps {
   return {
     hierarchyRead,
+    refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints(),
     sourceLifecycleRead,
     expandedNodeIds: expandedNodeIds.value,
     clearContentsWarmSnapshots: () => contentsRead.clearWarmSnapshots(),
@@ -537,6 +548,32 @@ async function handleRemoveSource(): Promise<void> {
   }
 
   await rootLifecycle.removeSource(rootId)
+}
+
+function requestBrowserNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
+  const projection = browserProjection.value
+  const binding = projection?.bindingsById.get(nodeId)
+
+  if (
+    binding?.kind === 'localBrowseEntryPoint' ||
+    binding?.kind === 'localBrowseItem' ||
+    binding?.kind === 'localBrowseMore'
+  ) {
+    return localBrowse.requestNodeChildren(nodeId, projection)
+  }
+
+  return hierarchyRead.requestNodeChildren(nodeId)
+}
+
+function requestLocalBrowseNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
+  const projection = browserProjection.value
+  const binding = projection?.bindingsById.get(nodeId)
+
+  if (binding?.kind !== 'localBrowseEntryPoint' && binding?.kind !== 'localBrowseItem') {
+    return Promise.resolve(false)
+  }
+
+  return localBrowse.requestNodeChildren(nodeId, projection)
 }
 
 function clearBrowserView(): void {

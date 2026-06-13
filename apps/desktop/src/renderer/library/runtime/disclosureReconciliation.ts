@@ -1,6 +1,8 @@
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNodeId } from '../tree/types'
 import type { DirectoryState, SourceState } from '../state'
+import type { LocalBrowseItemState } from '../localBrowse/types'
+import { localBrowseStateForBinding } from '../localBrowse/controller'
 
 export type DisclosureReconciler = {
   readonly reconcile: (input: DisclosureReconciliationInput) => readonly BrowserTreeNodeId[]
@@ -24,6 +26,7 @@ export type DisclosureReconciliationInput = {
   readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
 }
 
 export function createDisclosureReconciler(options: {
@@ -75,6 +78,28 @@ export function createDisclosureReconciler(options: {
           requestedThisPass.push(nodeId)
           void options.requestNodeChildren(nodeId)
         }
+      } else if (binding?.kind === 'localBrowseEntryPoint' || binding?.kind === 'localBrowseItem') {
+        const state =
+          input.localBrowseItemStates === undefined
+            ? undefined
+            : localBrowseStateForBinding(input.localBrowseItemStates, binding)
+
+        if (binding.kind === 'localBrowseItem' && binding.target === undefined) {
+          continue
+        }
+
+        bindableExpandedNodeIds.add(nodeId)
+        reconcileLedgerFailure(nodeId, state)
+
+        if (state?.kind === 'loaded') {
+          loadedExpandedNodeIds.add(nodeId)
+        }
+
+        if (!hasLoadedOrInFlightChildren(state) && !ledger.has(nodeId)) {
+          ledger.set(nodeId, { status: 'pending' })
+          requestedThisPass.push(nodeId)
+          void options.requestNodeChildren(nodeId)
+        }
       }
     }
 
@@ -93,7 +118,7 @@ export function createDisclosureReconciler(options: {
 
   function reconcileLedgerFailure(
     nodeId: BrowserTreeNodeId,
-    state: SourceState | DirectoryState | undefined
+    state: SourceState | DirectoryState | LocalBrowseItemState | undefined
   ): void {
     const entry = ledger.get(nodeId)
 
@@ -130,6 +155,8 @@ export function createDisclosureReconciler(options: {
   return { reconcile, getLedgerEntry, clearFailed, clearFailedForNode }
 }
 
-function hasLoadedOrInFlightChildren(state: SourceState | DirectoryState | undefined): boolean {
+function hasLoadedOrInFlightChildren(
+  state: SourceState | DirectoryState | LocalBrowseItemState | undefined
+): boolean {
   return state?.kind === 'loaded' || state?.kind === 'loading' || state?.kind === 'refreshing'
 }

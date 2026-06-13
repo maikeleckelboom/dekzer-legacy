@@ -160,6 +160,40 @@ describe('local root scan lifecycle', () => {
     expect(events).toEqual(['registered:root-2', 'refresh', 'scan'])
   })
 
+  it('refreshes local browse entry points after successful registration', async () => {
+    const events: string[] = []
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-2', canonicalPath: 'C:/Music/Two' }),
+        runScan: async () => {
+          events.push('scan')
+          return startedRootResult()
+        }
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: {
+        refresh: async () => {
+          events.push('durableNavigation')
+          return true
+        }
+      },
+      localBrowseRead: {
+        refreshEntryPoints: async () => {
+          events.push('localBrowseEntryPoints')
+          return true
+        }
+      },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false
+    })
+
+    await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
+    expect(events).toEqual(['durableNavigation', 'localBrowseEntryPoints', 'scan'])
+  })
+
   it('evaluates source activation when the registration response arrives, not at request start', async () => {
     const choice = deferred<LocalRootChoiceResult>()
     const selection = { nodeId: undefined as string | undefined }
@@ -653,6 +687,45 @@ describe('local root remove lifecycle', () => {
     expect(rootActions.registeredRoot.value).toBeUndefined()
     expect(rootActions.removeSourceStatus.value).toBe('removed')
     expect(lifecycle.refreshStatus.value).toBe('refreshed')
+  })
+
+  it('refreshes local browse entry points after successful unregister', async () => {
+    const events: string[] = []
+    const rootActions = createLocalRootActionsController(
+      testRootApi({
+        chooseAndRegisterLocal: async () =>
+          registeredChoice({ rootId: 'root-1', canonicalPath: 'C:/Music' }),
+        runScan: async () => startedRootResult(),
+        unregisterLocalRoot: async () => {
+          events.push('unregister')
+          return { state: 'unregistered', unregistered: true }
+        }
+      })
+    )
+    const lifecycle = createRootLifecycleController({
+      rootActions,
+      hierarchyRead: {
+        refresh: async () => {
+          events.push('durableNavigation')
+          return true
+        }
+      },
+      localBrowseRead: {
+        refreshEntryPoints: async () => {
+          events.push('localBrowseEntryPoints')
+          return true
+        }
+      },
+      confirmRemoveSource: () => true,
+      isSourceRootVisible: () => false
+    })
+
+    await expect(lifecycle.addMusicFolder()).resolves.toBe(true)
+    rootActions.scanStatus.value = 'scanned'
+    events.length = 0
+
+    await expect(lifecycle.removeSource()).resolves.toBe(true)
+    expect(events).toEqual(['unregister', 'durableNavigation', 'localBrowseEntryPoints'])
   })
 
   it('clears selected browser contents intentionally after removal is authoritative', async () => {

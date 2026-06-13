@@ -1,6 +1,15 @@
 import type { LibraryBoundaryHostStatus } from '../../shared/library/boundary/status'
 import type { EntryPoint, ChildRow, HierarchyCoverage } from '../../shared/library/hierarchy/read'
 import type { NavigationReadRowsResult, NavigationRow } from '../../shared/library/navigation/read'
+import type { LocalBrowseEntryPoint } from '../../shared/library/localBrowse/entryPoints'
+import type { LocalBrowseItem } from '../../shared/library/localBrowse/items'
+import type {
+  LocalBrowseDirectoryTarget,
+  LocalBrowseEntryPointTarget,
+  LocalBrowseEntryPointsState,
+  LocalBrowseItemState,
+  LocalBrowseMoreTarget
+} from './localBrowse/types'
 import type { SourceReadiness } from './runtime/sourceReadiness'
 
 export type DirectoryTarget = {
@@ -142,6 +151,26 @@ export type RowBinding =
       readonly target: MoreTarget
       readonly detail: string
     }
+  | {
+      readonly kind: 'localBrowseSection'
+    }
+  | {
+      readonly kind: 'localBrowseEntryPoint'
+      readonly entry: LocalBrowseEntryPoint
+      readonly target: LocalBrowseEntryPointTarget
+    }
+  | {
+      readonly kind: 'localBrowseItem'
+      readonly item: LocalBrowseItem
+      readonly target?: LocalBrowseDirectoryTarget
+    }
+  | {
+      readonly kind: 'localBrowseMore'
+      readonly state: 'available' | 'loading' | 'error'
+      readonly ownerId: string
+      readonly target: LocalBrowseMoreTarget
+      readonly detail: string
+    }
 
 export type BrowserState = {
   readonly hostStatus?: LibraryBoundaryHostStatus
@@ -149,4 +178,6 @@ export type BrowserState = {
   readonly sourceReadinessByNodeId?: ReadonlyMap<string, SourceReadiness>
   readonly sourceReadStates: ReadonlyMap<string, SourceState>
   readonly directoryReadStates: ReadonlyMap<string, DirectoryState>
+  readonly localBrowseEntryPointsState?: LocalBrowseEntryPointsState
+  readonly localBrowseItemStates?: ReadonlyMap<string, LocalBrowseItemState>
 }

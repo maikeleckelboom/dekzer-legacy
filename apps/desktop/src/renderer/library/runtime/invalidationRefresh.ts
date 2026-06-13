@@ -11,6 +11,7 @@ export type InvalidationScope = 'navigationRows' | 'contents' | 'sourceLifecycle
 export type RefreshPlan = {
   readonly refreshRootHierarchy: boolean
   readonly refreshNavigationRows: boolean
+  readonly refreshLocalBrowseEntryPoints: boolean
   readonly refreshExpandedBrowserWindows: boolean
   readonly refreshCurrentContents: boolean
   readonly refreshActiveSearchFilter: boolean
@@ -35,6 +36,7 @@ export type RefreshPlanDeps = {
     LibraryHierarchyReadController,
     'refreshNavigationRows' | 'refreshBrowserWindows' | 'refresh'
   >
+  readonly refreshLocalBrowseEntryPoints?: () => Promise<boolean> | boolean | void
   readonly sourceLifecycleRead?: Pick<SourceLifecycleReadController, 'refreshSourceLifecycles'>
   readonly sourceLifecycleSourceIds?: ReadonlySet<string>
   readonly expandedNodeIds: ReadonlySet<BrowserTreeNodeId>
@@ -56,6 +58,7 @@ export function classifyInvalidationScope(scope: string): InvalidationScope {
 
 export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan {
   let refreshNavigationRows = false
+  let refreshLocalBrowseEntryPoints = false
   let refreshExpandedBrowserWindows = false
   let refreshCurrentContents = false
   let refreshActiveSearchFilter = false
@@ -66,6 +69,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
     switch (classifyInvalidationScope(event.invalidation.scope)) {
       case 'navigationRows':
         refreshNavigationRows = true
+        refreshLocalBrowseEntryPoints = true
         addSourceLifecycleIds(refreshSourceLifecycleIds, input.sourceLifecycleSourceIds)
         break
       case 'contents':
@@ -83,6 +87,7 @@ export function buildInvalidationPlan(input: InvalidationPlanInput): RefreshPlan
 
   return refreshPlan({
     refreshNavigationRows,
+    refreshLocalBrowseEntryPoints,
     refreshExpandedBrowserWindows,
     refreshCurrentContents,
     refreshActiveSearchFilter,
@@ -123,6 +128,7 @@ export function buildScanPlan(input: ScanPlanInput): RefreshPlan {
 export function buildGapPlan(): RefreshPlan {
   return refreshPlan({
     refreshRootHierarchy: true,
+    refreshLocalBrowseEntryPoints: true,
     refreshActiveSearchFilter: true,
     clearAllContentsWarmSnapshots: true,
     acknowledgeGapAfterExecution: true,
@@ -142,6 +148,11 @@ export async function executeRefreshPlan(
 
   if (plan.refreshNavigationRows && !plan.refreshRootHierarchy) {
     succeeded = (await runRefresh(dependencies.hierarchyRead.refreshNavigationRows)) && succeeded
+  }
+
+  if (plan.refreshLocalBrowseEntryPoints) {
+    succeeded =
+      (await runOptionalBooleanRefresh(dependencies.refreshLocalBrowseEntryPoints)) && succeeded
   }
 
   if (plan.refreshExpandedBrowserWindows) {
@@ -188,6 +199,7 @@ function refreshPlan(
   return {
     refreshRootHierarchy: input.refreshRootHierarchy ?? false,
     refreshNavigationRows: input.refreshNavigationRows ?? false,
+    refreshLocalBrowseEntryPoints: input.refreshLocalBrowseEntryPoints ?? false,
     refreshExpandedBrowserWindows: input.refreshExpandedBrowserWindows ?? false,
     refreshCurrentContents: input.refreshCurrentContents ?? false,
     refreshActiveSearchFilter: input.refreshActiveSearchFilter ?? false,

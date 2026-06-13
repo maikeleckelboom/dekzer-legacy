@@ -50,6 +50,7 @@ describe('buildInvalidationPlan', () => {
     expect(planSnapshot(first)).toEqual({
       refreshRootHierarchy: false,
       refreshNavigationRows: true,
+      refreshLocalBrowseEntryPoints: true,
       refreshExpandedBrowserWindows: true,
       refreshCurrentContents: true,
       refreshActiveSearchFilter: true,
@@ -69,6 +70,7 @@ describe('buildInvalidationPlan', () => {
     expect(planSnapshot(plan)).toEqual({
       refreshRootHierarchy: false,
       refreshNavigationRows: false,
+      refreshLocalBrowseEntryPoints: false,
       refreshExpandedBrowserWindows: false,
       refreshCurrentContents: false,
       refreshActiveSearchFilter: false,
@@ -166,6 +168,7 @@ describe('buildGapPlan', () => {
     expect(planSnapshot(buildGapPlan())).toEqual({
       refreshRootHierarchy: true,
       refreshNavigationRows: false,
+      refreshLocalBrowseEntryPoints: true,
       refreshExpandedBrowserWindows: false,
       refreshCurrentContents: false,
       refreshActiveSearchFilter: true,
@@ -200,6 +203,7 @@ describe('executeRefreshPlan', () => {
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
 
     expect(deps.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
+    expect(deps.refreshLocalBrowseEntryPoints).toHaveBeenCalledTimes(1)
     expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
     expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(deps.expandedNodeIds)
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
@@ -231,6 +235,7 @@ describe('executeRefreshPlan', () => {
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(false)
 
     expect(deps.hierarchyRead.refreshNavigationRows).toHaveBeenCalledTimes(1)
+    expect(deps.refreshLocalBrowseEntryPoints).toHaveBeenCalledTimes(1)
     expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
     expect(deps.sourceLifecycleRead?.refreshSourceLifecycles).toHaveBeenCalledTimes(1)
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
@@ -254,6 +259,7 @@ describe('executeRefreshPlan', () => {
     expect(deps.hierarchyRead.refresh).toHaveBeenCalledTimes(1)
     expect(deps.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
     expect(deps.hierarchyRead.refreshBrowserWindows).not.toHaveBeenCalled()
+    expect(deps.refreshLocalBrowseEntryPoints).toHaveBeenCalledTimes(1)
     expect(deps.clearContentsWarmSnapshots).toHaveBeenCalledTimes(1)
     expect(plan.acknowledgeGapAfterExecution).toBe(true)
   })
@@ -270,6 +276,7 @@ describe('executeRefreshPlan', () => {
     await expect(executeRefreshPlan(plan, deps)).resolves.toBe(true)
 
     expect(deps.hierarchyRead.refreshNavigationRows).not.toHaveBeenCalled()
+    expect(deps.refreshLocalBrowseEntryPoints).not.toHaveBeenCalled()
     expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledTimes(1)
     expect(deps.hierarchyRead.refreshBrowserWindows).toHaveBeenCalledWith(deps.expandedNodeIds)
     expect(deps.refreshContentsForCurrentSelection).not.toHaveBeenCalled()
@@ -459,6 +466,15 @@ describe('panel runtime wiring', () => {
     expect(panel).not.toContain('requestNodeChildrenIfExpandable')
   })
 
+  it('wires local browse refresh from host start and refresh dependencies', () => {
+    const panel = readRendererSource('panel.vue')
+
+    expect(panel).toContain("import { useLocalBrowseController } from './localBrowse/controller'")
+    expect(panel).toContain('const localBrowse = useLocalBrowseController()')
+    expect(panel).toContain('void localBrowse.refreshEntryPoints()')
+    expect(panel).toContain('refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints()')
+  })
+
   it('clears failed disclosure ledger entries from scan completion and manual retries', () => {
     const panel = readRendererSource('panel.vue')
 
@@ -480,6 +496,7 @@ function testDeps(overrides: Partial<RefreshPlanDeps> = {}): RefreshPlanDeps {
       ...hierarchyRead
     },
     expandedNodeIds: new Set(['navigation-row:7', 'source-directory:12']),
+    refreshLocalBrowseEntryPoints: vi.fn(),
     refreshContentsForCurrentSelection: vi.fn(),
     refreshActiveSearchFilter: vi.fn(),
     ...rest
@@ -558,6 +575,7 @@ function audioRow(id: string, label: string): ContentsFileRow {
 function planSnapshot(plan: ReturnType<typeof buildGapPlan>): {
   readonly refreshRootHierarchy: boolean
   readonly refreshNavigationRows: boolean
+  readonly refreshLocalBrowseEntryPoints: boolean
   readonly refreshExpandedBrowserWindows: boolean
   readonly refreshCurrentContents: boolean
   readonly refreshActiveSearchFilter: boolean
@@ -569,6 +587,7 @@ function planSnapshot(plan: ReturnType<typeof buildGapPlan>): {
   return {
     refreshRootHierarchy: plan.refreshRootHierarchy,
     refreshNavigationRows: plan.refreshNavigationRows,
+    refreshLocalBrowseEntryPoints: plan.refreshLocalBrowseEntryPoints,
     refreshExpandedBrowserWindows: plan.refreshExpandedBrowserWindows,
     refreshCurrentContents: plan.refreshCurrentContents,
     refreshActiveSearchFilter: plan.refreshActiveSearchFilter,

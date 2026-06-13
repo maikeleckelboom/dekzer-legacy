@@ -159,6 +159,43 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         detail: binding.detail,
         rows: [contentMoreRow(selectedNodeId, binding)]
       }
+    case 'localBrowseSection':
+      return stateProjection({
+        kind: 'unsupported',
+        ownerId: selectedNodeId,
+        title: 'Local Files',
+        state: 'unsupported',
+        label: 'No library contents',
+        detail: 'Select a registered source or folder to see indexed contents.'
+      })
+    case 'localBrowseEntryPoint':
+      return stateProjection({
+        kind: 'unsupported',
+        ownerId: selectedNodeId,
+        title: binding.entry.displayName,
+        state: 'unsupported',
+        label: 'Local folder selected',
+        detail: binding.entry.identity.canonicalPath ?? binding.entry.displayName
+      })
+    case 'localBrowseItem':
+      return stateProjection({
+        kind: 'unsupported',
+        ownerId: selectedNodeId,
+        title: binding.item.displayName,
+        state: 'unsupported',
+        label:
+          binding.item.itemKind === 'mediaFile'
+            ? 'Local media file selected'
+            : 'Local item selected',
+        detail: localBrowseItemDetail(binding.item)
+      })
+    case 'localBrowseMore':
+      return {
+        kind: 'ready',
+        title: 'More local items',
+        detail: binding.detail,
+        rows: [localBrowseMoreRow(selectedNodeId, binding)]
+      }
   }
 }
 
@@ -949,6 +986,34 @@ function contentMoreRow(
     detail: binding.detail,
     icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more'
   }
+}
+
+function localBrowseMoreRow(
+  nodeId: BrowserTreeNodeId,
+  binding: Extract<RowBinding, { readonly kind: 'localBrowseMore' }>
+): ContentRow {
+  return {
+    id: nodeId,
+    kind: 'more',
+    label:
+      binding.state === 'error'
+        ? 'Retry loading more'
+        : binding.state === 'loading'
+          ? 'Loading more'
+          : 'Load more',
+    detail: binding.detail,
+    icon: binding.state === 'loading' ? 'loading' : binding.state === 'error' ? 'warning' : 'more'
+  }
+}
+
+function localBrowseItemDetail(
+  item: Extract<RowBinding, { readonly kind: 'localBrowseItem' }>['item']
+): string {
+  if (item.failure !== null) {
+    return item.failure.detail
+  }
+
+  return item.identity.itemCanonicalPath
 }
 
 function stateProjection(options: {

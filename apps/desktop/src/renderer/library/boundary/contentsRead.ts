@@ -698,6 +698,10 @@ function contentsScopeForBinding(
     case 'navigation':
     case 'readState':
     case 'more':
+    case 'localBrowseSection':
+    case 'localBrowseEntryPoint':
+    case 'localBrowseItem':
+    case 'localBrowseMore':
       return undefined
   }
 }

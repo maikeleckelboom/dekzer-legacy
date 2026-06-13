@@ -9,13 +9,39 @@ export function resolveBrowserTreeRowIcon(node: BrowserTreeNode): IconRole | und
       return 'source.local'
     case 'sourceLocation':
     case 'literalDirectory':
+    case 'localBrowseRoot':
+    case 'localBrowseDirectory':
       return 'folder.plain'
+    case 'localBrowseFile':
+      return resolveFileIcon(node.icon)
     case 'smartView':
       return 'navigation.view'
     case 'state':
       return resolveBrowserTreeStateIcon(node.icon)
     case 'action':
       return resolveActionIcon(node.icon)
+  }
+}
+
+function resolveFileIcon(icon: BrowserTreeNode['icon']): IconRole {
+  switch (icon) {
+    case 'music':
+      return 'media.audio'
+    case 'video':
+      return 'media.video'
+    case 'image':
+      return 'media.image'
+    case 'cueSheet':
+      return 'media.cueSheet'
+    case 'warning':
+      return 'state.warning'
+    case 'loading':
+      return 'state.loading'
+    case 'metadata':
+    case 'file':
+    case 'state':
+    default:
+      return 'media.metadata'
   }
 }
 

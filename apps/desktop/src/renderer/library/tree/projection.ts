@@ -25,6 +25,7 @@ import { copyEntryPoint } from '../runtime/entryPoint'
 import type { SourceReadiness } from '../runtime/sourceReadiness'
 import { formatSourceDisplayName } from './sourcePresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
+import { projectLocalBrowseSection } from '../localBrowse/projection'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -48,7 +49,7 @@ export function projectState(state: BrowserState): BrowserProjection | undefined
     return hostProjection
   }
 
-  if (state.navigationReadResult === undefined) {
+  if (state.navigationReadResult === undefined && state.localBrowseEntryPointsState === undefined) {
     return undefined
   }
 
@@ -94,49 +95,88 @@ function isRendererVisibleNavigationRow(row: NavigationRow): boolean {
 function projectNavigationResult(state: BrowserState): BrowserProjection {
   const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
   const result = state.navigationReadResult
+  const localBrowseSection = projectLocalBrowseSection({
+    ...(state.localBrowseEntryPointsState === undefined
+      ? {}
+      : { entryPointsState: state.localBrowseEntryPointsState }),
+    ...(state.localBrowseItemStates === undefined
+      ? {}
+      : { itemStates: state.localBrowseItemStates }),
+    bindingsById
+  })
+  const localBrowseNodes =
+    localBrowseSection === undefined ? [] : ([localBrowseSection] satisfies BrowserTreeNode[])
 
   if (result === undefined) {
-    return emptyProjection({
-      ownerId: 'navigation',
-      state: 'loading',
-      label: 'Loading library',
-      detail: 'Loading your library.'
-    })
+    if (localBrowseNodes.length > 0) {
+      return {
+        kind: 'tree',
+        nodes: localBrowseNodes,
+        bindingsById
+      }
+    }
+
+    return emptyProjectionWithBindings(
+      {
+        ownerId: 'navigation',
+        state: 'loading',
+        label: 'Loading library',
+        detail: 'Loading your library.'
+      },
+      bindingsById
+    )
   }
 
   if (result.state !== 'ready') {
-    return emptyProjection({
-      ownerId: 'navigation',
-      state: 'error',
-      label: 'Library unavailable',
-      detail: result.error.message
-    })
+    if (localBrowseNodes.length > 0) {
+      return {
+        kind: 'tree',
+        nodes: localBrowseNodes,
+        bindingsById
+      }
+    }
+
+    return emptyProjectionWithBindings(
+      {
+        ownerId: 'navigation',
+        state: 'error',
+        label: 'Library unavailable',
+        detail: result.error.message
+      },
+      bindingsById
+    )
   }
 
   const visibleRows = result.rows.filter(isRendererVisibleNavigationRow)
 
-  if (visibleRows.length === 0) {
-    return emptyProjection({
-      ownerId: 'navigation',
-      state: 'empty',
-      label: 'No library sources',
-      detail: 'Add a music folder to start building your library.'
-    })
+  if (visibleRows.length === 0 && localBrowseNodes.length === 0) {
+    return emptyProjectionWithBindings(
+      {
+        ownerId: 'navigation',
+        state: 'empty',
+        label: 'No library sources',
+        detail: 'Add a music folder to start building your library.'
+      },
+      bindingsById
+    )
   }
 
   return {
     kind: 'tree',
-    nodes: visibleRows.map((row) =>
-      projectNavigationRow({
-        row,
-        ...(state.sourceReadinessByNodeId === undefined
-          ? {}
-          : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),
-        sourceReadStates: state.sourceReadStates,
-        directoryReadStates: state.directoryReadStates,
-        bindingsById
-      })
-    ),
+    nodes: [
+      ...visibleRows.map((row) =>
+        projectNavigationRow({
+          row,
+          ...(state.sourceReadinessByNodeId === undefined
+            ? {}
+            : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),
+          sourceReadStates: state.sourceReadStates,
+          directoryReadStates: state.directoryReadStates,
+          bindingsById
+        })
+      ),
+      ...localBrowseNodes
+    ],
     bindingsById
   }
 }
@@ -676,6 +716,24 @@ function emptyProjection(options: {
   readonly detail: string
 }): BrowserProjection {
   const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
+  const node = trackedReadStateNode(options, bindingsById)
+
+  return {
+    kind: 'tree',
+    nodes: [node],
+    bindingsById
+  }
+}
+
+function emptyProjectionWithBindings(
+  options: {
+    readonly ownerId: string
+    readonly state: BrowserTreeReadState
+    readonly label: string
+    readonly detail: string
+  },
+  bindingsById: Map<BrowserTreeNodeId, RowBinding>
+): BrowserProjection {
   const node = trackedReadStateNode(options, bindingsById)
 
   return {
