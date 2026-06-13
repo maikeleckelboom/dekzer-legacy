@@ -31,7 +31,7 @@ pub enum StoreTrackIdentityCandidateStatus {
 pub struct StoreTrackIdentityCandidateMember {
     pub track_identity_candidate_member_id: i64,
     pub track_identity_candidate_id: i64,
-    pub primary_media_candidate_id: i64,
+    pub primary_media_fact_id: i64,
     pub attachment_id: i64,
     pub evidence_source_file_id: i64,
     pub evidence_basis_fingerprint: String,
@@ -45,7 +45,7 @@ pub struct StoreTrackIdentityCandidateMember {
 pub struct StoreTrackIdentityCandidateEvidence {
     pub track_identity_candidate_evidence_id: i64,
     pub track_identity_candidate_id: i64,
-    pub primary_media_candidate_id: i64,
+    pub primary_media_fact_id: i64,
     pub attachment_id: i64,
     pub source_file_attachment_link_id: i64,
     pub source_file_id: i64,
@@ -133,7 +133,7 @@ fn read_track_identity_candidate_members(
         .prepare(
             "SELECT track_identity_candidate_member_id,
                     track_identity_candidate_id,
-                    primary_media_candidate_id,
+                    primary_media_fact_id,
                     attachment_id,
                     evidence_source_file_id,
                     evidence_basis_fingerprint,
@@ -143,13 +143,13 @@ fn read_track_identity_candidate_members(
                     updated_at
              FROM track_identity_candidate_members
              WHERE track_identity_candidate_id = ?1
-             ORDER BY primary_media_candidate_id ASC",
+             ORDER BY primary_media_fact_id ASC",
         )?
         .query_map([track_identity_candidate_id], |row| {
             Ok(StoreTrackIdentityCandidateMember {
                 track_identity_candidate_member_id: row.get(0)?,
                 track_identity_candidate_id: row.get(1)?,
-                primary_media_candidate_id: row.get(2)?,
+                primary_media_fact_id: row.get(2)?,
                 attachment_id: row.get(3)?,
                 evidence_source_file_id: row.get(4)?,
                 evidence_basis_fingerprint: row.get(5)?,
@@ -172,7 +172,7 @@ fn read_track_identity_candidate_evidence(
         .prepare(&format!(
             "SELECT evidence.track_identity_candidate_evidence_id,
                    evidence.track_identity_candidate_id,
-                   evidence.primary_media_candidate_id,
+                   evidence.primary_media_fact_id,
                    evidence.attachment_id,
                    evidence.source_file_attachment_link_id,
                    evidence.source_file_id,
@@ -191,7 +191,7 @@ fn read_track_identity_candidate_evidence(
             FROM track_identity_candidate_evidence evidence
             JOIN source_files file
               ON file.source_file_id = evidence.source_file_id
-            LEFT JOIN SourceFacts facts
+            LEFT JOIN source_file_facts facts
               ON facts.source_file_id = evidence.source_file_id
             LEFT JOIN source_file_attachment_links link
               ON link.source_file_attachment_link_id = evidence.source_file_attachment_link_id
@@ -221,7 +221,7 @@ fn map_evidence_row(row: &Row<'_>) -> rusqlite::Result<StoreTrackIdentityCandida
     Ok(StoreTrackIdentityCandidateEvidence {
         track_identity_candidate_evidence_id: row.get(0)?,
         track_identity_candidate_id: row.get(1)?,
-        primary_media_candidate_id: row.get(2)?,
+        primary_media_fact_id: row.get(2)?,
         attachment_id: row.get(3)?,
         source_file_attachment_link_id: row.get(4)?,
         source_file_id: row.get(5)?,

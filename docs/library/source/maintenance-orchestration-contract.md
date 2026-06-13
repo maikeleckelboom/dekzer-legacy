@@ -32,7 +32,7 @@ The current unit exists so a scan completion or explicit command can make bounde
 2. Attachment materialization from current BLAKE3 facts.
 3. Audio-only media probe observations for pending audio source files.
 4. Evidence-backed primary-media promotion from current attachments and audio probe facts.
-5. Track identity candidate production from current evidence-backed primary-media candidates.
+5. Track identity candidate production from current evidence-backed primary-media facts.
 6. Track identity decision production from active exact-content candidates.
 7. Maintained read-model invalidation through the existing honest scopes.
 
@@ -55,11 +55,11 @@ The deterministic order is:
 7. Publish maintained snapshot invalidations after each phase using current maintained revision scopes.
 
 Attachment materialization follows hashing because `content_attachments` and `source_file_attachment_links` consume
-current BLAKE3 `SourceFacts`. Media probing follows materialization because probe commits merge current compatible
-BLAKE3 evidence into `SourceFacts`; existing attachment links remain current when the hash evidence is preserved.
+current BLAKE3 `source_file_facts`. Media probing follows materialization because probe commits merge current compatible
+BLAKE3 evidence into `source_file_facts`; existing attachment links remain current when the hash evidence is preserved.
 Primary-media promotion follows probing because it requires current attachment links and at least one current audio
 probe fact. Track identity candidate production follows primary-media promotion because it consumes only current
-evidence-backed `primary_media_candidates` rows and revalidates the source-file, attachment, BLAKE3, and probe evidence
+evidence-backed `primary_media_facts` rows and revalidates the source-file, attachment, BLAKE3, and probe evidence
 before producing or refreshing candidate rows. Track identity decision production follows candidate production because it
 consumes only active exact-content candidates with current candidate evidence and produces current
 `system_exact_content_v0` accepted decision records only when a current system decision does not already exist and no
@@ -153,8 +153,8 @@ The snapshot computes:
 - in-memory last bounded run summary, when this service instance has run one
 
 Runtime maintenance state is service-owned memory only. It is not durable identity and is not stored in SQLite. Durable
-truth remains in `SourceFacts`, `content_attachments`, `source_file_attachment_links`, and
-`primary_media_candidates`. Durable track identity candidate evidence remains in `track_identity_candidates`,
+truth remains in `source_file_facts`, `content_attachments`, `source_file_attachment_links`, and
+`primary_media_facts`. Durable track identity candidate evidence remains in `track_identity_candidates`,
 `track_identity_candidate_members`, and `track_identity_candidate_evidence`. Durable track identity decisions remain in
 `track_identity_decisions` and `track_identity_decision_evidence`.
 
@@ -177,13 +177,13 @@ maintenance unit.
 
 Each phase commits through the existing authority path:
 
-- BLAKE3 hashing commits accepted `SourceFacts` through inspect-source work/artifact authority.
+- BLAKE3 hashing commits accepted `source_file_facts` through inspect-source work/artifact authority.
 - Attachment materialization updates `content_attachments` and `source_file_attachment_links`.
-- Media probing commits accepted `SourceFacts` through inspect-source work/artifact authority.
-- Primary-media promotion updates `primary_media_candidates` from current attachments and current audio probe facts.
+- Media probing commits accepted `source_file_facts` through inspect-source work/artifact authority.
+- Primary-media promotion updates `primary_media_facts` from current attachments and current audio probe facts.
 - Track identity candidate production updates `track_identity_candidates`,
   `track_identity_candidate_members`, and `track_identity_candidate_evidence` from current evidence-backed
-  primary-media candidates.
+  primary-media facts.
 - Track identity decision production updates `track_identity_decisions` and `track_identity_decision_evidence` from
   active exact-content candidates, preserves candidate/member/evidence provenance, and skips candidates with current
   user reject/defer decisions.

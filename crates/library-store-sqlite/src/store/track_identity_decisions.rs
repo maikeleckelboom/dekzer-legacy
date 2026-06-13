@@ -456,7 +456,7 @@ fn count_current_track_identity_candidate_evidence(
                  FROM track_identity_candidate_evidence evidence
                  JOIN source_files file
                    ON file.source_file_id = evidence.source_file_id
-                 LEFT JOIN SourceFacts facts
+                 LEFT JOIN source_file_facts facts
                    ON facts.source_file_id = evidence.source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_attachment_link_id =
@@ -766,7 +766,7 @@ fn track_identity_decision_production_candidates_sql(select_clause: &str, suffix
            ON evidence.track_identity_candidate_id = candidate.track_identity_candidate_id
          JOIN source_files file
            ON file.source_file_id = evidence.source_file_id
-         LEFT JOIN SourceFacts facts
+         LEFT JOIN source_file_facts facts
            ON facts.source_file_id = evidence.source_file_id
          LEFT JOIN source_file_attachment_links link
            ON link.source_file_attachment_link_id =
@@ -867,7 +867,7 @@ fn insert_decision_evidence_snapshot(
                      track_identity_candidate_id,
                      track_identity_candidate_member_id,
                      track_identity_candidate_evidence_id,
-                     primary_media_candidate_id,
+                     primary_media_fact_id,
                      attachment_id,
                      source_file_attachment_link_id,
                      source_file_id,
@@ -883,7 +883,7 @@ fn insert_decision_evidence_snapshot(
                         evidence.track_identity_candidate_id,
                         member.track_identity_candidate_member_id,
                         evidence.track_identity_candidate_evidence_id,
-                        evidence.primary_media_candidate_id,
+                        evidence.primary_media_fact_id,
                         evidence.attachment_id,
                         evidence.source_file_attachment_link_id,
                         evidence.source_file_id,
@@ -898,10 +898,10 @@ fn insert_decision_evidence_snapshot(
                  JOIN track_identity_candidate_members member
                    ON member.track_identity_candidate_id =
                       evidence.track_identity_candidate_id
-                  AND member.primary_media_candidate_id = evidence.primary_media_candidate_id
+                  AND member.primary_media_fact_id = evidence.primary_media_fact_id
                  JOIN source_files file
                    ON file.source_file_id = evidence.source_file_id
-                 LEFT JOIN SourceFacts facts
+                 LEFT JOIN source_file_facts facts
                    ON facts.source_file_id = evidence.source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_attachment_link_id =
@@ -1119,8 +1119,7 @@ mod tests {
             let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
             let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
             let file_class = crate::browse_media::file_class_str_from_path(relative_path);
-            let relative_path_browse_sort_key =
-                crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
+            let path_sort_key = crate::browse_sort_key::compute_path_sort_key(relative_path);
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -1128,8 +1127,8 @@ mod tests {
                              source_file_id,
                              source_id,
                              name,
-                             name_browse_sort_key,
-                             relative_path_browse_sort_key,
+                             name_sort_key,
+                             path_sort_key,
                              relative_path,
                              size_bytes,
                              mtime_ns,
@@ -1147,7 +1146,7 @@ mod tests {
                             source_file_id,
                             self.source_id,
                             file_name,
-                            relative_path_browse_sort_key,
+                            path_sort_key,
                             relative_path,
                             file_kind,
                             file_class
@@ -1162,7 +1161,7 @@ mod tests {
             self.store
                 .with_write(|write| {
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkItems (
+                        "INSERT OR IGNORE INTO work_items (
                              work_item_id,
                              subject_kind,
                              subject_id,
@@ -1173,11 +1172,11 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (1, 'source_file', 'fixture', 'inspect_source', 'fixture', 'completed', 'interactive', 1, 1)",
+                         VALUES (1, 'source_file', 'fixture', 'inspect_source_file', 'fixture', 'completed', 'interactive', 1, 1)",
                         [],
                     )?;
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkRuns (
+                        "INSERT OR IGNORE INTO work_runs (
                              work_run_id,
                              work_item_id,
                              adapter_key,
@@ -1190,7 +1189,7 @@ mod tests {
                     )?;
                     let artifact_id = 10_000 + source_file_id;
                     write.execute(
-                        "INSERT OR REPLACE INTO Artifacts (
+                        "INSERT OR REPLACE INTO work_artifacts (
                              artifact_id,
                              work_run_id,
                              subject_kind,
@@ -1226,9 +1225,8 @@ mod tests {
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                     )?;
                     write.execute(
-                        "INSERT INTO SourceFacts (
+                        "INSERT INTO source_file_facts (
                              source_file_id,
-                             fact_kind,
                              basis_fingerprint,
                              basis_source_id,
                              basis_relative_path,
@@ -1248,7 +1246,7 @@ mod tests {
                              updated_at,
                              accepted_artifact_id
                          )
-                         VALUES (?1, 'source_inspection', ?2, ?3, ?4, ?5, ?6, ?7, 1, 'blake3', ?8, 'audio', 'audio/wav', 100, 44100, 2, 16, 'pcm', 1, ?9)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'blake3', ?8, 'audio', 'audio/wav', 100, 44100, 2, 16, 'pcm', 1, ?9)
                          ON CONFLICT(source_file_id) DO UPDATE SET
                              basis_fingerprint = excluded.basis_fingerprint,
                              basis_source_id = excluded.basis_source_id,
@@ -2814,12 +2812,11 @@ mod tests {
                     [],
                 )?;
                 let src_b_rpath = "Album/source-b.wav";
-                let src_b_rpath_key =
-                    crate::browse_sort_key::compute_relative_path_browse_sort_key(src_b_rpath);
+                let src_b_rpath_key = crate::browse_sort_key::compute_path_sort_key(src_b_rpath);
                 write.execute(
                     "INSERT INTO source_files (
-                         source_file_id, source_id, name, name_browse_sort_key,
-                         relative_path_browse_sort_key, relative_path,
+                         source_file_id, source_id, name, name_sort_key,
+                         path_sort_key, relative_path,
                          size_bytes, mtime_ns, file_kind, file_class,
                          presence_state, first_discovered_at,
                          last_observed_at, last_presence_change_at,
@@ -2831,18 +2828,18 @@ mod tests {
                     params![200, src_b_rpath_key, src_b_rpath],
                 )?;
                 write.execute(
-                    "INSERT OR IGNORE INTO WorkItems (
+                    "INSERT OR IGNORE INTO work_items (
                          work_item_id, subject_kind, subject_id, work_kind,
                          basis_fingerprint, state, priority_class,
                          created_at, updated_at
                      )
                      VALUES (10, 'source_file', 'fixture-multi',
-                             'inspect_source', 'fixture-multi',
+                             'inspect_source_file', 'fixture-multi',
                              'completed', 'interactive', 1, 1)",
                     [],
                 )?;
                 write.execute(
-                    "INSERT OR IGNORE INTO WorkRuns (
+                    "INSERT OR IGNORE INTO work_runs (
                          work_run_id, work_item_id, adapter_key,
                          adapter_version, started_at, outcome
                      )
@@ -2850,7 +2847,7 @@ mod tests {
                     [],
                 )?;
                 write.execute(
-                    "INSERT OR REPLACE INTO Artifacts (
+                    "INSERT OR REPLACE INTO work_artifacts (
                          artifact_id, work_run_id, subject_kind,
                          subject_id, artifact_kind, artifact_role,
                          adapter_key, adapter_version, basis_fingerprint,
@@ -2864,8 +2861,8 @@ mod tests {
                     [],
                 )?;
                 write.execute(
-                    "INSERT INTO SourceFacts (
-                         source_file_id, fact_kind, basis_fingerprint,
+                    "INSERT INTO source_file_facts (
+                         source_file_id, basis_fingerprint,
                          basis_source_id, basis_relative_path,
                          basis_size_bytes, basis_mtime_ns,
                          basis_presence_state, observed_at_ms,
@@ -2874,7 +2871,7 @@ mod tests {
                          sample_rate_hz, channels, bit_depth, codec,
                          updated_at, accepted_artifact_id
                      )
-                     VALUES (200, 'source_inspection', 'basis:200', 2,
+                     VALUES (200, 'basis:200', 2,
                              'Album/source-b.wav', 10, 100, 'present', 1,
                              'blake3', ?1, 'audio', 'audio/wav', 100,
                              44100, 2, 16, 'pcm', 1, 20000)

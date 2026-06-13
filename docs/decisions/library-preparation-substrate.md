@@ -13,10 +13,10 @@ schema, current table names, generated contracts, Rust types, TypeScript types, 
 The post-deletion baseline is authoritative through the accepted current substrate docs:
 
 - source files and source lifecycle/integrity;
-- `SourceFacts` observed evidence;
+- `source_file_facts` observed evidence;
 - `content_attachments`;
 - `source_file_attachment_links`;
-- primary-media candidates;
+- primary-media facts;
 - exact-content track-identity candidates;
 - track-identity decisions and review projections;
 - contents/search/filter and navigation contracts.

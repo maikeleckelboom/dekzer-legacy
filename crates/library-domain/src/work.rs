@@ -87,21 +87,21 @@ impl WorkSubject {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MachineWorkKind {
-    InspectSource,
+    InspectSourceFile,
     RebuildProjection,
 }
 
 impl MachineWorkKind {
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::InspectSource => "inspect_source",
+            Self::InspectSourceFile => "inspect_source_file",
             Self::RebuildProjection => "rebuild_projection",
         }
     }
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
-            "inspect_source" => Some(Self::InspectSource),
+            "inspect_source_file" => Some(Self::InspectSourceFile),
             "rebuild_projection" => Some(Self::RebuildProjection),
             _ => None,
         }

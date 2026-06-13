@@ -5,10 +5,8 @@ use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{ArtifactId, SourceFileId};
 
-const SOURCE_FACT_KIND_SOURCE_INSPECTION: &str = "source_inspection";
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CommitAcceptedSourceFactsInput {
+pub struct CommitAcceptedSourceFileFactsInput {
     pub source_file_id: SourceFileId,
     pub accepted_artifact_id: ArtifactId,
     pub basis_fingerprint: String,
@@ -25,12 +23,12 @@ pub struct CommitAcceptedSourceFactsInput {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CommitAcceptedSourceFactsMergePolicy {
+pub struct CommitAcceptedSourceFileFactsMergePolicy {
     pub preserve_current_content_hash_when_unspecified: bool,
     pub preserve_current_probe_fields_when_unspecified: bool,
 }
 
-impl CommitAcceptedSourceFactsMergePolicy {
+impl CommitAcceptedSourceFileFactsMergePolicy {
     pub const fn replacement() -> Self {
         Self {
             preserve_current_content_hash_when_unspecified: false,
@@ -69,7 +67,7 @@ struct SourceFileBasis {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct CurrentSourceFactsForMerge {
+struct CurrentSourceFileFactsForMerge {
     content_hash: Option<ContentHashEvidence>,
     mime_type: Option<String>,
     duration_ms: Option<i64>,
@@ -79,19 +77,19 @@ struct CurrentSourceFactsForMerge {
     codec: Option<String>,
 }
 
-pub struct SourceFactsAuthorityTx<'write, 'conn> {
+pub struct SourceFileFactsAuthorityTx<'write, 'conn> {
     tx: &'write AdmittedWrite<'conn>,
 }
 
-impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
+impl<'write, 'conn> SourceFileFactsAuthorityTx<'write, 'conn> {
     pub(crate) fn new(tx: &'write AdmittedWrite<'conn>) -> Self {
         Self { tx }
     }
 
-    pub fn commit_accepted_source_facts_with_merge(
+    pub fn commit_accepted_source_file_facts_with_merge(
         &self,
-        input: &CommitAcceptedSourceFactsInput,
-        merge_policy: CommitAcceptedSourceFactsMergePolicy,
+        input: &CommitAcceptedSourceFileFactsInput,
+        merge_policy: CommitAcceptedSourceFileFactsMergePolicy,
     ) -> LibrarySqliteResult<()> {
         validate_input(input)?;
         require_source_artifact(
@@ -112,9 +110,8 @@ impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
             .unwrap_or((None, None));
 
         self.tx.execute(
-            "INSERT INTO SourceFacts (
+            "INSERT INTO source_file_facts (
                  source_file_id,
-                 fact_kind,
                  basis_fingerprint,
                  basis_source_id,
                  basis_relative_path,
@@ -134,10 +131,9 @@ impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
                  updated_at,
                  accepted_artifact_id
              )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
              ON CONFLICT(source_file_id) DO UPDATE
-             SET fact_kind = excluded.fact_kind,
-                 basis_fingerprint = excluded.basis_fingerprint,
+             SET basis_fingerprint = excluded.basis_fingerprint,
                  basis_source_id = excluded.basis_source_id,
                  basis_relative_path = excluded.basis_relative_path,
                  basis_size_bytes = excluded.basis_size_bytes,
@@ -157,7 +153,6 @@ impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
                  accepted_artifact_id = excluded.accepted_artifact_id",
             params![
                 input.source_file_id.get(),
-                SOURCE_FACT_KIND_SOURCE_INSPECTION,
                 input.basis_fingerprint,
                 source_file_basis.source_id,
                 source_file_basis.relative_path,
@@ -184,10 +179,10 @@ impl<'write, 'conn> SourceFactsAuthorityTx<'write, 'conn> {
 
 fn merge_with_current_facts(
     tx: &AdmittedWrite<'_>,
-    input: &CommitAcceptedSourceFactsInput,
-    merge_policy: CommitAcceptedSourceFactsMergePolicy,
+    input: &CommitAcceptedSourceFileFactsInput,
+    merge_policy: CommitAcceptedSourceFileFactsMergePolicy,
     source_file_basis: &SourceFileBasis,
-) -> LibrarySqliteResult<CommitAcceptedSourceFactsInput> {
+) -> LibrarySqliteResult<CommitAcceptedSourceFileFactsInput> {
     if !merge_policy.preserve_current_content_hash_when_unspecified
         && !merge_policy.preserve_current_probe_fields_when_unspecified
     {
@@ -195,7 +190,7 @@ fn merge_with_current_facts(
     }
 
     let Some(current) =
-        load_current_source_facts_for_merge(tx, input.source_file_id, source_file_basis)?
+        load_current_source_file_facts_for_merge(tx, input.source_file_id, source_file_basis)?
     else {
         return Ok(input.clone());
     };
@@ -229,7 +224,7 @@ fn merge_with_current_facts(
     Ok(merged)
 }
 
-fn validate_input(input: &CommitAcceptedSourceFactsInput) -> LibrarySqliteResult<()> {
+fn validate_input(input: &CommitAcceptedSourceFileFactsInput) -> LibrarySqliteResult<()> {
     require_non_empty("basis_fingerprint", &input.basis_fingerprint)?;
     require_non_empty("media_kind", &input.media_kind)?;
     if input.updated_at < input.observed_at_ms {
@@ -286,11 +281,11 @@ fn load_source_file_basis(
     })
 }
 
-fn load_current_source_facts_for_merge(
+fn load_current_source_file_facts_for_merge(
     tx: &AdmittedWrite<'_>,
     source_file_id: SourceFileId,
     source_file_basis: &SourceFileBasis,
-) -> LibrarySqliteResult<Option<CurrentSourceFactsForMerge>> {
+) -> LibrarySqliteResult<Option<CurrentSourceFileFactsForMerge>> {
     tx.query_row(
         "SELECT content_hash_algorithm,
                 content_hash_value,
@@ -300,7 +295,7 @@ fn load_current_source_facts_for_merge(
                 channels,
                 bit_depth,
                 codec
-         FROM SourceFacts
+         FROM source_file_facts
          WHERE source_file_id = ?1
            AND basis_source_id = ?2
            AND basis_relative_path = ?3
@@ -318,7 +313,7 @@ fn load_current_source_facts_for_merge(
         |row| {
             let content_hash_algorithm = row.get::<_, Option<String>>(0)?;
             let content_hash_value = row.get::<_, Option<String>>(1)?;
-            Ok(CurrentSourceFactsForMerge {
+            Ok(CurrentSourceFileFactsForMerge {
                 content_hash: content_hash_algorithm
                     .zip(content_hash_value)
                     .map(|(algorithm, value)| ContentHashEvidence { algorithm, value }),
@@ -340,8 +335,8 @@ mod tests {
     use rusqlite::{Connection, params};
 
     use super::{
-        CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
-        SOURCE_FACT_KIND_SOURCE_INSPECTION, SourceFactsAuthorityTx,
+        CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+        ContentHashEvidence, SourceFileFactsAuthorityTx,
     };
     use crate::authority::write_lane::{AdmittedWrite, admit_write};
     use crate::read_models::observed_file_facts::{
@@ -386,9 +381,8 @@ mod tests {
             .rsplit('/')
             .next()
             .expect("relative path has file name");
-        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
-        let relative_path_browse_sort_key =
-            crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
+        let name_sort_key = crate::browse_sort_key::compute_name_sort_key(name);
+        let path_sort_key = crate::browse_sort_key::compute_path_sort_key(relative_path);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -396,8 +390,8 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
-                     relative_path_browse_sort_key,
+                     name_sort_key,
+                     path_sort_key,
                      relative_path,
                      size_bytes,
                      mtime_ns,
@@ -414,8 +408,8 @@ mod tests {
                 params![
                     source_file_id,
                     name,
-                    name_browse_sort_key,
-                    relative_path_browse_sort_key,
+                    name_sort_key,
+                    path_sort_key,
                     relative_path,
                     size_bytes,
                     mtime_ns,
@@ -432,7 +426,7 @@ mod tests {
     ) {
         write
             .execute(
-                "INSERT INTO WorkItems (
+                "INSERT INTO work_items (
                      work_item_id,
                      subject_kind,
                      subject_id,
@@ -444,13 +438,13 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (?1, 'source_file', ?2, 'inspect_source', 'interactive', ?3, 'completed', 1, 20, 20)",
+                 VALUES (?1, 'source_file', ?2, 'inspect_source_file', 'interactive', ?3, 'completed', 1, 20, 20)",
                 params![artifact_id, source_file_id.to_string(), basis_fingerprint],
             )
             .expect("insert work item");
         write
             .execute(
-                "INSERT INTO WorkRuns (
+                "INSERT INTO work_runs (
                      work_run_id,
                      work_item_id,
                      adapter_key,
@@ -465,7 +459,7 @@ mod tests {
             .expect("insert work run");
         write
             .execute(
-                "INSERT INTO Artifacts (
+                "INSERT INTO work_artifacts (
                      artifact_id,
                      work_run_id,
                      subject_kind,
@@ -501,8 +495,8 @@ mod tests {
     ) {
         admit_write(connection, |write| {
             insert_artifact(write, artifact_id, source_file_id, basis_fingerprint);
-            SourceFactsAuthorityTx::new(write).commit_accepted_source_facts_with_merge(
-                &CommitAcceptedSourceFactsInput {
+            SourceFileFactsAuthorityTx::new(write).commit_accepted_source_file_facts_with_merge(
+                &CommitAcceptedSourceFileFactsInput {
                     source_file_id: SourceFileId::new(source_file_id)
                         .expect("positive source_file_id"),
                     accepted_artifact_id: ArtifactId::new(artifact_id).expect("positive artifact"),
@@ -518,7 +512,7 @@ mod tests {
                     codec: None,
                     updated_at: 24,
                 },
-                CommitAcceptedSourceFactsMergePolicy::replacement(),
+                CommitAcceptedSourceFileFactsMergePolicy::replacement(),
             )
         })
         .expect("commit source facts");
@@ -546,7 +540,6 @@ mod tests {
             .expect("read observed facts")
             .expect("facts exist");
         assert_eq!(facts.source_file_id, 100);
-        assert_eq!(facts.fact_kind, SOURCE_FACT_KIND_SOURCE_INSPECTION);
         assert_eq!(facts.basis_source_id, 1);
         assert_eq!(facts.basis_relative_path, "Album/track.flac");
         assert_eq!(facts.basis_size_bytes, Some(123));

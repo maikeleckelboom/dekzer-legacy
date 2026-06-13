@@ -95,7 +95,7 @@ The following layers are canonical.
    content attachment.
 6. **Media probe observations v0** — The app records accepted basis-bound audio probe summary facts through backend
    inspection work.
-7. **Primary-media promotion v0** — The app promotes current audio evidence into backend-owned primary-media candidates.
+7. **Primary-media promotion v0** — The app promotes current audio evidence into backend-owned primary-media facts.
 8. **Exact-content track identity candidate and decision v0** — The app groups exact current evidence, records
    backend/user candidate decisions, resolves effective decision precedence, and exposes review candidates without
    claiming canonical track identity.
@@ -109,7 +109,7 @@ no track columns. `first_observed_at` is frozen at first insert.
 
 `source_file_attachment_links` — links source files to attachments. `UNIQUE(source_file_id)` enforces one current
 materialized attachment per source file. `source_id` is copied source scope and is schema-guarded to match the linked
-`source_files.source_id`. Staleness computed by join against current `SourceFacts`, not stored as a flag.
+`source_files.source_id`. Staleness computed by join against current `source_file_facts`, not stored as a flag.
 
 Materialization: `materialize_attachments_for_source(source_id, limit)` — store authority, called by bounded
 service-owned scan/manual hash maintenance. Candidate admission applies source-scoped SQL ordering and limits before
@@ -127,10 +127,10 @@ without requiring full source-wide candidate materialization in Rust.
 
 The current baseline is greenfield. Removed asset, browser, preparation, capability, playlist, and segment surfaces are
 not current, not aliases, not fallback views, and not implementation targets. Future media, track, preparation,
-analysis, playlist, waveform, workspace, or performance work must build on the current source-file, `SourceFacts`,
+analysis, playlist, waveform, workspace, or performance work must build on the current source-file, `source_file_facts`,
 attachment, primary-media, track-candidate, and track-decision substrate instead of reviving deleted tables.
 
-`primaryMedia` is current as a narrow read policy over `primary_media_candidates`; it remains non-default product
+`primaryMedia` is current as a narrow read policy over `primary_media_facts`; it remains non-default product
 doctrine until workflow-filter ownership explicitly chooses it. It is not track identity and not a fallback source-file
 browser.
 
@@ -235,9 +235,9 @@ attachments. It produces its own evidence table consumed by track identity.
 ### Staleness is computed, not stored — for observed-fact and attachment-link validity
 
 No `is_current` or `is_stale` boolean column on observed-fact or attachment-link tables. Link status is computed by
-joining to the current `SourceFacts` row and comparing `SourceFacts.content_hash_value` to the linked
+joining to the current `source_file_facts` row and comparing `source_file_facts.content_hash_value` to the linked
 `content_attachments.content_hash_value`. `source_file_attachment_links` does not store a duplicate hash copy. If
-current `SourceFacts` for a source file has a different hash or no current BLAKE3 fact, the link is stale.
+current `source_file_facts` for a source file has a different hash or no current BLAKE3 fact, the link is stale.
 
 This law applies to evidence and link validity. It does not prohibit stored lifecycle state fields for entities where
 state is an authority, not a cache — for example, user decision state, job status, or scan lifecycle.
@@ -742,7 +742,7 @@ Goal: Know what is ready for performance, what is missing, what changed, and wha
 **E-1 [DOCTRINE] Preparation, analysis, and waveform contracts** [Doctrine gate]
 
 After the post-deletion authority cleanup, preparation/work/analysis/waveform concepts must be contracted again before
-implementation. The future contracts must consume the current source-file, `SourceFacts`, attachment, primary-media,
+implementation. The future contracts must consume the current source-file, `source_file_facts`, attachment, primary-media,
 track-candidate, and track-decision substrate. They must not restore deleted preparation, capability, waveform, or
 segment models from earlier schema epochs.
 

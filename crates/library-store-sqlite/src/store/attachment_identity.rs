@@ -155,7 +155,7 @@ fn read_attachment_materialization_skip_summary(
                     THEN 1 ELSE 0
                 END), 0)
              FROM source_files file
-             LEFT JOIN SourceFacts facts
+             LEFT JOIN source_file_facts facts
                ON facts.source_file_id = file.source_file_id
              WHERE file.source_id = ?1",
             params![source_id, SOURCE_FILE_BLAKE3_ALGORITHM],
@@ -179,7 +179,7 @@ fn count_attachment_materialization_candidates(
         .query_row(
             "SELECT COUNT(*)
              FROM source_files file
-             JOIN SourceFacts facts
+             JOIN source_file_facts facts
                ON facts.source_file_id = file.source_file_id
              WHERE file.source_id = ?1
                AND file.source_id = facts.basis_source_id
@@ -208,7 +208,7 @@ fn read_attachment_materialization_candidates(
                 file.file_kind,
                 facts.content_hash_value
          FROM source_files file
-         JOIN SourceFacts facts
+         JOIN source_file_facts facts
            ON facts.source_file_id = file.source_file_id
          LEFT JOIN source_file_attachment_links link
            ON link.source_file_id = file.source_file_id
@@ -407,9 +407,9 @@ mod tests {
         get_source_files_for_attachment, get_source_files_for_attachment_limited,
     };
     use crate::{
-        CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy,
+        CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
         CompleteMachineWorkInput, ContentHashEvidence, FinishWorkRunInput,
-        InspectSourcePromotionInput, QueueInspectSourceWorkInput, RecordArtifactInput,
+        InspectSourceFilePromotionInput, QueueInspectSourceFileWorkInput, RecordArtifactInput,
         RecordInlineArtifactInput, RecordSourceFileObservationInput, StartWorkRunInput,
         UpsertSourceInput, UpsertSourceStateInput,
     };
@@ -576,7 +576,7 @@ mod tests {
             let basis_fingerprint = format!("attachment-test:basis:{source_file_id}:{queued_at}");
             let queued = self
                 .store
-                .queue_inspect_source_work(QueueInspectSourceWorkInput {
+                .queue_inspect_source_file_work(QueueInspectSourceFileWorkInput {
                     source_file_id: source_file_domain_id(source_file_id),
                     basis_fingerprint: basis_fingerprint.clone(),
                     priority_class: WorkPriorityClass::Interactive,
@@ -619,8 +619,8 @@ mod tests {
                 })
                 .expect("record inspection artifact");
             self.store
-                .inspect_source(InspectSourcePromotionInput {
-                    source_facts: CommitAcceptedSourceFactsInput {
+                .inspect_source_file(InspectSourceFilePromotionInput {
+                    source_file_facts: CommitAcceptedSourceFileFactsInput {
                         source_file_id: source_file_domain_id(source_file_id),
                         accepted_artifact_id: artifact.artifact_id,
                         basis_fingerprint,
@@ -638,11 +638,12 @@ mod tests {
                         codec: None,
                         updated_at: queued_at + 4,
                     },
-                    source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
+                    source_file_facts_merge_policy:
+                        CommitAcceptedSourceFileFactsMergePolicy::replacement(),
                     rebuild_projection_domains: vec![],
                     rebuild_priority: WorkPriorityClass::Interactive,
                 })
-                .expect("commit source facts through inspect_source");
+                .expect("commit source facts through inspect_source_file");
             self.store
                 .finish_work_run(FinishWorkRunInput {
                     work_run_id: work_run.work_run_id,

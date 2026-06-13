@@ -3,8 +3,8 @@ use crate::LibrarySqliteResult;
 use crate::authority::work::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
     CompleteMachineWorkInput, FailMachineWorkInput, FinishWorkRunInput,
-    QueueInspectSourceWorkInput, QueueMachineWorkResult, QueueRebuildProjectionWorkInput,
-    StartWorkRunInput, StartedWorkRun, WorkItemsAuthorityTx, WorkRunsAuthorityTx,
+    QueueInspectSourceFileWorkInput, QueueMachineWorkResult, QueueRebuildProjectionWorkInput,
+    StartWorkRunInput, StartedWorkRun, WorkItemAuthorityTx, WorkRunAuthorityTx,
 };
 
 impl SqliteDurableStore {
@@ -22,11 +22,13 @@ impl SqliteDurableStore {
         self.source_admission_gate.thaw_sources(root_ids.iter());
     }
 
-    pub fn queue_inspect_source_work(
+    pub fn queue_inspect_source_file_work(
         &self,
-        input: QueueInspectSourceWorkInput,
+        input: QueueInspectSourceFileWorkInput,
     ) -> LibrarySqliteResult<QueueMachineWorkResult> {
-        self.with_write(|write| WorkItemsAuthorityTx::new(write).queue_inspect_source_work(&input))
+        self.with_write(|write| {
+            WorkItemAuthorityTx::new(write).queue_inspect_source_file_work(&input)
+        })
     }
 
     pub fn queue_rebuild_projection_work(
@@ -34,7 +36,7 @@ impl SqliteDurableStore {
         input: QueueRebuildProjectionWorkInput,
     ) -> LibrarySqliteResult<QueueMachineWorkResult> {
         self.with_write(|write| {
-            WorkItemsAuthorityTx::new(write).queue_rebuild_projection_work(&input)
+            WorkItemAuthorityTx::new(write).queue_rebuild_projection_work(&input)
         })
     }
 
@@ -42,29 +44,29 @@ impl SqliteDurableStore {
         &self,
         input: ClaimMachineWorkBatchInput,
     ) -> LibrarySqliteResult<Vec<ClaimedMachineWorkItem>> {
-        self.with_write(|write| WorkItemsAuthorityTx::new(write).claim_machine_work_batch(&input))
+        self.with_write(|write| WorkItemAuthorityTx::new(write).claim_machine_work_batch(&input))
     }
 
     pub fn start_work_run(&self, input: StartWorkRunInput) -> LibrarySqliteResult<StartedWorkRun> {
-        self.with_write(|write| WorkRunsAuthorityTx::new(write).start_work_run(&input))
+        self.with_write(|write| WorkRunAuthorityTx::new(write).start_work_run(&input))
     }
 
     pub fn finish_work_run(&self, input: FinishWorkRunInput) -> LibrarySqliteResult<()> {
-        self.with_write(|write| WorkRunsAuthorityTx::new(write).finish_work_run(&input))
+        self.with_write(|write| WorkRunAuthorityTx::new(write).finish_work_run(&input))
     }
 
     pub fn complete_machine_work_item(
         &self,
         input: CompleteMachineWorkInput,
     ) -> LibrarySqliteResult<()> {
-        self.with_write(|write| WorkItemsAuthorityTx::new(write).complete_machine_work_item(&input))
+        self.with_write(|write| WorkItemAuthorityTx::new(write).complete_machine_work_item(&input))
     }
 
     pub fn fail_machine_work_item(&self, input: FailMachineWorkInput) -> LibrarySqliteResult<()> {
-        self.with_write(|write| WorkItemsAuthorityTx::new(write).fail_machine_work_item(&input))
+        self.with_write(|write| WorkItemAuthorityTx::new(write).fail_machine_work_item(&input))
     }
 
     pub fn block_machine_work_item(&self, input: BlockMachineWorkInput) -> LibrarySqliteResult<()> {
-        self.with_write(|write| WorkItemsAuthorityTx::new(write).block_machine_work_item(&input))
+        self.with_write(|write| WorkItemAuthorityTx::new(write).block_machine_work_item(&input))
     }
 }

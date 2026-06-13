@@ -45,11 +45,11 @@ pub struct PersistedWorkRun {
     pub error_detail: Option<String>,
 }
 
-pub struct WorkRunsAuthorityTx<'write, 'conn> {
+pub struct WorkRunAuthorityTx<'write, 'conn> {
     tx: &'write AdmittedWrite<'conn>,
 }
 
-impl<'write, 'conn> WorkRunsAuthorityTx<'write, 'conn> {
+impl<'write, 'conn> WorkRunAuthorityTx<'write, 'conn> {
     pub(crate) fn new(tx: &'write AdmittedWrite<'conn>) -> Self {
         Self { tx }
     }
@@ -72,7 +72,7 @@ impl<'write, 'conn> WorkRunsAuthorityTx<'write, 'conn> {
         }
 
         self.tx.execute(
-            "INSERT INTO WorkRuns (
+            "INSERT INTO work_runs (
                  work_item_id,
                  adapter_key,
                  adapter_version,
@@ -116,7 +116,7 @@ impl<'write, 'conn> WorkRunsAuthorityTx<'write, 'conn> {
             ));
         }
         self.tx.execute(
-            "UPDATE WorkRuns
+            "UPDATE work_runs
              SET finished_at = ?2,
                  outcome = ?3,
                  failure_kind = ?4,
@@ -148,7 +148,7 @@ impl<'write, 'conn> WorkRunsAuthorityTx<'write, 'conn> {
                         outcome,
                         failure_kind,
                         error_detail
-                 FROM WorkRuns
+                 FROM work_runs
                  WHERE work_run_id = ?1",
                 [work_run_id.get()],
                 map_work_run_row,
@@ -177,7 +177,7 @@ pub(crate) fn load_open_work_run_for_work_item(
                 outcome,
                 failure_kind,
                 error_detail
-         FROM WorkRuns
+         FROM work_runs
          WHERE work_item_id = ?1
            AND finished_at IS NULL
          ORDER BY work_run_id DESC
@@ -203,7 +203,7 @@ pub(crate) fn load_latest_work_run_for_work_item(
                 outcome,
                 failure_kind,
                 error_detail
-         FROM WorkRuns
+         FROM work_runs
          WHERE work_item_id = ?1
          ORDER BY work_run_id DESC
          LIMIT 1",
@@ -216,7 +216,7 @@ pub(crate) fn load_latest_work_run_for_work_item(
 
 fn parse_work_run_id(value: i64) -> LibrarySqliteResult<WorkRunId> {
     WorkRunId::new(value).ok_or_else(|| {
-        LibrarySqliteError::WriteInvariant(format!("invalid WorkRuns.work_run_id value: {value}"))
+        LibrarySqliteError::WriteInvariant(format!("invalid work_runs.work_run_id value: {value}"))
     })
 }
 

@@ -4,7 +4,7 @@
 
 PRAGMA auto_vacuum = INCREMENTAL;
 
-CREATE TABLE LibraryMetadata
+CREATE TABLE library_metadata
 (
     library_id         INTEGER PRIMARY KEY CHECK (library_id = 1),
     schema_generation  TEXT    NOT NULL CHECK (length(trim(schema_generation)) > 0),
@@ -152,8 +152,8 @@ CREATE TABLE source_scan_state
 CREATE TABLE source_root_navigation_state
 (
     source_id                         INTEGER PRIMARY KEY REFERENCES sources (source_id) ON DELETE CASCADE,
-    root_window_state                 TEXT    NOT NULL
-        CHECK (root_window_state IN ('unknown', 'established', 'empty', 'missing', 'blocked', 'failed')),
+    root_reach_state                 TEXT    NOT NULL
+        CHECK (root_reach_state IN ('unknown', 'established', 'empty', 'missing', 'blocked', 'failed')),
     immediate_child_directory_count   INTEGER NOT NULL DEFAULT 0 CHECK (immediate_child_directory_count >= 0),
     issue_kind                        TEXT
         CHECK (
@@ -178,14 +178,14 @@ CREATE TABLE source_root_navigation_state
     detail                            TEXT,
     checked_at                        INTEGER,
     updated_at                        INTEGER NOT NULL,
-    CHECK (root_window_state NOT IN ('missing', 'blocked', 'failed') OR issue_kind IS NOT NULL),
-    CHECK (root_window_state != 'established' OR immediate_child_directory_count > 0),
-    CHECK (root_window_state != 'empty' OR immediate_child_directory_count = 0)
+    CHECK (root_reach_state NOT IN ('missing', 'blocked', 'failed') OR issue_kind IS NOT NULL),
+    CHECK (root_reach_state != 'established' OR immediate_child_directory_count > 0),
+    CHECK (root_reach_state != 'empty' OR immediate_child_directory_count = 0)
 ) STRICT;
 
-CREATE TABLE source_registration_proposals
+CREATE TABLE root_admission_proposals
 (
-    source_registration_proposal_id INTEGER PRIMARY KEY,
+    root_admission_proposal_id INTEGER PRIMARY KEY,
     proposal_status                 TEXT    NOT NULL
         CHECK (proposal_status IN ('proposed', 'discarded', 'expired')),
     root_class                      TEXT    NOT NULL
@@ -211,8 +211,8 @@ CREATE TABLE source_registration_proposals
     CHECK (proposal_status != 'proposed' OR root_class != 'protected_root')
 ) STRICT;
 
-CREATE UNIQUE INDEX source_registration_proposals_active_canonical_path
-    ON source_registration_proposals (COALESCE(canonical_path, requested_path))
+CREATE UNIQUE INDEX root_admission_proposals_active_canonical_path
+    ON root_admission_proposals (COALESCE(canonical_path, requested_path))
     WHERE proposal_status = 'proposed';
 
 CREATE TABLE source_locations
@@ -255,35 +255,35 @@ CREATE INDEX source_locations_source
 CREATE TABLE source_navigation_user_order
 (
     order_id     INTEGER PRIMARY KEY,
-    node_domain  TEXT    NOT NULL CHECK (node_domain IN ('source', 'source_location')),
-    node_id      TEXT    NOT NULL CHECK (length(trim(node_id)) > 0),
-    parent_scope TEXT,
+    item_kind  TEXT    NOT NULL CHECK (item_kind IN ('source', 'source_location')),
+    item_key      TEXT    NOT NULL CHECK (length(trim(item_key)) > 0),
+    parent_source_key TEXT,
     ordinal      INTEGER NOT NULL CHECK (ordinal >= 0),
     created_at   INTEGER NOT NULL,
     updated_at   INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
     CHECK (
-        (node_domain = 'source' AND parent_scope IS NULL)
+        (item_kind = 'source' AND parent_source_key IS NULL)
             OR (
-                node_domain = 'source_location'
-                    AND parent_scope IS NOT NULL
-                    AND length(trim(parent_scope)) > 0
+                item_kind = 'source_location'
+                    AND parent_source_key IS NOT NULL
+                    AND length(trim(parent_source_key)) > 0
             )
     )
 ) STRICT;
 
-CREATE UNIQUE INDEX source_navigation_user_order_source_node
-    ON source_navigation_user_order (node_domain, node_id)
-    WHERE node_domain = 'source'
-      AND parent_scope IS NULL;
+CREATE UNIQUE INDEX source_navigation_user_order_source_item
+    ON source_navigation_user_order (item_kind, item_key)
+    WHERE item_kind = 'source'
+      AND parent_source_key IS NULL;
 
-CREATE UNIQUE INDEX source_navigation_user_order_source_location_node
-    ON source_navigation_user_order (node_domain, node_id)
-    WHERE node_domain = 'source_location'
-      AND parent_scope IS NOT NULL;
+CREATE UNIQUE INDEX source_navigation_user_order_source_location_item
+    ON source_navigation_user_order (item_kind, item_key)
+    WHERE item_kind = 'source_location'
+      AND parent_source_key IS NOT NULL;
 
-CREATE INDEX source_navigation_user_order_domain_parent_ordinal
-    ON source_navigation_user_order (node_domain, parent_scope, ordinal);
+CREATE INDEX source_navigation_user_order_parent_order
+    ON source_navigation_user_order (item_kind, parent_source_key, ordinal);
 
 CREATE TABLE source_directories
 (
@@ -291,7 +291,7 @@ CREATE TABLE source_directories
     source_id                          INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
     parent_source_directory_id         INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                               TEXT    NOT NULL,
-    name_browse_sort_key               TEXT    NOT NULL,
+    name_sort_key               TEXT    NOT NULL,
     relative_path                      TEXT    NOT NULL,
     presence_state              TEXT    NOT NULL
         CHECK (presence_state IN ('present', 'missing', 'removed')),
@@ -341,8 +341,8 @@ CREATE INDEX source_directories_parent
 CREATE INDEX source_directories_source_relative_path_binary
     ON source_directories (source_id, relative_path COLLATE BINARY);
 
-CREATE INDEX source_directories_parent_browse
-    ON source_directories (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name);
+CREATE INDEX source_directories_parent_order
+    ON source_directories (source_id, parent_source_directory_id, presence_state, name_sort_key, name);
 
 CREATE TABLE source_files
 (
@@ -350,8 +350,8 @@ CREATE TABLE source_files
     source_id                            INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
     parent_source_directory_id           INTEGER REFERENCES source_directories (source_directory_id) ON DELETE CASCADE,
     name                                 TEXT    NOT NULL CHECK (length(name) > 0),
-    name_browse_sort_key                 TEXT    NOT NULL,
-    relative_path_browse_sort_key        TEXT    NOT NULL,
+    name_sort_key                 TEXT    NOT NULL,
+    path_sort_key        TEXT    NOT NULL,
     relative_path                        TEXT    NOT NULL CHECK (length(relative_path) > 0),
     size_bytes                  INTEGER CHECK (size_bytes IS NULL OR size_bytes >= 0),
     mtime_ns                    INTEGER CHECK (mtime_ns IS NULL OR mtime_ns >= 0),
@@ -386,13 +386,13 @@ CREATE INDEX source_files_parent_source_directory
 CREATE INDEX source_files_source_relative_path_binary
     ON source_files (source_id, relative_path COLLATE BINARY);
 
-CREATE INDEX source_files_source_browse_order
-    ON source_files (source_id, relative_path_browse_sort_key, relative_path, source_file_id);
+CREATE INDEX source_files_path_order
+    ON source_files (source_id, path_sort_key, relative_path, source_file_id);
 
-CREATE INDEX source_files_parent_browse
-    ON source_files (source_id, parent_source_directory_id, presence_state, name_browse_sort_key, name, file_class, file_kind);
+CREATE INDEX source_files_parent_order
+    ON source_files (source_id, parent_source_directory_id, presence_state, name_sort_key, name, file_class, file_kind);
 
-CREATE TABLE WorkItems
+CREATE TABLE work_items
 (
     work_item_id        INTEGER PRIMARY KEY,
     subject_kind        TEXT    NOT NULL
@@ -400,7 +400,7 @@ CREATE TABLE WorkItems
     subject_id          TEXT    NOT NULL CHECK (length(trim(subject_id)) > 0),
     work_kind           TEXT    NOT NULL
         CHECK (work_kind IN (
-            'inspect_source',
+            'inspect_source_file',
             'rebuild_projection'
         )),
     priority_class      TEXT    NOT NULL
@@ -423,17 +423,17 @@ CREATE TABLE WorkItems
     CHECK (updated_at >= created_at)
 ) STRICT;
 
-CREATE INDEX WorkItems_subject_state
-    ON WorkItems (subject_kind, subject_id, state, priority_class);
+CREATE INDEX work_items_subject_state
+    ON work_items (subject_kind, subject_id, state, priority_class);
 
-CREATE UNIQUE INDEX WorkItems_active_work
-    ON WorkItems (subject_kind, subject_id, work_kind, basis_fingerprint)
+CREATE UNIQUE INDEX work_items_active_work
+    ON work_items (subject_kind, subject_id, work_kind, basis_fingerprint)
     WHERE state IN ('queued', 'leased', 'blocked');
 
-CREATE TABLE WorkRuns
+CREATE TABLE work_runs
 (
     work_run_id       INTEGER PRIMARY KEY,
-    work_item_id      INTEGER NOT NULL REFERENCES WorkItems (work_item_id) ON DELETE CASCADE,
+    work_item_id      INTEGER NOT NULL REFERENCES work_items (work_item_id) ON DELETE CASCADE,
     adapter_key       TEXT    NOT NULL CHECK (length(trim(adapter_key)) > 0),
     adapter_version   TEXT    NOT NULL CHECK (length(trim(adapter_version)) > 0),
     started_at        INTEGER NOT NULL,
@@ -444,13 +444,13 @@ CREATE TABLE WorkRuns
     CHECK (finished_at IS NULL OR finished_at >= started_at)
 ) STRICT;
 
-CREATE INDEX WorkRuns_work_item_started_at
-    ON WorkRuns (work_item_id, started_at DESC);
+CREATE INDEX work_runs_work_item_started_at
+    ON work_runs (work_item_id, started_at DESC);
 
-CREATE TABLE Artifacts
+CREATE TABLE work_artifacts
 (
     artifact_id         INTEGER PRIMARY KEY,
-    work_run_id         INTEGER NOT NULL REFERENCES WorkRuns (work_run_id) ON DELETE CASCADE,
+    work_run_id         INTEGER NOT NULL REFERENCES work_runs (work_run_id) ON DELETE CASCADE,
     subject_kind        TEXT    NOT NULL
         CHECK (subject_kind IN ('source_file', 'projection_domain')),
     subject_id          TEXT    NOT NULL CHECK (length(trim(subject_id)) > 0),
@@ -460,13 +460,7 @@ CREATE TABLE Artifacts
             'projection_snapshot'
         )),
     artifact_role       TEXT    NOT NULL
-        CHECK (artifact_role IN (
-            'primary_result',
-            'preview_summary',
-            'manifest',
-            'diagnostic_payload',
-            'intermediate_output'
-        )),
+        CHECK (artifact_role = 'primary_result'),
     adapter_key         TEXT    NOT NULL CHECK (length(trim(adapter_key)) > 0),
     adapter_version     TEXT    NOT NULL CHECK (length(trim(adapter_version)) > 0),
     basis_fingerprint   TEXT    NOT NULL CHECK (length(trim(basis_fingerprint)) > 0),
@@ -486,35 +480,35 @@ CREATE TABLE Artifacts
     )
 ) STRICT;
 
-CREATE INDEX Artifacts_work_run
-    ON Artifacts (work_run_id);
+CREATE INDEX work_artifacts_work_run
+    ON work_artifacts (work_run_id);
 
-CREATE INDEX Artifacts_subject_created_at
-    ON Artifacts (subject_kind, subject_id, created_at DESC);
+CREATE INDEX work_artifacts_subject_created_at
+    ON work_artifacts (subject_kind, subject_id, created_at DESC);
 
-CREATE INDEX Artifacts_kind_role_lookup
-    ON Artifacts (subject_kind, subject_id, artifact_kind, artifact_role);
+CREATE INDEX work_artifacts_kind_role_lookup
+    ON work_artifacts (subject_kind, subject_id, artifact_kind, artifact_role);
 
-CREATE TABLE ArtifactInlinePayloads
+CREATE TABLE work_artifact_inline_payloads
 (
-    artifact_id  INTEGER PRIMARY KEY REFERENCES Artifacts (artifact_id) ON DELETE CASCADE,
+    artifact_id  INTEGER PRIMARY KEY REFERENCES work_artifacts (artifact_id) ON DELETE CASCADE,
     payload      BLOB    NOT NULL,
     created_at   INTEGER NOT NULL
 ) STRICT;
 
-CREATE TABLE ArtifactFileStoreEntries
+CREATE TABLE work_artifact_file_store_entries
 (
-    artifact_id    INTEGER PRIMARY KEY REFERENCES Artifacts (artifact_id) ON DELETE CASCADE,
+    artifact_id    INTEGER PRIMARY KEY REFERENCES work_artifacts (artifact_id) ON DELETE CASCADE,
     root_kind      TEXT    NOT NULL CHECK (length(trim(root_kind)) > 0),
     relative_path  TEXT    NOT NULL CHECK (length(trim(relative_path)) > 0),
     payload_bytes  INTEGER NOT NULL CHECK (payload_bytes >= 0),
     created_at     INTEGER NOT NULL
 ) STRICT;
 
-CREATE TABLE ArtifactClaims
+CREATE TABLE work_artifact_claims
 (
     claim_id         INTEGER PRIMARY KEY,
-    artifact_id      INTEGER NOT NULL REFERENCES Artifacts (artifact_id) ON DELETE CASCADE,
+    artifact_id      INTEGER NOT NULL REFERENCES work_artifacts (artifact_id) ON DELETE CASCADE,
     claimant_kind    TEXT    NOT NULL CHECK (length(trim(claimant_kind)) > 0),
     claimant_key     TEXT    NOT NULL CHECK (length(trim(claimant_key)) > 0),
     release_policy   TEXT    NOT NULL CHECK (length(trim(release_policy)) > 0),
@@ -523,14 +517,13 @@ CREATE TABLE ArtifactClaims
     CHECK (released_at IS NULL OR released_at >= claimed_at)
 ) STRICT;
 
-CREATE UNIQUE INDEX ArtifactClaims_active_claim
-    ON ArtifactClaims (artifact_id, claimant_kind, claimant_key)
+CREATE UNIQUE INDEX work_artifact_claims_active_claim
+    ON work_artifact_claims (artifact_id, claimant_kind, claimant_key)
     WHERE released_at IS NULL;
 
-CREATE TABLE SourceFacts
+CREATE TABLE source_file_facts
 (
     source_file_id        INTEGER PRIMARY KEY REFERENCES source_files (source_file_id) ON DELETE CASCADE,
-    fact_kind             TEXT    NOT NULL CHECK (fact_kind IN ('source_inspection')),
     basis_fingerprint     TEXT    NOT NULL CHECK (length(trim(basis_fingerprint)) > 0),
     basis_source_id       INTEGER NOT NULL REFERENCES sources (source_id) ON DELETE CASCADE,
     basis_relative_path   TEXT    NOT NULL CHECK (length(trim(basis_relative_path)) > 0),
@@ -548,7 +541,7 @@ CREATE TABLE SourceFacts
     bit_depth             INTEGER CHECK (bit_depth IS NULL OR bit_depth > 0),
     codec                 TEXT,
     updated_at            INTEGER NOT NULL,
-    accepted_artifact_id  INTEGER NOT NULL REFERENCES Artifacts (artifact_id),
+    accepted_artifact_id  INTEGER NOT NULL REFERENCES work_artifacts (artifact_id),
     CHECK (
         (content_hash_algorithm IS NULL AND content_hash_value IS NULL)
             OR (content_hash_algorithm IS NOT NULL AND content_hash_value IS NOT NULL)
@@ -556,11 +549,11 @@ CREATE TABLE SourceFacts
     CHECK (updated_at >= observed_at_ms)
 ) STRICT;
 
-CREATE INDEX SourceFacts_source_basis
-    ON SourceFacts (basis_source_id, basis_relative_path);
+CREATE INDEX source_file_facts_source_basis
+    ON source_file_facts (basis_source_id, basis_relative_path);
 
-CREATE INDEX SourceFacts_media_kind
-    ON SourceFacts (media_kind);
+CREATE INDEX source_file_facts_media_kind
+    ON source_file_facts (media_kind);
 
 CREATE TABLE content_attachments
 (
@@ -714,9 +707,9 @@ CREATE VIRTUAL TABLE search_filter_index_fts USING fts5(
     tokenize = 'unicode61 remove_diacritics 1'
 );
 
-CREATE TABLE primary_media_candidates
+CREATE TABLE primary_media_facts
 (
-    primary_media_candidate_id  INTEGER PRIMARY KEY,
+    primary_media_fact_id  INTEGER PRIMARY KEY,
     attachment_id               INTEGER NOT NULL UNIQUE REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
     evidence_source_file_id     INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
     evidence_basis_fingerprint  TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
@@ -732,8 +725,8 @@ CREATE TABLE primary_media_candidates
     CHECK (updated_at >= created_at)
 ) STRICT;
 
-CREATE INDEX primary_media_candidates_evidence_source_file
-    ON primary_media_candidates (evidence_source_file_id);
+CREATE INDEX primary_media_facts_evidence_source_file
+    ON primary_media_facts (evidence_source_file_id);
 
 CREATE TABLE track_identity_candidates
 (
@@ -756,7 +749,7 @@ CREATE TABLE track_identity_candidate_members
 (
     track_identity_candidate_member_id  INTEGER PRIMARY KEY,
     track_identity_candidate_id         INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
-    primary_media_candidate_id          INTEGER NOT NULL REFERENCES primary_media_candidates (primary_media_candidate_id) ON DELETE CASCADE,
+    primary_media_fact_id          INTEGER NOT NULL REFERENCES primary_media_facts (primary_media_fact_id) ON DELETE CASCADE,
     attachment_id                       INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
     evidence_source_file_id             INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
     evidence_basis_fingerprint          TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
@@ -765,7 +758,7 @@ CREATE TABLE track_identity_candidate_members
     created_at                          INTEGER NOT NULL,
     updated_at                          INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
-    UNIQUE (primary_media_candidate_id)
+    UNIQUE (primary_media_fact_id)
 ) STRICT;
 
 CREATE INDEX track_identity_candidate_members_candidate
@@ -778,7 +771,7 @@ CREATE TABLE track_identity_candidate_evidence
 (
     track_identity_candidate_evidence_id  INTEGER PRIMARY KEY,
     track_identity_candidate_id           INTEGER NOT NULL REFERENCES track_identity_candidates (track_identity_candidate_id) ON DELETE CASCADE,
-    primary_media_candidate_id            INTEGER NOT NULL REFERENCES primary_media_candidates (primary_media_candidate_id) ON DELETE CASCADE,
+    primary_media_fact_id            INTEGER NOT NULL REFERENCES primary_media_facts (primary_media_fact_id) ON DELETE CASCADE,
     attachment_id                         INTEGER NOT NULL REFERENCES content_attachments (attachment_id) ON DELETE CASCADE,
     source_file_attachment_link_id        INTEGER NOT NULL,
     source_file_id                        INTEGER NOT NULL REFERENCES source_files (source_file_id) ON DELETE CASCADE,
@@ -786,11 +779,11 @@ CREATE TABLE track_identity_candidate_evidence
     evidence_basis_fingerprint            TEXT    NOT NULL CHECK (length(trim(evidence_basis_fingerprint)) > 0),
     content_hash_algorithm                TEXT    NOT NULL CHECK (content_hash_algorithm = 'blake3'),
     content_hash_value                    TEXT    NOT NULL CHECK (length(trim(content_hash_value)) > 0),
-    probe_accepted_artifact_id            INTEGER NOT NULL REFERENCES Artifacts (artifact_id),
+    probe_accepted_artifact_id            INTEGER NOT NULL REFERENCES work_artifacts (artifact_id),
     created_at                            INTEGER NOT NULL,
     updated_at                            INTEGER NOT NULL,
     CHECK (updated_at >= created_at),
-    UNIQUE (track_identity_candidate_id, primary_media_candidate_id, source_file_id)
+    UNIQUE (track_identity_candidate_id, primary_media_fact_id, source_file_id)
 ) STRICT;
 
 CREATE INDEX track_identity_candidate_evidence_candidate
@@ -858,7 +851,7 @@ CREATE TABLE track_identity_decision_evidence
     track_identity_candidate_id          INTEGER NOT NULL,
     track_identity_candidate_member_id   INTEGER NOT NULL,
     track_identity_candidate_evidence_id INTEGER NOT NULL,
-    primary_media_candidate_id           INTEGER NOT NULL,
+    primary_media_fact_id           INTEGER NOT NULL,
     attachment_id                        INTEGER NOT NULL,
     source_file_attachment_link_id       INTEGER NOT NULL,
     source_file_id                       INTEGER NOT NULL,
@@ -889,7 +882,7 @@ CREATE TABLE navigation_rows
     parent_navigation_row_id  INTEGER REFERENCES navigation_rows (navigation_row_id) ON DELETE CASCADE,
     family                    TEXT CHECK (
         family IS NULL
-            OR family IN ('Views', 'Sources')
+            OR family IN ('views', 'sources')
     ),
     row_kind                  TEXT    NOT NULL CHECK (length(trim(row_kind)) > 0),
     display_name              TEXT    NOT NULL CHECK (length(trim(display_name)) > 0),
@@ -920,7 +913,7 @@ CREATE TABLE navigation_rows
 CREATE INDEX navigation_rows_parent_sibling
     ON navigation_rows (parent_navigation_row_id, sibling_position);
 
-CREATE TABLE ProjectionChangeLog
+CREATE TABLE projection_change_log
 (
     change_sequence  INTEGER PRIMARY KEY,
     projection_domain TEXT NOT NULL
@@ -932,10 +925,10 @@ CREATE TABLE ProjectionChangeLog
     created_at       INTEGER NOT NULL
 ) STRICT;
 
-CREATE INDEX ProjectionChangeLog_domain_sequence
-    ON ProjectionChangeLog (projection_domain, change_sequence);
+CREATE INDEX projection_change_log_domain_sequence
+    ON projection_change_log (projection_domain, change_sequence);
 
-CREATE TABLE ProjectionSubscribers
+CREATE TABLE projection_subscribers
 (
     subscriber_id  INTEGER PRIMARY KEY,
     owner_kind     TEXT    NOT NULL CHECK (length(trim(owner_kind)) > 0),
@@ -944,12 +937,12 @@ CREATE TABLE ProjectionSubscribers
     CHECK (expires_at >= last_seen_at)
 ) STRICT;
 
-CREATE INDEX ProjectionSubscribers_expires_at
-    ON ProjectionSubscribers (expires_at);
+CREATE INDEX projection_subscribers_expires_at
+    ON projection_subscribers (expires_at);
 
-CREATE TABLE ProjectionCursors
+CREATE TABLE projection_cursors
 (
-    subscriber_id      INTEGER NOT NULL REFERENCES ProjectionSubscribers (subscriber_id) ON DELETE CASCADE,
+    subscriber_id      INTEGER NOT NULL REFERENCES projection_subscribers (subscriber_id) ON DELETE CASCADE,
     projection_domain  TEXT    NOT NULL
         CHECK (projection_domain = 'navigation'),
     position           INTEGER NOT NULL CHECK (position >= 0),
@@ -957,7 +950,7 @@ CREATE TABLE ProjectionCursors
     PRIMARY KEY (subscriber_id, projection_domain)
 ) STRICT;
 
-CREATE TABLE ProjectionRetentionWatermarks
+CREATE TABLE projection_retention_watermarks
 (
     projection_domain                  TEXT PRIMARY KEY
         CHECK (projection_domain = 'navigation'),

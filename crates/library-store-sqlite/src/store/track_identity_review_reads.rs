@@ -21,9 +21,7 @@ mod tests {
     use rusqlite::params;
     use tempfile::TempDir;
 
-    use crate::browse_sort_key::{
-        compute_name_browse_sort_key, compute_relative_path_browse_sort_key,
-    };
+    use crate::browse_sort_key::{compute_name_sort_key, compute_path_sort_key};
     use crate::read_models::track_identity_candidates::StoreTrackIdentityCandidateStatus;
     use crate::read_models::track_identity_decisions::{
         StoreTrackIdentityDecisionState, StoreTrackIdentityUserBlockingDecisionState,
@@ -86,7 +84,7 @@ mod tests {
             self.insert_source_file(source_id, source_file_id);
             self.insert_current_facts(source_id, source_file_id, hash);
             self.insert_attachment(source_file_id, hash);
-            self.insert_primary_media_candidate(source_file_id);
+            self.insert_primary_media_fact(source_file_id);
             self.insert_candidate(candidate_id, hash, "active");
             self.insert_member(candidate_id, source_file_id, hash);
             self.insert_evidence(candidate_id, source_id, source_file_id, hash);
@@ -141,14 +139,14 @@ mod tests {
         fn insert_source_file(&self, source_id: i64, source_file_id: i64) {
             let name = format!("track-{source_file_id}.wav");
             let relative_path = format!("Album/{name}");
-            let name_key = compute_name_browse_sort_key(&name);
-            let relative_path_key = compute_relative_path_browse_sort_key(&relative_path);
+            let name_key = compute_name_sort_key(&name);
+            let relative_path_key = compute_path_sort_key(&relative_path);
             self.store
                 .with_write(|write| {
                     write.execute(
                         "INSERT OR IGNORE INTO source_files (
                              source_file_id, source_id, parent_source_directory_id,
-                             name, name_browse_sort_key, relative_path_browse_sort_key,
+                             name, name_sort_key, path_sort_key,
                              relative_path, size_bytes, mtime_ns, file_kind, file_class,
                              presence_state, first_discovered_at, last_observed_at,
                              last_presence_change_at, created_at, updated_at
@@ -175,15 +173,15 @@ mod tests {
             self.store
                 .with_write(|write| {
                     write.execute(
-                        "INSERT INTO SourceFacts (
-                             source_file_id, fact_kind, basis_fingerprint,
+                        "INSERT INTO source_file_facts (
+                             source_file_id, basis_fingerprint,
                              basis_source_id, basis_relative_path, basis_size_bytes,
                              basis_mtime_ns, basis_presence_state, observed_at_ms,
                              content_hash_algorithm, content_hash_value, media_kind,
                              mime_type, duration_ms, sample_rate_hz, channels,
                              bit_depth, codec, updated_at, accepted_artifact_id
                          )
-                         VALUES (?1, 'source_inspection', ?2, ?3, ?4, 10, 100,
+                         VALUES (?1, ?2, ?3, ?4, 10, 100,
                                  'present', 1, 'blake3', ?5, 'audio', 'audio/wav',
                                  100, 44100, 2, 16, 'pcm', 1, ?6)
                          ON CONFLICT(source_file_id) DO UPDATE SET
@@ -222,11 +220,11 @@ mod tests {
             self.store
                 .with_write(|write| {
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkItems (
+                        "INSERT OR IGNORE INTO work_items (
                              work_item_id, subject_kind, subject_id, work_kind,
                              basis_fingerprint, state, priority_class, created_at, updated_at
                          )
-                         VALUES (?1, 'source_file', ?2, 'inspect_source',
+                         VALUES (?1, 'source_file', ?2, 'inspect_source_file',
                                  ?3, 'completed', 'interactive', 1, 1)",
                         params![
                             source_file_id,
@@ -235,7 +233,7 @@ mod tests {
                         ],
                     )?;
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkRuns (
+                        "INSERT OR IGNORE INTO work_runs (
                              work_run_id, work_item_id, adapter_key, adapter_version,
                              started_at, outcome
                          )
@@ -243,7 +241,7 @@ mod tests {
                         [source_file_id],
                     )?;
                     write.execute(
-                        "INSERT OR IGNORE INTO Artifacts (
+                        "INSERT OR IGNORE INTO work_artifacts (
                              artifact_id, work_run_id, subject_kind, subject_id,
                              artifact_kind, artifact_role, adapter_key, adapter_version,
                              basis_fingerprint, media_type, storage_kind, payload_hash,
@@ -307,13 +305,13 @@ mod tests {
                 .expect("insert attachment");
         }
 
-        fn insert_primary_media_candidate(&self, source_file_id: i64) {
+        fn insert_primary_media_fact(&self, source_file_id: i64) {
             self.store
                 .with_write(|write| {
                     let attachment_id = attachment_id_for_source_file(write, source_file_id)?;
                     write.execute(
-                        "INSERT OR IGNORE INTO primary_media_candidates (
-                             primary_media_candidate_id, attachment_id, evidence_source_file_id,
+                        "INSERT OR IGNORE INTO primary_media_facts (
+                             primary_media_fact_id, attachment_id, evidence_source_file_id,
                              evidence_basis_fingerprint, media_kind, mime_type, duration_ms,
                              sample_rate_hz, channels, bit_depth, codec, created_at, updated_at
                         )
@@ -328,7 +326,7 @@ mod tests {
                     )?;
                     Ok(())
                 })
-                .expect("insert primary media candidate");
+                .expect("insert primary media fact");
         }
 
         fn insert_candidate(&self, candidate_id: i64, hash: &str, status: &str) {
@@ -357,7 +355,7 @@ mod tests {
                     write.execute(
                         "INSERT OR IGNORE INTO track_identity_candidate_members (
                              track_identity_candidate_member_id, track_identity_candidate_id,
-                             primary_media_candidate_id, attachment_id, evidence_source_file_id,
+                             primary_media_fact_id, attachment_id, evidence_source_file_id,
                              evidence_basis_fingerprint, content_hash_algorithm,
                              content_hash_value, created_at, updated_at
                          )
@@ -387,12 +385,12 @@ mod tests {
             self.store
                 .with_write(|write| {
                     let attachment_id = attachment_id_for_source_file(write, source_file_id)?;
-                    let primary_media_candidate_id =
+                    let primary_media_fact_id =
                         primary_media_id_for_candidate(write, candidate_id)?;
                     write.execute(
                         "INSERT OR IGNORE INTO track_identity_candidate_evidence (
                              track_identity_candidate_evidence_id, track_identity_candidate_id,
-                             primary_media_candidate_id, attachment_id,
+                             primary_media_fact_id, attachment_id,
                              source_file_attachment_link_id, source_file_id, source_id,
                              evidence_basis_fingerprint, content_hash_algorithm,
                              content_hash_value, probe_accepted_artifact_id,
@@ -403,7 +401,7 @@ mod tests {
                         params![
                             evidence_id(source_file_id),
                             candidate_id,
-                            primary_media_candidate_id,
+                            primary_media_fact_id,
                             attachment_id,
                             link_id(source_file_id),
                             source_file_id,
@@ -528,7 +526,7 @@ mod tests {
         candidate_id: i64,
     ) -> rusqlite::Result<i64> {
         connection.query_row(
-            "SELECT primary_media_candidate_id
+            "SELECT primary_media_fact_id
              FROM track_identity_candidate_members
              WHERE track_identity_candidate_id = ?1
              ORDER BY track_identity_candidate_member_id ASC

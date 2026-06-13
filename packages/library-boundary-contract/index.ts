@@ -374,7 +374,7 @@ export type ContentsScopeCoverageState = "complete" | "pending" | "scanning" | "
 
 export type ContentsFileRow = { id: string, sourceId: string, sourceFileId: string, parentDirectoryId: string | null, label: string, relativePath?: string, fileName: string, fileClass: ContentsFileClass, fileKind: ContentsFileKind, presence: ContentsPresenceState, primaryMedia?: PrimaryMediaSummary, updatedAtMs?: number, };
 
-export type PrimaryMediaSummary = { primaryMediaCandidateId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, };
+export type PrimaryMediaSummary = { primaryMediaFactId: string | null, attachmentId: string | null, contentHashAlgorithm: string | null, contentHashValue: string | null, evidenceSourceFileId: string | null, mediaKind: string | null, mimeType: string | null, durationMs: number | null, sampleRateHz: number | null, channels: number | null, bitDepth: number | null, codec: string | null, };
 
 export type ContentsFileKind = "audio" | "video" | "image" | "cueSheet" | "logDoc" | "textDoc" | "archive" | "other" | "unknown";
 
@@ -418,7 +418,7 @@ export type SourceMaintenanceProbeSummary = { effectiveLimit: number, probedCoun
 
 export type SourceMaintenancePrimaryMediaPromotionSummary = { effectiveLimit: number, promotedCount: number, refreshedCount: number, skippedUnusableSource: number, skippedUnsupportedMediaKind: number, skippedNoFacts: number, skippedStaleFacts: number, skippedNoBlake3: number, skippedNoProbeFacts: number, skippedMissingAttachmentLink: number, skippedStaleAttachmentLink: number, remainingCandidates: number, };
 
-export type SourceMaintenanceTrackIdentityCandidateSummary = { effectiveLimit: number, candidatesCreated: number, candidatesRefreshed: number, membersCreated: number, membersRefreshed: number, evidenceCreated: number, evidenceRefreshed: number, candidatesMarkedStale: number, skippedStalePrimaryMediaCandidates: number, remainingCandidates: number, };
+export type SourceMaintenanceTrackIdentityCandidateSummary = { effectiveLimit: number, candidatesCreated: number, candidatesRefreshed: number, membersCreated: number, membersRefreshed: number, evidenceCreated: number, evidenceRefreshed: number, candidatesMarkedStale: number, skippedStalePrimaryMediaFacts: number, remainingCandidates: number, };
 
 export type SourceMaintenanceTrackIdentityDecisionSummary = { effectiveLimit: number, decisionsCreated: number, decisionEvidenceCreated: number, skippedStaleCandidates: number, skippedExistingCurrentDecisions: number, skippedUserBlockedCandidates: number, remainingCandidates: number, };
 

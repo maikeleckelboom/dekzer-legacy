@@ -825,9 +825,9 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
         let source_id = self.tx().last_insert_rowid();
         self.tx().execute(
             "INSERT INTO source_navigation_user_order (
-                 node_domain,
-                 node_id,
-                 parent_scope,
+                 item_kind,
+                 item_key,
+                 parent_source_key,
                  ordinal,
                  created_at,
                  updated_at
@@ -865,8 +865,8 @@ impl<'write, 'conn> SourceLifecycleTx<'write, 'conn> {
             .query_row(
                 "SELECT COALESCE(MAX(ordinal), -1) + 1
                  FROM source_navigation_user_order
-                 WHERE node_domain = 'source'
-                   AND parent_scope IS NULL",
+                 WHERE item_kind = 'source'
+                   AND parent_source_key IS NULL",
                 [],
                 |row| row.get(0),
             )

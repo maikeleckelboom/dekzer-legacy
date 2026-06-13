@@ -2676,7 +2676,7 @@
             "null"
           ]
         },
-        "primaryMediaCandidateId": {
+        "primaryMediaFactId": {
           "type": [
             "string",
             "null"
@@ -5991,7 +5991,7 @@
           "format": "uint",
           "minimum": 0
         },
-        "skippedStalePrimaryMediaCandidates": {
+        "skippedStalePrimaryMediaFacts": {
           "type": "integer",
           "format": "uint",
           "minimum": 0
@@ -6006,7 +6006,7 @@
         "evidenceCreated",
         "evidenceRefreshed",
         "candidatesMarkedStale",
-        "skippedStalePrimaryMediaCandidates",
+        "skippedStalePrimaryMediaFacts",
         "remainingCandidates"
       ]
     },

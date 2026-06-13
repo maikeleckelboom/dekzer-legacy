@@ -21,13 +21,13 @@ pub struct ProduceTrackIdentityCandidatesForSourceResult {
     pub evidence_created: usize,
     pub evidence_refreshed: usize,
     pub candidates_marked_stale: usize,
-    pub skipped_stale_primary_media_candidates: usize,
+    pub skipped_stale_primary_media_facts: usize,
     pub remaining_candidates: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TrackIdentityCandidateProductionRow {
-    primary_media_candidate_id: i64,
+    primary_media_fact_id: i64,
     attachment_id: i64,
     evidence_source_file_id: i64,
     evidence_basis_fingerprint: String,
@@ -77,11 +77,10 @@ fn produce_track_identity_candidates_for_source(
     limit: usize,
     produced_at: i64,
 ) -> LibrarySqliteResult<ProduceTrackIdentityCandidatesForSourceResult> {
-    let skipped_stale_primary_media_candidates =
-        count_stale_primary_media_candidates(write, source_id)?;
+    let skipped_stale_primary_media_facts = count_stale_primary_media_facts(write, source_id)?;
 
     let mut result = ProduceTrackIdentityCandidatesForSourceResult {
-        skipped_stale_primary_media_candidates,
+        skipped_stale_primary_media_facts,
         ..Default::default()
     };
 
@@ -141,7 +140,7 @@ fn count_track_identity_candidate_production_candidates(
         .map_err(Into::into)
 }
 
-fn count_stale_primary_media_candidates(
+fn count_stale_primary_media_facts(
     connection: &rusqlite::Connection,
     source_id: i64,
 ) -> LibrarySqliteResult<usize> {
@@ -149,10 +148,10 @@ fn count_stale_primary_media_candidates(
         .query_row(
             &format!(
                 "SELECT COUNT(*)
-                 FROM primary_media_candidates pmc
+                 FROM primary_media_facts pmc
                  JOIN source_files file
                    ON file.source_file_id = pmc.evidence_source_file_id
-                 LEFT JOIN SourceFacts facts
+                 LEFT JOIN source_file_facts facts
                    ON facts.source_file_id = pmc.evidence_source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_id = pmc.evidence_source_file_id
@@ -177,7 +176,7 @@ fn read_track_identity_candidate_production_candidates(
     let limit_i64 =
         i64::try_from(limit).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, i64::MAX))?;
     let sql = track_identity_candidate_production_candidates_sql(
-        "SELECT evidence.primary_media_candidate_id,
+        "SELECT evidence.primary_media_fact_id,
                 evidence.attachment_id,
                 evidence.evidence_source_file_id,
                 evidence.evidence_basis_fingerprint,
@@ -187,7 +186,7 @@ fn read_track_identity_candidate_production_candidates(
                 evidence.source_id,
                 evidence.accepted_artifact_id",
         "ORDER BY lower(evidence.relative_path) ASC,
-                 evidence.primary_media_candidate_id ASC,
+                 evidence.primary_media_fact_id ASC,
                  evidence.evidence_rank ASC
          LIMIT ?5",
     );
@@ -203,7 +202,7 @@ fn read_track_identity_candidate_production_candidates(
             ],
             |row| {
                 Ok(TrackIdentityCandidateProductionRow {
-                    primary_media_candidate_id: row.get(0)?,
+                    primary_media_fact_id: row.get(0)?,
                     attachment_id: row.get(1)?,
                     evidence_source_file_id: row.get(2)?,
                     evidence_basis_fingerprint: row.get(3)?,
@@ -222,16 +221,16 @@ fn read_track_identity_candidate_production_candidates(
 fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffix: &str) -> String {
     format!(
         "WITH current_primary_media AS (
-                 SELECT pmc.primary_media_candidate_id,
+                 SELECT pmc.primary_media_fact_id,
                         pmc.attachment_id,
                         pmc.evidence_source_file_id,
                         pmc.evidence_basis_fingerprint,
                         attachment.content_hash_value,
                         file.relative_path
-                 FROM primary_media_candidates pmc
+                 FROM primary_media_facts pmc
                  JOIN source_files file
                    ON file.source_file_id = pmc.evidence_source_file_id
-                 JOIN SourceFacts facts
+                 JOIN source_file_facts facts
                    ON facts.source_file_id = pmc.evidence_source_file_id
                  JOIN source_file_attachment_links link
                    ON link.source_file_id = pmc.evidence_source_file_id
@@ -242,7 +241,7 @@ fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffi
                    AND {current_primary_media_predicate}
              ),
              current_attachment_evidence AS (
-                 SELECT current.primary_media_candidate_id,
+                 SELECT current.primary_media_fact_id,
                         current.attachment_id,
                         current.evidence_source_file_id,
                         current.evidence_basis_fingerprint,
@@ -253,7 +252,7 @@ fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffi
                         link.source_id,
                         facts.accepted_artifact_id,
                         ROW_NUMBER() OVER (
-                            PARTITION BY current.primary_media_candidate_id
+                            PARTITION BY current.primary_media_fact_id
                             ORDER BY lower(file.relative_path) ASC,
                                      file.source_file_id ASC
                         ) AS evidence_rank
@@ -262,7 +261,7 @@ fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffi
                    ON link.attachment_id = current.attachment_id
                  JOIN source_files file
                    ON file.source_file_id = link.source_file_id
-                 JOIN SourceFacts facts
+                 JOIN source_file_facts facts
                    ON facts.source_file_id = link.source_file_id
                  JOIN content_attachments attachment
                    ON attachment.attachment_id = link.attachment_id
@@ -276,10 +275,10 @@ fn track_identity_candidate_production_candidates_sql(select_clause: &str, suffi
               AND candidate.evidence_key_algorithm = ?2
               AND candidate.evidence_key_value = evidence.content_hash_value
              LEFT JOIN track_identity_candidate_members member
-               ON member.primary_media_candidate_id = evidence.primary_media_candidate_id
+               ON member.primary_media_fact_id = evidence.primary_media_fact_id
              LEFT JOIN track_identity_candidate_evidence stored_evidence
                ON stored_evidence.track_identity_candidate_id = candidate.track_identity_candidate_id
-              AND stored_evidence.primary_media_candidate_id = evidence.primary_media_candidate_id
+              AND stored_evidence.primary_media_fact_id = evidence.primary_media_fact_id
               AND stored_evidence.source_file_id = evidence.source_file_id
              WHERE candidate.track_identity_candidate_id IS NULL
                 OR candidate.status != 'active'
@@ -386,8 +385,8 @@ fn upsert_track_identity_candidate_member(
         .query_row(
             "SELECT track_identity_candidate_member_id
              FROM track_identity_candidate_members
-             WHERE primary_media_candidate_id = ?1",
-            [production.primary_media_candidate_id],
+             WHERE primary_media_fact_id = ?1",
+            [production.primary_media_fact_id],
             |row| row.get(0),
         )
         .optional()?;
@@ -395,7 +394,7 @@ fn upsert_track_identity_candidate_member(
     write.execute(
         "INSERT INTO track_identity_candidate_members (
              track_identity_candidate_id,
-             primary_media_candidate_id,
+             primary_media_fact_id,
              attachment_id,
              evidence_source_file_id,
              evidence_basis_fingerprint,
@@ -405,7 +404,7 @@ fn upsert_track_identity_candidate_member(
              updated_at
          )
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
-         ON CONFLICT(primary_media_candidate_id) DO UPDATE SET
+         ON CONFLICT(primary_media_fact_id) DO UPDATE SET
              track_identity_candidate_id = excluded.track_identity_candidate_id,
              attachment_id = excluded.attachment_id,
              evidence_source_file_id = excluded.evidence_source_file_id,
@@ -415,7 +414,7 @@ fn upsert_track_identity_candidate_member(
              updated_at = excluded.updated_at",
         params![
             track_identity_candidate_id,
-            production.primary_media_candidate_id,
+            production.primary_media_fact_id,
             production.attachment_id,
             production.evidence_source_file_id,
             production.evidence_basis_fingerprint,
@@ -442,11 +441,11 @@ fn upsert_track_identity_candidate_evidence(
             "SELECT track_identity_candidate_evidence_id
              FROM track_identity_candidate_evidence
              WHERE track_identity_candidate_id = ?1
-               AND primary_media_candidate_id = ?2
+               AND primary_media_fact_id = ?2
                AND source_file_id = ?3",
             params![
                 track_identity_candidate_id,
-                production.primary_media_candidate_id,
+                production.primary_media_fact_id,
                 production.source_file_id,
             ],
             |row| row.get(0),
@@ -456,7 +455,7 @@ fn upsert_track_identity_candidate_evidence(
     write.execute(
         "INSERT INTO track_identity_candidate_evidence (
              track_identity_candidate_id,
-             primary_media_candidate_id,
+             primary_media_fact_id,
              attachment_id,
              source_file_attachment_link_id,
              source_file_id,
@@ -469,7 +468,7 @@ fn upsert_track_identity_candidate_evidence(
              updated_at
          )
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
-         ON CONFLICT(track_identity_candidate_id, primary_media_candidate_id, source_file_id)
+         ON CONFLICT(track_identity_candidate_id, primary_media_fact_id, source_file_id)
          DO UPDATE SET
              attachment_id = excluded.attachment_id,
              source_file_attachment_link_id = excluded.source_file_attachment_link_id,
@@ -481,7 +480,7 @@ fn upsert_track_identity_candidate_evidence(
              updated_at = excluded.updated_at",
         params![
             track_identity_candidate_id,
-            production.primary_media_candidate_id,
+            production.primary_media_fact_id,
             production.attachment_id,
             production.source_file_attachment_link_id,
             production.source_file_id,
@@ -513,11 +512,11 @@ fn mark_track_identity_candidates_without_current_members_stale(
                AND NOT EXISTS (
                    SELECT 1
                    FROM track_identity_candidate_members member
-                   JOIN primary_media_candidates pmc
-                     ON pmc.primary_media_candidate_id = member.primary_media_candidate_id
+                   JOIN primary_media_facts pmc
+                     ON pmc.primary_media_fact_id = member.primary_media_fact_id
                    JOIN source_files file
                      ON file.source_file_id = pmc.evidence_source_file_id
-                   JOIN SourceFacts facts
+                   JOIN source_file_facts facts
                      ON facts.source_file_id = pmc.evidence_source_file_id
                    JOIN source_file_attachment_links link
                      ON link.source_file_id = pmc.evidence_source_file_id
@@ -673,10 +672,8 @@ mod tests {
             let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
             let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
             let file_class = crate::browse_media::file_class_str_from_path(relative_path);
-            let name_browse_sort_key =
-                crate::browse_sort_key::compute_name_browse_sort_key(file_name);
-            let relative_path_browse_sort_key =
-                crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
+            let name_sort_key = crate::browse_sort_key::compute_name_sort_key(file_name);
+            let path_sort_key = crate::browse_sort_key::compute_path_sort_key(relative_path);
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -684,8 +681,8 @@ mod tests {
                              source_file_id,
                              source_id,
                              name,
-                             name_browse_sort_key,
-                             relative_path_browse_sort_key,
+                             name_sort_key,
+                             path_sort_key,
                              relative_path,
                              size_bytes,
                              mtime_ns,
@@ -703,8 +700,8 @@ mod tests {
                             source_file_id,
                             self.source_id,
                             file_name,
-                            name_browse_sort_key,
-                            relative_path_browse_sort_key,
+                            name_sort_key,
+                            path_sort_key,
                             relative_path,
                             file_kind,
                             file_class,
@@ -742,7 +739,7 @@ mod tests {
             self.store
                 .with_write(|write| {
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkItems (
+                        "INSERT OR IGNORE INTO work_items (
                              work_item_id,
                              subject_kind,
                              subject_id,
@@ -753,11 +750,11 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (1, 'source_file', 'fixture', 'inspect_source', 'fixture', 'completed', 'interactive', 1, 1)",
+                         VALUES (1, 'source_file', 'fixture', 'inspect_source_file', 'fixture', 'completed', 'interactive', 1, 1)",
                         [],
                     )?;
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkRuns (
+                        "INSERT OR IGNORE INTO work_runs (
                              work_run_id,
                              work_item_id,
                              adapter_key,
@@ -769,7 +766,7 @@ mod tests {
                         [],
                     )?;
                     write.execute(
-                        "INSERT OR REPLACE INTO Artifacts (
+                        "INSERT OR REPLACE INTO work_artifacts (
                              artifact_id,
                              work_run_id,
                              subject_kind,
@@ -805,9 +802,8 @@ mod tests {
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                     )?;
                     write.execute(
-                        "INSERT INTO SourceFacts (
+                        "INSERT INTO source_file_facts (
                              source_file_id,
-                             fact_kind,
                              basis_fingerprint,
                              basis_source_id,
                              basis_relative_path,
@@ -827,7 +823,7 @@ mod tests {
                              updated_at,
                              accepted_artifact_id
                          )
-                         VALUES (?1, 'source_inspection', ?2, ?3, ?4, ?5, ?6, ?7, 1, 'blake3', ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 1, ?16)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'blake3', ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 1, ?16)
                          ON CONFLICT(source_file_id) DO UPDATE SET
                              basis_fingerprint = excluded.basis_fingerprint,
                              basis_source_id = excluded.basis_source_id,
@@ -965,7 +961,7 @@ mod tests {
     }
 
     #[test]
-    fn current_primary_media_candidate_produces_track_identity_candidate() {
+    fn current_primary_media_fact_produces_track_identity_candidate() {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         let attachment_id = fixture.link_attachment(100, HASH_A);
@@ -1004,7 +1000,7 @@ mod tests {
     }
 
     #[test]
-    fn stale_primary_media_candidate_is_skipped_and_existing_candidate_becomes_stale() {
+    fn stale_primary_media_fact_is_skipped_and_existing_candidate_becomes_stale() {
         let fixture = TrackIdentityCandidateFixture::new();
         fixture.insert_source_file(100, "Album/stale.wav");
         fixture.link_attachment(100, HASH_A);
@@ -1015,7 +1011,7 @@ mod tests {
 
         let result = fixture.produce(10);
 
-        assert_eq!(result.skipped_stale_primary_media_candidates, 1);
+        assert_eq!(result.skipped_stale_primary_media_facts, 1);
         assert_eq!(result.candidates_created, 0);
         assert_eq!(result.candidates_refreshed, 0);
         assert_eq!(result.candidates_marked_stale, 1);
@@ -1096,7 +1092,7 @@ mod tests {
         fixture.commit_current_facts(100, HASH_B, "audio", true);
         let result = fixture.produce(10);
 
-        assert_eq!(result.skipped_stale_primary_media_candidates, 1);
+        assert_eq!(result.skipped_stale_primary_media_facts, 1);
         assert_eq!(result.candidates_refreshed, 0);
         assert_eq!(result.evidence_refreshed, 0);
         assert_eq!(result.candidates_marked_stale, 1);

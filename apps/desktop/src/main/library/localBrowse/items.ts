@@ -13,13 +13,13 @@ import type {
   ReadLocalBrowseItemsRequest
 } from '../../../shared/library/localBrowse/items'
 
-export async function readLocalBrowseItemsThroughHost(
+export async function readItems(
   host: LibraryBoundaryHost,
   request: ReadLocalBrowseItemsRequest
 ): Promise<ReadLocalBrowseItemsOutcome> {
-  const client = getStartedClient(host)
+  const client = startedClient(host)
 
-  if (isReadLocalBrowseItemsOutcome(client)) {
+  if (isOutcome(client)) {
     return client
   }
 
@@ -35,45 +35,33 @@ export async function readLocalBrowseItemsThroughHost(
       offset: reply.offset,
       limit: reply.limit,
       totalItems: reply.totalItems,
-      items: reply.items.map(mapLocalBrowseItem),
+      items: reply.items.map(mapItem),
       failure: reply.failure
     }
   } catch {
-    return createReadLocalBrowseItemsErrorResult(
-      'readFailed',
-      'readFailed',
-      'Unable to read local browse items.'
-    )
+    return errorResult('readFailed', 'readFailed', 'Unable to read local browse items.')
   }
 }
 
-function getStartedClient(
+function startedClient(
   host: LibraryBoundaryHost
 ): LibraryBoundaryHostClient | ReadLocalBrowseItemsOutcome {
   try {
     return host.client
   } catch (error: unknown) {
     if (error instanceof LibraryBoundaryHostError) {
-      return hostUnavailableResult(host, error)
+      return hostError(host, error)
     }
 
-    return createReadLocalBrowseItemsErrorResult(
-      'hostUnavailable',
-      'hostFailed',
-      'The library boundary host is unavailable.'
-    )
+    return errorResult('hostUnavailable', 'hostFailed', 'The library boundary host is unavailable.')
   }
 }
 
-function hostUnavailableResult(
+function hostError(
   host: LibraryBoundaryHost,
   error: LibraryBoundaryHostError
 ): ReadLocalBrowseItemsOutcome {
-  return createReadLocalBrowseItemsErrorResult(
-    'hostUnavailable',
-    hostErrorCode(host, error),
-    hostErrorMessage(host, error)
-  )
+  return errorResult('hostUnavailable', hostErrorCode(host, error), hostErrorMessage(host, error))
 }
 
 function hostErrorCode(
@@ -114,7 +102,7 @@ function hostErrorMessage(host: LibraryBoundaryHost, error: LibraryBoundaryHostE
   }
 }
 
-function createReadLocalBrowseItemsErrorResult(
+function errorResult(
   state: ReadLocalBrowseItemsErrorState,
   code: ReadLocalBrowseItemsErrorCode,
   message: string
@@ -128,7 +116,7 @@ function createReadLocalBrowseItemsErrorResult(
   }
 }
 
-function mapLocalBrowseItem(item: ContractLocalBrowseItem): LocalBrowseItem {
+function mapItem(item: ContractLocalBrowseItem): LocalBrowseItem {
   return {
     identity: item.identity,
     itemKind: item.itemKind,
@@ -143,6 +131,6 @@ function mapLocalBrowseItem(item: ContractLocalBrowseItem): LocalBrowseItem {
   }
 }
 
-function isReadLocalBrowseItemsOutcome(value: unknown): value is ReadLocalBrowseItemsOutcome {
+function isOutcome(value: unknown): value is ReadLocalBrowseItemsOutcome {
   return typeof value === 'object' && value !== null && 'state' in value
 }

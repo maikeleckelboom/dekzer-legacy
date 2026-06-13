@@ -269,7 +269,7 @@ describe('preload renderer API', () => {
           evidenceCreated: 1,
           evidenceRefreshed: 0,
           candidatesMarkedStale: 0,
-          skippedStalePrimaryMediaCandidates: 0,
+          skippedStalePrimaryMediaFacts: 0,
           remainingCandidates: 0
         },
         trackIdentityDecisions: {

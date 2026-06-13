@@ -2,7 +2,7 @@ use rusqlite::{OptionalExtension, params};
 
 use crate::LibrarySqliteResult;
 use crate::authority::write_lane::AdmittedWrite;
-use crate::browse_sort_key::compute_name_browse_sort_key;
+use crate::browse_sort_key::compute_name_sort_key;
 use library_domain::{SourceAccessIssueKind, SourcePresenceState};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,7 +52,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                  SET source_id = ?2,
                      parent_source_directory_id = ?3,
                      name = ?4,
-                     name_browse_sort_key = ?5,
+                     name_sort_key = ?5,
                      relative_path = ?6,
                      presence_state = ?7,
                      dir_scan_state = COALESCE(?9, dir_scan_state),
@@ -68,7 +68,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                     input.source_id,
                     input.parent_source_directory_id,
                     input.name,
-                    compute_name_browse_sort_key(&input.name),
+                    compute_name_sort_key(&input.name),
                     input.relative_path,
                     input.presence_state.as_str(),
                     input.changed_at,
@@ -93,7 +93,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          source_id,
                          parent_source_directory_id,
                          name,
-                         name_browse_sort_key,
+                         name_sort_key,
                          relative_path,
                          presence_state,
                          dir_scan_state,
@@ -111,7 +111,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                         input.source_id,
                         input.parent_source_directory_id,
                         input.name,
-                        compute_name_browse_sort_key(&input.name),
+                        compute_name_sort_key(&input.name),
                         input.relative_path,
                         input.presence_state.as_str(),
                         dir_scan_state,
@@ -133,7 +133,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                          source_id,
                          parent_source_directory_id,
                          name,
-                         name_browse_sort_key,
+                         name_sort_key,
                          relative_path,
                          presence_state,
                          dir_scan_state,
@@ -150,7 +150,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                         input.source_id,
                         input.parent_source_directory_id,
                         input.name,
-                        compute_name_browse_sort_key(&input.name),
+                        compute_name_sort_key(&input.name),
                         input.relative_path,
                         input.presence_state.as_str(),
                         dir_scan_state,
@@ -191,7 +191,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                 "UPDATE source_directories
                  SET parent_source_directory_id = NULL,
                      name = ?3,
-                     name_browse_sort_key = ?4,
+                     name_sort_key = ?4,
                      presence_state = 'present',
                      dir_scan_state = CASE
                          WHEN presence_state = 'present' THEN dir_scan_state
@@ -221,7 +221,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                     source_directory_id,
                     input.source_id,
                     input.name,
-                    compute_name_browse_sort_key(&input.name),
+                    compute_name_sort_key(&input.name),
                     input.observed_at,
                     input.mtime_ns,
                 ],
@@ -234,7 +234,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
                  source_id,
                  parent_source_directory_id,
                  name,
-                 name_browse_sort_key,
+                 name_sort_key,
                  relative_path,
                  presence_state,
                  dir_scan_state,
@@ -250,7 +250,7 @@ impl<'write, 'conn> SourceDirectoriesAuthorityTx<'write, 'conn> {
             params![
                 input.source_id,
                 input.name,
-                compute_name_browse_sort_key(&input.name),
+                compute_name_sort_key(&input.name),
                 input.relative_path,
                 input.observed_at,
                 input.mtime_ns,

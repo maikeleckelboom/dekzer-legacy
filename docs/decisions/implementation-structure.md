@@ -955,7 +955,7 @@ track.
 Preparation is the work plane.
 Readiness is the projected answer.
 Facets are the independently evaluated dimensions.
-Artifacts are the evidence.
+work_artifacts are the evidence.
 Jobs produce the evidence.
 ```
 
@@ -1128,7 +1128,7 @@ Phase 5 (organization):
 
 Phase 6 (prep):
   Jobs and readiness surface first.
-  Artifacts projection.
+  work_artifacts projection.
   Facet editors (beatGrid, cuePoints, phraseMarkers) when their DSP pipeline
   is stable enough to surface.
 

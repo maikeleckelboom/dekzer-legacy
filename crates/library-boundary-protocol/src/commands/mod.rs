@@ -368,7 +368,7 @@ mod tests {
                     evidence_created: 1,
                     evidence_refreshed: 0,
                     candidates_marked_stale: 0,
-                    skipped_stale_primary_media_candidates: 0,
+                    skipped_stale_primary_media_facts: 0,
                     remaining_candidates: 0,
                 },
                 track_identity_decisions: super::SourceMaintenanceTrackIdentityDecisionSummary {

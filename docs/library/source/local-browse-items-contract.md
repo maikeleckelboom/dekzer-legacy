@@ -2,7 +2,7 @@
 
 ## Purpose And Non-Goals
 
-This contract defines `LocalBrowseItem`: an immediate child path returned by a bounded local browse item read.
+This contract defines `LocalBrowseItem`: an immediate path item returned by a bounded local browse item read.
 
 Core law:
 
@@ -16,18 +16,21 @@ V0 does not implement visible renderer UI, workspace layout, automatic source re
 analysis, playlists, CUE interpretation, canonical track identity, source inventory mutation, or renderer filesystem
 crawling.
 
+Local browse entry points and local browse items are separate boundary concepts. Entry points are platform/default browse
+roots. Items are bounded path entries under one validated entry point root and parent path.
+
 ## Item Kinds
 
 The finite V0 item kinds are:
 
 | Item kind         | Meaning                                                                  |
 | ----------------- | ------------------------------------------------------------------------ |
-| `directory`       | Immediate child directory that may be browsed and may request admission. |
+| `directory`       | Immediate directory item that may be browsed and may request admission.  |
 | `mediaFile`       | Immediate media-relevant file shown before admission.                    |
 | `unsupportedFile` | Immediate file that is accessible but not media-relevant for V0 action.  |
 | `rejectedRoot`    | Directory path that is displayable but rejected by local browse policy.  |
-| `inaccessible`    | Child path whose metadata or access state cannot be resolved safely.     |
-| `unknown`         | Child path with an unknown or unsupported filesystem kind.               |
+| `inaccessible`    | Item path whose metadata or access state cannot be resolved safely.      |
+| `unknown`         | Item path with an unknown or unsupported filesystem kind.                |
 
 V0 may include files only as local browse items. Files discovered by a local browse item read must not appear in
 admitted-source tree rows. Admitted-source trees remain source, source-location, and source-directory scoped.
@@ -41,7 +44,7 @@ admitted-source tree rows. Admitted-source trees remain source, source-location,
 ```
 
 `entryPointKind` identifies the entry point kind. `rootCanonicalPath` identifies the validated local browse root that
-bounds the read. `itemCanonicalPath` identifies the immediate child item path resolved for this read.
+bounds the read. `itemCanonicalPath` identifies the immediate item path resolved for this read.
 
 Labels are not identity. Relative display paths are not identity. Item identity is resolved at read time and is not
 persisted as source identity before admission.
@@ -74,7 +77,7 @@ not satisfy `LibraryTreeEntryPoint`, source-directory selection, or `ContentsSco
 
 ## Browse Versus Scan
 
-Local browse item reads are bounded pre-admission reads. They may enumerate immediate children of the selected local
+Local browse item reads are bounded pre-admission reads. They may enumerate immediate items under the selected local
 parent path.
 
 They must not:
@@ -82,7 +85,7 @@ They must not:
 - recurse by default;
 - hash files;
 - run media probes;
-- create `SourceFacts`;
+- create `source_file_facts`;
 - create `source_files`;
 - create `source_directories`;
 - create `source_locations`;
@@ -111,7 +114,7 @@ The V0 item read reply includes:
 
 V0 keeps offset/limit and exact `totalItems`. The implementation may enumerate immediate directory entries into
 lightweight ordering keys, sort those keys, and materialize only the requested window of protocol items. It must not
-construct full protocol item rows for every child before applying `offset` and `limit`.
+construct full protocol item rows for every directory entry before applying `offset` and `limit`.
 
 Cursor pagination can replace offset/limit later if filesystem ordering, resume, or mutation behavior requires stronger
 cursor identity.
@@ -197,14 +200,14 @@ Backend read acceptance:
 
 - `readLocalBrowseItems` validates root identity, parent path, offset, and limit.
 - A mismatched `entryPointKind`/`rootCanonicalPath` pair fails the read before parent browsing.
-- Reads enumerate immediate children only.
+- Reads enumerate immediate items only.
 - The implementation bounds protocol item materialization to the requested window.
 - Windows V0 avoids following symlink or junction escapes and maps missing, permission, unavailable, and unsupported
   states to local browse read or item failures.
 - Non-Windows V0 returns `unsupportedPlatform` consistently.
 - Exact admitted source path matches are marked with duplicate status without mutating sources.
 - Local browse item reads do not create source lifecycle rows, source locations, source directories, source files,
-  `SourceFacts`, navigation rows, search/filter rows, attachment rows, scan jobs, or source events.
+  `source_file_facts`, navigation rows, search/filter rows, attachment rows, scan jobs, or source events.
 
 Protocol acceptance:
 
@@ -227,6 +230,9 @@ Desktop forwarding acceptance:
 - Main, shared, and preload expose the read as a local browse item read.
 - No renderer filesystem crawling is introduced.
 - No visible renderer UI or state is implemented in this slice.
+- Handwritten adapters use folder context. In `localBrowse/items`, helpers may be named `readItems`, `mapItem`,
+  `errorResult`, and `isOutcome`; they must not repeat the full local-browse boundary name or carry a transport suffix
+  unless one module truly implements multiple transports.
 
 ## Summary Term
 

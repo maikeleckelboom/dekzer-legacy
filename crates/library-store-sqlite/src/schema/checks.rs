@@ -164,11 +164,11 @@ fn validate_source_navigation_user_order_constraints(
 ) -> LibrarySqliteResult<()> {
     let sql = read_required_normalized_table_sql(connection, "source_navigation_user_order")?;
     for fragment in [
-        "node_domain IN ('source', 'source_location')",
-        "node_domain = 'source' AND parent_scope IS NULL",
-        "node_domain = 'source_location'",
-        "parent_scope IS NOT NULL",
-        "length(trim(parent_scope)) > 0",
+        "item_kind IN ('source', 'source_location')",
+        "item_kind = 'source' AND parent_source_key IS NULL",
+        "item_kind = 'source_location'",
+        "parent_source_key IS NOT NULL",
+        "length(trim(parent_source_key)) > 0",
     ] {
         require_sql_fragment(
             &sql,
@@ -184,7 +184,7 @@ fn validate_source_navigation_user_order_constraints(
 fn validate_navigation_rows_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
     let sql = read_required_normalized_table_sql(connection, "navigation_rows")?;
     for fragment in [
-        "family IN ('Views', 'Sources')",
+        "family IN ('views', 'sources')",
         "parent_navigation_row_id IS NULL AND family IS NOT NULL",
         "parent_navigation_row_id IS NOT NULL AND family IS NULL",
     ] {
@@ -200,10 +200,10 @@ fn validate_navigation_rows_constraints(connection: &Connection) -> LibrarySqlit
 }
 
 fn validate_work_item_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
-    let sql = read_required_normalized_table_sql(connection, "WorkItems")?;
+    let sql = read_required_normalized_table_sql(connection, "work_items")?;
     for fragment in [
         "subject_kind IN ('source_file', 'projection_domain')",
-        "work_kind IN ( 'inspect_source', 'rebuild_projection' )",
+        "work_kind IN ( 'inspect_source_file', 'rebuild_projection' )",
         "priority_class IN ('urgent', 'interactive', 'background')",
         "state IN ('queued', 'leased', 'completed', 'blocked', 'failed', 'canceled')",
         "state = 'leased' AND leased_until IS NOT NULL",
@@ -212,18 +212,18 @@ fn validate_work_item_constraints(connection: &Connection) -> LibrarySqliteResul
         require_sql_fragment(
             &sql,
             fragment,
-            format!("WorkItems must retain work-model constraint fragment {fragment:?}"),
+            format!("work_items must retain work-model constraint fragment {fragment:?}"),
         )?;
     }
     Ok(())
 }
 
 fn validate_artifact_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
-    let sql = read_required_normalized_table_sql(connection, "Artifacts")?;
+    let sql = read_required_normalized_table_sql(connection, "work_artifacts")?;
     for fragment in [
         "subject_kind IN ('source_file', 'projection_domain')",
         "artifact_kind IN ( 'inspection_result', 'projection_snapshot' )",
-        "artifact_role IN ( 'primary_result', 'preview_summary', 'manifest', 'diagnostic_payload', 'intermediate_output' )",
+        "artifact_role = 'primary_result'",
         "storage_kind IN ('inline_payload', 'file_store')",
         "artifact_kind <> 'inspection_result' OR subject_kind = 'source_file'",
         "subject_kind = 'source_file'",
@@ -234,18 +234,18 @@ fn validate_artifact_constraints(connection: &Connection) -> LibrarySqliteResult
         require_sql_fragment(
             &sql,
             fragment,
-            format!("Artifacts must retain artifact constraint fragment {fragment:?}"),
+            format!("work_artifacts must retain artifact constraint fragment {fragment:?}"),
         )?;
     }
     Ok(())
 }
 
 fn validate_projection_subscribers_constraints(connection: &Connection) -> LibrarySqliteResult<()> {
-    let sql = read_required_normalized_table_sql(connection, "ProjectionSubscribers")?;
+    let sql = read_required_normalized_table_sql(connection, "projection_subscribers")?;
     require_sql_fragment(
         &sql,
         "expires_at >= last_seen_at",
-        "ProjectionSubscribers must retain the liveness ordering constraint".to_string(),
+        "projection_subscribers must retain the liveness ordering constraint".to_string(),
     )
 }
 

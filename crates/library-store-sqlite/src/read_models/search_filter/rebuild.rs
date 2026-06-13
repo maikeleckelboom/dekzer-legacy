@@ -233,7 +233,7 @@ fn insert_directory_rows(
                 directory.name,
                 directory.relative_path,
                 directory.relative_path,
-                directory.name_browse_sort_key || '/' || directory.relative_path,
+                directory.name_sort_key || '/' || directory.relative_path,
                 directory.presence_state,
                 state.access_state,
                 scan.scan_phase,
@@ -273,7 +273,7 @@ fn insert_source_file_rows(
                 file.name,
                 file.relative_path,
                 file.relative_path,
-                file.relative_path_browse_sort_key || '/' || file.relative_path,
+                file.path_sort_key || '/' || file.relative_path,
                 file.file_class,
                 file.file_kind,
                 CASE
@@ -335,7 +335,7 @@ fn insert_source_file_rows(
          FROM source_files file
          LEFT JOIN source_state state ON state.source_id = file.source_id
          LEFT JOIN source_scan_state scan ON scan.source_id = file.source_id
-         LEFT JOIN SourceFacts facts ON facts.source_file_id = file.source_file_id
+         LEFT JOIN source_file_facts facts ON facts.source_file_id = file.source_file_id
          LEFT JOIN source_file_attachment_links link ON link.source_file_id = file.source_file_id
          LEFT JOIN content_attachments attachment ON attachment.attachment_id = link.attachment_id
          WHERE file.source_id = ?1",

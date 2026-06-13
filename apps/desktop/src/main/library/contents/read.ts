@@ -509,9 +509,9 @@ function mapContentsRow(row: ContractContentsFileRow): ContentsFileRow | undefin
 
 function mapPrimaryMedia(summary: ContractPrimaryMediaSummary): PrimaryMediaSummary {
   return {
-    ...(summary.primaryMediaCandidateId === null
+    ...(summary.primaryMediaFactId === null
       ? {}
-      : { primaryMediaCandidateId: summary.primaryMediaCandidateId }),
+      : { primaryMediaFactId: summary.primaryMediaFactId }),
     ...(summary.attachmentId === null ? {} : { attachmentId: summary.attachmentId }),
     ...(summary.contentHashAlgorithm === null
       ? {}

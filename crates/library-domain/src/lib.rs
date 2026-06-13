@@ -146,7 +146,7 @@ mod tests {
         assert_round_trip!(
             MachineWorkKind,
             [
-                (MachineWorkKind::InspectSource, "inspect_source"),
+                (MachineWorkKind::InspectSourceFile, "inspect_source_file"),
                 (MachineWorkKind::RebuildProjection, "rebuild_projection"),
             ]
         );
@@ -180,13 +180,7 @@ mod tests {
         );
         assert_round_trip!(
             ArtifactRole,
-            [
-                (ArtifactRole::PrimaryResult, "primary_result"),
-                (ArtifactRole::PreviewSummary, "preview_summary"),
-                (ArtifactRole::Manifest, "manifest"),
-                (ArtifactRole::DiagnosticPayload, "diagnostic_payload"),
-                (ArtifactRole::IntermediateOutput, "intermediate_output"),
-            ]
+            [(ArtifactRole::PrimaryResult, "primary_result")]
         );
         assert_round_trip!(
             ArtifactStorageKind,

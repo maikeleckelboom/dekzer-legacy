@@ -765,7 +765,7 @@ fn read_child_rows(
                     has_primary_media_descendant,
                     has_image_media_descendant,
                     dir_scan_state,
-                    name_browse_sort_key
+                    name_sort_key
              FROM source_directories
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -792,7 +792,7 @@ fn read_child_rows(
                     NULL AS has_primary_media_descendant,
                     NULL AS has_image_media_descendant,
                     NULL AS dir_scan_state,
-                    name_browse_sort_key
+                    name_sort_key
              FROM source_files
              WHERE source_id = ?1
                AND presence_state = 'present'
@@ -803,7 +803,7 @@ fn read_child_rows(
                )
          )
          ORDER BY sort_kind ASC,
-                  name_browse_sort_key ASC,
+                  name_sort_key ASC,
                   display_name ASC,
                   COALESCE(source_directory_id, source_file_id) ASC
          LIMIT ?3
@@ -977,7 +977,7 @@ mod tests {
         dir_scan_state: &str,
         dir_scan_issue_kind: Option<&str>,
     ) {
-        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let name_sort_key = crate::browse_sort_key::compute_name_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -985,7 +985,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      has_child_directories,
@@ -1002,7 +1002,7 @@ mod tests {
                     source_directory_id,
                     parent_source_directory_id,
                     name,
-                    name_browse_sort_key,
+                    name_sort_key,
                     facts.has_child_directories,
                     facts.has_primary_media_descendant,
                     facts.has_image_media_descendant,
@@ -1057,9 +1057,8 @@ mod tests {
         name: &str,
         file_class: &str,
     ) {
-        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
-        let relative_path_browse_sort_key =
-            crate::browse_sort_key::compute_relative_path_browse_sort_key(name);
+        let name_sort_key = crate::browse_sort_key::compute_name_sort_key(name);
+        let path_sort_key = crate::browse_sort_key::compute_path_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -1067,8 +1066,8 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
-                     relative_path_browse_sort_key,
+                     name_sort_key,
+                     path_sort_key,
                      relative_path,
                      file_class,
                      presence_state,
@@ -1083,8 +1082,8 @@ mod tests {
                     source_file_id,
                     parent_source_directory_id,
                     name,
-                    name_browse_sort_key,
-                    relative_path_browse_sort_key,
+                    name_sort_key,
+                    path_sort_key,
                     file_class
                 ],
             )

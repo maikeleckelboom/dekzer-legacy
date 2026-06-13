@@ -353,8 +353,8 @@ fn map_navigation_row_family(
     family: &str,
 ) -> store::LibrarySqliteResult<protocol::NavigationRowFamily> {
     match family {
-        "Views" => Ok(protocol::NavigationRowFamily::Views),
-        "Sources" => Ok(protocol::NavigationRowFamily::Sources),
+        "views" => Ok(protocol::NavigationRowFamily::Views),
+        "sources" => Ok(protocol::NavigationRowFamily::Sources),
         other => Err(malformed_store_state(format!(
             "navigation_rows row {navigation_row_id} has unsupported family {other:?}"
         ))),
@@ -1411,7 +1411,7 @@ fn map_primary_media_summary(
     summary: store::StorePrimaryMediaSummary,
 ) -> protocol::PrimaryMediaSummary {
     protocol::PrimaryMediaSummary {
-        primary_media_candidate_id: summary.primary_media_candidate_id,
+        primary_media_fact_id: summary.primary_media_fact_id,
         attachment_id: summary.attachment_id,
         content_hash_algorithm: summary.content_hash_algorithm,
         content_hash_value: summary.content_hash_value,

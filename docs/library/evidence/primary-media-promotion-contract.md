@@ -29,7 +29,7 @@ track-identity-candidate layer, which remains non-canonical and reversible.
 
 ## Durable Target
 
-The durable target is `primary_media_candidates`.
+The durable target is `primary_media_facts`.
 
 Rules:
 
@@ -37,8 +37,8 @@ Rules:
 - The row stores the evidence source file, the accepted evidence basis fingerprint, media kind, and basic probe fields.
 - The row is evidence-backed attachment promotion only. It must not write source inventory, attachment identity,
   track-identity candidate/decision rows, preparation rows, waveform/stem artifacts, playlists, or product UI state.
-- Current contents row identity for this policy is the `primary_media_candidates` row plus revalidated source-file,
-  attachment, and `SourceFacts` provenance.
+- Current contents row identity for this policy is the `primary_media_facts` row plus revalidated source-file,
+  attachment, and `source_file_facts` provenance.
 
 ## Eligibility
 
@@ -46,10 +46,10 @@ A source-file occurrence is eligible only when all of these are true:
 
 - The source is usable for maintenance.
 - The source file is present, `file_class = audio`, and `file_kind = audio`.
-- `SourceFacts` is current for the exact source-file basis: source id, relative path, size, mtime, and presence state.
+- `source_file_facts` is current for the exact source-file basis: source id, relative path, size, mtime, and presence state.
 - The current facts contain `content_hash_algorithm = blake3` and a non-empty hash value.
 - `source_file_attachment_links` currently links the source file to a `content_attachments` row with the same hash.
-- `SourceFacts.media_kind = audio`.
+- `source_file_facts.media_kind = audio`.
 - At least one probe field is present: MIME type, duration, sample rate, channels, bit depth, or codec.
 
 When multiple current source files point at the same attachment, promotion stores one candidate for the attachment and
@@ -58,14 +58,14 @@ chooses a deterministic representative by lowercased relative path and source-fi
 ## Contents Read Behavior
 
 `readContents` with `{ kind: 'primaryMedia', mediaKinds: [...] }` reads only promoted
-`primary_media_candidates` rows. At read time it
+`primary_media_facts` rows. At read time it
 revalidates the current scoped source-file row, attachment link, attachment hash, and source facts. Stale or out-of-scope
 candidate rows are omitted rather than returned as degraded product rows.
 
 There is no fallback from plain present audio/video `source_files` to primary-media rows. A complete scope with no
 promoted candidates is an authoritative empty primary-media result.
 
-The row origin exposed through the boundary for these rows is `primaryMediaCandidate`. Plain source-file fallback rows
+The row origin exposed through the boundary for these rows is `primaryMediaFact`. Plain source-file fallback rows
 are not emitted by the v0 primary-media query path.
 
 ## Source Maintenance Integration
@@ -76,7 +76,7 @@ Source maintenance runs promotion after hashing, attachment materialization, and
 2. Attachment materialization from current BLAKE3 facts.
 3. Audio media probe observations.
 4. Primary media promotion from current attachments and probe evidence.
-5. Track identity candidate production from current evidence-backed primary-media candidates.
+5. Track identity candidate production from current evidence-backed primary-media facts.
 6. Track identity decision production from active exact-content candidates.
 7. Maintained snapshot invalidation.
 
@@ -98,7 +98,7 @@ Primary media promotion v0 does not:
 - parse CUE sheets or pair CUE with audio;
 - infer canonical tracks, releases, performances, artwork roles, or metadata identity;
 - create preparation, waveform, stems, playlist, or product-contents projection records outside
-  `primary_media_candidates`;
+  `primary_media_facts`;
 - drain all candidates synchronously;
 - expose local filesystem paths to the renderer.
 
@@ -106,4 +106,4 @@ Primary media promotion v0 does not:
 
 Future work may add video-capable probing and promotion, CUE parse observations, richer playable identity, canonical
 track identity, or preparation integration. Those layers must remain separate from attachment identity and from v0
-evidence-backed primary-media candidates.
+evidence-backed primary-media facts.

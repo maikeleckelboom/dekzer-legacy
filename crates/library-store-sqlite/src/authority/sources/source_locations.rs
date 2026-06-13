@@ -186,8 +186,8 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
         if deleted {
             self.tx.execute(
                 "DELETE FROM source_navigation_user_order
-                 WHERE node_domain = 'source_location'
-                   AND node_id = ?1",
+                 WHERE item_kind = 'source_location'
+                   AND item_key = ?1",
                 [input.source_location_id.to_string()],
             )?;
         }
@@ -236,19 +236,19 @@ impl<'write, 'conn> SourceLocationsAuthorityTx<'write, 'conn> {
         if let Some(ordinal) = ordinal {
             self.tx.execute(
                 "INSERT INTO source_navigation_user_order (
-                     node_domain,
-                     node_id,
-                     parent_scope,
+                     item_kind,
+                     item_key,
+                     parent_source_key,
                      ordinal,
                      created_at,
                      updated_at
                  )
                  VALUES ('source_location', ?1, ?2, ?3, ?4, ?4)
-                 ON CONFLICT(node_domain, node_id)
-                 WHERE node_domain = 'source_location'
-                   AND parent_scope IS NOT NULL
+                 ON CONFLICT(item_kind, item_key)
+                 WHERE item_kind = 'source_location'
+                   AND parent_source_key IS NOT NULL
                  DO UPDATE
-                 SET parent_scope = excluded.parent_scope,
+                 SET parent_source_key = excluded.parent_source_key,
                      ordinal = excluded.ordinal,
                      updated_at = excluded.updated_at",
                 params![

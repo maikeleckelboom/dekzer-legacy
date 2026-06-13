@@ -4,8 +4,8 @@ pub(crate) mod work_items;
 pub(crate) mod work_runs;
 
 pub use artifacts::{
-    ArtifactsAuthorityTx, RecordArtifactInput, RecordFileStoreArtifactInput,
-    RecordInlineArtifactInput, RecordedArtifact,
+    RecordArtifactInput, RecordFileStoreArtifactInput, RecordInlineArtifactInput, RecordedArtifact,
+    WorkArtifactAuthorityTx,
 };
 pub use file_store::{ArtifactFileStoreReconciliationResult, ArtifactFileStoreRoot};
 pub(crate) use file_store::{
@@ -14,8 +14,8 @@ pub(crate) use file_store::{
 pub(crate) use work_items::ClaimSpecificMachineWorkInput;
 pub use work_items::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
-    CompleteMachineWorkInput, FailMachineWorkInput, MachineWorkKey, QueueInspectSourceWorkInput,
-    QueueMachineWorkInput, QueueMachineWorkResult, QueueRebuildProjectionWorkInput,
-    WorkItemsAuthorityTx,
+    CompleteMachineWorkInput, FailMachineWorkInput, MachineWorkKey,
+    QueueInspectSourceFileWorkInput, QueueMachineWorkInput, QueueMachineWorkResult,
+    QueueRebuildProjectionWorkInput, WorkItemAuthorityTx,
 };
-pub use work_runs::{FinishWorkRunInput, StartWorkRunInput, StartedWorkRun, WorkRunsAuthorityTx};
+pub use work_runs::{FinishWorkRunInput, StartWorkRunInput, StartedWorkRun, WorkRunAuthorityTx};

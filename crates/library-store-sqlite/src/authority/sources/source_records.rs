@@ -135,17 +135,17 @@ impl<'write, 'conn> SourcesAuthorityTx<'write, 'conn> {
         if let Some(ordinal) = ordinal {
             self.tx.execute(
                 "INSERT INTO source_navigation_user_order (
-                     node_domain,
-                     node_id,
-                     parent_scope,
+                     item_kind,
+                     item_key,
+                     parent_source_key,
                      ordinal,
                      created_at,
                      updated_at
                  )
                  VALUES ('source', ?1, NULL, ?2, ?3, ?3)
-                 ON CONFLICT(node_domain, node_id)
-                 WHERE node_domain = 'source'
-                   AND parent_scope IS NULL
+                 ON CONFLICT(item_kind, item_key)
+                 WHERE item_kind = 'source'
+                   AND parent_source_key IS NULL
                  DO UPDATE
                  SET ordinal = excluded.ordinal,
                      updated_at = excluded.updated_at",

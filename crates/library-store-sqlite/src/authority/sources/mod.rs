@@ -1,6 +1,6 @@
 pub(crate) mod source_access;
 pub(crate) mod source_directories;
-pub(crate) mod source_facts;
+pub(crate) mod source_file_facts;
 pub(crate) mod source_files;
 pub(crate) mod source_locations;
 pub(crate) mod source_locators;
@@ -14,9 +14,10 @@ pub(crate) use source_access::{
 pub use source_directories::{
     EstablishRootChildDirectoryInput, SourceDirectoriesAuthorityTx, UpsertSourceDirectoryInput,
 };
-pub(crate) use source_facts::SourceFactsAuthorityTx;
-pub use source_facts::{
-    CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+pub(crate) use source_file_facts::SourceFileFactsAuthorityTx;
+pub use source_file_facts::{
+    CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+    ContentHashEvidence,
 };
 pub use source_files::{RecordSourceFileObservationInput, SourceFilesAuthorityTx};
 pub use source_locations::{

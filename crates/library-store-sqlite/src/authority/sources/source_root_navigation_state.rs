@@ -41,7 +41,7 @@ impl SourceRootNavigationWindowState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SourceRootNavigationStateRecord {
     pub source_id: i64,
-    pub root_window_state: SourceRootNavigationWindowState,
+    pub root_reach_state: SourceRootNavigationWindowState,
     pub immediate_child_directory_count: i64,
     pub issue_kind: Option<String>,
     pub detail: Option<String>,
@@ -52,7 +52,7 @@ pub struct SourceRootNavigationStateRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpsertSourceRootNavigationStateInput {
     pub source_id: i64,
-    pub root_window_state: SourceRootNavigationWindowState,
+    pub root_reach_state: SourceRootNavigationWindowState,
     pub immediate_child_directory_count: i64,
     pub issue_kind: Option<SourceAccessIssueKind>,
     pub detail: Option<String>,
@@ -76,7 +76,7 @@ impl<'write, 'conn> SourceRootNavigationStateAuthorityTx<'write, 'conn> {
         self.tx.execute(
             "INSERT INTO source_root_navigation_state (
                  source_id,
-                 root_window_state,
+                 root_reach_state,
                  immediate_child_directory_count,
                  issue_kind,
                  detail,
@@ -85,7 +85,7 @@ impl<'write, 'conn> SourceRootNavigationStateAuthorityTx<'write, 'conn> {
              )
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT(source_id) DO UPDATE SET
-                 root_window_state = excluded.root_window_state,
+                 root_reach_state = excluded.root_reach_state,
                  immediate_child_directory_count = excluded.immediate_child_directory_count,
                  issue_kind = excluded.issue_kind,
                  detail = excluded.detail,
@@ -93,7 +93,7 @@ impl<'write, 'conn> SourceRootNavigationStateAuthorityTx<'write, 'conn> {
                  updated_at = excluded.updated_at",
             params![
                 input.source_id,
-                input.root_window_state.as_str(),
+                input.root_reach_state.as_str(),
                 input.immediate_child_directory_count,
                 input.issue_kind.map(SourceAccessIssueKind::as_str),
                 input.detail.as_deref(),
@@ -112,7 +112,7 @@ pub(crate) fn read_source_root_navigation_state(
     connection
         .query_row(
             "SELECT source_id,
-                    root_window_state,
+                    root_reach_state,
                     immediate_child_directory_count,
                     issue_kind,
                     detail,
@@ -122,10 +122,10 @@ pub(crate) fn read_source_root_navigation_state(
              WHERE source_id = ?1",
             [source_id],
             |row| {
-                let root_window_state = row.get::<_, String>(1)?;
+                let root_reach_state = row.get::<_, String>(1)?;
                 Ok(SourceRootNavigationStateRecord {
                     source_id: row.get(0)?,
-                    root_window_state: SourceRootNavigationWindowState::parse(&root_window_state),
+                    root_reach_state: SourceRootNavigationWindowState::parse(&root_reach_state),
                     immediate_child_directory_count: row.get(2)?,
                     issue_kind: row.get(3)?,
                     detail: row.get(4)?,

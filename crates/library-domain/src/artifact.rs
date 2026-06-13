@@ -24,30 +24,18 @@ impl ArtifactKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArtifactRole {
     PrimaryResult,
-    PreviewSummary,
-    Manifest,
-    DiagnosticPayload,
-    IntermediateOutput,
 }
 
 impl ArtifactRole {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::PrimaryResult => "primary_result",
-            Self::PreviewSummary => "preview_summary",
-            Self::Manifest => "manifest",
-            Self::DiagnosticPayload => "diagnostic_payload",
-            Self::IntermediateOutput => "intermediate_output",
         }
     }
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "primary_result" => Some(Self::PrimaryResult),
-            "preview_summary" => Some(Self::PreviewSummary),
-            "manifest" => Some(Self::Manifest),
-            "diagnostic_payload" => Some(Self::DiagnosticPayload),
-            "intermediate_output" => Some(Self::IntermediateOutput),
             _ => None,
         }
     }

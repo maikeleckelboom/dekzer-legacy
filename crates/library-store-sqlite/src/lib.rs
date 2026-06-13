@@ -18,20 +18,20 @@ pub fn canonical_baseline_generation() -> &'static str {
 }
 
 pub use authority::promotion::{
-    InspectSourcePromotionInput, InspectSourcePromotionResult, RebuildProjectionPromotionInput,
-    RebuildProjectionPromotionResult,
+    InspectSourceFilePromotionInput, InspectSourceFilePromotionResult,
+    RebuildProjectionPromotionInput, RebuildProjectionPromotionResult,
 };
 pub use authority::sources::{
-    CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
-    DeleteSourceLocationInput, RecordSourceFileObservationInput, SourceLocatorInput,
-    UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
+    CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+    ContentHashEvidence, DeleteSourceLocationInput, RecordSourceFileObservationInput,
+    SourceLocatorInput, UpsertSourceDirectoryInput, UpsertSourceInput, UpsertSourceLocationInput,
     UpsertSourceLocatorInput, UpsertSourceScanStateInput, UpsertSourceStateInput,
     canonicalize_source_location_relative_path,
 };
 pub use authority::work::{
     BlockMachineWorkInput, ClaimMachineWorkBatchInput, ClaimedMachineWorkItem,
     CompleteMachineWorkInput, FailMachineWorkInput, FinishWorkRunInput, MachineWorkKey,
-    QueueInspectSourceWorkInput, QueueMachineWorkInput, QueueMachineWorkResult,
+    QueueInspectSourceFileWorkInput, QueueMachineWorkInput, QueueMachineWorkResult,
     QueueRebuildProjectionWorkInput, RecordArtifactInput, RecordFileStoreArtifactInput,
     RecordInlineArtifactInput, RecordedArtifact, StartWorkRunInput, StartedWorkRun,
 };

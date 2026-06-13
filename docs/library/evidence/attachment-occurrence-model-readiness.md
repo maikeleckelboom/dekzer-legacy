@@ -37,7 +37,7 @@ future concepts are architectural compatibility targets, not A-5 product scope.
 - `docs/library/evidence/attachment-identity-contract.md` is accepted and states that
   `source_file_attachment_links` is the canonical source-file occurrence table for the attachment identity pass.
 - `docs/library/evidence/media-probe-observations-contract.md` is accepted and stores probe observations in
-  `SourceFacts`, not on attachments or tracks.
+  `source_file_facts`, not on attachments or tracks.
 - `docs/library/health/source-integrity-read-model-contract.md` is accepted and documents the source-scoped
   `readSourceIntegrity` boundary.
 - `crates/library-store-sqlite/migrations/20260502000000_substrate_baseline.sql` contains `source_files`,
@@ -73,7 +73,7 @@ not a second source-file inventory model.
 | Source locator/path identity | `source_locators`, `SourceLocatorsAuthorityTx`, source lifecycle reads, and `source_locations` for accepted sub-roots | Reuse source and path evidence. Do not infer relocation acceptance. |
 | Source file inventory | `source_files`, `source_directories`, `SourceFilesAuthorityTx`, scan/finalization code | A source-file occurrence is this row. |
 | Attachment/content identity | `content_attachments`, `source_file_attachment_links`, and `materialize_attachments_for_source` | Group by `attachment_id` / BLAKE3 content identity. |
-| Probe observations | `SourceFacts` plus accepted inspection artifacts and media probe maintenance | Expose only as evidence availability if needed. Do not move probe facts onto occurrences. |
+| Probe observations | `source_file_facts` plus accepted inspection artifacts and media probe maintenance | Expose only as evidence availability if needed. Do not move probe facts onto occurrences. |
 | Source health/integrity | `readSourceIntegrity`, source lifecycle, scan coverage, source maintenance snapshot | Use to mark unavailable, missing, blocked, stale, or incomplete evidence without hiding rows. |
 | Occurrence grouping | Derived query over `source_file_attachment_links`, `content_attachments`, and `source_files` | No durable owner beyond existing tables. |
 | Occurrence read model | Existing attachment identity read path, especially `readAttachmentSourceFiles` | Extend in place for occurrence evidence rather than adding occurrence-interpretation commands. |
@@ -195,7 +195,7 @@ Invalidation scope:
 
 - A-5 is an explicit snapshot read in the first implementation.
 - It must not attach occurrence truth to navigation invalidations.
-- The read is invalidated by writes to source lifecycle/state, source-file inventory, `SourceFacts`, `content_attachments`,
+- The read is invalidated by writes to source lifecycle/state, source-file inventory, `source_file_facts`, `content_attachments`,
   or `source_file_attachment_links`.
 - A maintained occurrence invalidation scope is not required for the substrate slice. If a future UI needs live
   subscription semantics, add a dedicated source/attachment-scoped invalidation contract in a later slice.
@@ -226,14 +226,14 @@ index, not a new occurrence representation.
 
 Do not introduce a second occurrence authority, aliases, compatibility wrappers, or duplicate read paths for A-5.
 Attachment occurrence evidence must stay a derived read over `source_file_attachment_links`, `content_attachments`,
-`source_files`, source lifecycle state, and current `SourceFacts`.
+`source_files`, source lifecycle state, and current `source_file_facts`.
 
 Current non-occurrence tables keep their own roles:
 
-- `primary_media_candidates`: playable-media candidate projection; one row per attachment in v0, not per source-file
+- `primary_media_facts`: playable-media candidate projection; one row per attachment in v0, not per source-file
   occurrence.
 - `track_identity_candidates`, `track_identity_candidate_members`, and `track_identity_candidate_evidence`: exact
-  primary-media candidate grouping; not A-5 occurrence grouping.
+  primary-media fact grouping; not A-5 occurrence grouping.
 - `track_identity_decisions` and related decision evidence tables: candidate decision authority; not occurrence
   preference or relocation decisions.
 

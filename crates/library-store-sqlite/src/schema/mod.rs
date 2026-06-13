@@ -91,14 +91,14 @@ mod tests {
     use rusqlite::Connection;
 
     const EXPECTED_TABLES: &[&str] = &[
-        "ArtifactClaims",
-        "ArtifactFileStoreEntries",
-        "ArtifactInlinePayloads",
-        "Artifacts",
-        "LibraryMetadata",
+        "work_artifact_claims",
+        "work_artifact_file_store_entries",
+        "work_artifact_inline_payloads",
+        "work_artifacts",
+        "library_metadata",
         "source_navigation_user_order",
         "source_root_navigation_state",
-        "source_registration_proposals",
+        "root_admission_proposals",
         "source_state",
         "source_scan_state",
         "source_locations",
@@ -108,15 +108,15 @@ mod tests {
         "search_filter_index_rows",
         "search_filter_index_source_coverage",
         "navigation_rows",
-        "ProjectionChangeLog",
-        "ProjectionCursors",
-        "ProjectionRetentionWatermarks",
-        "ProjectionSubscribers",
+        "projection_change_log",
+        "projection_cursors",
+        "projection_retention_watermarks",
+        "projection_subscribers",
         "content_attachments",
-        "primary_media_candidates",
+        "primary_media_facts",
         "source_directories",
         "source_file_attachment_links",
-        "SourceFacts",
+        "source_file_facts",
         "source_files",
         "source_locators",
         "track_identity_candidate_evidence",
@@ -125,8 +125,8 @@ mod tests {
         "track_identity_decision_evidence",
         "track_identity_decision_source_scope",
         "track_identity_decisions",
-        "WorkItems",
-        "WorkRuns",
+        "work_items",
+        "work_runs",
     ];
 
     fn install_test_baseline() -> Connection {
@@ -198,6 +198,22 @@ mod tests {
             .expect("collect table indexes")
     }
 
+    fn schema_object_names(connection: &Connection, object_type: &str) -> Vec<String> {
+        let mut stmt = connection
+            .prepare(
+                "SELECT name
+                 FROM sqlite_master
+                 WHERE type = ?1
+                   AND name NOT LIKE 'sqlite_%'
+                 ORDER BY name",
+            )
+            .expect("prepare schema object query");
+        stmt.query_map([object_type], |row| row.get::<_, String>(0))
+            .expect("query schema objects")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect schema objects")
+    }
+
     fn table_trigger_names(connection: &Connection, table_name: &str) -> Vec<String> {
         let mut stmt = connection
             .prepare(
@@ -253,7 +269,7 @@ mod tests {
         let metadata_rows = connection
             .prepare(
                 "SELECT library_id, schema_generation
-                 FROM LibraryMetadata
+                 FROM library_metadata
                  ORDER BY library_id",
             )
             .expect("prepare metadata query")
@@ -270,6 +286,144 @@ mod tests {
     }
 
     #[test]
+    fn canonical_baseline_uses_snake_case_schema_object_names() {
+        let connection = install_test_baseline();
+
+        for table_name in sorted_user_table_names(&connection) {
+            assert!(
+                table_name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+                "canonical table name must be snake_case: {table_name}"
+            );
+        }
+
+        for index_name in schema_object_names(&connection, "index") {
+            assert!(
+                !index_name.bytes().any(|byte| byte.is_ascii_uppercase()),
+                "canonical index name must not contain PascalCase: {index_name}"
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_baseline_has_renamed_schema_objects_and_no_old_names() {
+        let connection = install_test_baseline();
+        let tables = sorted_user_table_names(&connection);
+        let indexes = schema_object_names(&connection, "index");
+
+        for table_name in [
+            "library_metadata",
+            "work_items",
+            "work_runs",
+            "work_artifacts",
+            "work_artifact_inline_payloads",
+            "work_artifact_file_store_entries",
+            "work_artifact_claims",
+            "source_file_facts",
+            "projection_change_log",
+            "projection_subscribers",
+            "projection_cursors",
+            "projection_retention_watermarks",
+            "root_admission_proposals",
+            "primary_media_facts",
+        ] {
+            assert!(
+                tables.iter().any(|table| table == table_name),
+                "renamed table {table_name} is missing"
+            );
+        }
+
+        for index_name in [
+            "work_items_subject_state",
+            "work_items_active_work",
+            "work_runs_work_item_started_at",
+            "work_artifacts_work_run",
+            "work_artifacts_subject_created_at",
+            "work_artifacts_kind_role_lookup",
+            "work_artifact_claims_active_claim",
+            "source_file_facts_source_basis",
+            "source_file_facts_media_kind",
+            "projection_change_log_domain_sequence",
+            "projection_subscribers_expires_at",
+            "root_admission_proposals_active_canonical_path",
+            "source_directories_parent_order",
+            "source_files_path_order",
+            "source_files_parent_order",
+            "source_navigation_user_order_source_item",
+            "source_navigation_user_order_source_location_item",
+            "source_navigation_user_order_parent_order",
+        ] {
+            assert!(
+                indexes.iter().any(|index| index == index_name),
+                "renamed index {index_name} is missing"
+            );
+        }
+
+        for old_name in [
+            concat!("Library", "Metadata"),
+            concat!("Work", "Items"),
+            concat!("Work", "Runs"),
+            concat!("Arti", "facts"),
+            concat!("Artifact", "InlinePayloads"),
+            concat!("Artifact", "FileStoreEntries"),
+            concat!("Artifact", "Claims"),
+            concat!("Source", "Facts"),
+            concat!("Projection", "ChangeLog"),
+            concat!("Projection", "Subscribers"),
+            concat!("Projection", "Cursors"),
+            concat!("Projection", "RetentionWatermarks"),
+            concat!("source_registration", "_proposals"),
+            concat!("primary_media_", "candidates"),
+            concat!("Work", "Items_subject_state"),
+            concat!("Work", "Items_active_work"),
+            concat!("Work", "Runs_work_item_started_at"),
+            concat!("Arti", "facts_work_run"),
+            concat!("Arti", "facts_subject_created_at"),
+            concat!("Arti", "facts_kind_role_lookup"),
+            concat!("Artifact", "Claims_active_claim"),
+            concat!("Source", "Facts_source_basis"),
+            concat!("Source", "Facts_media_kind"),
+            concat!("Projection", "ChangeLog_domain_sequence"),
+            concat!("Projection", "Subscribers_expires_at"),
+            concat!("source_registration", "_proposals_active_canonical_path"),
+            concat!("source_directories_parent_", "browse"),
+            concat!("source_files_source_", "browse_order"),
+            concat!("source_files_parent_", "browse"),
+            concat!("source_navigation_user_order_source_", "node"),
+            concat!("source_navigation_user_order_source_location_", "node"),
+            concat!("source_navigation_user_order_domain_", "parent_ordinal"),
+        ] {
+            assert!(
+                !tables.iter().any(|table| table == old_name)
+                    && !indexes.iter().any(|index| index == old_name),
+                "old schema object name remains active: {old_name}"
+            );
+        }
+
+        for (table_name, old_column) in [
+            ("source_directories", concat!("name_browse", "_sort_key")),
+            ("source_files", concat!("name_browse", "_sort_key")),
+            ("source_files", concat!("relative_path_browse", "_sort_key")),
+            (
+                "source_root_navigation_state",
+                concat!("root_window", "_state"),
+            ),
+            ("source_navigation_user_order", concat!("node", "_domain")),
+            ("source_navigation_user_order", concat!("node", "_id")),
+            ("source_navigation_user_order", concat!("parent", "_scope")),
+            ("source_file_facts", concat!("fact", "_kind")),
+        ] {
+            assert!(
+                !table_column_names(&connection, table_name)
+                    .iter()
+                    .any(|column| column == old_column),
+                "old column {table_name}.{old_column} remains active"
+            );
+        }
+    }
+
+    #[test]
     fn canonical_baseline_defines_source_location_ownership_and_projection_tables() {
         let connection = install_test_baseline();
         let tables = sorted_user_table_names(&connection);
@@ -279,7 +433,7 @@ mod tests {
             "source_locators",
             "source_state",
             "source_scan_state",
-            "source_registration_proposals",
+            "root_admission_proposals",
             "source_locations",
             "source_directories",
             "source_files",
@@ -312,7 +466,7 @@ mod tests {
                 "source_id",
                 "parent_source_directory_id",
                 "name",
-                "name_browse_sort_key",
+                "name_sort_key",
                 "relative_path",
                 "presence_state",
                 "has_child_directories",
@@ -338,13 +492,13 @@ mod tests {
         );
         assert!(
             table_index_names(&connection, "source_files")
-                .contains(&"source_files_source_browse_order".to_string())
+                .contains(&"source_files_path_order".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "source_root_navigation_state"),
             vec![
                 "source_id",
-                "root_window_state",
+                "root_reach_state",
                 "immediate_child_directory_count",
                 "issue_kind",
                 "detail",
@@ -353,9 +507,9 @@ mod tests {
             ]
         );
         assert_eq!(
-            table_column_names(&connection, "source_registration_proposals"),
+            table_column_names(&connection, "root_admission_proposals"),
             vec![
-                "source_registration_proposal_id",
+                "root_admission_proposal_id",
                 "proposal_status",
                 "root_class",
                 "requested_path",
@@ -367,8 +521,8 @@ mod tests {
             ]
         );
         assert!(
-            table_index_names(&connection, "source_registration_proposals")
-                .contains(&"source_registration_proposals_active_canonical_path".to_string())
+            table_index_names(&connection, "root_admission_proposals")
+                .contains(&"root_admission_proposals_active_canonical_path".to_string())
         );
         assert!(
             table_foreign_keys(&connection, "source_root_navigation_state").contains(&(
@@ -396,8 +550,8 @@ mod tests {
                 "source_id",
                 "parent_source_directory_id",
                 "name",
-                "name_browse_sort_key",
-                "relative_path_browse_sort_key",
+                "name_sort_key",
+                "path_sort_key",
                 "relative_path",
                 "size_bytes",
                 "mtime_ns",
@@ -412,10 +566,9 @@ mod tests {
             ]
         );
         assert_eq!(
-            table_column_names(&connection, "SourceFacts"),
+            table_column_names(&connection, "source_file_facts"),
             vec![
                 "source_file_id",
-                "fact_kind",
                 "basis_fingerprint",
                 "basis_source_id",
                 "basis_relative_path",
@@ -437,8 +590,8 @@ mod tests {
             ]
         );
         assert!(
-            table_index_names(&connection, "SourceFacts")
-                .contains(&"SourceFacts_source_basis".to_string())
+            table_index_names(&connection, "source_file_facts")
+                .contains(&"source_file_facts_source_basis".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "content_attachments"),
@@ -533,9 +686,9 @@ mod tests {
                 .contains(&"search_filter_index_rows_source".to_string())
         );
         assert_eq!(
-            table_column_names(&connection, "primary_media_candidates"),
+            table_column_names(&connection, "primary_media_facts"),
             vec![
-                "primary_media_candidate_id",
+                "primary_media_fact_id",
                 "attachment_id",
                 "evidence_source_file_id",
                 "evidence_basis_fingerprint",
@@ -551,8 +704,8 @@ mod tests {
             ]
         );
         assert!(
-            table_index_names(&connection, "primary_media_candidates")
-                .contains(&"primary_media_candidates_evidence_source_file".to_string())
+            table_index_names(&connection, "primary_media_facts")
+                .contains(&"primary_media_facts_evidence_source_file".to_string())
         );
         assert_eq!(
             table_column_names(&connection, "track_identity_candidates"),
@@ -572,7 +725,7 @@ mod tests {
             vec![
                 "track_identity_candidate_member_id",
                 "track_identity_candidate_id",
-                "primary_media_candidate_id",
+                "primary_media_fact_id",
                 "attachment_id",
                 "evidence_source_file_id",
                 "evidence_basis_fingerprint",
@@ -587,7 +740,7 @@ mod tests {
             vec![
                 "track_identity_candidate_evidence_id",
                 "track_identity_candidate_id",
-                "primary_media_candidate_id",
+                "primary_media_fact_id",
                 "attachment_id",
                 "source_file_attachment_link_id",
                 "source_file_id",
@@ -635,7 +788,7 @@ mod tests {
                 "track_identity_candidate_id",
                 "track_identity_candidate_member_id",
                 "track_identity_candidate_evidence_id",
-                "primary_media_candidate_id",
+                "primary_media_fact_id",
                 "attachment_id",
                 "source_file_attachment_link_id",
                 "source_file_id",
@@ -734,7 +887,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      has_child_directories,
@@ -759,7 +912,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      has_primary_media_descendant,
@@ -780,7 +933,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      has_primary_media_descendant,
@@ -812,7 +965,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_updated_at,
@@ -830,7 +983,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_updated_at,
@@ -848,8 +1001,8 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
-                     relative_path_browse_sort_key,
+                     name_sort_key,
+                     path_sort_key,
                      relative_path,
                      presence_state,
                      first_discovered_at,
@@ -912,8 +1065,8 @@ mod tests {
                      source_file_id,
                      source_id,
                      name,
-                     name_browse_sort_key,
-                     relative_path_browse_sort_key,
+                     name_sort_key,
+                     path_sort_key,
                      relative_path,
                      file_kind,
                      file_class,
@@ -995,23 +1148,35 @@ mod tests {
     fn source_navigation_user_order_uses_partial_unique_indexes_and_legal_parent_shapes() {
         let connection = install_test_baseline();
         let index_names = table_index_names(&connection, "source_navigation_user_order");
-        assert!(
-            index_names
-                .iter()
-                .any(|name| name == "source_navigation_user_order_source_node")
+        assert_eq!(
+            table_column_names(&connection, "source_navigation_user_order"),
+            vec![
+                "order_id",
+                "item_kind",
+                "item_key",
+                "parent_source_key",
+                "ordinal",
+                "created_at",
+                "updated_at",
+            ]
         );
         assert!(
             index_names
                 .iter()
-                .any(|name| name == "source_navigation_user_order_source_location_node")
+                .any(|name| name == "source_navigation_user_order_source_item")
+        );
+        assert!(
+            index_names
+                .iter()
+                .any(|name| name == "source_navigation_user_order_source_location_item")
         );
 
         connection
             .execute(
                 "INSERT INTO source_navigation_user_order (
-                     node_domain,
-                     node_id,
-                     parent_scope,
+                     item_kind,
+                     item_key,
+                     parent_source_key,
                      ordinal,
                      created_at,
                      updated_at
@@ -1023,9 +1188,9 @@ mod tests {
         connection
             .execute(
                 "INSERT INTO source_navigation_user_order (
-                     node_domain,
-                     node_id,
-                     parent_scope,
+                     item_kind,
+                     item_key,
+                     parent_source_key,
                      ordinal,
                      created_at,
                      updated_at
@@ -1037,9 +1202,9 @@ mod tests {
         connection
             .execute(
                 "INSERT INTO source_navigation_user_order (
-                     node_domain,
-                     node_id,
-                     parent_scope,
+                     item_kind,
+                     item_key,
+                     parent_source_key,
                      ordinal,
                      created_at,
                      updated_at
@@ -1051,9 +1216,9 @@ mod tests {
         connection
             .execute(
                 "INSERT INTO source_navigation_user_order (
-                     node_domain,
-                     node_id,
-                     parent_scope,
+                     item_kind,
+                     item_key,
+                     parent_source_key,
                      ordinal,
                      created_at,
                      updated_at
@@ -1062,6 +1227,81 @@ mod tests {
                 [],
             )
             .expect_err("source-location order rows require parent scope");
+    }
+
+    #[test]
+    fn navigation_family_and_work_kind_values_use_current_names() {
+        let connection = install_test_baseline();
+
+        connection
+            .execute(
+                "INSERT INTO navigation_rows (
+                     navigation_row_id,
+                     stable_key,
+                     family,
+                     row_kind,
+                     display_name,
+                     sibling_position,
+                     selectable,
+                     updated_at,
+                     row_version
+                 )
+                 VALUES (1, 'views', 'views', 'group', 'Views', 0, 0, 1, 1)",
+                [],
+            )
+            .expect("lowercase views family is accepted");
+        connection
+            .execute(
+                "INSERT INTO navigation_rows (
+                     navigation_row_id,
+                     stable_key,
+                     family,
+                     row_kind,
+                     display_name,
+                     sibling_position,
+                     selectable,
+                     updated_at,
+                     row_version
+                 )
+                 VALUES (2, 'Sources', 'Sources', 'group', 'Sources', 1, 0, 1, 1)",
+                [],
+            )
+            .expect_err("PascalCase Sources family is rejected");
+
+        connection
+            .execute(
+                "INSERT INTO work_items (
+                     work_item_id,
+                     subject_kind,
+                     subject_id,
+                     work_kind,
+                     priority_class,
+                     basis_fingerprint,
+                     state,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (1, 'source_file', '1', 'inspect_source_file', 'background', 'basis:1', 'queued', 1, 1)",
+                [],
+            )
+            .expect("inspect_source_file work kind is accepted");
+        connection
+            .execute(
+                "INSERT INTO work_items (
+                     work_item_id,
+                     subject_kind,
+                     subject_id,
+                     work_kind,
+                     priority_class,
+                     basis_fingerprint,
+                     state,
+                     created_at,
+                     updated_at
+                 )
+                 VALUES (2, 'source_file', '2', ?1, 'background', 'basis:2', 'queued', 1, 1)",
+                [concat!("inspect_", "source")],
+            )
+            .expect_err("old work kind is rejected");
     }
 
     #[test]
@@ -1103,7 +1343,7 @@ mod tests {
     fn tampered_compared_schema_object_reports_a_precise_structural_failure() {
         let mut connection = install_test_baseline();
         connection
-            .execute_batch("DROP INDEX WorkItems_active_work;")
+            .execute_batch("DROP INDEX work_items_active_work;")
             .expect("drop compared index");
 
         let detail = malformed_detail(
@@ -1115,7 +1355,7 @@ mod tests {
             "expected compared-index diagnostic, found {detail}"
         );
         assert!(
-            detail.contains("WorkItems_active_work"),
+            detail.contains("work_items_active_work"),
             "expected missing index name in diagnostic, found {detail}"
         );
     }
@@ -1151,7 +1391,7 @@ mod tests {
 
         let library_metadata = connection.query_row(
             "SELECT library_id, schema_generation, created_at
-                 FROM LibraryMetadata",
+                 FROM library_metadata",
             [],
             |row| {
                 Ok((
@@ -1167,7 +1407,9 @@ mod tests {
         );
 
         let metadata_row_count: i64 =
-            connection.query_row("SELECT COUNT(*) FROM LibraryMetadata", [], |row| row.get(0))?;
+            connection.query_row("SELECT COUNT(*) FROM library_metadata", [], |row| {
+                row.get(0)
+            })?;
         assert_eq!(metadata_row_count, 1);
 
         let search_filter_metadata = connection.query_row(
@@ -1274,9 +1516,9 @@ mod tests {
         let connection = install_test_baseline();
         connection
             .execute_batch(
-                "DROP INDEX WorkItems_active_work;
-                 CREATE UNIQUE INDEX WorkItems_active_work
-                     ON WorkItems (subject_kind, subject_id, work_kind, basis_fingerprint)
+                "DROP INDEX work_items_active_work;
+                 CREATE UNIQUE INDEX work_items_active_work
+                     ON work_items (subject_kind, subject_id, work_kind, basis_fingerprint)
                      WHERE state IN ('queued', 'leased');",
             )
             .expect("tamper partial index predicate");
@@ -1288,7 +1530,7 @@ mod tests {
                 .expect_err("reject partial-index predicate drift"),
         );
         assert!(
-            detail.contains("WorkItems_active_work"),
+            detail.contains("work_items_active_work"),
             "expected drifting partial index name in diagnostic, found {detail}"
         );
         assert!(

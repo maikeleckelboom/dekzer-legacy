@@ -255,7 +255,7 @@ pub struct SourceMaintenanceTrackIdentityCandidateSummary {
     pub evidence_created: usize,
     pub evidence_refreshed: usize,
     pub candidates_marked_stale: usize,
-    pub skipped_stale_primary_media_candidates: usize,
+    pub skipped_stale_primary_media_facts: usize,
     pub remaining_candidates: usize,
 }
 

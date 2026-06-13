@@ -5,7 +5,6 @@ use crate::LibrarySqliteResult;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoreObservedFileFacts {
     pub source_file_id: i64,
-    pub fact_kind: String,
     pub basis_fingerprint: String,
     pub basis_source_id: i64,
     pub basis_relative_path: String,
@@ -45,7 +44,6 @@ pub fn read_observed_file_facts_for_source_file(
     connection
         .query_row(
             "SELECT facts.source_file_id,
-                    facts.fact_kind,
                     facts.basis_fingerprint,
                     facts.basis_source_id,
                     facts.basis_relative_path,
@@ -73,37 +71,36 @@ pub fn read_observed_file_facts_for_source_file(
                         THEN 'current'
                         ELSE 'stale'
                     END AS fact_status
-             FROM SourceFacts facts
+             FROM source_file_facts facts
              JOIN source_files file
                ON file.source_file_id = facts.source_file_id
              WHERE facts.source_file_id = ?1",
             [source_file_id],
             |row| {
-                let content_hash_algorithm = row.get::<_, Option<String>>(9)?;
-                let content_hash_value = row.get::<_, Option<String>>(10)?;
+                let content_hash_algorithm = row.get::<_, Option<String>>(8)?;
+                let content_hash_value = row.get::<_, Option<String>>(9)?;
                 Ok(StoreObservedFileFacts {
                     source_file_id: row.get(0)?,
-                    fact_kind: row.get(1)?,
-                    basis_fingerprint: row.get(2)?,
-                    basis_source_id: row.get(3)?,
-                    basis_relative_path: row.get(4)?,
-                    basis_size_bytes: row.get(5)?,
-                    basis_mtime_ns: row.get(6)?,
-                    basis_presence_state: row.get(7)?,
-                    observed_at_ms: row.get(8)?,
+                    basis_fingerprint: row.get(1)?,
+                    basis_source_id: row.get(2)?,
+                    basis_relative_path: row.get(3)?,
+                    basis_size_bytes: row.get(4)?,
+                    basis_mtime_ns: row.get(5)?,
+                    basis_presence_state: row.get(6)?,
+                    observed_at_ms: row.get(7)?,
                     content_hash: content_hash_algorithm
                         .zip(content_hash_value)
                         .map(|(algorithm, value)| StoreContentHashEvidence { algorithm, value }),
-                    media_kind: row.get(11)?,
-                    mime_type: row.get(12)?,
-                    duration_ms: row.get(13)?,
-                    sample_rate_hz: row.get(14)?,
-                    channels: row.get(15)?,
-                    bit_depth: row.get(16)?,
-                    codec: row.get(17)?,
-                    accepted_artifact_id: row.get(18)?,
-                    updated_at_ms: row.get(19)?,
-                    status: match row.get::<_, String>(20)?.as_str() {
+                    media_kind: row.get(10)?,
+                    mime_type: row.get(11)?,
+                    duration_ms: row.get(12)?,
+                    sample_rate_hz: row.get(13)?,
+                    channels: row.get(14)?,
+                    bit_depth: row.get(15)?,
+                    codec: row.get(16)?,
+                    accepted_artifact_id: row.get(17)?,
+                    updated_at_ms: row.get(18)?,
+                    status: match row.get::<_, String>(19)?.as_str() {
                         "current" => StoreObservedFileFactStatus::Current,
                         _ => StoreObservedFileFactStatus::Stale,
                     },

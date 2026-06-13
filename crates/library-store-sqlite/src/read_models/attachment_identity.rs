@@ -236,7 +236,7 @@ pub fn get_source_attachment_summary(
                             ELSE 0
                         END AS has_current_blake3
                  FROM source_files file
-                 LEFT JOIN SourceFacts facts
+                 LEFT JOIN source_file_facts facts
                    ON facts.source_file_id = file.source_file_id
                  WHERE file.source_id = ?1
              ),
@@ -259,7 +259,7 @@ pub fn get_source_attachment_summary(
                    ON attachment.attachment_id = link.attachment_id
                  JOIN source_files file
                    ON file.source_file_id = link.source_file_id
-                 LEFT JOIN SourceFacts facts
+                 LEFT JOIN source_file_facts facts
                    ON facts.source_file_id = link.source_file_id
                  WHERE link.source_id = ?1
              )
@@ -370,7 +370,7 @@ LEFT JOIN source_state state
   ON state.source_id = file.source_id
 LEFT JOIN source_scan_state scan_state
   ON scan_state.source_id = file.source_id
-LEFT JOIN SourceFacts facts
+LEFT JOIN source_file_facts facts
   ON facts.source_file_id = link.source_file_id";
 
 fn map_attachment_identity_row(row: &Row<'_>) -> rusqlite::Result<StoreAttachmentIdentity> {

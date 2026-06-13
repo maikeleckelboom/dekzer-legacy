@@ -421,7 +421,7 @@ mod tests {
             .execute(
                 "INSERT INTO source_directories (
                      source_directory_id, source_id, parent_source_directory_id, name,
-                     name_browse_sort_key, relative_path, presence_state, dir_scan_state,
+                     name_sort_key, relative_path, presence_state, dir_scan_state,
                      dir_scan_issue_kind, dir_scan_updated_at, created_at, updated_at
                  )
                  VALUES (?1, ?2, NULL, ?3, ?3, ?3, ?4, ?5, ?6, 1, 1, 1)",
@@ -450,7 +450,7 @@ mod tests {
             .execute(
                 "INSERT INTO source_files (
                      source_file_id, source_id, parent_source_directory_id, name,
-                     name_browse_sort_key, relative_path_browse_sort_key, relative_path,
+                     name_sort_key, path_sort_key, relative_path,
                      size_bytes, mtime_ns, file_kind, file_class, presence_state,
                      first_discovered_at, last_observed_at, last_presence_change_at,
                      created_at, updated_at

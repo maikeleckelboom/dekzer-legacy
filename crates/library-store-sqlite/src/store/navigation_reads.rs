@@ -41,7 +41,7 @@ pub(crate) struct FilesystemPathRootResolution {
 #[allow(dead_code)]
 pub(crate) struct LibraryNavigationPathTarget {
     pub root_id: i64,
-    pub parent_node_id: Option<i64>,
+    pub parent_item_key: Option<i64>,
 }
 
 impl SqliteDurableStore {
@@ -151,7 +151,7 @@ impl SqliteDurableStore {
                     (
                         SELECT sfacts.media_kind
                         FROM source_files sf
-                        JOIN SourceFacts sfacts
+                        JOIN source_file_facts sfacts
                           ON sfacts.source_file_id = sf.source_file_id
                         WHERE sf.source_id = candidate_paths.root_id
                           AND sf.presence_state = 'present'
@@ -324,7 +324,7 @@ impl SqliteDurableStore {
         if relative_path.is_empty() {
             return Ok(Some(LibraryNavigationPathTarget {
                 root_id,
-                parent_node_id: None,
+                parent_item_key: None,
             }));
         }
 
@@ -342,7 +342,7 @@ impl SqliteDurableStore {
                 |row| {
                     Ok(LibraryNavigationPathTarget {
                         root_id,
-                        parent_node_id: row.get(0)?,
+                        parent_item_key: row.get(0)?,
                     })
                 },
             )
@@ -359,7 +359,7 @@ impl SqliteDurableStore {
         if relative_path.is_empty() {
             return Ok(Some(LibraryNavigationPathTarget {
                 root_id,
-                parent_node_id: None,
+                parent_item_key: None,
             }));
         }
 
@@ -377,7 +377,7 @@ impl SqliteDurableStore {
                 |row| {
                     Ok(LibraryNavigationPathTarget {
                         root_id,
-                        parent_node_id: Some(row.get(0)?),
+                        parent_item_key: Some(row.get(0)?),
                     })
                 },
             )

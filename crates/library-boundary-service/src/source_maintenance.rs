@@ -565,7 +565,7 @@ fn empty_run(
             evidence_created: 0,
             evidence_refreshed: 0,
             candidates_marked_stale: 0,
-            skipped_stale_primary_media_candidates: 0,
+            skipped_stale_primary_media_facts: 0,
             remaining_candidates: 0,
         },
         track_identity_decisions: protocol::SourceMaintenanceTrackIdentityDecisionSummary {
@@ -676,7 +676,7 @@ fn map_track_identity_candidate_summary(
         evidence_created: result.evidence_created,
         evidence_refreshed: result.evidence_refreshed,
         candidates_marked_stale: result.candidates_marked_stale,
-        skipped_stale_primary_media_candidates: result.skipped_stale_primary_media_candidates,
+        skipped_stale_primary_media_facts: result.skipped_stale_primary_media_facts,
         remaining_candidates: result.remaining_candidates,
     }
 }

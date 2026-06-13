@@ -62,7 +62,7 @@ pub(crate) fn sweep_projection_retention(
     now_ms: i64,
 ) -> LibrarySqliteResult<Vec<ProjectionRetentionState>> {
     connection.execute(
-        "DELETE FROM ProjectionSubscribers
+        "DELETE FROM projection_subscribers
          WHERE expires_at <= ?1",
         [now_ms],
     )?;
@@ -70,7 +70,7 @@ pub(crate) fn sweep_projection_retention(
     let domain = ProjectionDomain::Navigation;
     let (live_subscriber_count, live_min_position): (i64, Option<i64>) = connection.query_row(
         "SELECT COUNT(*), MIN(position)
-         FROM ProjectionCursors
+         FROM projection_cursors
          WHERE projection_domain = ?1",
         [domain.as_str()],
         |row| Ok((row.get(0)?, row.get(1)?)),
@@ -78,7 +78,7 @@ pub(crate) fn sweep_projection_retention(
 
     if let Some(live_min_position) = live_min_position {
         connection.execute(
-            "DELETE FROM ProjectionChangeLog
+            "DELETE FROM projection_change_log
              WHERE projection_domain = ?1
                AND change_sequence < ?2",
             params![domain.as_str(), live_min_position],
@@ -87,14 +87,14 @@ pub(crate) fn sweep_projection_retention(
 
     let earliest_retained_change_sequence = connection.query_row(
         "SELECT MIN(change_sequence)
-         FROM ProjectionChangeLog
+         FROM projection_change_log
          WHERE projection_domain = ?1",
         [domain.as_str()],
         |row| row.get::<_, Option<i64>>(0),
     )?;
 
     connection.execute(
-        "INSERT INTO ProjectionRetentionWatermarks (
+        "INSERT INTO projection_retention_watermarks (
              projection_domain,
              live_subscriber_count,
              live_min_position,
@@ -259,9 +259,9 @@ fn load_next_navigation_rows(
          LEFT JOIN source_state ss
            ON ss.source_id = s.source_id
          LEFT JOIN source_navigation_user_order buo
-           ON buo.node_domain = 'source'
-          AND buo.node_id = CAST(s.source_id AS TEXT)
-          AND buo.parent_scope IS NULL
+           ON buo.item_kind = 'source'
+          AND buo.item_key = CAST(s.source_id AS TEXT)
+          AND buo.parent_source_key IS NULL
          WHERE s.is_user_visible = 1
          ORDER BY sibling_position ASC, s.source_id ASC",
     )?;
@@ -286,7 +286,7 @@ fn load_next_navigation_rows(
                 navigation_row_id: source_id,
                 stable_key,
                 parent_navigation_row_id: None,
-                family: Some("Sources".to_string()),
+                family: Some("sources".to_string()),
                 row_kind: "source".to_string(),
                 display_name,
                 sibling_position,
@@ -329,7 +329,7 @@ fn insert_structural_navigation_rows(
             navigation_row_id: ALL_AUDIO_VIEW_ROW_ID,
             stable_key: "view:all_audio",
             parent_navigation_row_id: None,
-            family: Some("Views"),
+            family: Some("views"),
             row_kind: "view",
             display_name: "All Audio",
             sibling_position: 1,
@@ -343,7 +343,7 @@ fn insert_structural_navigation_rows(
             navigation_row_id: ALL_MEDIA_VIEW_ROW_ID,
             stable_key: "view:all_media",
             parent_navigation_row_id: None,
-            family: Some("Views"),
+            family: Some("views"),
             row_kind: "view",
             display_name: "All Media",
             sibling_position: 0,
@@ -357,7 +357,7 @@ fn insert_structural_navigation_rows(
             navigation_row_id: ALL_VIDEOS_VIEW_ROW_ID,
             stable_key: "view:all_videos",
             parent_navigation_row_id: None,
-            family: Some("Views"),
+            family: Some("views"),
             row_kind: "view",
             display_name: "All Videos",
             sibling_position: 2,
@@ -371,7 +371,7 @@ fn insert_structural_navigation_rows(
             navigation_row_id: RECENTLY_ADDED_VIEW_ROW_ID,
             stable_key: "view:recently_added",
             parent_navigation_row_id: None,
-            family: Some("Views"),
+            family: Some("views"),
             row_kind: "view",
             display_name: "Recently Added",
             sibling_position: 3,
@@ -435,9 +435,9 @@ fn insert_source_location_navigation_rows(
                 ) - 1 AS sibling_position
          FROM source_locations sl
          LEFT JOIN source_navigation_user_order buo
-           ON buo.node_domain = 'source_location'
-          AND buo.node_id = CAST(sl.source_location_id AS TEXT)
-          AND buo.parent_scope = CAST(sl.source_id AS TEXT)
+           ON buo.item_kind = 'source_location'
+          AND buo.item_key = CAST(sl.source_location_id AS TEXT)
+          AND buo.parent_source_key = CAST(sl.source_id AS TEXT)
          WHERE sl.authority = 'user'
            AND sl.location_kind = 'registered_subpath'
            AND sl.is_user_visible = 1
@@ -577,7 +577,7 @@ fn insert_projection_change(
     changed_at: i64,
 ) -> LibrarySqliteResult<()> {
     write.execute(
-        "INSERT INTO ProjectionChangeLog (
+        "INSERT INTO projection_change_log (
              projection_domain,
              row_key,
              change_kind,
@@ -606,7 +606,7 @@ fn latest_logged_row_version(
     connection
         .query_row(
             "SELECT row_version
-             FROM ProjectionChangeLog
+             FROM projection_change_log
              WHERE projection_domain = ?1
                AND row_key = ?2
              ORDER BY change_sequence DESC

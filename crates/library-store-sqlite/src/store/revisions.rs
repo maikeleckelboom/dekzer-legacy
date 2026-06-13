@@ -35,7 +35,7 @@ impl SqliteDurableStore {
             let domain = scope.projection_domain();
             let revision = connection.query_row(
                 "SELECT MAX(change_sequence)
-                 FROM ProjectionChangeLog
+                 FROM projection_change_log
                  WHERE projection_domain = ?1",
                 [domain.as_str()],
                 |row| row.get::<_, Option<i64>>(0),

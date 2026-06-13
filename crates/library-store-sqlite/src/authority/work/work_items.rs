@@ -25,7 +25,7 @@ pub struct QueueMachineWorkInput {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QueueInspectSourceWorkInput {
+pub struct QueueInspectSourceFileWorkInput {
     pub source_file_id: SourceFileId,
     pub basis_fingerprint: String,
     pub priority_class: WorkPriorityClass,
@@ -100,11 +100,11 @@ pub struct BlockMachineWorkInput {
     pub error_detail: Option<String>,
 }
 
-pub struct WorkItemsAuthorityTx<'write, 'conn> {
+pub struct WorkItemAuthorityTx<'write, 'conn> {
     tx: &'write AdmittedWrite<'conn>,
 }
 
-impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
+impl<'write, 'conn> WorkItemAuthorityTx<'write, 'conn> {
     pub(crate) fn new(tx: &'write AdmittedWrite<'conn>) -> Self {
         Self { tx }
     }
@@ -122,7 +122,7 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
                 state
             };
             self.tx.execute(
-                "UPDATE WorkItems
+                "UPDATE work_items
                  SET priority_class = ?2,
                      state = ?3,
                      leased_until = CASE WHEN ?3 = 'queued' THEN NULL ELSE leased_until END,
@@ -147,7 +147,7 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
 
         let subject_id = input.key.subject.storage_id();
         self.tx.execute(
-            "INSERT INTO WorkItems (
+            "INSERT INTO work_items (
                  subject_kind,
                  subject_id,
                  work_kind,
@@ -180,14 +180,14 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
         })
     }
 
-    pub fn queue_inspect_source_work(
+    pub fn queue_inspect_source_file_work(
         &self,
-        input: &QueueInspectSourceWorkInput,
+        input: &QueueInspectSourceFileWorkInput,
     ) -> LibrarySqliteResult<QueueMachineWorkResult> {
         self.queue_machine_work(&QueueMachineWorkInput {
             key: MachineWorkKey {
                 subject: WorkSubject::SourceFile(input.source_file_id),
-                work_kind: MachineWorkKind::InspectSource,
+                work_kind: MachineWorkKind::InspectSourceFile,
                 basis_fingerprint: input.basis_fingerprint.clone(),
             },
             priority_class: input.priority_class,
@@ -223,7 +223,7 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
             .tx
             .prepare(
                 "SELECT work_item_id
-                 FROM WorkItems
+                 FROM work_items
                  WHERE state = 'queued'
                     OR (state = 'leased' AND leased_until IS NOT NULL AND leased_until <= ?1)
                  ORDER BY CASE priority_class
@@ -243,7 +243,7 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
         let mut claimed = Vec::with_capacity(claimed_ids.len());
         for work_item_id in claimed_ids {
             self.tx.execute(
-                "UPDATE WorkItems
+                "UPDATE work_items
                  SET state = 'leased',
                      leased_until = ?2,
                      attempt_count = attempt_count + 1,
@@ -266,7 +266,7 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
     ) -> LibrarySqliteResult<ClaimedMachineWorkItem> {
         let lease_until = input.claimed_at + input.lease_duration_ms;
         let changed = self.tx.execute(
-            "UPDATE WorkItems
+            "UPDATE work_items
              SET state = 'leased',
                  leased_until = ?2,
                  attempt_count = attempt_count + 1,
@@ -356,7 +356,7 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
         error_detail: Option<&str>,
     ) -> LibrarySqliteResult<()> {
         self.tx.execute(
-            "UPDATE WorkItems
+            "UPDATE work_items
              SET state = ?2,
                  leased_until = NULL,
                  blocked_reason = ?3,
@@ -434,7 +434,7 @@ impl<'write, 'conn> WorkItemsAuthorityTx<'write, 'conn> {
             .tx
             .query_row(
                 "SELECT work_item_id, state
-                 FROM WorkItems
+                 FROM work_items
                  WHERE subject_kind = ?1
                    AND subject_id = ?2
                    AND work_kind = ?3
@@ -477,7 +477,7 @@ pub(crate) fn load_work_item_row(
                 error_detail,
                 created_at,
                 updated_at
-         FROM WorkItems
+         FROM work_items
          WHERE work_item_id = ?1",
             [work_item_id.get()],
             |row| {
@@ -533,7 +533,7 @@ fn validate_work_key(key: &MachineWorkKey) -> LibrarySqliteResult<()> {
     }
 
     match key.work_kind {
-        MachineWorkKind::InspectSource => {
+        MachineWorkKind::InspectSourceFile => {
             if !matches!(key.subject, WorkSubject::SourceFile(_)) {
                 return Err(LibrarySqliteError::WriteInvariant(format!(
                     "{} work must target subject_kind=source_file",
@@ -556,13 +556,17 @@ fn validate_work_key(key: &MachineWorkKey) -> LibrarySqliteResult<()> {
 
 fn parse_work_item_id(value: i64) -> LibrarySqliteResult<WorkItemId> {
     WorkItemId::new(value).ok_or_else(|| {
-        LibrarySqliteError::WriteInvariant(format!("invalid WorkItems.work_item_id value: {value}"))
+        LibrarySqliteError::WriteInvariant(format!(
+            "invalid work_items.work_item_id value: {value}"
+        ))
     })
 }
 
 fn parse_subject_kind(value: &str) -> LibrarySqliteResult<WorkSubjectKind> {
     WorkSubjectKind::parse(value).ok_or_else(|| {
-        LibrarySqliteError::WriteInvariant(format!("unknown WorkItems.subject_kind value: {value}"))
+        LibrarySqliteError::WriteInvariant(format!(
+            "unknown work_items.subject_kind value: {value}"
+        ))
     })
 }
 
@@ -572,7 +576,7 @@ fn parse_work_subject(
 ) -> LibrarySqliteResult<WorkSubject> {
     WorkSubject::parse(subject_kind, subject_id).ok_or_else(|| {
         LibrarySqliteError::WriteInvariant(format!(
-            "invalid WorkItems.subject_id value for {}: {subject_id}",
+            "invalid work_items.subject_id value for {}: {subject_id}",
             subject_kind.as_str()
         ))
     })
@@ -580,20 +584,20 @@ fn parse_work_subject(
 
 fn parse_work_kind(value: &str) -> LibrarySqliteResult<MachineWorkKind> {
     MachineWorkKind::parse(value).ok_or_else(|| {
-        LibrarySqliteError::WriteInvariant(format!("unknown WorkItems.work_kind value: {value}"))
+        LibrarySqliteError::WriteInvariant(format!("unknown work_items.work_kind value: {value}"))
     })
 }
 
 fn parse_priority_class(value: &str) -> LibrarySqliteResult<WorkPriorityClass> {
     WorkPriorityClass::parse(value).ok_or_else(|| {
         LibrarySqliteError::WriteInvariant(format!(
-            "unknown WorkItems.priority_class value: {value}"
+            "unknown work_items.priority_class value: {value}"
         ))
     })
 }
 
 fn parse_state(value: &str) -> LibrarySqliteResult<WorkItemState> {
     WorkItemState::parse(value).ok_or_else(|| {
-        LibrarySqliteError::WriteInvariant(format!("unknown WorkItems.state value: {value}"))
+        LibrarySqliteError::WriteInvariant(format!("unknown work_items.state value: {value}"))
     })
 }

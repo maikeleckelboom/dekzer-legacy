@@ -236,7 +236,7 @@ mod tests {
             .rsplit('/')
             .next()
             .unwrap_or(&fix.relative_path);
-        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let name_sort_key = crate::browse_sort_key::compute_name_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -244,7 +244,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      has_child_directories,
@@ -262,7 +262,7 @@ mod tests {
                     fix.source_id,
                     fix.parent_source_directory_id,
                     name,
-                    name_browse_sort_key,
+                    name_sort_key,
                     fix.relative_path,
                     fix.presence_state,
                     fix.dir_scan_state,

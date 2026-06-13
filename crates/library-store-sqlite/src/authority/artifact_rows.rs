@@ -24,7 +24,7 @@ pub(crate) fn load_artifact_row(
                 artifact_kind,
                 artifact_role,
                 basis_fingerprint
-         FROM Artifacts
+         FROM work_artifacts
          WHERE artifact_id = ?1",
         [artifact_id],
         |row| {

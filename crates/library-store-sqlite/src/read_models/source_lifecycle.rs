@@ -271,7 +271,7 @@ mod tests {
                  source_id,
                  parent_source_directory_id,
 name,
-                  name_browse_sort_key,
+                  name_sort_key,
                   relative_path,
                   presence_state,
                   has_child_directories,

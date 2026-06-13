@@ -131,7 +131,7 @@ Decision evidence snapshots must preserve:
 - candidate id;
 - candidate member id;
 - candidate evidence id;
-- primary-media candidate id;
+- primary-media fact id;
 - attachment id;
 - source-file attachment link id;
 - source file id and source id;

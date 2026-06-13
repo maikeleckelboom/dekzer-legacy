@@ -234,13 +234,13 @@ Directory-level `dir_scan_state` values:
   also admit it.
 - `source_files.presence = missing`: excluded from ordinary playable-media contents; source lifecycle/integrity reads
   own missing/unavailable diagnostics.
-- `primary_media_candidates`: eligible for `primaryMedia` policy only after current attachment identity and media probe
+- `primary_media_facts`: eligible for `primaryMedia` policy only after current attachment identity and media probe
   evidence revalidation.
 
 #### `source_files.file_class`
 
 - `audio`: raw source-file class for audio files; included in primary media.
-- `video`: raw source-file class for video files; visible as a primary media candidate until future video inspection
+- `video`: raw source-file class for video files; visible as a primary media fact until future video inspection
   proves actual deck/output eligibility.
 - `image`: raw source-file class for image files; image media is stored and can be exposed through explicit source-file
   visibility in the tree, but is not primary media and is not included in normal recursive selected contents.
@@ -262,7 +262,7 @@ be used as current design vocabulary.
 ## Query execution contract
 
 The renderer passes a selected target to the substrate-owned read path. The substrate resolves the target and returns
-rows from the current source-file inventory and, for `primaryMedia`, evidence-backed `primary_media_candidates`.
+rows from the current source-file inventory and, for `primaryMedia`, evidence-backed `primary_media_facts`.
 
 The renderer never constructs fallback rows.
 
@@ -273,7 +273,7 @@ selected tree row
   -> resolve selector/binding target
   -> derive source_id and optional relative path prefix/scope
   -> query scoped source_files according to the requested contents policy
-  -> for primaryMedia, join current primary_media_candidates with source_files, attachments, and SourceFacts
+  -> for primaryMedia, join current primary_media_facts with source_files, attachments, and source_file_facts
   -> for sourceFileInventory/audioBrowse/playableMediaBrowse, return scoped source-file inventory rows
   -> return rows plus scan coverage metadata
   -> render contents table

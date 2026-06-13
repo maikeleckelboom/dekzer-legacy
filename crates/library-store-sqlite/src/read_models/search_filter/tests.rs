@@ -38,7 +38,7 @@ fn seed_source(connection: &Connection) {
              ) VALUES (1, 'complete', 1);
              INSERT INTO source_directories (
                  source_directory_id, source_id, parent_source_directory_id, name,
-                 name_browse_sort_key, relative_path, presence_state, dir_scan_state,
+                 name_sort_key, relative_path, presence_state, dir_scan_state,
                  dir_scan_updated_at, created_at, updated_at
              ) VALUES
                  (10, 1, NULL, 'Music', 'music', 'Music', 'present', 'complete', 1, 1, 1),
@@ -49,7 +49,7 @@ fn seed_source(connection: &Connection) {
              ) VALUES (100, 1, 'user', 'registered_subpath', 'Music/Breaks', 'Breaks', 1, 1, 1);
              INSERT INTO source_files (
                  source_file_id, source_id, parent_source_directory_id, name,
-                 name_browse_sort_key, relative_path_browse_sort_key, relative_path,
+                 name_sort_key, path_sort_key, relative_path,
                  size_bytes, mtime_ns, file_kind, file_class, presence_state,
                  first_discovered_at, last_observed_at, last_presence_change_at,
                  created_at, updated_at
@@ -57,27 +57,27 @@ fn seed_source(connection: &Connection) {
                  (1000, 1, 11, 'Amen.wav', 'amen', 'music/breaks/amen', 'Music/Breaks/Amen.wav', 10, 100, 'audio', 'audio', 'present', 1, 1, 1, 1, 1),
                  (1001, 1, 11, 'Cover.jpg', 'cover', 'music/breaks/cover', 'Music/Breaks/Cover.jpg', 5, 100, 'image', 'image', 'present', 1, 1, 1, 1, 1),
                  (1002, 1, 10, 'Notes.txt', 'notes', 'music/notes', 'Music/Notes.txt', 3, 100, 'text_doc', 'none', 'present', 1, 1, 1, 1, 1);
-             INSERT INTO WorkItems (
+             INSERT INTO work_items (
                  work_item_id, subject_kind, subject_id, work_kind, priority_class,
                  basis_fingerprint, state, created_at, updated_at
-             ) VALUES (1, 'source_file', '1000', 'inspect_source', 'interactive', 'basis:1000', 'completed', 1, 1);
-             INSERT INTO WorkRuns (
+             ) VALUES (1, 'source_file', '1000', 'inspect_source_file', 'interactive', 'basis:1000', 'completed', 1, 1);
+             INSERT INTO work_runs (
                  work_run_id, work_item_id, adapter_key, adapter_version,
                  started_at, finished_at, outcome
              ) VALUES (1, 1, 'test', '1', 1, 1, 'completed');
-             INSERT INTO Artifacts (
+             INSERT INTO work_artifacts (
                  artifact_id, work_run_id, subject_kind, subject_id, artifact_kind,
                  artifact_role, adapter_key, adapter_version, basis_fingerprint,
                  media_type, storage_kind, payload_hash, created_at
              ) VALUES (1, 1, 'source_file', '1000', 'inspection_result', 'primary_result', 'test', '1', 'basis:1000', 'application/json', 'inline_payload', 'hash', 1);
-             INSERT INTO SourceFacts (
-                 source_file_id, fact_kind, basis_fingerprint, basis_source_id,
+             INSERT INTO source_file_facts (
+                 source_file_id, basis_fingerprint, basis_source_id,
                  basis_relative_path, basis_size_bytes, basis_mtime_ns,
                  basis_presence_state, observed_at_ms, content_hash_algorithm,
                  content_hash_value, media_kind, mime_type, duration_ms,
                  sample_rate_hz, channels, bit_depth, codec, updated_at,
                  accepted_artifact_id
-             ) VALUES (1000, 'source_inspection', 'basis:1000', 1, 'Music/Breaks/Amen.wav', 10, 100, 'present', 1, 'blake3', 'abc', 'audio', 'audio/wav', 1000, 44100, 2, 16, 'pcm', 1, 1);
+             ) VALUES (1000, 'basis:1000', 1, 'Music/Breaks/Amen.wav', 10, 100, 'present', 1, 'blake3', 'abc', 'audio', 'audio/wav', 1000, 44100, 2, 16, 'pcm', 1, 1);
              INSERT INTO content_attachments (
                  attachment_id, content_hash_algorithm, content_hash_value,
                  first_observed_at, updated_at
@@ -528,12 +528,12 @@ fn relevance_sort_orders_match_tiers_before_stable_ties() {
         .execute_batch(
             "INSERT INTO source_directories (
                  source_directory_id, source_id, parent_source_directory_id, name,
-                 name_browse_sort_key, relative_path, presence_state, dir_scan_state,
+                 name_sort_key, relative_path, presence_state, dir_scan_state,
                  dir_scan_updated_at, created_at, updated_at
              ) VALUES (12, 1, 10, 'Amen Path', 'amen path', 'Music/Amen Path', 'present', 'complete', 1, 1, 1);
              INSERT INTO source_files (
                  source_file_id, source_id, parent_source_directory_id, name,
-                 name_browse_sort_key, relative_path_browse_sort_key, relative_path,
+                 name_sort_key, path_sort_key, relative_path,
                  size_bytes, mtime_ns, file_kind, file_class, presence_state,
                  first_discovered_at, last_observed_at, last_presence_change_at,
                  created_at, updated_at

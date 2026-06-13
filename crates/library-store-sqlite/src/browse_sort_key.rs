@@ -1,8 +1,8 @@
-pub(crate) fn compute_name_browse_sort_key(name: &str) -> String {
+pub(crate) fn compute_name_sort_key(name: &str) -> String {
     encode_sort_key_component(name)
 }
 
-pub(crate) fn compute_relative_path_browse_sort_key(relative_path: &str) -> String {
+pub(crate) fn compute_path_sort_key(relative_path: &str) -> String {
     if relative_path.is_empty() {
         return "v1|".to_string();
     }
@@ -79,12 +79,12 @@ fn write_digit_run(key: &mut String, significant: &str, original: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_name_browse_sort_key, compute_relative_path_browse_sort_key};
+    use super::{compute_name_sort_key, compute_path_sort_key};
 
     fn assert_order(expected: &[&str]) {
         let keys: Vec<(String, &str)> = expected
             .iter()
-            .map(|name| (compute_name_browse_sort_key(name), *name))
+            .map(|name| (compute_name_sort_key(name), *name))
             .collect();
         let mut sorted = keys.clone();
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
@@ -121,9 +121,9 @@ mod tests {
 
     #[test]
     fn natural_sort_leading_zeros_deterministic_individual() {
-        let key_01 = compute_name_browse_sort_key("Track 01.wav");
-        let key_1 = compute_name_browse_sort_key("Track 1.wav");
-        let key_001 = compute_name_browse_sort_key("Track 001.wav");
+        let key_01 = compute_name_sort_key("Track 01.wav");
+        let key_1 = compute_name_sort_key("Track 1.wav");
+        let key_001 = compute_name_sort_key("Track 001.wav");
         assert!(
             key_1 < key_01,
             "1 should sort before 01 (shorter original digit string first)"
@@ -136,8 +136,8 @@ mod tests {
 
     #[test]
     fn natural_sort_case_insensitive_primary() {
-        let key_lower = compute_name_browse_sort_key("track 1.wav");
-        let key_upper = compute_name_browse_sort_key("Track 1.wav");
+        let key_lower = compute_name_sort_key("track 1.wav");
+        let key_upper = compute_name_sort_key("Track 1.wav");
         assert_eq!(
             key_lower, key_upper,
             "case-folded keys must be identical for deterministic tie-breaking by id"
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn natural_sort_empty_string() {
-        let key = compute_name_browse_sort_key("");
+        let key = compute_name_sort_key("");
         assert!(!key.is_empty(), "empty name must produce a valid key");
     }
 
@@ -177,8 +177,8 @@ mod tests {
 
     #[test]
     fn natural_sort_no_digits() {
-        let key_a = compute_name_browse_sort_key("aaa");
-        let key_b = compute_name_browse_sort_key("bbb");
+        let key_a = compute_name_sort_key("aaa");
+        let key_b = compute_name_sort_key("bbb");
         assert!(key_a < key_b, "pure text keys must sort alphabetically");
     }
 
@@ -192,7 +192,7 @@ mod tests {
         let names = ["[10]", "[1]", "[2]", "[20]", "[3]", "[11]"];
         let mut keyed: Vec<_> = names
             .iter()
-            .map(|n| (compute_name_browse_sort_key(n), *n))
+            .map(|n| (compute_name_sort_key(n), *n))
             .collect();
         keyed.sort_by(|a, b| a.0.cmp(&b.0));
         let sorted: Vec<&&str> = keyed.iter().map(|(_, n)| n).collect();
@@ -204,9 +204,9 @@ mod tests {
 
     #[test]
     fn large_number_does_not_overflow_and_sorts_after_smaller() {
-        let key_9 = compute_name_browse_sort_key("Track 9.wav");
-        let key_10 = compute_name_browse_sort_key("Track 10.wav");
-        let key_huge = compute_name_browse_sort_key("Track 999999999999999999999999999999.wav");
+        let key_9 = compute_name_sort_key("Track 9.wav");
+        let key_10 = compute_name_sort_key("Track 10.wav");
+        let key_huge = compute_name_sort_key("Track 999999999999999999999999999999.wav");
         assert!(key_9 < key_10, "Track 9 must sort before Track 10");
         assert!(
             key_10 < key_huge,
@@ -220,9 +220,9 @@ mod tests {
 
     #[test]
     fn large_number_with_many_leading_zeros_sorts_by_numeric_value_9() {
-        let key_9 = compute_name_browse_sort_key("Track 9.wav");
-        let key_padded = compute_name_browse_sort_key("Track 000000000000000000000000000009.wav");
-        let key_10 = compute_name_browse_sort_key("Track 10.wav");
+        let key_9 = compute_name_sort_key("Track 9.wav");
+        let key_padded = compute_name_sort_key("Track 000000000000000000000000000009.wav");
+        let key_10 = compute_name_sort_key("Track 10.wav");
 
         assert!(
             key_9 < key_padded,
@@ -236,8 +236,8 @@ mod tests {
 
     #[test]
     fn all_zero_digit_run_collapses_to_single_zero() {
-        let key_000 = compute_name_browse_sort_key("Track 000.wav");
-        let key_0 = compute_name_browse_sort_key("Track 0.wav");
+        let key_000 = compute_name_sort_key("Track 000.wav");
+        let key_0 = compute_name_sort_key("Track 0.wav");
         assert!(
             key_0 < key_000,
             "Track 0 must sort before Track 000 (shorter original length)"
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn key_is_printable_ascii_for_ascii_input() {
-        let key = compute_name_browse_sort_key("Track 10.wav");
+        let key = compute_name_sort_key("Track 10.wav");
         assert!(
             key.chars()
                 .all(|c| c.is_ascii_graphic() || c == ' ' || c == ':')
@@ -258,10 +258,7 @@ mod tests {
     #[test]
     fn non_ascii_filename_produces_deterministic_non_empty_key() {
         let names = ["café.wav", "über cool.mp3", "señor.flac", "café.wav"];
-        let keys: Vec<_> = names
-            .iter()
-            .map(|n| compute_name_browse_sort_key(n))
-            .collect();
+        let keys: Vec<_> = names.iter().map(|n| compute_name_sort_key(n)).collect();
         for (i, key) in keys.iter().enumerate() {
             assert!(
                 !key.is_empty(),
@@ -284,7 +281,7 @@ mod tests {
     fn non_ascii_sort_key_does_not_panic_on_non_latin_scripts() {
         let names = ["日本語.mp3", "中文.wav", "한국어.flac", "Русский.mp3"];
         for name in &names {
-            let key = compute_name_browse_sort_key(name);
+            let key = compute_name_sort_key(name);
             assert!(
                 !key.is_empty(),
                 "sort key must not be empty for name: {name:?}"
@@ -307,7 +304,7 @@ mod tests {
         ];
         let keys: Vec<_> = paths
             .iter()
-            .map(|p| (compute_relative_path_browse_sort_key(p), *p))
+            .map(|p| (compute_path_sort_key(p), *p))
             .collect();
         let mut sorted = keys.clone();
         sorted.sort_by(|a, b| a.0.cmp(&b.0));
@@ -327,19 +324,19 @@ mod tests {
 
     #[test]
     fn relative_path_sort_key_empty_path() {
-        let key = compute_relative_path_browse_sort_key("");
+        let key = compute_path_sort_key("");
         assert!(key.starts_with("v1|"));
     }
 
     #[test]
     fn relative_path_sort_key_single_component() {
-        let key = compute_relative_path_browse_sort_key("Track 1.wav");
-        assert_eq!(key, compute_name_browse_sort_key("Track 1.wav"));
+        let key = compute_path_sort_key("Track 1.wav");
+        assert_eq!(key, compute_name_sort_key("Track 1.wav"));
     }
 
     #[test]
     fn relative_path_sort_key_prefixed() {
-        let key = compute_relative_path_browse_sort_key("v1|");
+        let key = compute_path_sort_key("v1|");
         assert!(key.starts_with("v1|"));
     }
 
@@ -356,7 +353,7 @@ mod tests {
             "000",
         ];
         for name in &names {
-            let key = compute_name_browse_sort_key(name);
+            let key = compute_name_sort_key(name);
             assert!(
                 !key.is_empty(),
                 "sort key must not be empty for name: {name:?}"

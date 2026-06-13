@@ -1004,7 +1004,7 @@ pub struct PrimaryMediaSummary {
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]
-    pub primary_media_candidate_id: Option<i64>,
+    pub primary_media_fact_id: Option<i64>,
     #[serde(with = "crate::wire::option_i64_string")]
     #[schemars(with = "Option<String>")]
     #[ts(as = "Option<String>")]

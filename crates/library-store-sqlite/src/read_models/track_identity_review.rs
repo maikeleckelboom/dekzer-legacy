@@ -139,7 +139,7 @@ fn read_factual_candidates(
                             FROM track_identity_candidate_evidence evidence
                             JOIN source_files file
                               ON file.source_file_id = evidence.source_file_id
-                            LEFT JOIN SourceFacts facts
+                            LEFT JOIN source_file_facts facts
                               ON facts.source_file_id = evidence.source_file_id
                             LEFT JOIN source_file_attachment_links link
                               ON link.source_file_attachment_link_id =
@@ -195,7 +195,7 @@ fn read_factual_candidates(
                     FROM track_identity_candidate_evidence evidence
                     JOIN source_files file
                       ON file.source_file_id = evidence.source_file_id
-                    LEFT JOIN SourceFacts facts
+                    LEFT JOIN source_file_facts facts
                       ON facts.source_file_id = evidence.source_file_id
                     LEFT JOIN source_file_attachment_links link
                       ON link.source_file_attachment_link_id =

@@ -20,7 +20,7 @@ This contract owns:
 - entry point admission action guidance for the later source-root admission flow;
 - the entry-point side of the browse-versus-scan boundary.
 
-[`local-browse-items-contract.md`](local-browse-items-contract.md) owns `LocalBrowseItem`, immediate child item
+[`local-browse-items-contract.md`](local-browse-items-contract.md) owns `LocalBrowseItem`, immediate item
 classification, local browse item window identity, item read windowing, and item action policy.
 
 ## Non-Goals
@@ -34,7 +34,7 @@ Local browse entry point reads must not create, own, or imply any of the followi
 - `source_locations`;
 - `source_files`;
 - `source_directories`;
-- `SourceFacts`;
+- `source_file_facts`;
 - `navigation_rows`;
 - search/filter rows;
 - hash, probe, attachment, primary-media, or track-identity work;
@@ -53,7 +53,7 @@ admission, source registration, and scan start remain separate explicit actions.
 Entry points and items are different concepts:
 
 - `LocalBrowseEntryPoint` is a platform/default browse root.
-- `LocalBrowseItem` is an ephemeral immediate child path returned by a bounded local browse item read.
+- `LocalBrowseItem` is an ephemeral immediate path item returned by a bounded local browse item read.
 
 Neither is an admitted source.
 
@@ -145,7 +145,7 @@ Confirmation remains owned by source-root admission results, not by local browse
 
 Local browse reads are pre-admission snapshot reads. They may expose entry points and bounded immediate item windows.
 
-They must not create or own `source_files`, `source_directories`, `SourceFacts`, `source_locations`, or
+They must not create or own `source_files`, `source_directories`, `source_file_facts`, `source_locations`, or
 `navigation_rows` before admission. They must not populate search/filter rows, publish source scan lifecycle events,
 start hashing, run media probes, materialize attachments, promote primary media, produce track identity, trigger cloud
 downloads, or follow symlink/junction escapes.
@@ -196,6 +196,10 @@ Implemented V0 backend read:
   versus source distinction.
 - The next implementation step is renderer projection/UI. The substrate vocabulary is not expected to churn again before
   that projection work.
+
+Handwritten adapter names use folder context. In `localBrowse/entryPoints`, helpers may be named `readEntryPoints`,
+`mapEntryPoint`, `errorResult`, and `isOutcome`; they must not repeat the full local-browse boundary name or carry a
+transport suffix unless one module truly implements multiple transports.
 
 ## Summary Term
 

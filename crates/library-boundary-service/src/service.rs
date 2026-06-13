@@ -3656,7 +3656,7 @@ mod tests {
         assert!(missing_source.summary.is_none());
 
         let before_counts = (
-            count_rows(&context, "SourceFacts"),
+            count_rows(&context, "source_file_facts"),
             count_rows(&context, "content_attachments"),
             count_rows(&context, "source_file_attachment_links"),
             service.source_maintenance.completed_runs_for_test().len(),
@@ -3665,7 +3665,7 @@ mod tests {
         let _ = read_attachment_source_files(&service, first_link.attachment_id, Some(10));
         let _ = read_source_attachment_summary(&service, registered.root_id);
         let after_counts = (
-            count_rows(&context, "SourceFacts"),
+            count_rows(&context, "source_file_facts"),
             count_rows(&context, "content_attachments"),
             count_rows(&context, "source_file_attachment_links"),
             service.source_maintenance.completed_runs_for_test().len(),
@@ -3802,7 +3802,7 @@ mod tests {
         assert_eq!(run.hash.hashed_count, 0);
         assert_eq!(run.attachment_materialization.links_created, 0);
         assert_eq!(run.probe.probed_count, 0);
-        assert_eq!(count_rows(&context, "SourceFacts"), 0);
+        assert_eq!(count_rows(&context, "source_file_facts"), 0);
         assert_eq!(count_rows(&context, "content_attachments"), 0);
         assert_eq!(
             service.source_maintenance.completed_runs_for_test().len(),
@@ -3985,7 +3985,7 @@ mod tests {
             runs[0].attachment_materialization.links_created == 0,
             "stop must be observed before starting the attachment materialization unit"
         );
-        assert_eq!(count_rows(&context, "SourceFacts"), 1);
+        assert_eq!(count_rows(&context, "source_file_facts"), 1);
         assert_eq!(count_rows(&context, "source_file_attachment_links"), 0);
         assert_eq!(count_rows(&context, "content_attachments"), 0);
     }

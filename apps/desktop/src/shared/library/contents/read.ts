@@ -110,7 +110,7 @@ export type ContentsScopeCoverage = {
 export type ContentsPresence = 'present' | 'missing' | 'removed'
 
 export type PrimaryMediaSummary = {
-  readonly primaryMediaCandidateId?: string
+  readonly primaryMediaFactId?: string
   readonly attachmentId?: string
   readonly contentHashAlgorithm?: string
   readonly contentHashValue?: string

@@ -106,7 +106,7 @@ Durable lessons from the old brief:
 | Law                                                | Meaning                                                                                              |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Work runs own work items                           | A work item belongs to an execution context.                                                         |
-| Work items produce artifacts                       | Artifacts are evidence outputs, not free-floating facts.                                             |
+| Work items produce artifacts                       | work_artifacts are evidence outputs, not free-floating facts.                                             |
 | Artifact supersession is an edge                   | Do not mutate history into disappearance.                                                            |
 | Current pointers need validation                   | A current artifact pointer must match subject and facet/scope.                                       |
 | Projections are disposable                         | Browser rows and derived views are rebuildable, not source authority.                                |

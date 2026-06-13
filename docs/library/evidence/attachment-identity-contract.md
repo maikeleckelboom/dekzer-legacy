@@ -48,9 +48,9 @@ belongs on the link, not on the attachment/content row, because it is source-fil
 `source_file_attachment_links.source_id` does not match the linked `source_files.source_id`, and rejects source-file
 source moves that would drift an existing link.
 
-## Relation To Observed File Facts / SourceFacts
+## Relation To Observed File Facts / source_file_facts
 
-`SourceFacts` remains evidence. Attachment materialization consumes only current observed facts. A source-file link is
+`source_file_facts` remains evidence. Attachment materialization consumes only current observed facts. A source-file link is
 current only when the current observed-facts read for that `source_file_id` has:
 
 - `content_hash_algorithm = 'blake3'`;
@@ -62,7 +62,7 @@ Facts with stale basis, missing facts, or non-BLAKE3 facts do not materialize cu
 ## Relation To BLAKE3 Evidence
 
 BLAKE3 evidence is bytes evidence produced before this layer. Attachment materialization does not hash files, resolve
-filesystem paths, scan roots, or repair missing facts. It reads accepted `SourceFacts` rows and source-file basis only.
+filesystem paths, scan roots, or repair missing facts. It reads accepted `source_file_facts` rows and source-file basis only.
 
 ## Service-Owned Maintenance
 
@@ -162,7 +162,7 @@ occurrence for a `source_file_id` in this v0. It deliberately has no link histor
 
 ## Staleness Model
 
-Staleness is computed by read-model join against current `SourceFacts`, `source_files` basis, and the linked
+Staleness is computed by read-model join against current `source_file_facts`, `source_files` basis, and the linked
 `content_attachments` hash. It is not stored as a boolean or cached status column. The read model exposes
 `link_status = Current | Stale`, and any protocol-level link `content_hash_value` is derived from
 `content_attachments`.

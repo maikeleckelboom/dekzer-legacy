@@ -21,7 +21,7 @@ use crate::authority::sources::{
     UpsertSourceLocatorInput, UpsertSourceRootNavigationStateInput, UpsertSourceScanStateInput,
     UpsertSourceStateInput, read_source_root_navigation_state,
 };
-use crate::authority::work::{QueueInspectSourceWorkInput, WorkItemsAuthorityTx};
+use crate::authority::work::{QueueInspectSourceFileWorkInput, WorkItemAuthorityTx};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::classify_relative_path_file_kind;
 use crate::publication;
@@ -78,7 +78,7 @@ impl SourceRegistrationRootClass {
             "indirection_root" => Ok(Self::IndirectionRoot),
             "unknown_root" => Ok(Self::UnknownRoot),
             other => Err(LibrarySqliteError::MalformedSchemaState(format!(
-                "unexpected value {other:?} for source_registration_proposals.root_class"
+                "unexpected value {other:?} for root_admission_proposals.root_class"
             ))),
         }
     }
@@ -236,7 +236,7 @@ impl SqliteDurableStore {
         self.with_write(|write| {
             let source_file_id =
                 SourceFilesAuthorityTx::new(write).record_source_file_observation(&input)?;
-            queue_inspect_source_work_for_observation(
+            queue_inspect_source_file_work_for_observation(
                 write,
                 source_file_id,
                 &input.relative_path,
@@ -394,7 +394,7 @@ impl SqliteDurableStore {
 
             let now_ms = unix_time_ms()?;
             write.execute(
-                "INSERT INTO source_registration_proposals (
+                "INSERT INTO root_admission_proposals (
                      proposal_status,
                      root_class,
                      requested_path,
@@ -635,7 +635,7 @@ impl SqliteDurableStore {
                 Err(failure) => {
                     self.write_root_navigation_state(RootNavigationStateWrite {
                         root_id,
-                        root_window_state: root_navigation_window_state_for_establishment(
+                        root_reach_state: root_navigation_window_state_for_establishment(
                             failure.state,
                         ),
                         immediate_child_directory_count: 0,
@@ -677,7 +677,7 @@ impl SqliteDurableStore {
             SourceRootNavigationStateAuthorityTx::new(write).upsert_source_root_navigation_state(
                 &UpsertSourceRootNavigationStateInput {
                     source_id: root_id,
-                    root_window_state: if child_directories.is_empty() {
+                    root_reach_state: if child_directories.is_empty() {
                         SourceRootNavigationWindowState::Empty
                     } else {
                         SourceRootNavigationWindowState::Established
@@ -738,7 +738,7 @@ impl SqliteDurableStore {
             return Ok(None);
         };
         if matches!(
-            root_navigation_state.root_window_state,
+            root_navigation_state.root_reach_state,
             SourceRootNavigationWindowState::Unknown
         ) {
             return Ok(None);
@@ -760,7 +760,7 @@ impl SqliteDurableStore {
         };
         self.write_root_navigation_state(RootNavigationStateWrite {
             root_id,
-            root_window_state: root_navigation_window_state_for_establishment(
+            root_reach_state: root_navigation_window_state_for_establishment(
                 root_establishment_state_for_issue(issue_kind),
             ),
             immediate_child_directory_count: 0,
@@ -779,7 +779,7 @@ impl SqliteDurableStore {
             SourceRootNavigationStateAuthorityTx::new(write).upsert_source_root_navigation_state(
                 &UpsertSourceRootNavigationStateInput {
                     source_id: input.root_id,
-                    root_window_state: input.root_window_state,
+                    root_reach_state: input.root_reach_state,
                     immediate_child_directory_count: input.immediate_child_directory_count,
                     issue_kind: input.issue_kind,
                     detail: input.detail,
@@ -795,7 +795,7 @@ impl SqliteDurableStore {
 
 struct RootNavigationStateWrite {
     root_id: i64,
-    root_window_state: SourceRootNavigationWindowState,
+    root_reach_state: SourceRootNavigationWindowState,
     immediate_child_directory_count: i64,
     issue_kind: Option<SourceAccessIssueKind>,
     detail: Option<String>,
@@ -815,7 +815,7 @@ fn root_establishment_from_root_navigation_state(
         })?;
     Ok(RootNavigationWindowEstablishment {
         root_id: state.source_id,
-        state: match state.root_window_state {
+        state: match state.root_reach_state {
             SourceRootNavigationWindowState::Established => {
                 RootNavigationWindowEstablishmentState::Established
             }
@@ -988,7 +988,7 @@ fn root_ids_from_deltas(deltas: &[RootStatusDelta]) -> Vec<i64> {
     dedup_ids(&deltas.iter().map(|delta| delta.root_id).collect::<Vec<_>>())
 }
 
-fn queue_inspect_source_work_for_observation(
+fn queue_inspect_source_file_work_for_observation(
     write: &AdmittedWrite<'_>,
     source_file_id: i64,
     relative_path: &str,
@@ -1003,8 +1003,8 @@ fn queue_inspect_source_work_for_observation(
         return Ok(false);
     }
 
-    let result = WorkItemsAuthorityTx::new(write).queue_inspect_source_work(
-        &QueueInspectSourceWorkInput {
+    let result = WorkItemAuthorityTx::new(write).queue_inspect_source_file_work(
+        &QueueInspectSourceFileWorkInput {
             source_file_id: SourceFileId::new(source_file_id).ok_or_else(|| {
                 LibrarySqliteError::WriteInvariant(format!(
                     "recorded source_files.source_file_id is not a domain id: {source_file_id}"
@@ -1203,13 +1203,13 @@ fn read_proposed_source_registration_proposal(
 ) -> LibrarySqliteResult<Option<SourceRegistrationProposal>> {
     connection
         .query_row(
-            "SELECT source_registration_proposal_id,
+            "SELECT root_admission_proposal_id,
                     root_class,
                     requested_path,
                     canonical_path,
                     confirmation_required_reason,
                     suggested_roots_json
-             FROM source_registration_proposals
+             FROM root_admission_proposals
              WHERE proposal_status = 'proposed'
                AND COALESCE(canonical_path, requested_path) = ?1",
             [canonical_key],

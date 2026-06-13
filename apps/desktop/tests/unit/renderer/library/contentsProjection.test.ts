@@ -1281,7 +1281,7 @@ function primaryMediaRow(
     fileKind: fileClass,
     presence: 'present',
     primaryMedia: {
-      primaryMediaCandidateId: stableId,
+      primaryMediaFactId: stableId,
       evidenceSourceFileId: `file-${stableId}`,
       mediaKind: fileClass,
       mimeType: fileClass === 'audio' ? 'audio/wav' : 'video/mp4'

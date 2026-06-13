@@ -59,7 +59,7 @@ enum ContentsCursorScope {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum ContentsCursorPosition {
     SourceFile {
-        relative_path_browse_sort_key: String,
+        path_sort_key: String,
         relative_path: String,
         source_file_id: i64,
     },
@@ -210,10 +210,10 @@ fn compute_cursor_position(
         StoreContentsReadPolicy::PlayableMediaBrowse
         | StoreContentsReadPolicy::SourceFileInventory { .. }
         | StoreContentsReadPolicy::AudioBrowse => ContentsCursorPosition::SourceFile {
-            relative_path_browse_sort_key: row
-                .relative_path_browse_sort_key
+            path_sort_key: row
+                .path_sort_key
                 .clone()
-                .expect("source-file contents rows select relative_path_browse_sort_key"),
+                .expect("source-file contents rows select path_sort_key"),
             relative_path: row.relative_path.clone(),
             source_file_id: row.source_file_id,
         },
@@ -402,7 +402,7 @@ pub enum StoreContentsReadPolicy {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StorePrimaryMediaSummary {
-    pub primary_media_candidate_id: Option<i64>,
+    pub primary_media_fact_id: Option<i64>,
     pub attachment_id: Option<i64>,
     pub content_hash_algorithm: Option<String>,
     pub content_hash_value: Option<String>,
@@ -430,7 +430,7 @@ pub struct StoreContentsFileRow {
     pub presence: String,
     pub primary_media: Option<StorePrimaryMediaSummary>,
     pub updated_at: i64,
-    pub(crate) relative_path_browse_sort_key: Option<String>,
+    pub(crate) path_sort_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -484,7 +484,7 @@ const RELATIVE_PATH_PREFIX_UPPER_BOUND_SENTINEL_SQL: &str = "char(48)";
 const PRIMARY_MEDIA_CONTENTS_ORDER_SQL: &str =
     "lower(COALESCE(relative_path, '')) ASC, source_file_id ASC";
 
-const SOURCE_FILE_CONTENTS_ORDER_SQL: &str = "sf.relative_path_browse_sort_key ASC,
+const SOURCE_FILE_CONTENTS_ORDER_SQL: &str = "sf.path_sort_key ASC,
     sf.relative_path ASC,
     sf.source_file_id ASC";
 
@@ -1885,7 +1885,7 @@ fn source_file_rows_sql(
             let rp_idx = base + 1;
             let sid_idx = base + 2;
             format!(
-                "\n  AND (\n      sf.relative_path_browse_sort_key > ?{bsk_idx}\n      OR (sf.relative_path_browse_sort_key = ?{bsk_idx} AND sf.relative_path > ?{rp_idx})\n      OR (sf.relative_path_browse_sort_key = ?{bsk_idx} AND sf.relative_path = ?{rp_idx} AND sf.source_file_id > ?{sid_idx})\n  )"
+                "\n  AND (\n      sf.path_sort_key > ?{bsk_idx}\n      OR (sf.path_sort_key = ?{bsk_idx} AND sf.relative_path > ?{rp_idx})\n      OR (sf.path_sort_key = ?{bsk_idx} AND sf.relative_path = ?{rp_idx} AND sf.source_file_id > ?{sid_idx})\n  )"
             )
         }
         None => String::new(),
@@ -1901,7 +1901,7 @@ SELECT sf.source_file_id, \
        sf.file_kind, \
        sf.presence_state, \
        sf.updated_at, \
-       NULL AS primary_media_candidate_id, \
+       NULL AS primary_media_fact_id, \
        NULL AS attachment_id, \
        NULL AS content_hash_algorithm, \
        NULL AS content_hash_value, \
@@ -1913,7 +1913,7 @@ SELECT sf.source_file_id, \
        NULL AS channels, \
        NULL AS bit_depth, \
        NULL AS codec, \
-       sf.relative_path_browse_sort_key \
+       sf.path_sort_key \
    FROM source_files sf \
 WHERE {file_class_predicate} \
   AND {source_predicate}{cursor_clause} \
@@ -1968,7 +1968,7 @@ fn primary_media_rows_sql(
                  AND {source_predicate} \
            ), \
            candidate_scope AS ( \
-               SELECT pmc.primary_media_candidate_id, \
+               SELECT pmc.primary_media_fact_id, \
                       pmc.attachment_id, \
                       attachment.content_hash_algorithm, \
                       attachment.content_hash_value, \
@@ -1998,7 +1998,7 @@ fn primary_media_rows_sql(
                       sf.file_kind, \
                       sf.presence_state, \
                       ROW_NUMBER() OVER ( \
-                          PARTITION BY pmc.primary_media_candidate_id \
+                          PARTITION BY pmc.primary_media_fact_id \
                           ORDER BY CASE \
                                        WHEN sf.source_file_id = pmc.evidence_source_file_id THEN 0 \
                                        ELSE 1 \
@@ -2012,9 +2012,9 @@ fn primary_media_rows_sql(
                 AND link.source_id = sf.source_id \
                JOIN content_attachments attachment \
                  ON attachment.attachment_id = link.attachment_id \
-               JOIN primary_media_candidates pmc \
+               JOIN primary_media_facts pmc \
                  ON pmc.attachment_id = attachment.attachment_id \
-               JOIN SourceFacts facts \
+               JOIN source_file_facts facts \
                  ON facts.source_file_id = sf.source_file_id \
               WHERE sf.source_id = facts.basis_source_id \
                 AND sf.relative_path = facts.basis_relative_path \
@@ -2043,7 +2043,7 @@ fn primary_media_rows_sql(
                       file_kind, \
                       presence_state, \
                       updated_at, \
-                      primary_media_candidate_id, \
+                      primary_media_fact_id, \
                       attachment_id, \
                       content_hash_algorithm, \
                       content_hash_value, \
@@ -2067,7 +2067,7 @@ fn primary_media_rows_sql(
                  file_kind, \
                  presence_state, \
                  updated_at, \
-                 primary_media_candidate_id, \
+                 primary_media_fact_id, \
                  attachment_id, \
                  content_hash_algorithm, \
                  content_hash_value, \
@@ -2079,7 +2079,7 @@ fn primary_media_rows_sql(
                  channels, \
                  bit_depth, \
                  codec, \
-                 NULL AS relative_path_browse_sort_key \
+                 NULL AS path_sort_key \
            FROM promoted{cursor_clause} \
            ORDER BY {PRIMARY_MEDIA_CONTENTS_ORDER_SQL} \
            LIMIT ?{limit_param}"
@@ -2089,13 +2089,11 @@ fn primary_media_rows_sql(
 fn push_cursor_params(cursor: &ContentsCursorPosition, params: &mut Vec<rusqlite::types::Value>) {
     match cursor {
         ContentsCursorPosition::SourceFile {
-            relative_path_browse_sort_key,
+            path_sort_key,
             relative_path,
             source_file_id,
         } => {
-            params.push(rusqlite::types::Value::Text(
-                relative_path_browse_sort_key.clone(),
-            ));
+            params.push(rusqlite::types::Value::Text(path_sort_key.clone()));
             params.push(rusqlite::types::Value::Text(relative_path.clone()));
             params.push(rusqlite::types::Value::Integer(*source_file_id));
         }
@@ -2145,7 +2143,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let file_kind: String = row.get(6)?;
     let presence: String = row.get(7)?;
     let updated_at: i64 = row.get(8)?;
-    let primary_media_candidate_id: Option<i64> = row.get(9)?;
+    let primary_media_fact_id: Option<i64> = row.get(9)?;
     let attachment_id: Option<i64> = row.get(10)?;
     let content_hash_algorithm: Option<String> = row.get(11)?;
     let content_hash_value: Option<String> = row.get(12)?;
@@ -2157,11 +2155,11 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
     let channels: Option<i64> = row.get(18)?;
     let bit_depth: Option<i64> = row.get(19)?;
     let codec: Option<String> = row.get(20)?;
-    let relative_path_browse_sort_key: Option<String> = row.get(21)?;
+    let path_sort_key: Option<String> = row.get(21)?;
 
     let primary_media =
-        primary_media_candidate_id.map(|primary_media_candidate_id| StorePrimaryMediaSummary {
-            primary_media_candidate_id: Some(primary_media_candidate_id),
+        primary_media_fact_id.map(|primary_media_fact_id| StorePrimaryMediaSummary {
+            primary_media_fact_id: Some(primary_media_fact_id),
             attachment_id,
             content_hash_algorithm: content_hash_algorithm.clone(),
             content_hash_value: content_hash_value.clone(),
@@ -2182,7 +2180,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
             .as_ref()
             .and_then(|summary| {
                 summary
-                    .primary_media_candidate_id
+                    .primary_media_fact_id
                     .map(|id| format!("primary-media:{id}"))
             })
             .unwrap_or_else(|| format!("source-file:{source_file_id}")),
@@ -2197,7 +2195,7 @@ fn contents_row_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoreConte
         presence,
         primary_media,
         updated_at,
-        relative_path_browse_sort_key,
+        path_sort_key,
     })
 }
 
@@ -2373,7 +2371,7 @@ mod tests {
         dir_scan_state: &str,
     ) {
         let name = relative_path.rsplit('/').next().unwrap_or(relative_path);
-        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
+        let name_sort_key = crate::browse_sort_key::compute_name_sort_key(name);
         connection
             .execute(
                 "INSERT INTO source_directories (
@@ -2381,7 +2379,7 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
+                     name_sort_key,
                      relative_path,
                      presence_state,
                      dir_scan_state,
@@ -2394,7 +2392,7 @@ mod tests {
                     source_directory_id,
                     source_id,
                     name,
-                    name_browse_sort_key,
+                    name_sort_key,
                     relative_path,
                     dir_scan_state,
                 ],
@@ -2518,7 +2516,7 @@ mod tests {
 
         connection
             .execute(
-                "INSERT OR IGNORE INTO WorkItems (
+                "INSERT OR IGNORE INTO work_items (
                      work_item_id,
                      subject_kind,
                      subject_id,
@@ -2529,13 +2527,13 @@ mod tests {
                      created_at,
                      updated_at
                  )
-                 VALUES (1, 'source_file', 'fixture', 'inspect_source', 'fixture', 'completed', 'interactive', 1, 1)",
+                 VALUES (1, 'source_file', 'fixture', 'inspect_source_file', 'fixture', 'completed', 'interactive', 1, 1)",
                 [],
             )
             .expect("insert work item");
         connection
             .execute(
-                "INSERT OR IGNORE INTO WorkRuns (
+                "INSERT OR IGNORE INTO work_runs (
                      work_run_id,
                      work_item_id,
                      adapter_key,
@@ -2551,7 +2549,7 @@ mod tests {
         let basis_fingerprint = format!("basis:{source_file_id}");
         connection
             .execute(
-                "INSERT INTO Artifacts (
+                "INSERT INTO work_artifacts (
                      artifact_id,
                      work_run_id,
                      subject_kind,
@@ -2592,9 +2590,8 @@ mod tests {
         let hash_value = format!("hash:{source_file_id}");
         connection
             .execute(
-                "INSERT INTO SourceFacts (
+                "INSERT INTO source_file_facts (
                      source_file_id,
-                     fact_kind,
                      basis_fingerprint,
                      basis_source_id,
                      basis_relative_path,
@@ -2614,7 +2611,7 @@ mod tests {
                      updated_at,
                      accepted_artifact_id
                  )
-                 VALUES (?1, 'source_inspection', ?2, ?3, ?4, ?5, ?6, ?7, 1, 'blake3', ?8, 'audio', 'audio/wav', 120000, 44100, 2, 16, 'pcm', 1, ?9)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'blake3', ?8, 'audio', 'audio/wav', 120000, 44100, 2, 16, 'pcm', 1, ?9)",
                 params![
                     source_file_id,
                     basis_fingerprint,
@@ -2666,7 +2663,7 @@ mod tests {
             .expect("insert attachment link");
         connection
             .execute(
-                "INSERT INTO primary_media_candidates (
+                "INSERT INTO primary_media_facts (
                      attachment_id,
                      evidence_source_file_id,
                      evidence_basis_fingerprint,
@@ -2683,13 +2680,13 @@ mod tests {
                  VALUES (?1, ?2, ?3, 'audio', 'audio/wav', 120000, 44100, 2, 16, 'pcm', 1, 1)",
                 params![attachment_id, source_file_id, basis_fingerprint],
             )
-            .expect("insert primary media candidate");
+            .expect("insert primary media fact");
     }
 
     fn seed_assets(connection: &Connection) {
         connection
             .execute(
-                "INSERT INTO WorkItems (
+                "INSERT INTO work_items (
                      work_item_id,
                      subject_kind,
                      subject_id,
@@ -2706,7 +2703,7 @@ mod tests {
             .expect("insert work item");
         connection
             .execute(
-                "INSERT INTO WorkRuns (
+                "INSERT INTO work_runs (
                      work_run_id,
                      work_item_id,
                      adapter_key,
@@ -2768,7 +2765,7 @@ mod tests {
                 .map(|row| {
                     let summary = primary_media(row);
                     (
-                        summary.primary_media_candidate_id.is_some(),
+                        summary.primary_media_fact_id.is_some(),
                         summary.attachment_id.is_some(),
                     )
                 })
@@ -2875,7 +2872,7 @@ mod tests {
                 .map(|row| {
                     let summary = primary_media(row);
                     (
-                        summary.primary_media_candidate_id.is_some(),
+                        summary.primary_media_fact_id.is_some(),
                         summary.attachment_id.is_some(),
                         row.file_class.as_str(),
                     )
@@ -3032,7 +3029,7 @@ mod tests {
     ) {
         let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
         let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
-        let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(file_name);
+        let name_sort_key = crate::browse_sort_key::compute_name_sort_key(file_name);
         connection
             .execute(
                 "INSERT INTO source_files (
@@ -3040,8 +3037,8 @@ mod tests {
                      source_id,
                      parent_source_directory_id,
                      name,
-                     name_browse_sort_key,
-                     relative_path_browse_sort_key,
+                     name_sort_key,
+                     path_sort_key,
                      relative_path,
                      file_kind,
                      file_class,
@@ -3058,8 +3055,8 @@ mod tests {
                     source_id,
                     parent_directory_id,
                     file_name,
-                    name_browse_sort_key,
-                    crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path),
+                    name_sort_key,
+                    crate::browse_sort_key::compute_path_sort_key(relative_path),
                     relative_path,
                     file_kind,
                     file_class,
@@ -3186,7 +3183,7 @@ mod tests {
         assert_eq!(result.state, StoreContentsState::Ready);
         assert_eq!(result.rows.len(), 1);
         let summary = primary_media(&result.rows[0]);
-        assert!(summary.primary_media_candidate_id.is_some());
+        assert!(summary.primary_media_fact_id.is_some());
         assert!(summary.attachment_id.is_some());
         assert_eq!(summary.content_hash_value.as_deref(), Some("hash:1000"));
         assert_eq!(summary.media_kind.as_deref(), Some("audio"));
@@ -3375,7 +3372,7 @@ mod tests {
         assert_eq!(result.rows[0].source_file_id, 1000);
         assert!(
             primary_media(&result.rows[0])
-                .primary_media_candidate_id
+                .primary_media_fact_id
                 .is_some()
         );
     }
@@ -5462,7 +5459,7 @@ mod tests {
         );
 
         assert!(
-            plan.contains("source_files_source_browse_order"),
+            plan.contains("source_files_path_order"),
             "whole-source source-file contents should use browse-order index, observed:\n{plan}"
         );
     }
@@ -5512,7 +5509,7 @@ mod tests {
 
         assert!(
             plan_lower.contains("source_files_source_relative_path_binary")
-                || plan_lower.contains("sourcefacts_source_basis"),
+                || plan_lower.contains("source_file_facts_source_basis"),
             "directory-prefix scope should use an indexed relative-path range, observed:\n{plan}"
         );
     }
@@ -5643,7 +5640,7 @@ mod tests {
             "mixed-promotion plan should use content-attachment lookup, observed:\n{plan}"
         );
         assert!(
-            plan_lower.contains("primary_media_candidates"),
+            plan_lower.contains("primary_media_facts"),
             "mixed-promotion plan should use promoted-candidate lookup, observed:\n{plan}"
         );
         assert!(
@@ -6781,7 +6778,7 @@ mod tests {
         connection
             .execute(
                 "UPDATE source_files
-                 SET relative_path_browse_sort_key = 'persisted-authority-key'
+                 SET path_sort_key = 'persisted-authority-key'
                  WHERE source_file_id = 1000",
                 [],
             )
@@ -6806,10 +6803,10 @@ mod tests {
         assert!(matches!(
             cursor.position,
             super::ContentsCursorPosition::SourceFile {
-                relative_path_browse_sort_key,
+                path_sort_key,
                 relative_path,
                 source_file_id: 1000,
-            } if relative_path_browse_sort_key == "persisted-authority-key"
+            } if path_sort_key == "persisted-authority-key"
                 && relative_path == "Music/Track 1.wav"
         ));
     }

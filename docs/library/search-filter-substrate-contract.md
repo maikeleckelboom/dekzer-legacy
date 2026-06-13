@@ -66,9 +66,9 @@ rebuilt from authoritative tables and read models:
 | Source locations                                                  | `source_locations`                                                                           |
 | Directory identity, path, presence, scan coverage                 | `source_directories`                                                                         |
 | Source-file identity, path, name, file class, file kind, presence | `source_files`                                                                               |
-| Current BLAKE3 evidence availability                              | current `SourceFacts` basis and `content_hash_algorithm = 'blake3'`                          |
+| Current BLAKE3 evidence availability                              | current `source_file_facts` basis and `content_hash_algorithm = 'blake3'`                          |
 | Attachment identity summary                                       | `content_attachments` plus `source_file_attachment_links`, with link status computed by join |
-| Media probe summary                                               | current-basis `SourceFacts` probe fields                                                     |
+| Media probe summary                                               | current-basis `source_file_facts` probe fields                                                     |
 | CUE/companion classification                                      | current source-file `file_kind`/`file_class` only                                            |
 
 The renderer may:
@@ -117,7 +117,7 @@ Indexed material:
   - probe summary present or missing;
   - probe-supported evidence when current fields exist;
   - unsupported or failed status only when current implementation has an explicit basis for that result;
-  - container/audio summary fields already stored in `SourceFacts`;
+  - container/audio summary fields already stored in `source_file_facts`;
 - CUE/source companion classification that is already available from `file_kind = 'cue_sheet'` or existing companion
   file classification.
 
@@ -328,7 +328,7 @@ Staleness triggers:
 - source-directory insert/update/removal, path/name changes, presence changes, scan state changes, or parent changes;
 - source-file insert/update/removal, path/name changes, file class/kind changes, presence changes, parent changes, size
   changes, or mtime changes;
-- `SourceFacts` basis change, insertion, removal, hash change, probe-field change, or current/stale basis transition;
+- `source_file_facts` basis change, insertion, removal, hash change, probe-field change, or current/stale basis transition;
 - `content_attachments` insertion or hash summary change;
 - `source_file_attachment_links` insertion, replacement, deletion, or computed link-status transition;
 - classifier or indexer version changes that alter tokenization, indexed field selection, normalized sort fields, or
@@ -448,7 +448,7 @@ A-8 must not add:
 - tag ledger tables;
 - occurrence/product duplicate/relocation tables;
 - renderer cache tables as search authority;
-- stored stale booleans on `SourceFacts` or `source_file_attachment_links`.
+- stored stale booleans on `source_file_facts` or `source_file_attachment_links`.
 
 ### Backend read boundary shape
 

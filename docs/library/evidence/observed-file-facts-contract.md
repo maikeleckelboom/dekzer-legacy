@@ -25,11 +25,10 @@ time; they do not promote that file into playable media.
 
 ## Current Storage
 
-`SourceFacts` is the accepted observed-file-facts table for the current substrate. It stores the accepted
-`source_inspection` fact for a `source_file_id`. The row includes:
+`source_file_facts` is the accepted observed-file-facts table for the current substrate. It stores the accepted
+source-file facts for a `source_file_id`. The row includes:
 
 - `source_file_id`
-- `fact_kind`
 - `basis_fingerprint`
 - `basis_source_id`
 - `basis_relative_path`
@@ -53,7 +52,7 @@ algorithm tag.
 SHA-256 appears only in tests and fixtures as explicit evidence. It is not declared the product content-hash algorithm.
 
 BLAKE3 source-file hashing is implemented in `library-store-sqlite` as a store-side evidence job. The low-level commit
-path streams file bytes through BLAKE3 and commits accepted `SourceFacts` through the existing inspect-source artifact
+path streams file bytes through BLAKE3 and commits accepted `source_file_facts` through the existing inspect-source artifact
 and observed-facts authority path. The production batch path does not accept renderer- or caller-resolved filesystem
 paths. It resolves each `source_file_id` from durable source state before reading bytes. The algorithm string is
 `blake3`, and the value is the canonical lowercase hex digest.
@@ -64,7 +63,7 @@ candidates, track identity rows, preparation rows, waveform artifacts, or CUE-to
 The job captures the current `source_files` basis before reading bytes and re-reads it before committing. If the basis
 changed while hashing was in flight, the job rejects the commit with a typed basis-change result instead of recording
 evidence that could appear current for the wrong row state. Missing or unreadable filesystem paths fail as typed IO
-errors and do not create `SourceFacts`.
+errors and do not create `source_file_facts`.
 
 ## Source-File Path Resolution
 
@@ -83,7 +82,7 @@ also rejects malformed source-file relative paths containing absolute prefixes, 
 segments, or traversal segments.
 
 Missing physical files, blocked files, unavailable/unmounted roots, missing roots, invalid relative paths, and root
-escape attempts are typed failures. They do not erase source-file inventory and do not write `SourceFacts`.
+escape attempts are typed failures. They do not erase source-file inventory and do not write `source_file_facts`.
 
 `source_locations` can represent user-visible registered subpaths and contents scopes. Production source-file hashing
 does not currently narrow path resolution through source-location subpath prefixes; the row's `source_id` root plus
@@ -99,7 +98,7 @@ Hash admission is bounded and deterministic. The store-owned candidate read supp
 - include present `unsupported` rows only when `file_kind = 'cue_sheet'`;
 - exclude docs, logs, archives, other unsupported files, unknown files, missing rows, and removed rows.
 
-A candidate needs BLAKE3 evidence when no `SourceFacts` row exists, the content hash is absent, the stored hash
+A candidate needs BLAKE3 evidence when no `source_file_facts` row exists, the content hash is absent, the stored hash
 algorithm is not `blake3`, or the observed facts read model would be stale against the current `source_files` basis.
 
 The batch path uses a default bounded limit when none is supplied and caps oversized requests. It orders candidates by
@@ -152,11 +151,11 @@ Probe commits use the same inspect-source work/run/artifact plus observed-facts 
 accepted artifact is an inline JSON `inspection_result` that records adapter key/version, source file id, basis
 fingerprint, and the observed probe fields.
 
-`SourceFacts` remains one accepted row per `source_file_id`, so current compatible evidence must be merged:
+`source_file_facts` remains one accepted row per `source_file_id`, so current compatible evidence must be merged:
 
-- a probe commit preserves current BLAKE3 hash evidence only when the previous `SourceFacts` basis still matches the
+- a probe commit preserves current BLAKE3 hash evidence only when the previous `source_file_facts` basis still matches the
   current `source_files` row;
-- a BLAKE3 hash commit preserves current probe fields only when the previous `SourceFacts` basis still matches the
+- a BLAKE3 hash commit preserves current probe fields only when the previous `source_file_facts` basis still matches the
   current `source_files` row;
 - stale hash evidence is not resurrected by probing;
 - stale probe fields are not resurrected by hashing.
@@ -167,7 +166,7 @@ while probing is in flight, the job rejects the commit with a typed basis-change
 Bounded probe admission is deterministic and source-owned. v0 source-scope media probe admission is audio-only: it
 admits present `audio` rows ordered by lowercased relative path then `source_file_id`. Video files remain media-relevant
 inventory rows but are not admitted to media probe v0 until a video-capable adapter is selected. Direct probing of a
-video file returns a typed `UnsupportedMediaKind` failure and does not write `SourceFacts`. Images are not admitted for
+video file returns a typed `UnsupportedMediaKind` failure and does not write `source_file_facts`. Images are not admitted for
 v0 media probing. CUE sheets are excluded from probe admission and are not parsed or paired.
 
 Missing physical files, source lifecycle failures, invalid relative paths, root escapes, unreadable files, unsupported

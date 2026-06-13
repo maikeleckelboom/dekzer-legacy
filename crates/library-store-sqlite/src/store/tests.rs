@@ -10,9 +10,9 @@ use crate::authority::roots::{
     RootMountStatus,
 };
 use crate::{
-    ClaimMachineWorkBatchInput, CommitAcceptedSourceFactsInput,
-    CommitAcceptedSourceFactsMergePolicy, CompleteMachineWorkInput, ContentHashEvidence,
-    DeleteSourceLocationInput, FinishWorkRunInput, InspectSourcePromotionInput,
+    ClaimMachineWorkBatchInput, CommitAcceptedSourceFileFactsInput,
+    CommitAcceptedSourceFileFactsMergePolicy, CompleteMachineWorkInput, ContentHashEvidence,
+    DeleteSourceLocationInput, FinishWorkRunInput, InspectSourceFilePromotionInput,
     RecordArtifactInput, RecordInlineArtifactInput, SourceFileClassFilter, StartWorkRunInput,
     StoreContentsReadPolicy, StoreContentsScope, StoreContentsScopeCoverageState,
     StoreContentsScopeDepth, StoreContentsState, StoreLiteralHierarchyCoverageState,
@@ -34,7 +34,7 @@ const FIXED_TOP_LEVEL_NAVIGATION_ROW_COUNT: usize = 4;
 const FIXED_TOP_LEVEL_NAVIGATION_ROWS: &[(&str, &str, &str, &str, i64, &str)] = &[
     (
         "view:all_media",
-        "Views",
+        "views",
         "view",
         "All Media",
         0,
@@ -42,7 +42,7 @@ const FIXED_TOP_LEVEL_NAVIGATION_ROWS: &[(&str, &str, &str, &str, i64, &str)] = 
     ),
     (
         "view:all_audio",
-        "Views",
+        "views",
         "view",
         "All Audio",
         1,
@@ -50,7 +50,7 @@ const FIXED_TOP_LEVEL_NAVIGATION_ROWS: &[(&str, &str, &str, &str, i64, &str)] = 
     ),
     (
         "view:all_videos",
-        "Views",
+        "views",
         "view",
         "All Videos",
         2,
@@ -58,7 +58,7 @@ const FIXED_TOP_LEVEL_NAVIGATION_ROWS: &[(&str, &str, &str, &str, i64, &str)] = 
     ),
     (
         "view:recently_added",
-        "Views",
+        "views",
         "view",
         "Recently Added",
         3,
@@ -102,7 +102,7 @@ fn root_navigation_state(path: &std::path::Path, source_id: i64) -> Option<(Stri
     let connection = open_mutation_connection(path);
     connection
         .query_row(
-            "SELECT root_window_state,
+            "SELECT root_reach_state,
                     immediate_child_directory_count
              FROM source_root_navigation_state
              WHERE source_id = ?1",
@@ -127,7 +127,7 @@ fn proposed_registration_proposal_count(path: &std::path::Path) -> i64 {
     connection
         .query_row(
             "SELECT COUNT(*)
-             FROM source_registration_proposals
+             FROM root_admission_proposals
              WHERE proposal_status = 'proposed'",
             [],
             |row| row.get(0),
@@ -176,7 +176,7 @@ fn navigation_projection_change_count(connection: &Connection) -> i64 {
     connection
         .query_row(
             "SELECT COUNT(*)
-             FROM ProjectionChangeLog
+             FROM projection_change_log
              WHERE projection_domain = 'navigation'",
             [],
             |row| row.get(0),
@@ -426,9 +426,9 @@ fn repeated_upsert_source_keeps_one_order_row_and_one_navigation_row() {
         .query_row(
             "SELECT COUNT(*), MAX(ordinal)
              FROM source_navigation_user_order
-             WHERE node_domain = 'source'
-               AND node_id = ?1
-               AND parent_scope IS NULL",
+             WHERE item_kind = 'source'
+               AND item_key = ?1
+               AND parent_source_key IS NULL",
             [first_source_id.to_string()],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
@@ -500,7 +500,7 @@ fn source_navigation_projection_uses_active_top_level_substrate_rows() {
         .collect::<Vec<_>>();
     assert_eq!(source_rows.len(), 2);
     assert!(source_rows.iter().all(|row| {
-        row.parent_navigation_row_id.is_none() && row.family.as_deref() == Some("Sources")
+        row.parent_navigation_row_id.is_none() && row.family.as_deref() == Some("sources")
     }));
     assert!(
         source_rows
@@ -599,9 +599,9 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
                     MAX(source_navigation_user_order.ordinal)
              FROM source_locations
              LEFT JOIN source_navigation_user_order
-               ON source_navigation_user_order.node_domain = 'source_location'
-              AND source_navigation_user_order.node_id = CAST(source_locations.source_location_id AS TEXT)
-              AND source_navigation_user_order.parent_scope = CAST(source_locations.source_id AS TEXT)
+               ON source_navigation_user_order.item_kind = 'source_location'
+              AND source_navigation_user_order.item_key = CAST(source_locations.source_location_id AS TEXT)
+              AND source_navigation_user_order.parent_source_key = CAST(source_locations.source_id AS TEXT)
              WHERE source_locations.source_id = ?1",
             [source_id],
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
@@ -627,7 +627,7 @@ fn source_locations_write_side_validates_paths_and_enforces_uniqueness() {
         .query_row(
             "SELECT
                  (SELECT COUNT(*) FROM source_locations),
-                 (SELECT COUNT(*) FROM source_navigation_user_order WHERE node_domain = 'source_location')",
+                 (SELECT COUNT(*) FROM source_navigation_user_order WHERE item_kind = 'source_location')",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
@@ -808,7 +808,7 @@ fn source_directory_writes_do_not_reseed_navigation_projection() {
     let connection = open_mutation_connection(&db_path);
     let source_directory_row: (i64, String) = connection
         .query_row(
-            "SELECT COUNT(*), MIN(name_browse_sort_key)
+            "SELECT COUNT(*), MIN(name_sort_key)
              FROM source_directories",
             [],
             |row| Ok((row.get(0)?, row.get(1)?)),
@@ -977,9 +977,9 @@ fn commit_discovery_syncs_source_rows_and_queues_inspection_work() {
     let inspection_work_count: i64 = connection
         .query_row(
             "SELECT COUNT(*)
-                 FROM WorkItems
+                 FROM work_items
                  WHERE subject_kind = 'source_file'
-                   AND work_kind = 'inspect_source'",
+                   AND work_kind = 'inspect_source_file'",
             [],
             |row| row.get(0),
         )
@@ -1742,9 +1742,9 @@ fn root_scan_materialization_records_files_and_queues_source_work() {
     let inspection_work_count: i64 = connection
         .query_row(
             "SELECT COUNT(*)
-                 FROM WorkItems
+                 FROM work_items
                  WHERE subject_kind = 'source_file'
-                   AND work_kind = 'inspect_source'",
+                   AND work_kind = 'inspect_source_file'",
             [],
             |row| row.get(0),
         )
@@ -1964,7 +1964,7 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
     let connection = open_mutation_connection(&db_path);
     let source_file_sort_keys: (String, String) = connection
         .query_row(
-            "SELECT name_browse_sort_key, relative_path_browse_sort_key
+            "SELECT name_sort_key, path_sort_key
              FROM source_files
              WHERE source_file_id = ?1",
             [source_file_id],
@@ -1991,8 +1991,8 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
         "hash:inspect:1",
     );
     durable_store
-        .inspect_source(InspectSourcePromotionInput {
-            source_facts: CommitAcceptedSourceFactsInput {
+        .inspect_source_file(InspectSourceFilePromotionInput {
+            source_file_facts: CommitAcceptedSourceFileFactsInput {
                 source_file_id: SourceFileId::new(source_file_id).expect("positive source file id"),
                 accepted_artifact_id: library_domain::ArtifactId::new(inspection_artifact_id)
                     .expect("positive artifact id"),
@@ -2011,7 +2011,7 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
                 codec: Some("pcm".to_string()),
                 updated_at: 24,
             },
-            source_facts_merge_policy: CommitAcceptedSourceFactsMergePolicy::replacement(),
+            source_file_facts_merge_policy: CommitAcceptedSourceFileFactsMergePolicy::replacement(),
             rebuild_projection_domains: vec![library_domain::ProjectionDomain::Navigation],
             rebuild_priority: WorkPriorityClass::Interactive,
         })
@@ -2062,8 +2062,8 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
         FIXED_TOP_LEVEL_NAVIGATION_ROW_COUNT + 1
     );
     assert_fixed_top_level_navigation_rows(&top_level_navigation_rows);
-    assert_eq!(all_media_row.family.as_deref(), Some("Views"));
-    assert_eq!(source_row.family.as_deref(), Some("Sources"));
+    assert_eq!(all_media_row.family.as_deref(), Some("views"));
+    assert_eq!(source_row.family.as_deref(), Some("sources"));
     let expected_selector = encode_selector(&NavigationSelector::Source(
         SourceId::new(source_id).expect("positive source id"),
     ));
@@ -2160,16 +2160,18 @@ fn store_source_flow_drives_navigation_and_observed_facts() {
     );
     let connection = open_mutation_connection(&db_path);
     let accepted_facts_count: i64 = connection
-        .query_row("SELECT COUNT(*) FROM SourceFacts", [], |row| row.get(0))
+        .query_row("SELECT COUNT(*) FROM source_file_facts", [], |row| {
+            row.get(0)
+        })
         .expect("count source facts");
     assert_eq!(accepted_facts_count, 1);
     assert_eq!(
         connection
             .query_row(
                 "SELECT COUNT(*)
-                     FROM WorkItems
+                     FROM work_items
                      WHERE subject_kind = 'source_file'
-                       AND work_kind = 'inspect_source'",
+                       AND work_kind = 'inspect_source_file'",
                 [],
                 |row| row.get::<_, i64>(0)
             )

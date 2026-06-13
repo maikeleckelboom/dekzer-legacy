@@ -24,7 +24,7 @@ fn install_library_metadata_row(
     created_at_ms: i64,
 ) -> LibrarySqliteResult<()> {
     connection.execute(
-        "INSERT INTO LibraryMetadata (
+        "INSERT INTO library_metadata (
              library_id,
              schema_generation,
              created_at
@@ -39,7 +39,7 @@ fn validate_library_metadata_row(connection: &Connection) -> LibrarySqliteResult
     let found = connection
         .prepare(
             "SELECT library_id, schema_generation, created_at
-             FROM LibraryMetadata
+             FROM library_metadata
              ORDER BY library_id",
         )?
         .query_map([], |row| {
@@ -58,7 +58,7 @@ fn validate_library_metadata_row(connection: &Connection) -> LibrarySqliteResult
             Ok(())
         }
         _ => Err(LibrarySqliteError::MalformedSchemaState(format!(
-            "LibraryMetadata durable singleton row is malformed: found {found:?}"
+            "library_metadata durable singleton row is malformed: found {found:?}"
         ))),
     }
 }

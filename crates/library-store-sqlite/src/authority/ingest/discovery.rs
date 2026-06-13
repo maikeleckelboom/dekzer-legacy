@@ -7,7 +7,7 @@ use crate::authority::sources::{
     RecordSourceFileObservationInput, SourceDirectoriesAuthorityTx, SourceFilesAuthorityTx,
     UpsertSourceDirectoryInput,
 };
-use crate::authority::work::{QueueInspectSourceWorkInput, WorkItemsAuthorityTx};
+use crate::authority::work::{QueueInspectSourceFileWorkInput, WorkItemAuthorityTx};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::browse_media::{
     SourceFileClassFilter, classify_relative_path_file_kind,
@@ -529,7 +529,7 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         let has_facts = self.tx().query_row(
             "SELECT EXISTS(
                      SELECT 1
-                     FROM SourceFacts
+                     FROM source_file_facts
                      WHERE source_file_id = ?1
                  )",
             [existing.source_file_id],
@@ -577,8 +577,8 @@ impl<'write, 'conn> DiscoveryTx<'write, 'conn> {
         )?;
 
         if needs_probe {
-            let result = WorkItemsAuthorityTx::new(self.tx).queue_inspect_source_work(
-                &QueueInspectSourceWorkInput {
+            let result = WorkItemAuthorityTx::new(self.tx).queue_inspect_source_file_work(
+                &QueueInspectSourceFileWorkInput {
                     source_file_id: source_file_domain_id(source_file_id)?,
                     basis_fingerprint: observation_basis_fingerprint(
                         source_file_id,
@@ -2669,7 +2669,7 @@ mod tests {
                  source_id,
                  parent_source_directory_id,
 name,
-                  name_browse_sort_key,
+                  name_sort_key,
                   relative_path,
                   presence_state,
                   dir_scan_state,
@@ -2718,7 +2718,7 @@ name,
                  source_id,
                  parent_source_directory_id,
 name,
-                  name_browse_sort_key,
+                  name_sort_key,
                   relative_path,
                   presence_state,
                   dir_scan_state,

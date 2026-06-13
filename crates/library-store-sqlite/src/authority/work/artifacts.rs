@@ -4,7 +4,7 @@ use crate::authority::work::file_store::{
     ArtifactFileStorePath, ArtifactFileStoreRoot, persist_artifact_file_payload,
 };
 use crate::authority::work::work_items::load_work_item_row;
-use crate::authority::work::work_runs::{PersistedWorkRun, WorkRunsAuthorityTx};
+use crate::authority::work::work_runs::{PersistedWorkRun, WorkRunAuthorityTx};
 use crate::authority::write_lane::AdmittedWrite;
 use crate::{LibrarySqliteError, LibrarySqliteResult};
 use library_domain::{
@@ -73,7 +73,7 @@ pub struct RecordedArtifact {
     pub created_at: i64,
 }
 
-pub struct ArtifactsAuthorityTx<'write, 'conn> {
+pub struct WorkArtifactAuthorityTx<'write, 'conn> {
     tx: &'write mut AdmittedWrite<'conn>,
 }
 
@@ -82,7 +82,7 @@ struct ArtifactContext {
     work_item: crate::authority::work::ClaimedMachineWorkItem,
 }
 
-impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
+impl<'write, 'conn> WorkArtifactAuthorityTx<'write, 'conn> {
     pub(crate) fn new(tx: &'write mut AdmittedWrite<'conn>) -> Self {
         Self { tx }
     }
@@ -99,7 +99,7 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
             ArtifactStorageKind::InlinePayload,
         )?;
         self.tx.execute(
-            "INSERT INTO ArtifactInlinePayloads (
+            "INSERT INTO work_artifact_inline_payloads (
                  artifact_id,
                  payload,
                  created_at
@@ -133,7 +133,7 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
         let artifact =
             self.insert_artifact(&context, &input.artifact, ArtifactStorageKind::FileStore)?;
         self.tx.execute(
-            "INSERT INTO ArtifactFileStoreEntries (
+            "INSERT INTO work_artifact_file_store_entries (
                  artifact_id,
                  root_kind,
                  relative_path,
@@ -168,7 +168,7 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
                 ArtifactStorageKind::InlinePayload,
             )?;
             self.tx.execute(
-                "INSERT INTO ArtifactInlinePayloads (
+                "INSERT INTO work_artifact_inline_payloads (
                      artifact_id,
                      payload,
                      created_at
@@ -196,7 +196,7 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
             &input.payload,
         )?;
         self.tx.execute(
-            "INSERT INTO ArtifactFileStoreEntries (
+            "INSERT INTO work_artifact_file_store_entries (
                  artifact_id,
                  root_kind,
                  relative_path,
@@ -219,7 +219,7 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
     }
 
     fn load_context(&self, work_run_id: WorkRunId) -> LibrarySqliteResult<ArtifactContext> {
-        let runs = WorkRunsAuthorityTx::new(&*self.tx);
+        let runs = WorkRunAuthorityTx::new(&*self.tx);
         let run = runs.load_work_run(work_run_id)?;
         if run.finished_at.is_some() {
             return Err(LibrarySqliteError::WriteInvariant(format!(
@@ -229,7 +229,7 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
         }
         let work_item_id = WorkItemId::new(run.work_item_id).ok_or_else(|| {
             LibrarySqliteError::WriteInvariant(format!(
-                "invalid WorkRuns.work_item_id value: {}",
+                "invalid work_runs.work_item_id value: {}",
                 run.work_item_id
             ))
         })?;
@@ -247,7 +247,7 @@ impl<'write, 'conn> ArtifactsAuthorityTx<'write, 'conn> {
     ) -> LibrarySqliteResult<RecordedArtifact> {
         let subject_id = context.work_item.subject.storage_id();
         self.tx.execute(
-            "INSERT INTO Artifacts (
+            "INSERT INTO work_artifacts (
                  work_run_id,
                  subject_kind,
                  subject_id,
@@ -331,13 +331,15 @@ fn validate_artifact_input(
 
 fn parse_artifact_id(value: i64) -> LibrarySqliteResult<ArtifactId> {
     ArtifactId::new(value).ok_or_else(|| {
-        LibrarySqliteError::WriteInvariant(format!("invalid Artifacts.artifact_id value: {value}"))
+        LibrarySqliteError::WriteInvariant(format!(
+            "invalid work_artifacts.artifact_id value: {value}"
+        ))
     })
 }
 
 fn expected_primary_artifact_kind(work_kind: MachineWorkKind) -> ArtifactKind {
     match work_kind {
-        MachineWorkKind::InspectSource => ArtifactKind::InspectionResult,
+        MachineWorkKind::InspectSourceFile => ArtifactKind::InspectionResult,
         MachineWorkKind::RebuildProjection => ArtifactKind::ProjectionSnapshot,
     }
 }

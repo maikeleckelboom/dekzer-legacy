@@ -1,6 +1,6 @@
 use crate::LibrarySqliteResult;
 use crate::authority::work::{
-    QueueMachineWorkResult, QueueRebuildProjectionWorkInput, WorkItemsAuthorityTx,
+    QueueMachineWorkResult, QueueRebuildProjectionWorkInput, WorkItemAuthorityTx,
 };
 use crate::authority::write_lane::AdmittedWrite;
 use library_domain::{ProjectionDomain, WorkItemId, WorkPriorityClass};
@@ -32,7 +32,7 @@ impl<'write, 'conn> RebuildProjectionPromotionTx<'write, 'conn> {
         &self,
         input: &RebuildProjectionPromotionInput,
     ) -> LibrarySqliteResult<RebuildProjectionPromotionResult> {
-        let queued = WorkItemsAuthorityTx::new(self.tx).queue_rebuild_projection_work(
+        let queued = WorkItemAuthorityTx::new(self.tx).queue_rebuild_projection_work(
             &QueueRebuildProjectionWorkInput {
                 projection_domain: input.projection_domain,
                 basis_fingerprint: input.basis_fingerprint.clone(),

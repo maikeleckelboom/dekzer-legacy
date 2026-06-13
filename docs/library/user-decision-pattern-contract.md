@@ -18,7 +18,7 @@ Evidence records what the system observed or derived under a basis. Evidence doe
 copy is preferred, whether two items are the same musical track, whether cleanup is safe, or whether a relocation was
 accepted.
 
-Current examples include `source_files`, `SourceFacts`, `content_attachments`, `source_file_attachment_links`, source
+Current examples include `source_files`, `source_file_facts`, `content_attachments`, `source_file_attachment_links`, source
 lifecycle rows, attachment occurrence status projected from those rows, and track identity candidate evidence snapshots.
 
 ### Candidate
@@ -29,7 +29,7 @@ A candidate is not a user decision. A candidate may appear, disappear, change st
 changes. Candidate generation owns proposals only; it must not mutate evidence into acceptance, cleanup, merge, or
 preference.
 
-Current examples include source-file hash candidates, media-probe candidates, `primary_media_candidates`, and exact
+Current examples include source-file hash candidates, media-probe candidates, `primary_media_facts`, and exact
 content `track_identity_candidates`.
 
 ### Decision
@@ -250,19 +250,19 @@ classifies current and legacy decision-like concepts against A-6. It is not a mi
 | Concept | File/path | Current owner | Target object | Kind | Classification |
 | --- | --- | --- | --- | --- | --- |
 | Source registration admission outcomes (`registered`, `proposalRequired`, `rejected`) | `crates/library-store-sqlite/src/store/sources.rs`; `crates/library-boundary-protocol/src/commands/library_roots.rs`; `docs/library/source/root-admission-policy.md` | Source root admission service/store | Requested/canonical source root path; future source | Candidate/policy outcome | Conforming but narrow. Not an A-6 decision record; future confirmation/override must declare A-6 target/provenance. |
-| Source registration proposals | `source_registration_proposals`; `crates/library-store-sqlite/src/store/sources.rs` | Source root admission store | Requested/canonical source root path | Candidate/proposal | Conforming but narrow. Proposal is not user acceptance. |
+| Source registration proposals | `root_admission_proposals`; `crates/library-store-sqlite/src/store/sources.rs` | Source root admission store | Requested/canonical source root path | Candidate/proposal | Conforming but narrow. Proposal is not user acceptance. |
 | Local root unregister | `crates/library-store-sqlite/src/store/sources.rs`; `crates/library-boundary-protocol/src/commands/library_roots.rs` | Source lifecycle store/service | `sources.source_id` | Durable configuration command | Conforming but narrow. Not reusable as generic delete/cleanup decision. |
 | Source lifecycle states and relocation vocabulary | `docs/library/source/lifecycle-visible-state-contract.md`; `crates/library-store-sqlite/src/authority/roots/lifecycle.rs` | Source lifecycle authority | Source and source locator | Evidence/lifecycle projection | Conforming but narrow. Relocation acceptance remains future and must use A-6. |
 | Source locations observed vs registered | `source_locations`; `docs/decisions/source-locations-lifecycle-contract.md`; `crates/library-store-sqlite/src/authority/sources/source_locations.rs` | Source-location authority | Source id plus relative path/source_location row | Evidence plus durable configuration | Needs future migration if exposed as general accept/ignore decisions. Current registered subpath pattern is compatible but predates A-6. |
 | Source-location proposal suppression | `docs/decisions/source-locations-lifecycle-contract.md` | Future source-location authority | Source id plus relative path plus heuristic key/version | Future decision/suppression | Conforming but future-only. Must not overload hidden source locations. |
 | Source navigation user order | `source_navigation_user_order`; `crates/library-store-sqlite/src/authority/sources/source_records.rs`; `source_locations.rs` | Source/navigation ordering authority | Source or source location | Durable ordering preference | Unrelated to A-6 `prefer`/`pin` unless a future feature explicitly reclassifies it. |
 | Source file inventory | `source_files`; `crates/library-store-sqlite/src/authority/sources/source_files.rs`; `authority/ingest/discovery.rs` | Scanner/source inventory authority | `source_files.source_file_id` | Evidence | Already conforming. |
-| Accepted source facts and accepted artifacts | `SourceFacts`; `crates/library-store-sqlite/src/authority/sources/source_facts.rs`; `authority/promotion/inspect_source.rs` | Source inspection/hash/probe authority | Source file plus basis/artifact | Evidence | Conforming but narrow. "Accepted" means accepted inspection artifact, not a user decision. |
+| Accepted source-file facts and accepted artifacts | `source_file_facts`; `crates/library-store-sqlite/src/authority/sources/source_file_facts.rs`; `authority/promotion/inspect_source_file.rs` | Source inspection/hash/probe authority | Source file plus basis/artifact | Evidence | Conforming but narrow. "Accepted" means accepted inspection artifact, not a user decision. |
 | Source-file hash candidates | `crates/library-store-sqlite/src/store/source_file_hash.rs`; boundary source-file hash commands | Maintenance/hash authority | Source file | Candidate/work proposal | Conforming but narrow. Not durable user decision. |
 | Source-file media-probe candidates | `crates/library-store-sqlite/src/store/source_file_media_probe.rs` | Maintenance/probe authority | Source file | Candidate/work proposal | Conforming but narrow. Not durable user decision. |
 | Attachment identity and links | `content_attachments`; `source_file_attachment_links`; `crates/library-store-sqlite/src/store/attachment_identity.rs` | Attachment identity store | Content attachment; source-file attachment link | Evidence | Already conforming. |
 | Attachment occurrence read | `crates/library-store-sqlite/src/read_models/attachment_identity.rs`; `docs/library/evidence/attachment-occurrence-model-readiness.md` | Attachment identity read model | Attachment/link/source-file/source status | Projection | Already conforming. Evidence/status only; no duplicate/relocation/cleanup meaning. |
-| Primary media candidates | `primary_media_candidates`; `crates/library-store-sqlite/src/store/primary_media_promotion.rs` | Primary-media promotion authority | Content attachment plus source-file evidence | Candidate | Conforming but narrow. Audio evidence candidate only; not canonical track identity. |
+| Primary media candidates | `primary_media_facts`; `crates/library-store-sqlite/src/store/primary_media_promotion.rs` | Primary-media promotion authority | Content attachment plus source-file evidence | Candidate | Conforming but narrow. Audio evidence candidate only; not canonical track identity. |
 | Exact-content track identity candidates | `track_identity_candidates`, members, evidence; `crates/library-store-sqlite/src/store/track_identity_candidates.rs` | Track identity candidate authority | Track identity candidate id plus BLAKE3 evidence key | Candidate | Conforming but narrow. Exact current primary-media content only. |
 | Track identity decisions | `track_identity_decisions`, decision evidence, decision source scope; `crates/library-store-sqlite/src/store/track_identity_decisions.rs` | Track identity decision authority | Exact-content track identity candidate | Decision | Already conforming but narrow. Supports accept/reject/defer only and no canonical track. |
 | System exact-content decisions | `produce_track_identity_decisions_for_source`; `system_exact_content_v0` | Track identity decision maintenance | Exact-content track identity candidate | System-authored decision | Conforming but narrow. User reject/defer blocks system; future system decisions need explicit provenance. |

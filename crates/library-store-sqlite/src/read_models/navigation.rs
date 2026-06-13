@@ -40,8 +40,8 @@ pub fn read_rows(
             OR parent_navigation_row_id = ?1
          ORDER BY CASE
                       WHEN parent_navigation_row_id IS NOT NULL THEN 0
-                      WHEN family = 'Views' THEN 0
-                      WHEN family = 'Sources' THEN 1
+                      WHEN family = 'views' THEN 0
+                      WHEN family = 'sources' THEN 1
                       ELSE 2
                   END ASC,
                   sibling_position ASC,

@@ -92,7 +92,7 @@ fn promote_primary_media_for_source(
     }
 
     for candidate in read_primary_media_promotion_candidates(write, source_id, limit)? {
-        upsert_primary_media_candidate(write, &candidate, promoted_at)?;
+        upsert_primary_media_fact(write, &candidate, promoted_at)?;
         match candidate.change {
             PrimaryMediaPromotionChange::Create => result.promoted_count += 1,
             PrimaryMediaPromotionChange::Refresh => result.refreshed_count += 1,
@@ -208,7 +208,7 @@ fn read_primary_media_promotion_skip_summary(
                          )
                         THEN 1 ELSE 0 END), 0)
                  FROM source_files file
-                 LEFT JOIN SourceFacts facts
+                 LEFT JOIN source_file_facts facts
                    ON facts.source_file_id = file.source_file_id
                  LEFT JOIN source_file_attachment_links link
                    ON link.source_file_id = file.source_file_id
@@ -255,7 +255,7 @@ fn read_primary_media_promotion_candidates(
                 candidate.bit_depth,
                 candidate.codec,
                 CASE
-                    WHEN existing.primary_media_candidate_id IS NULL THEN 'create'
+                    WHEN existing.primary_media_fact_id IS NULL THEN 'create'
                     ELSE 'refresh'
                 END AS promotion_change",
         "ORDER BY lower(candidate.relative_path) ASC,
@@ -324,7 +324,7 @@ fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> 
                                  file.source_file_id ASC
                     ) AS attachment_rank
              FROM source_files file
-             JOIN SourceFacts facts
+             JOIN source_file_facts facts
                ON facts.source_file_id = file.source_file_id
              JOIN source_file_attachment_links link
                ON link.source_file_id = file.source_file_id
@@ -357,9 +357,9 @@ fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> 
          )
          {select_clause}
          FROM candidates candidate
-         LEFT JOIN primary_media_candidates existing
+         LEFT JOIN primary_media_facts existing
            ON existing.attachment_id = candidate.attachment_id
-         WHERE existing.primary_media_candidate_id IS NULL
+         WHERE existing.primary_media_fact_id IS NULL
             OR existing.evidence_source_file_id != candidate.source_file_id
             OR existing.evidence_basis_fingerprint != candidate.basis_fingerprint
             OR existing.media_kind != candidate.media_kind
@@ -376,13 +376,13 @@ fn primary_media_promotion_candidates_sql(select_clause: &str, suffix: &str) -> 
     )
 }
 
-fn upsert_primary_media_candidate(
+fn upsert_primary_media_fact(
     write: &mut AdmittedWrite<'_>,
     candidate: &PrimaryMediaPromotionCandidate,
     promoted_at: i64,
 ) -> LibrarySqliteResult<()> {
     write.execute(
-        "INSERT INTO primary_media_candidates (
+        "INSERT INTO primary_media_facts (
              attachment_id,
              evidence_source_file_id,
              evidence_basis_fingerprint,
@@ -534,10 +534,8 @@ mod tests {
             let file_name = relative_path.rsplit('/').next().unwrap_or(relative_path);
             let file_kind = crate::browse_media::file_kind_str_from_path(relative_path);
             let file_class = crate::browse_media::file_class_str_from_path(relative_path);
-            let name_browse_sort_key =
-                crate::browse_sort_key::compute_name_browse_sort_key(file_name);
-            let relative_path_browse_sort_key =
-                crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
+            let name_sort_key = crate::browse_sort_key::compute_name_sort_key(file_name);
+            let path_sort_key = crate::browse_sort_key::compute_path_sort_key(relative_path);
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -545,8 +543,8 @@ mod tests {
                              source_file_id,
                              source_id,
                              name,
-                             name_browse_sort_key,
-                             relative_path_browse_sort_key,
+                             name_sort_key,
+                             path_sort_key,
                              relative_path,
                              size_bytes,
                              mtime_ns,
@@ -564,8 +562,8 @@ mod tests {
                             source_file_id,
                             self.source_id,
                             file_name,
-                            name_browse_sort_key,
-                            relative_path_browse_sort_key,
+                            name_sort_key,
+                            path_sort_key,
                             relative_path,
                             file_kind,
                             file_class,
@@ -587,7 +585,7 @@ mod tests {
                 .with_write(|write| {
                     let artifact_id = 10_000 + source_file_id;
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkItems (
+                        "INSERT OR IGNORE INTO work_items (
                              work_item_id,
                              subject_kind,
                              subject_id,
@@ -598,11 +596,11 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (1, 'source_file', 'fixture', 'inspect_source', 'fixture', 'completed', 'interactive', 1, 1)",
+                         VALUES (1, 'source_file', 'fixture', 'inspect_source_file', 'fixture', 'completed', 'interactive', 1, 1)",
                         [],
                     )?;
                     write.execute(
-                        "INSERT OR IGNORE INTO WorkRuns (
+                        "INSERT OR IGNORE INTO work_runs (
                              work_run_id,
                              work_item_id,
                              adapter_key,
@@ -614,7 +612,7 @@ mod tests {
                         [],
                     )?;
                     write.execute(
-                        "INSERT INTO Artifacts (
+                        "INSERT INTO work_artifacts (
                              artifact_id,
                              work_run_id,
                              subject_kind,
@@ -650,9 +648,8 @@ mod tests {
                         |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                     )?;
                     write.execute(
-                        "INSERT INTO SourceFacts (
+                        "INSERT INTO source_file_facts (
                              source_file_id,
-                             fact_kind,
                              basis_fingerprint,
                              basis_source_id,
                              basis_relative_path,
@@ -672,7 +669,7 @@ mod tests {
                              updated_at,
                              accepted_artifact_id
                          )
-                         VALUES (?1, 'source_inspection', ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 1, ?17)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, 1, ?17)
                          ON CONFLICT(source_file_id) DO UPDATE SET
                              basis_fingerprint = excluded.basis_fingerprint,
                              basis_source_id = excluded.basis_source_id,
@@ -810,7 +807,7 @@ mod tests {
                 ..Default::default()
             }
         );
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 1);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 1);
         let connection = fixture.store.open_read_connection().expect("open read");
         let stored: (i64, i64, Option<i64>, Option<i64>, Option<String>) = connection
             .query_row(
@@ -819,7 +816,7 @@ mod tests {
                         duration_ms,
                         sample_rate_hz,
                         codec
-                 FROM primary_media_candidates",
+                 FROM primary_media_facts",
                 [],
                 |row| {
                     Ok((
@@ -857,12 +854,12 @@ mod tests {
         let result = fixture.promote(10);
 
         assert_eq!(result.promoted_count, 1);
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 1);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 1);
         let connection = fixture.store.open_read_connection().expect("open read");
         let stored: (i64, i64) = connection
             .query_row(
                 "SELECT attachment_id, evidence_source_file_id
-                 FROM primary_media_candidates",
+                 FROM primary_media_facts",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
@@ -881,7 +878,7 @@ mod tests {
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_no_probe_facts, 1);
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 0);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
     }
 
     #[test]
@@ -894,7 +891,7 @@ mod tests {
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_missing_attachment_link, 1);
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 0);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
     }
 
     #[test]
@@ -909,7 +906,7 @@ mod tests {
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_stale_facts, 1);
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 0);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
     }
 
     #[test]
@@ -923,7 +920,7 @@ mod tests {
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_stale_attachment_link, 1);
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 0);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
     }
 
     #[test]
@@ -946,7 +943,7 @@ mod tests {
 
         assert_eq!(result.promoted_count, 0);
         assert_eq!(result.skipped_unsupported_media_kind, 6);
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 0);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 0);
     }
 
     #[test]
@@ -976,7 +973,7 @@ mod tests {
         let row = &result.rows[0];
         assert_eq!(row.source_file_id, 100);
         let summary = row.primary_media.as_ref().expect("primary media summary");
-        assert!(summary.primary_media_candidate_id.is_some());
+        assert!(summary.primary_media_fact_id.is_some());
         assert!(summary.attachment_id.is_some());
         assert_eq!(summary.content_hash_value.as_deref(), Some(HASH_A));
         assert_eq!(summary.codec.as_deref(), Some("pcm"));
@@ -1028,7 +1025,7 @@ mod tests {
         let first = fixture.promote(2);
         assert_eq!(first.promoted_count, 2);
         assert_eq!(first.remaining_candidates, 1);
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 2);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 2);
 
         let second = fixture.promote(2);
         assert_eq!(second.promoted_count, 1);
@@ -1038,7 +1035,7 @@ mod tests {
         let source_file_ids = connection
             .prepare(
                 "SELECT evidence_source_file_id
-                 FROM primary_media_candidates
+                 FROM primary_media_facts
                  ORDER BY evidence_source_file_id ASC",
             )
             .expect("prepare candidate read")
@@ -1050,7 +1047,7 @@ mod tests {
     }
 
     #[test]
-    fn promotion_writes_only_primary_media_candidates() {
+    fn promotion_writes_only_primary_media_facts() {
         let fixture = PrimaryMediaPromotionFixture::new();
         fixture.insert_source_file(100, "Album/track.wav");
         fixture.link_attachment(100, HASH_A);
@@ -1058,7 +1055,7 @@ mod tests {
 
         fixture.promote(10);
 
-        assert_eq!(fixture.count_rows("primary_media_candidates"), 1);
+        assert_eq!(fixture.count_rows("primary_media_facts"), 1);
         assert_eq!(fixture.count_rows("track_identity_candidates"), 0);
         assert_eq!(fixture.count_rows("track_identity_decisions"), 0);
     }

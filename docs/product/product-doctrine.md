@@ -84,8 +84,8 @@ browser candidates are not sources.
 Library scanning. Canonical track identity. Source registration. Browse scopes. Contents reads. Media filtering. Event
 pump. Lifecycle reads. Stable references. Deterministic renderer projection.
 
-Current implementation authority is narrower than the long-term product model: source files, SourceFacts, content
-attachments, source-file attachment links, primary-media candidates, track-identity candidates, track-identity
+Current implementation authority is narrower than the long-term product model: source files, source_file_facts, content
+attachments, source-file attachment links, primary-media facts, track-identity candidates, track-identity
 decisions, source lifecycle/integrity, contents/search/filter, and navigation. Future product surfaces consume this
 substrate when their contracts exist; they do not own it.
 

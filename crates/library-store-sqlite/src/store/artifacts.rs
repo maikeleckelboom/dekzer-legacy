@@ -1,7 +1,7 @@
 use crate::LibrarySqliteResult;
 use crate::authority::work::{
-    ArtifactFileStoreReconciliationResult, ArtifactsAuthorityTx, RecordFileStoreArtifactInput,
-    RecordInlineArtifactInput, RecordedArtifact, reconcile_artifact_file_store,
+    ArtifactFileStoreReconciliationResult, RecordFileStoreArtifactInput, RecordInlineArtifactInput,
+    RecordedArtifact, WorkArtifactAuthorityTx, reconcile_artifact_file_store,
 };
 
 use super::SqliteDurableStore;
@@ -11,14 +11,16 @@ impl SqliteDurableStore {
         &self,
         input: RecordInlineArtifactInput,
     ) -> LibrarySqliteResult<RecordedArtifact> {
-        self.with_write(|write| ArtifactsAuthorityTx::new(write).record_inline_artifact(&input))
+        self.with_write(|write| WorkArtifactAuthorityTx::new(write).record_inline_artifact(&input))
     }
 
     pub fn record_file_store_artifact(
         &self,
         input: RecordFileStoreArtifactInput,
     ) -> LibrarySqliteResult<RecordedArtifact> {
-        self.with_write(|write| ArtifactsAuthorityTx::new(write).record_file_store_artifact(&input))
+        self.with_write(|write| {
+            WorkArtifactAuthorityTx::new(write).record_file_store_artifact(&input)
+        })
     }
 
     #[allow(dead_code)]

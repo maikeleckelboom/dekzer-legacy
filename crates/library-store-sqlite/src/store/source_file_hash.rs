@@ -5,14 +5,15 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params_from_iter, types::Value};
 use thiserror::Error;
 
-use crate::authority::promotion::{InspectSourcePromotionInput, InspectSourcePromotionTx};
+use crate::authority::promotion::{InspectSourceFilePromotionInput, InspectSourceFilePromotionTx};
 use crate::authority::sources::{
-    CommitAcceptedSourceFactsInput, CommitAcceptedSourceFactsMergePolicy, ContentHashEvidence,
+    CommitAcceptedSourceFileFactsInput, CommitAcceptedSourceFileFactsMergePolicy,
+    ContentHashEvidence,
 };
 use crate::authority::work::{
-    ArtifactsAuthorityTx, ClaimSpecificMachineWorkInput, CompleteMachineWorkInput,
-    FinishWorkRunInput, QueueInspectSourceWorkInput, RecordArtifactInput,
-    RecordInlineArtifactInput, StartWorkRunInput, WorkItemsAuthorityTx, WorkRunsAuthorityTx,
+    ClaimSpecificMachineWorkInput, CompleteMachineWorkInput, FinishWorkRunInput,
+    QueueInspectSourceFileWorkInput, RecordArtifactInput, RecordInlineArtifactInput,
+    StartWorkRunInput, WorkArtifactAuthorityTx, WorkItemAuthorityTx, WorkRunAuthorityTx,
 };
 use crate::authority::write_lane::AdmittedWrite;
 use crate::store::sources::source_observation_basis_fingerprint;
@@ -713,7 +714,7 @@ fn read_source_file_blake3_hash_candidates_for_scope(
                     ELSE 'stale_facts'
                 END AS reason
          FROM source_files sf
-         LEFT JOIN SourceFacts facts
+         LEFT JOIN source_file_facts facts
            ON facts.source_file_id = sf.source_file_id
          WHERE {scope_predicate}
            AND sf.presence_state = 'present'
@@ -762,7 +763,7 @@ fn count_source_file_blake3_hash_candidates_for_scope(
     let sql = format!(
         "SELECT COUNT(*)
          FROM source_files sf
-         LEFT JOIN SourceFacts facts
+         LEFT JOIN source_file_facts facts
            ON facts.source_file_id = sf.source_file_id
          WHERE {scope_predicate}
            AND sf.presence_state = 'present'
@@ -1026,8 +1027,8 @@ fn commit_blake3_hash_evidence(
     observed_at_ms: i64,
 ) -> LibrarySqliteResult<HashSourceFileBlake3Result> {
     let basis_fingerprint = basis.basis_fingerprint();
-    let queued = WorkItemsAuthorityTx::new(write).queue_inspect_source_work(
-        &QueueInspectSourceWorkInput {
+    let queued = WorkItemAuthorityTx::new(write).queue_inspect_source_file_work(
+        &QueueInspectSourceFileWorkInput {
             source_file_id: basis.source_file_id,
             basis_fingerprint: basis_fingerprint.clone(),
             priority_class: WorkPriorityClass::Interactive,
@@ -1039,14 +1040,14 @@ fn commit_blake3_hash_evidence(
             "inspect-source hash work is already active".to_string(),
         ));
     }
-    let claimed = WorkItemsAuthorityTx::new(write).claim_specific_machine_work(
+    let claimed = WorkItemAuthorityTx::new(write).claim_specific_machine_work(
         &ClaimSpecificMachineWorkInput {
             work_item_id: queued.work_item_id,
             lease_duration_ms: HASH_JOB_LEASE_DURATION_MS,
             claimed_at: observed_at_ms,
         },
     )?;
-    let work_run = WorkRunsAuthorityTx::new(write).start_work_run(&StartWorkRunInput {
+    let work_run = WorkRunAuthorityTx::new(write).start_work_run(&StartWorkRunInput {
         work_item_id: claimed.work_item_id,
         adapter_key: HASH_JOB_ADAPTER_KEY.to_string(),
         adapter_version: HASH_JOB_ADAPTER_VERSION.to_string(),
@@ -1063,7 +1064,7 @@ fn commit_blake3_hash_evidence(
     .into_bytes();
     let payload_hash = format!("blake3:{}", blake3::hash(&payload).to_hex());
     let artifact =
-        ArtifactsAuthorityTx::new(write).record_inline_artifact(&RecordInlineArtifactInput {
+        WorkArtifactAuthorityTx::new(write).record_inline_artifact(&RecordInlineArtifactInput {
             artifact: RecordArtifactInput {
                 work_run_id: work_run.work_run_id,
                 artifact_kind: ArtifactKind::InspectionResult,
@@ -1076,9 +1077,9 @@ fn commit_blake3_hash_evidence(
             payload,
         })?;
 
-    InspectSourcePromotionTx::new(write, file_store_root).inspect_source(
-        &InspectSourcePromotionInput {
-            source_facts: CommitAcceptedSourceFactsInput {
+    InspectSourceFilePromotionTx::new(write, file_store_root).inspect_source_file(
+        &InspectSourceFilePromotionInput {
+            source_file_facts: CommitAcceptedSourceFileFactsInput {
                 source_file_id: basis.source_file_id,
                 accepted_artifact_id: artifact.artifact_id,
                 basis_fingerprint,
@@ -1096,21 +1097,21 @@ fn commit_blake3_hash_evidence(
                 codec: None,
                 updated_at: observed_at_ms,
             },
-            source_facts_merge_policy:
-                CommitAcceptedSourceFactsMergePolicy::preserve_current_probe_fields(),
+            source_file_facts_merge_policy:
+                CommitAcceptedSourceFileFactsMergePolicy::preserve_current_probe_fields(),
             rebuild_projection_domains: vec![],
             rebuild_priority: WorkPriorityClass::Interactive,
         },
     )?;
 
-    WorkRunsAuthorityTx::new(write).finish_work_run(&FinishWorkRunInput {
+    WorkRunAuthorityTx::new(write).finish_work_run(&FinishWorkRunInput {
         work_run_id: work_run.work_run_id,
         finished_at: observed_at_ms,
         outcome: WorkRunOutcome::Completed,
         failure_kind: None,
         error_detail: None,
     })?;
-    WorkItemsAuthorityTx::new(write).complete_machine_work_item(&CompleteMachineWorkInput {
+    WorkItemAuthorityTx::new(write).complete_machine_work_item(&CompleteMachineWorkInput {
         work_item_id: claimed.work_item_id,
         completed_at: observed_at_ms,
     })?;
@@ -1315,9 +1316,8 @@ mod tests {
             mtime_ns: i64,
         ) {
             let name = relative_path.rsplit('/').next().expect("file name");
-            let name_browse_sort_key = crate::browse_sort_key::compute_name_browse_sort_key(name);
-            let relative_path_browse_sort_key =
-                crate::browse_sort_key::compute_relative_path_browse_sort_key(relative_path);
+            let name_sort_key = crate::browse_sort_key::compute_name_sort_key(name);
+            let path_sort_key = crate::browse_sort_key::compute_path_sort_key(relative_path);
             self.store
                 .with_write(|write| {
                     write.execute(
@@ -1326,8 +1326,8 @@ mod tests {
                              source_id,
                              parent_source_directory_id,
                              name,
-                             name_browse_sort_key,
-                             relative_path_browse_sort_key,
+                             name_sort_key,
+                             path_sort_key,
                              relative_path,
                              size_bytes,
                              mtime_ns,
@@ -1344,8 +1344,8 @@ mod tests {
                         params![
                             source_file_id,
                             name,
-                            name_browse_sort_key,
-                            relative_path_browse_sort_key,
+                            name_sort_key,
+                            path_sort_key,
                             relative_path,
                             size_bytes,
                             mtime_ns,
@@ -1482,7 +1482,7 @@ mod tests {
             self.store
                 .with_write(|write| {
                     write.execute(
-                        "INSERT INTO WorkItems (
+                        "INSERT INTO work_items (
                              work_item_id,
                              subject_kind,
                              subject_id,
@@ -1494,11 +1494,11 @@ mod tests {
                              created_at,
                              updated_at
                          )
-                         VALUES (?1, 'source_file', ?2, 'inspect_source', 'interactive', ?3, 'completed', 1, 20, 20)",
+                         VALUES (?1, 'source_file', ?2, 'inspect_source_file', 'interactive', ?3, 'completed', 1, 20, 20)",
                         params![artifact_id, source_file_id.to_string(), basis_fingerprint],
                     )?;
                     write.execute(
-                        "INSERT INTO WorkRuns (
+                        "INSERT INTO work_runs (
                              work_run_id,
                              work_item_id,
                              adapter_key,
@@ -1511,7 +1511,7 @@ mod tests {
                         [artifact_id],
                     )?;
                     write.execute(
-                        "INSERT INTO Artifacts (
+                        "INSERT INTO work_artifacts (
                              artifact_id,
                              work_run_id,
                              subject_kind,
@@ -1535,9 +1535,8 @@ mod tests {
                         ],
                     )?;
                     write.execute(
-                        "INSERT INTO SourceFacts (
+                        "INSERT INTO source_file_facts (
                              source_file_id,
-                             fact_kind,
                              basis_fingerprint,
                              basis_source_id,
                              basis_relative_path,
@@ -1557,7 +1556,7 @@ mod tests {
                              updated_at,
                              accepted_artifact_id
                          )
-                         VALUES (?1, 'source_inspection', ?2, 1, ?3, ?4, ?5, ?6, 23, ?7, ?8, ?9, NULL, NULL, NULL, NULL, NULL, NULL, 24, ?10)",
+                         VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6, 23, ?7, ?8, ?9, NULL, NULL, NULL, NULL, NULL, NULL, 24, ?10)",
                         params![
                             source_file_id,
                             basis_fingerprint,
@@ -1678,7 +1677,7 @@ mod tests {
             .run_hash(100, missing_path)
             .expect_err("missing file must fail");
         assert!(matches!(error, HashSourceFileBlake3Error::FileOpen { .. }));
-        assert_eq!(fixture.count_rows("SourceFacts"), 0);
+        assert_eq!(fixture.count_rows("source_file_facts"), 0);
     }
 
     #[test]
@@ -1717,7 +1716,7 @@ mod tests {
             error,
             HashSourceFileBlake3Error::BasisChanged { .. }
         ));
-        assert_eq!(fixture.count_rows("SourceFacts"), 0);
+        assert_eq!(fixture.count_rows("source_file_facts"), 0);
     }
 
     #[test]
@@ -1773,7 +1772,7 @@ mod tests {
                 failure: SourceFileBlake3HashFailure::InvalidRelativePath { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("SourceFacts"), 0);
+        assert_eq!(fixture.count_rows("source_file_facts"), 0);
     }
 
     #[test]
@@ -1814,7 +1813,7 @@ mod tests {
                 failure: SourceFileBlake3HashFailure::PhysicalFileMissing { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("SourceFacts"), 0);
+        assert_eq!(fixture.count_rows("source_file_facts"), 0);
     }
 
     #[test]
@@ -1840,7 +1839,7 @@ mod tests {
                 failure: SourceFileBlake3HashFailure::SourceRootUnavailable { .. }
             }
         ));
-        assert_eq!(fixture.count_rows("SourceFacts"), 0);
+        assert_eq!(fixture.count_rows("source_file_facts"), 0);
     }
 
     #[test]

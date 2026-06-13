@@ -38,7 +38,7 @@ The durable tables are:
 The internal candidate kind for v0 is `exact_primary_media_content`.
 
 The v0 evidence basis is `current_primary_media_exact_blake3`. It means the candidate was produced from a current
-`primary_media_candidates` row, current attachment identity, current BLAKE3 observed-file facts, and current audio probe
+`primary_media_facts` row, current attachment identity, current BLAKE3 observed-file facts, and current audio probe
 evidence. It does not mean "same song" beyond exact current content evidence.
 
 ## Status
@@ -61,26 +61,26 @@ Evidence rows also have computed read status:
 `source_files` remain the default contents surface. Candidate production never removes source-file inventory rows and
 never changes default `readContents` behavior.
 
-`SourceFacts` remain observed evidence. Candidate production consumes only current BLAKE3 and audio probe facts; stale
+`source_file_facts` remain observed evidence. Candidate production consumes only current BLAKE3 and audio probe facts; stale
 facts cannot create or refresh candidates.
 
 `content_attachments` and `source_file_attachment_links` remain attachment identity. Candidate production consumes
 current links and attachment hash equality but does not re-read files or own hash authority.
 
-`primary_media_candidates` remain the playable-media input. Candidate production consumes only current promoted audio
-primary-media candidates and revalidates them before producing or refreshing candidate rows.
+`primary_media_facts` remain the playable-media input. Candidate production consumes only current promoted audio
+primary-media facts and revalidates them before producing or refreshing candidate rows.
 
 ## Sufficient Evidence
 
 V0 production may create or refresh a candidate only when all of these are true:
 
-- The input `primary_media_candidates` row is current.
+- The input `primary_media_facts` row is current.
 - The evidence source file is present audio source-file inventory.
-- `SourceFacts` is current for the exact source-file basis.
-- `SourceFacts.content_hash_algorithm = blake3` and the hash value is non-empty.
+- `source_file_facts` is current for the exact source-file basis.
+- `source_file_facts.content_hash_algorithm = blake3` and the hash value is non-empty.
 - A current `source_file_attachment_links` row connects the source file to a `content_attachments` row with the same
   BLAKE3 value.
-- `SourceFacts.media_kind = audio`.
+- `source_file_facts.media_kind = audio`.
 - At least one audio probe field is present.
 
 ## Insufficient Evidence
@@ -96,11 +96,11 @@ The following never create or refresh track identity candidates by themselves:
 
 ## Grouping Rules
 
-One candidate group may contain multiple evidence rows when current primary-media candidates share the same exact BLAKE3
+One candidate group may contain multiple evidence rows when current primary-media facts share the same exact BLAKE3
 content evidence. This is exact content evidence grouping only. It is not a semantic track decision.
 
-The current substrate promotes one `primary_media_candidates` row per attachment, so duplicate source files with the same
-BLAKE3 attachment are represented as one member with multiple source-file evidence rows. A primary-media candidate may
+The current substrate promotes one `primary_media_facts` row per attachment, so duplicate source files with the same
+BLAKE3 attachment are represented as one member with multiple source-file evidence rows. A primary-media fact may
 belong to only one active v0 candidate.
 
 Different hashes do not group merely because paths, titles, filenames, or probe facts look similar. Different encodes of

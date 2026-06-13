@@ -275,7 +275,7 @@ pub(crate) fn retire_artifact_if_unreferenced_and_unclaimed(
         let file_store_path =
             load_artifact_file_store_path(write, artifact_id)?.ok_or_else(|| {
                 LibrarySqliteError::MalformedSchemaState(format!(
-                    "file-backed artifact {artifact_id} is missing from ArtifactFileStoreEntries"
+                    "file-backed artifact {artifact_id} is missing from work_artifact_file_store_entries"
                 ))
             })?;
         if file_store_path.root_kind != file_store_root.kind() {
@@ -291,7 +291,7 @@ pub(crate) fn retire_artifact_if_unreferenced_and_unclaimed(
     }
 
     write.execute(
-        "DELETE FROM Artifacts WHERE artifact_id = ?1",
+        "DELETE FROM work_artifacts WHERE artifact_id = ?1",
         [artifact_id],
     )?;
     Ok(true)
@@ -573,7 +573,7 @@ fn load_artifact_storage_kind(
     let persisted_storage_kind = connection
         .query_row(
             "SELECT storage_kind
-             FROM Artifacts
+             FROM work_artifacts
              WHERE artifact_id = ?1",
             [artifact_id],
             |row| row.get::<_, String>(0),
@@ -597,7 +597,7 @@ fn load_artifact_file_store_path(
     let persisted_entry = connection
         .query_row(
             "SELECT root_kind, relative_path
-             FROM ArtifactFileStoreEntries
+             FROM work_artifact_file_store_entries
              WHERE artifact_id = ?1",
             [artifact_id],
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
@@ -627,7 +627,7 @@ fn artifact_has_active_claim(
 ) -> LibrarySqliteResult<bool> {
     let active_claim_count: i64 = connection.query_row(
         "SELECT COUNT(*)
-         FROM ArtifactClaims
+         FROM work_artifact_claims
          WHERE artifact_id = ?1
            AND released_at IS NULL",
         [artifact_id],
@@ -644,7 +644,7 @@ fn artifact_has_live_reference(
         "SELECT CASE
                     WHEN EXISTS(
                         SELECT 1
-                        FROM SourceFacts
+                        FROM source_file_facts
                         WHERE accepted_artifact_id = ?1
                     ) THEN 1
                     ELSE 0
@@ -665,18 +665,18 @@ fn load_owned_file_store_rows(
                 CASE
                     WHEN EXISTS(
                         SELECT 1
-                        FROM SourceFacts
+                        FROM source_file_facts
                         WHERE accepted_artifact_id = entry.artifact_id
                     ) THEN 1
                     ELSE 0
                 END AS has_live_reference,
                 EXISTS(
                     SELECT 1
-                    FROM ArtifactClaims claim
+                    FROM work_artifact_claims claim
                     WHERE claim.artifact_id = entry.artifact_id
                       AND claim.released_at IS NULL
                 ) AS has_active_claim
-         FROM ArtifactFileStoreEntries entry
+         FROM work_artifact_file_store_entries entry
          ORDER BY entry.artifact_id ASC",
     )?;
     let rows = statement.query_map([], |row| {
@@ -724,8 +724,8 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::authority::work::artifacts::{
-        ArtifactsAuthorityTx, PersistArtifactPayloadInput, PersistedArtifactPayload,
-        PersistedArtifactStorage, RecordArtifactInput,
+        PersistArtifactPayloadInput, PersistedArtifactPayload, PersistedArtifactStorage,
+        RecordArtifactInput, WorkArtifactAuthorityTx,
     };
     use crate::authority::write_lane::admit_write;
     use crate::schema::install_baseline_schema_for_test;
@@ -754,7 +754,7 @@ mod tests {
     ) -> WorkRunId {
         write
             .execute(
-                "INSERT INTO WorkItems (
+                "INSERT INTO work_items (
                      subject_kind,
                      subject_id,
                      work_kind,
@@ -772,7 +772,7 @@ mod tests {
                  VALUES (
                      'source_file',
                      '300',
-                     'inspect_source',
+                     'inspect_source_file',
                      'interactive',
                      ?1,
                      'leased',
@@ -790,7 +790,7 @@ mod tests {
         let work_item_id = write.last_insert_rowid();
         write
             .execute(
-                "INSERT INTO WorkRuns (
+                "INSERT INTO work_runs (
                      work_item_id,
                      adapter_key,
                      adapter_version,
@@ -816,7 +816,7 @@ mod tests {
         created_at: i64,
         payload: Vec<u8>,
     ) -> PersistedArtifactPayload {
-        let mut artifacts = ArtifactsAuthorityTx::new(write);
+        let mut artifacts = WorkArtifactAuthorityTx::new(write);
         artifacts
             .persist_artifact_payload(
                 file_store_root,
@@ -861,7 +861,7 @@ mod tests {
         let storage_row: String = connection
             .query_row(
                 "SELECT storage_kind
-                 FROM Artifacts
+                 FROM work_artifacts
                  ORDER BY artifact_id ASC
                  LIMIT 1",
                 [],
@@ -869,14 +869,18 @@ mod tests {
             )
             .expect("read artifact storage kind");
         let inline_payload_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM ArtifactInlinePayloads", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT COUNT(*) FROM work_artifact_inline_payloads",
+                [],
+                |row| row.get(0),
+            )
             .expect("count inline payload rows");
         let file_store_entry_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM ArtifactFileStoreEntries", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT COUNT(*) FROM work_artifact_file_store_entries",
+                [],
+                |row| row.get(0),
+            )
             .expect("count file-store rows");
 
         assert_eq!(storage_row, "inline_payload");
@@ -916,7 +920,7 @@ mod tests {
         let (artifact_id, relative_path, payload_bytes): (i64, String, i64) = connection
             .query_row(
                 "SELECT artifact_id, relative_path, payload_bytes
-                 FROM ArtifactFileStoreEntries
+                 FROM work_artifact_file_store_entries
                  ORDER BY artifact_id ASC
                  LIMIT 1",
                 [],
@@ -926,7 +930,7 @@ mod tests {
         let storage_row: String = connection
             .query_row(
                 "SELECT storage_kind
-                 FROM Artifacts
+                 FROM work_artifacts
                  WHERE artifact_id = ?1",
                 [artifact_id],
                 |row| row.get(0),
@@ -1013,7 +1017,7 @@ mod tests {
             );
             artifact_id = persisted.artifact.artifact_id.get();
             write.execute(
-                "INSERT INTO ArtifactClaims (
+                "INSERT INTO work_artifact_claims (
                      artifact_id,
                      claimant_kind,
                      claimant_key,
@@ -1031,7 +1035,7 @@ mod tests {
         let relative_path: String = connection
             .query_row(
                 "SELECT relative_path
-                 FROM ArtifactFileStoreEntries
+                 FROM work_artifact_file_store_entries
                  WHERE artifact_id = ?1",
                 [artifact_id],
                 |row| row.get(0),
