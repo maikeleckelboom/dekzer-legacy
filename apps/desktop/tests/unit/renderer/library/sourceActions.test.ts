@@ -145,18 +145,10 @@ describe('deriveSourceActionModel', () => {
     expect(hasVisibleSourceRootBinding(undefined, 'root-1')).toBe(false)
   })
 
-  it('authors activation only from selection state at registration response time', () => {
-    expect(sourceRegistrationIntent('root-2', undefined)).toEqual({
+  it('authors registration responses to activate the admitted source surface', () => {
+    expect(sourceRegistrationIntent('root-2')).toEqual({
       rootId: 'root-2',
       activateWhenVisible: true
-    })
-    expect(sourceRegistrationIntent('root-2', 'local-browse-entry:music:C%3A%5CMusic')).toEqual({
-      rootId: 'root-2',
-      activateWhenVisible: true
-    })
-    expect(sourceRegistrationIntent('root-2', 'navigation-row:root-1')).toEqual({
-      rootId: 'root-2',
-      activateWhenVisible: false
     })
   })
 
@@ -169,7 +161,7 @@ describe('deriveSourceActionModel', () => {
 
   it('carries response-authored activation until the registered row is visible', () => {
     const projection = sourceProjection(['root-1', 'root-2'])
-    const intent = sourceRegistrationIntent('root-2', undefined)
+    const intent = sourceRegistrationIntent('root-2')
 
     expect(resolveVisibleSourceRegistration(intent, projection)).toEqual({
       nodeId: 'navigation-row:root-2',
@@ -177,13 +169,13 @@ describe('deriveSourceActionModel', () => {
     })
   })
 
-  it('reveals but never activates when registration response observed an existing selection', () => {
+  it('activates even when a prior library selection existed before admission', () => {
     const projection = sourceProjection(['root-1', 'root-2'])
-    const intent = sourceRegistrationIntent('root-2', 'navigation-row:root-1')
+    const intent = sourceRegistrationIntent('root-2')
 
     expect(resolveVisibleSourceRegistration(intent, projection)).toEqual({
       nodeId: 'navigation-row:root-2',
-      activate: false
+      activate: true
     })
   })
 })

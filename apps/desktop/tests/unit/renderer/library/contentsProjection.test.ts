@@ -11,6 +11,7 @@ import {
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
+import { projectAddSourceState } from '../../../../src/renderer/library/localBrowse/projection'
 import {
   projectContents,
   type ContentProjection,
@@ -1448,7 +1449,14 @@ function projectForSelection(
 }
 
 function browserProjection(state: BrowserState): BrowserProjection {
-  const projection = projectState(state)
+  const projection =
+    state.localBrowseEntryPointsState === undefined
+      ? projectState(state)
+      : projectAddSourceState({
+          localPreviewMode: state.localPreviewMode ?? 'musicEvidence',
+          entryPointsState: state.localBrowseEntryPointsState,
+          itemStates: state.localBrowseItemStates
+        })
 
   expect(projection?.kind).toBe('tree')
   if (projection?.kind !== 'tree') {

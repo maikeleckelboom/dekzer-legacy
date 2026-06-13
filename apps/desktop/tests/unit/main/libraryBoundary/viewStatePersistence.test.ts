@@ -7,8 +7,11 @@ describe('library view-state persistence', () => {
     expect(
       isValidViewState({
         version: 2,
-        selectedNodeId: 'node-1',
-        expandedNodeIds: ['node-1'],
+        activeSurface: 'libraryBrowse',
+        selectedLibraryNodeId: 'node-1',
+        selectedAddSourceNodeId: 'local-browse:section',
+        expandedLibraryNodeIds: ['node-1'],
+        expandedAddSourceNodeIds: ['local-browse:section'],
         libraryBrowseProfile: 'audio',
         localPreviewMode: 'musicEvidence'
       })
@@ -19,7 +22,9 @@ describe('library view-state persistence', () => {
     expect(
       isValidViewState({
         version: 1,
-        expandedNodeIds: [],
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
         libraryBrowseProfile: 'audio',
         localPreviewMode: 'musicEvidence'
       })
@@ -28,8 +33,20 @@ describe('library view-state persistence', () => {
     expect(
       isValidViewState({
         version: 2,
-        expandedNodeIds: [],
+        activeSurface: 'libraryBrowse',
+        expandedLibraryNodeIds: [],
+        expandedAddSourceNodeIds: [],
         profile: 'audio'
+      })
+    ).toBe(false)
+
+    expect(
+      isValidViewState({
+        version: 2,
+        selectedNodeId: 'node-1',
+        expandedNodeIds: ['node-1'],
+        libraryBrowseProfile: 'audio',
+        localPreviewMode: 'musicEvidence'
       })
     ).toBe(false)
   })

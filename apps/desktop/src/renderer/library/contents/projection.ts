@@ -5,6 +5,7 @@ import type {
   ContentsFileRow,
   PlayableMedia
 } from '../../../shared/library/contents/read'
+import type { LibraryPanelSurface } from '../../../shared/library/viewState/persistence'
 import type { ContentsBoundaryState } from '../boundary/contentsRead'
 import type {
   LocalBrowseEntryPointKind,
@@ -126,6 +127,7 @@ export type ContentProjection = {
 
 export type ProjectContentsOptions = {
   readonly state: BrowserState
+  readonly surface?: LibraryPanelSurface
   readonly selectedNodeId?: BrowserTreeNodeId
   readonly bindingsById?: BrowserProjection['bindingsById']
   readonly contentsState?: ContentsBoundaryState
@@ -189,6 +191,22 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
   const selectedNodeId = options.selectedNodeId
 
   if (selectedNodeId === undefined) {
+    if (options.surface === 'addSource') {
+      return addSourceStartProjection()
+    }
+
+    if (options.surface === 'libraryBrowse') {
+      return stateProjection({
+        surface: librarySurface,
+        kind: 'emptySelection',
+        ownerId: 'selection',
+        title: 'Select a source',
+        state: 'empty',
+        label: 'No source selected',
+        detail: 'Select an admitted source to browse indexed contents.'
+      })
+    }
+
     return stateProjection({
       surface: librarySurface,
       kind: 'libraryStart',
@@ -342,6 +360,27 @@ export function projectContents(options: ProjectContentsOptions): ContentProject
         }
       )
   }
+}
+
+function addSourceStartProjection(): ContentProjection {
+  return contentProjection(addSourceSurface, {
+    kind: 'ready',
+    title: 'Add Source',
+    detail:
+      'Choose a suggested music folder to add as a managed source, or pick another folder manually.',
+    rows: [
+      stateRow({
+        ownerId: 'add-source',
+        state: 'empty',
+        label: 'Add a music folder',
+        detail: 'Suggested folders are starting points for adding a managed music source.',
+        action: {
+          kind: 'chooseMusicFolder',
+          label: 'Add music folder'
+        }
+      })
+    ]
+  })
 }
 
 function projectHostContents(

@@ -9,6 +9,7 @@ import type {
   LocalBrowseItemStatus
 } from '../../../shared/library/localBrowse/items'
 import type { RowBinding } from '../state'
+import type { BrowserProjection } from '../tree/projection'
 import type {
   BrowserTreeAction,
   BrowserTreeActionState,
@@ -107,6 +108,28 @@ export function projectAddSourceSection(
       ? (state.detail ?? 'Refreshing local browse entry points.')
       : state.refreshError
   )
+}
+
+export function projectAddSourceState(
+  state: Omit<LocalBrowseProjectionOptions, 'bindingsById'>
+): BrowserProjection | undefined {
+  const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
+  const addSourceSection = projectAddSourceSection({
+    localPreviewMode: state.localPreviewMode,
+    ...(state.entryPointsState === undefined ? {} : { entryPointsState: state.entryPointsState }),
+    ...(state.itemStates === undefined ? {} : { itemStates: state.itemStates }),
+    bindingsById
+  })
+
+  if (addSourceSection === undefined) {
+    return undefined
+  }
+
+  return {
+    kind: 'tree',
+    nodes: [addSourceSection],
+    bindingsById
+  }
 }
 
 function addSourceSectionNode(

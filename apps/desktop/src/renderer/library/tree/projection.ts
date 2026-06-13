@@ -25,12 +25,10 @@ import { copyEntryPoint } from '../runtime/entryPoint'
 import type { SourceReadiness } from '../runtime/sourceReadiness'
 import { formatSourceDisplayName } from './sourcePresentation'
 import { browserRowRoleForNavigationRow } from './rowRoles'
-import { projectAddSourceSection } from '../localBrowse/projection'
 import {
   defaultLibraryBrowseProfile,
   type LibraryBrowseProfile
 } from '../libraryBrowseProfile/types'
-import { defaultLocalPreviewMode } from '../localBrowse/previewMode'
 
 export type BrowserProjection = {
   readonly kind: 'tree'
@@ -54,7 +52,7 @@ export function projectState(state: BrowserState): BrowserProjection | undefined
     return hostProjection
   }
 
-  if (state.navigationReadResult === undefined && state.localBrowseEntryPointsState === undefined) {
+  if (state.navigationReadResult === undefined) {
     return undefined
   }
 
@@ -100,28 +98,8 @@ function isRendererVisibleNavigationRow(row: NavigationRow): boolean {
 function projectNavigationResult(state: BrowserState): BrowserProjection {
   const bindingsById = new Map<BrowserTreeNodeId, RowBinding>()
   const result = state.navigationReadResult
-  const addSourceSection = projectAddSourceSection({
-    localPreviewMode: state.localPreviewMode ?? defaultLocalPreviewMode,
-    ...(state.localBrowseEntryPointsState === undefined
-      ? {}
-      : { entryPointsState: state.localBrowseEntryPointsState }),
-    ...(state.localBrowseItemStates === undefined
-      ? {}
-      : { itemStates: state.localBrowseItemStates }),
-    bindingsById
-  })
-  const localBrowseNodes =
-    addSourceSection === undefined ? [] : ([addSourceSection] satisfies BrowserTreeNode[])
 
   if (result === undefined) {
-    if (localBrowseNodes.length > 0) {
-      return {
-        kind: 'tree',
-        nodes: localBrowseNodes,
-        bindingsById
-      }
-    }
-
     return emptyProjectionWithBindings(
       {
         ownerId: 'navigation',
@@ -134,14 +112,6 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
   }
 
   if (result.state !== 'ready') {
-    if (localBrowseNodes.length > 0) {
-      return {
-        kind: 'tree',
-        nodes: localBrowseNodes,
-        bindingsById
-      }
-    }
-
     return emptyProjectionWithBindings(
       {
         ownerId: 'navigation',
@@ -155,7 +125,7 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
 
   const visibleRows = result.rows.filter(isRendererVisibleNavigationRow)
 
-  if (visibleRows.length === 0 && localBrowseNodes.length === 0) {
+  if (visibleRows.length === 0) {
     return emptyProjectionWithBindings(
       {
         ownerId: 'navigation',
@@ -169,21 +139,18 @@ function projectNavigationResult(state: BrowserState): BrowserProjection {
 
   return {
     kind: 'tree',
-    nodes: [
-      ...visibleRows.map((row) =>
-        projectNavigationRow({
-          row,
-          profile: state.libraryBrowseProfile ?? defaultLibraryBrowseProfile,
-          ...(state.sourceReadinessByNodeId === undefined
-            ? {}
-            : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),
-          sourceReadStates: state.sourceReadStates,
-          directoryReadStates: state.directoryReadStates,
-          bindingsById
-        })
-      ),
-      ...localBrowseNodes
-    ],
+    nodes: visibleRows.map((row) =>
+      projectNavigationRow({
+        row,
+        profile: state.libraryBrowseProfile ?? defaultLibraryBrowseProfile,
+        ...(state.sourceReadinessByNodeId === undefined
+          ? {}
+          : { sourceReadinessByNodeId: state.sourceReadinessByNodeId }),
+        sourceReadStates: state.sourceReadStates,
+        directoryReadStates: state.directoryReadStates,
+        bindingsById
+      })
+    ),
     bindingsById
   }
 }

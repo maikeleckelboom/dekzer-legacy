@@ -11,36 +11,47 @@ describe('createViewStateStore', () => {
     const { api, writes, resolveAll } = createQueuedWriteApi()
     const store = createViewStateStore(api)
 
-    store.save({ version: 2, expandedNodeIds: ['node-1'] })
-    store.save({ version: 2, expandedNodeIds: ['node-2'] })
-    store.save({ version: 2, expandedNodeIds: ['node-3'] })
+    store.save(viewState({ expandedLibraryNodeIds: ['node-1'] }))
+    store.save(viewState({ expandedLibraryNodeIds: ['node-2'] }))
+    store.save(viewState({ expandedLibraryNodeIds: ['node-3'] }))
 
     await resolveAll()
 
-    expect(writes.map((write) => write.state.expandedNodeIds)).toEqual([['node-1'], ['node-3']])
+    expect(writes.map((write) => write.state.expandedLibraryNodeIds)).toEqual([
+      ['node-1'],
+      ['node-3']
+    ])
     expect(writes[0]?.sequence).toBeLessThan(writes[1]?.sequence ?? 0)
   })
 
   it('delegates load and normalizes persisted state', async () => {
     const { api, writes, resolveAll } = createQueuedWriteApi()
     const store = createViewStateStore(api)
-    const expandedNodeIds = ['node-a', 'node-a']
+    const expandedLibraryNodeIds = ['node-a', 'node-a']
+    const expandedAddSourceNodeIds = ['local-a', 'local-a']
 
     await expect(store.load()).resolves.toEqual({ state: 'empty' })
     store.save({
       version: 2,
-      selectedNodeId: 'node-a',
-      expandedNodeIds,
+      activeSurface: 'addSource',
+      selectedLibraryNodeId: 'node-a',
+      selectedAddSourceNodeId: 'local-a',
+      expandedLibraryNodeIds,
+      expandedAddSourceNodeIds,
       libraryBrowseProfile: 'playable',
       localPreviewMode: 'musicEvidence'
     })
-    expandedNodeIds.push('node-b')
+    expandedLibraryNodeIds.push('node-b')
+    expandedAddSourceNodeIds.push('local-b')
     await resolveAll()
 
     expect(writes[0]?.state).toEqual({
       version: 2,
-      selectedNodeId: 'node-a',
-      expandedNodeIds: ['node-a'],
+      activeSurface: 'addSource',
+      selectedLibraryNodeId: 'node-a',
+      selectedAddSourceNodeId: 'local-a',
+      expandedLibraryNodeIds: ['node-a'],
+      expandedAddSourceNodeIds: ['local-a'],
       libraryBrowseProfile: 'playable',
       localPreviewMode: 'musicEvidence'
     })
@@ -52,7 +63,9 @@ describe('createViewStateStore', () => {
 
     store.save({
       version: 2,
-      expandedNodeIds: [],
+      activeSurface: 'libraryBrowse',
+      expandedLibraryNodeIds: [],
+      expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'allFiles',
       localPreviewMode: 'advancedInventory'
     })
@@ -60,14 +73,18 @@ describe('createViewStateStore', () => {
 
     expect(writes[0]?.state).toEqual({
       version: 2,
-      expandedNodeIds: [],
+      activeSurface: 'libraryBrowse',
+      expandedLibraryNodeIds: [],
+      expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'allFiles',
       localPreviewMode: 'advancedInventory'
     })
 
     store.save({
       version: 2,
-      expandedNodeIds: [],
+      activeSurface: 'libraryBrowse',
+      expandedLibraryNodeIds: [],
+      expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'invalid',
       localPreviewMode: 'invalid'
     } as unknown as PersistedLibraryViewState)
@@ -75,7 +92,9 @@ describe('createViewStateStore', () => {
 
     expect(writes[1]?.state).toEqual({
       version: 2,
-      expandedNodeIds: []
+      activeSurface: 'libraryBrowse',
+      expandedLibraryNodeIds: [],
+      expandedAddSourceNodeIds: []
     })
   })
 
@@ -85,7 +104,9 @@ describe('createViewStateStore', () => {
 
     store.save({
       version: 2,
-      expandedNodeIds: [],
+      activeSurface: 'libraryBrowse',
+      expandedLibraryNodeIds: [],
+      expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'audio',
       localPreviewMode: 'musicEvidence',
       searchText: 'amen'
@@ -94,7 +115,9 @@ describe('createViewStateStore', () => {
 
     expect(writes[0]?.state).toEqual({
       version: 2,
-      expandedNodeIds: [],
+      activeSurface: 'libraryBrowse',
+      expandedLibraryNodeIds: [],
+      expandedAddSourceNodeIds: [],
       libraryBrowseProfile: 'audio',
       localPreviewMode: 'musicEvidence'
     })
@@ -119,15 +142,20 @@ describe('createViewStateStore', () => {
 
     store.save({
       version: 2,
-      selectedNodeId: 'will-fail',
-      expandedNodeIds: ['will-fail']
+      activeSurface: 'libraryBrowse',
+      selectedLibraryNodeId: 'will-fail',
+      expandedLibraryNodeIds: ['will-fail'],
+      expandedAddSourceNodeIds: []
     })
     await waitForMicrotasks()
 
     store.save({
       version: 2,
-      selectedNodeId: 'will-succeed',
-      expandedNodeIds: ['will-succeed']
+      activeSurface: 'addSource',
+      selectedLibraryNodeId: 'will-succeed',
+      selectedAddSourceNodeId: 'local-succeed',
+      expandedLibraryNodeIds: ['will-succeed'],
+      expandedAddSourceNodeIds: ['local-succeed']
     })
     await waitForWrites()
 
@@ -135,8 +163,11 @@ describe('createViewStateStore', () => {
     expect(writes).toEqual([
       {
         version: 2,
-        selectedNodeId: 'will-succeed',
-        expandedNodeIds: ['will-succeed']
+        activeSurface: 'addSource',
+        selectedLibraryNodeId: 'will-succeed',
+        selectedAddSourceNodeId: 'local-succeed',
+        expandedLibraryNodeIds: ['will-succeed'],
+        expandedAddSourceNodeIds: ['local-succeed']
       }
     ])
   })
@@ -204,4 +235,14 @@ function waitForMicrotasks(): Promise<void> {
 
 function waitForWrites(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 50))
+}
+
+function viewState(overrides: Partial<PersistedLibraryViewState> = {}): PersistedLibraryViewState {
+  return {
+    version: 2,
+    activeSurface: 'libraryBrowse',
+    expandedLibraryNodeIds: [],
+    expandedAddSourceNodeIds: [],
+    ...overrides
+  }
 }

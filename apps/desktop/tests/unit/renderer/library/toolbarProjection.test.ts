@@ -8,30 +8,35 @@ import type { RowBinding } from '../../../../src/renderer/library/state'
 import type { BrowserProjection } from '../../../../src/renderer/library/tree/projection'
 
 describe('library toolbar projection', () => {
-  it('shows only library start actions when nothing is selected', () => {
-    const toolbar = projectLibraryToolbar(input({ selectedNodeId: undefined }))
+  it('shows Library Browse controls and an Add Source path without local preview controls', () => {
+    const toolbar = projectLibraryToolbar(
+      input({ activeSurface: 'libraryBrowse', selectedNodeId: undefined })
+    )
 
-    expect(toolbar.scope).toBe('libraryStart')
+    expect(toolbar.scope).toBe('libraryBrowse')
     expect(toolbar.addMusicFolder).toMatchObject({
+      kind: 'openAddSource',
       visible: true,
       enabled: true,
-      label: 'Add music folder'
+      label: 'Add Source'
     })
-    expect(toolbar.search.visible).toBe(false)
-    expect(toolbar.libraryBrowseProfile.visible).toBe(false)
+    expect(toolbar.search.visible).toBe(true)
+    expect(toolbar.libraryBrowseProfile.visible).toBe(true)
     expect(toolbar.localPreviewMode.visible).toBe(false)
   })
 
   it('scopes Add Source root to local preview controls without indexed search', () => {
     const toolbar = projectLibraryToolbar(
       input({
+        activeSurface: 'addSource',
         selectedNodeId: 'selected',
         binding: { kind: 'addSourceSection' }
       })
     )
 
-    expect(toolbar.scope).toBe('localAdmission')
+    expect(toolbar.scope).toBe('addSource')
     expect(toolbar.addMusicFolder.visible).toBe(true)
+    expect(toolbar.addMusicFolder.kind).toBe('chooseMusicFolder')
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
     expect(toolbar.localPreviewMode).toMatchObject({
@@ -44,6 +49,7 @@ describe('library toolbar projection', () => {
   it('keeps Inventory explicit and hides folder picker/search', () => {
     const toolbar = projectLibraryToolbar(
       input({
+        activeSurface: 'addSource',
         selectedNodeId: 'selected',
         binding: { kind: 'addSourceSection' },
         localPreviewMode: 'advancedInventory',
@@ -51,7 +57,7 @@ describe('library toolbar projection', () => {
       })
     )
 
-    expect(toolbar.scope).toBe('localAdmission')
+    expect(toolbar.scope).toBe('addSource')
     expect(toolbar.addMusicFolder.visible).toBe(false)
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
@@ -64,6 +70,7 @@ describe('library toolbar projection', () => {
   it('does not duplicate add actions for an eligible local preview selection', () => {
     const toolbar = projectLibraryToolbar(
       input({
+        activeSurface: 'addSource',
         selectedNodeId: 'selected',
         binding: {
           kind: 'localBrowseEntryPoint',
@@ -95,7 +102,7 @@ describe('library toolbar projection', () => {
       })
     )
 
-    expect(toolbar.scope).toBe('localAdmission')
+    expect(toolbar.scope).toBe('addSource')
     expect(toolbar.addMusicFolder.visible).toBe(false)
     expect(toolbar.localPreviewMode.visible).toBe(true)
   })
@@ -103,13 +110,18 @@ describe('library toolbar projection', () => {
   it('scopes admitted source rows to indexed controls only', () => {
     const toolbar = projectLibraryToolbar(
       input({
+        activeSurface: 'libraryBrowse',
         selectedNodeId: 'selected',
         binding: sourceBinding()
       })
     )
 
-    expect(toolbar.scope).toBe('indexedLibrary')
-    expect(toolbar.addMusicFolder.visible).toBe(false)
+    expect(toolbar.scope).toBe('libraryBrowse')
+    expect(toolbar.addMusicFolder).toMatchObject({
+      kind: 'openAddSource',
+      visible: true,
+      label: 'Add Source'
+    })
     expect(toolbar.search).toMatchObject({
       visible: true,
       label: 'Search indexed library'
@@ -124,6 +136,7 @@ describe('library toolbar projection', () => {
   it('hides scoped controls for neutral read-state selections', () => {
     const toolbar = projectLibraryToolbar(
       input({
+        activeSurface: 'addSource',
         selectedNodeId: 'selected',
         binding: {
           kind: 'readState',
@@ -134,11 +147,11 @@ describe('library toolbar projection', () => {
       })
     )
 
-    expect(toolbar.scope).toBe('neutral')
-    expect(toolbar.addMusicFolder.visible).toBe(false)
+    expect(toolbar.scope).toBe('addSource')
+    expect(toolbar.addMusicFolder.visible).toBe(true)
     expect(toolbar.search.visible).toBe(false)
     expect(toolbar.libraryBrowseProfile.visible).toBe(false)
-    expect(toolbar.localPreviewMode.visible).toBe(false)
+    expect(toolbar.localPreviewMode.visible).toBe(true)
   })
 })
 
@@ -150,6 +163,7 @@ function input(
   return {
     projection:
       overrides.binding === undefined ? undefined : projectionForBinding(overrides.binding),
+    activeSurface: 'libraryBrowse',
     selectedNodeId: 'selected',
     selectedLibraryBrowseProfileLabel: 'Audio',
     selectedLocalPreviewModeLabel: 'Music Preview',

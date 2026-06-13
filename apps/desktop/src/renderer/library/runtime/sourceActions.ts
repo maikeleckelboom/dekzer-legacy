@@ -86,13 +86,10 @@ export function hasVisibleSourceRootBinding(
   return visibleSourceNodeId(projection, rootId) !== undefined
 }
 
-export function sourceRegistrationIntent(
-  rootId: string,
-  selectedNodeId: BrowserTreeNodeId | undefined
-): SourceRegistrationIntent {
+export function sourceRegistrationIntent(rootId: string): SourceRegistrationIntent {
   return {
     rootId,
-    activateWhenVisible: selectedNodeId === undefined || selectedNodeId.startsWith('local-browse')
+    activateWhenVisible: true
   }
 }
 

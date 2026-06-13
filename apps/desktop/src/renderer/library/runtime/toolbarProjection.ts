@@ -3,8 +3,9 @@ import { sourceAdmissionOperation } from '../localBrowse/projection'
 import type { LocalPreviewMode } from '../localBrowse/previewMode'
 import type { BrowserProjection } from '../tree/projection'
 import type { BrowserTreeNodeId } from '../tree/types'
+import type { LibraryPanelSurface } from '../../../shared/library/viewState/persistence'
 
-export type LibraryToolbarScope = 'libraryStart' | 'indexedLibrary' | 'localAdmission' | 'neutral'
+export type LibraryToolbarScope = LibraryPanelSurface | 'neutral'
 
 export type LibraryToolbarModel = {
   readonly scope: LibraryToolbarScope
@@ -23,6 +24,7 @@ export type ToolbarControl = {
 }
 
 export type ToolbarAction = {
+  readonly kind: 'openAddSource' | 'chooseMusicFolder'
   readonly visible: boolean
   readonly enabled: boolean
   readonly label: string
@@ -30,6 +32,7 @@ export type ToolbarAction = {
 }
 
 export type LibraryToolbarInput = {
+  readonly activeSurface: LibraryPanelSurface
   readonly projection: BrowserProjection | undefined
   readonly selectedNodeId: BrowserTreeNodeId | undefined
   readonly selectedLibraryBrowseProfileLabel: string
@@ -40,55 +43,69 @@ export type LibraryToolbarInput = {
 }
 
 export function projectLibraryToolbar(input: LibraryToolbarInput): LibraryToolbarModel {
-  const scope = toolbarScope(input.projection, input.selectedNodeId)
+  const scope = toolbarScope(input.activeSurface, input.projection, input.selectedNodeId)
   const selectedBinding =
     input.selectedNodeId === undefined
       ? undefined
       : input.projection?.bindingsById.get(input.selectedNodeId)
   const selectedLocalAdmissionAvailable =
-    selectedBinding === undefined ? false : hasLocalSourceAdmission(selectedBinding)
+    scope === 'addSource' && selectedBinding !== undefined
+      ? hasLocalSourceAdmission(selectedBinding)
+      : false
+  const showOpenAddSource = scope === 'libraryBrowse'
   const showFolderPicker =
-    scope === 'libraryStart' ||
-    (scope === 'localAdmission' &&
-      input.localPreviewMode !== 'advancedInventory' &&
-      !selectedLocalAdmissionAvailable)
+    scope === 'addSource' &&
+    input.localPreviewMode !== 'advancedInventory' &&
+    !selectedLocalAdmissionAvailable
 
   return {
     scope,
     search: {
-      visible: scope === 'indexedLibrary',
-      enabled: scope === 'indexedLibrary',
+      visible: scope === 'libraryBrowse',
+      enabled: scope === 'libraryBrowse',
       label: 'Search indexed library',
       title: 'Search indexed library',
       placeholder: 'Search indexed library'
     },
     libraryBrowseProfile: {
-      visible: scope === 'indexedLibrary',
-      enabled: scope === 'indexedLibrary',
+      visible: scope === 'libraryBrowse',
+      enabled: scope === 'libraryBrowse',
       label: 'Indexed contents view',
       title: `Indexed contents view: ${input.selectedLibraryBrowseProfileLabel}`
     },
     localPreviewMode: {
-      visible: scope === 'localAdmission',
-      enabled: scope === 'localAdmission',
+      visible: scope === 'addSource',
+      enabled: scope === 'addSource',
       label: 'Local preview mode',
       title: `Local preview mode: ${input.selectedLocalPreviewModeLabel}`
     },
     addMusicFolder: {
-      visible: showFolderPicker,
-      enabled: input.canAddMusicFolder,
-      label: input.addMusicFolderLabel,
-      ...(input.canAddMusicFolder ? {} : { reason: 'A source action is already running.' })
+      kind: showOpenAddSource ? 'openAddSource' : 'chooseMusicFolder',
+      visible: showOpenAddSource || showFolderPicker,
+      enabled: showOpenAddSource || input.canAddMusicFolder,
+      label: showOpenAddSource ? 'Add Source' : input.addMusicFolderLabel,
+      ...(showOpenAddSource || input.canAddMusicFolder
+        ? {}
+        : { reason: 'A source action is already running.' })
     }
   }
 }
 
 function toolbarScope(
+  activeSurface: LibraryPanelSurface,
   projection: BrowserProjection | undefined,
   selectedNodeId: BrowserTreeNodeId | undefined
 ): LibraryToolbarScope {
+  if (activeSurface === 'libraryBrowse') {
+    return 'libraryBrowse'
+  }
+
+  if (activeSurface === 'addSource') {
+    return 'addSource'
+  }
+
   if (selectedNodeId === undefined) {
-    return 'libraryStart'
+    return 'neutral'
   }
 
   const binding = projection?.bindingsById.get(selectedNodeId)
@@ -98,11 +115,11 @@ function toolbarScope(
   }
 
   if (isLocalAdmissionBinding(binding)) {
-    return 'localAdmission'
+    return 'addSource'
   }
 
   if (isIndexedLibraryBinding(binding)) {
-    return 'indexedLibrary'
+    return 'libraryBrowse'
   }
 
   return 'neutral'

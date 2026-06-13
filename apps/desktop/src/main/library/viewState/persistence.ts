@@ -11,8 +11,11 @@ import type { LibraryBoundaryHost } from '../boundary/host'
 const viewStateFileName = 'library-view-state.json'
 const viewStateKeys = new Set([
   'version',
-  'selectedNodeId',
-  'expandedNodeIds',
+  'activeSurface',
+  'selectedLibraryNodeId',
+  'selectedAddSourceNodeId',
+  'expandedLibraryNodeIds',
+  'expandedAddSourceNodeIds',
   'libraryBrowseProfile',
   'localPreviewMode'
 ])
@@ -32,8 +35,15 @@ export async function readViewStateFromHost(
       state: 'ready',
       viewState: {
         version: parsed.version,
-        ...(parsed.selectedNodeId === undefined ? {} : { selectedNodeId: parsed.selectedNodeId }),
-        expandedNodeIds: deduplicateStringIds(parsed.expandedNodeIds),
+        activeSurface: parsed.activeSurface,
+        ...(parsed.selectedLibraryNodeId === undefined
+          ? {}
+          : { selectedLibraryNodeId: parsed.selectedLibraryNodeId }),
+        ...(parsed.selectedAddSourceNodeId === undefined
+          ? {}
+          : { selectedAddSourceNodeId: parsed.selectedAddSourceNodeId }),
+        expandedLibraryNodeIds: deduplicateStringIds(parsed.expandedLibraryNodeIds),
+        expandedAddSourceNodeIds: deduplicateStringIds(parsed.expandedAddSourceNodeIds),
         ...(parsed.libraryBrowseProfile === undefined
           ? {}
           : { libraryBrowseProfile: parsed.libraryBrowseProfile }),
@@ -56,10 +66,15 @@ export async function writeViewStateToHost(
     await mkdir(dir, { recursive: true })
     const payload = JSON.stringify({
       version: viewState.version,
-      ...(viewState.selectedNodeId === undefined
+      activeSurface: viewState.activeSurface,
+      ...(viewState.selectedLibraryNodeId === undefined
         ? {}
-        : { selectedNodeId: viewState.selectedNodeId }),
-      expandedNodeIds: deduplicateStringIds(viewState.expandedNodeIds),
+        : { selectedLibraryNodeId: viewState.selectedLibraryNodeId }),
+      ...(viewState.selectedAddSourceNodeId === undefined
+        ? {}
+        : { selectedAddSourceNodeId: viewState.selectedAddSourceNodeId }),
+      expandedLibraryNodeIds: deduplicateStringIds(viewState.expandedLibraryNodeIds),
+      expandedAddSourceNodeIds: deduplicateStringIds(viewState.expandedAddSourceNodeIds),
       ...(viewState.libraryBrowseProfile === undefined
         ? {}
         : { libraryBrowseProfile: viewState.libraryBrowseProfile }),
@@ -107,11 +122,17 @@ export function isValidViewState(value: unknown): value is PersistedLibraryViewS
   const obj = value as Record<string, unknown>
   if (!Object.keys(obj).every((key) => viewStateKeys.has(key))) return false
   if (obj.version !== 2) return false
-  if ('selectedNodeId' in obj && obj.selectedNodeId !== undefined) {
-    if (typeof obj.selectedNodeId !== 'string') return false
+  if (obj.activeSurface !== 'libraryBrowse' && obj.activeSurface !== 'addSource') return false
+  if ('selectedLibraryNodeId' in obj && obj.selectedLibraryNodeId !== undefined) {
+    if (typeof obj.selectedLibraryNodeId !== 'string') return false
   }
-  if (!Array.isArray(obj.expandedNodeIds)) return false
-  if (!obj.expandedNodeIds.every((id: unknown) => typeof id === 'string')) return false
+  if ('selectedAddSourceNodeId' in obj && obj.selectedAddSourceNodeId !== undefined) {
+    if (typeof obj.selectedAddSourceNodeId !== 'string') return false
+  }
+  if (!Array.isArray(obj.expandedLibraryNodeIds)) return false
+  if (!obj.expandedLibraryNodeIds.every((id: unknown) => typeof id === 'string')) return false
+  if (!Array.isArray(obj.expandedAddSourceNodeIds)) return false
+  if (!obj.expandedAddSourceNodeIds.every((id: unknown) => typeof id === 'string')) return false
   if ('libraryBrowseProfile' in obj && obj.libraryBrowseProfile !== undefined) {
     if (
       obj.libraryBrowseProfile !== 'audio' &&

@@ -485,12 +485,14 @@ describe('panel runtime wiring', () => {
     const panel = readRendererSource('panel.vue')
 
     expect(panel).toContain('() => libraryBrowseProfile.profile.value')
-    expect(panel).toContain('await hierarchyRead.refreshBrowserWindows(expandedNodeIds.value)')
+    expect(panel).toContain(
+      'await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)'
+    )
     expect(panel).toContain('requestContentsForCurrentSelection({ force: true })')
     expect(panel).toContain('() => localPreviewMode.mode.value')
-    expect(panel).toContain(
-      'await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)'
-    )
+    expect(panel).toContain('await localBrowse.refreshBrowserWindows(')
+    expect(panel).toContain('expandedAddSourceNodeIds.value')
+    expect(panel).toContain('addSourceProjection.value')
     expect(panel).toContain('libraryBrowseProfile: libraryBrowseProfile.profile.value')
     expect(panel).toContain('localPreviewMode: localPreviewMode.mode.value')
   })

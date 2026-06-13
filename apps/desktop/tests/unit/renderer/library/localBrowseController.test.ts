@@ -9,10 +9,8 @@ import {
 import { localBrowseWindowKey } from '../../../../src/renderer/library/localBrowse/types'
 import type { LocalPreviewMode } from '../../../../src/renderer/library/localBrowse/previewMode'
 import type { BrowserState } from '../../../../src/renderer/library/state'
-import {
-  projectState,
-  type BrowserProjection
-} from '../../../../src/renderer/library/tree/projection'
+import { projectAddSourceState } from '../../../../src/renderer/library/localBrowse/projection'
+import type { BrowserProjection } from '../../../../src/renderer/library/tree/projection'
 import type { LocalBrowseEntryPoint } from '../../../../src/shared/library/localBrowse/entryPoints'
 import type {
   LocalBrowseItem,
@@ -268,7 +266,11 @@ function directoryItem(): LocalBrowseItem {
 }
 
 function projectTree(state: BrowserState): BrowserProjection {
-  const projection = projectState(state)
+  const projection = projectAddSourceState({
+    localPreviewMode: state.localPreviewMode ?? 'musicEvidence',
+    entryPointsState: state.localBrowseEntryPointsState,
+    itemStates: state.localBrowseItemStates
+  })
 
   expect(projection?.kind).toBe('tree')
   if (projection?.kind !== 'tree') {

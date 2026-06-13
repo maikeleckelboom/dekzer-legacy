@@ -29,8 +29,18 @@ function getRendererApi(): ViewStateApi {
 function normalizeViewStateForPersist(state: PersistedLibraryViewState): PersistedLibraryViewState {
   return {
     version: 2,
-    ...(state.selectedNodeId === undefined ? {} : { selectedNodeId: state.selectedNodeId }),
-    expandedNodeIds: [...new Set(state.expandedNodeIds)],
+    activeSurface:
+      state.activeSurface === 'addSource' || state.activeSurface === 'libraryBrowse'
+        ? state.activeSurface
+        : 'libraryBrowse',
+    ...(state.selectedLibraryNodeId === undefined
+      ? {}
+      : { selectedLibraryNodeId: state.selectedLibraryNodeId }),
+    ...(state.selectedAddSourceNodeId === undefined
+      ? {}
+      : { selectedAddSourceNodeId: state.selectedAddSourceNodeId }),
+    expandedLibraryNodeIds: [...new Set(state.expandedLibraryNodeIds)],
+    expandedAddSourceNodeIds: [...new Set(state.expandedAddSourceNodeIds)],
     ...(isLibraryBrowseProfile(state.libraryBrowseProfile)
       ? { libraryBrowseProfile: state.libraryBrowseProfile }
       : {}),

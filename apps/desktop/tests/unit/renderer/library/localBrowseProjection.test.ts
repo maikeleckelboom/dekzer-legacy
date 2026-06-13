@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import type { BrowserState } from '../../../../src/renderer/library/state'
 import {
+  projectAddSourceState,
+  addSourceSectionNodeId
+} from '../../../../src/renderer/library/localBrowse/projection'
+import {
   projectState,
   type BrowserProjection
 } from '../../../../src/renderer/library/tree/projection'
@@ -23,7 +27,7 @@ describe('local browse tree projection', () => {
       })
     )
 
-    expect(projection.nodes.map((node) => node.id)).toEqual(['local-browse:section'])
+    expect(projection.nodes.map((node) => node.id)).toEqual([addSourceSectionNodeId])
     expect(projection.nodes[0]?.label).toBe('Add Source')
     expect(firstLoadedChildLabels(projection.nodes[0])).toEqual(['Music'])
     expect(projection.bindingsById.get('local-browse:section')).toEqual({
@@ -232,10 +236,31 @@ describe('local browse tree projection', () => {
     expect(firstLoadedChildLabels(music)).toEqual([])
     expect(music?.children.kind).toBe('deferred')
   })
+
+  it('keeps Add Source rows out of the admitted library projection', () => {
+    const projection = projectState(
+      browserState({
+        entries: [musicEntryPoint()]
+      })
+    )
+
+    expect(projection?.kind).toBe('tree')
+    expect(projection?.nodes.map((node) => node.id)).toEqual(['read-state:navigation'])
+    expect(projection?.bindingsById.has(addSourceSectionNodeId)).toBe(false)
+    expect(
+      [...(projection?.bindingsById.values() ?? [])].some((binding) =>
+        binding.kind.startsWith('localBrowse')
+      )
+    ).toBe(false)
+  })
 })
 
 function projectTree(state: BrowserState): BrowserProjection {
-  const projection = projectState(state)
+  const projection = projectAddSourceState({
+    localPreviewMode: state.localPreviewMode ?? 'musicEvidence',
+    entryPointsState: state.localBrowseEntryPointsState,
+    itemStates: state.localBrowseItemStates
+  })
 
   expect(projection?.kind).toBe('tree')
   if (projection?.kind !== 'tree') {

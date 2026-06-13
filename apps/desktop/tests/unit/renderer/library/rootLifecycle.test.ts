@@ -262,9 +262,8 @@ describe('local root scan lifecycle', () => {
     ])
   })
 
-  it('evaluates source activation when the registration response arrives, not at request start', async () => {
+  it('activates the registered source regardless of prior library selection', async () => {
     const choice = deferred<LocalRootChoiceResult>()
-    const selection = { nodeId: undefined as string | undefined }
     let intent: SourceRegistrationIntent | undefined
     const rootActions = createLocalRootActionsController(
       testRootApi({
@@ -278,18 +277,17 @@ describe('local root scan lifecycle', () => {
       confirmRemoveSource: () => true,
       isSourceRootVisible: () => false,
       onSourceRegistered: (root) => {
-        intent = sourceRegistrationIntent(root.rootId, selection.nodeId)
+        intent = sourceRegistrationIntent(root.rootId)
       }
     })
 
     const registration = lifecycle.addMusicFolder()
-    selection.nodeId = 'navigation-row:root-1'
     choice.resolve(registeredChoice({ rootId: 'root-2', admittedRootPath: 'C:/Music/Two' }))
 
     await expect(registration).resolves.toBe(true)
     expect(intent).toEqual({
       rootId: 'root-2',
-      activateWhenVisible: false
+      activateWhenVisible: true
     })
   })
 

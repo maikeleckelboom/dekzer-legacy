@@ -12,6 +12,7 @@ import { useLibraryHierarchyRead } from './boundary/hierarchyRead'
 import { useContentsRead } from './boundary/contentsRead'
 import { useLocalRootActions } from './boundary/localRootActions'
 import { useLocalBrowseController } from './localBrowse/controller'
+import { addSourceSectionNodeId, projectAddSourceState } from './localBrowse/projection'
 import {
   createLocalPreviewModeController,
   localPreviewModeLabel,
@@ -54,6 +55,7 @@ import { createViewStateStore } from './runtime/viewState'
 import { projectState } from './tree/projection'
 import TreeRoot from './tree/treeRoot.vue'
 import type { BrowserTreeNodeId } from './tree/types'
+import type { LibraryPanelSurface } from '../../shared/library/viewState/persistence'
 
 defineOptions({
   name: 'LibraryPanel'
@@ -91,7 +93,10 @@ const librarySearch = createLibrarySearchController({
   searchFilterRead
 })
 const disclosureReconciler = createDisclosureReconciler({
-  requestNodeChildren: (nodeId) => requestBrowserNodeChildren(nodeId)
+  requestNodeChildren: (nodeId) => requestLibraryNodeChildren(nodeId)
+})
+const addSourceDisclosureReconciler = createDisclosureReconciler({
+  requestNodeChildren: (nodeId) => requestAddSourceNodeChildren(nodeId)
 })
 
 const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(() => {
@@ -102,9 +107,15 @@ const scanProgressForRegisteredRoot = computed<ScanProgressState | undefined>(()
   return boundaryEvents.scanProgress.value.get(root.rootId)
 })
 
-const selectedNodeId = ref<BrowserTreeNodeId>()
-const expandedNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
-const pendingRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const activeSurface = ref<LibraryPanelSurface>('libraryBrowse')
+const selectedLibraryNodeId = ref<BrowserTreeNodeId>()
+const selectedAddSourceNodeId = ref<BrowserTreeNodeId>()
+const expandedLibraryNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const expandedAddSourceNodeIds = ref<ReadonlySet<BrowserTreeNodeId>>(
+  new Set([addSourceSectionNodeId])
+)
+const pendingLibraryRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
+const pendingAddSourceRestoreIds = ref<ReadonlySet<BrowserTreeNodeId>>(new Set())
 const pendingSourceRegistration = ref<SourceRegistrationIntent>()
 const sourceRevealRequest = ref<{
   readonly nodeId: BrowserTreeNodeId
@@ -163,12 +174,34 @@ const selectedLocalPreviewModeLabel = computed(() =>
   localPreviewModeLabel(localPreviewMode.mode.value)
 )
 
-const browserProjection = computed(() => projectState(browserState.value))
+const libraryBrowseProjection = computed(() => projectState(browserState.value))
+const addSourceProjection = computed(() =>
+  projectAddSourceState({
+    localPreviewMode: localPreviewMode.mode.value,
+    entryPointsState: localBrowse.entryPointsState.value,
+    itemStates: localBrowse.itemStates.value
+  })
+)
+const activeProjection = computed(() =>
+  activeSurface.value === 'addSource' ? addSourceProjection.value : libraryBrowseProjection.value
+)
+const activeSelectedNodeId = computed(() =>
+  activeSurface.value === 'addSource' ? selectedAddSourceNodeId.value : selectedLibraryNodeId.value
+)
+const activeExpandedNodeIds = computed(() =>
+  activeSurface.value === 'addSource'
+    ? expandedAddSourceNodeIds.value
+    : expandedLibraryNodeIds.value
+)
+const hasAdmittedLibraryRowsVisible = computed(() =>
+  hasAdmittedLibraryRows(libraryBrowseProjection.value)
+)
 
 const toolbarModel = computed(() =>
   projectLibraryToolbar({
-    projection: browserProjection.value,
-    selectedNodeId: selectedNodeId.value,
+    activeSurface: activeSurface.value,
+    projection: activeProjection.value,
+    selectedNodeId: activeSelectedNodeId.value,
     selectedLibraryBrowseProfileLabel: selectedLibraryBrowseProfileLabel.value,
     selectedLocalPreviewModeLabel: selectedLocalPreviewModeLabel.value,
     localPreviewMode: localPreviewMode.mode.value,
@@ -179,9 +212,11 @@ const toolbarModel = computed(() =>
 
 const sourceLifecycleSourceIds = computed(() =>
   sourceLifecycleIdsForBrowserContext({
-    projection: hierarchyRead.browserProjection.value,
-    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
-    expandedNodeIds: expandedNodeIds.value
+    projection: libraryBrowseProjection.value,
+    ...(selectedLibraryNodeId.value === undefined
+      ? {}
+      : { selectedNodeId: selectedLibraryNodeId.value }),
+    expandedNodeIds: expandedLibraryNodeIds.value
   })
 )
 
@@ -194,37 +229,65 @@ const rootLifecycle = useRootLifecycle({
     refreshEntryPoints: localBrowse.refreshEntryPoints
   },
   confirmRemoveSource: () => window.confirm(removeSourceMessage),
-  isSourceRootVisible: (rootId) => hasVisibleSourceRootBinding(browserProjection.value, rootId),
+  isSourceRootVisible: (rootId) =>
+    hasVisibleSourceRootBinding(libraryBrowseProjection.value, rootId),
   onSourceRegistered: (root) => {
-    pendingSourceRegistration.value = sourceRegistrationIntent(root.rootId, selectedNodeId.value)
+    pendingSourceRegistration.value = sourceRegistrationIntent(root.rootId)
   },
   onSourceRemoved: clearBrowserView
 })
 
-const liveTreeNodes = computed(() => browserProjection.value?.nodes ?? [])
+const liveTreeNodes = computed(() => activeProjection.value?.nodes ?? [])
 
 const treeRootProps = computed(() => ({
-  expandedNodeIds: expandedNodeIds.value,
-  emptyLabel: emptyTreeLabel,
+  expandedNodeIds: activeExpandedNodeIds.value,
+  emptyLabel:
+    activeSurface.value === 'addSource'
+      ? 'Choose a music folder to add as a source.'
+      : emptyTreeLabel,
   labelledBy: 'library-hierarchy-title',
   nodes: liveTreeNodes.value,
-  ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
-  ...(sourceRevealRequest.value === undefined ? {} : { revealRequest: sourceRevealRequest.value })
+  ...(activeSelectedNodeId.value === undefined
+    ? {}
+    : { selectedNodeId: activeSelectedNodeId.value }),
+  ...(activeSurface.value !== 'libraryBrowse' || sourceRevealRequest.value === undefined
+    ? {}
+    : { revealRequest: sourceRevealRequest.value })
 }))
 
-const selectedContentsProjection = computed(() => {
-  const projection = browserProjection.value
+const selectedLibraryContentsProjection = computed(() => {
+  const projection = libraryBrowseProjection.value
 
   return projectContents({
+    surface: 'libraryBrowse',
     state: browserState.value,
-    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
+    ...(selectedLibraryNodeId.value === undefined
+      ? {}
+      : { selectedNodeId: selectedLibraryNodeId.value }),
     ...(projection === undefined ? {} : { bindingsById: projection.bindingsById }),
     contentsState: contentsRead.state.value
   })
 })
 
+const selectedAddSourceContentsProjection = computed(() => {
+  const projection = addSourceProjection.value
+
+  return projectContents({
+    surface: 'addSource',
+    state: browserState.value,
+    ...(selectedAddSourceNodeId.value === undefined
+      ? {}
+      : { selectedNodeId: selectedAddSourceNodeId.value }),
+    ...(projection === undefined ? {} : { bindingsById: projection.bindingsById })
+  })
+})
+
 const contentsProjection = computed(() => {
-  if (toolbarModel.value.search.visible && librarySearch.searchActive.value) {
+  if (
+    activeSurface.value === 'libraryBrowse' &&
+    toolbarModel.value.search.visible &&
+    librarySearch.searchActive.value
+  ) {
     return projectSearchFilterContents({
       state: searchFilterRead.state.value,
       activeQuery: librarySearch.activeQuery.value,
@@ -232,14 +295,21 @@ const contentsProjection = computed(() => {
     })
   }
 
-  return selectedContentsProjection.value
+  return activeSurface.value === 'addSource'
+    ? selectedAddSourceContentsProjection.value
+    : selectedLibraryContentsProjection.value
 })
 
 const sourceStatusContext = computed(() =>
   projectStatusContext({
-    projection: browserProjection.value,
-    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value }),
-    selectedTitle: selectedContentsProjection.value.title
+    projection: activeProjection.value,
+    ...(activeSelectedNodeId.value === undefined
+      ? {}
+      : { selectedNodeId: activeSelectedNodeId.value }),
+    selectedTitle:
+      activeSurface.value === 'addSource'
+        ? selectedAddSourceContentsProjection.value.title
+        : selectedLibraryContentsProjection.value.title
   })
 )
 
@@ -273,9 +343,9 @@ const sourceStatusView = computed(() => {
   const maintenanceRunState =
     sourceId === undefined ? undefined : maintenanceRead.runStateBySourceId.value.get(sourceId)
   const sourceReadiness =
-    selectedNodeId.value === undefined
+    activeSurface.value !== 'libraryBrowse' || selectedLibraryNodeId.value === undefined
       ? undefined
-      : sourceReadinessByNodeId.value.get(selectedNodeId.value)
+      : sourceReadinessByNodeId.value.get(selectedLibraryNodeId.value)
 
   return projectStatusView({
     context,
@@ -325,7 +395,11 @@ watch(scanProgressForRegisteredRoot, (progress) => {
 })
 
 watch(
-  [selectedNodeId, () => browserProjection.value, () => hierarchyRead.hostStatus.value?.state],
+  [
+    selectedLibraryNodeId,
+    () => libraryBrowseProjection.value,
+    () => hierarchyRead.hostStatus.value?.state
+  ],
   () => {
     requestContentsForCurrentSelection()
   },
@@ -336,7 +410,7 @@ watch(
   () => libraryBrowseProfile.profile.value,
   async () => {
     contentsRead.clear()
-    await hierarchyRead.refreshBrowserWindows(expandedNodeIds.value)
+    await hierarchyRead.refreshBrowserWindows(expandedLibraryNodeIds.value)
     requestContentsForCurrentSelection({ force: true })
     saveViewState()
   }
@@ -345,15 +419,19 @@ watch(
 watch(
   () => localPreviewMode.mode.value,
   async () => {
-    await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
+    await localBrowse.refreshBrowserWindows(
+      expandedAddSourceNodeIds.value,
+      addSourceProjection.value
+    )
     saveViewState()
   }
 )
 
-watch(browserProjection, (projection) => {
+watch(libraryBrowseProjection, (projection) => {
   applyPendingSourceRegistration(projection)
+  applyEmptyLibraryDefaultSurface(projection)
 
-  const selectedId = selectedNodeId.value
+  const selectedId = selectedLibraryNodeId.value
 
   if (
     selectedId === undefined ||
@@ -363,13 +441,28 @@ watch(browserProjection, (projection) => {
     return
   }
 
-  selectedNodeId.value = undefined
+  selectedLibraryNodeId.value = undefined
   contentsRead.clear()
   saveViewState()
 })
 
+watch(addSourceProjection, (projection) => {
+  const selectedId = selectedAddSourceNodeId.value
+
+  if (
+    selectedId === undefined ||
+    projection === undefined ||
+    projection.bindingsById.has(selectedId)
+  ) {
+    return
+  }
+
+  selectedAddSourceNodeId.value = undefined
+  saveViewState()
+})
+
 watch(
-  [() => browserProjection.value, () => expandedNodeIds.value],
+  [() => libraryBrowseProjection.value, () => expandedLibraryNodeIds.value],
   ([projection, expandedIds]) => {
     disclosureReconciler.reconcile({
       projection,
@@ -382,7 +475,21 @@ watch(
   { immediate: true }
 )
 
-watch(liveTreeNodes, () => {
+watch(
+  [() => addSourceProjection.value, () => expandedAddSourceNodeIds.value],
+  ([projection, expandedIds]) => {
+    addSourceDisclosureReconciler.reconcile({
+      projection,
+      expandedNodeIds: expandedIds,
+      sourceReadStates: hierarchyRead.sourceReadStates.value,
+      directoryReadStates: hierarchyRead.directoryReadStates.value,
+      localBrowseItemStates: localBrowse.itemStates.value
+    })
+  },
+  { immediate: true }
+)
+
+watch([() => libraryBrowseProjection.value?.nodes, () => addSourceProjection.value?.nodes], () => {
   if (!restoreState.readStarted) {
     restoreState.readStarted = true
     void restoreViewState()
@@ -391,10 +498,11 @@ watch(liveTreeNodes, () => {
 
   if (
     restoreState.readCompleted &&
-    pendingRestoreIds.value.size > 0 &&
+    (pendingLibraryRestoreIds.value.size > 0 || pendingAddSourceRestoreIds.value.size > 0) &&
     !restoreState.userInteracted
   ) {
-    applyPendingRestoreIds()
+    applyPendingRestoreIds('libraryBrowse')
+    applyPendingRestoreIds('addSource')
   }
 })
 
@@ -511,17 +619,25 @@ watch(
 function saveViewState(): void {
   viewStateStore.save({
     version: 2,
-    expandedNodeIds: [...expandedNodeIds.value],
+    activeSurface: activeSurface.value,
+    expandedLibraryNodeIds: [...expandedLibraryNodeIds.value],
+    expandedAddSourceNodeIds: [...expandedAddSourceNodeIds.value],
     libraryBrowseProfile: libraryBrowseProfile.profile.value,
     localPreviewMode: localPreviewMode.mode.value,
-    ...(selectedNodeId.value === undefined ? {} : { selectedNodeId: selectedNodeId.value })
+    ...(selectedLibraryNodeId.value === undefined
+      ? {}
+      : { selectedLibraryNodeId: selectedLibraryNodeId.value }),
+    ...(selectedAddSourceNodeId.value === undefined
+      ? {}
+      : { selectedAddSourceNodeId: selectedAddSourceNodeId.value })
   })
 }
 
 async function restoreViewState(): Promise<void> {
-  const projection = browserProjection.value
+  const libraryProjection = libraryBrowseProjection.value
+  const addSource = addSourceProjection.value
 
-  if (projection?.kind !== 'tree') {
+  if (libraryProjection?.kind !== 'tree' && addSource?.kind !== 'tree') {
     restoreState.readStarted = false
     return
   }
@@ -535,8 +651,27 @@ async function restoreViewState(): Promise<void> {
       return
     }
 
-    applyRestoredSelection(result.viewState.selectedNodeId, projection.bindingsById)
-    applyRestoredExpansion(result.viewState.expandedNodeIds, projection.bindingsById)
+    activeSurface.value = result.viewState.activeSurface
+    applyRestoredSelection(
+      'libraryBrowse',
+      result.viewState.selectedLibraryNodeId,
+      libraryProjection?.bindingsById
+    )
+    applyRestoredSelection(
+      'addSource',
+      result.viewState.selectedAddSourceNodeId,
+      addSource?.bindingsById
+    )
+    applyRestoredExpansion(
+      'libraryBrowse',
+      result.viewState.expandedLibraryNodeIds,
+      libraryProjection?.bindingsById
+    )
+    applyRestoredExpansion(
+      'addSource',
+      result.viewState.expandedAddSourceNodeIds,
+      addSource?.bindingsById
+    )
     libraryBrowseProfile.restoreProfile(result.viewState.libraryBrowseProfile)
     localPreviewMode.restoreMode(result.viewState.localPreviewMode)
   } catch {
@@ -585,6 +720,32 @@ function handleSearchEscape(): void {
   librarySearch.handleEscape()
 }
 
+function openLibraryBrowseSurface(): void {
+  markUserInteraction()
+  activeSurface.value = 'libraryBrowse'
+  requestContentsForCurrentSelection()
+  saveViewState()
+}
+
+function openAddSourceSurface(): void {
+  markUserInteraction()
+  activeSurface.value = 'addSource'
+  saveViewState()
+}
+
+function activateToolbarAddMusicFolder(): void {
+  if (!toolbarModel.value.addMusicFolder.enabled) {
+    return
+  }
+
+  if (toolbarModel.value.addMusicFolder.kind === 'openAddSource') {
+    openAddSourceSurface()
+    return
+  }
+
+  void rootLifecycle.addMusicFolder()
+}
+
 function handleLibraryBrowseProfileOutsidePointerDown(event: PointerEvent): void {
   const target = event.target
 
@@ -604,26 +765,33 @@ function handleLibraryBrowseProfileOutsidePointerDown(event: PointerEvent): void
 }
 
 function applyRestoredSelection(
+  surface: LibraryPanelSurface,
   nodeId: BrowserTreeNodeId | undefined,
-  bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>
+  bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding> | undefined
 ): void {
-  if (nodeId === undefined || !bindingsById.has(nodeId)) {
+  if (nodeId === undefined || bindingsById === undefined || !bindingsById.has(nodeId)) {
     return
   }
 
-  selectedNodeId.value = nodeId
+  if (surface === 'addSource') {
+    selectedAddSourceNodeId.value = nodeId
+  } else {
+    selectedLibraryNodeId.value = nodeId
+  }
+
   restoreState.initialNodeApplied = true
 }
 
 function applyRestoredExpansion(
+  surface: LibraryPanelSurface,
   nodeIds: readonly BrowserTreeNodeId[],
-  bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding>
+  bindingsById: ReadonlyMap<BrowserTreeNodeId, RowBinding> | undefined
 ): void {
   const visibleIds: BrowserTreeNodeId[] = []
   const pendingIds: BrowserTreeNodeId[] = []
 
   for (const nodeId of nodeIds) {
-    if (bindingsById.has(nodeId)) {
+    if (bindingsById?.has(nodeId)) {
       visibleIds.push(nodeId)
     } else {
       pendingIds.push(nodeId)
@@ -631,17 +799,28 @@ function applyRestoredExpansion(
   }
 
   if (visibleIds.length > 0) {
-    expandedNodeIds.value = new Set(visibleIds)
+    if (surface === 'addSource') {
+      expandedAddSourceNodeIds.value = new Set(visibleIds)
+    } else {
+      expandedLibraryNodeIds.value = new Set(visibleIds)
+    }
     restoreState.initialNodeApplied = true
   }
 
   if (pendingIds.length > 0) {
-    pendingRestoreIds.value = new Set(pendingIds)
+    if (surface === 'addSource') {
+      pendingAddSourceRestoreIds.value = new Set(pendingIds)
+    } else {
+      pendingLibraryRestoreIds.value = new Set(pendingIds)
+    }
   }
 }
 
-function applyPendingRestoreIds(): void {
-  const projection = browserProjection.value
+function applyPendingRestoreIds(surface: LibraryPanelSurface): void {
+  const projection =
+    surface === 'addSource' ? addSourceProjection.value : libraryBrowseProjection.value
+  const pendingRestoreIds =
+    surface === 'addSource' ? pendingAddSourceRestoreIds : pendingLibraryRestoreIds
 
   if (projection?.kind !== 'tree') {
     return
@@ -671,13 +850,18 @@ function applyPendingRestoreIds(): void {
   }
 
   pendingRestoreIds.value = remainingIds
-  expandedNodeIds.value = new Set([...expandedNodeIds.value, ...appliedIds])
+  if (surface === 'addSource') {
+    expandedAddSourceNodeIds.value = new Set([...expandedAddSourceNodeIds.value, ...appliedIds])
+  } else {
+    expandedLibraryNodeIds.value = new Set([...expandedLibraryNodeIds.value, ...appliedIds])
+  }
   restoreState.initialNodeApplied = true
 }
 
 function markUserInteraction(): void {
   restoreState.userInteracted = true
-  pendingRestoreIds.value = new Set()
+  pendingLibraryRestoreIds.value = new Set()
+  pendingAddSourceRestoreIds.value = new Set()
 }
 
 function applyPendingSourceRegistration(projection: ReturnType<typeof projectState>): void {
@@ -703,23 +887,59 @@ function applyPendingSourceRegistration(projection: ReturnType<typeof projectSta
     return
   }
 
-  selectedNodeId.value = visibleRegistration.nodeId
+  activeSurface.value = 'libraryBrowse'
+  selectedLibraryNodeId.value = visibleRegistration.nodeId
   restoreState.initialNodeApplied = true
   requestContentsForCurrentSelection()
   saveViewState()
 }
 
+function applyEmptyLibraryDefaultSurface(projection: ReturnType<typeof projectState>): void {
+  if (restoreState.userInteracted || activeSurface.value === 'addSource') {
+    return
+  }
+
+  if (hasAdmittedLibraryRows(projection)) {
+    return
+  }
+
+  activeSurface.value = 'addSource'
+  saveViewState()
+}
+
+function hasAdmittedLibraryRows(projection: ReturnType<typeof projectState>): boolean {
+  if (projection?.kind !== 'tree') {
+    return false
+  }
+
+  for (const binding of projection.bindingsById.values()) {
+    if (binding.kind === 'source' || binding.kind === 'directory' || binding.kind === 'file') {
+      return true
+    }
+  }
+
+  return false
+}
+
 function selectNode(nodeId: BrowserTreeNodeId): void {
   markUserInteraction()
-  selectedNodeId.value = nodeId
-  void requestLocalBrowseNodeChildren(nodeId)
-  requestContentsForCurrentSelection()
+
+  if (activeSurface.value === 'addSource') {
+    selectedAddSourceNodeId.value = nodeId
+    void requestAddSourceNodeChildren(nodeId)
+  } else {
+    selectedLibraryNodeId.value = nodeId
+    requestContentsForCurrentSelection()
+  }
+
   saveViewState()
 }
 
 function toggleNode(nodeId: BrowserTreeNodeId): void {
   markUserInteraction()
 
+  const expandedNodeIds =
+    activeSurface.value === 'addSource' ? expandedAddSourceNodeIds : expandedLibraryNodeIds
   const nextExpandedIds = new Set(expandedNodeIds.value)
 
   if (nextExpandedIds.has(nodeId)) {
@@ -735,19 +955,35 @@ function toggleNode(nodeId: BrowserTreeNodeId): void {
 function activateNodeAction(nodeId: BrowserTreeNodeId): void {
   markUserInteraction()
 
-  expandedNodeIds.value = new Set([...expandedNodeIds.value, nodeId])
+  if (activeSurface.value === 'addSource') {
+    expandedAddSourceNodeIds.value = new Set([...expandedAddSourceNodeIds.value, nodeId])
+    saveViewState()
+    addSourceDisclosureReconciler.clearFailedForNode(nodeId)
+    void requestAddSourceNodeChildren(nodeId)
+    return
+  }
+
+  expandedLibraryNodeIds.value = new Set([...expandedLibraryNodeIds.value, nodeId])
   saveViewState()
 
   disclosureReconciler.clearFailedForNode(nodeId)
-  void requestBrowserNodeChildren(nodeId)
+  void requestLibraryNodeChildren(nodeId)
 }
 
 function prepareNodeContents(nodeId: BrowserTreeNodeId): void {
-  contentsRead.preloadForBinding(browserProjection.value?.bindingsById.get(nodeId))
+  if (activeSurface.value !== 'libraryBrowse') {
+    return
+  }
+
+  contentsRead.preloadForBinding(libraryBrowseProjection.value?.bindingsById.get(nodeId))
 }
 
 function cancelPrepareNodeContents(nodeId: BrowserTreeNodeId): void {
-  contentsRead.cancelPreloadForBinding(browserProjection.value?.bindingsById.get(nodeId))
+  if (activeSurface.value !== 'libraryBrowse') {
+    return
+  }
+
+  contentsRead.cancelPreloadForBinding(libraryBrowseProjection.value?.bindingsById.get(nodeId))
 }
 
 function refreshPlanExecutionDependencies(): RefreshPlanDeps {
@@ -755,7 +991,7 @@ function refreshPlanExecutionDependencies(): RefreshPlanDeps {
     hierarchyRead,
     refreshLocalBrowseEntryPoints: () => localBrowse.refreshEntryPoints(),
     sourceLifecycleRead,
-    expandedNodeIds: expandedNodeIds.value,
+    expandedNodeIds: expandedLibraryNodeIds.value,
     clearContentsWarmSnapshots: () => contentsRead.clearWarmSnapshots(),
     refreshContentsForCurrentSelection,
     refreshActiveSearchFilter: () => searchFilterRead.invalidationSignal()
@@ -763,8 +999,8 @@ function refreshPlanExecutionDependencies(): RefreshPlanDeps {
 }
 
 function refreshContentsForCurrentSelection(): Promise<boolean> {
-  const selectedId = selectedNodeId.value
-  const projection = browserProjection.value
+  const selectedId = selectedLibraryNodeId.value
+  const projection = libraryBrowseProjection.value
 
   if (selectedId === undefined || projection === undefined) {
     contentsRead.clear()
@@ -783,7 +1019,10 @@ async function handleStatusAction(action: StatusAction): Promise<void> {
     case 'addLocalPath':
       await rootLifecycle.addLocalPath(action.resolvedPath).then(async (registered) => {
         if (registered) {
-          await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
+          await localBrowse.refreshBrowserWindows(
+            expandedAddSourceNodeIds.value,
+            addSourceProjection.value
+          )
         }
       })
       break
@@ -810,11 +1049,11 @@ async function handleStatusAction(action: StatusAction): Promise<void> {
 
 function showAdmittedSource(sourceId: string): void {
   markUserInteraction()
-  const projection = browserProjection.value
+  const projection = libraryBrowseProjection.value
   const nodeId = sourceNodeIdForSourceId(projection, sourceId)
 
   if (nodeId === undefined) {
-    pendingSourceRegistration.value = sourceRegistrationIntent(sourceId, undefined)
+    pendingSourceRegistration.value = sourceRegistrationIntent(sourceId)
     return
   }
 
@@ -822,7 +1061,8 @@ function showAdmittedSource(sourceId: string): void {
     nodeId,
     sequence: ++sourceRevealSequence
   }
-  selectedNodeId.value = nodeId
+  activeSurface.value = 'libraryBrowse'
+  selectedLibraryNodeId.value = nodeId
   restoreState.initialNodeApplied = true
   requestContentsForCurrentSelection()
   saveViewState()
@@ -902,26 +1142,19 @@ function clearMaintenanceRefreshTimer(): void {
   maintenanceRefreshTimer = undefined
 }
 
-function requestBrowserNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
-  const projection = browserProjection.value
-  const binding = projection?.bindingsById.get(nodeId)
-
-  if (
-    binding?.kind === 'localBrowseEntryPoint' ||
-    binding?.kind === 'localBrowseItem' ||
-    binding?.kind === 'localBrowseMore'
-  ) {
-    return localBrowse.requestNodeChildren(nodeId, projection)
-  }
-
+function requestLibraryNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
   return hierarchyRead.requestNodeChildren(nodeId)
 }
 
-function requestLocalBrowseNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
-  const projection = browserProjection.value
+function requestAddSourceNodeChildren(nodeId: BrowserTreeNodeId): Promise<boolean> {
+  const projection = addSourceProjection.value
   const binding = projection?.bindingsById.get(nodeId)
 
-  if (binding?.kind !== 'localBrowseEntryPoint' && binding?.kind !== 'localBrowseItem') {
+  if (
+    binding?.kind !== 'localBrowseEntryPoint' &&
+    binding?.kind !== 'localBrowseItem' &&
+    binding?.kind !== 'localBrowseMore'
+  ) {
     return Promise.resolve(false)
   }
 
@@ -929,21 +1162,27 @@ function requestLocalBrowseNodeChildren(nodeId: BrowserTreeNodeId): Promise<bool
 }
 
 function clearBrowserView(): void {
-  selectedNodeId.value = undefined
+  selectedLibraryNodeId.value = undefined
   contentsRead.clear()
-  expandedNodeIds.value = new Set()
-  pendingRestoreIds.value = new Set()
+  expandedLibraryNodeIds.value = new Set()
+  pendingLibraryRestoreIds.value = new Set()
   pendingSourceRegistration.value = undefined
   sourceRevealRequest.value = undefined
+  activeSurface.value = 'addSource'
 
   restoreState.userInteracted = false
   restoreState.initialNodeApplied = false
 
   viewStateStore.save({
     version: 2,
+    activeSurface: activeSurface.value,
     libraryBrowseProfile: libraryBrowseProfile.profile.value,
     localPreviewMode: localPreviewMode.mode.value,
-    expandedNodeIds: []
+    expandedLibraryNodeIds: [],
+    expandedAddSourceNodeIds: [...expandedAddSourceNodeIds.value],
+    ...(selectedAddSourceNodeId.value === undefined
+      ? {}
+      : { selectedAddSourceNodeId: selectedAddSourceNodeId.value })
   })
 }
 
@@ -957,37 +1196,43 @@ function activateContentRowAction(row: ContentRow): void {
   }
 
   if (action.kind === 'loadChildren') {
-    expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
+    expandedLibraryNodeIds.value = new Set([...expandedLibraryNodeIds.value, action.nodeId])
     saveViewState()
     disclosureReconciler.clearFailedForNode(action.nodeId)
     void hierarchyRead.requestNodeChildren(action.nodeId)
   } else if (action.kind === 'loadLocalBrowseChildren') {
-    expandedNodeIds.value = new Set([...expandedNodeIds.value, action.nodeId])
+    expandedAddSourceNodeIds.value = new Set([...expandedAddSourceNodeIds.value, action.nodeId])
     saveViewState()
-    disclosureReconciler.clearFailedForNode(action.nodeId)
-    void localBrowse.requestNodeChildren(action.nodeId, browserProjection.value)
+    addSourceDisclosureReconciler.clearFailedForNode(action.nodeId)
+    void localBrowse.requestNodeChildren(action.nodeId, addSourceProjection.value)
   } else if (action.kind === 'loadLocalBrowseMore') {
-    void localBrowse.requestNodeMore(action.nodeId, browserProjection.value)
+    void localBrowse.requestNodeMore(action.nodeId, addSourceProjection.value)
   } else if (action.kind === 'requestLocalBrowseAdmission') {
     void rootLifecycle.addLocalPath(action.resolvedPath).then(async (registered) => {
       if (registered) {
-        await localBrowse.refreshBrowserWindows(expandedNodeIds.value, browserProjection.value)
+        await localBrowse.refreshBrowserWindows(
+          expandedAddSourceNodeIds.value,
+          addSourceProjection.value
+        )
       }
     })
   } else if (action.kind === 'chooseMusicFolder') {
     void rootLifecycle.addMusicFolder()
   } else if (action.kind === 'loadContentsPage') {
-    void contentsRead.readForBinding(browserProjection.value?.bindingsById.get(action.nodeId), {
-      cursor: action.cursor
-    })
+    void contentsRead.readForBinding(
+      libraryBrowseProjection.value?.bindingsById.get(action.nodeId),
+      {
+        cursor: action.cursor
+      }
+    )
   } else if (action.kind === 'loadSearchPage') {
     void searchFilterRead.loadNext()
   }
 }
 
 function requestContentsForCurrentSelection(options: { readonly force?: boolean } = {}): void {
-  const selectedId = selectedNodeId.value
-  const projection = browserProjection.value
+  const selectedId = selectedLibraryNodeId.value
+  const projection = libraryBrowseProjection.value
 
   if (selectedId === undefined || projection === undefined) {
     contentsRead.clear()
@@ -1011,6 +1256,17 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
       </h2>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
+        <button
+          v-if="activeSurface === 'addSource' && hasAdmittedLibraryRowsVisible"
+          type="button"
+          :class="iconButtonClass"
+          aria-label="Library Browse"
+          title="Library Browse"
+          @click="openLibraryBrowseSurface"
+        >
+          <Icon role="folder.plain" size="md" />
+        </button>
+
         <button
           v-if="toolbarModel.search.visible && !librarySearch.searchOpen.value"
           type="button"
@@ -1137,7 +1393,7 @@ function requestContentsForCurrentSelection(options: { readonly force?: boolean 
           :class="primaryButtonClass"
           :disabled="!toolbarModel.addMusicFolder.enabled"
           :title="toolbarModel.addMusicFolder.reason"
-          @click="rootLifecycle.addMusicFolder"
+          @click="activateToolbarAddMusicFolder"
         >
           {{ toolbarModel.addMusicFolder.label }}
         </button>
