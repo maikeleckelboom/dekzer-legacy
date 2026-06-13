@@ -96,12 +96,15 @@ This is module-owned semantic scale.
 
 Examples:
 
-- browser density
+- library browser density
+- contents row density
+- tree indent rhythm
+- cover artwork scale
+- inspector compactness
+- column header style
 - mixer strip density
 - deck information emphasis
 - waveform zoom
-- artwork scale
-- inspector compactness
 
 These are not core settings concepts.
 These are module concepts.

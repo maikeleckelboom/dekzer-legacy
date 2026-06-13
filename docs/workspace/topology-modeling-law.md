@@ -98,7 +98,10 @@ Topology slots are stable workspace attachment points that participate in layout
 continuity, and geometry negotiation.
 
 Typical slots: dominant field, authority upper, authority lower, mid support A, mid support B, mid support C, horizon
-lane, object row, table field, inspector, graph field, operator field, verification field.
+lane, object row, contents field, inspector, graph field, operator field, verification field.
+
+Concrete product slot examples include `browseRoots`, `contentsField`, `selectionInspector`, `performanceField`, and
+`lowerBrowseSupport`.
 
 A slot should be modeled only when it can independently affect: participation, geometry, visibility mode, responsive
 substitution, continuity, or feature placement.
@@ -113,13 +116,16 @@ Examples:
 
 - dominant field → perform surface
 - dominant field → route canvas surface
-- table field → library table surface
+- contents field → library contents surface
 - inspector → track inspector surface
 - horizon lane → commit horizon surface
 - object row → candidate objects surface
 
 Topology says where something can live. Surface assignment says what currently lives there. These are separate ownership
 layers.
+
+Projection switches such as List, Tree, Columns, and Covers are view/projection state inside the same Contents slot.
+They are not topology mutation and do not create new room-level slots.
 
 ## Minimal topology schema
 
@@ -237,8 +243,8 @@ Surface assignments:
 - authorityUpper → hierarchy surface
 - authorityLower → collection surface
 - dominantField → waveform workbench surface
-- midSupportA → browser surface
-- midSupportB → details surface
+- midSupportA → lower browse support surface
+- midSupportB → selection inspector surface
 - midSupportC → preparation surface
 - horizonLane → commit horizon surface
 - objectRow → candidate objects surface

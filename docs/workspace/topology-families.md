@@ -122,11 +122,13 @@ Upper instrument field containing decks, mixer, and immediate action surfaces.
 
 - perform mode at laptop size and above
 - when the upper instrument field remains clearly dominant over all lower regions
+- when lower browse/library support remains subordinate to decks, mixer, transport, and action readiness
 
 ### Illegal distortions
 
 - lower regions expanding to equal the upper instrument field in visual weight
 - lower region using card grid instead of continuous surface discipline
+- lower browse/library support becoming the primary visual read in perform mode
 
 ### Responsive substitution
 
@@ -142,22 +144,23 @@ Use for library mode at laptop and wide-monitor sizes.
 
 ### Dominant slot
 
-Center table field. Primary working plane for track selection, sorting, and scanning.
+Contents field. Primary working plane for track selection, sorting, scanning, artwork browsing, and focused library
+work.
 
 ### Support slots
 
-- left hierarchy and navigation region
-- right details or inspector region
+- Browse roots and navigation region
+- Inspector, preview, or action region
 
 ### Legal uses
 
 - library mode at laptop size and above
-- when the table is the dominant surface and hierarchy supports filtering without competing
+- when Contents is the dominant surface and Browse roots support filtering without competing
 
 ### Illegal distortions
 
-- left hierarchy or right inspector growing to equal the table in visual weight
-- table region treated as secondary to navigation
+- Browse roots or Inspector growing to equal the Contents field in visual weight
+- Contents treated as secondary to navigation
 - table styled like a generic admin grid
 
 ### Responsive substitution
@@ -271,8 +274,8 @@ Appropriate when the user simultaneously needs: durable orientation through a le
 dominant working surface, contextual support modules near that field, a visible horizon lane, and a contained object
 row.
 
-This is not the default topology for every screen. It is valid for complex preparation, hybrid perform-plus-library
-work, and authority-heavy workbench screens.
+This is not the default topology for every screen, and it must not be selected just because a left authority stack
+exists. It is valid for complex preparation, hybrid perform-plus-library work, and authority-heavy workbench screens.
 
 ### Shell behavior
 
@@ -337,6 +340,7 @@ If the eye lands first on the module rail or the object row, the hierarchy is wr
 - every support slot given equal visual weight
 - shell titlebar visually stops at one region instead of wrapping the whole composition
 - used for simple screens that would be clearer as perform bench, library bench, or route canvas
+- used as the default answer merely because the screen has left navigation or browse roots
 
 ### Responsive substitution
 

@@ -90,6 +90,14 @@ Topology mutation commands are unavailable during performance interaction. The c
 separation — whether a literal edit mode, a locked workspace state, permission-gated commands, or edit-only surfaces —
 is defined in ADR-layout-session-law. This ADR establishes only the separation requirement.
 
+### Drag Taxonomy
+
+| Drag type               | Example                                       | Room-level topology mutation? | Available during performance? |
+| ----------------------- | --------------------------------------------- | ----------------------------- | ----------------------------- |
+| Content drag            | Track to deck, track to crate                 | No                            | Yes                           |
+| Component-local drag    | Table column reorder, playlist reorder        | No room-level mutation        | Yes, if safe                  |
+| Workspace topology drag | Move inspector, swap panes, park support slot | Yes                           | No, edit/customize mode only  |
+
 ### Room-Level Positive Commitments
 
 - Topology-native shared-boundary resize co-negotiation under dominance and participation law (see

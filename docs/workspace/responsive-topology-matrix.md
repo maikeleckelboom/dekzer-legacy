@@ -143,6 +143,17 @@ Small screens preserve focus. Large screens preserve context. This order is not 
 
 Support becomes summonable before the dominant instrument becomes dishonest.
 
+## Library And Perform Collapse Rules
+
+In Library mode:
+
+- Covers collapses before Contents becomes unreadable.
+- Inspector becomes summonable before Contents compresses below credible use.
+- Browse roots can become a drawer on small surfaces.
+- Contents is the last compromised region.
+
+In Perform mode, browse/library support collapses before decks, mixer, transport, or action readiness become dishonest.
+
 ## Rejection rules
 
 Reject any responsive design that:

@@ -72,6 +72,21 @@ strong role hierarchy, low ornamental noise.
 Secondary utilities are contained and subordinate. Inspectors, pickers, dialogs, popovers, side utilities, and transient
 tools may use more containment than the main field but must not visually overpower the active instrument.
 
+## Library surface visual law
+
+The library surface is one continuous field partitioned into Browse roots, Contents, and Inspector. These regions may
+resize, collapse, or become summonable, but they remain parts of one applied library workflow.
+
+Browser/Library/Details are not sibling product domains. Browser remains valid as an interaction or surface word, but it
+must not imply a three-authority model where browse, contents, and detail fight for equal product ownership.
+
+Cover View is legal when artwork browsing is the active projection inside Contents. It is dangerous as loud lower
+support in Perform Bench when it competes with decks, mixer, transport, or action readiness.
+
+First-glance review must distinguish Perform Bench from Library Bench. In Perform Bench, browse/library support is
+subordinate to the performance instrument. In Library Bench, Contents is the primary field, with Browse roots and
+Inspector as support.
+
 ## Explicit optical spec
 
 ### Where radius appears
